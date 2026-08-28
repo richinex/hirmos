@@ -1,0 +1,82 @@
+Hirmos — third-party notices
+
+Hirmos is licensed under the GNU General Public License, version 3 or (at your
+option) any later version; see LICENSE. It includes Rust ports of scientific
+software. Each entry below names the original work, its licence, and the Hirmos
+module derived from it. Full licence texts are in THIRD_PARTY_LICENSES.
+
+Corresponding Source: the Hirmos repository that contains this file. Anyone who
+receives Hirmos, including the hirmos_analysis wasm binary served by the app,
+is entitled to that source under the terms of the GPL.
+
+TIGRAMITE — GPL-3.0-or-later
+  Copyright (C) 2014-2025 Jakob Runge and contributors (LPCMCI: Andreas Gerhardus;
+  RPCMCI: Elena Saggioro). https://github.com/jakobrunge/tigramite
+  Ports: crates/causal-core/src/{pcmci,pcmciplus,lpcmci,parcorr,causal_effects}.rs,
+  construct_array semantics in preprocessing.rs. Modified 2026-08.
+  This program is free software: you can redistribute it and/or modify it under the
+  terms of the GNU General Public License as published by the Free Software
+  Foundation, either version 3 of the License, or (at your option) any later
+  version. It is distributed WITHOUT ANY WARRANTY.
+
+statsmodels — BSD-3-Clause
+  Copyright (C) 2006, Jonathan E. Taylor. Copyright (c) 2006-2008 Scipy Developers.
+  Copyright (c) 2009-2018 statsmodels Developers. https://github.com/statsmodels/statsmodels
+  Ports: stationarity.rs, zivot_andrews.rs, tsdiag.rs, ols.rs; constants in mackinnon.rs
+  (tsa/adfvalues.py).
+
+SciPy — BSD-3-Clause
+  Copyright (c) 2001-2002 Enthought, Inc. Copyright (c) 2003-2024 SciPy Developers.
+  https://github.com/scipy/scipy
+  Port: expm.rs (scipy.linalg.expm).
+
+Cephes Math Library — BSD-3-Clause (as distributed in SciPy/xsf)
+  Copyright 1984, 1987, 1989, 1992 by Stephen L. Moshier.
+  Port: stdtr in parcorr.rs; special functions through the spec_math crate.
+
+L-BFGS-B v3.0 — BSD-3-Clause ("New BSD")
+  Copyright (c) 2011 Ciyou Zhu, Richard Byrd, Jorge Nocedal, Jose Luis Morales;
+  Optimization Technology Center, Argonne National Laboratory and Northwestern
+  University. https://users.iems.northwestern.edu/~nocedal/lbfgsb.html
+  Port: lbfgsb.rs, including LINPACK dpofa/dtrsl and MINPACK-2 dcsrch/dcstep
+  (Jorge J. Moré and David J. Thuente, Argonne National Laboratory).
+  Publications using this code are asked to cite Byrd, Lu, Nocedal & Zhu (1995) and
+  Zhu, Byrd, Lu & Nocedal (1997).
+
+NumPy — BSD-3-Clause
+  Copyright (c) 2005-2025, NumPy Developers. https://github.com/numpy/numpy
+  Ports: nprandom.rs (SeedSequence, Generator.shuffle, MT19937); ziggurat.rs
+  (random/src/distributions/ziggurat_constants.h, derived from Julia, MIT,
+  Copyright (c) 2009-2019 Jeff Bezanson, Stefan Karpinski, Viral B. Shah, and other
+  contributors). numpy.random: Copyright (c) 2019 Kevin Sheppard.
+
+PCG Random Number Generation — MIT
+  Copyright 2014 Melissa O'Neill <oneill@pcg-random.org>. Port: PCG64 in nprandom.rs.
+
+DoWhy — MIT
+  Copyright (c) PyWhy contributors. https://github.com/py-why/dowhy
+  Port: backdoor.rs.
+
+pgmpy — MIT
+  Copyright (c) 2013 - present, pgmpy. https://github.com/pgmpy/pgmpy
+  Port: discrete_bn.rs.
+
+CausationEntropy — MIT
+  Copyright (c) 2024 Kevin Slote (Slote, Fish & Bollt, Clarkson Center for Complex
+  Systems Science). https://github.com/Center-For-Complex-Systems-Science/causationentropy
+  Port: ocse.rs.
+
+CausalNex — Apache-2.0
+  Copyright 2019-2020 QuantumBlack Visual Analytics Limited. https://github.com/mckinsey/causalnex
+  Port: dynotears.rs (causalnex/structure/dynotears.py, modified). "QuantumBlack" and
+  the QuantumBlack logo are trademarks of QuantumBlack Visual Analytics Limited and
+  are not licensed.
+
+Rust crates linked into the wasm binary (licences as declared on crates.io):
+  nalgebra, nalgebra-macros, simba, approx — Apache-2.0
+  libm, zmij — MIT
+  spec_math, puruspe, serde, serde_json, num-traits, num-complex, num-integer,
+  num-rational, num-bigint, glam, itoa, paste, typenum, wasm-bindgen, js-sys,
+  matrixmultiply, rawpointer — MIT OR Apache-2.0
+  bytemuck, safe_arch, wide — Zlib OR Apache-2.0 OR MIT
+  memchr — Unlicense OR MIT

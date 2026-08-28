@@ -3,6 +3,7 @@ name = "hirmos-causal-core"
 version = "0.1.0"
 edition = "2021"
 description = "Parity-tested causal kernels owned by Hirmos"
+license = "GPL-3.0-or-later"
 
 [lib]
 crate-type = ["rlib"]
