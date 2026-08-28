@@ -1,0 +1,294 @@
+import { brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+
+export type MethodId = Brand<string, 'MethodId'>
+export type MethodCaveatId = Brand<string, 'MethodCaveatId'>
+
+export type MethodFamily = 'diagnostic' | 'discovery' | 'identification' | 'estimation' | 'refuter'
+
+export type MethodSource =
+  | {
+      readonly kind: 'reference-implementation'
+      readonly repository: 'statsmodels' | 'tigramite'
+      readonly revision: string
+      readonly locator: string
+    }
+  | { readonly kind: 'paper'; readonly title: string; readonly locator: string }
+  | { readonly kind: 'hirmos-constraint'; readonly locator: string }
+
+export type CaveatCategory =
+  | 'sampling-structure'
+  | 'stationarity-and-dynamics'
+  | 'identification'
+  | 'functional-form'
+  | 'noise-and-dependence'
+  | 'missingness'
+  | 'finite-sample'
+  | 'computation'
+  | 'interpretation'
+
+export interface MethodCaveat {
+  readonly id: MethodCaveatId
+  readonly category: CaveatCategory
+  readonly requirement: string
+  readonly consequenceIfUnmet: string
+  readonly sources: NonEmptyArray<MethodSource>
+}
+
+export interface MethodDefinition {
+  readonly id: MethodId
+  readonly name: string
+  readonly family: MethodFamily
+  readonly summary: string
+  readonly caveats: NonEmptyArray<MethodCaveat>
+}
+
+export type CaveatEvaluation =
+  | { readonly kind: 'satisfied'; readonly caveat: MethodCaveat; readonly evidence: string }
+  | { readonly kind: 'unresolved'; readonly caveat: MethodCaveat; readonly missingEvidence: string }
+  | { readonly kind: 'violated'; readonly caveat: MethodCaveat; readonly evidence: string }
+
+export type MethodEligibility =
+  | {
+      readonly kind: 'eligible'
+      readonly satisfied: readonly Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>[]
+    }
+  | {
+      readonly kind: 'caution'
+      readonly satisfied: readonly Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>[]
+      readonly unresolved: NonEmptyArray<Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>>
+    }
+  | {
+      readonly kind: 'refused'
+      readonly violations: NonEmptyArray<Extract<CaveatEvaluation, { readonly kind: 'violated' }>>
+    }
+
+export type MethodLookupProblem = { readonly kind: 'unknown-method'; readonly id: MethodId }
+
+const methodId = (value: string): MethodId => brand<string, 'MethodId'>(value)
+const caveatId = (value: string): MethodCaveatId => brand<string, 'MethodCaveatId'>(value)
+
+const STATSMODELS_REVISION = '9307ef1b3a975a3807009432cbb489c4ae6f5c60'
+const TIGRAMITE_REVISION = 'ff3ff13e1481073b8c5833a6fde1c304627a208e'
+
+const statsmodels = (locator: string): MethodSource => ({
+  kind: 'reference-implementation',
+  repository: 'statsmodels',
+  revision: STATSMODELS_REVISION,
+  locator,
+})
+
+const tigramite = (locator: string): MethodSource => ({
+  kind: 'reference-implementation',
+  repository: 'tigramite',
+  revision: TIGRAMITE_REVISION,
+  locator,
+})
+
+const hirmos = (locator: string): MethodSource => ({ kind: 'hirmos-constraint', locator })
+
+export const ADF_METHOD_ID = methodId('adf')
+export const KPSS_METHOD_ID = methodId('kpss')
+export const ZIVOT_ANDREWS_METHOD_ID = methodId('zivot-andrews')
+export const GRANGER_SSR_F_METHOD_ID = methodId('granger-ssr-f')
+export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
+
+const ADF: MethodDefinition = {
+  id: ADF_METHOD_ID,
+  name: 'Augmented Dickey–Fuller',
+  family: 'diagnostic',
+  summary: 'Tests a univariate series for a unit root under an explicit deterministic specification.',
+  caveats: [
+    {
+      id: caveatId('adf-null'),
+      category: 'interpretation',
+      requirement: 'Interpret the null as a unit root; failure to reject is not proof that a unit root exists.',
+      consequenceIfUnmet: 'Reversing the null turns inconclusive evidence into a false stationarity verdict.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:233-355')],
+    },
+    {
+      id: caveatId('adf-deterministic'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Choose the constant/trend specification and lag-selection policy explicitly.',
+      consequenceIfUnmet: 'A misspecified deterministic term or inadequate lag order can change the test statistic and inference.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:233-355')],
+    },
+    {
+      id: caveatId('adf-dense'),
+      category: 'missingness',
+      requirement: 'Supply a finite dense univariate sequence on the accepted time grid.',
+      consequenceIfUnmet: 'The Hirmos kernel refuses the run rather than compressing time or silently dropping observations.',
+      sources: [hirmos('crates/analysis-wasm/src/lib.rs#validate_stationarity_values')],
+    },
+  ],
+}
+
+const KPSS: MethodDefinition = {
+  id: KPSS_METHOD_ID,
+  name: 'KPSS',
+  family: 'diagnostic',
+  summary: 'Tests level or trend stationarity using a Newey–West long-run variance estimate.',
+  caveats: [
+    {
+      id: caveatId('kpss-null'),
+      category: 'interpretation',
+      requirement: 'Interpret the null as level or trend stationarity according to the selected specification.',
+      consequenceIfUnmet: 'Treating the null as a unit root reverses the conclusion.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3051-3175')],
+    },
+    {
+      id: caveatId('kpss-pvalue-bounds'),
+      category: 'finite-sample',
+      requirement: 'Treat boundary p-values as table bounds rather than precise tail probabilities.',
+      consequenceIfUnmet: 'A reported 0.01 or 0.10 can be overinterpreted even though statsmodels clips outside its interpolation table.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3051-3175')],
+    },
+    {
+      id: caveatId('kpss-missing'),
+      category: 'missingness',
+      requirement: 'Resolve missing observations without collapsing the time grid.',
+      consequenceIfUnmet: 'The reference does not handle missing values and row deletion can change temporal adjacency.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3051-3175')],
+    },
+  ],
+}
+
+const ZIVOT_ANDREWS: MethodDefinition = {
+  id: ZIVOT_ANDREWS_METHOD_ID,
+  name: 'Zivot–Andrews',
+  family: 'diagnostic',
+  summary: 'Tests a unit-root null while allowing one endogenous level or trend break.',
+  caveats: [
+    {
+      id: caveatId('za-one-break'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'The one-break model must be a plausible description of the series.',
+      consequenceIfUnmet: 'Multiple breaks or changing regimes are not resolved by a one-break rejection.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3548-3945')],
+    },
+    {
+      id: caveatId('za-null'),
+      category: 'interpretation',
+      requirement: 'Interpret the null as a unit root with a single structural break.',
+      consequenceIfUnmet: 'A rejection supports stationarity around the selected break; it does not establish general stability.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3866-3945')],
+    },
+    {
+      id: caveatId('za-baum-approximation'),
+      category: 'computation',
+      requirement: 'Record that statsmodels chooses autolag once on the base model rather than at every breakpoint.',
+      consequenceIfUnmet: 'Results can differ from the original per-breakpoint Zivot–Andrews procedure.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3914-3928')],
+    },
+  ],
+}
+
+const GRANGER_SSR_F: MethodDefinition = {
+  id: GRANGER_SSR_F_METHOD_ID,
+  name: 'Granger SSR F test',
+  family: 'diagnostic',
+  summary: 'Tests whether past candidate-cause values add predictive information beyond the target’s own past.',
+  caveats: [
+    {
+      id: caveatId('granger-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows must be an ordered, regularly sampled time series; independent observations are not a temporal sequence.',
+      consequenceIfUnmet: 'Lagged predictors would be formed from arbitrary neighboring rows and the test would have no temporal meaning.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:2368-2445')],
+    },
+    {
+      id: caveatId('granger-predictive-not-interventional'),
+      category: 'interpretation',
+      requirement: 'Interpret rejection as lagged predictive precedence, not intervention causality.',
+      consequenceIfUnmet: 'Common causes, omitted dynamics, or measurement timing can be mislabeled as a causal effect.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:2368-2445')],
+    },
+    {
+      id: caveatId('granger-lag-order'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Use a justified lag range on an accepted stable-series route.',
+      consequenceIfUnmet: 'Too few lags leave serial structure in the residuals; too many consume power and can produce unstable fits.',
+      sources: [statsmodels('docs/source/vector_ar.rst:80-95'), hirmos('crates/causal-core/src/tsdiag.rs#granger_ssr_ftest')],
+    },
+    {
+      id: caveatId('granger-finite-dense'),
+      category: 'finite-sample',
+      requirement: 'Use finite paired observations with more than 3 × maxLag + constant rows.',
+      consequenceIfUnmet: 'The unrestricted lag model lacks adequate residual degrees of freedom and is refused.',
+      sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:2368-2475')],
+    },
+    {
+      id: caveatId('granger-multiple-lags'),
+      category: 'interpretation',
+      requirement: 'Treat testing several lag orders as multiple related hypotheses.',
+      consequenceIfUnmet: 'Selecting the smallest unadjusted p-value across lags inflates false-positive risk.',
+      sources: [hirmos('DESIGN.md#sourced-assumptions-and-caveats-are-part-of-every-method')],
+    },
+  ],
+}
+
+const PCMCI_PLUS_PAR_CORR: MethodDefinition = {
+  id: PCMCI_PLUS_PAR_CORR_METHOD_ID,
+  name: 'PCMCI+ with ParCorr',
+  family: 'discovery',
+  summary: 'Discovers lagged and contemporaneous conditional-dependence structure in autocorrelated time series.',
+  caveats: [
+    {
+      id: caveatId('pcmciplus-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows must be an ordered time series on the declared sampling grid.',
+      consequenceIfUnmet: 'The constructed lagged variables connect unrelated rows and the discovered time graph is invalid.',
+      sources: [tigramite('tigramite/data_processing.py:481-881'), tigramite('tigramite/pcmci.py:47-90')],
+    },
+    {
+      id: caveatId('pcmciplus-causal-stationarity'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Assume the causal time-series graph is stationary over the analyzed window.',
+      consequenceIfUnmet: 'A single repeated lag graph can average over incompatible regimes or changing edges.',
+      sources: [tigramite('README.md:18-27'), tigramite('tigramite/pcmci.py:75-90')],
+    },
+    {
+      id: caveatId('pcmciplus-no-hidden'),
+      category: 'identification',
+      requirement: 'Assume no hidden common causes among the modeled variables.',
+      consequenceIfUnmet: 'Orientations from PCMCI+ can be confounded; LPCMCI is the latent-variable discovery route.',
+      sources: [tigramite('README.md:20-27')],
+    },
+    {
+      id: caveatId('parcorr-linear-gaussian'),
+      category: 'functional-form',
+      requirement: 'Use univariate continuous variables with linear dependencies and Gaussian noise for ParCorr.',
+      consequenceIfUnmet: 'Conditional-independence p-values and edge decisions may be invalid even when the algorithm completes.',
+      sources: [tigramite('README.md:30-40'), tigramite('tigramite/independence_tests/parcorr.py:15-40')],
+    },
+    {
+      id: caveatId('pcmciplus-cpdag'),
+      category: 'interpretation',
+      requirement: 'Preserve the returned time-series CPDAG marks and unresolved contemporaneous orientations.',
+      consequenceIfUnmet: 'Turning every reported adjacency into a directed causal arrow asserts information the method did not identify.',
+      sources: [tigramite('README.md:20-27')],
+    },
+    {
+      id: caveatId('pcmciplus-browser-dense'),
+      category: 'missingness',
+      requirement: 'The current browser command requires a finite dense matrix; Tigramite-mask execution is a pending separate command.',
+      consequenceIfUnmet: 'The run is refused rather than silently compressing the time axis.',
+      sources: [hirmos('crates/analysis-wasm/src/lib.rs#pcmci_plus')],
+    },
+  ],
+}
+
+export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
+  ADF,
+  KPSS,
+  ZIVOT_ANDREWS,
+  GRANGER_SSR_F,
+  PCMCI_PLUS_PAR_CORR,
+]
+
+export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
+export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [GRANGER_SSR_F, PCMCI_PLUS_PAR_CORR]
+
+export function methodDefinition(id: MethodId): Result<MethodDefinition, MethodLookupProblem> {
+  const definition = METHOD_CATALOG.find((candidate) => candidate.id === id)
+  return definition ? ok(definition) : err({ kind: 'unknown-method', id })
+}

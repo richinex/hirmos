@@ -1,0 +1,610 @@
+@import "tailwindcss";
+
+/* Hirmos — "graphite instrument".
+   ------------------------------------------------------------------------
+   What this palette IS, and the reasoning behind it. Two experiments were tried and reverted; their
+   reasons are recorded here because they are the useful part — without them the next person re-tries
+   them and rediscovers the same result the hard way.
+
+   1. COLOUR CARRIES CATEGORY. A node's group sets its colour: Okabe-Ito (colourblind-safe) for the
+      first eight groups, OKLCH-generated overflow beyond, assigned first-seen. See theme.ts.
+      REVERTED EXPERIMENT — encoding the group as GEOMETRY instead (square / triangle / diamond / ring /
+      hexagon / bar) and keeping every node monochrome. It read as noise: at plot scale the silhouettes
+      were not separable, and the field looked like a uniform grey mesh. Nodes are spheres (3D) and
+      discs (2D); tracePath and geometryFor still take a `shape` argument so call sites did not have to
+      change, and both ignore it.
+
+   2. ONE SIGNAL COLOUR, FEW MEANINGS. --color-signal (vermilion) means "this is live": the answer to
+      your question, an in-progress compile (JobFlow's source card), and links. It is NOT a category
+      colour and never encodes a node's type — that is what the group ramp is for. The original rule
+      here was "the answer and nothing else"; the compile flow legitimately needed one attention colour
+      and reached for it, so the rule is written as it is actually followed.
+      The reason the rule exists at all still holds: when a categorical rainbow and the highlight share
+      a colour space, you cannot tell "this is in the answer" from "this is an Entity". The group ramp
+      is deliberately muted so the signal stays the loudest thing on the stage.
+
+   3. STATUS IS ITS OWN RAMP. ok / info / warn / danger, for machine state only — never category, never
+      the answer. Tokenised so each carries a per-theme variant and exactly one meaning.
+
+   4. MOTION HAS ONE CURVE AND FOUR DURATIONS. Arrivals ease out on cubic-bezier(0.2, 0.7, 0.2, 1) at
+      150ms (colour, hover), 200ms (`.pop`, a surface entering) or 280ms (`.rise`). Loops are LINEAR
+      on a 0.9s period: `.jobflow-run` marches, `.pulse-live` breathes. The split is not decoration.
+      An ease-out is shaped for something that starts fast and settles, so a loop built on it lurches
+      at the seam where it restarts; linear has no seam.
+      This is stated as a rule because six places had drifted onto Tailwind's `animate-pulse` — a 2s
+      loop on its own curve — which is exactly how a vocabulary stops being one. If you need a new
+      motion, first check whether one of these already means what you are trying to say.
+
+   Everything else is a graphite/bone neutral ramp. FOUR THEMES: dark (default), light, and two paper
+   sketchbook variants, switched by :root[data-theme=...] with a pre-paint boot script in index.html.
+   (An earlier version was dark-only on the grounds that emissive-on-black contrast could not survive a
+   paper stage. That turned out to be solvable — the paper themes drop emissive entirely and lean on
+   heavier strokes instead; see `pal.glow`.)
+
+   Elevation is NOT drop shadows: `.lift` is an inset top-edge highlight, `.float` a theme-aware shadow
+   for surfaces that leave the plane. Components carry no `shadow-*` utilities. */
+@theme {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* THE TYPE RAMP — seven named tiers, and no other font size exists in the workspace UI.
+     The app once had nineteen: 61% of all type sat in a 9.5/10/10.5/11px cluster whose half-pixel
+     steps nobody can see, so hierarchy was being faked with colour and tracking. Six tiers with
+     real steps put it back on size. Rem, not px: an absolute px base overrides the reader's own
+     browser font-size preference, which is the one typography setting that is theirs, not ours.
+     Values are rem against the 16px default root, so `body` at --text-subtitle is today's 13px.
+     Line heights ride the tokens (1.5 floors the prose tiers per WCAG 2.1; display sizes tighten
+     because 1.5 gaps a two-line heading apart). Two sanctioned editorial exceptions live at call sites:
+     the hero's max-md 26px step, and the composer's 16px mobile input (the iOS auto-zoom floor). */
+  --text-metric: clamp(2rem, 4cqi, 3rem); /* the primary figure in an analytical result */
+  --text-metric--line-height: 1;
+  --text-metric--letter-spacing: -0.04em;
+  --text-metric--font-weight: 600;
+  --text-heading: 1.1875rem;            /* 19px — the hero/empty-state display tier */
+  --text-heading--line-height: 1.2;
+  /* The display tier: tutorial and landing-scale headlines. cqi, so a headline sizes to its
+     column, not the window; without an ancestor container it falls back to viewport units. */
+  --text-display: clamp(2rem, 5cqi, 4.75rem);
+  --text-display--line-height: 0.98;
+  --text-display--letter-spacing: -0.055em;
+  --text-display--font-weight: 600;
+  --text-display-sub: clamp(1.5rem, 3cqi, 2.5rem);
+  --text-display-sub--line-height: 1.1;
+  --text-display-sub--letter-spacing: -0.04em;
+  --text-display-sub--font-weight: 600;
+  --text-heading--letter-spacing: -0.03em;
+  --text-heading--font-weight: 600;
+  --text-title: 0.9375rem;              /* 15px — a surface's subject */
+  --text-title--line-height: 1.4;
+  --text-subtitle: 0.8125rem;           /* 13px — reading prose; the body element's own size */
+  --text-subtitle--line-height: 1.5;
+  --text-body: 0.75rem;                 /* 12px — working text: fields, dialogs, hints */
+  --text-body--line-height: 1.5;
+  --text-label: 0.6875rem;              /* 11px — chrome: buttons, panel titles, captions */
+  --text-label--line-height: 1.4;
+  --text-micro: 0.625rem;               /* 10px — the floor: timings, keycaps, terse execution metadata */
+  --text-micro--line-height: 1.4;
+
+  --color-stage: #0A0A0B;        /* graph ground, app background */
+  --color-panel: #0C0C0E;        /* chrome: header, rail, composer bed */
+  --color-column: #0A0A0C;       /* conversation column */
+  --color-well: #101012;         /* inset control / input */
+  --color-raised: #141417;       /* active nav, selected tab */
+
+  --color-line: #17171A;         /* structural divider */
+  --color-hair: #1E1E22;         /* control border */
+  --color-edge: #26262A;         /* emphasised border (focus, panels) */
+
+  --color-ink: #E6E3DC;          /* primary text, selected node */
+  --color-bone: #B8B5AE;         /* graph node stroke, secondary text */
+  --color-muted: #8C8A85;        /* labels, inactive controls */
+  --color-faint: #817F78;        /* SMALLEST TEXT ALLOWED — ≥4.5:1 on every ground incl. raised */
+  --color-dim: #3A3936;          /* NON-TEXT ONLY: hairlines, dimmed plot, disabled fill */
+
+  --color-signal: #E4501F;       /* "this is live": the answer, a running compile, links. Never a category. */
+  --color-signal-ink: #0A0A0B;   /* text on signal */
+  --color-signal-line: #4A2216;  /* signal at border strength */
+
+  /* Status ramp — the ONLY other hues, and only for machine state, never category or the answer. Tokenised
+     so they carry a light-mode variant and one meaning each, instead of scattered raw Tailwind classes. */
+  --color-ok: #34D399;           /* success / extracted / valid */
+  --color-info: #4FA3DA;         /* in-progress / running (muted sky, not the signal) */
+  --color-warn: #E0A63C;         /* caution / abstained */
+  --color-danger: #E5484D;       /* destructive / failed */
+
+  /* Elevation: a faint bone top-edge highlight lifts a surface off the stage (lit from above). */
+  --color-highlight: rgba(230, 227, 220, 0.05);
+}
+
+/* 100dvh, not 100%/100vh: on iOS Safari the static units include the retracted toolbar, which parked
+   the composer permanently under browser chrome (overflow:hidden means no scroll rescue). dvh tracks
+   the real visible height. Fallback chain for pre-dvh engines. */
+/* Native form controls (the OS select picker, scrollbars, inputs) follow the ACTIVE theme instead
+   of the system default: without this, Android renders a dark picker sheet over the paper themes. */
+:root { color-scheme: dark; }
+
+/* Radius: rounded-md for controls and fields, rounded-lg for rows and small cards, rounded-xl
+   for section cards, rounded-2xl for the palette, rounded-3xl for floating windows and sheets,
+   rounded-full for pills only. Anything else is drift. */
+
+/* The layering order, in one readable list. Increments of 10 leave room; nothing floats
+   without a name here. */
+:root {
+  --z-expanded: 30;
+  --z-inspector: 40;
+  --z-overlay: 50;
+  --z-panel: 60;
+  --z-dialog: 70;
+  --z-palette: 80;
+  --z-popover: 90;
+  --z-toast: 100;
+  --z-drag: 110;
+}
+:root[data-theme="light"], :root[data-theme="sketchbook"], :root[data-theme="sketchbook-white"] { color-scheme: light; }
+
+html, body { height: 100%; margin: 0; }
+#root { height: 100%; height: 100dvh; }
+body {
+  background: var(--color-stage);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* Rem so the reader's browser base-size preference actually reaches the app; 13px at default root. */
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  /* Kill scroll chaining / pull-to-refresh behind the app shell (Safari 16+). */
+  overscroll-behavior: none;
+  /* iOS: no landscape text inflation; never `none` (blocks user text zoom). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+* { box-sizing: border-box; }
+/* Custom controls provide their own :active/focus feedback; the iOS gray tap flash reads as jank. */
+button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
+
+/* IN @layer base, which is not a detail. Unlayered CSS beats @layer utilities in Tailwind v4, so as a bare
+   rule this made every anchor in the app immune to a text-colour utility — a link on a signal-coloured
+   button rendered signal-on-signal and simply vanished. Layering it restores the normal precedence: this is
+   the default, a utility overrides it. Nothing in the app was relying on the old behaviour; no anchor
+   anywhere sets a text colour. */
+@layer base {
+  a { color: var(--color-signal); text-decoration: none; }
+  a:hover { color: color-mix(in oklab, var(--color-signal), white 18%); }
+}
+
+/* Tailwind v4's preflight sets buttons to cursor:default; restore the affordance for clickables. */
+button:not(:disabled),
+[role='button'],
+summary,
+select,
+label:has(> input[type='checkbox']),
+label:has(> input[type='radio']) {
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; }
+/* Physical press: a 1px settle on :active. Transform-only, so it costs nothing. */
+button:not(:disabled):active, [role='button']:active { transform: translateY(1px); }
+/* One keyboard-focus contract for the whole app: signal ring at 2px offset — the DEFAULT for every
+   focusable thing, including text fields (they were missing, so no input or textarea in the app had a
+   focus ring at all; those are the controls a keyboard user spends the most time in).
+   It lives in @layer base ON PURPOSE. Unlayered rules beat every Tailwind utility no matter their
+   specificity, so as an unlayered rule this silently overrode `focus:outline-none` and drew a rectangle
+   inside the composer's rounded pill, which already shows focus on its wrapper. In `base`, a component
+   that owns its focus treatment can opt out with a utility, and everything that does not still gets the
+   ring for free. */
+@layer base {
+  :where(button, [role='button'], a, input, textarea, select, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-signal);
+    outline-offset: 2px;
+  }
+}
+
+/* Material Symbols Sharp — squared terminals match the hairline chrome.
+   Self-hosted, imported in main.tsx; this only fixes the ligature rendering. */
+.msym {
+  font-family: "Material Symbols Sharp";
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+}
+
+/* Scrollbars hidden (anatomy-style clean surfaces): content still scrolls, there is just no visible track. */
+* { scrollbar-width: none; }
+::-webkit-scrollbar { width: 0; height: 0; }
+
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.rise { animation: rise 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* One entrance for every floating surface (Rnd panels, dialogs, drawer), using the same sharp easing as
+   `rise` — a settle, not a bounce, which would read wrong on a technical instrument. */
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
+.pop { animation: pop 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* The extraction-flow edge while its unit runs: a dash march along the gradient stroke, reading as
+   "data in flight" from the source card to the unit. Killed with everything else by reduced-motion. */
+@keyframes jobflow-dash { to { stroke-dashoffset: -24; } }
+.jobflow-run { stroke-dasharray: 7 5; animation: jobflow-dash 0.9s linear infinite; }
+
+/* "Working" — a live status dot, or a placeholder standing in for content that has not arrived.
+   The house loop period is 0.9s, set by the dash march above; `alternate` at 0.45s completes the round
+   trip in the same time, so every repeating thing in the app breathes together. LOOPS ARE LINEAR here;
+   the cubic-bezier house curve is for arrivals, and easing a loop makes it lurch.
+   This replaces Tailwind's `animate-pulse`, which ran 2s on its own curve and was the only motion in the
+   app outside the documented vocabulary. */
+@keyframes pulse-live { to { opacity: 0.45; } }
+.pulse-live { animation: pulse-live 0.45s linear infinite alternate; }
+
+/* Skeleton sweep — Kinetics' "Skeleton to Content", on our surfaces.
+   A placeholder that SHOWS ITS SHAPE beats a word that describes its absence: the reader learns the layout
+   while it loads instead of after. Gated on real loading only; an empty graph with nothing on the way keeps
+   its honest empty state, because a skeleton promises content is coming.
+   The sweep is 1.4s and linear, not the 0.9s house loop: it is a travelling highlight rather than a breath,
+   and matching it to the pulse would read as one stuttering motion instead of two calm ones. */
+@keyframes skeleton-sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--color-line) 25%, var(--color-hair) 50%, var(--color-line) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+
+/* A determinate bar that is also ALIVE.
+   The width says where the work is; a sweep and a lit leading edge say it is still moving. Both are needed
+   because our fill can hold the same width for a minute — one slow extraction — and a bar that has not
+   moved is indistinguishable from a bar that has stopped.
+
+   WIDTH, not scaleX, and that is the whole reason this note exists. Pseudo-elements scale with their
+   element, so driving the fill by transform made the 30% sweep render at 30% OF THE FILL: 22px and darting
+   at a quarter full, 90px and gliding when full. The sweep got faster the less there was to report, which
+   is exactly backwards. A width transition is not composited, but this bar advances a handful of times a
+   minute rather than per frame, so the cost is nothing and the geometry is finally honest.
+
+   1.8s and linear: a travelling highlight, not a breath, so it does not try to match the 0.9s house loop. */
+@keyframes bar-sweep { from { transform: translateX(-110%); } to { transform: translateX(360%); } }
+.bar-live { position: relative; overflow: hidden; }
+.bar-live::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 28%;
+  min-width: 40px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 55%, transparent), transparent);
+  animation: bar-sweep 1.8s linear infinite;
+}
+/* The frontier, lit. Without it the fill ends on a hard cut and the bar reads as a static rule; with it the
+   eye finds where the work has got to. Fixed width in px because it marks a POSITION, not a proportion. */
+.bar-live::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  right: 0;
+  width: 14px;
+  z-index: 1;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent));
+}
+:root[data-theme="light"] .bar-live::after,
+:root[data-theme="sketchbook-white"] .bar-live::after {
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent), transparent);
+}
+@media (prefers-reduced-motion: reduce) { .bar-live::after { animation: none; opacity: 0; } }
+
+/* Elevation utilities. `.lift` is just the top-edge highlight for inline surfaces (cards, legend). `.float`
+   adds a theme-aware drop shadow for surfaces that leave the plane (Rnd windows, modals), replacing the flat
+   shadow-2xl so panels visibly lift off the stage. */
+.lift { box-shadow: inset 0 1px 0 var(--color-highlight); }
+:root { --shadow-float: 0 24px 50px -12px rgba(0, 0, 0, 0.55); }
+:root[data-theme="light"] { --shadow-float: 0 18px 48px rgba(47, 52, 55, 0.10); }
+:root[data-theme="sketchbook"] { --shadow-float: 0 18px 48px rgba(87, 62, 30, 0.16); }
+:root[data-theme="sketchbook-white"] { --shadow-float: 0 18px 48px rgba(87, 70, 40, 0.10); }
+.float { box-shadow: var(--shadow-float), inset 0 1px 0 var(--color-highlight); }
+
+/* LIGHT — premium utilitarian monochrome (the Notion/Linear register): warm-bone canvas, true-white
+   surfaces, hairline greys, charcoal ink. Colour is scarce: the one signal is the same red-ink accent
+   the sketchbook family uses, so every theme shares a single answer colour. */
+:root[data-theme="light"] {
+  --color-stage: #F7F6F3;        /* warm bone canvas */
+  --color-panel: #FFFFFF;        /* chrome and cards: true white */
+  --color-column: #FBFBFA;       /* conversation column */
+  --color-well: #FFFFFF;         /* input / inset */
+  --color-raised: #EFEEEA;       /* active nav, selected tab */
+
+  --color-line: #EAEAE8;         /* structural divider */
+  --color-hair: #E0DFDB;         /* control border */
+  --color-edge: #C9C7C1;         /* emphasised border */
+
+  --color-ink: #363330;          /* warm charcoal, never absolute black */
+  --color-bone: #585450;         /* secondary text */
+  --color-muted: #6B6A67;        /* labels — ≥4.5:1 on raised */
+  --color-faint: #676663;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
+  --color-dim: #D9D8D4;          /* NON-TEXT ONLY */
+
+  --color-signal: #AE3B24;       /* the family's red-ink annotation. THE answer colour. */
+  --color-signal-ink: #FFFFFF;
+  --color-signal-line: #E5C4BA;
+
+  --color-ok: #346538;           /* desaturated semantic set (pale-pastel text weights) */
+  --color-info: #1F6C9F;
+  --color-warn: #845800;
+  --color-danger: #9F2F2D;
+
+  --color-highlight: rgba(255, 255, 255, 0.9);
+}
+
+/* A single soft top light on the bone canvas; no cream gradient, no warm cast. */
+:root[data-theme="light"] body {
+  background:
+    radial-gradient(100% 60% at 50% -8%, rgba(255, 255, 255, 0.8), transparent 55%),
+    #F7F6F3;
+}
+
+/* SKETCHBOOK — the aged-paper atelier palette, distilled from sketchbook-main (watercolour spreads,
+   Instrument Serif, brass loupe on a desk): sepia paper a full step deeper than the cream light theme,
+   sepia-black ink, and RED-INK ANNOTATION as the one signal colour. Same contract as the other themes:
+   one signal, one meaning; smallest text stays ≥4.5:1 on its ground. */
+:root[data-theme="sketchbook"] {
+  --color-stage: #EDE2CB;        /* aged paper ground */
+  --color-panel: #F4EBD6;        /* lighter leaf */
+  --color-column: #F0E6CF;       /* conversation column */
+  --color-well: #FAF3E1;         /* input / inset */
+  --color-raised: #E6D8BA;       /* active nav, selected tab */
+
+  --color-line: #DECDA9;         /* structural divider */
+  --color-hair: #CDB88D;         /* control border */
+  --color-edge: #B29B6E;         /* emphasised border */
+
+  --color-ink: #3B2F21;          /* sepia-black ink */
+  --color-bone: #55462F;         /* secondary text */
+  --color-muted: #6C5C43;        /* labels — ≥4.5:1 on raised */
+  --color-faint: #685B44;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
+  --color-dim: #C7B28C;          /* NON-TEXT ONLY */
+
+  --color-signal: #AE3B24;       /* red-ink annotation. THE answer colour, nothing else. */
+  --color-signal-ink: #FFF8EC;
+  --color-signal-line: #DEB2A2;
+
+  --color-ok: #48603B;           /* moss ink — dark enough to read on the raised paper */
+  --color-info: #305577;         /* wash blue, ink weight */
+  --color-warn: #7E550A;
+  --color-danger: #A93226;
+
+  --color-highlight: rgba(255, 250, 235, 0.9);
+}
+
+/* Aged-paper ground: warm diagonal sheet + top light + a faint edge vignette, the desk-lamp-on-paper
+   depth of the sketchbook without shipping its texture images. */
+:root[data-theme="sketchbook"] body {
+  background:
+    radial-gradient(120% 90% at 50% 50%, transparent 62%, rgba(107, 84, 48, 0.10)),
+    radial-gradient(100% 60% at 50% -8%, rgba(255, 251, 238, 0.75), transparent 55%),
+    linear-gradient(150deg, #F0E5CC, #F4EBD6 45%, #E7D9B8);
+}
+
+/* SKETCHBOOK-WHITE — the fresh-sheet variant: TRUE white, no warm cast. Neutral paper-white grounds and
+   neutral grey structure; only the INK stays sepia and the signal stays red-ink, which is what keeps it
+   in the sketchbook family (ink on a white page) rather than a generic grey theme. */
+:root[data-theme="sketchbook-white"] {
+  --color-stage: #FFFFFF;        /* true white sheet */
+  --color-panel: #FFFFFF;
+  --color-column: #FCFCFB;       /* a hair off pure, so panels still separate */
+  --color-well: #FFFFFF;
+  --color-raised: #F1F1EF;
+
+  --color-line: #EAEAE7;         /* neutral structure — no yellow */
+  --color-hair: #DBDAD5;
+  --color-edge: #C0BFB8;
+
+  --color-ink: #2B241A;          /* the family's sepia ink */
+  --color-bone: #4C4130;
+  --color-muted: #75695A;
+  --color-faint: #6E6357;        /* SMALLEST TEXT — comfortably ≥4.5:1 on white */
+  --color-dim: #DEDDD8;          /* NON-TEXT ONLY */
+
+  --color-signal: #AE3B24;       /* the family's red-ink annotation, unchanged */
+  --color-signal-ink: #FFFFFF;
+  --color-signal-line: #E7C2B4;
+
+  --color-ok: #48603B;
+  --color-info: #3E6C8F;
+  --color-warn: #845800;
+  --color-danger: #A93226;
+
+  --color-highlight: rgba(255, 255, 255, 0.95);
+}
+:root[data-theme="sketchbook-white"] body {
+  background: #FFFFFF;   /* a flat white sheet — no wash, no tint */
+}
+
+/* The sketchbook family's display voice, now same-family emphasis (weight and tracking in Geist)
+   rather than a second typeface: one family per project, headings still read as headings. */
+:root[data-theme="sketchbook"] h2,
+:root[data-theme="sketchbook-white"] h2 {
+  font-weight: 550;
+  letter-spacing: -0.03em;
+  font-size: 1.25em;
+}
+
+/* Reduced motion removes MOVEMENT, not feedback.
+   WCAG 2.3.3 is about motion animation: things that travel, scale, spin or slide. A colour change on
+   hover or focus is none of those, and the previous blanket `transition: none` killed those too, which
+   made the app harsher for exactly the people the setting protects. The focus ring appeared with no
+   transition, buttons lost their hover response, and the composer border snapped.
+   So: keyframe animations stop, transitions are restricted to colour and opacity, and everything that
+   moved now arrives at its final position instantly. Motion that carried information must still carry it
+   statically — the compile bar renders at its true width, it just does not slide there. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-property: color, background-color, border-color, outline-color, fill, stroke, opacity !important;
+    transition-duration: 150ms !important;
+  }
+}
+
+/* The answer-figures thumbnail strip: a THIN VISIBLE scrollbar is the affordance that more figures exist
+   past the fold (an invisible scrollbar made the tail unreachable-looking for mouse users). */
+.figure-strip { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
+/* The vertical sibling: panel bodies whose overflow is unpredictable get the same thin native bar, so
+   "this scrolls" is visible before the first wheel. Same reasoning as .figure-strip, other axis. */
+.panel-scroll { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
+.panel-scroll::-webkit-scrollbar { width: 6px; }
+.panel-scroll::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }
+.panel-scroll::-webkit-scrollbar-track { background: transparent; }
+/* The live log: edge fades say "more above / more below" without a bar. Driven by the two data
+   attributes its scroll handler sets, so a log pinned to the tail never fades its newest line. */
+.log-fade { --fade-top: 0px; --fade-bottom: 0px; mask-image: linear-gradient(to bottom, transparent 0, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent 100%); }
+.log-fade[data-clipped-top='1'] { --fade-top: 18px; }
+.log-fade[data-clipped-bottom='1'] { --fade-bottom: 18px; }
+/* cmdk publishes its list height; animate it on the house curve. */
+.cmdk-list { height: var(--cmdk-list-height); transition: height 150ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.figure-strip::-webkit-scrollbar { height: 6px; }
+.figure-strip::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }
+.figure-strip::-webkit-scrollbar-track { background: transparent; }
+
+/* Radial stage vignette behind the transparent graph canvas — theme-aware, restores the "lit field"
+   depth from v1 so the plot floats rather than sitting flat against a solid panel. */
+.stage-vignette {
+  background: radial-gradient(120% 120% at 50% 40%, var(--color-well) 0%, var(--color-stage) 72%);
+}
+
+/* Smart truncation, ported from recursis' SmartTruncate. A label is clipped to ONE line and, when it
+   actually overflows, its right edge fades out — no ellipsis eating a character, no JS measurement, and
+   no ResizeObserver. The trick: a zero-WIDTH sensor sits beside the text in a grid cell and is a size
+   container; the text lays out wrapped (`white-space: normal`) inside a 1-line-tall frame, so when it
+   needs a second line the sensor grows past 1.5lh and the container query fades the edge in. The visible
+   single line comes from the ::before layer, which repeats the text unwrapped. Full text on hover via
+   the title attribute. Set --smart-truncate-surface to the background the label sits on. */
+.smart-truncate {
+  --smart-truncate-fade-width: 14px;
+  --smart-truncate-surface: var(--color-panel);
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+.smart-truncate__frame { display: block; min-width: 0; max-width: 100%; block-size: 1lh; overflow: hidden; }
+.smart-truncate__grid {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) 0;
+  align-items: start;
+  min-width: 0;
+  max-width: 100%;
+}
+.smart-truncate__layers { grid-column: 1; grid-row: 1; position: relative; display: block; min-width: 0; max-width: 100%; }
+.smart-truncate__layers::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  pointer-events: none;
+}
+/* Deviation from recursis: the WRAPPED copy is invisible here and exists only to drive the sensor's
+   height. recursis keeps it visible (it coincides with the clipped copy in their proportional font), but
+   with our monospace filenames the two layouts disagree at hyphens — the wrapped line breaks early and the
+   nowrap ::before shows through the gap, rendering "a-deliberately-  ong". visibility:hidden still occupies
+   layout, so overflow detection is unchanged, and ::before becomes the single visible, cleanly clipped line. */
+.smart-truncate__text { display: block; position: relative; z-index: 1; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; visibility: hidden; }
+.smart-truncate__sensor {
+  grid-column: 2;
+  grid-row: 1;
+  inline-size: 0;
+  block-size: 100%;
+  container-type: size;
+  container-name: smart-truncate;
+  position: relative;
+  pointer-events: none;
+}
+.smart-truncate__fade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  inline-size: var(--smart-truncate-fade-width);
+  block-size: 1lh;
+  transform: translateX(calc(-1 * var(--smart-truncate-fade-width)));
+  opacity: 0;
+  background: linear-gradient(to right, color-mix(in srgb, var(--smart-truncate-surface) 0%, transparent), var(--smart-truncate-surface) 80%);
+  transition: opacity 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@container smart-truncate (min-height: 1.5lh) {
+  .smart-truncate__fade { opacity: 1; }
+}
+
+/* Shiki output, fitted to the surface it sits on.
+   Shiki emits its own background and padding with the theme; here the block already sits inside a panel
+   that owns those, so the theme contributes COLOUR ONLY and everything else is inherited. Without this the
+   code block paints a github-light card inside a dark panel. */
+.shiki-host pre,
+.shiki-host .shiki,
+.shiki-host .shiki-plain {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.shiki-host code { font: inherit; }
+/* Before the highlighter lands, the same text in the surface's own ink, so a block does not flash. */
+.shiki-host .shiki-plain code { color: var(--color-ink); }
+
+/* The verbatim span a fact was bound to inside its source passage (PassageView, in the inspector's
+   Sources section and the floating source panel). Signal at a wash, not a category colour: the tint
+   says "this is the live claim in its evidence", the same meaning signal carries everywhere else,
+   and it reads over every theme because the mix keeps the passage's own ink. */
+mark.passage-bound {
+  background-color: color-mix(in oklab, var(--color-signal) 20%, transparent);
+  color: inherit;
+}
+
+/* While the palette is being swapped, nothing eases. See useTheme: a theme change replaces every custom
+   property at once, and an element carrying `transition-colors` would otherwise animate to the new value
+   over 150ms and arrive after the rest of the app had already repainted. The attribute is set, the new
+   palette is committed, and it is removed on the next frame. */
+:root[data-theme-switching] *,
+:root[data-theme-switching] *::before,
+:root[data-theme-switching] *::after {
+  transition: none !important;
+}
+
+/* 3D graph node labels. These are real DOM (CSS2DRenderer), not canvas textures baked into a sprite —
+   so they render Geist Mono at the display's true resolution instead of a fixed-pixel raster that goes
+   soft on a retina panel, and they cost no GPU memory. `pointer-events: none` matters: a label sitting
+   over a node must not swallow the click meant for the node behind it. Colour and size are set per node
+   in GraphPanel (lit vs quiet), so only the invariant parts live here. */
+.graph-label {
+  /* Sans, not mono: node labels are entity NAMES, read as words. Mono is reserved for code. */
+  font-family: var(--font-sans);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  text-shadow: 0 1px 2px var(--color-stage);
+}
+
+/* Printing: the cited answers are the artefact; panels, nav, composer and dark grounds are not.
+   The universal reset flattens theme backgrounds; the height/overflow resets unclip the transcript,
+   which lives inside #root's 100dvh and an inner scroller on screen. */
+@media print {
+  * { color: black !important; background: none !important; box-shadow: none !important; }
+  html, body, #root { height: auto !important; overflow: visible !important; background: white !important; }
+  header, nav, [role="dialog"], .float { display: none !important; }
+  .panel-scroll { height: auto !important; overflow: visible !important; }
+  [data-print-full] { width: auto !important; }
+}

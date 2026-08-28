@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+.claude/
+crates/analysis-wasm/target/
+crates/causal-core/target/
+*.local
+.DS_Store
+
+# Design, explanation, and working notes remain local. Only the project README is versioned.
+*.md
+!/README.md

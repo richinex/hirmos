@@ -1,0 +1,17 @@
+[package]
+name = "hirmos-causal-core"
+version = "0.1.0"
+edition = "2021"
+description = "Parity-tested causal kernels owned by Hirmos"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+libm = "0.2"
+nalgebra = { version = "0.34", features = ["libm", "std"] }
+spec_math = "0.1.6"
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
