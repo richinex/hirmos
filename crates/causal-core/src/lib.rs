@@ -28,3 +28,10 @@ pub use preprocessing::{
 };
 pub use stationarity::{adfuller, kpss, AdfResult, KpssResult};
 pub use zivot_andrews::{zivot_andrews, ZaModel, ZaResult};
+pub mod dynotears;
+pub mod expm;
+pub mod lbfgsb;
+pub mod lpcmci;
+pub mod nprandom;
+pub mod ocse;
+pub mod ziggurat;

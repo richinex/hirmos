@@ -1,5 +1,6 @@
 import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem } from './dataset'
+import type { DagDocument } from './dag'
 import type { DiscoveryRunArtifact } from './discovery'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 
@@ -62,6 +63,7 @@ export type Workflow =
       readonly prepared: PreparedDatasetArtifact | null
       readonly stationarity: StationarityEvidenceArtifact | null
       readonly discoveryRuns: readonly DiscoveryRunArtifact[]
+      readonly dagDocuments: readonly DagDocument[]
     }
 
 export type WorkflowEvent =
@@ -74,6 +76,8 @@ export type WorkflowEvent =
   | { readonly type: 'prepared-dataset-created'; readonly artifact: PreparedDatasetArtifact }
   | { readonly type: 'stationarity-evidence-created'; readonly evidence: StationarityEvidenceArtifact }
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
+  | { readonly type: 'dag-document-created'; readonly document: DagDocument }
+  | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
   | { readonly type: 'source-cleared' }
 
 export const INITIAL_WORKFLOW: Workflow = {
@@ -167,6 +171,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           prepared: null,
           stationarity: null,
           discoveryRuns: [],
+          dagDocuments: [],
         }
       }
       if (event.type === 'profile-failed' && event.request === state.request) {
@@ -182,7 +187,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
     case 'profiled':
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, discoveryRuns: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, discoveryRuns: [], dagDocuments: [] }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
@@ -193,6 +198,22 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         && state.prepared !== null
         && event.artifact.preparedDataset === state.prepared.id) {
         return { ...state, discoveryRuns: [...state.discoveryRuns, event.artifact] }
+      }
+      if (event.type === 'dag-document-created'
+        && state.prepared !== null
+        && event.document.preparedDataset === state.prepared.id
+        && !state.dagDocuments.some((document) => document.id === event.document.id)) {
+        return { ...state, dagDocuments: [...state.dagDocuments, event.document] }
+      }
+      if (event.type === 'dag-document-revised'
+        && state.prepared !== null
+        && event.document.preparedDataset === state.prepared.id
+        && state.dagDocuments.some((document) => document.id === event.document.id)) {
+        return {
+          ...state,
+          dagDocuments: state.dagDocuments.map((document) =>
+            document.id === event.document.id ? event.document : document),
+        }
       }
       return state
     default:

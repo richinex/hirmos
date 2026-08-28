@@ -91,6 +91,9 @@ export const KPSS_METHOD_ID = methodId('kpss')
 export const ZIVOT_ANDREWS_METHOD_ID = methodId('zivot-andrews')
 export const GRANGER_SSR_F_METHOD_ID = methodId('granger-ssr-f')
 export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
+export const LPCMCI_PAR_CORR_METHOD_ID = methodId('lpcmci-parcorr')
+export const DYNOTEARS_METHOD_ID = methodId('dynotears')
+export const OCSE_METHOD_ID = methodId('ocse')
 
 const ADF: MethodDefinition = {
   id: ADF_METHOD_ID,
@@ -277,16 +280,178 @@ const PCMCI_PLUS_PAR_CORR: MethodDefinition = {
   ],
 }
 
+const LPCMCI_PAR_CORR: MethodDefinition = {
+  id: LPCMCI_PAR_CORR_METHOD_ID,
+  name: 'LPCMCI with ParCorr',
+  family: 'discovery',
+  summary: 'Discovers a lagged partial ancestral graph while allowing latent common causes.',
+  caveats: [
+    {
+      id: caveatId('lpcmci-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows must be an ordered time series on the declared sampling grid.',
+      consequenceIfUnmet: 'Lagged variables connect unrelated rows and the partial ancestral graph has no temporal meaning.',
+      sources: [tigramite('tigramite/lpcmci.py:28-83'), tigramite('tigramite/data_processing.py:481-881')],
+    },
+    {
+      id: caveatId('lpcmci-stationary-graph'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Assume the causal graph and relevant dependencies are stable over the analyzed window.',
+      consequenceIfUnmet: 'One repeated graph can combine incompatible regimes and misleading endpoint marks.',
+      sources: [tigramite('tigramite/lpcmci.py:28-83')],
+    },
+    {
+      id: caveatId('lpcmci-markov-faithfulness'),
+      category: 'identification',
+      requirement: 'The time-series causal Markov and faithfulness assumptions must be scientifically plausible.',
+      consequenceIfUnmet: 'Conditional independences need not identify the intended ancestral relations, even though latent confounding is allowed.',
+      sources: [tigramite('tigramite/lpcmci.py:28-83')],
+    },
+    {
+      id: caveatId('lpcmci-parcorr-form'),
+      category: 'functional-form',
+      requirement: 'ParCorr requires continuous variables with linear conditional relationships and suitable residual behavior.',
+      consequenceIfUnmet: 'The conditional-independence p-values and therefore PAG marks can be invalid.',
+      sources: [tigramite('tigramite/independence_tests/parcorr.py:15-40')],
+    },
+    {
+      id: caveatId('lpcmci-pag-interpretation'),
+      category: 'interpretation',
+      requirement: 'Interpret circles, tails, and arrowheads as partial ancestral graph marks, not as a fully oriented DAG.',
+      consequenceIfUnmet: 'Unresolved orientation or possible latent confounding is silently promoted to a definite causal arrow.',
+      sources: [tigramite('tigramite/lpcmci.py:28-83'), hirmos('crates/causal-core/src/lpcmci.rs')],
+    },
+    {
+      id: caveatId('lpcmci-browser-dense'),
+      category: 'missingness',
+      requirement: 'The current browser command requires a finite dense matrix.',
+      consequenceIfUnmet: 'The run is refused rather than silently compressing time.',
+      sources: [hirmos('crates/analysis-wasm/src/lib.rs#lpcmci_evidence')],
+    },
+  ],
+}
+
+const DYNOTEARS: MethodDefinition = {
+  id: DYNOTEARS_METHOD_ID,
+  name: 'DYNOTEARS',
+  family: 'discovery',
+  summary: 'Fits a sparse linear dynamic structural equation model with an acyclic contemporaneous graph.',
+  caveats: [
+    {
+      id: caveatId('dynotears-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows must be ordered observations on a regular time grid.',
+      consequenceIfUnmet: 'The explicit lag design represents arbitrary row neighbors instead of temporal effects.',
+      sources: [hirmos('crates/analysis-wasm/src/lib.rs#dynotears_evidence')],
+    },
+    {
+      id: caveatId('dynotears-linear-sem'),
+      category: 'functional-form',
+      requirement: 'A sparse linear dynamic structural equation model must be a useful approximation.',
+      consequenceIfUnmet: 'Nonlinear or dense dependencies can be omitted, distorted, or assigned misleading weights.',
+      sources: [{ kind: 'paper', title: 'DYNOTEARS: Structure Learning from Time-Series Data', locator: 'arXiv:2002.00498' }],
+    },
+    {
+      id: caveatId('dynotears-stable-window'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Use a window where the dynamic coefficients and contemporaneous structure are stable.',
+      consequenceIfUnmet: 'One coefficient matrix averages changing regimes and is not a faithful description of either regime.',
+      sources: [{ kind: 'paper', title: 'DYNOTEARS: Structure Learning from Time-Series Data', locator: 'arXiv:2002.00498' }],
+    },
+    {
+      id: caveatId('dynotears-penalty-sensitivity'),
+      category: 'computation',
+      requirement: 'Treat lambdaW, lambdaA, and any later display threshold as sensitivity choices.',
+      consequenceIfUnmet: 'A tuning choice is mistaken for uniquely identified graph structure.',
+      sources: [{ kind: 'paper', title: 'DYNOTEARS: Structure Learning from Time-Series Data', locator: 'arXiv:2002.00498' }, hirmos('crates/causal-core/src/dynotears.rs')],
+    },
+    {
+      id: caveatId('dynotears-weight-interpretation'),
+      category: 'interpretation',
+      requirement: 'Interpret the returned matrices as fitted candidate structure, not intervention effects.',
+      consequenceIfUnmet: 'Optimization weights are promoted to causal effects without a defended identification argument.',
+      sources: [hirmos('crates/causal-core/src/dynotears.rs')],
+    },
+    {
+      id: caveatId('dynotears-browser-boundary'),
+      category: 'missingness',
+      requirement: 'The current browser command accepts 2–12 finite dense variables and lags 1–6.',
+      consequenceIfUnmet: 'The run is refused instead of imputing or silently reducing the matrix.',
+      sources: [hirmos('crates/analysis-wasm/src/lib.rs#dynotears_evidence')],
+    },
+  ],
+}
+
+const OCSE: MethodDefinition = {
+  id: OCSE_METHOD_ID,
+  name: 'Optimal Causation Entropy',
+  family: 'discovery',
+  summary: 'Selects lagged predictors by forward and backward conditional mutual-information tests.',
+  caveats: [
+    {
+      id: caveatId('ocse-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows must be ordered observations on a regular time grid.',
+      consequenceIfUnmet: 'Lagged candidates connect arbitrary neighbors and conditional information has no temporal interpretation.',
+      sources: [hirmos('crates/causal-core/src/ocse.rs#discover_network')],
+    },
+    {
+      id: caveatId('ocse-information-estimator'),
+      category: 'functional-form',
+      requirement: 'Choose an information estimator appropriate to the dependency shape and sample size.',
+      consequenceIfUnmet: 'Gaussian CMI misses nonlinear dependence; k-nearest-neighbor CMI can be unstable in small or high-dimensional samples.',
+      sources: [{ kind: 'paper', title: 'Optimal causation entropy principle for causal network reconstruction', locator: 'Phys. Rev. Lett. 112, 138701 (2014)' }, hirmos('crates/causal-core/src/ocse.rs#cmi')],
+    },
+    {
+      id: caveatId('ocse-lag-and-stability'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Use a defensible maximum lag and a window with stable dependency structure.',
+      consequenceIfUnmet: 'Relevant parents may be omitted or a changing process may be represented as one network.',
+      sources: [{ kind: 'paper', title: 'Optimal causation entropy principle for causal network reconstruction', locator: 'Phys. Rev. Lett. 112, 138701 (2014)' }],
+    },
+    {
+      id: caveatId('ocse-permutation-resolution'),
+      category: 'finite-sample',
+      requirement: 'Interpret p-values at the resolution permitted by the recorded shuffle count and seed.',
+      consequenceIfUnmet: 'A coarse Monte Carlo p-value is treated as a precise tail probability.',
+      sources: [hirmos('crates/causal-core/src/ocse.rs#shuffle_test')],
+    },
+    {
+      id: caveatId('ocse-corrected-semantics'),
+      category: 'computation',
+      requirement: 'Record that Hirmos excludes duplicate target self-lags already present in the initial conditioning set.',
+      consequenceIfUnmet: 'Results are incorrectly described as reproducing the reference package’s legacy singular-candidate behavior.',
+      sources: [hirmos('crates/causal-core/src/ocse.rs#discover_network')],
+    },
+    {
+      id: caveatId('ocse-not-interventional'),
+      category: 'interpretation',
+      requirement: 'Interpret selected edges as conditional-information evidence, not intervention causality.',
+      consequenceIfUnmet: 'Predictive information pathways can be mistaken for identified causal effects.',
+      sources: [{ kind: 'paper', title: 'Optimal causation entropy principle for causal network reconstruction', locator: 'Phys. Rev. Lett. 112, 138701 (2014)' }],
+    },
+  ],
+}
+
 export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   ADF,
   KPSS,
   ZIVOT_ANDREWS,
   GRANGER_SSR_F,
   PCMCI_PLUS_PAR_CORR,
+  LPCMCI_PAR_CORR,
+  DYNOTEARS,
+  OCSE,
 ]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
-export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [GRANGER_SSR_F, PCMCI_PLUS_PAR_CORR]
+export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
+  GRANGER_SSR_F,
+  PCMCI_PLUS_PAR_CORR,
+  LPCMCI_PAR_CORR,
+  DYNOTEARS,
+  OCSE,
+]
 
 export function methodDefinition(id: MethodId): Result<MethodDefinition, MethodLookupProblem> {
   const definition = METHOD_CATALOG.find((candidate) => candidate.id === id)

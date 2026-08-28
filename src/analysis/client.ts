@@ -1,10 +1,17 @@
 import { err, type Result } from '@/domain/dop'
-import type { GrangerSsrEvidence, PcmciPlusEvidence } from '@/domain/discovery'
+import type {
+  DynotearsEvidence,
+  GrangerSsrEvidence,
+  LpcmciEvidence,
+  OcseEvidence,
+  PcmciPlusEvidence,
+} from '@/domain/discovery'
 import type { StationarityBattery } from '@/domain/stationarity'
 import {
   newWorkerRequestId,
   parseAnalysisWorkerEvent,
   type AnalysisWorkerCommand,
+  type AnalysisProgress,
   type AnalysisWorkerProblem,
   type WorkerRequestId,
 } from '@/workers/analysisProtocol'
@@ -12,10 +19,16 @@ import {
 type StationarityOutcome = Result<StationarityBattery, AnalysisWorkerProblem>
 type PcmciPlusOutcome = Result<PcmciPlusEvidence, AnalysisWorkerProblem>
 type GrangerOutcome = Result<GrangerSsrEvidence, AnalysisWorkerProblem>
+type LpcmciOutcome = Result<LpcmciEvidence, AnalysisWorkerProblem>
+type DynotearsOutcome = Result<DynotearsEvidence, AnalysisWorkerProblem>
+type OcseOutcome = Result<OcseEvidence, AnalysisWorkerProblem>
 type PendingRun =
-  | { readonly kind: 'stationarity'; readonly resolve: (outcome: StationarityOutcome) => void }
-  | { readonly kind: 'pcmci-plus'; readonly resolve: (outcome: PcmciPlusOutcome) => void }
-  | { readonly kind: 'granger'; readonly resolve: (outcome: GrangerOutcome) => void }
+  | { readonly kind: 'stationarity'; readonly resolve: (outcome: StationarityOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'pcmci-plus'; readonly resolve: (outcome: PcmciPlusOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'lpcmci'; readonly resolve: (outcome: LpcmciOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'dynotears'; readonly resolve: (outcome: DynotearsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'ocse'; readonly resolve: (outcome: OcseOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'granger'; readonly resolve: (outcome: GrangerOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
 
 let worker: Worker | null = null
 const pending = new Map<WorkerRequestId, PendingRun>()
@@ -45,6 +58,10 @@ const analysisWorker = (): Worker => {
     }
     const run = pending.get(parsed.value.request)
     if (!run) return
+    if (parsed.value.kind === 'analysis-progress') {
+      run.onProgress?.(parsed.value.progress)
+      return
+    }
     if (parsed.value.kind === 'analysis-failed') {
       pending.delete(parsed.value.request)
       run.resolve({ ok: false, error: parsed.value.problem })
@@ -58,6 +75,18 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a PCMCI+ request.' })
       return
     }
+    if (run.kind === 'lpcmci' && parsed.value.kind !== 'lpcmci-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an LPCMCI request.' })
+      return
+    }
+    if (run.kind === 'dynotears' && parsed.value.kind !== 'dynotears-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a DYNOTEARS request.' })
+      return
+    }
+    if (run.kind === 'ocse' && parsed.value.kind !== 'ocse-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an oCSE request.' })
+      return
+    }
     if (run.kind === 'granger' && parsed.value.kind !== 'granger-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a Granger request.' })
       return
@@ -68,6 +97,18 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'pcmci-plus' && parsed.value.kind === 'pcmci-plus-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'lpcmci' && parsed.value.kind === 'lpcmci-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'dynotears' && parsed.value.kind === 'dynotears-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'ocse' && parsed.value.kind === 'ocse-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -84,6 +125,79 @@ const analysisWorker = (): Worker => {
   }
   worker = created
   return created
+}
+
+export function runLpcmci(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  tauMax: number,
+  pcAlpha: number,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<LpcmciOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'lpcmci', resolve, onProgress })
+    const command: AnalysisWorkerCommand = {
+      kind: 'lpcmci', request, values, rows, columns, tauMax, pcAlpha,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runDynotears(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  maxLag: number,
+  lambdaW: number,
+  lambdaA: number,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<DynotearsOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'dynotears', resolve, onProgress })
+    const command: AnalysisWorkerCommand = {
+      kind: 'dynotears', request, values, rows, columns, maxLag, lambdaW, lambdaA,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runOcse(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  maxLag: number,
+  alpha: number,
+  nShuffles: number,
+  method: 'gaussian' | 'knn',
+  k: number,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<OcseOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'ocse', resolve, onProgress })
+    const command: AnalysisWorkerCommand = {
+      kind: 'ocse', request, values, rows, columns, maxLag, alpha, nShuffles, method, k,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
 }
 
 export function runStationarityBattery(values: Float64Array): Promise<StationarityOutcome> {

@@ -199,7 +199,7 @@ test('prepares independent observations without inventing time or requiring stat
   await expect(page.getByText('Stationarity and temporal transforms do not apply to independent observations.')).toBeVisible()
 })
 
-test('runs Granger and PCMCI+ from the prepared series and surfaces complete raw evidence', async ({ page }, testInfo) => {
+test('runs every discovery method from the prepared series and surfaces complete raw evidence', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Discovery workflow runs once')
   await createProject(page)
   await page.locator('input[type="file"]').setInputFiles(seatbelts)
@@ -215,6 +215,9 @@ test('runs Granger and PCMCI+ from the prepared series and surfaces complete raw
   await page.getByRole('button', { name: 'Discovery Lab' }).click()
   await expect(page).toHaveURL(/\?chapter=discovery$/)
   await expect(page.getByRole('heading', { name: 'Explore temporal structure' })).toBeVisible()
+  for (const method of ['PCMCI+', 'LPCMCI', 'DYNOTEARS', 'oCSE', 'Granger SSR F']) {
+    await expect(page.getByRole('button', { name: method, exact: true })).toBeVisible()
+  }
   await expect(page.getByText('Available with unresolved assumptions')).toBeVisible()
   await page.getByText(/Review \d+ unresolved requirements/).click()
   await expect(page.getByText('No stationarity evidence has been run for this prepared version.', { exact: false }).first()).toBeVisible()
@@ -249,11 +252,37 @@ test('runs Granger and PCMCI+ from the prepared series and surfaces complete raw
   const pcmciRun = page.getByRole('article', { name: 'Stationary lag-graph evidence' })
   await expect(pcmciRun).toHaveScreenshot('seatbelts-pcmci-result.png')
 
+  await page.getByRole('button', { name: 'LPCMCI', exact: true }).click()
+  await page.getByLabel('Maximum lag').selectOption('1')
+  await page.getByRole('button', { name: 'Run LPCMCI with ParCorr' }).click()
+  await expect(page.getByRole('heading', { name: 'Latent-aware partial ancestral graph evidence' })).toBeVisible({ timeout: 30_000 })
+  const lpcmciTable = page.getByLabel('LPCMCI raw evidence')
+  await expect(lpcmciTable.getByRole('row')).toHaveCount(9)
+  await expect(lpcmciTable.getByRole('columnheader', { name: 'Mark' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'DYNOTEARS', exact: true }).click()
+  await page.getByLabel('Maximum lag').selectOption('1')
+  await page.getByRole('button', { name: 'Run DYNOTEARS' }).click()
+  await expect(page.getByRole('heading', { name: 'Sparse dynamic SEM weights' })).toBeVisible({ timeout: 30_000 })
+  const dynotearsTable = page.getByLabel('DYNOTEARS raw weights')
+  await expect(dynotearsTable.getByRole('row')).toHaveCount(9)
+  await expect(dynotearsTable.getByRole('columnheader', { name: 'Weight' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'oCSE', exact: true }).click()
+  await page.getByLabel('Maximum lag').selectOption('1')
+  await page.getByLabel('Permutation shuffles').selectOption('20')
+  await page.getByRole('button', { name: 'Run Optimal Causation Entropy' }).click()
+  await expect(page.getByRole('heading', { name: 'Conditional-information network evidence' })).toBeVisible({ timeout: 30_000 })
+  const ocseTable = page.getByLabel('oCSE raw evidence')
+  await expect(ocseTable.getByRole('columnheader', { name: 'CMI' })).toBeVisible()
+  await expect(page.getByText('Hirmos uses corrected candidate-set semantics.')).toBeVisible()
+  await expect(page.getByText('5 runs', { exact: true })).toBeVisible()
+
   await page.goBack()
   await expect(page.getByRole('heading', { name: 'Prepare analysis data' })).toBeVisible()
   await page.goForward()
   await expect(page.getByRole('heading', { name: 'Explore temporal structure' })).toBeVisible()
-  await expect(page.getByText('2 runs', { exact: true })).toBeVisible()
+  await expect(page.getByText('5 runs', { exact: true })).toBeVisible()
 })
 
 test('refuses temporal discovery for an explicit cross-section', async ({ page }, testInfo) => {
@@ -274,6 +303,48 @@ test('refuses temporal discovery for an explicit cross-section', async ({ page }
   await expect(page.getByRole('button', { name: 'Run PCMCI+ with ParCorr' })).toBeDisabled()
   await page.getByText('PCMCI+ with ParCorr · 6 caveats').click()
   await expect(page.getByText('Rows must be an ordered time series on the declared sampling grid.')).toBeVisible()
+})
+
+test('moves directly from preparation to an experiment-informed DAG without discovery', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Direct DAG workflow runs once')
+  await createProject(page)
+  await page.locator('input[type="file"]').setInputFiles(seatbelts)
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await expect(page.getByRole('heading', { name: 'Prepare analysis data' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Independent observations' }).click()
+  await page.getByRole('checkbox', { name: 'law', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'DriversKilled', exact: true }).check()
+  await page.getByRole('button', { name: 'Create prepared version' }).click()
+  await expect(page.getByText('Prepared cross-section · 192 observations')).toBeVisible({ timeout: 30_000 })
+
+  await expect(page.getByRole('button', { name: 'DAG Workspace' })).toBeEnabled()
+  await page.getByRole('button', { name: 'Build a DAG' }).click()
+  await expect(page).toHaveURL(/\?chapter=dag$/)
+  await expect(page.getByRole('heading', { name: 'Build the causal model' })).toBeVisible()
+  await expect(page.getByText('Discovery is optional.', { exact: false })).toBeVisible()
+  await expect(page.getByRole('button', { name: /Discovery-informed/ })).toBeDisabled()
+
+  await page.getByRole('button', { name: /Experimental design/ }).click()
+  await page.getByLabel('DAG name').fill('Seat-belt assignment mechanism')
+  await page.getByRole('button', { name: 'Create DAG draft' }).click()
+  await expect(page.getByRole('heading', { name: 'Seat-belt assignment mechanism' })).toBeVisible()
+  await expect(page.getByText('known experimental assignment mechanism', { exact: false })).toBeVisible()
+  await expect(page.getByText('No causal edges yet')).toBeVisible()
+
+  await page.getByLabel('Proposed cause').selectOption({ label: 'law' })
+  await page.getByLabel('Proposed effect').selectOption({ label: 'DriversKilled' })
+  await page.getByLabel('Why is this direct causal relationship credible?').fill('The assignment protocol determines whether the seat-belt law is in force before outcomes are measured.')
+  await page.getByRole('button', { name: 'Add edge as new revision' }).click()
+  await expect(page.getByText('law → DriversKilled')).toBeVisible()
+  await expect(page.getByText('Acyclic structure')).toBeVisible()
+  await expect(page.getByText('experimental-design', { exact: true })).toBeVisible()
+
+  await page.getByLabel('Proposed cause').selectOption({ label: 'DriversKilled' })
+  await page.getByLabel('Proposed effect').selectOption({ label: 'law' })
+  await page.getByLabel('Why is this direct causal relationship credible?').fill('Attempt a reverse edge to exercise cycle validation.')
+  await page.getByRole('button', { name: 'Add edge as new revision' }).click()
+  await expect(page.getByRole('alert')).toContainText('directed cycle')
+  await expect(page.getByText('law → DriversKilled')).toBeVisible()
 })
 
 test('rejects an unknown chapter query without losing the workflow entry point', async ({ page }) => {

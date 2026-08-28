@@ -1,6 +1,12 @@
 import { expect, test } from '@playwright/test'
 import { z } from 'zod'
-import { grangerSsrEvidenceSchema, pcmciPlusEvidenceSchema } from '../src/domain/discovery'
+import {
+  dynotearsEvidenceSchema,
+  grangerSsrEvidenceSchema,
+  lpcmciEvidenceSchema,
+  ocseEvidenceSchema,
+  pcmciPlusEvidenceSchema,
+} from '../src/domain/discovery'
 import { stationarityBatterySchema } from '../src/domain/stationarity'
 
 const analysisOutcomeSchema = z.discriminatedUnion('ok', [
@@ -227,4 +233,64 @@ test('runs the Granger SSR F port with target then candidate-cause column order'
   expect(parsed.data.result.value.maxLag).toBe(4)
   expect(parsed.data.result.value.tests.map((result) => result.lag)).toEqual([1, 2, 3, 4])
   expect(parsed.data.result.value.tests[0].pValue).toBeLessThan(1e-10)
+})
+
+test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress callbacks', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
+  await page.goto('/')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 60
+    const columns = 3
+    const makeValues = () => {
+      const values = new Float64Array(rows * columns)
+      for (let row = 0; row < rows; row += 1) {
+        const time = row
+        values[row] = Math.sin(time / 3.7) + 0.07 * Math.cos(time / 1.9)
+        values[rows + row] = (row === 0 ? 0 : 0.72 * values[row - 1]) + 0.05 * Math.sin(time / 2.1)
+        values[2 * rows + row] = (row === 0 ? 0 : -0.55 * values[rows + row - 1]) + 0.04 * Math.cos(time / 2.9)
+      }
+      return values
+    }
+    const lpcmciProgress: unknown[] = []
+    const dynotearsProgress: unknown[] = []
+    const ocseProgress: unknown[] = []
+    const lpcmci = await analysis.runLpcmci(makeValues(), rows, columns, 1, 0.05, (progress: unknown) => lpcmciProgress.push(progress))
+    const dynotears = await analysis.runDynotears(makeValues(), rows, columns, 1, 0.1, 0.1, (progress: unknown) => dynotearsProgress.push(progress))
+    const ocse = await analysis.runOcse(makeValues(), rows, columns, 1, 0.05, 20, 'gaussian', 5, (progress: unknown) => ocseProgress.push(progress))
+    return { lpcmci, dynotears, ocse, lpcmciProgress, dynotearsProgress, ocseProgress }
+  })
+
+  const progressSchema = z.array(z.object({
+    stage: z.string().min(1),
+    completed: z.number().int().nonnegative(),
+    total: z.number().int().positive(),
+  }).strict()).min(2)
+  const outcome = <Value extends z.ZodType>(value: Value) => z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value }).strict(),
+    z.object({ ok: z.literal(false), error: z.object({ kind: z.string(), detail: z.string() }).strict() }).strict(),
+  ])
+  const parsed = z.object({
+    lpcmci: outcome(lpcmciEvidenceSchema),
+    dynotears: outcome(dynotearsEvidenceSchema),
+    ocse: outcome(ocseEvidenceSchema),
+    lpcmciProgress: progressSchema,
+    dynotearsProgress: progressSchema,
+    ocseProgress: progressSchema,
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  if (!parsed.data.lpcmci.ok || !parsed.data.dynotears.ok || !parsed.data.ocse.ok) {
+    throw new Error('One of the new discovery methods was refused at the browser boundary.')
+  }
+  const expectedColumns = 3
+  expect(parsed.data.lpcmci.value.graph).toHaveLength(expectedColumns)
+  expect(parsed.data.dynotears.value.contemporaneousWeights).toHaveLength(expectedColumns)
+  expect(parsed.data.dynotears.value.laggedWeights).toHaveLength(1)
+  expect(parsed.data.ocse.value.seed).toBe(42)
+  expect(parsed.data.lpcmciProgress.at(-1)).toMatchObject({ stage: 'complete', completed: 5, total: 5 })
+  const finalDynotearsProgress = parsed.data.dynotearsProgress.at(-1)
+  expect(finalDynotearsProgress?.stage).toBe('complete')
+  expect(finalDynotearsProgress?.completed).toBe(finalDynotearsProgress?.total)
+  expect(parsed.data.ocseProgress.at(-1)).toMatchObject({ stage: 'complete', completed: expectedColumns, total: expectedColumns })
 })

@@ -43,9 +43,18 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'zivot-andrews',
     'granger-ssr-f',
     'pcmci-plus-parcorr',
+    'lpcmci-parcorr',
+    'dynotears',
+    'ocse',
   ])
   const granger = parsed.data.find((method) => method.id === 'granger-ssr-f')
   expect(granger?.caveats.some((caveat) => caveat.requirement.includes('not intervention causality'))).toBe(true)
   const pcmci = parsed.data.find((method) => method.id === 'pcmci-plus-parcorr')
   expect(pcmci?.caveats.some((caveat) => caveat.requirement.includes('no hidden common causes'))).toBe(true)
+  const lpcmci = parsed.data.find((method) => method.id === 'lpcmci-parcorr')
+  expect(lpcmci?.caveats.some((caveat) => caveat.requirement.includes('partial ancestral graph'))).toBe(true)
+  const dynotears = parsed.data.find((method) => method.id === 'dynotears')
+  expect(dynotears?.caveats.some((caveat) => caveat.requirement.includes('sparse linear dynamic'))).toBe(true)
+  const ocse = parsed.data.find((method) => method.id === 'ocse')
+  expect(ocse?.caveats.some((caveat) => caveat.requirement.includes('not intervention causality'))).toBe(true)
 })

@@ -5,7 +5,9 @@ import { button, field, label, literal, num, segment } from '@/components/ui/rec
 import type { ColumnId, DatasetProfile, NumericColumnSelection } from '@/domain/dataset'
 import {
   DISCOVERY_LAG_OPTIONS,
+  DYNOTEARS_PENALTY_OPTIONS,
   INITIAL_DISCOVERY_DRAFT,
+  OCSE_SHUFFLE_OPTIONS,
   PCMCI_ALPHA_OPTIONS,
   describeDiscoveryReadiness,
   describeDiscoveryRunProblem,
@@ -17,11 +19,16 @@ import {
   type DiscoveryConfiguration,
   type DiscoveryLag,
   type DiscoveryRunArtifact,
+  type DynotearsPenalty,
+  type OcseShuffles,
   type PcmciAlpha,
 } from '@/domain/discovery'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import {
   GRANGER_SSR_F_METHOD_ID,
+  DYNOTEARS_METHOD_ID,
+  LPCMCI_PAR_CORR_METHOD_ID,
+  OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
   methodDefinition,
   type MethodDefinition,
@@ -51,9 +58,18 @@ const lagFromValue = (value: string): DiscoveryLag | null =>
 const alphaFromValue = (value: string): PcmciAlpha | null =>
   PCMCI_ALPHA_OPTIONS.find((candidate) => String(candidate) === value) ?? null
 
+const penaltyFromValue = (value: string): DynotearsPenalty | null =>
+  DYNOTEARS_PENALTY_OPTIONS.find((candidate) => String(candidate) === value) ?? null
+
+const shufflesFromValue = (value: string): OcseShuffles | null =>
+  OCSE_SHUFFLE_OPTIONS.find((candidate) => String(candidate) === value) ?? null
+
 const methodIdOf = (configuration: DiscoveryConfiguration) => {
   switch (configuration.kind) {
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
+    case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
+    case 'dynotears': return DYNOTEARS_METHOD_ID
+    case 'ocse': return OCSE_METHOD_ID
     case 'granger-ssr-f': return GRANGER_SSR_F_METHOD_ID
     default: return assertNever(configuration)
   }
@@ -160,7 +176,9 @@ function RunProvenance({ run }: { readonly run: DiscoveryRunArtifact }) {
   )
 }
 
-function PcmciResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' }> }) {
+type TimeGraphRun = Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>
+
+function TimeGraphResult({ run }: { readonly run: TimeGraphRun }) {
   const cells = run.result.graph.flatMap((targets, sourceIndex) =>
     targets.flatMap((lags, targetIndex) =>
       lags.map((mark, lag) => ({
@@ -174,12 +192,16 @@ function PcmciResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { re
     ),
   )
   const reported = cells.filter((cell) => cell.mark.length > 0).length
+  const isLpcmci = run.kind === 'lpcmci-run'
+  const methodLabel = isLpcmci ? 'LPCMCI · ParCorr' : 'PCMCI+ · ParCorr'
+  const resultTitle = isLpcmci ? 'Latent-aware partial ancestral graph evidence' : 'Stationary lag-graph evidence'
+  const tableLabel = isLpcmci ? 'LPCMCI raw evidence' : 'PCMCI+ raw evidence'
   return (
     <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <span className={label('text-signal')}>PCMCI+ · ParCorr</span>
-          <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">Stationary lag-graph evidence</h3>
+          <span className={label('text-signal')}>{methodLabel}</span>
+          <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{resultTitle}</h3>
           <p className="m-0 text-body text-faint">{run.result.observations} observations · {run.result.variables} variables · τ max {run.result.tauMax} · α {run.result.pcAlpha}</p>
         </div>
         <span className={num('text-body text-muted')}>{reported} marked cells</span>
@@ -187,8 +209,8 @@ function PcmciResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { re
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <ResultAssumptions eligibility={run.eligibility} />
       <RunProvenance run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">Every graph mark, p-value, and ParCorr value is retained below. Empty marks remain visible as “—”; contemporaneous unresolved endpoints are not converted into arrows.</p>
-      <div className="max-h-96 overflow-auto rounded-lg border border-hair" aria-label="PCMCI+ raw evidence">
+      <p className="mb-3 mt-3 text-body text-muted">Every graph mark, p-value, and ParCorr value is retained below. Empty marks remain visible as “—”; {isLpcmci ? 'circles, tails, and arrowheads remain PAG/DPAG endpoint marks' : 'contemporaneous unresolved endpoints are not converted into arrows'}.</p>
+      <div className="max-h-96 overflow-auto rounded-lg border border-hair" aria-label={tableLabel}>
         <table className="w-full border-collapse text-left text-body">
           <thead className="sticky top-0 bg-panel text-faint">
             <tr>
@@ -212,6 +234,59 @@ function PcmciResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { re
               </tr>
             ))}
           </tbody>
+        </table>
+      </div>
+    </article>
+  )
+}
+
+function DynotearsResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' }> }) {
+  const weights = [run.result.contemporaneousWeights, ...run.result.laggedWeights].flatMap((matrix, lag) =>
+    matrix.flatMap((targets, source) => targets.map((weight, target) => ({ lag, source, target, weight }))),
+  )
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
+      <span className={label('text-signal')}>DYNOTEARS</span>
+      <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">Sparse dynamic SEM weights</h3>
+      <p className="m-0 text-body text-faint">{run.result.observations} observations · {run.result.variables} variables · max lag {run.result.maxLag} · λW {run.result.lambdaW} · λA {run.result.lambdaA}</p>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <ResultAssumptions eligibility={run.eligibility} />
+      <RunProvenance run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">All fitted weights are retained without a display threshold. Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
+      <div className="max-h-96 overflow-auto rounded-lg border border-hair" aria-label="DYNOTEARS raw weights">
+        <table className="w-full border-collapse text-left text-body">
+          <thead className="sticky top-0 bg-panel text-faint"><tr>
+            <th className="border-b border-hair px-2 py-2 font-normal">Source</th><th className="border-b border-hair px-2 py-2 font-normal">Target</th><th className="border-b border-hair px-2 py-2 text-right font-normal">Lag</th><th className="border-b border-hair px-2 py-2 text-right font-normal">Weight</th>
+          </tr></thead>
+          <tbody>{weights.map((cell) => (
+            <tr key={`${cell.lag}:${cell.source}:${cell.target}`} className="border-b border-hair last:border-0">
+              <td className="px-2 py-2 text-ink">{run.variables[cell.source].name}</td><td className="px-2 py-2 text-ink">{run.variables[cell.target].name}</td><td className={num('px-2 py-2 text-right text-muted')}>{cell.lag}</td><td className={num('px-2 py-2 text-right text-muted')}>{statistic(cell.weight)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+    </article>
+  )
+}
+
+function OcseResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
+      <span className={label('text-signal')}>Optimal Causation Entropy</span>
+      <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">Conditional-information network evidence</h3>
+      <p className="m-0 text-body text-faint">{run.result.observations} observations · max lag {run.result.maxLag} · {run.result.method} CMI · {run.result.nShuffles} shuffles · seed {run.result.seed}</p>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <ResultAssumptions eligibility={run.eligibility} />
+      <RunProvenance run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">Hirmos uses corrected candidate-set semantics. Selected lagged information edges are evidence for graph review, not intervention effects.</p>
+      <div className="overflow-x-auto rounded-lg border border-hair" aria-label="oCSE raw evidence">
+        <table className="w-full border-collapse text-left text-body">
+          <thead className="text-faint"><tr><th className="border-b border-hair px-2 py-2 font-normal">Source</th><th className="border-b border-hair px-2 py-2 font-normal">Target</th><th className="border-b border-hair px-2 py-2 text-right font-normal">Lag</th><th className="border-b border-hair px-2 py-2 text-right font-normal">CMI</th><th className="border-b border-hair px-2 py-2 text-right font-normal">p-value</th></tr></thead>
+          <tbody>{run.result.edges.length === 0 ? (
+            <tr><td className="px-2 py-3 text-faint" colSpan={5}>No edge survived forward and backward selection.</td></tr>
+          ) : run.result.edges.map((edge, index) => (
+            <tr key={`${edge.source}:${edge.target}:${edge.lag}:${index}`} className="border-b border-hair last:border-0"><td className="px-2 py-2 text-ink">{run.variables[edge.source].name}</td><td className="px-2 py-2 text-ink">{run.variables[edge.target].name}</td><td className={num('px-2 py-2 text-right text-muted')}>{edge.lag}</td><td className={num('px-2 py-2 text-right text-muted')}>{statistic(edge.cmi)}</td><td className={num('px-2 py-2 text-right text-muted')}>{pValue(edge.pValue)}</td></tr>
+          ))}</tbody>
         </table>
       </div>
     </article>
@@ -254,7 +329,10 @@ function GrangerResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { 
 
 function DiscoveryResult({ run }: { readonly run: DiscoveryRunArtifact }) {
   switch (run.kind) {
-    case 'pcmci-plus-run': return <PcmciResult run={run} />
+    case 'pcmci-plus-run': return <TimeGraphResult run={run} />
+    case 'lpcmci-run': return <TimeGraphResult run={run} />
+    case 'dynotears-run': return <DynotearsResult run={run} />
+    case 'ocse-run': return <OcseResult run={run} />
     case 'granger-ssr-f-run': return <GrangerResult run={run} />
     default: return assertNever(run)
   }
@@ -278,13 +356,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     if (!specification.ok || eligibility.kind === 'refused') return
     dispatch({ type: 'run-started' })
     try {
-      const [{ materializeNumericColumnsInWorker }, { runGrangerSsrF, runPcmciPlus }] = await Promise.all([
+      const [{ materializeNumericColumnsInWorker }, analysis] = await Promise.all([
         import('@/data/client'),
         import('@/analysis/client'),
       ])
-      const requestedColumns: NonEmptyArray<ColumnId> = specification.value.kind === 'pcmci-plus'
-        ? prepared.columns
-        : [specification.value.target, specification.value.candidateCause]
+      const requestedColumns: NonEmptyArray<ColumnId> = specification.value.kind === 'granger-ssr-f'
+        ? [specification.value.target, specification.value.candidateCause]
+        : prepared.columns
       const matrix = await materializeNumericColumnsInWorker(source.file, profile, requestedColumns)
       if (!matrix.ok) {
         dispatch({
@@ -300,7 +378,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
       switch (specification.value.kind) {
       case 'pcmci-plus': {
-        const result = await runPcmciPlus(
+        const result = await analysis.runPcmciPlus(
           matrix.value.values,
           matrix.value.rowCount,
           matrix.value.columns.length,
@@ -325,6 +403,39 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         onRun(artifact)
         return
       }
+      case 'lpcmci': {
+        const result = await analysis.runLpcmci(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.tauMax, specification.value.pcAlpha, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'dynotears': {
+        const result = await analysis.runDynotears(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.lambdaW, specification.value.lambdaA, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'ocse': {
+        const result = await analysis.runOcse(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.alpha, specification.value.nShuffles, specification.value.method, specification.value.k, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
       case 'granger-ssr-f': {
         const granger = specification.value
         const target = matrix.value.columns.find((column) => column.id === granger.target)
@@ -336,7 +447,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           })
           return
         }
-        const result = await runGrangerSsrF(matrix.value.values, matrix.value.rowCount, granger.maxLag)
+        const result = await analysis.runGrangerSsrF(matrix.value.values, matrix.value.rowCount, granger.maxLag)
         if (!result.ok) {
           dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
           return
@@ -392,6 +503,30 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             </button>
             <button
               type="button"
+              className={segment(configuration.kind === 'lpcmci')}
+              aria-pressed={configuration.kind === 'lpcmci'}
+              onClick={() => dispatch({ type: 'method-selected', method: 'lpcmci' })}
+            >
+              LPCMCI
+            </button>
+            <button
+              type="button"
+              className={segment(configuration.kind === 'dynotears')}
+              aria-pressed={configuration.kind === 'dynotears'}
+              onClick={() => dispatch({ type: 'method-selected', method: 'dynotears' })}
+            >
+              DYNOTEARS
+            </button>
+            <button
+              type="button"
+              className={segment(configuration.kind === 'ocse')}
+              aria-pressed={configuration.kind === 'ocse'}
+              onClick={() => dispatch({ type: 'method-selected', method: 'ocse' })}
+            >
+              oCSE
+            </button>
+            <button
+              type="button"
               className={segment(configuration.kind === 'granger-ssr-f')}
               aria-pressed={configuration.kind === 'granger-ssr-f'}
               onClick={() => dispatch({ type: 'method-selected', method: 'granger-ssr-f' })}
@@ -400,7 +535,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             </button>
           </div>
 
-          {configuration.kind === 'pcmci-plus' && (
+          {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <label className="text-body text-ink">
                 Maximum lag
@@ -426,6 +561,79 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                   }}
                 >
                   {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {configuration.kind === 'dynotears' && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <label className="text-body text-ink">
+                Maximum lag
+                <select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+                  const value = lagFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'max-lag-selected', value })
+                }}>
+                  {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-body text-ink">
+                Contemporaneous λ
+                <select className={field('text', 'mt-1')} value={configuration.lambdaW} onChange={(event) => {
+                  const value = penaltyFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'dynotears-lambda-w-selected', value })
+                }}>
+                  {DYNOTEARS_PENALTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-body text-ink">
+                Lagged λ
+                <select className={field('text', 'mt-1')} value={configuration.lambdaA} onChange={(event) => {
+                  const value = penaltyFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'dynotears-lambda-a-selected', value })
+                }}>
+                  {DYNOTEARS_PENALTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+            </div>
+          )}
+
+          {configuration.kind === 'ocse' && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <label className="text-body text-ink">
+                Maximum lag
+                <select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+                  const value = lagFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'max-lag-selected', value })
+                }}>
+                  {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 8).map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-body text-ink">
+                Information estimator
+                <select className={field('text', 'mt-1')} value={configuration.method} onChange={(event) => {
+                  if (event.target.value === 'gaussian' || event.target.value === 'knn') dispatch({ type: 'ocse-method-selected', value: event.target.value })
+                }}>
+                  <option value="gaussian">Gaussian CMI</option>
+                  <option value="knn">k-nearest-neighbor CMI (k=5)</option>
+                </select>
+              </label>
+              <label className="text-body text-ink">
+                Test alpha
+                <select className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
+                  const value = alphaFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'ocse-alpha-selected', value })
+                }}>
+                  {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </label>
+              <label className="text-body text-ink">
+                Permutation shuffles
+                <select className={field('text', 'mt-1')} value={configuration.nShuffles} onChange={(event) => {
+                  const value = shufflesFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'ocse-shuffles-selected', value })
+                }}>
+                  {OCSE_SHUFFLE_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </select>
               </label>
             </div>
@@ -480,6 +688,15 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           <EligibilityView eligibility={eligibility} />
           {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeDiscoveryReadiness(readiness.error)}</p>}
           {draft.job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{describeDiscoveryRunProblem(draft.job.problem)}</p>}
+          {draft.job.kind === 'running' && draft.job.progress !== null && (
+            <div className="mt-3" role="status" aria-live="polite">
+              <div className="mb-1 flex items-center justify-between gap-3 text-micro text-faint">
+                <span>{draft.job.progress.stage}</span>
+                <span className={num()}>{draft.job.progress.completed} / {draft.job.progress.total}</span>
+              </div>
+              <progress className="block h-1.5 w-full accent-signal" max={draft.job.progress.total} value={draft.job.progress.completed} />
+            </div>
+          )}
           <button
             type="button"
             className={button('signal', 'mt-4')}

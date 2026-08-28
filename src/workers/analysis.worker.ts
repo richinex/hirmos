@@ -1,10 +1,17 @@
 /// <reference lib="webworker" />
 
 import initWasm, { runAnalysis } from '@/generated/analysis-wasm/hirmos_analysis'
-import { parseGrangerSsrEvidence, parsePcmciPlusEvidence } from '@/domain/discovery'
+import {
+  parseDynotearsEvidence,
+  parseGrangerSsrEvidence,
+  parseLpcmciEvidence,
+  parseOcseEvidence,
+  parsePcmciPlusEvidence,
+} from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
 import { parseStationarityBattery } from '@/domain/stationarity'
 import {
+  analysisProgressSchema,
   parseAnalysisWorkerCommand,
   type AnalysisWorkerCommand,
   type AnalysisWorkerEvent,
@@ -40,6 +47,34 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         tauMax: command.tauMax,
         pcAlpha: command.pcAlpha,
       }
+    case 'lpcmci':
+      return {
+        kind: 'lpcmci',
+        rows: command.rows,
+        columns: command.columns,
+        tauMax: command.tauMax,
+        pcAlpha: command.pcAlpha,
+      }
+    case 'dynotears':
+      return {
+        kind: 'dynotears',
+        rows: command.rows,
+        columns: command.columns,
+        maxLag: command.maxLag,
+        lambdaW: command.lambdaW,
+        lambdaA: command.lambdaA,
+      }
+    case 'ocse':
+      return {
+        kind: 'ocse',
+        rows: command.rows,
+        columns: command.columns,
+        maxLag: command.maxLag,
+        alpha: command.alpha,
+        nShuffles: command.nShuffles,
+        method: command.method,
+        k: command.k,
+      }
     case 'granger-ssr-f':
       return { kind: 'grangerSsrF', rows: command.rows, maxLag: command.maxLag }
     default:
@@ -65,7 +100,10 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     const command = parsed.value
     let raw: string
     try {
-      raw = runAnalysis(JSON.stringify(rustCommand(command)), command.values)
+      raw = runAnalysis(JSON.stringify(rustCommand(command)), command.values, (stage: unknown, completed: unknown, total: unknown) => {
+        const progress = analysisProgressSchema.safeParse({ stage, completed, total })
+        if (progress.success) emit({ kind: 'analysis-progress', request: command.request, progress: progress.data })
+      })
     } catch (cause: unknown) {
       fail(command.request, { kind: 'kernel-refused', detail: detailOf(cause) })
       return
@@ -98,6 +136,33 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'pcmci-plus-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'lpcmci': {
+        const result = parseLpcmciEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'lpcmci-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'dynotears': {
+        const result = parseDynotearsEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'dynotears-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'ocse': {
+        const result = parseOcseEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'ocse-succeeded', request: command.request, result: result.value })
         return
       }
       case 'granger-ssr-f': {

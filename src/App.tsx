@@ -4,6 +4,7 @@ import { button, field, label, literal, num } from '@/components/ui/recipes'
 import { DataProfileView } from '@/components/data/DataProfileView'
 import { PreprocessingPanel } from '@/components/data/PreprocessingPanel'
 import { DiscoveryPanel } from '@/components/discovery/DiscoveryPanel'
+import { DagWorkspace } from '@/components/dag/DagWorkspace'
 import { parseChapterSelection, type ChapterId } from '@/domain/navigation'
 import {
   datasetProfileProblemDetail,
@@ -123,6 +124,7 @@ function App() {
     if (chapter === 'projects') return workflow.kind === 'awaiting-project'
     if (chapter === 'data') return project !== null
     if (chapter === 'discovery') return workflow.kind === 'profiled' && workflow.prepared !== null
+    if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
     return false
   }
 
@@ -278,6 +280,17 @@ function App() {
                   <button type="button" className={button('quiet', 'mt-4')} onClick={() => dispatch({ type: 'source-cleared' })}>
                     Choose another file
                   </button>
+                  {workflow.prepared !== null && (
+                    <section className="mt-4 rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
+                      <span className={label('text-faint')}>Continue</span>
+                      <h3 id="prepared-next-title" className="mb-1 mt-1 text-title font-medium text-ink">Choose the next reasoning step</h3>
+                      <p className="mb-3 mt-0 text-body text-faint">A prepared dataset can go directly to a user-authored DAG. Discovery is optional evidence, not a prerequisite.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
+                        <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Explore discovery evidence</button>
+                      </div>
+                    </section>
+                  )}
                 </div>
                 {activeChapter === 'discovery' && workflow.prepared !== null && (
                   <DiscoveryPanel
@@ -287,6 +300,17 @@ function App() {
                     stationarity={workflow.stationarity}
                     runs={workflow.discoveryRuns}
                     onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
+                  />
+                )}
+                {activeChapter === 'dag' && workflow.prepared !== null && (
+                  <DagWorkspace
+                    key={workflow.prepared.id}
+                    profile={workflow.profile}
+                    prepared={workflow.prepared}
+                    discoveryRuns={workflow.discoveryRuns}
+                    documents={workflow.dagDocuments}
+                    onDocumentCreated={(document) => dispatch({ type: 'dag-document-created', document })}
+                    onDocumentRevised={(document) => dispatch({ type: 'dag-document-revised', document })}
                   />
                 )}
               </>
