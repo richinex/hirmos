@@ -925,7 +925,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           </Alert>
         ) : (
           <>
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <label className="block">
                 <span className={fieldLabel}>Identified study</span>
                 <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => { const chosen = event.target.value === '' ? null : (event.target.value as IdentificationId); const chosenStudy = studies.find((candidate) => candidate.id === identifications.find((identification) => identification.id === chosen)?.study) ?? null; dispatch({ type: 'identification-chosen', identification: chosen, configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, chosenStudy)])) as Record<EstimatorId, EstimatorConfiguration> }) }}>
@@ -967,7 +967,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       </section>
 
       {runs.length > 0 && (
-        <section aria-labelledby="estimation-results-title" className="grid gap-4">
+        <section aria-labelledby="estimation-results-title" className="grid grid-cols-1 gap-4">
           <div>
             <span className={label('text-faint')}>Recorded results</span>
             <h2 id="estimation-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Estimates</h2>
