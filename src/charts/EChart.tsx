@@ -1,0 +1,57 @@
+import { useEffect, useRef, useState } from 'react'
+import type { EChartsCoreOption, EChartsType } from 'echarts/core'
+import type { ChartRenderer } from './registry'
+
+/**
+ * The one chart host. The registry loads lazily on first mount so chart code stays out of the initial
+ * bundle; the option is re-applied whenever its identity changes, which the theme hook guarantees on a
+ * theme switch because builders take the theme as an argument.
+ */
+/** The description the builder wrote into the option; a responsive option keeps it under `baseOption`. */
+const describe = (option: EChartsCoreOption): string | undefined => {
+  const root = Reflect.get(option, 'baseOption') ?? option
+  const aria = root !== null && typeof root === 'object' ? Reflect.get(root, 'aria') : undefined
+  const label = aria !== null && typeof aria === 'object' ? Reflect.get(aria, 'label') : undefined
+  const description = label !== null && typeof label === 'object' ? Reflect.get(label, 'description') : undefined
+  return typeof description === 'string' ? description : undefined
+}
+
+export function EChart({ option, label, renderer = 'svg', className = 'h-[260px]', style, testId }: {
+  readonly option: EChartsCoreOption
+  readonly label: string
+  readonly renderer?: ChartRenderer
+  readonly className?: string
+  /** Explicit pixel size for charts with a natural size, such as the lag grid. */
+  readonly style?: React.CSSProperties
+  readonly testId?: string
+}) {
+  const host = useRef<HTMLDivElement>(null)
+  const chart = useRef<EChartsType | null>(null)
+  const latestOption = useRef(option)
+  const [failed, setFailed] = useState(false)
+  latestOption.current = option
+
+  useEffect(() => {
+    let cancelled = false
+    let resize: ResizeObserver | null = null
+    void import('./registry').then(({ createChart }) => {
+      if (cancelled || !host.current) return
+      const instance = createChart(host.current, renderer)
+      chart.current = instance
+      instance.setOption(latestOption.current, { notMerge: true })
+      resize = new ResizeObserver(() => instance.resize())
+      resize.observe(host.current)
+    }).catch(() => { if (!cancelled) setFailed(true) })
+    return () => {
+      cancelled = true
+      resize?.disconnect()
+      chart.current?.dispose()
+      chart.current = null
+    }
+  }, [renderer])
+
+  useEffect(() => { chart.current?.setOption(option, { notMerge: true }) }, [option])
+
+  if (failed) return <p role="alert" className="grid min-h-40 place-items-center text-body text-danger">The chart could not be loaded.</p>
+  return <div ref={host} role="img" aria-label={label} aria-description={describe(option)} data-testid={testId} style={style} className={`min-w-0 w-full ${className}`} />
+}

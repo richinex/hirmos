@@ -56,19 +56,19 @@
      Line heights ride the tokens (1.5 floors the prose tiers per WCAG 2.1; display sizes tighten
      because 1.5 gaps a two-line heading apart). Two sanctioned editorial exceptions live at call sites:
      the hero's max-md 26px step, and the composer's 16px mobile input (the iOS auto-zoom floor). */
-  --text-metric: clamp(2rem, 4cqi, 3rem); /* the primary figure in an analytical result */
+  --text-metric: clamp(1.75rem, calc(1rem + 2.5cqi), 3rem); /* 28px at a 480px stage, 48px at 1280 */
   --text-metric--line-height: 1;
   --text-metric--letter-spacing: -0.04em;
   --text-metric--font-weight: 600;
   --text-heading: 1.1875rem;            /* 19px — the hero/empty-state display tier */
-  --text-heading--line-height: 1.2;
+  --text-heading--line-height: 1.5rem;  /* 24px box: a whole number of 4px steps */
   /* The display tier: tutorial and landing-scale headlines. cqi, so a headline sizes to its
      column, not the window; without an ancestor container it falls back to viewport units. */
   --text-display: clamp(2rem, 5cqi, 4.75rem);
-  --text-display--line-height: 0.98;
-  --text-display--letter-spacing: -0.055em;
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.03em;
   --text-display--font-weight: 600;
-  --text-display-sub: clamp(1.5rem, 3cqi, 2.5rem);
+  --text-display-sub: calc(var(--text-display) * 0.6); /* holds a fixed ratio to the display tier */
   --text-display-sub--line-height: 1.1;
   --text-display-sub--letter-spacing: -0.04em;
   --text-display-sub--font-weight: 600;
@@ -77,13 +77,13 @@
   --text-title: 0.9375rem;              /* 15px — a surface's subject */
   --text-title--line-height: 1.4;
   --text-subtitle: 0.8125rem;           /* 13px — reading prose; the body element's own size */
-  --text-subtitle--line-height: 1.5;
+  --text-subtitle--line-height: 1.25rem; /* 20px box */
   --text-body: 0.75rem;                 /* 12px — working text: fields, dialogs, hints */
   --text-body--line-height: 1.5;
   --text-label: 0.6875rem;              /* 11px — chrome: buttons, panel titles, captions */
-  --text-label--line-height: 1.4;
+  --text-label--line-height: 1rem;      /* 16px box: never less leading than body */
   --text-micro: 0.625rem;               /* 10px — the floor: timings, keycaps, terse execution metadata */
-  --text-micro--line-height: 1.4;
+  --text-micro--line-height: 1rem;      /* 16px box */
 
   --color-stage: #0A0A0B;        /* graph ground, app background */
   --color-panel: #0C0C0E;        /* chrome: header, rail, composer bed */
@@ -94,6 +94,7 @@
   --color-line: #17171A;         /* structural divider */
   --color-hair: #1E1E22;         /* control border */
   --color-edge: #26262A;         /* emphasised border (focus, panels) */
+  --color-control: #606065;      /* input boundary: 3:1 on the well (WCAG 1.4.11) */
 
   --color-ink: #E6E3DC;          /* primary text, selected node */
   --color-bone: #B8B5AE;         /* graph node stroke, secondary text */
@@ -130,6 +131,8 @@
 /* The layering order, in one readable list. Increments of 10 leave room; nothing floats
    without a name here. */
 :root {
+  --z-sticky: 10;
+  --z-canvas: 20;
   --z-expanded: 30;
   --z-inspector: 40;
   --z-overlay: 50;
@@ -143,6 +146,9 @@
 :root[data-theme="light"], :root[data-theme="sketchbook"], :root[data-theme="sketchbook-white"] { color-scheme: light; }
 
 html, body { height: 100%; margin: 0; }
+/* The root grows with the viewport above 1280px (16px there, 18px at 1920px) so every rem tier scales
+   together on large displays; below 1280px the ramp stays at its designed size. */
+html { font-size: clamp(1rem, calc(0.5svw + 0.6rem), 1.125rem); }
 #root { height: 100%; height: 100dvh; }
 body {
   background: var(--color-stage);
@@ -201,6 +207,12 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
   }
 }
 
+/* Figures in tables and definition lists align down a column without every cell opting in through
+   `num()`; Geist's figures are already lining, so `lining-nums` only guards a fallback face. */
+@layer base {
+  table, dl { font-variant-numeric: tabular-nums lining-nums; }
+}
+
 /* Material Symbols Sharp — squared terminals match the hairline chrome.
    Self-hosted, imported in main.tsx; this only fixes the ligature rendering. */
 .msym {
@@ -224,7 +236,7 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
 ::-webkit-scrollbar { width: 0; height: 0; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.rise { animation: rise 0.28s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.rise { animation: rise 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
 /* One entrance for every floating surface (Rnd panels, dialogs, drawer), using the same sharp easing as
    `rise` — a settle, not a bounce, which would read wrong on a technical instrument. */
@@ -243,7 +255,7 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
    This replaces Tailwind's `animate-pulse`, which ran 2s on its own curve and was the only motion in the
    app outside the documented vocabulary. */
 @keyframes pulse-live { to { opacity: 0.45; } }
-.pulse-live { animation: pulse-live 0.45s linear infinite alternate; }
+.pulse-live { animation: pulse-live 0.45s ease-in-out infinite alternate; }
 
 /* Skeleton sweep — Kinetics' "Skeleton to Content", on our surfaces.
    A placeholder that SHOWS ITS SHAPE beats a word that describes its absence: the reader learns the layout
@@ -251,7 +263,7 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
    its honest empty state, because a skeleton promises content is coming.
    The sweep is 1.4s and linear, not the 0.9s house loop: it is a travelling highlight rather than a breath,
    and matching it to the pulse would read as one stuttering motion instead of two calm ones. */
-@keyframes skeleton-sweep { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes skeleton-sweep { from { background-position: 200% 0; } to { background-position: 0% 0; } }
 .skeleton {
   background: linear-gradient(90deg, var(--color-line) 25%, var(--color-hair) 50%, var(--color-line) 75%);
   background-size: 200% 100%;
@@ -259,39 +271,27 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
 }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
-/* A determinate bar that is also ALIVE.
-   The width says where the work is; a sweep and a lit leading edge say it is still moving. Both are needed
-   because our fill can hold the same width for a minute — one slow extraction — and a bar that has not
-   moved is indistinguishable from a bar that has stopped.
-
-   WIDTH, not scaleX, and that is the whole reason this note exists. Pseudo-elements scale with their
-   element, so driving the fill by transform made the 30% sweep render at 30% OF THE FILL: 22px and darting
-   at a quarter full, 90px and gliding when full. The sweep got faster the less there was to report, which
-   is exactly backwards. A width transition is not composited, but this bar advances a handful of times a
-   minute rather than per frame, so the cost is nothing and the geometry is finally honest.
-
-   1.8s and linear: a travelling highlight, not a breath, so it does not try to match the 0.9s house loop. */
-@keyframes bar-sweep { from { transform: translateX(-110%); } to { transform: translateX(360%); } }
+/* A determinate bar that is also alive: `.bar-live` is the TRACK. A 48px highlight crosses the whole
+   track at one speed whatever the fill, and a 14px bright edge marks the fill's frontier. 1.8s and linear:
+   a travelling highlight, not a breath, so it does not try to match the 0.9s house loop. */
+@keyframes bar-sweep { from { left: -48px; } to { left: 100%; } }
 .bar-live { position: relative; overflow: hidden; }
 .bar-live::after {
   content: "";
   position: absolute;
   inset-block: 0;
-  left: 0;
-  width: 28%;
-  min-width: 40px;
+  left: -48px;
+  width: 48px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 55%, transparent), transparent);
   animation: bar-sweep 1.8s linear infinite;
 }
-/* The frontier, lit. Without it the fill ends on a hard cut and the bar reads as a static rule; with it the
-   eye finds where the work has got to. Fixed width in px because it marks a POSITION, not a proportion. */
-.bar-live::before {
+.bar-live > .bar-live__fill { position: relative; height: 100%; }
+.bar-live > .bar-live__fill::after {
   content: "";
   position: absolute;
   inset-block: 0;
   right: 0;
   width: 14px;
-  z-index: 1;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent));
 }
 :root[data-theme="light"] .bar-live::after,
@@ -323,11 +323,12 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
   --color-line: #EAEAE8;         /* structural divider */
   --color-hair: #E0DFDB;         /* control border */
   --color-edge: #C9C7C1;         /* emphasised border */
+  --color-control: #96948F;      /* input boundary, 3:1 on the well */
 
   --color-ink: #363330;          /* warm charcoal, never absolute black */
   --color-bone: #585450;         /* secondary text */
-  --color-muted: #6B6A67;        /* labels — ≥4.5:1 on raised */
-  --color-faint: #676663;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
+  --color-muted: #676663;        /* labels — ≥4.5:1 on raised; darker than faint so a label outranks its hint */
+  --color-faint: #6B6A67;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
   --color-dim: #D9D8D4;          /* NON-TEXT ONLY */
 
   --color-signal: #AE3B24;       /* the family's red-ink annotation. THE answer colour. */
@@ -363,14 +364,15 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
   --color-line: #DECDA9;         /* structural divider */
   --color-hair: #CDB88D;         /* control border */
   --color-edge: #B29B6E;         /* emphasised border */
+  --color-control: #A18A5D;      /* input boundary, 3:1 on the well */
 
   --color-ink: #3B2F21;          /* sepia-black ink */
   --color-bone: #55462F;         /* secondary text */
-  --color-muted: #6C5C43;        /* labels — ≥4.5:1 on raised */
-  --color-faint: #685B44;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
+  --color-muted: #685B44;        /* labels — ≥4.5:1 on raised; darker than faint so a label outranks its hint */
+  --color-faint: #6C5C43;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
   --color-dim: #C7B28C;          /* NON-TEXT ONLY */
 
-  --color-signal: #AE3B24;       /* red-ink annotation. THE answer colour, nothing else. */
+  --color-signal: #AA3720;       /* red-ink annotation. THE answer colour, nothing else. 4.55:1 on raised. */
   --color-signal-ink: #FFF8EC;
   --color-signal-line: #DEB2A2;
 
@@ -404,11 +406,12 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
   --color-line: #EAEAE7;         /* neutral structure — no yellow */
   --color-hair: #DBDAD5;
   --color-edge: #C0BFB8;
+  --color-control: #96958F;      /* input boundary, 3:1 on the well */
 
   --color-ink: #2B241A;          /* the family's sepia ink */
   --color-bone: #4C4130;
-  --color-muted: #75695A;
-  --color-faint: #6E6357;        /* SMALLEST TEXT — comfortably ≥4.5:1 on white */
+  --color-muted: #6E6357;
+  --color-faint: #75695A;        /* SMALLEST TEXT — ≥4.5:1 on white; lighter than muted so a hint sits under its label */
   --color-dim: #DEDDD8;          /* NON-TEXT ONLY */
 
   --color-signal: #AE3B24;       /* the family's red-ink annotation, unchanged */
@@ -432,7 +435,6 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
 :root[data-theme="sketchbook-white"] h2 {
   font-weight: 550;
   letter-spacing: -0.03em;
-  font-size: 1.25em;
 }
 
 /* Reduced motion removes MOVEMENT, not feedback.
@@ -457,6 +459,19 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
 .figure-strip { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
 /* The vertical sibling: panel bodies whose overflow is unpredictable get the same thin native bar, so
    "this scrolls" is visible before the first wheel. Same reasoning as .figure-strip, other axis. */
+/* Pane separators: the seam is a one-pixel hairline; an 8px hit area either side does the ergonomics.
+   react-resizable-panels sets data-separator="active" while dragging. */
+.seam { position: relative; background: var(--color-line); transition: background-color 150ms; }
+.seam::before { content: ''; position: absolute; inset: 0 -4px; }
+.seam-h::before { inset: -4px 0; }
+.seam:hover, .seam[data-separator="active"] { background: var(--color-edge); }
+.seam:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 0; }
+.seam-v { cursor: col-resize; }
+.seam-h { cursor: row-resize; }
+
+/* The chapter nav's width change rides the house curve; prefers-reduced-motion strips it below. */
+[data-chapter-nav] { transition: width 200ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+
 .panel-scroll { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
 .panel-scroll::-webkit-scrollbar { width: 6px; }
 .panel-scroll::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }

@@ -1,46 +1,117 @@
-import { useId } from 'react'
+import { Icon } from '@/components/Icon'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import type { MethodDefinition, MethodSource } from '@/domain/methods'
-import { label } from '@/components/ui/recipes'
+import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility } from '@/domain/methods'
+import type { Identification } from '@/domain/study'
+import { IdentificationRecord } from '@/components/IdentificationRecord'
 
 interface MethodCaveatsProps {
   readonly methods: NonEmptyArray<MethodDefinition>
+  readonly eligibility?: MethodEligibility | null
+  readonly identification?: Identification | null
 }
 
-function sourceLabel(source: MethodSource): string {
-  switch (source.kind) {
-    case 'reference-implementation': return `${source.repository}@${source.revision.slice(0, 8)} · ${source.locator}`
-    case 'paper': return `${source.title} · ${source.locator}`
-    case 'hirmos-constraint': return `Hirmos boundary · ${source.locator}`
-    default: return assertNever(source)
+/** The literature behind a method's conditions, each work once. Implementation references stay in the method record and the manifest. */
+const literature = (method: MethodDefinition): readonly string[] =>
+  [...new Set(method.caveats.flatMap((caveat) => caveat.sources.flatMap((source) => (source.kind === 'paper' ? [`${source.title} · ${source.locator}`] : []))))]
+
+const eligibilityEvaluations = (eligibility: MethodEligibility | null | undefined): readonly CaveatEvaluation[] => {
+  if (eligibility === null || eligibility === undefined) return []
+  switch (eligibility.kind) {
+    case 'eligible': return eligibility.satisfied
+    case 'caution': return [...eligibility.satisfied, ...eligibility.unresolved]
+    case 'refused': return eligibility.violations
+    default: return assertNever(eligibility)
   }
 }
 
-export function MethodCaveats({ methods }: MethodCaveatsProps) {
-  const titleId = useId()
+function Status({ evaluation, refused }: { readonly evaluation: CaveatEvaluation | undefined; readonly refused: boolean }) {
+  // A refusal reports only what failed; the other conditions were not reached, so they carry no status.
+  if (evaluation === undefined) return refused ? null : <span className="whitespace-nowrap text-label text-faint">Not checked</span>
+  switch (evaluation.kind) {
+    case 'satisfied': return <span className="whitespace-nowrap text-label text-ok">Checked</span>
+    case 'unresolved':
+      return (
+        <Tooltip text="No evidence has been recorded for this requirement.">
+          <span tabIndex={0} className="cursor-help whitespace-nowrap text-label text-warn underline decoration-dotted underline-offset-2">Not checked</span>
+        </Tooltip>
+      )
+    case 'violated': return <span className="whitespace-nowrap text-label text-danger">Fails</span>
+    default: return assertNever(evaluation)
+  }
+}
+
+const evidenceText = (evaluation: CaveatEvaluation | undefined): string | null => {
+  if (evaluation === undefined) return null
+  switch (evaluation.kind) {
+    case 'satisfied': return evaluation.evidence
+    case 'unresolved': return evaluation.missingEvidence
+    case 'violated': return evaluation.evidence
+    default: return assertNever(evaluation)
+  }
+}
+
+/** Conditions the project can meet or fail, then the rules for reading the result, which nobody assesses. */
+const conditions = (method: MethodDefinition): readonly MethodCaveat[] => method.caveats.filter((caveat) => caveat.category !== 'interpretation')
+const readingRules = (method: MethodDefinition): readonly MethodCaveat[] => method.caveats.filter((caveat) => caveat.category === 'interpretation')
+
+/** "2 checked · 1 not checked" for the disclosure row; the plain count when nothing was evaluated. */
+const tally = (method: MethodDefinition, evaluations: ReadonlyMap<string, CaveatEvaluation>): string => {
+  const counts = { satisfied: 0, unresolved: 0, violated: 0 }
+  for (const caveat of conditions(method)) {
+    const evaluation = evaluations.get(caveat.id)
+    if (evaluation !== undefined) counts[evaluation.kind] += 1
+  }
+  const parts = [
+    counts.satisfied > 0 ? `${counts.satisfied} checked` : null,
+    counts.unresolved > 0 ? `${counts.unresolved} not checked` : null,
+    counts.violated > 0 ? `${counts.violated} fail${counts.violated === 1 ? 's' : ''}` : null,
+  ].filter((part): part is string => part !== null)
+  const total = conditions(method).length
+  return parts.length === 0 ? `${total} condition${total === 1 ? '' : 's'}` : parts.join(' · ')
+}
+
+export function MethodCaveats({ methods, eligibility = null, identification = null }: MethodCaveatsProps) {
+  const evaluations = new Map(eligibilityEvaluations(eligibility).map((evaluation) => [evaluation.caveat.id, evaluation]))
+  // Without an evaluator (diagnostics, identification methods) a status column is noise: the method reads as prose.
+  const evaluated = eligibility !== null && eligibility !== undefined
   return (
-    <section className="mt-4 rounded-lg border border-hair bg-well p-3" aria-labelledby={titleId}>
-      <span className={label('text-faint')}>Assumptions and limits</span>
-      <h4 id={titleId} className="mb-1 mt-1 text-body font-medium text-ink">Review before running</h4>
-      <p className="mb-3 mt-0 text-body text-faint">Each method answers a narrower question than a causal conclusion. Sources are pinned to the reference revision used by the port.</p>
-      <div className="space-y-2">
-        {methods.map((method) => (
-          <details key={method.id} className="rounded-md border border-hair bg-panel px-3 py-2">
-            <summary className="cursor-pointer text-body font-medium text-ink">
-              {method.name} · {method.caveats.length} caveats
-            </summary>
-            <p className="mb-2 mt-2 text-body text-muted">{method.summary}</p>
-            <ul className="m-0 space-y-3 pl-4 text-body text-muted">
-              {method.caveats.map((caveat) => (
-                <li key={caveat.id}>
-                  <p className="m-0 text-ink">{caveat.requirement}</p>
-                  <p className="mb-1 mt-0.5 text-faint">If unmet: {caveat.consequenceIfUnmet}</p>
-                  <p className="m-0 text-micro text-faint">Source: {caveat.sources.map(sourceLabel).join('; ')}</p>
-                </li>
-              ))}
-            </ul>
-          </details>
-        ))}
+    <section className="mt-4 border-t border-hair pt-4" aria-label="Method requirements">
+      {identification !== null && <IdentificationRecord identification={identification} />}
+      <div className="divide-y divide-hair border-y border-hair">
+        {methods.map((method) => {
+          return (
+            <details key={method.id} className="group" open={methods.length === 1}>
+              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md py-2 text-body transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+                <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
+                <span className="min-w-0 font-medium text-ink">{method.name}</span>
+                {evaluated && <span className="ml-auto whitespace-nowrap text-label text-faint">{tally(method, evaluations)}</span>}
+              </summary>
+              {!evaluated && (
+                <p className="mb-2 mt-0 max-w-[65ch] text-body text-muted">
+                  {[method.summary, ...method.caveats.flatMap((caveat) => (caveat.category === 'interpretation' ? [caveat.requirement] : [caveat.requirement, `If this is not met: ${caveat.consequenceIfUnmet}`]))].join(' ')}
+                </p>
+              )}
+              {evaluated && <p className="mb-2 mt-0 max-w-[65ch] text-body text-muted">{method.summary}</p>}
+              {evaluated && <ol className="m-0 list-none divide-y divide-line p-0">
+                {[...conditions(method), ...readingRules(method)].map((caveat) => {
+                  const reading = caveat.category === 'interpretation'
+                  const evaluation = reading ? undefined : evaluations.get(caveat.id)
+                  const evidence = evaluation !== undefined && isStageNote(evaluation) ? null : evidenceText(evaluation)
+                  return (
+                    <li key={caveat.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2 text-body">
+                      <p className="m-0 text-ink">{caveat.requirement}</p>
+                      {reading ? <span className="whitespace-nowrap text-label text-faint">Interpretation</span> : <Status evaluation={evaluation} refused={eligibility?.kind === 'refused'} />}
+                      {evidence !== null && evidence.length > 0 && <p className="col-span-2 m-0 text-muted">{evidence}</p>}
+                      {!reading && evaluation?.kind !== 'satisfied' && <p className="col-span-2 m-0 text-faint">If this is not met: {caveat.consequenceIfUnmet}</p>}
+                    </li>
+                  )
+                })}
+              </ol>}
+              {literature(method).length > 0 && <p className="mb-2 mt-2 text-label text-faint">Literature: {literature(method).join('; ')}</p>}
+            </details>
+          )
+        })}
       </div>
     </section>
   )

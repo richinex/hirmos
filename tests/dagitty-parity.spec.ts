@@ -1,0 +1,119 @@
+import { expect, test, type Locator, type Page } from '@playwright/test'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+
+const fixtureDir = fileURLToPath(new URL('fixtures/dagitty/', import.meta.url))
+
+/**
+ * dagitty's example DAGs, rebuilt through the DAG Workspace's own controls, then Hirmos's back-door
+ * verdict checked against dagitty's: whether a back-door path is open, and whether the adjustment set
+ * Hirmos names is one dagitty accepts. Fixtures come from tests/fixtures/dagitty/build.mjs.
+ */
+
+interface Fixture {
+  readonly label: string
+  readonly slug: string
+  readonly exposure: string
+  readonly outcome: string
+  readonly nodes: readonly { readonly name: string; readonly kind: 'observed' | 'latent' }[]
+  readonly edges: readonly { readonly from: string; readonly to: string }[]
+  readonly expected: {
+    readonly msas: readonly (readonly string[])[]
+    readonly backdoorOpen: boolean
+    readonly canonical: readonly string[]
+    readonly canonicalValid: boolean
+  }
+}
+
+const fixtures: readonly Fixture[] = JSON.parse(readFileSync(`${fixtureDir}examples.json`, 'utf8'))
+const heavy = process.env.DAGITTY_HEAVY === '1'
+const selected = fixtures.filter((fixture) => heavy || fixture.edges.length <= 24)
+
+const choose = async (trigger: Locator, label: string) => {
+  await trigger.click()
+  await trigger.page().getByRole('listbox').getByRole('option', { name: label, exact: true }).click()
+}
+
+const prepare = async (page: Page, fixture: Fixture) => {
+  await page.goto('/app')
+  await page.getByRole('textbox', { name: 'Project name' }).fill(`dagitty · ${fixture.label}`)
+  await page.getByRole('button', { name: 'Create project' }).click()
+  await page.locator('input[type="file"]').setInputFiles(`${fixtureDir}${fixture.slug}.csv`)
+  await page.getByRole('button', { name: /Inspect data/ }).click()
+  await page.getByRole('radio', { name: /Independent observations/ }).click()
+  for (const node of fixture.nodes) {
+    if (node.kind === 'observed') await page.getByRole('checkbox', { name: node.name, exact: true }).check()
+  }
+  await page.getByRole('button', { name: /Create prepared/ }).click()
+  await expect(page.getByText(/Prepared cross-section/)).toBeVisible({ timeout: 30_000 })
+}
+
+const buildDag = async (page: Page, fixture: Fixture) => {
+  await page.getByRole('button', { name: /Build a DAG/ }).click()
+  await page.getByRole('button', { name: /Substantive knowledge/ }).click()
+  await page.getByLabel('DAG name').fill(fixture.label)
+  await page.getByRole('button', { name: /Create DAG/ }).click()
+  for (const node of fixture.nodes) {
+    if (node.kind !== 'latent') continue
+    await page.getByRole('button', { name: /Unmeasured variable/ }).click()
+    await page.getByLabel(/Unmeasured variable name/).fill(node.name)
+    await page.getByRole('button', { name: /Add to DAG/ }).click()
+  }
+  const ledger = page.getByRole('table', { name: 'Arrows' })
+  for (const edge of fixture.edges) {
+    await choose(page.getByLabel('Proposed cause'), edge.from)
+    await choose(page.getByLabel('Proposed effect'), edge.to)
+    await page.getByLabel(/Rationale|Substantive basis/).fill(`dagitty example: ${fixture.label}`)
+    await page.getByRole('button', { name: /Add the arrow|Add edge/ }).click()
+    await expect(ledger.getByText(`${edge.from} → ${edge.to}`, { exact: true })).toBeVisible()
+  }
+  await choose(page.getByLabel('Treatment'), fixture.exposure)
+  await choose(page.getByLabel('Outcome'), fixture.outcome)
+}
+
+for (const fixture of selected) {
+  test(`dagitty parity: ${fixture.label}`, async ({ page }) => {
+    test.setTimeout(120_000 + fixture.edges.length * 8_000)
+    await prepare(page, fixture)
+    await buildDag(page, fixture)
+    const adjustment = page.getByLabel('Adjustment')
+    await expect(adjustment).toBeVisible()
+    // Evidence for the side-by-side report: Hirmos's canvas and its verdict, beside dagitty's drawing and verdict.
+    const out = 'test-results/dagitty-parity'
+    mkdirSync(out, { recursive: true })
+    await page.getByRole('button', { name: /Tidy graph/ }).click()
+    await page.waitForTimeout(400)
+    await page.getByLabel('Causal DAG editor').screenshot({ path: `${out}/${fixture.slug}.png` })
+    writeFileSync(`${out}/${fixture.slug}.json`, JSON.stringify({ verdict: (await adjustment.innerText()).replace(/\n+/g, ' ').trim() }))
+    if (!fixture.expected.backdoorOpen) {
+      await expect(adjustment.getByText('No back-door path is open.', { exact: false })).toBeVisible()
+      return
+    }
+    if (fixture.expected.msas.length === 0) {
+      await expect(adjustment.getByText('No observed adjustment set blocks every back-door path', { exact: false })).toBeVisible()
+      return
+    }
+    expect(fixture.expected.canonicalValid, 'dagitty must accept the canonical set Hirmos names').toBe(true)
+    await expect(adjustment.getByText('blocks all represented back-door paths', { exact: false })).toBeVisible()
+    const sentence = await adjustment.innerText()
+    const named = /Adjusting for (.+?) blocks all represented back-door paths/.exec(sentence.replace(/\n/g, ' '))
+    expect(named, sentence).not.toBeNull()
+    expect((named?.[1] ?? '').split(', ').sort()).toEqual([...fixture.expected.canonical].sort())
+
+    if (fixture.slug === 'extended-confounding-triangle') {
+      await page.getByRole('button', { name: 'Use for study' }).click()
+      await page.getByRole('radio', { name: 'Observed choice' }).click()
+      await page.getByLabel('Assignment sentence').fill('Treatment arose from observed unit characteristics.')
+      await page.getByRole('button', { name: 'Identify the effect' }).click()
+
+      await expect(page.getByRole('heading', { name: 'Choose a valid adjustment set' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Minimal set 1 · A, Z' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Minimal set 2 · B, Z' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Canonical set · A, B, Z' })).toBeVisible()
+
+      await page.getByRole('button', { name: 'Minimal set 1 · A, Z' }).click()
+      await expect(page.getByText('Minimal adjustment set 1', { exact: false })).toBeVisible()
+      await expect(page.getByText('Canonical set: A, B, Z.', { exact: true })).toBeVisible()
+    }
+  })
+}

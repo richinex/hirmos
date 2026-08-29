@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { materializeNumericColumns, profileSource } from '@/data/duckdb'
+import { inspectPanelStructure, materializeNumericColumns, materializePanelLong, previewWindow, profileColumn, profileSource, summarizeColumns } from '@/data/duckdb'
 import { assertNever } from '@/domain/dop'
 import { describeSourceSelectionProblem, selectSource } from '@/domain/workflow'
 import { parseDataWorkerCommand, type DataWorkerEvent } from './dataProtocol'
@@ -19,10 +19,17 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     const source = selectSource(command.file)
     if (!source.ok) {
       const detail = describeSourceSelectionProblem(source.error)
-      emit(command.kind === 'profile-source'
-        ? { kind: 'profile-failed', request: command.request, problem: { kind: 'worker-protocol-failed', detail } }
-        : { kind: 'materialization-failed', request: command.request, problem: { kind: 'worker-protocol-failed', detail } })
-      return
+      const problem = { kind: 'worker-protocol-failed', detail } as const
+      switch (command.kind) {
+        case 'profile-source': emit({ kind: 'profile-failed', request: command.request, problem }); return
+        case 'profile-column': emit({ kind: 'column-profile-failed', request: command.request, problem }); return
+        case 'materialize-numeric': emit({ kind: 'materialization-failed', request: command.request, problem }); return
+        case 'summarize-columns': emit({ kind: 'summary-failed', request: command.request, problem }); return
+        case 'preview-window': emit({ kind: 'preview-window-failed', request: command.request, problem }); return
+        case 'inspect-panel': emit({ kind: 'panel-data-failed', request: command.request, problem }); return
+        case 'materialize-panel': emit({ kind: 'panel-data-failed', request: command.request, problem }); return
+        default: return assertNever(command)
+      }
     }
 
     switch (command.kind) {
@@ -43,6 +50,40 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           { kind: 'materialization-succeeded', request: command.request, matrix: result.value },
           [result.value.values.buffer, result.value.validity.buffer],
         )
+        return
+      }
+      case 'profile-column': {
+        const result = await profileColumn(source.value, command.profile, command.columnId)
+        emit(result.ok
+          ? { kind: 'column-profile-succeeded', request: command.request, profile: result.value }
+          : { kind: 'column-profile-failed', request: command.request, problem: result.error })
+        return
+      }
+      case 'summarize-columns': {
+        const result = await summarizeColumns(source.value, command.profile)
+        emit(result.ok
+          ? { kind: 'summary-succeeded', request: command.request, summary: result.value }
+          : { kind: 'summary-failed', request: command.request, problem: result.error })
+        return
+      }
+      case 'preview-window': {
+        const result = await previewWindow(source.value, command.profile, command.query)
+        emit(result.ok
+          ? { kind: 'preview-window-succeeded', request: command.request, window: result.value }
+          : { kind: 'preview-window-failed', request: command.request, problem: result.error })
+        return
+      }
+      case 'inspect-panel': {
+        const result = await inspectPanelStructure(source.value, command.profile, command.unitColumn, command.timeColumn)
+        emit(result.ok
+          ? { kind: 'panel-inspection-succeeded', request: command.request, structure: result.value }
+          : { kind: 'panel-data-failed', request: command.request, problem: result.error })
+        return
+      }
+      case 'materialize-panel': {
+        const result = await materializePanelLong(source.value, command.profile, command.unitColumn, command.timeColumn, command.outcomeColumn, command.treatmentColumn)
+        if (!result.ok) { emit({ kind: 'panel-data-failed', request: command.request, problem: result.error }); return }
+        emit({ kind: 'panel-materialization-succeeded', request: command.request, matrix: result.value }, [result.value.values.buffer])
         return
       }
       default:

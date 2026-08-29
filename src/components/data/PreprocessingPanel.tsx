@@ -1,9 +1,20 @@
-import { useReducer } from 'react'
+import { Select } from '@/components/ui/Select'
+import { describePanelDataProblem } from '@/domain/panel'
+import { RadioList } from '@/components/ui/RadioList'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { useReducer, useState } from 'react'
 import { Icon } from '@/components/Icon'
+import { Alert } from '@/components/ui/Alert'
 import { MethodCaveats } from '@/components/MethodCaveats'
-import { button, field, label, num, segment } from '@/components/ui/recipes'
+import { SeriesStructureCard } from './SeriesStructureCard'
+import { GrangerCard } from './GrangerCard'
+import type { GrangerEvidenceArtifact } from '@/domain/granger'
+import { describeMissingnessRefusal, describeResolutionRecord, resolutionCommandFor, type MissingnessResolutionRecord } from '@/domain/missingness'
+import { button, field, fieldLabel, label, num, table, td, th, tr } from '@/components/ui/recipes'
+import { cellPadding, useTableDensity } from '@/components/table/primitives'
+import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
-import { assertNever, isNonEmpty } from '@/domain/dop'
+import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
 import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
   describeReadinessProblem,
@@ -22,13 +33,36 @@ import {
   type StationarityEvidenceArtifact,
   type VariableStationarityEvidence,
 } from '@/domain/preprocessing'
+import { assessStationarity, decisiveEvidence, describeStationarityAssessment, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
+import { describeSeasonalAdjustment, seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
+import { formatP, formatStatistic } from '@/lib/format/number'
+import type { PanelStructureEvidence } from '@/domain/panel'
 
 interface PreprocessingPanelProps {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly onPrepared: (artifact: PreparedDatasetArtifact) => void
   readonly onStationarityEvidence: (evidence: StationarityEvidenceArtifact) => void
+  /** The recorded battery, so a reopened project shows the diagnostic as done before the panel runs one. */
+  readonly stationarity: StationarityEvidenceArtifact | null
+  /** The workflow's prepared version, so a reopened project shows its diagnostics before the form is touched. */
+  readonly preparedVersion: PreparedDatasetArtifact | null
+  readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
+  readonly onGrangerEvidence: (evidence: GrangerEvidenceArtifact) => void
+}
+
+type Diagnostic = 'stationarity' | 'structure' | 'granger'
+
+/** A switch label with a fixed slot for the done glyph, so the knob's measured width does not change when a check appears. */
+function DiagnosticLabel({ text, done }: { readonly text: string; readonly done: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {text}
+      <Icon name="check" size={12} className={cn('shrink-0 text-ok', !done && 'invisible')} />
+      {done && <span className="sr-only">, done</span>}
+    </span>
+  )
 }
 
 const FREQUENCIES: readonly { readonly value: Frequency; readonly label: string }[] = [
@@ -45,14 +79,32 @@ const TRANSFORMS: readonly { readonly value: SeriesTransform; readonly label: st
   { value: { kind: 'linear-detrend' }, label: 'Linear detrend', detail: 'Residual from an explicit intercept-and-time trend.' },
 ]
 
-type MissingnessChoiceKind = 'unresolved' | 'tigramite-mask' | 'complete-interval' | 'imputation'
+type MissingnessChoiceKind = 'unresolved' | 'lag-aware-exclusion' | 'complete-interval' | 'imputation'
+type LagAwareExclusionDraft = Extract<MissingnessDraft, { readonly kind: 'lag-aware-exclusion' }>
 
 const MISSINGNESS_CHOICES: readonly MissingnessChoiceKind[] = [
   'unresolved',
-  'tigramite-mask',
+  'lag-aware-exclusion',
   'complete-interval',
   'imputation',
 ]
+
+const TONE_CLASS = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' } as const
+
+const ruleLabel = (ref: StationarityTestRef): string => `${ref.test === 'zivot-andrews' ? 'ZA' : ref.test.toUpperCase()} ${ref.specification}${ref.series === 'first-difference' ? ' Δ' : ''} ${pValue(ref.pValue)}`
+
+/** The interpreted route for one series with the tests that decided it. */
+function StationarityVerdict({ assessment }: { readonly assessment: StationarityAssessment }) {
+  const described = describeStationarityAssessment(assessment)
+  const decisive = decisiveEvidence(assessment)
+  return (
+    <div className="min-w-[14rem]" aria-label={`Verdict for ${described.verdict}`}>
+      <span className={`text-body font-medium ${TONE_CLASS[described.tone]}`}>{described.verdict}</span>
+      <span className="block text-label text-faint">{described.route}</span>
+      <span className={num('block text-micro text-faint')}>{decisive.map(ruleLabel).join(' · ')}</span>
+    </div>
+  )
+}
 
 const transformIsSelected = (selected: SeriesTransform, candidate: SeriesTransform): boolean =>
   selected.kind === candidate.kind
@@ -60,12 +112,12 @@ const transformIsSelected = (selected: SeriesTransform, candidate: SeriesTransfo
 const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): MissingnessDraft => {
   switch (kind) {
     case 'unresolved': return { kind, cells }
-    case 'tigramite-mask': return {
+    case 'lag-aware-exclusion': return {
       kind,
       cells,
-      cutOff: 'methodDefault',
-      propagateThroughMaxLag: false,
-      maskType: 'xyz',
+      history: { kind: 'method-default' },
+      gapInfluence: { kind: 'direct-only' },
+      analysisExclusions: { kind: 'ignore' },
     }
     case 'complete-interval': return { kind, cells }
     case 'imputation': return {
@@ -80,15 +132,17 @@ const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): Missi
   }
 }
 
-const pValue = (value: number): string => value < 0.0001 ? '<0.0001' : value.toFixed(4)
-const rawNumber = (value: number): string => String(value)
+const pValue = (value: number): string => formatP(value, { withLabel: false }).text
+const rawNumber = (value: number): string => formatStatistic('raw', value).text
 const criticalValues = (values: readonly number[]): string => values.map(rawNumber).join(' · ')
 
 function preparedArtifact(
   recipe: ReadyPreprocessingRecipe,
   profile: DatasetProfile,
   observations: number,
-): PreparedDatasetArtifact {
+  resolution: MissingnessResolutionRecord,
+  panel: PanelStructureEvidence | null,
+): Result<PreparedDatasetArtifact, { readonly kind: 'panel-evidence-missing' }> {
   const identity = {
     id: newPreparedDatasetVersionId(),
     recipe: newTransformRecipeId(),
@@ -96,29 +150,48 @@ function preparedArtifact(
     observations,
     columns: recipe.columns,
     missingness: recipe.missingness,
+    resolution,
   }
   switch (recipe.kind) {
-    case 'regular-series': return { ...identity, kind: 'prepared-time-series', sampling: recipe.sampling }
-    case 'cross-sectional': return { ...identity, kind: 'prepared-cross-section', sampling: recipe.sampling }
+    case 'regular-series': return ok({ ...identity, kind: 'prepared-time-series', sampling: recipe.sampling, seasonalAdjustment: recipe.seasonalAdjustment })
+    case 'cross-sectional': return ok({ ...identity, kind: 'prepared-cross-section', sampling: recipe.sampling, seasonalAdjustment: { kind: 'none' } })
+    case 'regular-panel': {
+      if (panel === null) return err({ kind: 'panel-evidence-missing' })
+      return ok({ ...identity, kind: 'prepared-panel', sampling: recipe.sampling, panel, seasonalAdjustment: { kind: 'none' } })
+    }
     default: return assertNever(recipe)
   }
 }
 
-export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence }: PreprocessingPanelProps) {
+export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence }: PreprocessingPanelProps) {
+  const [diagnostic, setDiagnostic] = useState<Diagnostic>('stationarity')
+  const [structureChecked, setStructureChecked] = useState(false)
   const [draft, dispatch] = useReducer(
     stepPreprocessing,
     profile,
     initialPreprocessingDraft,
   )
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
+  const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
   const readiness = readyPreprocessingRecipe(draft)
   const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
+  // The version this panel just made, or the one the project reopened with.
+  const preparedCurrent = draft.preparation.kind === 'succeeded' ? draft.preparation.artifact : preparedVersion
+  const preparedTimeSeries = preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series' ? preparedCurrent : null
+  const stationarityEvidence: StationarityEvidenceArtifact | null = draft.stationarity.kind === 'succeeded'
+    ? draft.stationarity.evidence
+    : stationarity !== null && preparedCurrent !== null && stationarity.preparedDataset === preparedCurrent.id ? stationarity : null
+  const panelSelected = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys'
   const crossSectionSelected = draft.sampling.kind === 'cross-sectional'
-  const currentFrequency = timeSeriesSelected ? draft.sampling.frequency : 'monthly'
-  const currentTime = draft.sampling.kind === 'regular-series' ? draft.sampling.timeColumn : ''
+  const currentFrequency = timeSeriesSelected || panelSelected ? draft.sampling.frequency : 'monthly'
+  const currentTime = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.timeColumn ?? '' : ''
+  const currentUnit = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.unitColumn ?? '' : ''
+  const seasonalPeriod = timeSeriesSelected ? seasonalPeriodOf(draft.sampling.frequency) : null
+  const lagExclusion = draft.missingness.kind === 'lag-aware-exclusion' ? draft.missingness : null
+  const columnName = (column: ColumnId): string => profile.columns.find((candidate) => candidate.id === column)?.name ?? column
   const missingnessChoices = crossSectionSelected
-    ? MISSINGNESS_CHOICES.filter((kind) => kind !== 'tigramite-mask')
+    ? MISSINGNESS_CHOICES.filter((kind) => kind !== 'lag-aware-exclusion')
     : MISSINGNESS_CHOICES
 
   const createPreparedVersion = async () => {
@@ -126,20 +199,64 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     if (!recipe.ok) return
     dispatch({ type: 'preparation-started' })
     try {
+      let panelStructure: PanelStructureEvidence | null = null
+      if (recipe.value.kind === 'regular-panel') {
+        const { inspectPanelInWorker } = await import('@/data/client')
+        const inspected = await inspectPanelInWorker(source.file, profile, recipe.value.sampling.unitColumn, recipe.value.sampling.timeColumn)
+        if (!inspected.ok) { dispatch({ type: 'preparation-failed', detail: describePanelDataProblem(inspected.error) }); return }
+        panelStructure = inspected.value
+        if (panelStructure.missingUnitKeys > 0 || panelStructure.missingTimeKeys > 0) {
+          dispatch({ type: 'preparation-failed', detail: `Panel keys have ${panelStructure.missingUnitKeys} missing unit values and ${panelStructure.missingTimeKeys} missing time values. Fill or drop those rows.` }); return
+        }
+        if (panelStructure.duplicateKeys > 0) { dispatch({ type: 'preparation-failed', detail: `${panelStructure.duplicateKeys} unit–time keys repeat. Remove the duplicate rows.` }); return }
+        if (!panelStructure.balanced) { dispatch({ type: 'preparation-failed', detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. Complete every unit–period cell.` }); return }
+      }
       const { materializeNumericColumnsInWorker } = await import('@/data/client')
       const matrix = await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
       if (!matrix.ok) {
-        dispatch({ type: 'preparation-failed', detail: `Numeric materialization refused: ${matrix.error.kind}.` })
+        dispatch({ type: 'preparation-failed', detail: 'The selected numeric columns could not be read. Check their types and missing-value settings.' })
         return
       }
-      if (matrix.value.missingCells > 0) {
-        dispatch({ type: 'preparation-failed', detail: 'The selected prepared matrix still contains unresolved missing cells.' })
+      const command = resolutionCommandFor(recipe.value.missingness)
+      let resolution: MissingnessResolutionRecord = { kind: 'none' }
+      let observations = matrix.value.rowCount
+      if (matrix.value.missingCells > 0 && command === null) {
+        dispatch({ type: 'preparation-failed', detail: 'Missing values remain in the selected columns. Choose a missing-value policy.' })
         return
+      }
+      if (recipe.value.kind === 'regular-panel' && matrix.value.missingCells > 0) {
+        dispatch({ type: 'preparation-failed', detail: 'Complete the missing values separately within each unit, then import the balanced panel again.' })
+        return
+      }
+      if (command !== null) {
+        const { resolveMissingnessInWorker } = await import('@/analysis/client')
+        const cells = matrix.value.rowCount * matrix.value.columns.length
+        const validity = new Uint8Array(cells)
+        for (let index = 0; index < cells; index += 1) validity[index] = (matrix.value.validity[index >> 3] >> (index & 7)) & 1
+        const resolved = await resolveMissingnessInWorker(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, validity, command)
+        if (!resolved.ok) {
+          dispatch({ type: 'preparation-failed', detail: resolved.error.detail })
+          return
+        }
+        const outcome = resolved.value.outcome
+        if (outcome.kind === 'refused') {
+          const reasons = outcome.reasons.map(describeMissingnessRefusal).join(' ')
+          const runs = outcome.unresolvedRuns.slice(0, 4).map((run) => `${matrix.value.columns[run.column]?.name ?? run.column} rows ${run.start + 1} to ${run.end}`).join('; ')
+          dispatch({ type: 'preparation-failed', detail: `${reasons}${runs.length > 0 ? ` (${runs}${outcome.unresolvedRuns.length > 4 ? '; …' : ''})` : ''} Raise the gap limit, choose another policy, or keep the complete interval.` })
+          return
+        }
+        if (command.kind === 'completeInterval') {
+          resolution = { kind: 'window', start: outcome.windowStart, endExclusive: outcome.windowEnd, sourceRows: matrix.value.rowCount }
+          observations = outcome.windowEnd - outcome.windowStart
+        } else {
+          resolution = { kind: 'imputed', method: command.method, maxGap: command.maxGap, cells: outcome.imputedCells.length }
+        }
       }
 
-      const artifact = preparedArtifact(recipe.value, profile, matrix.value.rowCount)
-      dispatch({ type: 'preparation-succeeded', artifact })
-      onPrepared(artifact)
+      const artifact = preparedArtifact(recipe.value, profile, observations, resolution, panelStructure)
+      if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
+      dispatch({ type: 'preparation-succeeded', artifact: artifact.value })
+      onPrepared(artifact.value)
     } catch (cause: unknown) {
       dispatch({
         type: 'preparation-failed',
@@ -149,21 +266,17 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   }
 
   const runDiagnostics = async () => {
-    if (draft.preparation.kind !== 'succeeded' || draft.preparation.artifact.kind !== 'prepared-time-series') return
-    const prepared = draft.preparation.artifact
+    if (preparedTimeSeries === null) return
+    const prepared = preparedTimeSeries
     dispatch({ type: 'diagnostics-started', total: prepared.columns.length })
     try {
-      const [{ materializeNumericColumnsInWorker }, { runStationarityBattery }] = await Promise.all([
-        import('@/data/client'),
+      const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runStationarityBattery }] = await Promise.all([
+        import('@/data/prepared'),
         import('@/analysis/client'),
       ])
-      const matrix = await materializeNumericColumnsInWorker(source.file, profile, prepared.columns)
+      const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
       if (!matrix.ok) {
-        dispatch({ type: 'diagnostics-failed', detail: `Numeric materialization refused: ${matrix.error.kind}.` })
-        return
-      }
-      if (matrix.value.missingCells > 0) {
-        dispatch({ type: 'diagnostics-failed', detail: 'The selected diagnostic matrix still contains unresolved missing cells.' })
+        dispatch({ type: 'diagnostics-failed', detail: describePreparedMaterialisationProblem(matrix.error) })
         return
       }
 
@@ -171,17 +284,27 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       for (const [columnIndex, column] of matrix.value.columns.entries()) {
         const start = columnIndex * matrix.value.rowCount
         const levels = matrix.value.values.slice(start, start + matrix.value.rowCount)
-        const transformed = transformSeries(levels, draft.transform)
-        const result = await runStationarityBattery(transformed)
-        if (!result.ok) {
-          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${result.error.detail}` })
+        const levelsBattery = await runStationarityBattery(levels.slice())
+        if (!levelsBattery.ok) {
+          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${levelsBattery.error.detail}` })
           return
         }
-        evidence.push({ column: column.id, result: result.value })
+        const differencedBattery = await runStationarityBattery(transformSeries(levels, { kind: 'difference', order: 1 }))
+        const differenced = differencedBattery.ok ? differencedBattery.value : null
+        const viewed = draft.transform.kind === 'levels'
+          ? ok(levelsBattery.value)
+          : draft.transform.kind === 'difference' && differenced !== null
+            ? ok(differenced)
+            : await runStationarityBattery(transformSeries(levels, draft.transform))
+        if (!viewed.ok) {
+          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${viewed.error.detail}` })
+          return
+        }
+        evidence.push({ column: column.id, result: viewed.value, levels: levelsBattery.value, differenced, assessment: assessStationarity(levelsBattery.value, differenced) })
         dispatch({ type: 'diagnostic-completed' })
       }
       if (!isNonEmpty(evidence)) {
-        dispatch({ type: 'diagnostics-failed', detail: 'No stationarity evidence was produced.' })
+        dispatch({ type: 'diagnostics-failed', detail: 'The stationarity tests returned no results. Check the selected numeric columns and run the tests again.' })
         return
       }
       const [firstEvidence] = evidence
@@ -207,42 +330,45 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   }
 
   return (
-    <section aria-labelledby="preprocessing-title">
+    <section aria-labelledby="preprocessing-title" className="@container/panel">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <span className={label('text-signal')}>Preprocessing</span>
-          <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">Prepare analysis data</h2>
+          <span className={label('text-signal')}>Prepare data</span>
+          <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">Set the analysis dataset</h2>
         </div>
-        <span className="text-body text-faint">Every choice becomes a new recipe version.</span>
+        <span className="max-w-[52ch] text-body text-faint">Set how rows are organised, handle missing values, and choose any time-series transformations.</span>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-line bg-panel p-4" aria-labelledby="sampling-title">
-          <span className={label('text-faint')}>01 · Observational structure</span>
-          <h3 id="sampling-title" className="mb-3 mt-1 text-title font-medium text-ink">How are rows related?</h3>
-          <div className="mb-3 flex flex-wrap gap-1 rounded-lg border border-hair bg-well p-1">
-            <button
-              type="button"
-              className={segment(timeSeriesSelected)}
-              aria-pressed={timeSeriesSelected}
-              onClick={() => dispatch({ type: 'regular-series-selected' })}
-            >
-              Regular time series
-            </button>
-            <button
-              type="button"
-              className={segment(crossSectionSelected)}
-              aria-pressed={crossSectionSelected}
-              onClick={() => dispatch({ type: 'cross-section-selected' })}
-            >
-              Independent observations
-            </button>
-          </div>
-          {timeSeriesSelected && (
-            <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 @3xl/panel:grid-cols-2">
+        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="sampling-title">
+          <span className={label('text-faint')}>How rows are organised</span>
+          <h3 id="sampling-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose the observation structure</h3>
+          <RadioList
+            className="mb-3"
+            legend="Observation structure"
+            legendHidden
+            value={timeSeriesSelected ? 'regular-series' : panelSelected ? 'regular-panel' : crossSectionSelected ? 'cross-section' : null}
+            onChange={(next) => dispatch({ type: next === 'regular-series' ? 'regular-series-selected' : next === 'regular-panel' ? 'regular-panel-selected' : 'cross-section-selected' })}
+            options={[
+              { value: 'regular-series', label: 'Regular time series', hint: 'One row per time step, ordered by its temporal key' },
+              { value: 'regular-panel', label: 'Panel', hint: 'Several units observed repeatedly; requires unit and temporal keys' },
+              { value: 'cross-section', label: 'Independent observations', hint: 'Rows are exchangeable; no time ordering' },
+            ]}
+          />
+          {(timeSeriesSelected || panelSelected) && (
+            <div className="grid gap-3 @md/card:grid-cols-2">
+              {panelSelected && (
+                <label className="block text-body text-ink">
+                  Unit column
+                  <Select className={field('text', 'mt-1')} value={currentUnit} onChange={(event) => { const column = profile.columns.find((candidate) => candidate.id === event.target.value); if (column) dispatch({ type: 'unit-column-selected', unitColumn: column.id }) }}>
+                    <option value="">Choose column</option>
+                    {profile.columns.filter((column) => column.id !== currentTime).map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
+                  </Select>
+                </label>
+              )}
               <label className="block text-body text-ink">
                 Time column
-                <select
+                <Select
                   className={field('text', 'mt-1')}
                   value={currentTime}
                   onChange={(event) => {
@@ -251,12 +377,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   }}
                 >
                   <option value="">Choose column</option>
-                  {profile.columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-                </select>
+                  {profile.columns.filter((column) => column.id !== currentUnit).map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
+                </Select>
               </label>
               <label className="block text-body text-ink">
                 Frequency
-                <select
+                <Select
                   className={field('text', 'mt-1')}
                   value={currentFrequency}
                   onChange={(event) => {
@@ -265,46 +391,51 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   }}
                 >
                   {FREQUENCIES.map((frequency) => <option key={frequency.value} value={frequency.value}>{frequency.label}</option>)}
-                </select>
+                </Select>
               </label>
             </div>
           )}
           {crossSectionSelected && (
-            <p className="m-0 text-body text-muted">Rows are independent units. Their order will not be interpreted as time.</p>
+            <p className="m-0 text-body text-muted">Rows are independent units. Their order does not represent time.</p>
           )}
           {draft.sampling.kind === 'unconfigured' && (
-            <p className="m-0 text-body text-faint">Choose explicitly; Hirmos will not infer time from row order.</p>
+            <p className="m-0 text-body text-faint">Select the structure that describes one row.</p>
           )}
         </section>
 
-        <section className="rounded-xl border border-line bg-panel p-4" aria-labelledby="variables-title">
-          <span className={label('text-faint')}>02 · Variables</span>
-          <h3 id="variables-title" className="mb-3 mt-1 text-title font-medium text-ink">Analysis columns</h3>
-          <div className="grid max-h-40 gap-1 overflow-y-auto sm:grid-cols-2">
+        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="variables-title">
+          <span className={label('text-faint')}>Variables</span>
+          <h3 id="variables-title" className="mb-3 mt-1 text-title font-medium text-ink">Select analysis columns</h3>
+          <div className="grid max-h-40 gap-1 overflow-y-auto @md/card:grid-cols-2">
             {numericColumns.map((column) => {
-              const isTime = column.id === currentTime
+              const isKey = column.id === currentTime || column.id === currentUnit
               return (
                 <label key={column.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-muted hover:bg-well">
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(column.id)}
-                    disabled={isTime}
+                    disabled={isKey}
                     onChange={() => dispatch({ type: 'variable-toggled', column: column.id })}
                   />
-                  <span className={isTime ? 'text-faint' : 'text-ink'}>{column.name}</span>
+                  <span className={isKey ? 'text-faint' : 'text-ink'}>{column.name}</span>
                 </label>
               )
             })}
           </div>
         </section>
 
-        <section className="rounded-xl border border-line bg-panel p-4" aria-labelledby="missingness-title">
-          <span className={label('text-faint')}>03 · Missing data</span>
-          <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">Resolution policy</h3>
+        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="missingness-title">
+          <span className={label('text-faint')}>Missing values</span>
+          <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose how to handle missing data</h3>
           {draft.missingness.kind === 'not-present' ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted">
-              <Icon name="check_circle" size={16} className="text-ok" /> No null cells detected.
+              <Icon name="check_circle" size={16} className="text-ok" /> No missing values detected.
             </p>
+          ) : panelSelected ? (
+            <Alert tone="danger" live={false}>
+              <p className="m-0">Fill the missing values separately within each unit before preparing this panel.</p>
+              <p className="mb-0 mt-1 text-muted">Interpolation and complete-interval operations on this screen do not cross unit boundaries.</p>
+            </Alert>
           ) : (
             <div className="space-y-2">
               {missingnessChoices.map((kind) => (
@@ -318,38 +449,170 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       resolution: missingnessChoice(kind, draft.missingness.kind === 'not-present' ? 0 : draft.missingness.cells),
                     })}
                   />
-                  <span>{kind === 'unresolved' ? 'Leave unresolved' : kind === 'tigramite-mask' ? 'Tigramite-compatible exclusion' : kind === 'complete-interval' ? 'Complete contiguous interval' : 'Explicit imputation'}</span>
+                  <span>{kind === 'unresolved' ? 'Leave unresolved' : kind === 'lag-aware-exclusion' ? 'Lag-aware sample exclusion' : kind === 'complete-interval' ? 'Complete contiguous interval' : 'Explicit imputation'}</span>
                 </label>
               ))}
+              {draft.missingness.kind === 'complete-interval' && (
+                <p className="mb-0 mt-1 pl-6 text-body text-faint">Keeps the longest run of rows where every selected column is observed; rows before and after are dropped and recorded.</p>
+              )}
+              {lagExclusion !== null && (
+                <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-2">
+                  <label className="block text-body text-ink">
+                    <span className={fieldLabel}>Leading history</span>
+                    <Select
+                      className={field('text', 'mt-1')}
+                      value={lagExclusion.history.kind}
+                      onChange={(event) => {
+                        const history: LagAwareExclusionDraft['history'] = event.target.value === 'minimum-for-features'
+                          ? { kind: 'minimum-for-features' }
+                          : event.target.value === 'fixed-warmup'
+                            ? { kind: 'fixed-warmup', observations: 1 }
+                            : { kind: 'method-default' }
+                        dispatch({ type: 'missingness-selected', resolution: { ...lagExclusion, history } })
+                      }}
+                    >
+                      <option value="method-default">Method default</option>
+                      <option value="minimum-for-features">Only required feature history</option>
+                      <option value="fixed-warmup">Fixed warm-up</option>
+                    </Select>
+                  </label>
+                  <label className="block text-body text-ink">
+                    <span className={fieldLabel}>Gap influence</span>
+                    <Select
+                      className={field('text', 'mt-1')}
+                      value={lagExclusion.gapInfluence.kind}
+                      onChange={(event) => {
+                        const gapInfluence: LagAwareExclusionDraft['gapInfluence'] = event.target.value === 'following-guard'
+                          ? { kind: 'following-guard', steps: 1 }
+                          : { kind: 'direct-only' }
+                        dispatch({ type: 'missingness-selected', resolution: { ...lagExclusion, gapInfluence } })
+                      }}
+                    >
+                      <option value="direct-only">Affected reference only</option>
+                      <option value="following-guard">Guard following references</option>
+                    </Select>
+                  </label>
+                  {lagExclusion.history.kind === 'fixed-warmup' && (
+                    <label className="block text-body text-ink">
+                      <span className={fieldLabel}>Warm-up observations</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={1000}
+                        className={field('text', 'mt-1 w-24')}
+                        value={lagExclusion.history.observations}
+                        onChange={(event) => dispatch({
+                          type: 'missingness-selected',
+                          resolution: {
+                            ...lagExclusion,
+                            history: { kind: 'fixed-warmup', observations: Math.max(0, Math.min(1000, Number(event.target.value) || 0)) },
+                          },
+                        })}
+                      />
+                    </label>
+                  )}
+                  {lagExclusion.gapInfluence.kind === 'following-guard' && (
+                    <label className="block text-body text-ink">
+                      <span className={fieldLabel}>Following references</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={1000}
+                        className={field('text', 'mt-1 w-24')}
+                        value={lagExclusion.gapInfluence.steps}
+                        onChange={(event) => dispatch({
+                          type: 'missingness-selected',
+                          resolution: {
+                            ...lagExclusion,
+                            gapInfluence: { kind: 'following-guard', steps: Math.max(1, Math.min(1000, Number(event.target.value) || 1)) },
+                          },
+                        })}
+                      />
+                    </label>
+                  )}
+                  <p className="mb-0 text-body text-faint @md/card:col-span-2">The time grid stays intact. Compatible lagged methods apply this policy while constructing their analysis samples.</p>
+                </div>
+              )}
+              {draft.missingness.kind === 'imputation' && (
+                <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[auto_auto] sm:items-end">
+                  <div>
+                    <span className={fieldLabel}>Method</span>
+                    <SegmentedControl
+                      className="mt-1"
+                      ariaLabel="Imputation method"
+                      value={draft.missingness.kind === 'imputation' ? draft.missingness.method : null}
+                      onChange={(method) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), method } })}
+                      options={[{ value: 'linearInterior', label: 'Linear inside the series' }, { value: 'forwardFill', label: 'Carry forward' }, { value: 'structuralZero', label: 'Structural zero' }]}
+                    />
+                  </div>
+                  {draft.missingness.method !== 'structuralZero' ? (
+                    <label className="block text-body text-ink"><span className={fieldLabel}>Longest gap to fill</span><input type="number" min={1} max={1000} aria-label="Longest gap to fill" className={field('text', 'mt-1 w-24')} value={draft.missingness.maxGap} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), maxGap: Math.max(1, Math.min(1000, Number(event.target.value) || 1)) } })} /></label>
+                  ) : (
+                    <label className="flex items-start gap-2 text-body text-ink"><input type="checkbox" checked={draft.missingness.confirmedStructuralZero} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), confirmedStructuralZero: event.target.checked } })} /><span>Confirm that each missing value represents a true zero.</span></label>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </section>
 
-        <section className="rounded-xl border border-line bg-panel p-4" aria-labelledby="transform-title">
-          <span className={label('text-faint')}>04 · Transformation</span>
-          <h3 id="transform-title" className="mb-3 mt-1 text-title font-medium text-ink">Stationarity view</h3>
+        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="transform-title">
+          <span className={label('text-faint')}>Time-series transformation</span>
+          <h3 id="transform-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose a time-series transformation</h3>
           {timeSeriesSelected ? (
             <>
-              <div className="flex flex-wrap gap-1 rounded-lg border border-hair bg-well p-1">
-                {TRANSFORMS.map((transform) => (
-                  <button
-                    key={transform.value.kind}
-                    type="button"
-                    className={segment(transformIsSelected(draft.transform, transform.value))}
-                    aria-pressed={transformIsSelected(draft.transform, transform.value)}
-                    onClick={() => dispatch({ type: 'transform-selected', transform: transform.value })}
-                  >
-                    {transform.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                ariaLabel="Stationarity view"
+                value={TRANSFORMS.find((transform) => transformIsSelected(draft.transform, transform.value))?.value.kind ?? null}
+                onChange={(next) => { const transform = TRANSFORMS.find((candidate) => candidate.value.kind === next); if (transform) dispatch({ type: 'transform-selected', transform: transform.value }) }}
+                options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
+              />
               <p className="mb-0 mt-2 text-body text-faint">
                 {TRANSFORMS.find((transform) => transformIsSelected(draft.transform, transform.value))?.detail}
               </p>
+              <div className="mt-4 border-t border-hair pt-3">
+                <label className="flex items-start gap-2 text-body text-ink">
+                  <input
+                    type="checkbox"
+                    checked={draft.seasonal.kind === 'stl'}
+                    disabled={seasonalPeriod === null}
+                    onChange={(event) => dispatch({ type: 'seasonal-adjustment-selected', seasonal: event.target.checked ? { kind: 'stl', columns: [], robust: false } : { kind: 'none' } })}
+                  />
+                  <span>
+                    Remove the seasonal component with seasonal-trend decomposition using loess (STL){seasonalPeriod === null ? ' (no period for yearly rows)' : ` at period ${seasonalPeriod}`}
+                    <span className="block text-faint">The prepared dataset version stores this adjustment. The seasonal strength card reports any remaining seasonality.</span>
+                  </span>
+                </label>
+                {draft.seasonal.kind === 'stl' && (
+                  <div className="mt-2 grid gap-2 pl-6">
+                    <div className="grid gap-1 @md/card:grid-cols-2" role="group" aria-label="Columns to adjust seasonally">
+                      {selectedIds.map((column) => {
+                        const name = profile.columns.find((candidate) => candidate.id === column)?.name ?? column
+                        const seasonal = draft.seasonal
+                        return (
+                          <label key={column} className="flex items-center gap-2 rounded-md px-2 py-1 text-body text-ink hover:bg-well">
+                            <input
+                              type="checkbox"
+                              checked={seasonal.kind === 'stl' && seasonal.columns.includes(column)}
+                              onChange={(event) => seasonal.kind === 'stl' && dispatch({ type: 'seasonal-adjustment-selected', seasonal: { ...seasonal, columns: event.target.checked ? [...seasonal.columns, column] : seasonal.columns.filter((candidate) => candidate !== column) } })}
+                            />
+                            <span>{name}</span>
+                          </label>
+                        )
+                      })}
+                      {selectedIds.length === 0 && <p className="m-0 text-body text-faint">Select analysis columns first.</p>}
+                    </div>
+                    <label className="flex items-center gap-2 text-body text-ink">
+                      <input type="checkbox" checked={draft.seasonal.robust} onChange={(event) => draft.seasonal.kind === 'stl' && dispatch({ type: 'seasonal-adjustment-selected', seasonal: { ...draft.seasonal, robust: event.target.checked } })} />
+                      <span>Robust fit (down-weights outliers)</span>
+                    </label>
+                  </div>
+                )}
+              </div>
             </>
           ) : (
             <p className="m-0 text-body text-faint">
-              {crossSectionSelected ? 'Stationarity and temporal transforms do not apply to independent observations.' : 'Choose the observational structure first.'}
+              {panelSelected ? 'This prepared panel keeps outcomes in levels. Any later lag, difference, or interpolation must operate separately within each unit.' : crossSectionSelected ? 'Stationarity and temporal transforms do not apply to independent observations.' : 'Choose the observational structure first.'}
             </p>
           )}
         </section>
@@ -358,8 +621,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       <section className="mt-4 rounded-xl border border-edge bg-panel p-4" aria-labelledby="preparation-run-title">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 id="preparation-run-title" className="m-0 text-title font-medium text-ink">Prepared dataset</h3>
-            <p className="mb-0 mt-1 text-body text-faint">Validate the selected structure and create an immutable version.</p>
+            <h3 id="preparation-run-title" className="m-0 text-title font-medium text-ink">Save the preparation settings</h3>
+            <p className="mb-0 mt-1 text-body text-faint">The imported source stays unchanged.</p>
           </div>
           <button
             type="button"
@@ -367,78 +630,103 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             disabled={!readiness.ok || draft.preparation.kind === 'running'}
             onClick={() => void createPreparedVersion()}
           >
-            {draft.preparation.kind === 'running' ? 'Preparing…' : 'Create prepared version'}
+            {draft.preparation.kind === 'running' ? 'Preparing…' : 'Create prepared dataset version'}
           </button>
         </div>
         {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeReadinessProblem(readiness.error)}</p>}
-        {draft.preparation.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{draft.preparation.detail}</p>}
+        {draft.preparation.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.preparation.detail}</p></Alert>}
         {draft.preparation.kind === 'succeeded' && (
           <p role="status" className="mb-0 mt-3 flex flex-wrap items-center gap-2 text-body text-muted">
             <Icon name="check_circle" size={16} className="text-ok" />
-            {draft.preparation.artifact.kind === 'prepared-time-series' ? 'Prepared time series' : 'Prepared cross-section'} ·{' '}
-            {draft.preparation.artifact.observations.toLocaleString()} observations
+            {draft.preparation.artifact.kind === 'prepared-time-series' ? 'Prepared time series' : draft.preparation.artifact.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'} ·{' '}
+            {draft.preparation.artifact.observations.toLocaleString()} rows
+            {describeResolutionRecord(draft.preparation.artifact.resolution) !== null && <> · {describeResolutionRecord(draft.preparation.artifact.resolution)}</>}
+            {describeSeasonalAdjustment(draft.preparation.artifact.seasonalAdjustment, columnName) !== null && <> · {describeSeasonalAdjustment(draft.preparation.artifact.seasonalAdjustment, columnName)}</>}
           </p>
+        )}
+        {draft.preparation.kind === 'succeeded' && draft.preparation.artifact.kind === 'prepared-panel' && (
+          <p className="mb-0 mt-1 text-body text-faint">{draft.preparation.artifact.panel.units.toLocaleString()} units × {draft.preparation.artifact.panel.periods.toLocaleString()} periods · balanced unit–time grid</p>
         )}
       </section>
 
-      {timeSeriesSelected && (
-        <section className="mt-4 rounded-xl border border-line bg-panel p-4" aria-labelledby="diagnostics-title">
+      {(timeSeriesSelected || preparedTimeSeries !== null) && (
+        <section className="mt-4 rounded-xl border border-hair bg-panel p-4" aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 id="diagnostics-title" className="m-0 text-title font-medium text-ink">Stationarity evidence</h3>
-              <p className="mb-0 mt-1 text-body text-faint">Optional ADF, KPSS, and Zivot–Andrews evidence. Preparation remains valid if evidence is inconclusive.</p>
+              <h3 id="diagnostics-title" className="m-0 text-title font-medium text-ink">Diagnostics</h3>
+              <p className="mb-0 mt-1 text-body text-faint">These tests do not change the prepared dataset.</p>
+            </div>
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Diagnostic"
+              value={diagnostic}
+              onChange={setDiagnostic}
+              options={[
+                { value: 'stationarity', label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
+                { value: 'structure', label: <DiagnosticLabel text="Breaks and seasonality" done={structureChecked} /> },
+                { value: 'granger', label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
+              ]}
+            />
+          </div>
+          {preparedTimeSeries === null && (
+            <p role="status" className="mb-0 mt-3 text-body text-faint">Create a prepared dataset version to run these diagnostics.</p>
+          )}
+          <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
+              <p className="mb-0 mt-1 text-body text-faint">Augmented Dickey–Fuller (ADF), Kwiatkowski–Phillips–Schmidt–Shin (KPSS), and Zivot–Andrews tests.</p>
             </div>
             <button
               type="button"
               className={button('quiet')}
-              disabled={draft.preparation.kind !== 'succeeded' || draft.stationarity.kind === 'running'}
+              disabled={preparedTimeSeries === null || draft.stationarity.kind === 'running'}
               onClick={() => void runDiagnostics()}
             >
               {draft.stationarity.kind === 'running' ? `Testing ${draft.stationarity.completed}/${draft.stationarity.total}` : 'Run stationarity tests'}
             </button>
           </div>
-          {draft.preparation.kind !== 'succeeded' && (
-            <p role="status" className="mb-0 mt-3 text-body text-faint">Create the structurally prepared version first.</p>
-          )}
           <MethodCaveats methods={STATIONARITY_METHODS} />
-          {draft.stationarity.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{draft.stationarity.detail}</p>}
-          {draft.stationarity.kind === 'succeeded' && (
+          {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
+          {stationarityEvidence !== null && (
           <div className="mt-4 overflow-x-auto">
             <p role="status" className="mb-3 mt-0 flex flex-wrap items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" />
-              Evidence run · {draft.stationarity.evidence.observations.toLocaleString()} observations · {
-                draft.stationarity.evidence.transform.kind === 'levels'
+              Stationarity tests · {stationarityEvidence.observations.toLocaleString()} rows · {
+                stationarityEvidence.transform.kind === 'levels'
                   ? 'levels'
-                  : draft.stationarity.evidence.transform.kind === 'difference'
+                  : stationarityEvidence.transform.kind === 'difference'
                     ? 'first difference'
                     : 'linear detrend'
               }
             </p>
-            <table className="w-full border-collapse text-left text-body">
-              <thead className="text-faint">
+            <table className={table}>
+              <thead>
                 <tr>
-                  <th className="border-b border-hair px-2 py-2 font-normal">Variable</th>
-                  <th className="border-b border-hair px-2 py-2 text-right font-normal">ADF p · c</th>
-                  <th className="border-b border-hair px-2 py-2 text-right font-normal">KPSS p · c</th>
-                  <th className="border-b border-hair px-2 py-2 text-right font-normal">ZA p · c+trend</th>
+                  <th className={th()}>Variable</th>
+                  <th className={th('text-right')}>ADF p · c</th>
+                  <th className={th('text-right')}>KPSS p · c</th>
+                  <th className={th('text-right')}>Zivot–Andrews p · constant and trend</th>
+                  <th className={th()}>Verdict</th>
                 </tr>
               </thead>
               <tbody>
-                {draft.stationarity.evidence.variables.map((evidence) => {
+                {stationarityEvidence.variables.map((evidence) => {
                   const column = profile.columns.find((candidate) => candidate.id === evidence.column)
                   return (
-                    <tr key={evidence.column} className="border-b border-hair last:border-0">
-                      <td className="px-2 py-2 text-ink">{column?.name ?? evidence.column}</td>
-                      <td className={num('px-2 py-2 text-right text-muted')}>{pValue(evidence.result.adf.constant.pValue)}</td>
-                      <td className={num('px-2 py-2 text-right text-muted')}>{pValue(evidence.result.kpss.constant.pValue)}</td>
-                      <td className={num('px-2 py-2 text-right text-muted')}>{pValue(evidence.result.zivotAndrews.levelAndTrend.pValue)}</td>
+                    <tr key={evidence.column} className={tr()}>
+                      <td className={td(cn('text-ink', cellPadding(density)))}>{column?.name ?? evidence.column}</td>
+                      <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{pValue(evidence.result.adf.constant.pValue)}</td>
+                      <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{pValue(evidence.result.kpss.constant.pValue)}</td>
+                      <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{pValue(evidence.result.zivotAndrews.levelAndTrend.pValue)}</td>
+                      <td className={td(cn('max-w-none whitespace-normal', cellPadding(density)))}><StationarityVerdict assessment={evidence.assessment} /></td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
             <div className="mt-4 space-y-2" aria-label="Stationarity raw evidence">
-              {draft.stationarity.evidence.variables.map((evidence) => {
+              {stationarityEvidence.variables.map((evidence) => {
                 const column = profile.columns.find((candidate) => candidate.id === evidence.column)
                 const result = evidence.result
                 const rows = [
@@ -498,24 +786,24 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       {column?.name ?? evidence.column} · complete numerical evidence
                     </summary>
                     <div className="mt-2 overflow-x-auto">
-                      <table className="w-full border-collapse text-left text-body">
-                        <thead className="text-faint">
+                      <table className={table}>
+                        <thead>
                           <tr>
-                            <th className="border-b border-hair px-2 py-2 font-normal">Specification</th>
-                            <th className="border-b border-hair px-2 py-2 text-right font-normal">Statistic</th>
-                            <th className="border-b border-hair px-2 py-2 text-right font-normal">p-value</th>
-                            <th className="border-b border-hair px-2 py-2 font-normal">Fit</th>
-                            <th className="border-b border-hair px-2 py-2 font-normal">Critical values · reference order</th>
+                            <th className={th()}>Specification</th>
+                            <th className={th('text-right')}>Statistic</th>
+                            <th className={th('text-right')}>p-value</th>
+                            <th className={th()}>Fit</th>
+                            <th className={th()}>Critical values · reference order</th>
                           </tr>
                         </thead>
                         <tbody>
                           {rows.map((row) => (
-                            <tr key={row.name} className="border-b border-hair last:border-0">
-                              <td className="px-2 py-2 text-ink">{row.name}</td>
-                              <td className={num('px-2 py-2 text-right text-muted')}>{rawNumber(row.statistic)}</td>
-                              <td className={num('px-2 py-2 text-right text-muted')}>{rawNumber(row.p)}</td>
-                              <td className={num('px-2 py-2 text-muted')}>{row.fit}</td>
-                              <td className={num('px-2 py-2 text-muted')}>{criticalValues(row.critical)}</td>
+                            <tr key={row.name} className={tr()}>
+                              <td className={td(cn('text-ink', cellPadding(density)))}>{row.name}</td>
+                              <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{rawNumber(row.statistic)}</td>
+                              <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{rawNumber(row.p)}</td>
+                              <td className={td(cn(num('text-muted'), cellPadding(density)))}>{row.fit}</td>
+                              <td className={td(cn(num('text-muted'), cellPadding(density)))}>{criticalValues(row.critical)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -525,9 +813,30 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 )
               })}
             </div>
-            <p className="mb-0 mt-3 text-body text-faint">ADF null: unit root. KPSS null: stationarity. This table is evidence; it does not transform the source automatically.</p>
+            <p className="mb-0 mt-3 text-body text-faint">The ADF null hypothesis is a unit root. The KPSS null hypothesis is stationarity. These tests do not transform the source.</p>
           </div>
           )}
+          </div>
+          <div hidden={diagnostic !== 'structure'} className="mt-4 border-t border-hair pt-4">
+            {preparedTimeSeries !== null
+              ? <SeriesStructureCard embedded source={source} profile={profile} prepared={preparedTimeSeries} onResult={() => setStructureChecked(true)} />
+              : null}
+          </div>
+          <div hidden={diagnostic !== 'granger'} className="mt-4 border-t border-hair pt-4">
+            {preparedTimeSeries !== null
+              ? (
+                <GrangerCard
+                  embedded
+                  source={source}
+                  profile={profile}
+                  prepared={preparedTimeSeries}
+                  stationarity={stationarityEvidence}
+                  evidence={grangerEvidence}
+                  onEvidence={onGrangerEvidence}
+                />
+              )
+              : null}
+          </div>
         </section>
       )}
     </section>

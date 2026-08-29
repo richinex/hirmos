@@ -1,8 +1,16 @@
-import { useReducer } from 'react'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { Select } from '@/components/ui/Select'
+import { useReducer, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
+import { Alert } from '@/components/ui/Alert'
 import { MethodCaveats } from '@/components/MethodCaveats'
-import { button, field, label, literal, num, segment } from '@/components/ui/recipes'
-import type { ColumnId, DatasetProfile, NumericColumnSelection } from '@/domain/dataset'
+import { EligibilityView } from '@/components/EligibilityView'
+import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
+import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
+import { OcsePlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { button, field, label, literal, num } from '@/components/ui/recipes'
+import type { DatasetProfile } from '@/domain/dataset'
 import {
   DISCOVERY_LAG_OPTIONS,
   DYNOTEARS_PENALTY_OPTIONS,
@@ -15,28 +23,33 @@ import {
   newDiscoveryRunId,
   readyDiscoverySpecification,
   stepDiscovery,
-  type ColumnChoice,
   type DiscoveryConfiguration,
   type DiscoveryLag,
   type DiscoveryRunArtifact,
   type DynotearsPenalty,
   type OcseShuffles,
   type PcmciAlpha,
+  type DiscoveryMethodChoice,
 } from '@/domain/discovery'
-import { assertNever, type NonEmptyArray } from '@/domain/dop'
+import { assertNever } from '@/domain/dop'
 import {
-  GRANGER_SSR_F_METHOD_ID,
   DYNOTEARS_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
+  VAR_LINGAM_METHOD_ID,
   methodDefinition,
   type MethodDefinition,
   type MethodEligibility,
-  type MethodSource,
 } from '@/domain/methods'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
+import { useRunActivity } from '@/lib/useRunActivity'
+import type { RunActivity } from '@/domain/activity'
+import { formatTimestamp } from '@/lib/format/date'
+import { formatCount } from '@/lib/format/number'
+
+const DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
 
 interface DiscoveryPanelProps {
   readonly source: SelectedSource
@@ -45,11 +58,7 @@ interface DiscoveryPanelProps {
   readonly stationarity: StationarityEvidenceArtifact | null
   readonly runs: readonly DiscoveryRunArtifact[]
   readonly onRun: (artifact: DiscoveryRunArtifact) => void
-}
-
-const selectedColumn = (value: string, columns: readonly ColumnId[]): ColumnChoice => {
-  const column = columns.find((candidate) => candidate === value)
-  return column === undefined ? { kind: 'unselected' } : { kind: 'selected', column }
+  readonly onActivity?: (activity: RunActivity | null) => void
 }
 
 const lagFromValue = (value: string): DiscoveryLag | null =>
@@ -69,8 +78,8 @@ const methodIdOf = (configuration: DiscoveryConfiguration) => {
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
     case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
     case 'dynotears': return DYNOTEARS_METHOD_ID
+    case 'var-lingam': return VAR_LINGAM_METHOD_ID
     case 'ocse': return OCSE_METHOD_ID
-    case 'granger-ssr-f': return GRANGER_SSR_F_METHOD_ID
     default: return assertNever(configuration)
   }
 }
@@ -78,107 +87,74 @@ const methodIdOf = (configuration: DiscoveryConfiguration) => {
 const pValue = (value: number): string => value < 0.0001 ? '<0.0001' : value.toFixed(4)
 const statistic = (value: number): string => Math.abs(value) >= 10_000 ? value.toExponential(4) : value.toFixed(6)
 
-function EligibilityView({ eligibility }: { readonly eligibility: MethodEligibility }) {
-  switch (eligibility.kind) {
-    case 'eligible':
-      return (
-        <div className="mt-4 rounded-lg border border-hair bg-well p-3 text-body text-muted">
-          <p className="m-0 flex items-center gap-2 text-ink"><Icon name="check_circle" size={16} className="text-ok" /> Eligible on recorded structural checks</p>
-          <p className="mb-0 mt-1 text-faint">{eligibility.satisfied.length} requirements have project evidence.</p>
-        </div>
-      )
-    case 'caution':
-      return (
-        <div className="mt-4 rounded-lg border border-edge bg-well p-3 text-body text-muted">
-          <p className="m-0 flex items-center gap-2 text-ink"><Icon name="warning" size={16} className="text-warn" /> Available with unresolved assumptions</p>
-          <details className="mt-2">
-            <summary className="cursor-pointer text-faint">Review {eligibility.unresolved.length} unresolved requirements</summary>
-            <ul className="mb-0 mt-2 space-y-2 pl-4">
-              {eligibility.unresolved.map((evaluation) => (
-                <li key={evaluation.caveat.id}>
-                  <span className="text-ink">{evaluation.caveat.requirement}</span>
-                  <span className="mt-0.5 block text-faint">{evaluation.missingEvidence}</span>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </div>
-      )
-    case 'refused':
-      return (
-        <div className="mt-4 rounded-lg border border-danger/30 bg-well p-3 text-body">
-          <p className="m-0 flex items-center gap-2 text-danger"><Icon name="block" size={16} /> Method refused for this prepared dataset</p>
-          <ul className="mb-0 mt-2 space-y-2 pl-4 text-muted">
-            {eligibility.violations.map((evaluation) => (
-              <li key={evaluation.caveat.id}>{evaluation.evidence}</li>
-            ))}
-          </ul>
-        </div>
-      )
-    default: return assertNever(eligibility)
-  }
-}
+const asNumber = (value: string | number): number => (typeof value === 'number' ? value : Number(value))
+
+interface LinkRow { readonly source: string; readonly target: string; readonly lag: number }
+
+const linkColumns = <Row extends LinkRow>(): readonly EvidenceColumn<Row>[] => [
+  { id: 'source', header: 'Source', value: (row) => row.source },
+  { id: 'target', header: 'Target', value: (row) => row.target },
+  { id: 'lag', header: 'Lag', align: 'right', value: (row) => row.lag },
+]
+
+const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => number, print: (value: number) => string = statistic): EvidenceColumn<Row> =>
+  ({ id, header, align: 'right', value, format: (value) => print(asNumber(value)) })
+
 
 function ResultEligibility({ eligibility }: { readonly eligibility: MethodEligibility }) {
   switch (eligibility.kind) {
-    case 'eligible': return <span className="text-ok">Eligible · {eligibility.satisfied.length} checks recorded</span>
-    case 'caution': return <span className="text-warn">Caution · {eligibility.unresolved.length} unresolved assumptions retained</span>
-    case 'refused': return <span className="text-danger">Refused · {eligibility.violations.length} violations</span>
+    case 'eligible': return <span className="text-ok">Available · {eligibility.satisfied.length} requirements checked</span>
+    case 'caution': return <span className="text-warn">Available · {eligibility.unresolved.length} requirements not checked</span>
+    case 'refused': return <span className="text-danger">Unavailable · {eligibility.violations.length} requirements fail</span>
     default: return assertNever(eligibility)
   }
 }
 
-const sourceLabel = (source: MethodSource): string => {
-  switch (source.kind) {
-    case 'reference-implementation': return `${source.repository}@${source.revision.slice(0, 8)} · ${source.locator}`
-    case 'paper': return `${source.title} · ${source.locator}`
-    case 'hirmos-constraint': return `Hirmos boundary · ${source.locator}`
-    default: return assertNever(source)
-  }
-}
-
-function ResultAssumptions({ eligibility }: { readonly eligibility: MethodEligibility }) {
-  const evaluations = eligibility.kind === 'eligible'
-    ? eligibility.satisfied
-    : eligibility.kind === 'caution'
-      ? eligibility.unresolved
-      : eligibility.violations
+function RunRecord({ run }: { readonly run: DiscoveryRunArtifact }) {
   return (
     <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
-      <summary className="cursor-pointer text-ink">Assumption snapshot retained with this run</summary>
-      <ul className="mb-0 mt-2 space-y-3 pl-4 text-muted">
-        {evaluations.map((evaluation) => (
-          <li key={evaluation.caveat.id}>
-            <p className="m-0 text-ink">{evaluation.caveat.requirement}</p>
-            <p className="mb-1 mt-0.5 text-faint">If unmet: {evaluation.caveat.consequenceIfUnmet}</p>
-            <p className="m-0 text-micro text-faint">
-              {evaluation.kind === 'satisfied' ? evaluation.evidence : evaluation.kind === 'unresolved' ? evaluation.missingEvidence : evaluation.evidence}
-            </p>
-            <p className="mb-0 mt-1 text-micro text-faint">Source: {evaluation.caveat.sources.map(sourceLabel).join('; ')}</p>
-          </li>
-        ))}
-      </ul>
-    </details>
-  )
-}
-
-function RunProvenance({ run }: { readonly run: DiscoveryRunArtifact }) {
-  return (
-    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
-      <summary className="cursor-pointer text-ink">Run provenance</summary>
+      <summary className="cursor-pointer text-ink">Run details</summary>
       <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
         <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
-        <dt>Prepared data</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
-        <dt>Created</dt><dd className={literal('m-0')}>{run.createdAt}</dd>
+        <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
+        <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         <dt>Method</dt><dd className={literal('m-0')}>{run.method}</dd>
       </dl>
     </details>
   )
 }
 
+/** One run's card: a disclosure whose summary carries the method, title and figures, so a reader can keep one run open and fold the rest. */
+function ResultCard({ run, method, title, meta, open, current, children }: {
+  readonly run: DiscoveryRunArtifact
+  readonly method: string
+  readonly title: ReactNode
+  readonly meta: ReactNode
+  readonly open: boolean
+  /** The newest run: the one card that carries the emphasised border. */
+  readonly current: boolean
+  readonly children: ReactNode
+}) {
+  return (
+    <article aria-labelledby={`run-${run.id}`}>
+      <details className={`group rounded-xl border bg-panel ${current ? 'border-edge' : 'border-hair'}`} open={open}>
+        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl p-4 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+          <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-150 group-open:rotate-180" />
+          <div className="min-w-0 flex-1">
+            <span className={label('text-signal')}>{method}</span>
+            <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{title}</h3>
+            <p className="m-0 text-body text-faint">{meta}</p>
+          </div>
+        </summary>
+        <div className="px-4 pb-4">{children}</div>
+      </details>
+    </article>
+  )
+}
+
 type TimeGraphRun = Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>
 
-function TimeGraphResult({ run }: { readonly run: TimeGraphRun }) {
+function TimeGraphResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: TimeGraphRun }) {
   const cells = run.result.graph.flatMap((targets, sourceIndex) =>
     targets.flatMap((lags, targetIndex) =>
       lags.map((mark, lag) => ({
@@ -191,155 +167,122 @@ function TimeGraphResult({ run }: { readonly run: TimeGraphRun }) {
       })),
     ),
   )
-  const reported = cells.filter((cell) => cell.mark.length > 0).length
+  const rows = cells.map((cell) => ({ key: `${cell.sourceIndex}:${cell.targetIndex}:${cell.lag}`, source: run.variables[cell.sourceIndex].name, target: run.variables[cell.targetIndex].name, lag: cell.lag, mark: cell.mark, p: cell.p, value: cell.value }))
   const isLpcmci = run.kind === 'lpcmci-run'
   const methodLabel = isLpcmci ? 'LPCMCI · ParCorr' : 'PCMCI+ · ParCorr'
   const resultTitle = isLpcmci ? 'Latent-aware partial ancestral graph evidence' : 'Stationary lag-graph evidence'
   const tableLabel = isLpcmci ? 'LPCMCI raw evidence' : 'PCMCI+ raw evidence'
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <span className={label('text-signal')}>{methodLabel}</span>
-          <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{resultTitle}</h3>
-          <p className="m-0 text-body text-faint">{run.result.observations} observations · {run.result.variables} variables · τ max {run.result.tauMax} · α {run.result.pcAlpha}</p>
-        </div>
-        <span className={num('text-body text-muted')}>{reported} marked cells</span>
-      </div>
+    <ResultCard run={run} open={open} current={current} method={methodLabel} title={resultTitle} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <ResultAssumptions eligibility={run.eligibility} />
-      <RunProvenance run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">Every graph mark, p-value, and ParCorr value is retained below. Empty marks remain visible as “—”; {isLpcmci ? 'circles, tails, and arrowheads remain PAG/DPAG endpoint marks' : 'contemporaneous unresolved endpoints are not converted into arrows'}.</p>
-      <div className="max-h-96 overflow-auto rounded-lg border border-hair" aria-label={tableLabel}>
-        <table className="w-full border-collapse text-left text-body">
-          <thead className="sticky top-0 bg-panel text-faint">
-            <tr>
-              <th className="border-b border-hair px-2 py-2 font-normal">Source</th>
-              <th className="border-b border-hair px-2 py-2 font-normal">Target</th>
-              <th className="border-b border-hair px-2 py-2 text-right font-normal">Lag</th>
-              <th className="border-b border-hair px-2 py-2 font-normal">Mark</th>
-              <th className="border-b border-hair px-2 py-2 text-right font-normal">p</th>
-              <th className="border-b border-hair px-2 py-2 text-right font-normal">ParCorr</th>
-            </tr>
-          </thead>
-          <tbody>
-            {cells.map((cell) => (
-              <tr key={`${cell.sourceIndex}:${cell.targetIndex}:${cell.lag}`} className="border-b border-hair last:border-0">
-                <td className="px-2 py-2 text-ink">{run.variables[cell.sourceIndex].name}</td>
-                <td className="px-2 py-2 text-ink">{run.variables[cell.targetIndex].name}</td>
-                <td className={num('px-2 py-2 text-right text-muted')}>{cell.lag}</td>
-                <td className={literal('px-2 py-2 text-muted')}>{cell.mark || '—'}</td>
-                <td className={num('px-2 py-2 text-right text-muted')}>{pValue(cell.p)}</td>
-                <td className={num('px-2 py-2 text-right text-muted')}>{statistic(cell.value)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </article>
+      <RunRecord run={run} />
+      <StructurePlot run={run} label={`${methodLabel} structure`} />
+      <TimeGraphPlot run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">Empty marks appear as “—”. {isLpcmci ? 'The legend under the structure view defines each mark.' : 'Unoriented same-period links keep the o-o mark.'}</p>
+      <EvidenceTable<typeof rows[number]>
+        title={tableLabel}
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="cell"
+        empty="The run reported no cell."
+        columns={[
+          ...linkColumns<typeof rows[number]>(),
+          { id: 'mark', header: 'Mark', mono: true, value: (row) => row.mark, format: (value) => (value === '' ? '—' : value) },
+          figureColumn<typeof rows[number]>('p', 'p', (row) => row.p, pValue),
+          figureColumn<typeof rows[number]>('value', 'ParCorr', (row) => row.value),
+        ]}
+      />
+    </ResultCard>
   )
 }
 
-function DynotearsResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' }> }) {
+function DynotearsResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' }> }) {
   const weights = [run.result.contemporaneousWeights, ...run.result.laggedWeights].flatMap((matrix, lag) =>
     matrix.flatMap((targets, source) => targets.map((weight, target) => ({ lag, source, target, weight }))),
   )
+  const rows = weights.map((cell) => ({ key: `${cell.lag}:${cell.source}:${cell.target}`, source: run.variables[cell.source].name, target: run.variables[cell.target].name, lag: cell.lag, weight: cell.weight }))
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
-      <span className={label('text-signal')}>DYNOTEARS</span>
-      <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">Sparse dynamic SEM weights</h3>
-      <p className="m-0 text-body text-faint">{run.result.observations} observations · {run.result.variables} variables · max lag {run.result.maxLag} · λW {run.result.lambdaW} · λA {run.result.lambdaA}</p>
+    <ResultCard run={run} open={open} current={current} method="DYNOTEARS" title={<>Sparse dynamic structural equation model weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · λW {run.result.lambdaW} · λA {run.result.lambdaA}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <ResultAssumptions eligibility={run.eligibility} />
-      <RunProvenance run={run} />
+      <RunRecord run={run} />
+      <StructurePlot run={run} label="DYNOTEARS structure" />
+      <WeightPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">All fitted weights are retained without a display threshold. Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
-      <div className="max-h-96 overflow-auto rounded-lg border border-hair" aria-label="DYNOTEARS raw weights">
-        <table className="w-full border-collapse text-left text-body">
-          <thead className="sticky top-0 bg-panel text-faint"><tr>
-            <th className="border-b border-hair px-2 py-2 font-normal">Source</th><th className="border-b border-hair px-2 py-2 font-normal">Target</th><th className="border-b border-hair px-2 py-2 text-right font-normal">Lag</th><th className="border-b border-hair px-2 py-2 text-right font-normal">Weight</th>
-          </tr></thead>
-          <tbody>{weights.map((cell) => (
-            <tr key={`${cell.lag}:${cell.source}:${cell.target}`} className="border-b border-hair last:border-0">
-              <td className="px-2 py-2 text-ink">{run.variables[cell.source].name}</td><td className="px-2 py-2 text-ink">{run.variables[cell.target].name}</td><td className={num('px-2 py-2 text-right text-muted')}>{cell.lag}</td><td className={num('px-2 py-2 text-right text-muted')}>{statistic(cell.weight)}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-    </article>
+      <EvidenceTable<typeof rows[number]>
+        title="DYNOTEARS raw weights"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="weight"
+        empty="The run reported no weight."
+        columns={[...linkColumns<typeof rows[number]>(), figureColumn<typeof rows[number]>('weight', 'Weight', (row) => row.weight)]}
+      />
+    </ResultCard>
   )
 }
 
-function OcseResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
+function VarLingamResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'var-lingam-run' }> }) {
+  const weights = [run.result.contemporaneousWeights, ...run.result.laggedWeights].flatMap((matrix, lag) =>
+    matrix.flatMap((targets, source) => targets.map((weight, target) => ({ lag, source, target, weight }))),
+  )
+  const rows = weights.map((cell) => ({ key: `${cell.lag}:${cell.source}:${cell.target}`, source: run.variables[cell.source].name, target: run.variables[cell.target].name, lag: cell.lag, weight: cell.weight }))
+  const order = run.result.causalOrder.map((index) => run.variables[index]?.name ?? String(index))
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
-      <span className={label('text-signal')}>Optimal Causation Entropy</span>
-      <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">Conditional-information network evidence</h3>
-      <p className="m-0 text-body text-faint">{run.result.observations} observations · max lag {run.result.maxLag} · {run.result.method} CMI · {run.result.nShuffles} shuffles · seed {run.result.seed}</p>
+    <ResultCard run={run} open={open} current={current} method="VAR-LiNGAM" title={<>Non-Gaussian structural vector autoregression weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · Bayesian information criterion lag {run.result.selectedLag} of at most {run.result.lags} · {run.result.prune ? 'adaptive-lasso pruned' : 'unpruned'}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <ResultAssumptions eligibility={run.eligibility} />
-      <RunProvenance run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">Hirmos uses corrected candidate-set semantics. Selected lagged information edges are evidence for graph review, not intervention effects.</p>
-      <div className="overflow-x-auto rounded-lg border border-hair" aria-label="oCSE raw evidence">
-        <table className="w-full border-collapse text-left text-body">
-          <thead className="text-faint"><tr><th className="border-b border-hair px-2 py-2 font-normal">Source</th><th className="border-b border-hair px-2 py-2 font-normal">Target</th><th className="border-b border-hair px-2 py-2 text-right font-normal">Lag</th><th className="border-b border-hair px-2 py-2 text-right font-normal">CMI</th><th className="border-b border-hair px-2 py-2 text-right font-normal">p-value</th></tr></thead>
-          <tbody>{run.result.edges.length === 0 ? (
-            <tr><td className="px-2 py-3 text-faint" colSpan={5}>No edge survived forward and backward selection.</td></tr>
-          ) : run.result.edges.map((edge, index) => (
-            <tr key={`${edge.source}:${edge.target}:${edge.lag}:${index}`} className="border-b border-hair last:border-0"><td className="px-2 py-2 text-ink">{run.variables[edge.source].name}</td><td className="px-2 py-2 text-ink">{run.variables[edge.target].name}</td><td className={num('px-2 py-2 text-right text-muted')}>{edge.lag}</td><td className={num('px-2 py-2 text-right text-muted')}>{statistic(edge.cmi)}</td><td className={num('px-2 py-2 text-right text-muted')}>{pValue(edge.pValue)}</td></tr>
-          ))}</tbody>
-        </table>
-      </div>
-    </article>
+      <RunRecord run={run} />
+      <p className="mb-1 mt-3 text-body text-muted">Contemporaneous causal order from residual non-Gaussianity:</p>
+      <p className={num('mb-3 mt-0 text-body text-ink')} aria-label="VAR-LiNGAM causal order">{order.join(' → ')}</p>
+      <StructurePlot run={run} label="VAR-LiNGAM structure" />
+      <WeightPlot run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
+      <EvidenceTable<typeof rows[number]>
+        title="VAR-LiNGAM raw weights"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="weight"
+        empty="The run reported no weight."
+        columns={[...linkColumns<typeof rows[number]>(), figureColumn<typeof rows[number]>('weight', 'Weight', (row) => row.weight)]}
+      />
+    </ResultCard>
   )
 }
 
-function GrangerResult({ run }: { readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'granger-ssr-f-run' }> }) {
+function OcseResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
+  const rows = run.result.edges.map((edge, index) => ({ key: `${edge.source}:${edge.target}:${edge.lag}:${index}`, source: run.variables[edge.source].name, target: run.variables[edge.target].name, lag: edge.lag, cmi: edge.cmi, pValue: edge.pValue }))
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-labelledby={`run-${run.id}`}>
-      <span className={label('text-signal')}>Granger SSR F</span>
-      <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{run.candidateCause.name} → {run.target.name} predictive evidence</h3>
-      <p className="m-0 text-body text-faint">{run.result.observations} paired observations · lags 1–{run.result.maxLag}</p>
+    <ResultCard run={run} open={open} current={current} method="Optimal causation entropy" title={<>Conditional-information network evidence</>} meta={<>{formatCount(run.result.observations).text} rows · maximum lag {run.result.maxLag} · {run.result.method} conditional mutual information · {run.result.nShuffles} shuffles · seed {run.result.seed}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <ResultAssumptions eligibility={run.eligibility} />
-      <RunProvenance run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">The null at each lag is that past {run.candidateCause.name} values add no predictive information beyond past {run.target.name}. This is not intervention causality.</p>
-      <div className="overflow-x-auto rounded-lg border border-hair" aria-label="Granger raw evidence">
-        <table className="w-full border-collapse text-left text-body">
-          <thead className="text-faint">
-            <tr>
-              <th className="border-b border-hair px-2 py-2 text-right font-normal">Lag</th>
-              <th className="border-b border-hair px-2 py-2 text-right font-normal">SSR F statistic</th>
-              <th className="border-b border-hair px-2 py-2 text-right font-normal">p-value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {run.result.tests.map((test) => (
-              <tr key={test.lag} className="border-b border-hair last:border-0">
-                <td className={num('px-2 py-2 text-right text-ink')}>{test.lag}</td>
-                <td className={num('px-2 py-2 text-right text-muted')}>{statistic(test.statistic)}</td>
-                <td className={num('px-2 py-2 text-right text-muted')}>{pValue(test.pValue)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </article>
+      <RunRecord run={run} />
+      <StructurePlot run={run} label="oCSE structure" />
+      <OcsePlot run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">Selected lagged relations can be reviewed in the DAG workspace. They are not estimates of intervention effects.</p>
+      <EvidenceTable<typeof rows[number]>
+        title="oCSE raw evidence"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="edge"
+        empty="No edge survived forward and backward selection."
+        columns={[...linkColumns<typeof rows[number]>(), figureColumn<typeof rows[number]>('cmi', 'CMI', (row) => row.cmi), figureColumn<typeof rows[number]>('p', 'p-value', (row) => row.pValue, pValue)]}
+      />
+    </ResultCard>
   )
 }
 
-function DiscoveryResult({ run }: { readonly run: DiscoveryRunArtifact }) {
+function DiscoveryResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: DiscoveryRunArtifact }) {
   switch (run.kind) {
-    case 'pcmci-plus-run': return <TimeGraphResult run={run} />
-    case 'lpcmci-run': return <TimeGraphResult run={run} />
-    case 'dynotears-run': return <DynotearsResult run={run} />
-    case 'ocse-run': return <OcseResult run={run} />
-    case 'granger-ssr-f-run': return <GrangerResult run={run} />
+    case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
+    case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
+    case 'dynotears-run': return <DynotearsResult run={run} open={open} current={current} />
+    case 'var-lingam-run': return <VarLingamResult run={run} open={open} current={current} />
+    case 'ocse-run': return <OcseResult run={run} open={open} current={current} />
     default: return assertNever(run)
   }
 }
 
-export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, onRun }: DiscoveryPanelProps) {
+export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, onRun, onActivity }: DiscoveryPanelProps) {
   const [draft, dispatch] = useReducer(stepDiscovery, INITIAL_DISCOVERY_DRAFT)
+  const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
+  useRunActivity(onActivity, draft.job.kind === 'running' ? { label: DISCOVERY_METHODS.find(([value]) => value === draft.configuration.kind)?.[1] ?? 'Discovery', progress: draft.job.progress === null ? null : draft.job.progress.completed / Math.max(1, draft.job.progress.total) } : null)
   const preparedColumns = profile.columns.filter((column) => prepared.columns.includes(column.id))
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
@@ -356,23 +299,15 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     if (!specification.ok || eligibility.kind === 'refused') return
     dispatch({ type: 'run-started' })
     try {
-      const [{ materializeNumericColumnsInWorker }, analysis] = await Promise.all([
-        import('@/data/client'),
+      const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
+        import('@/data/prepared'),
         import('@/analysis/client'),
       ])
-      const requestedColumns: NonEmptyArray<ColumnId> = specification.value.kind === 'granger-ssr-f'
-        ? [specification.value.target, specification.value.candidateCause]
-        : prepared.columns
-      const matrix = await materializeNumericColumnsInWorker(source.file, profile, requestedColumns)
+      const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
       if (!matrix.ok) {
-        dispatch({
-          type: 'run-failed',
-          problem: { kind: 'materialization-refused', detail: `Numeric materialization refused: ${matrix.error.kind}.` },
-        })
-        return
-      }
-      if (matrix.value.missingCells > 0) {
-        dispatch({ type: 'run-failed', problem: { kind: 'missing-values-remain', cells: matrix.value.missingCells } })
+        dispatch(matrix.error.kind === 'missing-values-remain'
+          ? { type: 'run-failed', problem: { kind: 'missing-values-remain', cells: matrix.error.cells } }
+          : { type: 'run-failed', problem: { kind: 'materialization-refused', detail: describePreparedMaterialisationProblem(matrix.error) } })
         return
       }
 
@@ -425,6 +360,17 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         onRun(artifact)
         return
       }
+      case 'var-lingam': {
+        const result = await analysis.runVarLingam(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.prune, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
       case 'ocse': {
         const result = await analysis.runOcse(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.alpha, specification.value.nShuffles, specification.value.method, specification.value.k, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
@@ -432,37 +378,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
-        onRun(artifact)
-        return
-      }
-      case 'granger-ssr-f': {
-        const granger = specification.value
-        const target = matrix.value.columns.find((column) => column.id === granger.target)
-        const candidateCause = matrix.value.columns.find((column) => column.id === granger.candidateCause)
-        if (target === undefined || candidateCause === undefined) {
-          dispatch({
-            type: 'run-failed',
-            problem: { kind: 'materialization-refused', detail: 'The returned matrix omitted the selected Granger pair.' },
-          })
-          return
-        }
-        const result = await analysis.runGrangerSsrF(matrix.value.values, matrix.value.rowCount, granger.maxLag)
-        if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
-          return
-        }
-        const artifact: DiscoveryRunArtifact = {
-          kind: 'granger-ssr-f-run',
-          id: newDiscoveryRunId(),
-          preparedDataset: prepared.id,
-          createdAt: new Date().toISOString(),
-          method: GRANGER_SSR_F_METHOD_ID,
-          target,
-          candidateCause,
-          eligibility,
-          result: result.value,
-        }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -480,66 +395,45 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     }
   }
 
-  return (
-    <section aria-labelledby="discovery-title">
-      <div className="mb-5">
+  const inspector = (
+    <div className="flex flex-col gap-4">
+      <section aria-labelledby="prepared-input-title">
+        <h3 id="prepared-input-title" className="mb-3 mt-0 text-body font-medium text-ink">Prepared dataset</h3>
+        <dl className="m-0 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-hair bg-hair">
+          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Structure</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind === 'prepared-time-series' ? `Regular ${prepared.sampling.frequency} series` : prepared.kind === 'prepared-panel' ? `Panel · ${prepared.panel.units} units × ${prepared.panel.periods} periods` : 'Independent observations'}</dd></div>
+          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Rows</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatCount(prepared.observations).text}</dd></div>
+          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Variables</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{prepared.columns.length}</dd></div>
+          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Stationarity</dt><dd className="m-0 mt-1 text-body text-ink">{stationarity === null ? 'Tests not run' : `${formatCount(stationarity.observations).text} rows tested`}</dd></div>
+        </dl>
+        <p className={literal('mb-0 mt-3 break-all text-micro text-faint')}>Dataset version {prepared.id.slice(0, 8)}</p>
+      </section>
+      <MethodCaveats methods={[method]} eligibility={eligibility} />
+    </div>
+  )
+
+  const stage = (
+    <section aria-labelledby="discovery-title" className="@container/panel flex flex-col gap-5">
+      <div>
         <span className={label('text-signal')}>03 · Discovery lab</span>
         <h2 id="discovery-title" className="mb-2 mt-2 text-heading text-ink">Explore temporal structure</h2>
-        <p className="m-0 max-w-3xl text-body text-muted">Discovery produces evidence for a later graph draft. It does not silently create or validate causal arrows.</p>
+        <p className="m-0 max-w-[65ch] text-body text-muted">Run a temporal discovery method to estimate candidate lagged and same-period relations. Review its requirements before using the result to inform a causal graph.</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.72fr)]">
-        <section className="rounded-xl border border-line bg-panel p-4" aria-labelledby="discovery-method-title">
-          <span className={label('text-faint')}>Method and run</span>
-          <h3 id="discovery-method-title" className="mb-3 mt-1 text-title font-medium text-ink">Temporal evidence</h3>
-          <div className="flex flex-wrap gap-1 rounded-lg border border-hair bg-well p-1">
-            <button
-              type="button"
-              className={segment(configuration.kind === 'pcmci-plus')}
-              aria-pressed={configuration.kind === 'pcmci-plus'}
-              onClick={() => dispatch({ type: 'method-selected', method: 'pcmci-plus' })}
-            >
-              PCMCI+
-            </button>
-            <button
-              type="button"
-              className={segment(configuration.kind === 'lpcmci')}
-              aria-pressed={configuration.kind === 'lpcmci'}
-              onClick={() => dispatch({ type: 'method-selected', method: 'lpcmci' })}
-            >
-              LPCMCI
-            </button>
-            <button
-              type="button"
-              className={segment(configuration.kind === 'dynotears')}
-              aria-pressed={configuration.kind === 'dynotears'}
-              onClick={() => dispatch({ type: 'method-selected', method: 'dynotears' })}
-            >
-              DYNOTEARS
-            </button>
-            <button
-              type="button"
-              className={segment(configuration.kind === 'ocse')}
-              aria-pressed={configuration.kind === 'ocse'}
-              onClick={() => dispatch({ type: 'method-selected', method: 'ocse' })}
-            >
-              oCSE
-            </button>
-            <button
-              type="button"
-              className={segment(configuration.kind === 'granger-ssr-f')}
-              aria-pressed={configuration.kind === 'granger-ssr-f'}
-              onClick={() => dispatch({ type: 'method-selected', method: 'granger-ssr-f' })}
-            >
-              Granger SSR F
-            </button>
-          </div>
+      <div className="grid gap-4">
+        <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="discovery-method-title">
+            <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Temporal evidence</h3>
+          <SegmentedControl
+            ariaLabel="Discovery method"
+            value={configuration.kind}
+            onChange={(method) => dispatch({ type: 'method-selected', method })}
+            options={DISCOVERY_METHODS.map(([value, label]) => ({ value, label }))}
+          />
 
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
               <label className="text-body text-ink">
                 Maximum lag
-                <select
+                <Select
                   className={field('text', 'mt-1')}
                   value={configuration.tauMax}
                   onChange={(event) => {
@@ -548,11 +442,11 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                   }}
                 >
                   {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="text-body text-ink">
                 PC alpha
-                <select
+                <Select
                   className={field('text', 'mt-1')}
                   value={configuration.pcAlpha}
                   onChange={(event) => {
@@ -561,133 +455,106 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                   }}
                 >
                   {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
             </div>
           )}
 
           {configuration.kind === 'dynotears' && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="mt-4 grid gap-3 @2xl/panel:grid-cols-3">
               <label className="text-body text-ink">
                 Maximum lag
-                <select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
                 }}>
                   {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="text-body text-ink">
                 Contemporaneous λ
-                <select className={field('text', 'mt-1')} value={configuration.lambdaW} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.lambdaW} onChange={(event) => {
                   const value = penaltyFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'dynotears-lambda-w-selected', value })
                 }}>
                   {DYNOTEARS_PENALTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="text-body text-ink">
                 Lagged λ
-                <select className={field('text', 'mt-1')} value={configuration.lambdaA} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.lambdaA} onChange={(event) => {
                   const value = penaltyFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'dynotears-lambda-a-selected', value })
                 }}>
                   {DYNOTEARS_PENALTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
+              </label>
+            </div>
+          )}
+
+          {configuration.kind === 'var-lingam' && (
+            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
+              <label className="text-body text-ink">
+                Maximum lag
+                <Select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+                  const value = lagFromValue(event.target.value)
+                  if (value !== null) dispatch({ type: 'max-lag-selected', value })
+                }}>
+                  {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
+                </Select>
+              </label>
+              <label className="flex items-start gap-2 self-end pb-2 text-body text-ink">
+                <input type="checkbox" className="mt-1" checked={configuration.prune} onChange={(event) => dispatch({ type: 'var-lingam-prune-selected', value: event.target.checked })} />
+                <span>Adaptive-lasso pruning<span className="block text-faint">BIC selects the lag order up to the maximum.</span></span>
               </label>
             </div>
           )}
 
           {configuration.kind === 'ocse' && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
               <label className="text-body text-ink">
                 Maximum lag
-                <select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
                 }}>
                   {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 8).map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="text-body text-ink">
                 Information estimator
-                <select className={field('text', 'mt-1')} value={configuration.method} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.method} onChange={(event) => {
                   if (event.target.value === 'gaussian' || event.target.value === 'knn') dispatch({ type: 'ocse-method-selected', value: event.target.value })
                 }}>
-                  <option value="gaussian">Gaussian CMI</option>
-                  <option value="knn">k-nearest-neighbor CMI (k=5)</option>
-                </select>
+                  <option value="gaussian">Gaussian conditional mutual information</option>
+                  <option value="knn">k-nearest neighbours (k = 5)</option>
+                </Select>
               </label>
               <label className="text-body text-ink">
                 Test alpha
-                <select className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
                   const value = alphaFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'ocse-alpha-selected', value })
                 }}>
                   {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="text-body text-ink">
                 Permutation shuffles
-                <select className={field('text', 'mt-1')} value={configuration.nShuffles} onChange={(event) => {
+                <Select className={field('text', 'mt-1')} value={configuration.nShuffles} onChange={(event) => {
                   const value = shufflesFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'ocse-shuffles-selected', value })
                 }}>
                   {OCSE_SHUFFLE_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
+                </Select>
               </label>
             </div>
           )}
 
-          {configuration.kind === 'granger-ssr-f' && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <label className="text-body text-ink">
-                Candidate cause
-                <select
-                  className={field('text', 'mt-1')}
-                  value={configuration.candidateCause.kind === 'selected' ? configuration.candidateCause.column : ''}
-                  onChange={(event) => dispatch({
-                    type: 'candidate-cause-selected',
-                    column: selectedColumn(event.target.value, prepared.columns),
-                  })}
-                >
-                  <option value="">Choose variable</option>
-                  {preparedColumns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-                </select>
-              </label>
-              <label className="text-body text-ink">
-                Target
-                <select
-                  className={field('text', 'mt-1')}
-                  value={configuration.target.kind === 'selected' ? configuration.target.column : ''}
-                  onChange={(event) => dispatch({
-                    type: 'target-selected',
-                    column: selectedColumn(event.target.value, prepared.columns),
-                  })}
-                >
-                  <option value="">Choose variable</option>
-                  {preparedColumns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-                </select>
-              </label>
-              <label className="text-body text-ink">
-                Maximum lag
-                <select
-                  className={field('text', 'mt-1')}
-                  value={configuration.maxLag}
-                  onChange={(event) => {
-                    const value = lagFromValue(event.target.value)
-                    if (value !== null) dispatch({ type: 'max-lag-selected', value })
-                  }}
-                >
-                  {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
-                </select>
-              </label>
-            </div>
-          )}
 
           <EligibilityView eligibility={eligibility} />
           {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeDiscoveryReadiness(readiness.error)}</p>}
-          {draft.job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{describeDiscoveryRunProblem(draft.job.problem)}</p>}
+          {draft.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{describeDiscoveryRunProblem(draft.job.problem)}</p></Alert>}
           {draft.job.kind === 'running' && draft.job.progress !== null && (
             <div className="mt-3" role="status" aria-live="polite">
               <div className="mb-1 flex items-center justify-between gap-3 text-micro text-faint">
@@ -706,42 +573,36 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             {draft.job.kind === 'running' ? 'Running…' : `Run ${method.name}`}
           </button>
         </section>
-
-        <section className="rounded-xl border border-line bg-panel p-4" aria-labelledby="prepared-input-title">
-          <span className={label('text-faint')}>Prepared input</span>
-          <h3 id="prepared-input-title" className="mb-3 mt-1 text-title font-medium text-ink">Bound dataset version</h3>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-body">
-            <dt className="text-faint">Structure</dt>
-            <dd className="m-0 text-ink">{prepared.kind === 'prepared-time-series' ? `Regular ${prepared.sampling.frequency} series` : 'Independent observations'}</dd>
-            <dt className="text-faint">Observations</dt>
-            <dd className={num('m-0 text-ink')}>{prepared.observations.toLocaleString()}</dd>
-            <dt className="text-faint">Variables</dt>
-            <dd className={num('m-0 text-ink')}>{prepared.columns.length}</dd>
-            <dt className="text-faint">Stationarity</dt>
-            <dd className="m-0 text-ink">{stationarity === null ? 'No evidence attached' : `${stationarity.observations} observations tested`}</dd>
-          </dl>
-          <p className={literal('mb-0 mt-4 break-all text-micro text-faint')}>Prepared {prepared.id}</p>
-        </section>
       </div>
 
-      <MethodCaveats methods={[method]} />
-
-      <section className="mt-6" aria-labelledby="discovery-runs-title">
+      <section aria-labelledby="discovery-runs-title">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <span className={label('text-faint')}>Immutable evidence</span>
-            <h2 id="discovery-runs-title" className="mb-0 mt-1 text-title font-medium text-ink">Run results</h2>
+            <span className={label('text-faint')}>Discovery runs</span>
+            <h2 id="discovery-runs-title" className="mb-0 mt-1 text-title font-medium text-ink">Results</h2>
           </div>
-          <span className={num('text-body text-faint')}>{runs.length} runs</span>
+          <div className="flex items-center gap-2">
+            {runs.length > 1 && (
+              <>
+                <button type="button" className={button('quiet', 'h-7 px-2 text-label')} onClick={() => setExpanded('all')}>Expand all</button>
+                <button type="button" className={button('quiet', 'h-7 px-2 text-label')} onClick={() => setExpanded('none')}>Collapse all</button>
+              </>
+            )}
+            <span className={num('text-body text-faint')}>{runs.length} run{runs.length === 1 ? '' : 's'}</span>
+          </div>
         </div>
         {runs.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-line bg-panel p-4 text-body text-faint">No discovery run has been accepted for this prepared version.</p>
+          <EmptyState>Choose a method and run discovery.</EmptyState>
         ) : (
           <div className="space-y-4">
-            {[...runs].reverse().map((run) => <DiscoveryResult key={run.id} run={run} />)}
+            {[...runs].reverse().map((run, index) => (
+              <DiscoveryResult key={`${run.id}:${expanded}`} run={run} open={expanded === 'all' || (expanded === 'latest' && index === 0)} current={index === 0} />
+            ))}
           </div>
         )}
       </section>
     </section>
   )
+
+  return <WorkbenchLayout id="discovery" stage={stage} inspector={{ title: 'Prepared dataset and method requirements', body: inspector }} />
 }

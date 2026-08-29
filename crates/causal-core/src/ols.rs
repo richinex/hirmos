@@ -44,6 +44,16 @@ impl Ols {
         -2.0 * self.llf() + 2.0 * self.k as f64
     }
 
+    /// (X'X)^-1 as R^-1 R^-T from the QR factor.
+    pub fn xtx_inverse(&self) -> DMatrix<f64> {
+        let identity = DMatrix::<f64>::identity(self.k, self.k);
+        let rinv = self
+            .r
+            .solve_upper_triangular(&identity)
+            .expect("triangular solve");
+        &rinv * rinv.transpose()
+    }
+
     /// t statistics: params over standard errors from sigma2 (X'X)^-1, sigma2 = ssr/(n-k).
     pub fn tvalues(&self) -> DVector<f64> {
         let sigma2 = self.ssr / (self.nobs - self.k) as f64;

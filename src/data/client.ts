@@ -1,26 +1,51 @@
 import { err, type Result } from '@/domain/dop'
 import type { NonEmptyArray } from '@/domain/dop'
 import {
-  validateNumericMatrixAgainstProfile,
   type ColumnId,
+  type ColumnProfile,
+  type ColumnProfileProblem,
   type DatasetProfile,
   type DatasetProfileProblem,
+  type DatasetSummary,
+  type DatasetSummaryProblem,
   type NullableNumericMatrix,
   type NumericMaterializationProblem,
+  type PreviewQuery,
+  type PreviewWindow,
+  type PreviewWindowProblem,
+  parseColumnProfile,
+  parseDatasetSummary,
+  parsePreviewWindow,
+  validateNumericMatrixAgainstProfile,
 } from '@/domain/dataset'
 import type { ImportRequestId } from '@/domain/workflow'
 import { newImportRequestId } from '@/domain/workflow'
 import { parseDataWorkerEvent, type DataWorkerCommand } from '@/workers/dataProtocol'
+import { parsePanelLongMatrix, parsePanelStructure, type PanelDataProblem, type PanelLongMatrix, type PanelStructureEvidence } from '@/domain/panel'
 
 type ProfileOutcome = Result<DatasetProfile, DatasetProfileProblem>
 type MaterializationOutcome = Result<NullableNumericMatrix, NumericMaterializationProblem>
+type ColumnProfileOutcome = Result<ColumnProfile, ColumnProfileProblem>
+type SummaryOutcome = Result<DatasetSummary, DatasetSummaryProblem>
+type PreviewWindowOutcome = Result<PreviewWindow, PreviewWindowProblem>
+type PanelStructureOutcome = Result<PanelStructureEvidence, PanelDataProblem>
+type PanelMaterializationOutcome = Result<PanelLongMatrix, PanelDataProblem>
 type PendingRequest =
   | { readonly kind: 'profile'; readonly resolve: (outcome: ProfileOutcome) => void }
+  | { readonly kind: 'summary'; readonly profile: DatasetProfile; readonly resolve: (outcome: SummaryOutcome) => void }
+  | { readonly kind: 'preview-window'; readonly profile: DatasetProfile; readonly resolve: (outcome: PreviewWindowOutcome) => void }
+  | {
+      readonly kind: 'column-profile'
+      readonly profile: DatasetProfile
+      readonly resolve: (outcome: ColumnProfileOutcome) => void
+    }
   | {
       readonly kind: 'materialization'
       readonly profile: DatasetProfile
       readonly resolve: (outcome: MaterializationOutcome) => void
     }
+  | { readonly kind: 'panel-inspection'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelStructureOutcome) => void }
+  | { readonly kind: 'panel-materialization'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelMaterializationOutcome) => void }
 
 let worker: Worker | null = null
 const pending = new Map<ImportRequestId, PendingRequest>()
@@ -61,6 +86,66 @@ const dataWorker = (): Worker => {
       waiting.resolve(parsed.value.kind === 'profile-succeeded'
         ? { ok: true, value: parsed.value.profile }
         : { ok: false, error: parsed.value.problem })
+      return
+    }
+    if (waiting.kind === 'summary') {
+      if (parsed.value.kind !== 'summary-succeeded' && parsed.value.kind !== 'summary-failed') {
+        failAll('The data worker returned another response for a summary request.')
+        return
+      }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'summary-failed') {
+        waiting.resolve({ ok: false, error: parsed.value.problem })
+        return
+      }
+      const bound = parseDatasetSummary(parsed.value.summary, waiting.profile)
+      waiting.resolve(bound.ok ? { ok: true, value: bound.value } : { ok: false, error: { kind: 'worker-protocol-failed', detail: bound.error.detail } })
+      return
+    }
+    if (waiting.kind === 'preview-window') {
+      if (parsed.value.kind !== 'preview-window-succeeded' && parsed.value.kind !== 'preview-window-failed') {
+        failAll('The data worker returned another response for a preview request.')
+        return
+      }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'preview-window-failed') {
+        waiting.resolve({ ok: false, error: parsed.value.problem })
+        return
+      }
+      const bound = parsePreviewWindow(parsed.value.window, waiting.profile)
+      waiting.resolve(bound.ok ? { ok: true, value: bound.value } : { ok: false, error: { kind: 'worker-protocol-failed', detail: bound.error.detail } })
+      return
+    }
+    if (waiting.kind === 'column-profile') {
+      if (parsed.value.kind !== 'column-profile-succeeded' && parsed.value.kind !== 'column-profile-failed') {
+        failAll('The data worker returned another response for a column profile request.')
+        return
+      }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'column-profile-failed') {
+        waiting.resolve({ ok: false, error: parsed.value.problem })
+        return
+      }
+      const bound = parseColumnProfile(parsed.value.profile, waiting.profile)
+      waiting.resolve(bound.ok
+        ? { ok: true, value: bound.value }
+        : { ok: false, error: { kind: 'worker-protocol-failed', detail: bound.error.detail } })
+      return
+    }
+    if (waiting.kind === 'panel-inspection') {
+      if (parsed.value.kind !== 'panel-inspection-succeeded' && parsed.value.kind !== 'panel-data-failed') { failAll('The data worker returned another response for a panel inspection.'); return }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'panel-data-failed') { waiting.resolve({ ok: false, error: parsed.value.problem }); return }
+      const checked = parsePanelStructure(parsed.value.structure, waiting.profile)
+      waiting.resolve(checked.ok ? checked : { ok: false, error: { kind: 'worker-protocol-failed', detail: checked.error.detail } })
+      return
+    }
+    if (waiting.kind === 'panel-materialization') {
+      if (parsed.value.kind !== 'panel-materialization-succeeded' && parsed.value.kind !== 'panel-data-failed') { failAll('The data worker returned another response for a panel materialization.'); return }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'panel-data-failed') { waiting.resolve({ ok: false, error: parsed.value.problem }); return }
+      const checked = parsePanelLongMatrix(parsed.value.matrix, waiting.profile)
+      waiting.resolve(checked.ok ? checked : { ok: false, error: { kind: 'worker-protocol-failed', detail: checked.error.detail } })
       return
     }
     if (parsed.value.kind !== 'materialization-succeeded' && parsed.value.kind !== 'materialization-failed') {
@@ -138,6 +223,74 @@ export function materializeNumericColumnsInWorker(
         kind: 'worker-unavailable',
         detail: cause instanceof Error ? cause.message : String(cause),
       }))
+    }
+  })
+}
+
+export function profileColumnInWorker(
+  file: File,
+  profile: DatasetProfile,
+  columnId: ColumnId,
+): Promise<ColumnProfileOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'column-profile', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'profile-column', request, file, profile, columnId }
+    try {
+      dataWorker().postMessage(command)
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function summarizeColumnsInWorker(file: File, profile: DatasetProfile): Promise<SummaryOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'summary', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'summarize-columns', request, file, profile }
+    try {
+      dataWorker().postMessage(command)
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function previewWindowInWorker(file: File, profile: DatasetProfile, query: PreviewQuery): Promise<PreviewWindowOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'preview-window', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'preview-window', request, file, profile, query }
+    try {
+      dataWorker().postMessage(command)
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function inspectPanelInWorker(file: File, profile: DatasetProfile, unitColumn: ColumnId, timeColumn: ColumnId): Promise<PanelStructureOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'panel-inspection', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'inspect-panel', request, file, profile, unitColumn, timeColumn }
+    try { dataWorker().postMessage(command) } catch (cause: unknown) {
+      pending.delete(request); resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function materializePanelInWorker(file: File, profile: DatasetProfile, columns: { readonly unit: ColumnId; readonly time: ColumnId; readonly outcome: ColumnId; readonly treatment: ColumnId }): Promise<PanelMaterializationOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'panel-materialization', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'materialize-panel', request, file, profile, unitColumn: columns.unit, timeColumn: columns.time, outcomeColumn: columns.outcome, treatmentColumn: columns.treatment }
+    try { dataWorker().postMessage(command) } catch (cause: unknown) {
+      pending.delete(request); resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }
   })
 }

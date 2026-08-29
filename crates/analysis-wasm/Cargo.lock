@@ -239,6 +239,7 @@ dependencies = [
  "nalgebra",
  "serde",
  "serde_json",
+ "spec_math",
  "wasm-bindgen",
 ]
 

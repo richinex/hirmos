@@ -1,0 +1,189 @@
+import { useMemo, useState } from 'react'
+import { EChart } from '@/charts/EChart'
+import { pValueBarsOption } from '@/charts/discovery/pValueBars'
+import { useChartTheme } from '@/charts/theme'
+import { Icon } from '@/components/Icon'
+import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
+import { Select } from '@/components/ui/Select'
+import { button, field, label, num } from '@/components/ui/recipes'
+import type { ColumnId, DatasetProfile } from '@/domain/dataset'
+import { Alert } from '@/components/ui/Alert'
+import {
+  GRANGER_LAG_OPTIONS,
+  describeGrangerReadiness,
+  describeGrangerVerdict,
+  evaluateGrangerEligibility,
+  newGrangerEvidenceId,
+  readyGrangerSpecification,
+  type GrangerEvidenceArtifact,
+  type GrangerLag,
+} from '@/domain/granger'
+import { GRANGER_SSR_F_METHOD_ID, methodDefinition } from '@/domain/methods'
+import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import type { SelectedSource } from '@/domain/workflow'
+import { formatTime } from '@/lib/format/date'
+import { formatCount } from '@/lib/format/number'
+
+type Job =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'running' }
+  | { readonly kind: 'failed'; readonly detail: string }
+
+const pValue = (value: number): string => (value < 0.0001 ? '<0.0001' : value.toFixed(4))
+const statistic = (value: number): string => (Math.abs(value) >= 10_000 ? value.toExponential(4) : value.toFixed(6))
+const asNumber = (value: string | number): number => (typeof value === 'number' ? value : Number(value))
+
+function GrangerPlot({ artifact }: { readonly artifact: GrangerEvidenceArtifact }) {
+  const theme = useChartTheme()
+  const option = useMemo(() => pValueBarsOption({
+    title: `Granger sum-of-squared-residuals F test: ${artifact.candidateCause.name} → ${artifact.target.name}`,
+    categories: artifact.result.tests.map((test) => `lag ${test.lag}`),
+    pValues: artifact.result.tests.map((test) => test.pValue),
+    statistics: artifact.result.tests.map((test) => test.statistic),
+    statisticName: 'F',
+    alpha: 0.05,
+  }, theme), [artifact, theme])
+  return (
+    <div className="mt-3 rounded-lg border border-hair bg-well p-3">
+      <p className={label('m-0 text-faint')}>p-value by lag order · alpha 0.05 reference, log scale</p>
+      <EChart option={option} label="Granger p-values by lag order" className="h-[clamp(160px,26cqb,240px)]" />
+    </div>
+  )
+}
+
+type TestRow = GrangerEvidenceArtifact['result']['tests'][number]
+
+const TEST_COLUMNS: readonly EvidenceColumn<TestRow>[] = [
+  { id: 'lag', header: 'Lag', align: 'right', value: (test) => test.lag },
+  { id: 'statistic', header: 'Sum-of-squared-residuals F statistic', align: 'right', value: (test) => test.statistic, format: (value) => statistic(asNumber(value)) },
+  { id: 'p', header: 'p-value', align: 'right', value: (test) => test.pValue, format: (value) => pValue(asNumber(value)) },
+]
+
+function GrangerRecord({ artifact, open }: { readonly artifact: GrangerEvidenceArtifact; readonly open: boolean }) {
+  return (
+    <li>
+      <details className="group rounded-lg border border-hair bg-well" open={open}>
+        <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-3 py-2 transition-colors hover:bg-raised [&::-webkit-details-marker]:hidden">
+          <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
+          <span className="text-body font-medium text-ink">{artifact.candidateCause.name} → {artifact.target.name}</span>
+          <span className={num('text-label text-faint')}>lags 1 to {artifact.maxLag} · {formatCount(artifact.result.observations).text} rows</span>
+          <span className={num('ml-auto text-micro text-faint')}>{formatTime(artifact.createdAt)}</span>
+        </summary>
+        <div className="px-3 pb-3">
+          <p className="m-0 text-body text-muted">{describeGrangerVerdict(artifact)}</p>
+          <GrangerPlot artifact={artifact} />
+          <div className="mt-3">
+            <EvidenceTable<TestRow> title="Granger raw evidence" rows={artifact.result.tests} rowKey={(test) => String(test.lag)} noun="lag" empty="The test reported no lag." columns={TEST_COLUMNS} maxHeight="max-h-72" />
+          </div>
+        </div>
+      </details>
+    </li>
+  )
+}
+
+/**
+ * The Granger SSR F test as a data diagnostic: does the past of one series add predictive information
+ * about another beyond its own past. Recorded with the prepared dataset like the stationarity tests;
+ * never offered to the DAG as evidence, because prediction is not intervention.
+ */
+export function GrangerCard({ source, profile, prepared, stationarity, evidence, onEvidence, embedded = false }: {
+  readonly source: SelectedSource
+  readonly profile: DatasetProfile
+  readonly prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>
+  readonly stationarity: StationarityEvidenceArtifact | null
+  readonly evidence: readonly GrangerEvidenceArtifact[]
+  readonly onEvidence: (artifact: GrangerEvidenceArtifact) => void
+  /** Inside the Diagnostics card: no border of its own, body-weight heading. */
+  readonly embedded?: boolean
+}) {
+  const [candidateCause, setCandidateCause] = useState<ColumnId | null>(null)
+  const [target, setTarget] = useState<ColumnId | null>(null)
+  const [maxLag, setMaxLag] = useState<GrangerLag>(4)
+  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const method = methodDefinition(GRANGER_SSR_F_METHOD_ID)
+  if (!method.ok) return <p role="alert" className="mt-4 text-body text-danger">The Granger test is not registered in the method catalogue.</p>
+  const readiness = readyGrangerSpecification(target, candidateCause, maxLag, prepared)
+  const columns = profile.columns.filter((column) => prepared.columns.includes(column.id))
+  const chosen = (id: ColumnId | null) => columns.find((column) => column.id === id)
+  const pair = chosen(target) !== undefined && chosen(candidateCause) !== undefined && target !== candidateCause
+    ? { target: { id: target as ColumnId, name: chosen(target)?.name ?? '' }, candidateCause: { id: candidateCause as ColumnId, name: chosen(candidateCause)?.name ?? '' } }
+    : null
+  const eligibility = evaluateGrangerEligibility(method.value, prepared, stationarity, pair)
+  const warning = eligibility.kind === 'caution'
+    ? eligibility.unresolved.find((entry) => entry.caveat.category === 'stationarity-and-dynamics')?.missingEvidence ?? null
+    : null
+  const columnOf = (id: ColumnId | null): ColumnId | null => (id !== null && prepared.columns.includes(id) ? id : null)
+
+  const run = async () => {
+    if (!readiness.ok || eligibility.kind === 'refused') return
+    setJob({ kind: 'running' })
+    try {
+      const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      const matrix = await materialisePrepared(source, profile, prepared, [readiness.value.target, readiness.value.candidateCause])
+      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      const targetColumn = matrix.value.columns.find((column) => column.id === readiness.value.target)
+      const causeColumn = matrix.value.columns.find((column) => column.id === readiness.value.candidateCause)
+      if (targetColumn === undefined || causeColumn === undefined) { setJob({ kind: 'failed', detail: 'The returned matrix omitted the selected pair.' }); return }
+      const result = await analysis.runGrangerSsrF(matrix.value.values, matrix.value.rowCount, readiness.value.maxLag)
+      if (!result.ok) { setJob({ kind: 'failed', detail: result.error.detail }); return }
+      onEvidence({
+        kind: 'granger-evidence',
+        id: newGrangerEvidenceId(),
+        preparedDataset: prepared.id,
+        createdAt: new Date().toISOString(),
+        method: GRANGER_SSR_F_METHOD_ID,
+        target: targetColumn,
+        candidateCause: causeColumn,
+        maxLag: readiness.value.maxLag,
+        eligibility,
+        result: result.value,
+      })
+      setJob({ kind: 'idle' })
+    } catch (cause: unknown) {
+      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+    }
+  }
+
+  const recorded = [...evidence].reverse()
+  return (
+    <section className={embedded ? undefined : 'mt-4 rounded-xl border border-hair bg-panel p-4'} aria-labelledby="granger-title">
+      <h3 id="granger-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Granger predictive test</h3>
+      <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
+      <div className="mt-3 flex flex-wrap items-end gap-2">
+        <label className="text-body text-ink"><span className={label('block text-faint')}>Candidate cause</span>
+          <Select aria-label="Candidate cause" className={field('text', 'mt-1 w-44')} value={columnOf(candidateCause) ?? ''} onChange={(event) => { setCandidateCause(event.target.value === '' ? null : (event.target.value as ColumnId)); setJob({ kind: 'idle' }) }}>
+            <option value="">Choose variable</option>
+            {columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
+          </Select>
+        </label>
+        <label className="text-body text-ink"><span className={label('block text-faint')}>Target</span>
+          <Select aria-label="Target" className={field('text', 'mt-1 w-44')} value={columnOf(target) ?? ''} onChange={(event) => { setTarget(event.target.value === '' ? null : (event.target.value as ColumnId)); setJob({ kind: 'idle' }) }}>
+            <option value="">Choose variable</option>
+            {columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
+          </Select>
+        </label>
+        <label className="text-body text-ink"><span className={label('block text-faint')}>Maximum lag</span>
+          <Select aria-label="Maximum lag" className={field('text', 'mt-1 w-24')} value={maxLag} onChange={(event) => { const value = GRANGER_LAG_OPTIONS.find((candidate) => String(candidate) === event.target.value); if (value !== undefined) setMaxLag(value) }}>
+            {GRANGER_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </label>
+        <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running'} onClick={() => void run()}>
+          {job.kind === 'running' ? 'Testing…' : 'Run Granger test'}
+        </button>
+      </div>
+      {!readiness.ok && <p role="status" className="mb-0 mt-2 text-body text-faint">{describeGrangerReadiness(readiness.error)}</p>}
+      {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
+      {pair !== null && warning !== null && (
+        <Alert tone="warn" live={false} className="mt-3">
+          <p className="m-0 flex items-center gap-2"><Icon name="warning" size={16} /> Stationarity caveat</p>
+          <p className="mb-0 mt-1 text-muted">{warning}</p>
+        </Alert>
+      )}
+      {recorded.length > 0 && (
+        <ul className="m-0 mt-4 list-none space-y-2 p-0" aria-label="Granger tests">
+          {recorded.map((artifact, index) => <GrangerRecord key={artifact.id} artifact={artifact} open={index === 0} />)}
+        </ul>
+      )}
+    </section>
+  )
+}

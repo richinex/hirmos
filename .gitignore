@@ -13,3 +13,21 @@ crates/causal-core/target/
 # Design, explanation, and working notes remain local. Only the project README is versioned.
 *.md
 !/README.md
+docs/
+.playwright-mcp/
+
+# Tool caches and reports
+blob-report/
+*.tsbuildinfo
+.eslintcache
+.wrangler/
+*.log
+
+# Local secrets and editor state
+.env
+.env.*
+!.env.example
+.idea/
+
+# Screenshots dropped in the project root by browser sessions
+/*.png

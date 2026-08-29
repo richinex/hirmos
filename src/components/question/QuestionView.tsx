@@ -1,3 +1,4 @@
+import { Select } from '@/components/ui/Select'
 import type { FormEvent } from 'react'
 import { button, field, label } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
@@ -27,25 +28,25 @@ export function QuestionView({ profile, state, dispatch }: {
           <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
             <label className="block">
               <span className="mb-1.5 block text-body font-medium text-ink">Treatment</span>
-              <select
+              <Select
                 className={field('text')}
                 value={state.treatment ?? ''}
                 onChange={(event) => dispatch({ type: 'treatment-changed', value: event.target.value })}
               >
                 <option value="" disabled>Choose a column</option>
                 {profile.columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-              </select>
+              </Select>
             </label>
             <label className="block">
               <span className="mb-1.5 block text-body font-medium text-ink">Outcome</span>
-              <select
+              <Select
                 className={field('text')}
                 value={state.outcome ?? ''}
                 onChange={(event) => dispatch({ type: 'outcome-changed', value: event.target.value })}
               >
                 <option value="" disabled>Choose a column</option>
                 {profile.columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
-              </select>
+              </Select>
             </label>
             {state.problem && <p role="alert" className="m-0 text-body text-danger sm:col-span-2">{describeQuestionProblem(state.problem)}</p>}
             <div className="sm:col-span-2">
@@ -60,7 +61,7 @@ export function QuestionView({ profile, state, dispatch }: {
         <section className="rise my-auto w-full max-w-2xl" aria-labelledby="framed-question-title">
           <span className={label('text-signal')}>05 · Study design</span>
           <h2 id="framed-question-title" className="mb-6 mt-3 text-heading text-ink">Causal question</h2>
-          <div className="lift flex items-center gap-3 rounded-xl border border-line bg-panel px-4 py-5 text-title text-ink">
+          <div className="lift flex items-center gap-3 rounded-xl border border-hair bg-panel px-4 py-5 text-title text-ink">
             <span>{nameOfColumn(profile, state.question.treatment)}</span>
             <span aria-label="affects" className="text-signal">→</span>
             <span>{nameOfColumn(profile, state.question.outcome)}</span>

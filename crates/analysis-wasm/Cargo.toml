@@ -10,6 +10,7 @@ license = "GPL-3.0-or-later"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+spec_math = "0.1.6"
 hirmos-causal-core = { path = "../causal-core" }
 js-sys = "0.3"
 nalgebra = "0.34"

@@ -1,10 +1,10 @@
 import { z } from 'zod'
 import { assertNever, brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import type { ColumnId, NumericColumnSelection } from './dataset'
+import { columnNameOf, type NumericColumnSelection } from './dataset'
 import {
-  GRANGER_SSR_F_METHOD_ID,
   DYNOTEARS_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
+  VAR_LINGAM_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
   type CaveatEvaluation,
@@ -16,6 +16,7 @@ import type {
   PreparedDatasetVersionId,
   StationarityEvidenceArtifact,
 } from './preprocessing'
+import { levelModelVerdict } from './stationarityAssessment'
 
 export const pcmciPlusEvidenceSchema = z.object({
   kind: z.literal('pcmciPlus'),
@@ -49,6 +50,20 @@ export const dynotearsEvidenceSchema = z.object({
 
 export type DynotearsEvidence = z.infer<typeof dynotearsEvidenceSchema>
 
+export const varLingamEvidenceSchema = z.object({
+  kind: z.literal('varLingam'),
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(12),
+  lags: z.number().int().min(1).max(6),
+  selectedLag: z.number().int().min(1).max(6),
+  prune: z.boolean(),
+  causalOrder: z.array(z.number().int().nonnegative()),
+  contemporaneousWeights: z.array(z.array(z.number().finite())),
+  laggedWeights: z.array(z.array(z.array(z.number().finite()))),
+}).strict()
+
+export type VarLingamEvidence = z.infer<typeof varLingamEvidenceSchema>
+
 export const ocseEvidenceSchema = z.object({
   kind: z.literal('ocse'),
   observations: z.number().int().positive(),
@@ -70,32 +85,15 @@ export const ocseEvidenceSchema = z.object({
 
 export type OcseEvidence = z.infer<typeof ocseEvidenceSchema>
 
-export const grangerSsrEvidenceSchema = z.object({
-  kind: z.literal('grangerSsrF'),
-  observations: z.number().int().positive(),
-  maxLag: z.number().int().min(1).max(20),
-  tests: z.array(z.object({
-    lag: z.number().int().positive(),
-    statistic: z.number().finite(),
-    pValue: z.number().finite().min(0).max(1),
-  }).strict()),
-}).strict()
-
-export type GrangerSsrEvidence = z.infer<typeof grangerSsrEvidenceSchema>
 
 export type PcmciPlusBoundaryProblem = {
   readonly kind: 'invalid-pcmci-plus-result'
   readonly detail: string
 }
 
-export type GrangerBoundaryProblem = {
-  readonly kind: 'invalid-granger-result'
-  readonly detail: string
-}
-
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'DYNOTEARS' | 'oCSE'
+  readonly method: 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
   readonly detail: string
 }
 
@@ -121,19 +119,6 @@ export function parsePcmciPlusEvidence(value: unknown): Result<PcmciPlusEvidence
   return ok(parsed.data)
 }
 
-export function parseGrangerSsrEvidence(
-  value: unknown,
-): Result<GrangerSsrEvidence, GrangerBoundaryProblem> {
-  const parsed = grangerSsrEvidenceSchema.safeParse(value)
-  if (!parsed.success) {
-    return err({ kind: 'invalid-granger-result', detail: z.prettifyError(parsed.error) })
-  }
-  if (parsed.data.tests.length !== parsed.data.maxLag
-    || parsed.data.tests.some((test, index) => test.lag !== index + 1)) {
-    return err({ kind: 'invalid-granger-result', detail: 'Granger evidence must contain one ordered result per requested lag.' })
-  }
-  return ok(parsed.data)
-}
 
 export function parseLpcmciEvidence(value: unknown): Result<LpcmciEvidence, DiscoveryMatrixBoundaryProblem> {
   const parsed = lpcmciEvidenceSchema.safeParse(value)
@@ -160,6 +145,26 @@ export function parseDynotearsEvidence(value: unknown): Result<DynotearsEvidence
     || parsed.data.laggedWeights.length !== parsed.data.maxLag
     || !parsed.data.laggedWeights.every(square)) {
     return err({ kind: 'invalid-discovery-matrix-result', method: 'DYNOTEARS', detail: 'DYNOTEARS weight matrices have inconsistent dimensions.' })
+  }
+  return ok(parsed.data)
+}
+
+export function parseVarLingamEvidence(value: unknown): Result<VarLingamEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = varLingamEvidenceSchema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'VAR-LiNGAM', detail: z.prettifyError(parsed.error) })
+  }
+  const square = (matrix: readonly (readonly number[])[]) => matrix.length === parsed.data.variables
+    && matrix.every((row) => row.length === parsed.data.variables)
+  if (!square(parsed.data.contemporaneousWeights)
+    || parsed.data.laggedWeights.length !== parsed.data.selectedLag
+    || parsed.data.selectedLag > parsed.data.lags
+    || !parsed.data.laggedWeights.every(square)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'VAR-LiNGAM', detail: 'VAR-LiNGAM adjacency matrices have inconsistent dimensions.' })
+  }
+  const order = [...parsed.data.causalOrder].sort((left, right) => left - right)
+  if (order.length !== parsed.data.variables || order.some((index, position) => index !== position)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'VAR-LiNGAM', detail: 'VAR-LiNGAM causal order is not a permutation of the variables.' })
   }
   return ok(parsed.data)
 }
@@ -192,12 +197,8 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'pcmci-plus' | 'lpcmci' | 'dynotears' | 'ocse' | 'granger-ssr-f'
+export type DiscoveryMethodChoice = 'pcmci-plus' | 'lpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
-
-export type ColumnChoice =
-  | { readonly kind: 'unselected' }
-  | { readonly kind: 'selected'; readonly column: ColumnId }
 
 export type DiscoveryConfiguration =
   | {
@@ -217,18 +218,17 @@ export type DiscoveryConfiguration =
       readonly lambdaA: DynotearsPenalty
     }
   | {
+      readonly kind: 'var-lingam'
+      readonly maxLag: DiscoveryLag
+      readonly prune: boolean
+    }
+  | {
       readonly kind: 'ocse'
       readonly maxLag: DiscoveryLag
       readonly alpha: PcmciAlpha
       readonly nShuffles: OcseShuffles
       readonly method: OcseInformationMethod
       readonly k: 5
-    }
-  | {
-      readonly kind: 'granger-ssr-f'
-      readonly target: ColumnChoice
-      readonly candidateCause: ColumnChoice
-      readonly maxLag: DiscoveryLag
     }
 
 export type DiscoveryRunArtifact =
@@ -263,6 +263,16 @@ export type DiscoveryRunArtifact =
       readonly result: DynotearsEvidence
     }
   | {
+      readonly kind: 'var-lingam-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof VAR_LINGAM_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: VarLingamEvidence
+    }
+  | {
       readonly kind: 'ocse-run'
       readonly id: DiscoveryRunId
       readonly preparedDataset: PreparedDatasetVersionId
@@ -271,17 +281,6 @@ export type DiscoveryRunArtifact =
       readonly variables: NonEmptyArray<NumericColumnSelection>
       readonly eligibility: AcceptedDiscoveryEligibility
       readonly result: OcseEvidence
-    }
-  | {
-      readonly kind: 'granger-ssr-f-run'
-      readonly id: DiscoveryRunId
-      readonly preparedDataset: PreparedDatasetVersionId
-      readonly createdAt: string
-      readonly method: typeof GRANGER_SSR_F_METHOD_ID
-      readonly target: NumericColumnSelection
-      readonly candidateCause: NumericColumnSelection
-      readonly eligibility: AcceptedDiscoveryEligibility
-      readonly result: GrangerSsrEvidence
     }
 
 export type DiscoveryRunProblem =
@@ -313,11 +312,10 @@ export type DiscoveryEvent =
   | { readonly type: 'pc-alpha-selected'; readonly value: PcmciAlpha }
   | { readonly type: 'dynotears-lambda-w-selected'; readonly value: DynotearsPenalty }
   | { readonly type: 'dynotears-lambda-a-selected'; readonly value: DynotearsPenalty }
+  | { readonly type: 'var-lingam-prune-selected'; readonly value: boolean }
   | { readonly type: 'ocse-alpha-selected'; readonly value: PcmciAlpha }
   | { readonly type: 'ocse-shuffles-selected'; readonly value: OcseShuffles }
   | { readonly type: 'ocse-method-selected'; readonly value: OcseInformationMethod }
-  | { readonly type: 'target-selected'; readonly column: ColumnChoice }
-  | { readonly type: 'candidate-cause-selected'; readonly column: ColumnChoice }
   | { readonly type: 'max-lag-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'run-started' }
   | { readonly type: 'run-progressed'; readonly progress: DiscoveryProgress }
@@ -352,6 +350,10 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
       return state.configuration.kind === 'dynotears'
         ? { configuration: { ...state.configuration, lambdaA: event.value }, job: { kind: 'idle' } }
         : state
+    case 'var-lingam-prune-selected':
+      return state.configuration.kind === 'var-lingam'
+        ? { configuration: { ...state.configuration, prune: event.value }, job: { kind: 'idle' } }
+        : state
     case 'ocse-alpha-selected':
       return state.configuration.kind === 'ocse'
         ? { configuration: { ...state.configuration, alpha: event.value }, job: { kind: 'idle' } }
@@ -364,16 +366,8 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
       return state.configuration.kind === 'ocse'
         ? { configuration: { ...state.configuration, method: event.value }, job: { kind: 'idle' } }
         : state
-    case 'target-selected':
-      return state.configuration.kind === 'granger-ssr-f'
-        ? { configuration: { ...state.configuration, target: event.column }, job: { kind: 'idle' } }
-        : state
-    case 'candidate-cause-selected':
-      return state.configuration.kind === 'granger-ssr-f'
-        ? { configuration: { ...state.configuration, candidateCause: event.column }, job: { kind: 'idle' } }
-        : state
     case 'max-lag-selected':
-      return state.configuration.kind === 'granger-ssr-f' || state.configuration.kind === 'dynotears' || state.configuration.kind === 'ocse'
+      return state.configuration.kind === 'dynotears' || state.configuration.kind === 'var-lingam' || state.configuration.kind === 'ocse'
         ? { configuration: { ...state.configuration, maxLag: event.value }, job: { kind: 'idle' } }
         : state
     case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
@@ -391,14 +385,8 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
     case 'pcmci-plus': return { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }
     case 'lpcmci': return { kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }
     case 'dynotears': return { kind: 'dynotears', maxLag: 2, lambdaW: 0.1, lambdaA: 0.1 }
+    case 'var-lingam': return { kind: 'var-lingam', maxLag: 2, prune: true }
     case 'ocse': return { kind: 'ocse', maxLag: 2, alpha: 0.05, nShuffles: 50, method: 'gaussian', k: 5 }
-    case 'granger-ssr-f':
-      return {
-        kind: 'granger-ssr-f',
-        target: { kind: 'unselected' },
-        candidateCause: { kind: 'unselected' },
-        maxLag: 4,
-      }
     default: return assertNever(method)
   }
 }
@@ -421,6 +409,11 @@ export type ReadyDiscoverySpecification =
       readonly lambdaA: DynotearsPenalty
     }
   | {
+      readonly kind: 'var-lingam'
+      readonly maxLag: DiscoveryLag
+      readonly prune: boolean
+    }
+  | {
       readonly kind: 'ocse'
       readonly maxLag: DiscoveryLag
       readonly alpha: PcmciAlpha
@@ -428,23 +421,14 @@ export type ReadyDiscoverySpecification =
       readonly method: OcseInformationMethod
       readonly k: 5
     }
-  | {
-      readonly kind: 'granger-ssr-f'
-      readonly target: ColumnId
-      readonly candidateCause: ColumnId
-      readonly maxLag: DiscoveryLag
-    }
 
 export type DiscoveryReadinessProblem =
   | { readonly kind: 'time-series-required' }
   | { readonly kind: 'at-least-two-variables-required' }
-  | { readonly kind: 'target-required' }
-  | { readonly kind: 'candidate-cause-required' }
-  | { readonly kind: 'distinct-pair-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'oCSE'; readonly maximum: number; readonly available: number }
-  | { readonly kind: 'browser-lag-limit'; readonly method: 'DYNOTEARS' | 'oCSE'; readonly maximum: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-lag-limit'; readonly method: 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number }
 
 export function readyDiscoverySpecification(
   configuration: DiscoveryConfiguration,
@@ -478,6 +462,15 @@ export function readyDiscoverySpecification(
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
         : ok(configuration)
     }
+    case 'var-lingam': {
+      if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'VAR-LiNGAM', maximum: 12, available: prepared.columns.length })
+      if (configuration.maxLag > 6) return err({ kind: 'browser-lag-limit', method: 'VAR-LiNGAM', maximum: 6 })
+      const required = prepared.columns.length * (configuration.maxLag + 1) + 16
+      return prepared.observations < required
+        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+        : ok(configuration)
+    }
     case 'ocse': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
       if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'oCSE', maximum: 12, available: prepared.columns.length })
@@ -486,22 +479,6 @@ export function readyDiscoverySpecification(
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
         : ok(configuration)
-    }
-    case 'granger-ssr-f': {
-      if (configuration.target.kind === 'unselected') return err({ kind: 'target-required' })
-      if (configuration.candidateCause.kind === 'unselected') return err({ kind: 'candidate-cause-required' })
-      if (configuration.target.column === configuration.candidateCause.column) {
-        return err({ kind: 'distinct-pair-required' })
-      }
-      const required = 3 * configuration.maxLag + 2
-      return prepared.observations < required
-        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
-        : ok({
-            kind: 'granger-ssr-f',
-            target: configuration.target.column,
-            candidateCause: configuration.candidateCause.column,
-            maxLag: configuration.maxLag,
-          })
     }
     default: return assertNever(configuration)
   }
@@ -520,7 +497,7 @@ export function evaluateDiscoveryEligibility(
       violations: [{
         kind: 'violated',
         caveat: samplingCaveat,
-        evidence: 'This prepared artifact declares independent observations, so row order has no temporal meaning.',
+        evidence: 'This prepared dataset holds independent rows. Their order does not represent time.',
       }],
     }
   }
@@ -528,6 +505,8 @@ export function evaluateDiscoveryEligibility(
   const satisfied: Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>[] = []
   const unresolved: Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>[] = []
   for (const caveat of method.caveats) {
+    // Reading rules say how to read a result; they are not conditions the data can meet or fail.
+    if (caveat.category === 'interpretation') continue
     if (caveat.category === 'sampling-structure') {
       satisfied.push({
         kind: 'satisfied',
@@ -537,18 +516,31 @@ export function evaluateDiscoveryEligibility(
       continue
     }
     if (caveat.category === 'missingness' && prepared.missingness.kind === 'not-present') {
-      satisfied.push({ kind: 'satisfied', caveat, evidence: 'The prepared numeric matrix contains no missing cells.' })
+      satisfied.push({ kind: 'satisfied', caveat, evidence: 'The prepared dataset contains no missing values.' })
       continue
     }
-    unresolved.push({
-      kind: 'unresolved',
-      caveat,
-      missingEvidence: caveat.category === 'stationarity-and-dynamics'
-        ? stationarity === null
-          ? 'No stationarity evidence has been run for this prepared version. The run remains available with caution.'
-          : `Stationarity tests exist for ${stationarity.observations} observations, but Hirmos does not turn them into an automatic verdict.`
-        : 'This requirement needs scientific judgment or evidence beyond the structural dataset checks.',
-    })
+    if (caveat.category === 'stationarity-and-dynamics') {
+      // The battery holds a verdict per series; an integrated series in levels warns rather than refuses, since the verdict is itself a test.
+      if (stationarity === null) {
+        unresolved.push({ kind: 'unresolved', caveat, missingEvidence: 'Run stationarity tests for this prepared dataset version in Data studio.' })
+        continue
+      }
+      if (stationarity.transform.kind === 'difference') {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: 'The stationarity view is the first difference; the run reads the prepared levels, so difference the series in the recipe before trusting links found on levels.' })
+        continue
+      }
+      const verdicts = prepared.columns.map((column) => ({ name: columnNameOf(column), verdict: levelModelVerdict(columnNameOf(column), stationarity.variables.find((variable) => variable.column === column)?.assessment ?? null) }))
+      const integrated = verdicts.filter((entry) => entry.verdict.kind === 'refused').map((entry) => entry.name)
+      const open = verdicts.filter((entry) => entry.verdict.kind === 'unresolved').map((entry) => entry.verdict.reason)
+      if (integrated.length === 0 && open.length === 0) {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: `${verdicts.map((entry) => entry.name).join(', ')} ${verdicts.length === 1 ? 'is' : 'are'} stationary in levels.` })
+        continue
+      }
+      const integratedText = integrated.length === 0 ? '' : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) in levels, so links found on levels can be spurious; a differenced version is the safer input.`
+      unresolved.push({ kind: 'unresolved', caveat, missingEvidence: [integratedText, ...open].filter((text) => text.length > 0).join(' ') })
+      continue
+    }
+    unresolved.push({ kind: 'unresolved', caveat, missingEvidence: '' })
   }
   if (!isNonEmpty(unresolved)) return { kind: 'eligible', satisfied }
   return { kind: 'caution', satisfied, unresolved }
@@ -559,15 +551,12 @@ export const newDiscoveryRunId = (): DiscoveryRunId =>
 
 export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): string {
   switch (problem.kind) {
-    case 'time-series-required': return 'Temporal discovery is refused because this dataset declares independent observations.'
-    case 'at-least-two-variables-required': return 'This multivariate discovery method requires at least two prepared variables.'
-    case 'target-required': return 'Choose the target series whose future values are being predicted.'
-    case 'candidate-cause-required': return 'Choose the candidate cause whose past values are added to the model.'
-    case 'distinct-pair-required': return 'Target and candidate cause must be different variables.'
-    case 'too-few-observations': return `This configuration needs at least ${problem.required} observations; ${problem.available} are available.`
-    case 'dense-browser-boundary-required': return 'The current browser command needs a dense prepared matrix. Tigramite-mask execution will use its own later boundary.'
-    case 'browser-variable-limit': return `${problem.method} accepts at most ${problem.maximum} variables in the current browser boundary; ${problem.available} are selected.`
-    case 'browser-lag-limit': return `${problem.method} accepts a maximum lag of ${problem.maximum} in the current browser boundary.`
+    case 'time-series-required': return 'Temporal discovery needs a time series. This prepared dataset holds independent rows.'
+    case 'at-least-two-variables-required': return 'Select at least 2 variables.'
+    case 'too-few-observations': return `This configuration needs at least ${problem.required} rows; ${problem.available} are available. Lower the maximum lag or use more rows.`
+    case 'dense-browser-boundary-required': return 'Choose a complete interval or imputation. This method needs complete numeric columns in the browser.'
+    case 'browser-variable-limit': return `${problem.method} accepts up to ${problem.maximum} variables in the browser; ${problem.available} are selected. Deselect ${problem.available - problem.maximum}.`
+    case 'browser-lag-limit': return `${problem.method} accepts a maximum lag of ${problem.maximum} in the browser. Lower the maximum lag.`
     default: return assertNever(problem)
   }
 }
@@ -575,7 +564,7 @@ export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): 
 export function describeDiscoveryRunProblem(problem: DiscoveryRunProblem): string {
   switch (problem.kind) {
     case 'materialization-refused': return problem.detail
-    case 'missing-values-remain': return `${problem.cells} missing cells remain in the numeric matrix.`
+    case 'missing-values-remain': return `${problem.cells} missing values remain. Choose a missing-value policy in Data studio.`
     case 'analysis-refused': return problem.detail
     case 'execution-unavailable': return problem.detail
     default: return assertNever(problem)

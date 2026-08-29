@@ -1,0 +1,2221 @@
+[
+  {
+    "label": "The M-bias graph",
+    "slug": "the-m-bias-graph",
+    "exposure": "E",
+    "outcome": "D",
+    "nodes": [
+      {
+        "name": "D",
+        "kind": "observed",
+        "x": 1,
+        "y": 1
+      },
+      {
+        "name": "E",
+        "kind": "observed",
+        "x": -2,
+        "y": 1
+      },
+      {
+        "name": "Z",
+        "kind": "observed",
+        "x": -0.5,
+        "y": 0.5
+      },
+      {
+        "name": "U_DZ",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_EZ",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "U_DZ",
+        "to": "D"
+      },
+      {
+        "from": "U_DZ",
+        "to": "Z"
+      },
+      {
+        "from": "E",
+        "to": "D"
+      },
+      {
+        "from": "U_EZ",
+        "to": "E"
+      },
+      {
+        "from": "U_EZ",
+        "to": "Z"
+      }
+    ],
+    "bidirected": 2,
+    "expected": {
+      "msas": [
+        []
+      ],
+      "backdoorOpen": false,
+      "canonical": [],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Extended confounding triangle",
+    "slug": "extended-confounding-triangle",
+    "exposure": "E",
+    "outcome": "D",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": -2.2,
+        "y": -1.52
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": 1.4,
+        "y": -1.46
+      },
+      {
+        "name": "D",
+        "kind": "observed",
+        "x": 1.4,
+        "y": 1.621
+      },
+      {
+        "name": "E",
+        "kind": "observed",
+        "x": -2.2,
+        "y": 1.597
+      },
+      {
+        "name": "Z",
+        "kind": "observed",
+        "x": -0.3,
+        "y": -0.082
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "E"
+      },
+      {
+        "from": "A",
+        "to": "Z"
+      },
+      {
+        "from": "B",
+        "to": "D"
+      },
+      {
+        "from": "B",
+        "to": "Z"
+      },
+      {
+        "from": "E",
+        "to": "D"
+      },
+      {
+        "from": "Z",
+        "to": "D"
+      },
+      {
+        "from": "Z",
+        "to": "E"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "B",
+          "Z"
+        ],
+        [
+          "A",
+          "Z"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "A",
+        "B",
+        "Z"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Small model with mediator",
+    "slug": "small-model-with-mediator",
+    "exposure": "X",
+    "outcome": "Y",
+    "nodes": [
+      {
+        "name": "X",
+        "kind": "observed",
+        "x": -1.193,
+        "y": 1.639
+      },
+      {
+        "name": "Y",
+        "kind": "observed",
+        "x": 1.053,
+        "y": 1.639
+      },
+      {
+        "name": "Z",
+        "kind": "observed",
+        "x": -0.132,
+        "y": -0.374
+      },
+      {
+        "name": "I",
+        "kind": "observed",
+        "x": 0.423,
+        "y": 0.755
+      }
+    ],
+    "edges": [
+      {
+        "from": "Z",
+        "to": "X"
+      },
+      {
+        "from": "Z",
+        "to": "I"
+      },
+      {
+        "from": "X",
+        "to": "I"
+      },
+      {
+        "from": "X",
+        "to": "Y"
+      },
+      {
+        "from": "I",
+        "to": "Y"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "Z"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "Z"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Many variables but few paths",
+    "slug": "many-variables-but-few-paths",
+    "exposure": "E",
+    "outcome": "D",
+    "nodes": [
+      {
+        "name": "1",
+        "kind": "observed",
+        "x": -5.6,
+        "y": 2.115
+      },
+      {
+        "name": "2",
+        "kind": "observed",
+        "x": -7.12,
+        "y": -0.603
+      },
+      {
+        "name": "3",
+        "kind": "observed",
+        "x": -7.138,
+        "y": -3.731
+      },
+      {
+        "name": "4",
+        "kind": "observed",
+        "x": -5.395,
+        "y": -6.348
+      },
+      {
+        "name": "5",
+        "kind": "observed",
+        "x": -2.468,
+        "y": -6.074
+      },
+      {
+        "name": "6",
+        "kind": "observed",
+        "x": -2.179,
+        "y": -2.682
+      },
+      {
+        "name": "7",
+        "kind": "observed",
+        "x": -1.049,
+        "y": -0.238
+      },
+      {
+        "name": "8",
+        "kind": "observed",
+        "x": 1.043,
+        "y": 0.916
+      },
+      {
+        "name": "9",
+        "kind": "observed",
+        "x": 2.654,
+        "y": -2.614
+      },
+      {
+        "name": "10",
+        "kind": "observed",
+        "x": 4.955,
+        "y": -4.447
+      },
+      {
+        "name": "11",
+        "kind": "observed",
+        "x": 7.152,
+        "y": -1.901
+      },
+      {
+        "name": "12",
+        "kind": "observed",
+        "x": 7.424,
+        "y": 1.256
+      },
+      {
+        "name": "13",
+        "kind": "observed",
+        "x": 5.971,
+        "y": 3.498
+      },
+      {
+        "name": "14",
+        "kind": "observed",
+        "x": 4.225,
+        "y": 5.936
+      },
+      {
+        "name": "15",
+        "kind": "observed",
+        "x": 1.634,
+        "y": 7.468
+      },
+      {
+        "name": "E",
+        "kind": "observed",
+        "x": -3.728,
+        "y": 5.092
+      },
+      {
+        "name": "D",
+        "kind": "observed",
+        "x": -1.51,
+        "y": 6.789
+      }
+    ],
+    "edges": [
+      {
+        "from": "1",
+        "to": "E"
+      },
+      {
+        "from": "2",
+        "to": "1"
+      },
+      {
+        "from": "3",
+        "to": "2"
+      },
+      {
+        "from": "4",
+        "to": "3"
+      },
+      {
+        "from": "5",
+        "to": "4"
+      },
+      {
+        "from": "6",
+        "to": "5"
+      },
+      {
+        "from": "7",
+        "to": "6"
+      },
+      {
+        "from": "7",
+        "to": "E"
+      },
+      {
+        "from": "8",
+        "to": "7"
+      },
+      {
+        "from": "8",
+        "to": "D"
+      },
+      {
+        "from": "9",
+        "to": "8"
+      },
+      {
+        "from": "10",
+        "to": "9"
+      },
+      {
+        "from": "11",
+        "to": "10"
+      },
+      {
+        "from": "12",
+        "to": "11"
+      },
+      {
+        "from": "13",
+        "to": "12"
+      },
+      {
+        "from": "14",
+        "to": "13"
+      },
+      {
+        "from": "15",
+        "to": "14"
+      },
+      {
+        "from": "15",
+        "to": "D"
+      },
+      {
+        "from": "E",
+        "to": "D"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "8"
+        ],
+        [
+          "7"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "1",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Sebastiani et al., 2005",
+    "slug": "sebastiani-et-al-2005",
+    "exposure": "EDN1.3",
+    "outcome": "EDNI1.7",
+    "nodes": [
+      {
+        "name": "EDN1.3",
+        "kind": "observed",
+        "x": -2.643,
+        "y": 16.642
+      },
+      {
+        "name": "EDNI1.7",
+        "kind": "observed",
+        "x": -1.234,
+        "y": 18.664
+      },
+      {
+        "name": "SELP.22",
+        "kind": "observed",
+        "x": -0.481,
+        "y": 2.644
+      },
+      {
+        "name": "SELP.17",
+        "kind": "observed",
+        "x": -1.367,
+        "y": 3.939
+      },
+      {
+        "name": "ECE1.13",
+        "kind": "observed",
+        "x": -0.28,
+        "y": 7.26
+      },
+      {
+        "name": "ECE1.12",
+        "kind": "observed",
+        "x": 1.202,
+        "y": 8.772
+      },
+      {
+        "name": "MET.6",
+        "kind": "observed",
+        "x": 3.562,
+        "y": 11.155
+      },
+      {
+        "name": "CAT",
+        "kind": "observed",
+        "x": 4.501,
+        "y": 12.816
+      },
+      {
+        "name": "CSF2.3",
+        "kind": "observed",
+        "x": 2.509,
+        "y": -8.195
+      },
+      {
+        "name": "CSF2.4",
+        "kind": "observed",
+        "x": -1.283,
+        "y": -8.195
+      },
+      {
+        "name": "TGFBR3.10",
+        "kind": "observed",
+        "x": 2.902,
+        "y": -3.702
+      },
+      {
+        "name": "TGFBR3.2",
+        "kind": "observed",
+        "x": 1.355,
+        "y": -2.058
+      },
+      {
+        "name": "TGFBR3.8",
+        "kind": "observed",
+        "x": -0.092,
+        "y": -5.524
+      },
+      {
+        "name": "SELP.12",
+        "kind": "observed",
+        "x": 3.144,
+        "y": 5.234
+      },
+      {
+        "name": "BMP6.13",
+        "kind": "observed",
+        "x": -3.207,
+        "y": -4.786
+      },
+      {
+        "name": "BMP6.12",
+        "kind": "observed",
+        "x": -2.382,
+        "y": -7.072
+      },
+      {
+        "name": "ANXA2.8",
+        "kind": "observed",
+        "x": 3.987,
+        "y": 20.108
+      },
+      {
+        "name": "BMP6.11",
+        "kind": "observed",
+        "x": -1.179,
+        "y": -0.789
+      },
+      {
+        "name": "ADCY9.8",
+        "kind": "observed",
+        "x": 2.198,
+        "y": 9.855
+      },
+      {
+        "name": "BMP6.10",
+        "kind": "observed",
+        "x": -3.086,
+        "y": 2.25
+      },
+      {
+        "name": "BMP6",
+        "kind": "observed",
+        "x": -1.985,
+        "y": 4.558
+      },
+      {
+        "name": "ANXA2.11",
+        "kind": "observed",
+        "x": 0.105,
+        "y": 12.599
+      },
+      {
+        "name": "ANXA2.13",
+        "kind": "observed",
+        "x": 1.437,
+        "y": 15.415
+      },
+      {
+        "name": "MET.5",
+        "kind": "observed",
+        "x": 4.32,
+        "y": 3.489
+      },
+      {
+        "name": "BMP6.9",
+        "kind": "observed",
+        "x": -2.416,
+        "y": -2.349
+      },
+      {
+        "name": "ANXA2.7",
+        "kind": "observed",
+        "x": -1.418,
+        "y": 9.206
+      },
+      {
+        "name": "BMP6.14",
+        "kind": "observed",
+        "x": -4.254,
+        "y": -6.607
+      },
+      {
+        "name": "TGFBR3.7",
+        "kind": "observed",
+        "x": 4.445,
+        "y": -7.336
+      },
+      {
+        "name": "ANXA2.12",
+        "kind": "observed",
+        "x": -1.329,
+        "y": 13.465
+      },
+      {
+        "name": "SELP.14",
+        "kind": "observed",
+        "x": 3.655,
+        "y": -1.126
+      },
+      {
+        "name": "Stroke",
+        "kind": "observed",
+        "x": 1.418,
+        "y": 3.285
+      },
+      {
+        "name": "ANXA2.5",
+        "kind": "observed",
+        "x": -3.41,
+        "y": 11.227
+      },
+      {
+        "name": "TGFBR3.9",
+        "kind": "observed",
+        "x": 1.494,
+        "y": -6.462
+      },
+      {
+        "name": "EDNI1.6",
+        "kind": "observed",
+        "x": 1.697,
+        "y": 21.769
+      },
+      {
+        "name": "EDN1.9",
+        "kind": "observed",
+        "x": -4.064,
+        "y": 21.051
+      },
+      {
+        "name": "EDN1.10",
+        "kind": "observed",
+        "x": -0.282,
+        "y": 22.274
+      }
+    ],
+    "edges": [
+      {
+        "from": "SELP.17",
+        "to": "SELP.22"
+      },
+      {
+        "from": "ECE1.13",
+        "to": "SELP.17"
+      },
+      {
+        "from": "ECE1.12",
+        "to": "ECE1.13"
+      },
+      {
+        "from": "MET.6",
+        "to": "SELP.12"
+      },
+      {
+        "from": "CAT",
+        "to": "MET.5"
+      },
+      {
+        "from": "CSF2.3",
+        "to": "CSF2.4"
+      },
+      {
+        "from": "TGFBR3.10",
+        "to": "TGFBR3.2"
+      },
+      {
+        "from": "TGFBR3.10",
+        "to": "TGFBR3.9"
+      },
+      {
+        "from": "TGFBR3.2",
+        "to": "TGFBR3.9"
+      },
+      {
+        "from": "TGFBR3.8",
+        "to": "TGFBR3.2"
+      },
+      {
+        "from": "TGFBR3.8",
+        "to": "TGFBR3.9"
+      },
+      {
+        "from": "EDN1.3",
+        "to": "ANXA2.12"
+      },
+      {
+        "from": "EDN1.3",
+        "to": "EDNI1.7"
+      },
+      {
+        "from": "BMP6.13",
+        "to": "BMP6.12"
+      },
+      {
+        "from": "BMP6.13",
+        "to": "BMP6.9"
+      },
+      {
+        "from": "EDN1.10",
+        "to": "EDNI1.7"
+      },
+      {
+        "from": "EDNI1.6",
+        "to": "EDN1.10"
+      },
+      {
+        "from": "EDNI1.6",
+        "to": "EDNI1.7"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "EDN1.3"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "CAT"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "ECE1.12"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "EDNI1.6"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "ADCY9.8"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "BMP6"
+      },
+      {
+        "from": "ANXA2.8",
+        "to": "ANXA2.13"
+      },
+      {
+        "from": "BMP6.11",
+        "to": "BMP6.9"
+      },
+      {
+        "from": "BMP6.10",
+        "to": "BMP6.11"
+      },
+      {
+        "from": "BMP6.10",
+        "to": "BMP6.13"
+      },
+      {
+        "from": "BMP6",
+        "to": "BMP6.10"
+      },
+      {
+        "from": "ANXA2.13",
+        "to": "ANXA2.11"
+      },
+      {
+        "from": "MET.5",
+        "to": "MET.6"
+      },
+      {
+        "from": "MET.5",
+        "to": "TGFBR3.7"
+      },
+      {
+        "from": "MET.5",
+        "to": "SELP.14"
+      },
+      {
+        "from": "EDN1.9",
+        "to": "EDN1.10"
+      },
+      {
+        "from": "EDN1.9",
+        "to": "BMP6.14"
+      },
+      {
+        "from": "EDN1.9",
+        "to": "EDN1.3"
+      },
+      {
+        "from": "ANXA2.7",
+        "to": "ANXA2.11"
+      },
+      {
+        "from": "ANXA2.7",
+        "to": "ANXA2.5"
+      },
+      {
+        "from": "BMP6.14",
+        "to": "BMP6.12"
+      },
+      {
+        "from": "TGFBR3.7",
+        "to": "CSF2.3"
+      },
+      {
+        "from": "TGFBR3.7",
+        "to": "TGFBR3.10"
+      },
+      {
+        "from": "ANXA2.12",
+        "to": "ANXA2.13"
+      },
+      {
+        "from": "ANXA2.12",
+        "to": "ANXA2.11"
+      },
+      {
+        "from": "ANXA2.12",
+        "to": "ANXA2.7"
+      },
+      {
+        "from": "ANXA2.12",
+        "to": "ANXA2.5"
+      },
+      {
+        "from": "Stroke",
+        "to": "CSF2.4"
+      },
+      {
+        "from": "Stroke",
+        "to": "TGFBR3.10"
+      },
+      {
+        "from": "Stroke",
+        "to": "MET.6"
+      },
+      {
+        "from": "Stroke",
+        "to": "SELP.12"
+      },
+      {
+        "from": "Stroke",
+        "to": "SELP.22"
+      },
+      {
+        "from": "Stroke",
+        "to": "ECE1.13"
+      },
+      {
+        "from": "Stroke",
+        "to": "ECE1.12"
+      },
+      {
+        "from": "Stroke",
+        "to": "BMP6.12"
+      },
+      {
+        "from": "Stroke",
+        "to": "BMP6.13"
+      },
+      {
+        "from": "Stroke",
+        "to": "BMP6.11"
+      },
+      {
+        "from": "Stroke",
+        "to": "ADCY9.8"
+      },
+      {
+        "from": "Stroke",
+        "to": "BMP6.10"
+      },
+      {
+        "from": "Stroke",
+        "to": "TGFBR3.8"
+      },
+      {
+        "from": "Stroke",
+        "to": "MET.5"
+      },
+      {
+        "from": "Stroke",
+        "to": "SELP.14"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "EDN1.10",
+          "EDNI1.6"
+        ],
+        [
+          "EDN1.9",
+          "EDNI1.6"
+        ],
+        [
+          "ANXA2.8",
+          "EDN1.9"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "ANXA2.8",
+        "EDN1.10",
+        "EDN1.9",
+        "EDNI1.6"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Polzer et al., 2012",
+    "slug": "polzer-et-al-2012",
+    "exposure": "ToothLoss",
+    "outcome": "Mortality",
+    "nodes": [
+      {
+        "name": "ToothLoss",
+        "kind": "observed",
+        "x": -1.677,
+        "y": 2.421
+      },
+      {
+        "name": "Mortality",
+        "kind": "observed",
+        "x": 1.9,
+        "y": 2.36
+      },
+      {
+        "name": "Periodontitis",
+        "kind": "observed",
+        "x": -0.335,
+        "y": 1.703
+      },
+      {
+        "name": "Caries",
+        "kind": "observed",
+        "x": -1.879,
+        "y": -1.875
+      },
+      {
+        "name": "Diabetes",
+        "kind": "observed",
+        "x": -0.888,
+        "y": 0.322
+      },
+      {
+        "name": "Obesity",
+        "kind": "observed",
+        "x": -0.904,
+        "y": -1.34
+      },
+      {
+        "name": "Hypertension",
+        "kind": "observed",
+        "x": 1.78,
+        "y": -0.157
+      },
+      {
+        "name": "Psychosocial",
+        "kind": "observed",
+        "x": -0.088,
+        "y": 0.266
+      },
+      {
+        "name": "Age",
+        "kind": "observed",
+        "x": -0.039,
+        "y": -1.762
+      },
+      {
+        "name": "Sex",
+        "kind": "observed",
+        "x": -0.844,
+        "y": -3.34
+      },
+      {
+        "name": "Alcohol",
+        "kind": "observed",
+        "x": 0.054,
+        "y": -3.594
+      },
+      {
+        "name": "Smoking",
+        "kind": "observed",
+        "x": 0.772,
+        "y": 0.379
+      },
+      {
+        "name": "Sport",
+        "kind": "observed",
+        "x": 0.914,
+        "y": -3.396
+      },
+      {
+        "name": "Lipids",
+        "kind": "observed",
+        "x": 2.026,
+        "y": -1.65
+      }
+    ],
+    "edges": [
+      {
+        "from": "ToothLoss",
+        "to": "Mortality"
+      },
+      {
+        "from": "Periodontitis",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Caries",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Diabetes",
+        "to": "Mortality"
+      },
+      {
+        "from": "Diabetes",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Diabetes",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Diabetes",
+        "to": "Lipids"
+      },
+      {
+        "from": "Obesity",
+        "to": "Mortality"
+      },
+      {
+        "from": "Obesity",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Obesity",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Obesity",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Obesity",
+        "to": "Lipids"
+      },
+      {
+        "from": "Hypertension",
+        "to": "Mortality"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Mortality"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Caries"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Obesity"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Alcohol"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Smoking"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Sport"
+      },
+      {
+        "from": "Psychosocial",
+        "to": "Lipids"
+      },
+      {
+        "from": "Age",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Age",
+        "to": "Mortality"
+      },
+      {
+        "from": "Age",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Age",
+        "to": "Caries"
+      },
+      {
+        "from": "Age",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Age",
+        "to": "Obesity"
+      },
+      {
+        "from": "Age",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Age",
+        "to": "Psychosocial"
+      },
+      {
+        "from": "Age",
+        "to": "Alcohol"
+      },
+      {
+        "from": "Age",
+        "to": "Smoking"
+      },
+      {
+        "from": "Age",
+        "to": "Sport"
+      },
+      {
+        "from": "Age",
+        "to": "Lipids"
+      },
+      {
+        "from": "Sex",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Sex",
+        "to": "Mortality"
+      },
+      {
+        "from": "Sex",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Sex",
+        "to": "Caries"
+      },
+      {
+        "from": "Sex",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Sex",
+        "to": "Obesity"
+      },
+      {
+        "from": "Sex",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Sex",
+        "to": "Psychosocial"
+      },
+      {
+        "from": "Sex",
+        "to": "Alcohol"
+      },
+      {
+        "from": "Sex",
+        "to": "Smoking"
+      },
+      {
+        "from": "Sex",
+        "to": "Sport"
+      },
+      {
+        "from": "Sex",
+        "to": "Lipids"
+      },
+      {
+        "from": "Alcohol",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Alcohol",
+        "to": "Mortality"
+      },
+      {
+        "from": "Alcohol",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Alcohol",
+        "to": "Obesity"
+      },
+      {
+        "from": "Alcohol",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Alcohol",
+        "to": "Smoking"
+      },
+      {
+        "from": "Alcohol",
+        "to": "Lipids"
+      },
+      {
+        "from": "Smoking",
+        "to": "ToothLoss"
+      },
+      {
+        "from": "Smoking",
+        "to": "Mortality"
+      },
+      {
+        "from": "Smoking",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Smoking",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Smoking",
+        "to": "Obesity"
+      },
+      {
+        "from": "Smoking",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Smoking",
+        "to": "Sport"
+      },
+      {
+        "from": "Sport",
+        "to": "Mortality"
+      },
+      {
+        "from": "Sport",
+        "to": "Periodontitis"
+      },
+      {
+        "from": "Sport",
+        "to": "Diabetes"
+      },
+      {
+        "from": "Sport",
+        "to": "Obesity"
+      },
+      {
+        "from": "Sport",
+        "to": "Hypertension"
+      },
+      {
+        "from": "Sport",
+        "to": "Lipids"
+      },
+      {
+        "from": "Lipids",
+        "to": "Mortality"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "Age",
+          "Alcohol",
+          "Diabetes",
+          "Obesity",
+          "Psychosocial",
+          "Sex",
+          "Smoking",
+          "Sport"
+        ],
+        [
+          "Age",
+          "Alcohol",
+          "Periodontitis",
+          "Psychosocial",
+          "Sex",
+          "Smoking"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "Age",
+        "Alcohol",
+        "Caries",
+        "Diabetes",
+        "Hypertension",
+        "Lipids",
+        "Obesity",
+        "Periodontitis",
+        "Psychosocial",
+        "Sex",
+        "Smoking",
+        "Sport"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Schipf et al., 2010",
+    "slug": "schipf-et-al-2010",
+    "exposure": "TT",
+    "outcome": "T2DM",
+    "nodes": [
+      {
+        "name": "TT",
+        "kind": "observed",
+        "x": -0.443,
+        "y": -0.942
+      },
+      {
+        "name": "T2DM",
+        "kind": "observed",
+        "x": 1.666,
+        "y": 2.693
+      },
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": -1.429,
+        "y": -2.311
+      },
+      {
+        "name": "S",
+        "kind": "observed",
+        "x": -1.423,
+        "y": 2.555
+      },
+      {
+        "name": "WC",
+        "kind": "observed",
+        "x": 0.829,
+        "y": -0.735
+      },
+      {
+        "name": "U",
+        "kind": "observed",
+        "x": -0.459,
+        "y": 1.159
+      },
+      {
+        "name": "PA",
+        "kind": "observed",
+        "x": 1.661,
+        "y": -2.186
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "S"
+      },
+      {
+        "from": "A",
+        "to": "PA"
+      },
+      {
+        "from": "A",
+        "to": "WC"
+      },
+      {
+        "from": "A",
+        "to": "U"
+      },
+      {
+        "from": "A",
+        "to": "TT"
+      },
+      {
+        "from": "S",
+        "to": "TT"
+      },
+      {
+        "from": "S",
+        "to": "T2DM"
+      },
+      {
+        "from": "WC",
+        "to": "TT"
+      },
+      {
+        "from": "WC",
+        "to": "U"
+      },
+      {
+        "from": "WC",
+        "to": "T2DM"
+      },
+      {
+        "from": "U",
+        "to": "TT"
+      },
+      {
+        "from": "U",
+        "to": "T2DM"
+      },
+      {
+        "from": "PA",
+        "to": "WC"
+      },
+      {
+        "from": "PA",
+        "to": "T2DM"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "PA",
+          "S",
+          "U",
+          "WC"
+        ],
+        [
+          "A",
+          "S",
+          "U",
+          "WC"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "A",
+        "PA",
+        "S",
+        "U",
+        "WC"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Shrier & Platt, 2008",
+    "slug": "shrier-platt-2008",
+    "exposure": "WarmUpExercises",
+    "outcome": "Injury",
+    "nodes": [
+      {
+        "name": "WarmUpExercises",
+        "kind": "observed",
+        "x": -7,
+        "y": 8.65
+      },
+      {
+        "name": "Injury",
+        "kind": "observed",
+        "x": 4.969,
+        "y": 8.605
+      },
+      {
+        "name": "Coach",
+        "kind": "observed",
+        "x": -4.392,
+        "y": -7.906
+      },
+      {
+        "name": "Genetics",
+        "kind": "observed",
+        "x": 2.022,
+        "y": -7.906
+      },
+      {
+        "name": "TeamMotivation",
+        "kind": "observed",
+        "x": -7.175,
+        "y": -0.95
+      },
+      {
+        "name": "PreGameProprioception",
+        "kind": "observed",
+        "x": -3.638,
+        "y": -1.235
+      },
+      {
+        "name": "ConnectiveTissueDisorder",
+        "kind": "observed",
+        "x": 3.494,
+        "y": -5.099
+      },
+      {
+        "name": "PreviousInjury",
+        "kind": "observed",
+        "x": -4.293,
+        "y": 4.175
+      },
+      {
+        "name": "ContactSport",
+        "kind": "observed",
+        "x": -1.157,
+        "y": 2.548
+      },
+      {
+        "name": "TissueWeakness",
+        "kind": "observed",
+        "x": 4.236,
+        "y": 1.857
+      },
+      {
+        "name": "IntraGameProprioception",
+        "kind": "observed",
+        "x": -1.196,
+        "y": 8.487
+      },
+      {
+        "name": "FitnessLevel",
+        "kind": "observed",
+        "x": -1.489,
+        "y": -4.53
+      },
+      {
+        "name": "NeuromuscularFatigue",
+        "kind": "observed",
+        "x": 1.501,
+        "y": -1.235
+      }
+    ],
+    "edges": [
+      {
+        "from": "Coach",
+        "to": "FitnessLevel"
+      },
+      {
+        "from": "Coach",
+        "to": "TeamMotivation"
+      },
+      {
+        "from": "Genetics",
+        "to": "FitnessLevel"
+      },
+      {
+        "from": "Genetics",
+        "to": "NeuromuscularFatigue"
+      },
+      {
+        "from": "Genetics",
+        "to": "ConnectiveTissueDisorder"
+      },
+      {
+        "from": "TeamMotivation",
+        "to": "PreviousInjury"
+      },
+      {
+        "from": "TeamMotivation",
+        "to": "WarmUpExercises"
+      },
+      {
+        "from": "PreGameProprioception",
+        "to": "WarmUpExercises"
+      },
+      {
+        "from": "ConnectiveTissueDisorder",
+        "to": "TissueWeakness"
+      },
+      {
+        "from": "ConnectiveTissueDisorder",
+        "to": "NeuromuscularFatigue"
+      },
+      {
+        "from": "ContactSport",
+        "to": "IntraGameProprioception"
+      },
+      {
+        "from": "ContactSport",
+        "to": "PreviousInjury"
+      },
+      {
+        "from": "TissueWeakness",
+        "to": "Injury"
+      },
+      {
+        "from": "IntraGameProprioception",
+        "to": "Injury"
+      },
+      {
+        "from": "FitnessLevel",
+        "to": "PreGameProprioception"
+      },
+      {
+        "from": "FitnessLevel",
+        "to": "NeuromuscularFatigue"
+      },
+      {
+        "from": "NeuromuscularFatigue",
+        "to": "IntraGameProprioception"
+      },
+      {
+        "from": "NeuromuscularFatigue",
+        "to": "Injury"
+      },
+      {
+        "from": "WarmUpExercises",
+        "to": "IntraGameProprioception"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "NeuromuscularFatigue",
+          "TissueWeakness"
+        ],
+        [
+          "ConnectiveTissueDisorder",
+          "NeuromuscularFatigue"
+        ],
+        [
+          "FitnessLevel",
+          "Genetics"
+        ],
+        [
+          "Coach",
+          "FitnessLevel"
+        ],
+        [
+          "Coach",
+          "PreGameProprioception"
+        ],
+        [
+          "FitnessLevel",
+          "TeamMotivation"
+        ],
+        [
+          "PreGameProprioception",
+          "TeamMotivation"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "Coach",
+        "ConnectiveTissueDisorder",
+        "ContactSport",
+        "FitnessLevel",
+        "Genetics",
+        "NeuromuscularFatigue",
+        "PreGameProprioception",
+        "TeamMotivation",
+        "TissueWeakness"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Acid & de Campos, 1996",
+    "slug": "acid-de-campos-1996",
+    "exposure": "x3",
+    "outcome": "x15",
+    "nodes": [
+      {
+        "name": "x3",
+        "kind": "observed",
+        "x": -7.255,
+        "y": 2.657
+      },
+      {
+        "name": "x15",
+        "kind": "observed",
+        "x": 5.872,
+        "y": 3.552
+      },
+      {
+        "name": "x4",
+        "kind": "observed",
+        "x": -7.549,
+        "y": -5.201
+      },
+      {
+        "name": "x5",
+        "kind": "observed",
+        "x": -4.116,
+        "y": -0.611
+      },
+      {
+        "name": "x6",
+        "kind": "observed",
+        "x": -4.389,
+        "y": 7.029
+      },
+      {
+        "name": "x7",
+        "kind": "observed",
+        "x": -1.746,
+        "y": 2.484
+      },
+      {
+        "name": "x8",
+        "kind": "observed",
+        "x": 2.209,
+        "y": 6.269
+      },
+      {
+        "name": "x9",
+        "kind": "observed",
+        "x": 1.392,
+        "y": 1.874
+      },
+      {
+        "name": "x10",
+        "kind": "observed",
+        "x": 3.925,
+        "y": -0.307
+      },
+      {
+        "name": "x11",
+        "kind": "observed",
+        "x": -1.569,
+        "y": -4.2
+      },
+      {
+        "name": "x12",
+        "kind": "observed",
+        "x": 1.903,
+        "y": -4.093
+      },
+      {
+        "name": "x13",
+        "kind": "observed",
+        "x": 6.728,
+        "y": -4.093
+      },
+      {
+        "name": "x14",
+        "kind": "observed",
+        "x": -0.676,
+        "y": 9.163
+      },
+      {
+        "name": "x16",
+        "kind": "observed",
+        "x": 5.343,
+        "y": 9.342
+      },
+      {
+        "name": "x17",
+        "kind": "observed",
+        "x": 7.417,
+        "y": 7.412
+      },
+      {
+        "name": "x18",
+        "kind": "observed",
+        "x": 7.26,
+        "y": 0.141
+      },
+      {
+        "name": "x1",
+        "kind": "observed",
+        "x": -10.173,
+        "y": -1.479
+      },
+      {
+        "name": "x2",
+        "kind": "observed",
+        "x": -9.832,
+        "y": 5.93
+      }
+    ],
+    "edges": [
+      {
+        "from": "x4",
+        "to": "x5"
+      },
+      {
+        "from": "x5",
+        "to": "x7"
+      },
+      {
+        "from": "x5",
+        "to": "x11"
+      },
+      {
+        "from": "x6",
+        "to": "x7"
+      },
+      {
+        "from": "x6",
+        "to": "x14"
+      },
+      {
+        "from": "x7",
+        "to": "x9"
+      },
+      {
+        "from": "x8",
+        "to": "x14"
+      },
+      {
+        "from": "x8",
+        "to": "x15"
+      },
+      {
+        "from": "x9",
+        "to": "x10"
+      },
+      {
+        "from": "x10",
+        "to": "x12"
+      },
+      {
+        "from": "x10",
+        "to": "x15"
+      },
+      {
+        "from": "x11",
+        "to": "x12"
+      },
+      {
+        "from": "x12",
+        "to": "x13"
+      },
+      {
+        "from": "x14",
+        "to": "x16"
+      },
+      {
+        "from": "x16",
+        "to": "x17"
+      },
+      {
+        "from": "x1",
+        "to": "x4"
+      },
+      {
+        "from": "x1",
+        "to": "x3"
+      },
+      {
+        "from": "x2",
+        "to": "x3"
+      },
+      {
+        "from": "x15",
+        "to": "x17"
+      },
+      {
+        "from": "x15",
+        "to": "x18"
+      },
+      {
+        "from": "x3",
+        "to": "x6"
+      },
+      {
+        "from": "x3",
+        "to": "x5"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "x4"
+        ],
+        [
+          "x1"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "x1",
+        "x2",
+        "x4",
+        "x8"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "van Kampen, 2014",
+    "slug": "van-kampen-2014",
+    "exposure": "SUS",
+    "outcome": "EGC",
+    "nodes": [
+      {
+        "name": "AFF",
+        "kind": "observed",
+        "x": 0.262,
+        "y": 0.477
+      },
+      {
+        "name": "AIS",
+        "kind": "observed",
+        "x": 0.123,
+        "y": 0.736
+      },
+      {
+        "name": "ALN",
+        "kind": "observed",
+        "x": 0.438,
+        "y": 0.506
+      },
+      {
+        "name": "APA",
+        "kind": "observed",
+        "x": 0.376,
+        "y": 0.147
+      },
+      {
+        "name": "CDR",
+        "kind": "observed",
+        "x": 0.628,
+        "y": 0.332
+      },
+      {
+        "name": "DET",
+        "kind": "observed",
+        "x": 0.92,
+        "y": 0.561
+      },
+      {
+        "name": "EGC",
+        "kind": "observed",
+        "x": 0.916,
+        "y": 1.016
+      },
+      {
+        "name": "FTW",
+        "kind": "observed",
+        "x": 0.667,
+        "y": 0.639
+      },
+      {
+        "name": "HOS",
+        "kind": "observed",
+        "x": 0.886,
+        "y": 0.727
+      },
+      {
+        "name": "PER",
+        "kind": "observed",
+        "x": 0.92,
+        "y": 0.382
+      },
+      {
+        "name": "SAN",
+        "kind": "observed",
+        "x": 0.031,
+        "y": 0.371
+      },
+      {
+        "name": "SUS",
+        "kind": "observed",
+        "x": 0.295,
+        "y": 1.003
+      }
+    ],
+    "edges": [
+      {
+        "from": "AFF",
+        "to": "ALN"
+      },
+      {
+        "from": "AFF",
+        "to": "APA"
+      },
+      {
+        "from": "AFF",
+        "to": "CDR"
+      },
+      {
+        "from": "AIS",
+        "to": "AFF"
+      },
+      {
+        "from": "AIS",
+        "to": "EGC"
+      },
+      {
+        "from": "AIS",
+        "to": "SUS"
+      },
+      {
+        "from": "ALN",
+        "to": "APA"
+      },
+      {
+        "from": "ALN",
+        "to": "DET"
+      },
+      {
+        "from": "ALN",
+        "to": "FTW"
+      },
+      {
+        "from": "ALN",
+        "to": "PER"
+      },
+      {
+        "from": "ALN",
+        "to": "SUS"
+      },
+      {
+        "from": "CDR",
+        "to": "DET"
+      },
+      {
+        "from": "EGC",
+        "to": "HOS"
+      },
+      {
+        "from": "FTW",
+        "to": "DET"
+      },
+      {
+        "from": "FTW",
+        "to": "EGC"
+      },
+      {
+        "from": "SAN",
+        "to": "ALN"
+      },
+      {
+        "from": "SAN",
+        "to": "AFF"
+      },
+      {
+        "from": "SAN",
+        "to": "AIS"
+      },
+      {
+        "from": "SAN",
+        "to": "APA"
+      },
+      {
+        "from": "SAN",
+        "to": "CDR"
+      },
+      {
+        "from": "SUS",
+        "to": "EGC"
+      },
+      {
+        "from": "SUS",
+        "to": "FTW"
+      },
+      {
+        "from": "SUS",
+        "to": "HOS"
+      },
+      {
+        "from": "PER",
+        "to": "DET"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "AIS",
+          "ALN"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "AFF",
+        "AIS",
+        "ALN",
+        "SAN"
+      ],
+      "canonicalValid": true
+    }
+  },
+  {
+    "label": "Didelez et al, 2010",
+    "slug": "didelez-et-al-2010",
+    "exposure": "HRT",
+    "outcome": "TCI",
+    "nodes": [
+      {
+        "name": "Age",
+        "kind": "observed",
+        "x": -1.973,
+        "y": -0.123
+      },
+      {
+        "name": "HRT",
+        "kind": "observed",
+        "x": -0.536,
+        "y": -0.016
+      },
+      {
+        "name": "Occ",
+        "kind": "observed",
+        "x": -1.645,
+        "y": 0.432
+      },
+      {
+        "name": "S",
+        "kind": "observed",
+        "x": 0.925,
+        "y": -0.5
+      },
+      {
+        "name": "Smo",
+        "kind": "observed",
+        "x": -0.879,
+        "y": 0.441
+      },
+      {
+        "name": "TCI",
+        "kind": "observed",
+        "x": 0.488,
+        "y": 0.09
+      },
+      {
+        "name": "Thist",
+        "kind": "observed",
+        "x": -0.569,
+        "y": 1.027
+      }
+    ],
+    "edges": [
+      {
+        "from": "Age",
+        "to": "HRT"
+      },
+      {
+        "from": "Age",
+        "to": "Occ"
+      },
+      {
+        "from": "Age",
+        "to": "S"
+      },
+      {
+        "from": "Age",
+        "to": "TCI"
+      },
+      {
+        "from": "HRT",
+        "to": "TCI"
+      },
+      {
+        "from": "Occ",
+        "to": "Smo"
+      },
+      {
+        "from": "Occ",
+        "to": "Thist"
+      },
+      {
+        "from": "Smo",
+        "to": "HRT"
+      },
+      {
+        "from": "Smo",
+        "to": "TCI"
+      },
+      {
+        "from": "TCI",
+        "to": "S"
+      },
+      {
+        "from": "Thist",
+        "to": "TCI"
+      }
+    ],
+    "bidirected": 0,
+    "expected": {
+      "msas": [
+        [
+          "Age",
+          "Smo"
+        ]
+      ],
+      "backdoorOpen": true,
+      "canonical": [
+        "Age",
+        "Occ",
+        "Smo",
+        "Thist"
+      ],
+      "canonicalValid": true
+    }
+  }
+]

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils'
  * register used by the eval and compile chrome. */
 export type ButtonTone = 'signal' | 'danger' | 'outline' | 'quiet' | 'mono'
 
-const BUTTON_BASE = 'rounded-md px-3 py-1.5 text-body transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:hover:brightness-100 pointer-coarse:min-h-10'
+const BUTTON_BASE = 'rounded-md border border-transparent px-3 py-1.5 text-body transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:hover:brightness-100 pointer-coarse:min-h-10'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
   signal: 'bg-signal font-medium text-signal-ink hover:brightness-110',
@@ -79,10 +79,10 @@ export const pill = (active: boolean, extra?: string): string =>
 /** A text field. `mono` for ids, models and Cypher — anything the user must read character by character.
  *  The edge border and dimmed placeholder are what separate "a box you can type in" from the text around
  *  it: on the dark theme the well fill sits four luminance points above the page, so the border carries
- *  the affordance, and a placeholder at full faint reads as an entered value. */
+ *  the affordance at 3:1, and the placeholder is italic so it never reads as an entered value. */
 export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string =>
   cn(
-    'w-full rounded-md border border-edge bg-well px-2 py-1.5 text-body text-ink placeholder:text-faint/60 focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint',
+    'w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink placeholder:italic placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint',
     variant === 'mono' && 'font-mono',
     extra,
   )
@@ -123,3 +123,28 @@ export const label = (extra?: string): string => cn('text-label uppercase tracki
 /** The title of a floating surface: panel, drawer or sheet. A step above `label()` in size, same voice.
  *  The app once had four registers for this, from 9.5px to 13px across three trackings. */
 export const panelTitle = 'text-label uppercase tracking-[0.1em] text-muted'
+
+/** Row padding per density: 24px compact and 32px comfortable rows with 12px body text, including the 1px hairline under the row. */
+export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px] pb-[6px]' } as const
+
+/** A data table: the caps tier for headers, hairline rows, comfortable 32px body rows unless a density is applied; figure cells add `text-right`. */
+export const table = 'w-full border-collapse text-left text-body'
+
+/** A header cell. Sticky, on the well, in the caps tier at regular weight. `p-0` when a sort button fills it. */
+export const th = (extra?: string): string =>
+  cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-well px-3.5 py-2 text-left font-normal text-faint', label(), extra)
+
+/** A body row. `action` rows fill on hover and focus; `selected` is a surface, never a colour or a weight. */
+export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: string): string =>
+  cn(
+    'border-b border-line transition-colors',
+    state !== 'static' && 'cursor-pointer hover:bg-well has-[button:focus-visible]:bg-well',
+    state === 'selected' && 'bg-raised',
+    extra,
+  )
+
+/** A body cell. Text cells truncate with the full value in `title`; figure cells add `text-right`. */
+export const td = (extra?: string): string => cn('px-3.5 align-top', rowPadding.comfortable, extra)
+
+/** The row-count line under a table; `aria-live="polite"` so a sort or filter is announced. */
+export const tableFoot = label('border-t border-hair px-3.5 py-1.5 text-faint')

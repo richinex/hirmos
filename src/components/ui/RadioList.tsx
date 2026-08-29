@@ -1,0 +1,62 @@
+import { useId, type ReactNode } from 'react'
+import { fieldLabel } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
+
+/**
+ * A single choice where each option needs a line of explanation, or where labels would wrap a
+ * segmented control: stacked native radios, one row each, the chosen row raised. Use the segmented
+ * knob for two or three short options that always fit one line; use this when they do not.
+ */
+
+export interface RadioOption<V extends string> {
+  readonly value: V
+  readonly label: string
+  readonly hint?: string
+  readonly disabled?: boolean
+}
+
+export function RadioList<V extends string>({ legend, legendHidden = false, value, onChange, options, className }: {
+  readonly legend: ReactNode
+  /** Keep the legend for assistive technology only, when a heading directly above already names the choice. */
+  readonly legendHidden?: boolean
+  readonly value: V | null
+  readonly onChange: (next: V) => void
+  readonly options: readonly RadioOption<V>[]
+  readonly className?: string
+}) {
+  const name = useId()
+  return (
+    <fieldset className={cn('m-0 min-w-0 border-0 p-0', className)}>
+      <legend className={legendHidden ? 'sr-only' : fieldLabel}>{legend}</legend>
+      <div className={cn('grid gap-1 rounded-lg border border-hair bg-well p-1', !legendHidden && 'mt-1')}>
+        {options.map((option) => {
+          const chosen = option.value === value
+          return (
+            <label
+              key={option.value}
+              className={cn(
+                'relative grid grid-cols-[auto_1fr] items-start gap-x-2.5 rounded-md border px-2.5 py-1.5 transition-colors duration-150',
+                option.disabled ? 'cursor-not-allowed text-faint' : 'cursor-pointer',
+                chosen ? 'border-edge bg-raised' : 'border-transparent hover:border-hair',
+              )}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={option.value}
+                checked={chosen}
+                disabled={option.disabled}
+                onChange={() => { if (!chosen) onChange(option.value) }}
+                className="mt-1 accent-signal"
+              />
+              <span className="min-w-0">
+                <span className={cn('block text-body', option.disabled ? 'text-faint' : 'text-ink')}>{option.label}</span>
+                {option.hint !== undefined && <span className="block text-label text-faint">{option.hint}</span>}
+              </span>
+            </label>
+          )
+        })}
+      </div>
+    </fieldset>
+  )
+}

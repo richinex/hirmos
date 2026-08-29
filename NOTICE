@@ -66,6 +66,15 @@ CausationEntropy — MIT
   Systems Science). https://github.com/Center-For-Complex-Systems-Science/causationentropy
   Port: ocse.rs.
 
+lingam — MIT
+  Copyright (c) 2019 T.Ikeuchi, G.Haraoka, M.Ide, W.Kurebayashi, S.Shimizu.
+  https://github.com/cdt15/lingam
+  Ports: var_lingam.rs (VARLiNGAM, DirectLiNGAM), adaptive lasso in lars.rs.
+
+scikit-learn — BSD-3-Clause
+  Copyright (c) 2007-2026 The scikit-learn developers. https://github.com/scikit-learn/scikit-learn
+  Port: lars.rs (LARS-lasso path, LassoLarsIC).
+
 CausalNex — Apache-2.0
   Copyright 2019-2020 QuantumBlack Visual Analytics Limited. https://github.com/mckinsey/causalnex
   Port: dynotears.rs (causalnex/structure/dynotears.py, modified). "QuantumBlack" and

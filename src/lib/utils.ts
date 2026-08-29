@@ -2,12 +2,12 @@ import { clsx, type ClassValue } from 'clsx'
 import { extendTailwindMerge } from 'tailwind-merge'
 
 /** twMerge must be TAUGHT the type ramp. It cannot see index.css, so an unknown `text-*` class is assumed
- *  to be a colour, which put `text-body` and `text-faint` in one conflict group and silently dropped the
- *  size. Declaring the six ramp tokens as font sizes restores size beats size, colour beats colour. */
+ *  to be a colour, which puts a size and a colour in one conflict group and silently drops the size.
+ *  Declaring every ramp tier as a font size restores size beats size, colour beats colour. */
 const twMerge = extendTailwindMerge({
   extend: {
     classGroups: {
-      'font-size': [{ text: ['heading', 'title', 'subtitle', 'body', 'label', 'micro'] }],
+      'font-size': [{ text: ['metric', 'display', 'display-sub', 'heading', 'title', 'subtitle', 'body', 'label', 'micro'] }],
     },
   },
 })

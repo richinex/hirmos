@@ -1,0 +1,137 @@
+{
+ "identifications": [
+  {
+   "name": "latent-confounder",
+   "nodes": [
+    "T",
+    "Y",
+    "U"
+   ],
+   "edges": [
+    [
+     "U",
+     "T"
+    ],
+    [
+     "U",
+     "Y"
+    ],
+    [
+     "T",
+     "Y"
+    ]
+   ],
+   "observed": [
+    "T",
+    "Y"
+   ],
+   "identified": false,
+   "backdoor": []
+  },
+  {
+   "name": "latent-and-observed",
+   "nodes": [
+    "T",
+    "Y",
+    "U",
+    "W"
+   ],
+   "edges": [
+    [
+     "U",
+     "T"
+    ],
+    [
+     "U",
+     "Y"
+    ],
+    [
+     "W",
+     "T"
+    ],
+    [
+     "W",
+     "Y"
+    ],
+    [
+     "T",
+     "Y"
+    ]
+   ],
+   "observed": [
+    "T",
+    "Y",
+    "W"
+   ],
+   "identified": false,
+   "backdoor": []
+  },
+  {
+   "name": "latent-blocked-by-observed",
+   "nodes": [
+    "T",
+    "Y",
+    "U",
+    "W"
+   ],
+   "edges": [
+    [
+     "U",
+     "W"
+    ],
+    [
+     "W",
+     "T"
+    ],
+    [
+     "U",
+     "Y"
+    ],
+    [
+     "T",
+     "Y"
+    ]
+   ],
+   "observed": [
+    "T",
+    "Y",
+    "W"
+   ],
+   "identified": true,
+   "backdoor": [
+    "W"
+   ]
+  },
+  {
+   "name": "observed-confounder",
+   "nodes": [
+    "T",
+    "Y",
+    "W"
+   ],
+   "edges": [
+    [
+     "W",
+     "T"
+    ],
+    [
+     "W",
+     "Y"
+    ],
+    [
+     "T",
+     "Y"
+    ]
+   ],
+   "observed": [
+    "T",
+    "Y",
+    "W"
+   ],
+   "identified": true,
+   "backdoor": [
+    "W"
+   ]
+  }
+ ]
+}

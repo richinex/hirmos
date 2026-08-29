@@ -1,0 +1,112 @@
+import { useMemo, useState } from 'react'
+import { EChart } from '@/charts/EChart'
+import { changePointsOption } from '@/charts/sensitivity/changePoints'
+import { useChartTheme } from '@/charts/theme'
+import { Icon } from '@/components/Icon'
+import { MethodCaveats } from '@/components/MethodCaveats'
+import { MetricTile } from '@/components/ui/figures'
+import { button, field, label, num } from '@/components/ui/recipes'
+import type { ColumnId, DatasetProfile } from '@/domain/dataset'
+import { SERIES_STRUCTURE_METHODS } from '@/domain/methods'
+import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
+import { seasonalPeriodOf } from '@/domain/seasonal'
+import { defaultPeltPenalty, type SeriesStructureEvidence } from '@/domain/sensitivity'
+import type { SelectedSource } from '@/domain/workflow'
+import { formatAbsent, formatCount, formatStatistic } from '@/lib/format/number'
+
+interface SeriesFacts {
+  readonly column: ColumnId
+  readonly name: string
+  readonly values: readonly number[]
+  readonly evidence: SeriesStructureEvidence['series'][number]
+}
+
+type Job =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'running'; readonly completed: number; readonly total: number }
+  | { readonly kind: 'ready'; readonly period: number | null; readonly series: readonly SeriesFacts[] }
+  | { readonly kind: 'failed'; readonly detail: string }
+
+function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly period: number | null }) {
+  const theme = useChartTheme()
+  const option = useMemo(() => changePointsOption({ name: facts.name, values: facts.values, changePoints: facts.evidence.changePoints, stepLabel: 'observation' }, theme), [facts, theme])
+  const strength = (value: number | null) => (value === null ? formatAbsent('notApplicable', period === null ? 'no seasonal period for yearly rows' : 'too few rows for two seasons') : formatStatistic('score', value))
+  return (
+    <li className="rounded-lg border border-hair bg-well p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-body font-medium text-ink">{facts.name}</span>
+        <span className={num('text-micro text-faint')}>{facts.evidence.changePoints.length === 0 ? 'no change points' : `change points at ${facts.evidence.changePoints.join(', ')}`} · penalty {formatStatistic('raw', facts.evidence.peltPenalty).text}</span>
+      </div>
+      <div className="mt-2 grid gap-2 @2xl/panel:grid-cols-3">
+        <MetricTile label="Trend strength" size="compact" value={strength(facts.evidence.trendStrength)} context="seasonal-trend decomposition using loess (STL), 0 to 1" />
+        <MetricTile label="Seasonal strength" size="compact" value={strength(facts.evidence.seasonalStrength)} context={period === null ? 'no period' : `period ${period}`} />
+        <MetricTile label="Change points" size="compact" value={formatCount(facts.evidence.changePoints.length)} context="pruned exact linear time (PELT), L2 cost" />
+      </div>
+      <EChart option={option} label={`${facts.name} with PELT change points`} className="mt-2 h-[180px]" testId="change-points" />
+    </li>
+  )
+}
+
+/** Breaks and seasonality of every prepared series: PELT change points drawn on the series, STL strengths beside them. */
+export function SeriesStructureCard({ source, profile, prepared, embedded = false, onResult }: {
+  readonly source: SelectedSource
+  readonly profile: DatasetProfile
+  readonly prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>
+  /** Inside the Diagnostics card: no border of its own, body-weight heading. */
+  readonly embedded?: boolean
+  readonly onResult?: () => void
+}) {
+  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const [minSize, setMinSize] = useState(4)
+  const period = seasonalPeriodOf(prepared.sampling.frequency)
+
+  const run = async () => {
+    setJob({ kind: 'running', completed: 0, total: prepared.columns.length })
+    try {
+      const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runSeriesStructure }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
+      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      const series: SeriesFacts[] = []
+      for (const [index, column] of matrix.value.columns.entries()) {
+        const values = Array.from(matrix.value.values.subarray(index * matrix.value.rowCount, (index + 1) * matrix.value.rowCount))
+        const result = await runSeriesStructure(Float64Array.from(values), matrix.value.rowCount, 1, { period, robust: false, peltMinSize: minSize, peltJump: 1, peltPenalty: defaultPeltPenalty(values) })
+        if (!result.ok) { setJob({ kind: 'failed', detail: `${column.name}: ${result.error.detail}` }); return }
+        const evidence = result.value.series[0]
+        if (evidence === undefined) { setJob({ kind: 'failed', detail: `${column.name}: no structure evidence returned.` }); return }
+        series.push({ column: column.id, name: column.name, values, evidence })
+        setJob({ kind: 'running', completed: index + 1, total: prepared.columns.length })
+      }
+      setJob({ kind: 'ready', period, series })
+      onResult?.()
+    } catch (cause: unknown) {
+      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+    }
+  }
+
+  return (
+    <section className={embedded ? undefined : 'mt-4 rounded-xl border border-hair bg-panel p-4'} aria-labelledby="structure-title">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 id="structure-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Breaks and seasonality</h3>
+          <p className="mb-0 mt-1 text-body text-faint">Pruned exact linear time (PELT) estimates change points in the series mean. Seasonal-trend decomposition using loess (STL) reports trend and seasonal strength{period === null ? ' (no seasonal period for yearly rows)' : ` at period ${period}`}. This analysis does not change the prepared dataset.</p>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-body text-ink"><span className={label('block text-faint')}>Min segment</span><input type="number" min={1} max={200} className={field('text', 'mt-1 w-20')} value={minSize} onChange={(event) => setMinSize(Math.max(1, Math.min(200, Number(event.target.value) || 1)))} /></label>
+          <button type="button" className={button('quiet')} disabled={job.kind === 'running'} onClick={() => void run()}>
+            {job.kind === 'running' ? `Checking ${job.completed}/${job.total}` : 'Find breaks and seasonality'}
+          </button>
+        </div>
+      </div>
+      <MethodCaveats methods={SERIES_STRUCTURE_METHODS} />
+      {job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{job.detail}</p>}
+      {job.kind === 'ready' && (
+        <>
+          <p role="status" className="mb-2 mt-4 flex items-center gap-2 text-body text-muted"><Icon name="check_circle" size={16} className="text-ok" /> {job.series.length} series checked · min segment {minSize}</p>
+          <ul className="m-0 list-none space-y-2 p-0" aria-label="Series structure">
+            {job.series.map((facts) => <SeriesRow key={facts.column} facts={facts} period={job.period} />)}
+          </ul>
+        </>
+      )}
+    </section>
+  )
+}

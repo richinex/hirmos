@@ -1,6 +1,10 @@
+import type { MissingnessResolutionRecord } from './missingness'
 import { assertNever, brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { ColumnId, DatasetProfile } from './dataset'
+import { seasonalPeriodOf, type SeasonalAdjustmentRecord } from './seasonal'
 import type { StationarityBattery } from './stationarity'
+import type { StationarityAssessment } from './stationarityAssessment'
+import type { PanelStructureEvidence } from './panel'
 
 export type PreparedDatasetVersionId = Brand<string, 'PreparedDatasetVersionId'>
 export type TransformRecipeId = Brand<string, 'TransformRecipeId'>
@@ -13,6 +17,8 @@ export type SamplingDraft =
   | { readonly kind: 'cross-sectional' }
   | { readonly kind: 'regular-series-awaiting-time'; readonly frequency: Frequency }
   | { readonly kind: 'regular-series'; readonly timeColumn: ColumnId; readonly frequency: Frequency }
+  | { readonly kind: 'regular-panel-awaiting-keys'; readonly unitColumn: ColumnId | null; readonly timeColumn: ColumnId | null; readonly frequency: Frequency }
+  | { readonly kind: 'regular-panel'; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly frequency: Frequency }
 
 export type VariableDraft =
   | { readonly kind: 'empty' }
@@ -22,11 +28,21 @@ export type MissingnessDraft =
   | { readonly kind: 'not-present' }
   | { readonly kind: 'unresolved'; readonly cells: number }
   | {
-      readonly kind: 'tigramite-mask'
+      readonly kind: 'lag-aware-exclusion'
       readonly cells: number
-      readonly cutOff: 'methodDefault' | '2xtau_max' | 'tau_max' | 'max_lag' | 'max_lag_or_tau_max' | '2xtau_max_future'
-      readonly propagateThroughMaxLag: boolean
-      readonly maskType: 'none' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz' | 'xyz'
+      readonly history:
+        | { readonly kind: 'method-default' }
+        | { readonly kind: 'minimum-for-features' }
+        | { readonly kind: 'fixed-warmup'; readonly observations: number }
+      readonly gapInfluence:
+        | { readonly kind: 'direct-only' }
+        | { readonly kind: 'following-guard'; readonly steps: number }
+      readonly analysisExclusions:
+        | { readonly kind: 'ignore' }
+        | {
+            readonly kind: 'roles'
+            readonly roles: NonEmptyArray<'candidate-cause' | 'tested-outcome' | 'conditioner'>
+          }
     }
   | { readonly kind: 'complete-interval'; readonly cells: number }
   | {
@@ -54,54 +70,82 @@ export type StationarityJob =
   | { readonly kind: 'failed'; readonly detail: string }
   | { readonly kind: 'succeeded'; readonly evidence: StationarityEvidenceArtifact }
 
+/** Which selected columns lose their STL seasonal component when the version is created. */
+export type SeasonalAdjustmentDraft =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'stl'; readonly columns: readonly ColumnId[]; readonly robust: boolean }
+
 export interface PreprocessingDraft {
   readonly sampling: SamplingDraft
   readonly variables: VariableDraft
   readonly missingness: MissingnessDraft
+  readonly seasonal: SeasonalAdjustmentDraft
   readonly transform: SeriesTransform
   readonly preparation: PreparationJob
   readonly stationarity: StationarityJob
 }
 
-type ReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' }>
+export type DenseReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' | 'lag-aware-exclusion' }>
 
 export type ReadyPreprocessingRecipe =
   | {
       readonly kind: 'regular-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
       readonly columns: NonEmptyArray<ColumnId>
-      readonly missingness: ReadyMissingness
+      readonly missingness: DenseReadyMissingness
+      readonly seasonalAdjustment: SeasonalAdjustmentRecord
     }
   | {
       readonly kind: 'cross-sectional'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'cross-sectional' }>
       readonly columns: NonEmptyArray<ColumnId>
-      readonly missingness: ReadyMissingness
+      readonly missingness: DenseReadyMissingness
+    }
+  | {
+      readonly kind: 'regular-panel'
+      readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-panel' }>
+      readonly columns: NonEmptyArray<ColumnId>
+      readonly missingness: DenseReadyMissingness
     }
 
 export interface VariableStationarityEvidence {
   readonly column: ColumnId
+  /** The battery under the chosen stationarity view. */
   readonly result: StationarityBattery
+  readonly levels: StationarityBattery
+  readonly differenced: StationarityBattery | null
+  readonly assessment: StationarityAssessment
 }
 
 interface PreparedDatasetIdentity {
   readonly id: PreparedDatasetVersionId
   readonly recipe: TransformRecipeId
   readonly sourceProfile: DatasetProfile['id']
+  /** Rows every chapter reads: the source rows, or the retained window of a complete-interval resolution. */
   readonly observations: number
   readonly columns: NonEmptyArray<ColumnId>
+  /** What the data-preparation core did about missing cells when this version was created. */
+  readonly resolution: MissingnessResolutionRecord
+  /** The STL seasonal adjustment every chapter applies after the resolution; none for a cross-section. */
+  readonly seasonalAdjustment: SeasonalAdjustmentRecord
 }
 
 export type PreparedDatasetArtifact =
   | PreparedDatasetIdentity & {
       readonly kind: 'prepared-time-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
-      readonly missingness: ReadyMissingness
+      readonly missingness: DenseReadyMissingness
+    }
+  | PreparedDatasetIdentity & {
+      readonly kind: 'prepared-panel'
+      readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-panel' }>
+      readonly missingness: DenseReadyMissingness
+      readonly panel: PanelStructureEvidence
     }
   | PreparedDatasetIdentity & {
       readonly kind: 'prepared-cross-section'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'cross-sectional' }>
-      readonly missingness: ReadyMissingness
+      readonly missingness: DenseReadyMissingness
     }
 
 export interface StationarityEvidenceArtifact {
@@ -116,10 +160,13 @@ export interface StationarityEvidenceArtifact {
 export type PreprocessingEvent =
   | { readonly type: 'regular-series-selected' }
   | { readonly type: 'cross-section-selected' }
+  | { readonly type: 'regular-panel-selected' }
+  | { readonly type: 'unit-column-selected'; readonly unitColumn: ColumnId }
   | { readonly type: 'time-column-selected'; readonly timeColumn: ColumnId }
   | { readonly type: 'frequency-selected'; readonly frequency: Frequency }
   | { readonly type: 'variable-toggled'; readonly column: ColumnId }
   | { readonly type: 'missingness-selected'; readonly resolution: MissingnessDraft }
+  | { readonly type: 'seasonal-adjustment-selected'; readonly seasonal: SeasonalAdjustmentDraft }
   | { readonly type: 'transform-selected'; readonly transform: SeriesTransform }
   | { readonly type: 'preparation-started' }
   | { readonly type: 'preparation-failed'; readonly detail: string }
@@ -132,10 +179,14 @@ export type PreprocessingEvent =
 export type PreprocessingReadinessProblem =
   | { readonly kind: 'observational-structure-required' }
   | { readonly kind: 'time-column-required' }
+  | { readonly kind: 'unit-column-required' }
   | { readonly kind: 'variables-required' }
   | { readonly kind: 'missingness-unresolved'; readonly cells: number }
-  | { readonly kind: 'mask-not-dense'; readonly cells: number }
-  | { readonly kind: 'missingness-execution-pending'; readonly resolution: 'complete-interval' | 'imputation' }
+  | { readonly kind: 'lag-exclusion-needs-compatible-method'; readonly cells: number }
+  | { readonly kind: 'panel-missingness-unsupported'; readonly cells: number }
+  | { readonly kind: 'structural-zero-unconfirmed' }
+  | { readonly kind: 'seasonal-period-unavailable' }
+  | { readonly kind: 'seasonal-columns-required' }
 
 export const initialPreprocessingDraft = (profile: DatasetProfile): PreprocessingDraft => {
   const missingCells = profile.columns.reduce((sum, column) => sum + column.nullCount, 0)
@@ -145,6 +196,7 @@ export const initialPreprocessingDraft = (profile: DatasetProfile): Preprocessin
     missingness: missingCells === 0
       ? { kind: 'not-present' }
       : { kind: 'unresolved', cells: missingCells },
+    seasonal: { kind: 'none' },
     transform: { kind: 'levels' },
     preparation: { kind: 'idle' },
     stationarity: { kind: 'idle' },
@@ -178,10 +230,36 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
       return {
         ...state,
         sampling: { kind: 'cross-sectional' },
+        seasonal: { kind: 'none' },
         transform: { kind: 'levels' },
         ...resetStructuralWork(),
       }
+    case 'regular-panel-selected':
+      return {
+        ...state,
+        sampling: state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys'
+          ? state.sampling
+          : { kind: 'regular-panel-awaiting-keys', unitColumn: null, timeColumn: null, frequency: 'yearly' },
+        seasonal: { kind: 'none' }, transform: { kind: 'levels' }, ...resetStructuralWork(),
+      }
+    case 'unit-column-selected': {
+      if (state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
+      const timeColumn = state.sampling.timeColumn === event.unitColumn ? null : state.sampling.timeColumn
+      const sampling: SamplingDraft = timeColumn === null
+        ? { kind: 'regular-panel-awaiting-keys', unitColumn: event.unitColumn, timeColumn, frequency: state.sampling.frequency }
+        : { kind: 'regular-panel', unitColumn: event.unitColumn, timeColumn, frequency: state.sampling.frequency }
+      const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.unitColumn) ? toggleColumn(state.variables, event.unitColumn) : state.variables
+      return { ...state, sampling, variables, ...resetStructuralWork() }
+    }
     case 'time-column-selected': {
+      if (state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys') {
+        const unitColumn = state.sampling.unitColumn === event.timeColumn ? null : state.sampling.unitColumn
+        const sampling: SamplingDraft = unitColumn === null
+          ? { kind: 'regular-panel-awaiting-keys', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
+          : { kind: 'regular-panel', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
+        const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn) ? toggleColumn(state.variables, event.timeColumn) : state.variables
+        return { ...state, sampling, variables, ...resetStructuralWork() }
+      }
       if (state.sampling.kind !== 'regular-series' && state.sampling.kind !== 'regular-series-awaiting-time') return state
       const frequency = state.sampling.frequency
       return {
@@ -200,9 +278,17 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
       if (state.sampling.kind === 'regular-series-awaiting-time') {
         return { ...state, sampling: { kind: 'regular-series-awaiting-time', frequency: event.frequency }, ...resetStructuralWork() }
       }
+      if (state.sampling.kind === 'regular-panel') return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
+      if (state.sampling.kind === 'regular-panel-awaiting-keys') return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
       return state
-    case 'variable-toggled':
-      return { ...state, variables: toggleColumn(state.variables, event.column), ...resetStructuralWork() }
+    case 'variable-toggled': {
+      const variables = toggleColumn(state.variables, event.column)
+      const kept: readonly ColumnId[] = variables.kind === 'selected' ? variables.columns : []
+      const seasonal: SeasonalAdjustmentDraft = state.seasonal.kind === 'stl' ? { ...state.seasonal, columns: state.seasonal.columns.filter((column) => kept.includes(column)) } : state.seasonal
+      return { ...state, variables, seasonal, ...resetStructuralWork() }
+    }
+    case 'seasonal-adjustment-selected':
+      return { ...state, seasonal: event.seasonal, ...resetStructuralWork() }
     case 'missingness-selected':
       return { ...state, missingness: event.resolution, ...resetStructuralWork() }
     case 'transform-selected':
@@ -233,13 +319,21 @@ export function readyPreprocessingRecipe(
 ): Result<ReadyPreprocessingRecipe, PreprocessingReadinessProblem> {
   if (state.sampling.kind === 'unconfigured') return err({ kind: 'observational-structure-required' })
   if (state.sampling.kind === 'regular-series-awaiting-time') return err({ kind: 'time-column-required' })
+  if (state.sampling.kind === 'regular-panel-awaiting-keys' && state.sampling.unitColumn === null) return err({ kind: 'unit-column-required' })
+  if (state.sampling.kind === 'regular-panel-awaiting-keys') return err({ kind: 'time-column-required' })
   if (state.variables.kind === 'empty') return err({ kind: 'variables-required' })
+  if (state.sampling.kind === 'regular-panel' && state.missingness.kind !== 'not-present') {
+    return err({ kind: 'panel-missingness-unsupported', cells: state.missingness.cells })
+  }
   switch (state.missingness.kind) {
     case 'unresolved': return err({ kind: 'missingness-unresolved', cells: state.missingness.cells })
-    case 'tigramite-mask': return err({ kind: 'mask-not-dense', cells: state.missingness.cells })
-    case 'complete-interval': return err({ kind: 'missingness-execution-pending', resolution: 'complete-interval' })
-    case 'imputation': return err({ kind: 'missingness-execution-pending', resolution: 'imputation' })
-    case 'not-present':
+    case 'lag-aware-exclusion': return err({ kind: 'lag-exclusion-needs-compatible-method', cells: state.missingness.cells })
+    case 'complete-interval':
+    case 'imputation':
+    case 'not-present': {
+      if (state.missingness.kind === 'imputation' && state.missingness.method === 'structuralZero' && !state.missingness.confirmedStructuralZero) {
+        return err({ kind: 'structural-zero-unconfirmed' })
+      }
       switch (state.sampling.kind) {
         case 'cross-sectional':
           return ok({
@@ -248,15 +342,28 @@ export function readyPreprocessingRecipe(
             columns: state.variables.columns,
             missingness: state.missingness,
           })
-        case 'regular-series':
+        case 'regular-series': {
+          const period = seasonalPeriodOf(state.sampling.frequency)
+          let seasonalAdjustment: SeasonalAdjustmentRecord = { kind: 'none' }
+          if (state.seasonal.kind === 'stl') {
+            if (period === null) return err({ kind: 'seasonal-period-unavailable' })
+            const columns = state.seasonal.columns.filter((column) => state.variables.kind === 'selected' && state.variables.columns.includes(column))
+            if (!isNonEmpty(columns)) return err({ kind: 'seasonal-columns-required' })
+            seasonalAdjustment = { kind: 'stl', period, robust: state.seasonal.robust, columns }
+          }
           return ok({
             kind: 'regular-series',
             sampling: state.sampling,
             columns: state.variables.columns,
             missingness: state.missingness,
+            seasonalAdjustment,
           })
+        }
+        case 'regular-panel':
+          return ok({ kind: 'regular-panel', sampling: state.sampling, columns: state.variables.columns, missingness: state.missingness })
         default: return assertNever(state.sampling)
       }
+    }
     default:
       return assertNever(state.missingness)
   }
@@ -302,12 +409,16 @@ export function transformSeries(values: Float64Array, transform: SeriesTransform
 
 export function describeReadinessProblem(problem: PreprocessingReadinessProblem): string {
   switch (problem.kind) {
-    case 'observational-structure-required': return 'Choose whether rows form a time series or independent observations.'
-    case 'time-column-required': return 'Choose the time column for this regular series.'
+    case 'observational-structure-required': return 'Choose a time series, a panel, or independent observations.'
+    case 'time-column-required': return 'Choose the time column.'
+    case 'unit-column-required': return 'Choose the unit column for this panel.'
     case 'variables-required': return 'Choose at least one numeric analysis variable.'
-    case 'missingness-unresolved': return `${problem.cells} missing cells still need an explicit policy.`
-    case 'mask-not-dense': return 'Tigramite exclusion preserves missingness for discovery, but dense stationarity diagnostics need a complete interval or approved imputation.'
-    case 'missingness-execution-pending': return `${problem.resolution === 'complete-interval' ? 'Complete-interval selection' : 'Imputation'} is configured but not executable in this UI slice yet.`
+    case 'missingness-unresolved': return `${problem.cells} missing values still need a policy.`
+    case 'lag-exclusion-needs-compatible-method': return 'Choose a complete interval or approved imputation for dense diagnostics. Lag-aware exclusion keeps the original time grid.'
+    case 'panel-missingness-unsupported': return `This panel has ${problem.cells} missing values. Complete them separately within each unit before preparing the panel.`
+    case 'structural-zero-unconfirmed': return 'Confirm that each missing value represents a true zero.'
+    case 'seasonal-period-unavailable': return 'Yearly rows have no seasonal period, so seasonal-trend decomposition using loess (STL) does not apply.'
+    case 'seasonal-columns-required': return 'Choose at least one selected column to adjust seasonally, or switch the adjustment off.'
     default: return assertNever(problem)
   }
 }

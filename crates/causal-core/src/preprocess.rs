@@ -1,0 +1,350 @@
+//! The 902 preprocessing helpers ported 1:1: scipy's Shapiro-Wilk (AS R94), the complete-linkage
+//! redundancy clustering over 1-|r|, and iterative VIF elimination.
+
+use nalgebra::{DMatrix, DVector};
+
+fn poly(c: &[f64], x: f64) -> f64 {
+    let nord = c.len();
+    let res = c[0];
+    if nord == 1 {
+        return res;
+    }
+    let mut p = x * c[nord - 1];
+    if nord == 2 {
+        return res + p;
+    }
+    for ind in (1..nord - 1).rev() {
+        p = (p + c[ind]) * x;
+    }
+    res + p
+}
+
+fn ppnd(p: f64) -> f64 {
+    const A: [f64; 4] = [
+        2.50662823884,
+        -18.61500062529,
+        41.39119773534,
+        -25.44106049637,
+    ];
+    const B: [f64; 4] = [
+        -8.47351093090,
+        23.08336743743,
+        -21.06224101826,
+        3.13082909833,
+    ];
+    const C: [f64; 4] = [-2.78718931138, -2.29796479134, 4.85014127135, 2.32121276858];
+    const D: [f64; 2] = [3.54388924762, 1.63706781897];
+    const SPLIT: f64 = 0.42;
+    let q = p - 0.5;
+    if q.abs() <= SPLIT {
+        let r = q * q;
+        let temp = q * (((A[3] * r + A[2]) * r + A[1]) * r + A[0]);
+        return temp / ((((B[3] * r + B[2]) * r + B[1]) * r + B[0]) * r + 1.0);
+    }
+    let mut r = p;
+    if q > 0.0 {
+        r = 1.0 - p;
+    }
+    if r > 0.0 {
+        r = (-r.ln()).sqrt();
+    } else {
+        return 0.0;
+    }
+    let temp = (((C[3] * r + C[2]) * r + C[1]) * r + C[0]) / ((D[1] * r + D[0]) * r + 1.0);
+    if q < 0.0 {
+        -temp
+    } else {
+        temp
+    }
+}
+
+fn alnorm(x: f64, upper: bool) -> f64 {
+    const LTONE: f64 = 7.0;
+    const UTZERO: f64 = 38.0;
+    const CON: f64 = 1.28;
+    let mut upper = upper;
+    let mut z = x;
+    if !(z > 0.0) {
+        upper = false;
+        z = -z;
+    }
+    if !(z <= LTONE || (upper && z <= UTZERO)) {
+        return if upper { 0.0 } else { 1.0 };
+    }
+    let y = 0.5 * z * z;
+    let temp = if z <= CON {
+        0.5 - z
+            * (0.398942280444
+                - 0.399903438504 * y
+                    / (y + 5.75885480458
+                        - 29.8213557808
+                            / (y + 2.62433121679 + 48.6959930692 / (y + 5.92885724438))))
+    } else {
+        0.398942280385 * (-y).exp()
+            / (z - 3.8052e-8
+                + 1.00000615302
+                    / (z + 3.98064794e-4
+                        + 1.98615381364
+                            / (z - 0.151679116635
+                                + 5.29330324926
+                                    / (z + 4.8385912808
+                                        - 15.1508972451
+                                            / (z + 0.742380924027
+                                                + 30.789933034 / (z + 3.99019417011))))))
+    };
+    if upper {
+        temp
+    } else {
+        1.0 - temp
+    }
+}
+
+/// scipy.stats.shapiro: sorts, centres on the unsorted middle element, then AS R94 swilk.
+pub fn shapiro(x: &[f64]) -> (f64, f64) {
+    let n = x.len();
+    assert!(n >= 3, "Data must be at least length 3");
+    let mut y: Vec<f64> = x.to_vec();
+    y.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let shift = x[n / 2];
+    for v in &mut y {
+        *v -= shift;
+    }
+    swilk(&y)
+}
+
+fn swilk(x: &[f64]) -> (f64, f64) {
+    const C1: [f64; 6] = [0.0, 0.221157, -0.147981, -2.07119, 4.434685, -2.706056];
+    const C2: [f64; 6] = [0.0, 0.042981, -0.293762, -1.752461, 5.682633, -3.582633];
+    const C3: [f64; 4] = [0.5440, -0.39978, 0.025054, -6.714e-4];
+    const C4: [f64; 4] = [1.3822, -0.77857, 0.062767, -2.0322e-3];
+    const C5: [f64; 4] = [-1.5861, -0.31082, -0.083751, 3.8915e-3];
+    const C6: [f64; 3] = [-0.4803, -0.082676, 3.0302e-3];
+    const G: [f64; 2] = [-2.273, 0.459];
+    const SMALL: f64 = 1e-19;
+
+    let n = x.len();
+    let n2 = n / 2;
+    let an = n as f64;
+
+    let mut a = vec![0.0; n2];
+    if n == 3 {
+        a[0] = std::f64::consts::FRAC_1_SQRT_2;
+    } else {
+        let an25 = an + 0.25;
+        let mut summ2 = 0.0;
+        for (ind1, item) in a.iter_mut().enumerate() {
+            let temp = ppnd((ind1 as f64 + 1.0 - 0.375) / an25);
+            *item = temp;
+            summ2 += temp * temp;
+        }
+        summ2 *= 2.0;
+        let ssumm2 = summ2.sqrt();
+        let rsn = 1.0 / an.sqrt();
+        let a1 = poly(&C1, rsn) - a[0] / ssumm2;
+        let (i1, fac) = if n > 5 {
+            let a2 = -a[1] / ssumm2 + poly(&C2, rsn);
+            let fac = ((summ2 - 2.0 * a[0] * a[0] - 2.0 * a[1] * a[1])
+                / (1.0 - 2.0 * a1 * a1 - 2.0 * a2 * a2))
+                .sqrt();
+            a[1] = a2;
+            (2, fac)
+        } else {
+            (
+                1,
+                ((summ2 - 2.0 * a[0] * a[0]) / (1.0 - 2.0 * a1 * a1)).sqrt(),
+            )
+        };
+        a[0] = a1;
+        for item in a.iter_mut().take(n2).skip(i1) {
+            *item *= -1.0 / fac;
+        }
+    }
+
+    let range = x[n - 1] - x[0];
+    if range < SMALL {
+        return (1.0, 1.0);
+    }
+
+    let mut xx = x[0] / range;
+    let mut sx = xx;
+    let mut sa = -a[0];
+    let mut ind2 = n - 2;
+    for (ind1, &xi_raw) in x.iter().enumerate().take(n).skip(1) {
+        let xi = xi_raw / range;
+        sx += xi;
+        if ind1 != ind2 {
+            let sign = if ind1 < ind2 { -1.0 } else { 1.0 };
+            sa += sign * a[ind1.min(ind2)];
+        }
+        xx = xi;
+        ind2 = ind2.wrapping_sub(1);
+    }
+    let _ = xx;
+
+    let sa = sa / n as f64;
+    let sx = sx / n as f64;
+    let (mut ssa, mut ssx, mut sax) = (0.0, 0.0, 0.0);
+    let mut ind2 = n - 1;
+    for (ind1, &xv) in x.iter().enumerate() {
+        let asa = if ind1 != ind2 {
+            let sign = if ind1 < ind2 { -1.0 } else { 1.0 };
+            sign * a[ind1.min(ind2)] - sa
+        } else {
+            -sa
+        };
+        let xsx = xv / range - sx;
+        ssa += asa * asa;
+        ssx += xsx * xsx;
+        sax += asa * xsx;
+        ind2 = ind2.wrapping_sub(1);
+    }
+
+    let ssassx = (ssa * ssx).sqrt();
+    let w1 = (ssassx - sax) * (ssassx + sax) / (ssa * ssx);
+    let w = 1.0 - w1;
+
+    if n == 3 {
+        if w < 0.75 {
+            return (0.75, 0.0);
+        }
+        let pi6 = 6.0 / std::f64::consts::PI;
+        return (w, 1.0 - pi6 * w.sqrt().acos());
+    }
+
+    let mut y = w1.ln();
+    let xx_log = an.ln();
+    let (m, s);
+    if n <= 11 {
+        let gamma = poly(&G, an);
+        if y >= gamma {
+            return (w, SMALL);
+        }
+        y = -(gamma - y).ln();
+        m = poly(&C3, an);
+        s = poly(&C4, an).exp();
+    } else {
+        m = poly(&C5, xx_log);
+        s = poly(&C6, xx_log).exp();
+    }
+
+    (w, alnorm((y - m) / s, true))
+}
+
+/// Complete-linkage clustering of 1-|r| cut at 1-threshold: keep the lowest index per cluster.
+pub fn cluster_redundant(
+    corr: &DMatrix<f64>,
+    threshold: f64,
+) -> (Vec<usize>, Vec<usize>, Vec<Vec<usize>>) {
+    let n = corr.nrows();
+    let mut dist = DMatrix::<f64>::zeros(n, n);
+    for i in 0..n {
+        for j in 0..n {
+            if i != j {
+                let d = 1.0 - corr[(i, j)].abs();
+                let dt = 1.0 - corr[(j, i)].abs();
+                dist[(i, j)] = ((d + dt) / 2.0).max(0.0);
+            }
+        }
+    }
+    let cut = 1.0 - threshold;
+    let mut clusters: Vec<Vec<usize>> = (0..n).map(|i| vec![i]).collect();
+    loop {
+        let mut best: Option<(usize, usize, f64)> = None;
+        for i in 0..clusters.len() {
+            for j in i + 1..clusters.len() {
+                let mut link = f64::NEG_INFINITY;
+                for &a in &clusters[i] {
+                    for &b in &clusters[j] {
+                        link = link.max(dist[(a, b)]);
+                    }
+                }
+                if best.is_none_or(|(_, _, d)| link < d) {
+                    best = Some((i, j, link));
+                }
+            }
+        }
+        match best {
+            Some((i, j, d)) if d <= cut => {
+                let merged = clusters.remove(j);
+                clusters[i].extend(merged);
+            }
+            _ => break,
+        }
+    }
+    let mut cluster_lists: Vec<Vec<usize>> = clusters
+        .into_iter()
+        .map(|mut c| {
+            c.sort_unstable();
+            c
+        })
+        .collect();
+    cluster_lists.sort_by_key(|c| c[0]);
+    let mut keep = Vec::new();
+    let mut drop = Vec::new();
+    for members in &cluster_lists {
+        keep.push(members[0]);
+        drop.extend(members[1..].iter().copied());
+    }
+    keep.sort_unstable();
+    drop.sort_unstable();
+    (keep, drop, cluster_lists)
+}
+
+fn rsquared(y: &DVector<f64>, x: &DMatrix<f64>) -> f64 {
+    let qr = x.clone().qr();
+    let beta = qr
+        .r()
+        .solve_upper_triangular(&(qr.q().transpose() * y))
+        .expect("VIF design is rank deficient");
+    let fitted = x * beta;
+    let ssr: f64 = (y - fitted).iter().map(|v| v * v).sum();
+    let mean = y.iter().sum::<f64>() / y.len() as f64;
+    let tss: f64 = y.iter().map(|v| (v - mean) * (v - mean)).sum();
+    1.0 - ssr / tss
+}
+
+/// Iterative VIF elimination: drop the worst above the threshold, higher index on ties.
+pub fn vif_redundant(
+    arr: &DMatrix<f64>,
+    vif_threshold: f64,
+) -> (Vec<usize>, Vec<usize>, Vec<(usize, f64)>) {
+    let n = arr.ncols();
+    let rows = arr.nrows();
+    let mut keep: Vec<usize> = (0..n).collect();
+    let mut dropped = Vec::new();
+    let mut history = Vec::new();
+    while keep.len() >= 2 {
+        let k = keep.len();
+        let mut vifs = Vec::with_capacity(k);
+        for p in 0..k {
+            let y = DVector::from_iterator(rows, (0..rows).map(|r| arr[(r, keep[p])]));
+            let mut design = DMatrix::<f64>::zeros(rows, k);
+            for r in 0..rows {
+                design[(r, 0)] = 1.0;
+                let mut c = 1;
+                for (q, &col) in keep.iter().enumerate() {
+                    if q != p {
+                        design[(r, c)] = arr[(r, col)];
+                        c += 1;
+                    }
+                }
+            }
+            let v = 1.0 / (1.0 - rsquared(&y, &design));
+            vifs.push(if v.is_finite() { v } else { f64::INFINITY });
+        }
+        let mut worst = 0usize;
+        for p in 1..k {
+            if (vifs[p], keep[p]) > (vifs[worst], keep[worst]) {
+                worst = p;
+            }
+        }
+        if vifs[worst] < vif_threshold {
+            break;
+        }
+        history.push((keep[worst], vifs[worst]));
+        dropped.push(keep[worst]);
+        keep.remove(worst);
+    }
+    dropped.sort_unstable();
+    (keep, dropped, history)
+}

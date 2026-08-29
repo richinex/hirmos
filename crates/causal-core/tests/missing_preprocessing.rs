@@ -168,7 +168,7 @@ fn nullable_construct_array_matches_tigramite_for_all_policies() {
 }
 
 #[test]
-fn imputation_matches_python_oracle_and_preserves_provenance() {
+fn imputation_matches_python_oracle_and_records_imputed_cells() {
     let fixture: Fixture = serde_json::from_str(include_str!(
         "../oracle/fixtures/missing_preprocessing.json"
     ))

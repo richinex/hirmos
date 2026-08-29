@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- The tab icon: the back-door triangle with heavier strokes, because 1.8 at 16px reads as grey mush. Signal red rather than currentColor, so it holds on a light and a dark tab strip alike. -->
+  <g stroke="#AA3720" stroke-width="2.2" stroke-linecap="round"><path d="M10.39 8.28L8.17 12.27"/><path d="M13.61 8.28L15.83 12.27"/><path d="M8.5 17.6L12.7 17.6"/></g>
+  <g fill="#AA3720"><path d="M6.81 14.72L6.67 11.67L9.47 13.23Z"/><path d="M17.19 14.72L14.53 13.23L17.33 11.67Z"/><path d="M15.5 17.6L12.9 19.2L12.9 16Z"/><circle cx="12" cy="5.4" r="2.4"/><circle cx="5.2" cy="17.6" r="2.4"/><circle cx="18.8" cy="17.6" r="2.4"/></g>
+</svg>

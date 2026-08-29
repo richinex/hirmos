@@ -1,15 +1,25 @@
+import { z } from 'zod'
+import { parseGrangerSsrEvidence } from '@/domain/granger'
 /// <reference lib="webworker" />
 
 import initWasm, { runAnalysis } from '@/generated/analysis-wasm/hirmos_analysis'
 import {
   parseDynotearsEvidence,
-  parseGrangerSsrEvidence,
   parseLpcmciEvidence,
   parseOcseEvidence,
   parsePcmciPlusEvidence,
+  parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
+import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence } from '@/domain/estimation'
+import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
+import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
+import { ardlEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
+import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
+import { linearScmEvidenceSchema } from '@/domain/counterfactual'
+import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import { parseStationarityBattery } from '@/domain/stationarity'
+import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import {
   analysisProgressSchema,
   parseAnalysisWorkerCommand,
@@ -64,6 +74,14 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         lambdaW: command.lambdaW,
         lambdaA: command.lambdaA,
       }
+    case 'var-lingam':
+      return {
+        kind: 'varLingam',
+        rows: command.rows,
+        columns: command.columns,
+        lags: command.lags,
+        prune: command.prune,
+      }
     case 'ocse':
       return {
         kind: 'ocse',
@@ -77,6 +95,60 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       }
     case 'granger-ssr-f':
       return { kind: 'grangerSsrF', rows: command.rows, maxLag: command.maxLag }
+    case 'backdoor-identify':
+      return {
+        kind: 'backdoorIdentify',
+        nodes: command.nodes,
+        edges: command.edges,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        unobserved: command.unobserved,
+      }
+    case 'backdoor-linear':
+      return {
+        kind: 'backdoorLinear',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        adjustment: command.adjustment,
+        hacMaxLags: command.hacMaxLags,
+        level: command.level,
+      }
+    case 'count-glm':
+      return { kind: 'countGlm', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, family: command.family }
+    case 'causal-effects-total':
+      return { kind: 'causalEffectsTotal', rows: command.rows, columns: command.columns, statLag: command.statLag, graph: command.graph, x: command.x, y: command.y, hidden: command.hidden, estimator: command.estimator, interventions: command.interventions }
+    case 'causal-impact':
+      return { kind: 'causalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, maxIter: command.maxIter }
+    case 'linear-refutation':
+      return { kind: 'linearRefutation', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, simulations: command.simulations, subsetFraction: command.subsetFraction, seed: command.seed, ljungBoxLags: command.ljungBoxLags }
+    case 'unobserved-confounding':
+      return { kind: 'unobservedConfounding', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, kappaT: command.kappaT, kappaY: command.kappaY }
+    case 'series-structure':
+      return { kind: 'seriesStructure', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, peltMinSize: command.peltMinSize, peltJump: command.peltJump, peltPenalty: command.peltPenalty }
+    case 'seasonal-adjust':
+      return { kind: 'seasonalAdjust', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, adjust: command.adjust }
+    case 'double-ml':
+      return { kind: 'doubleMl', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed }
+    case 'ardl-pss':
+      return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
+    case 'vecm':
+      return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex }
+    case 'synthetic-control':
+      return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre }
+    case 'panel-intervention':
+      return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times }
+    case 'negbin-nuts':
+      return { kind: 'negbinNuts', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, confounder: command.confounder, warmup: command.warmup, samples: command.samples, seed: command.seed }
+    case 'discrete-bn-query':
+      return { kind: 'discreteBnQuery', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, bins: command.bins, equivalentSampleSize: command.equivalentSampleSize }
+    case 'linear-scm-counterfactual':
+      return { kind: 'linearScmCounterfactual', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, interventions: command.interventions, observationNoise: command.observationNoise }
+    case 'dml-refutation-batch':
+      return { kind: 'dmlRefutationBatch', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed }
+    case 'resolve-missingness':
+      return { kind: 'resolveMissingness', rows: command.rows, columns: command.columns, validity: Array.from(command.validity), resolution: command.resolution }
     default:
       return assertNever(command)
   }
@@ -156,6 +228,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'dynotears-succeeded', request: command.request, result: result.value })
         return
       }
+      case 'var-lingam': {
+        const result = parseVarLingamEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'var-lingam-succeeded', request: command.request, result: result.value })
+        return
+      }
       case 'ocse': {
         const result = parseOcseEvidence(decoded)
         if (!result.ok) {
@@ -172,6 +253,126 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'granger-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'backdoor-identify': {
+        const result = parseBackdoorIdentificationEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'backdoor-identification-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'backdoor-linear': {
+        const result = parseBackdoorLinearEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'backdoor-linear-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'count-glm': {
+        const result = parseCountGlmEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'count-glm-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'causal-effects-total': {
+        const result = parseCausalEffectsEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'causal-effects-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'causal-impact': {
+        const result = parseCausalImpactEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'causal-impact-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'linear-refutation': {
+        const result = parseLinearRefutationEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'linear-refutation-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'unobserved-confounding': {
+        const result = parseUnobservedConfoundingEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'unobserved-confounding-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'series-structure': {
+        const result = parseSeriesStructureEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'series-structure-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'double-ml': {
+        const result = doubleMlEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'double-ml-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'ardl-pss': {
+        const result = ardlEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'ardl-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'vecm': {
+        const result = vecmEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'vecm-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'synthetic-control': {
+        const result = syntheticControlEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'synthetic-control-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'panel-intervention': {
+        const result = panelInterventionEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'panel-intervention-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'negbin-nuts': {
+        const result = negbinNutsEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'negbin-nuts-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'discrete-bn-query': {
+        const result = discreteBnEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'discrete-bn-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'linear-scm-counterfactual': {
+        const result = linearScmEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'linear-scm-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'dml-refutation-batch': {
+        const result = parseDmlRefutationEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'dml-refutation-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'seasonal-adjust': {
+        const result = parseSeasonalAdjustedEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'seasonal-adjusted', request: command.request, result: result.value })
+        return
+      }
+      case 'resolve-missingness': {
+        const result = parseMissingnessResolvedEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'missingness-resolved', request: command.request, result: result.value })
         return
       }
       default:

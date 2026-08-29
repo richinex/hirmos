@@ -1,13 +1,15 @@
 import { expect, test } from '@playwright/test'
+import { grangerSsrEvidenceSchema } from '../src/domain/granger'
 import { z } from 'zod'
 import {
   dynotearsEvidenceSchema,
-  grangerSsrEvidenceSchema,
   lpcmciEvidenceSchema,
   ocseEvidenceSchema,
+  varLingamEvidenceSchema,
   pcmciPlusEvidenceSchema,
 } from '../src/domain/discovery'
 import { stationarityBatterySchema } from '../src/domain/stationarity'
+import { panelInterventionEvidenceSchema } from '../src/domain/estimation'
 
 const analysisOutcomeSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: stationarityBatterySchema }).strict(),
@@ -24,7 +26,7 @@ test('moves a selected Seatbelts column from DuckDB to Rust through transferable
     const url = new URL(request.url())
     if (url.protocol.startsWith('http') && url.hostname !== '127.0.0.1') externalRequests.add(url.href)
   })
-  await page.goto('/')
+  await page.goto('/app')
 
   const raw: unknown = await page.evaluate(async () => {
     const [dataModule, workflowModule, analysisModule] = await Promise.all([
@@ -84,7 +86,7 @@ test('moves a selected Seatbelts column from DuckDB to Rust through transferable
 
 test('keeps null and zero distinct in a materialized numeric buffer', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
-  await page.goto('/')
+  await page.goto('/app')
   const raw: unknown = await page.evaluate(async () => {
     const dataModule = await import(new URL('/src/data/client.ts', window.location.href).href)
     const workflowModule = await import(new URL('/src/domain/workflow.ts', window.location.href).href)
@@ -106,9 +108,151 @@ test('keeps null and zero distinct in a materialized numeric buffer', async ({ p
   expect(raw).toEqual({ firstIsNaN: true, second: 2, validityByte: 2, missing: 1 })
 })
 
+test('validates, materializes, and estimates a balanced long panel through both workers', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Panel boundary runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const [dataModule, workflowModule, analysisModule, panelModule] = await Promise.all([
+      import(new URL('/src/data/client.ts', window.location.href).href),
+      import(new URL('/src/domain/workflow.ts', window.location.href).href),
+      import(new URL('/src/analysis/client.ts', window.location.href).href),
+      import(new URL('/src/domain/panel.ts', window.location.href).href),
+    ])
+    const rows = ['unit,time,outcome,treated']
+    const periods = 9
+    for (const unit of ['control-a', 'control-b', 'treated']) {
+      for (let time = 0; time < periods; time += 1) {
+        const a = 10 + time + 0.2 * Math.sin(time)
+        const b = 20 + 0.45 * time + 0.15 * Math.cos(time / 2)
+        const post = time >= 5
+        const outcome = unit === 'control-a' ? a : unit === 'control-b' ? b : 0.4 * a + 0.6 * b + (post ? 4 : 0)
+        rows.push(`${unit},${time},${outcome},${unit === 'treated' && post ? 1 : 0}`)
+      }
+    }
+    const file = new File([rows.join('\n')], 'balanced-panel.csv', { type: 'text/csv' })
+    const profiled = await dataModule.profileSourceInWorker(workflowModule.newImportRequestId(), file)
+    if (!profiled.ok) throw new Error(`Profile failed: ${profiled.error.kind}`)
+    const column = (name: string) => {
+      const found = profiled.value.columns.find((candidate: { readonly name: string }) => candidate.name === name)
+      if (!found) throw new Error(`${name} was not profiled.`)
+      return found.id
+    }
+    const unit = column('unit')
+    const time = column('time')
+    const outcome = column('outcome')
+    const treatment = column('treated')
+    const structure = await dataModule.inspectPanelInWorker(file, profiled.value, unit, time)
+    if (!structure.ok) throw new Error(`Panel inspection failed: ${structure.error.kind}`)
+    const matrix = await dataModule.materializePanelInWorker(file, profiled.value, { unit, time, outcome, treatment })
+    if (!matrix.ok) throw new Error(`Panel materialization failed: ${matrix.error.kind}`)
+    const layout = panelModule.assessPanelInterventionLayout(matrix.value)
+    if (!layout.ok) throw new Error(`Panel preflight failed: ${layout.error.kind}`)
+    const altered = (changes: readonly (readonly [number, number])[]) => {
+      const values = matrix.value.values.slice()
+      for (const [row, value] of changes) values[matrix.value.rowCount + row] = value
+      return panelModule.assessPanelInterventionLayout({ ...matrix.value, values })
+    }
+    const nonBinary = altered([[18, 0.5]])
+    const nonAbsorbing = altered([[26, 0]])
+    const noControls = altered([[5, 1], [6, 1], [7, 1], [8, 1], [14, 1], [15, 1], [16, 1], [17, 1]])
+    const progress: { stage: string; completed: number; total: number }[] = []
+    const estimated = await analysisModule.runPanelIntervention(
+      matrix.value.values,
+      matrix.value.rowCount,
+      matrix.value.units,
+      matrix.value.times,
+      (next: { stage: string; completed: number; total: number }) => progress.push(next),
+    )
+    return {
+      structure,
+      layout,
+      preflightRefusals: [nonBinary, nonAbsorbing, noControls].map((result) => result.ok ? 'unexpected-ready' : result.error.kind),
+      estimated,
+      progress,
+      detachedBytes: matrix.value.values.byteLength,
+    }
+  })
+
+  const parsed = z.object({
+    structure: z.object({
+      ok: z.literal(true),
+      value: z.object({
+        kind: z.literal('panel-structure'), observations: z.literal(27), units: z.literal(3), periods: z.literal(9), duplicateKeys: z.literal(0), missingUnitKeys: z.literal(0), missingTimeKeys: z.literal(0), balanced: z.literal(true),
+      }).passthrough(),
+    }).strict(),
+    layout: z.object({
+      ok: z.literal(true),
+      value: z.object({ kind: z.literal('panel-intervention-layout'), controls: z.array(z.string()).length(2), treated: z.array(z.string()).length(1), prePeriods: z.literal(5), postPeriods: z.literal(4), adoptionLabel: z.literal('5'), controlPreDifferenceSd: z.number().positive() }).passthrough(),
+    }).strict(),
+    preflightRefusals: z.tuple([z.literal('treatment-not-binary'), z.literal('non-simultaneous-adoption'), z.literal('no-control-unit')]),
+    estimated: z.object({ ok: z.literal(true), value: panelInterventionEvidenceSchema }).strict(),
+    progress: z.array(z.object({ stage: z.string(), completed: z.number(), total: z.number() }).strict()),
+    detachedBytes: z.literal(0),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(Math.abs(parsed.data.estimated.value.syntheticDid.estimate - 4)).toBeLessThan(0.1)
+  expect(Math.abs(parsed.data.estimated.value.syntheticControl.estimate - 4)).toBeLessThan(0.1)
+  expect(parsed.data.progress).toEqual([
+    { stage: 'validated-panel', completed: 1, total: 4 },
+    { stage: 'difference-in-differences', completed: 2, total: 4 },
+    { stage: 'synthetic-control', completed: 3, total: 4 },
+    { stage: 'synthetic-did', completed: 4, total: 4 },
+  ])
+})
+
+test('keeps completed and refused missingness outcomes disjoint at the Wasm boundary', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const values = new Float64Array([1, Number.NaN, Number.NaN, 4, 5, 6, Number.NaN, 2, 2, 2, 2, 2])
+    const validity = new Uint8Array([1, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1])
+    const refused = await analysis.resolveMissingnessInWorker(values, 6, 2, validity, {
+      kind: 'imputation',
+      method: 'linearInterior',
+      maxGap: 2,
+      confirmation: null,
+    })
+    const completed = await analysis.resolveMissingnessInWorker(values, 6, 2, validity, {
+      kind: 'imputation',
+      method: 'structuralZero',
+      maxGap: 1,
+      confirmation: 'absence means zero',
+    })
+    return { refused, completed }
+  })
+
+  const parsed = z.object({
+    refused: z.object({
+      ok: z.literal(true),
+      value: z.object({
+        kind: z.literal('missingnessResolved'),
+        outcome: z.object({
+          kind: z.literal('refused'),
+          reasons: z.array(z.object({ kind: z.literal('unresolvedCells'), count: z.literal(1) }).strict()).length(1),
+          remainingMissing: z.literal(1),
+        }).passthrough(),
+      }).passthrough(),
+    }).strict(),
+    completed: z.object({
+      ok: z.literal(true),
+      value: z.object({
+        kind: z.literal('missingnessResolved'),
+        outcome: z.object({
+          kind: z.literal('completed'),
+          values: z.array(z.number()).length(12),
+          imputedCells: z.array(z.tuple([z.number(), z.number()])).length(3),
+        }).passthrough(),
+      }).passthrough(),
+    }).strict(),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+})
+
 test('refuses materialization when the file no longer matches its profile', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
-  await page.goto('/')
+  await page.goto('/app')
   const raw: unknown = await page.evaluate(async () => {
     const dataModule = await import(new URL('/src/data/client.ts', window.location.href).href)
     const workflowModule = await import(new URL('/src/domain/workflow.ts', window.location.href).href)
@@ -138,7 +282,7 @@ test('runs PCMCI+ as a distinct heavy discovery method over three materialized c
     const url = new URL(request.url())
     if (url.protocol.startsWith('http') && url.hostname !== '127.0.0.1') externalRequests.add(url.href)
   })
-  await page.goto('/')
+  await page.goto('/app')
   const raw: unknown = await page.evaluate(async () => {
     const [dataModule, workflowModule, analysisModule] = await Promise.all([
       import(new URL('/src/data/client.ts', window.location.href).href),
@@ -198,7 +342,7 @@ test('runs PCMCI+ as a distinct heavy discovery method over three materialized c
 
 test('runs the Granger SSR F port with target then candidate-cause column order', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
-  await page.goto('/')
+  await page.goto('/app')
   const raw: unknown = await page.evaluate(async () => {
     const analysisModule = await import(new URL('/src/analysis/client.ts', window.location.href).href)
     const rows = 100
@@ -237,7 +381,7 @@ test('runs the Granger SSR F port with target then candidate-cause column order'
 
 test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress callbacks', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
-  await page.goto('/')
+  await page.goto('/app')
   const raw: unknown = await page.evaluate(async () => {
     const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
     const rows = 60
@@ -255,10 +399,12 @@ test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress call
     const lpcmciProgress: unknown[] = []
     const dynotearsProgress: unknown[] = []
     const ocseProgress: unknown[] = []
+    const varLingamProgress: unknown[] = []
     const lpcmci = await analysis.runLpcmci(makeValues(), rows, columns, 1, 0.05, (progress: unknown) => lpcmciProgress.push(progress))
     const dynotears = await analysis.runDynotears(makeValues(), rows, columns, 1, 0.1, 0.1, (progress: unknown) => dynotearsProgress.push(progress))
     const ocse = await analysis.runOcse(makeValues(), rows, columns, 1, 0.05, 20, 'gaussian', 5, (progress: unknown) => ocseProgress.push(progress))
-    return { lpcmci, dynotears, ocse, lpcmciProgress, dynotearsProgress, ocseProgress }
+    const varLingam = await analysis.runVarLingam(makeValues(), rows, columns, 2, true, (progress: unknown) => varLingamProgress.push(progress))
+    return { lpcmci, dynotears, ocse, varLingam, lpcmciProgress, dynotearsProgress, ocseProgress, varLingamProgress }
   })
 
   const progressSchema = z.array(z.object({
@@ -274,13 +420,15 @@ test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress call
     lpcmci: outcome(lpcmciEvidenceSchema),
     dynotears: outcome(dynotearsEvidenceSchema),
     ocse: outcome(ocseEvidenceSchema),
+    varLingam: outcome(varLingamEvidenceSchema),
     lpcmciProgress: progressSchema,
     dynotearsProgress: progressSchema,
     ocseProgress: progressSchema,
+    varLingamProgress: progressSchema,
   }).strict().safeParse(raw)
   expect(parsed.success).toBe(true)
   if (!parsed.success) return
-  if (!parsed.data.lpcmci.ok || !parsed.data.dynotears.ok || !parsed.data.ocse.ok) {
+  if (!parsed.data.lpcmci.ok || !parsed.data.dynotears.ok || !parsed.data.ocse.ok || !parsed.data.varLingam.ok) {
     throw new Error('One of the new discovery methods was refused at the browser boundary.')
   }
   const expectedColumns = 3
@@ -288,6 +436,9 @@ test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress call
   expect(parsed.data.dynotears.value.contemporaneousWeights).toHaveLength(expectedColumns)
   expect(parsed.data.dynotears.value.laggedWeights).toHaveLength(1)
   expect(parsed.data.ocse.value.seed).toBe(42)
+  expect(parsed.data.varLingam.value.causalOrder).toHaveLength(expectedColumns)
+  expect(parsed.data.varLingam.value.laggedWeights).toHaveLength(parsed.data.varLingam.value.selectedLag)
+  expect(parsed.data.varLingamProgress.at(-1)).toMatchObject({ stage: 'complete', completed: 2, total: 2 })
   expect(parsed.data.lpcmciProgress.at(-1)).toMatchObject({ stage: 'complete', completed: 5, total: 5 })
   const finalDynotearsProgress = parsed.data.dynotearsProgress.at(-1)
   expect(finalDynotearsProgress?.stage).toBe('complete')

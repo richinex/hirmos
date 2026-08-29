@@ -20,7 +20,7 @@ test('runs the stationarity battery in the Rust analysis worker', async ({ page 
     const url = new URL(request.url())
     if (url.protocol.startsWith('http') && url.hostname !== '127.0.0.1') externalRequests.add(url.href)
   })
-  await page.goto('/')
+  await page.goto('/app')
 
   const raw: unknown = await page.evaluate(async () => {
     const moduleUrl = new URL('/src/analysis/client.ts', window.location.href).href
@@ -54,7 +54,7 @@ test('runs the stationarity battery in the Rust analysis worker', async ({ page 
 
 test('surfaces a constant-series refusal from the Rust boundary', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Architecture spike runs once')
-  await page.goto('/')
+  await page.goto('/app')
   const raw: unknown = await page.evaluate(async () => {
     const moduleUrl = new URL('/src/analysis/client.ts', window.location.href).href
     const analysisModule: unknown = await import(moduleUrl)
@@ -78,4 +78,36 @@ test('surfaces a constant-series refusal from the Rust boundary', async ({ page 
   }).strict().safeParse(raw)
   expect(parsed.success).toBe(true)
   if (parsed.success) expect(parsed.data.error.detail).toContain('constant series')
+})
+
+test('returns canonical and all minimal adjustment sets through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture contract runs once')
+  await page.goto('/app')
+  const result: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    // Dagitty's extended confounding triangle: A=0, B=1, D=2, E=3, Z=4.
+    return analysis.identifyBackdoor({
+      nodes: 5,
+      edges: [[0, 3], [0, 4], [1, 2], [1, 4], [3, 2], [4, 2], [4, 3]],
+      treatment: 3,
+      outcome: 2,
+      unobserved: [],
+    })
+  })
+  expect(result).toEqual({
+    ok: true,
+    value: {
+      kind: 'backdoorIdentification',
+      nodes: 5,
+      treatment: 3,
+      outcome: 2,
+      unobserved: [],
+      result: {
+        kind: 'identified',
+        canonicalSet: [0, 1, 4],
+        minimalSets: [[0, 4], [1, 4]],
+        truncated: false,
+      },
+    },
+  })
 })

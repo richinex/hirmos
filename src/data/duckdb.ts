@@ -1,14 +1,14 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
-import duckdbEhWasm from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
-import duckdbMvpWasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url'
 import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
 import { fingerprintFile } from './fingerprint'
-import { err, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
+import { assertNever, err, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import {
   columnId,
   datasetProfileId,
   isNumericDuckDbType,
+  type ColumnProfile,
+  type ColumnProfileProblem,
   type DatasetProfile,
   type DatasetProfileProblem,
   type NullableNumericMatrix,
@@ -16,16 +16,29 @@ import {
   type PhysicalColumnProfile,
   type PreviewCell,
   type SourceFingerprint,
+  type ColumnSummary,
+  type DatasetSummary,
+  type DatasetSummaryProblem,
+  type PreviewFilter,
+  type PreviewQuery,
+  type PreviewRow,
+  type PreviewWindow,
+  type PreviewWindowProblem,
+  type ColumnId,
 } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
+import type { PanelDataProblem, PanelLongMatrix, PanelStructureEvidence } from '@/domain/panel'
 
 const DUCKDB_PACKAGE_VERSION = '1.30.0'
 const DUCKDB_ENGINE_VERSION = 'v1.3.2'
 const PREVIEW_ROWS = 12
 
+/** The engine binaries are served under the app's own origin at this path: from node_modules by the dev and preview servers, from R2 by the deployment. */
+const engineBinary = (file: string): string => new URL(`/duckdb/${DUCKDB_PACKAGE_VERSION}/${file}`, self.location.origin).href
+
 const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
-  mvp: { mainModule: duckdbMvpWasm, mainWorker: duckdbMvpWorker },
-  eh: { mainModule: duckdbEhWasm, mainWorker: duckdbEhWorker },
+  mvp: { mainModule: engineBinary('duckdb-mvp.wasm'), mainWorker: duckdbMvpWorker },
+  eh: { mainModule: engineBinary('duckdb-eh.wasm'), mainWorker: duckdbEhWorker },
 }
 
 interface Engine {
@@ -403,4 +416,543 @@ export async function materializeNumericColumns(
   return cleanupFailures.length > 0
     ? err({ kind: 'materialization-failed', detail: cleanupFailures.join('; ') })
     : outcome
+}
+
+const panelColumn = (profile: DatasetProfile, id: ColumnId): Result<PhysicalColumnProfile, PanelDataProblem> => {
+  const column = profile.columns.find((candidate) => candidate.id === id)
+  return column === undefined ? err({ kind: 'column-not-found', id }) : ok(column)
+}
+
+const firstDuplicate = (requested: readonly ColumnId[]): ColumnId | null => {
+  const seen = new Set<ColumnId>()
+  for (const id of requested) {
+    if (seen.has(id)) return id
+    seen.add(id)
+  }
+  return null
+}
+
+async function verifiedPanelSource(
+  source: SelectedSource,
+  profile: DatasetProfile,
+): Promise<Result<Engine, PanelDataProblem>> {
+  const fingerprint = await fingerprintFile(source.file)
+  if (!fingerprint.ok) return err({ kind: 'panel-data-failed', detail: fingerprint.error.detail })
+  if (fingerprint.value !== profile.source.fingerprint) {
+    return err({ kind: 'source-changed', expected: profile.source.fingerprint, actual: fingerprint.value })
+  }
+  try { return ok(await engine()) } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+}
+
+const sourceRelation = (source: SelectedSource, path: string): string => source.format === 'parquet'
+  ? `read_parquet(${sqlString(path)})`
+  : `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480)`
+
+/** Validate the observational panel keys without reading the scientific values. */
+export async function inspectPanelStructure(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  unitColumnId: ColumnId,
+  timeColumnId: ColumnId,
+): Promise<Result<PanelStructureEvidence, PanelDataProblem>> {
+  const duplicate = firstDuplicate([unitColumnId, timeColumnId])
+  if (duplicate !== null) return err({ kind: 'duplicate-column', id: duplicate })
+  const boundUnit = panelColumn(profile, unitColumnId)
+  if (!boundUnit.ok) return boundUnit
+  const boundTime = panelColumn(profile, timeColumnId)
+  if (!boundTime.ok) return boundTime
+  const unitColumn = boundUnit.value
+  const timeColumn = boundTime.value
+  const running = await verifiedPanelSource(source, profile)
+  if (!running.ok) return running
+  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
+  try {
+    await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+  } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  const relation = sourceRelation(source, registeredPath)
+  const unit = sqlIdentifier(unitColumn.name)
+  const time = sqlIdentifier(timeColumn.name)
+  let connection: duckdb.AsyncDuckDBConnection | null = null
+  let outcome: Result<PanelStructureEvidence, PanelDataProblem>
+  try {
+    connection = await running.value.db.connect()
+    const summary = await connection.query(`
+      WITH panel AS (SELECT ${unit} AS unit_key, ${time} AS time_key FROM ${relation}),
+      duplicates AS (
+        SELECT count(*)::UBIGINT AS duplicate_keys
+        FROM (SELECT unit_key, time_key FROM panel WHERE unit_key IS NOT NULL AND time_key IS NOT NULL GROUP BY unit_key, time_key HAVING count(*) > 1)
+      )
+      SELECT
+        count(*)::UBIGINT AS observations,
+        count(DISTINCT unit_key)::UBIGINT AS units,
+        count(DISTINCT time_key)::UBIGINT AS periods,
+        (count(*) - count(unit_key))::UBIGINT AS missing_units,
+        (count(*) - count(time_key))::UBIGINT AS missing_times,
+        (SELECT duplicate_keys FROM duplicates)::UBIGINT AS duplicate_keys
+      FROM panel
+    `)
+    const number = (name: string) => scalarNumber(summary.getChild(name)?.get(0), name)
+    const observations = number('observations')
+    const units = number('units')
+    const periods = number('periods')
+    const duplicateKeys = number('duplicate_keys')
+    const missingUnitKeys = number('missing_units')
+    const missingTimeKeys = number('missing_times')
+    outcome = ok({
+      kind: 'panel-structure', sourceFingerprint: profile.source.fingerprint,
+      unitColumn: unitColumn.id, timeColumn: timeColumn.id, observations, units, periods,
+      duplicateKeys, missingUnitKeys, missingTimeKeys,
+      balanced: duplicateKeys === 0 && missingUnitKeys === 0 && missingTimeKeys === 0 && observations === units * periods,
+    })
+  } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
+  }
+  return outcome
+}
+
+/** Materialize one long panel for the Rust estimator: outcome then treatment, column-major. */
+export async function materializePanelLong(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  unitColumnId: ColumnId,
+  timeColumnId: ColumnId,
+  outcomeColumnId: ColumnId,
+  treatmentColumnId: ColumnId,
+): Promise<Result<PanelLongMatrix, PanelDataProblem>> {
+  const duplicate = firstDuplicate([unitColumnId, timeColumnId, outcomeColumnId, treatmentColumnId])
+  if (duplicate !== null) return err({ kind: 'duplicate-column', id: duplicate })
+  const boundUnit = panelColumn(profile, unitColumnId)
+  if (!boundUnit.ok) return boundUnit
+  const boundTime = panelColumn(profile, timeColumnId)
+  if (!boundTime.ok) return boundTime
+  const boundOutcome = panelColumn(profile, outcomeColumnId)
+  if (!boundOutcome.ok) return boundOutcome
+  const boundTreatment = panelColumn(profile, treatmentColumnId)
+  if (!boundTreatment.ok) return boundTreatment
+  const unitColumn = boundUnit.value
+  const timeColumn = boundTime.value
+  const outcomeColumn = boundOutcome.value
+  const treatmentColumn = boundTreatment.value
+  for (const column of [outcomeColumn, treatmentColumn]) {
+    if (!isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
+  }
+  const running = await verifiedPanelSource(source, profile)
+  if (!running.ok) return running
+  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
+  try {
+    await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+  } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  const relation = sourceRelation(source, registeredPath)
+  const unit = sqlIdentifier(unitColumn.name)
+  const time = sqlIdentifier(timeColumn.name)
+  const outcomeName = sqlIdentifier(outcomeColumn.name)
+  const treatmentName = sqlIdentifier(treatmentColumn.name)
+  let connection: duckdb.AsyncDuckDBConnection | null = null
+  let outcome: Result<PanelLongMatrix, PanelDataProblem>
+  try {
+    connection = await running.value.db.connect()
+    const table = await connection.query(`
+      SELECT CAST(${unit} AS VARCHAR) AS unit_label,
+             (dense_rank() OVER (ORDER BY ${time}) - 1)::INTEGER AS time_code,
+             CAST(${time} AS VARCHAR) AS time_label,
+             CAST(${outcomeName} AS DOUBLE) AS outcome,
+             CAST(${treatmentName} AS DOUBLE) AS treatment
+      FROM ${relation}
+    `)
+    const unitVector = table.getChild('unit_label')
+    const timeVector = table.getChild('time_code')
+    const timeLabelVector = table.getChild('time_label')
+    const outcomeVector = table.getChild('outcome')
+    const treatmentVector = table.getChild('treatment')
+    const units: string[] = []
+    const times: number[] = []
+    const timeLabels: string[] = []
+    const values = new Float64Array(table.numRows * 2)
+    let problem: PanelDataProblem | null = null
+    for (let row = 0; row < table.numRows; row += 1) {
+      const unitValue = unitVector?.get(row)
+      const timeValue = timeVector?.get(row)
+      const timeLabel = timeLabelVector?.get(row)
+      if (unitValue === null || unitValue === undefined || String(unitValue) === '') { problem = { kind: 'missing-key', name: unitColumn.name, row }; break }
+      if (timeValue === null || timeValue === undefined || timeLabel === null || timeLabel === undefined) { problem = { kind: 'missing-key', name: timeColumn.name, row }; break }
+      units.push(String(unitValue)); times.push(scalarNumber(timeValue, 'panel time code')); timeLabels.push(String(timeLabel))
+      for (const [columnIndex, pair] of [[0, { vector: outcomeVector, column: outcomeColumn }], [1, { vector: treatmentVector, column: treatmentColumn }]] as const) {
+        const value = pair.vector?.get(row)
+        if (value === null || value === undefined) { problem = { kind: 'missing-value', name: pair.column.name, row }; break }
+        if (typeof value !== 'number' || !Number.isFinite(value)) { problem = { kind: 'non-finite-value', name: pair.column.name, row }; break }
+        values[columnIndex * table.numRows + row] = value
+      }
+      if (problem !== null) break
+    }
+    outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(times) || !isNonEmpty(timeLabels)
+      ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel query returned no rows.' })
+      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, times, timeLabels, values })
+  } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
+  }
+  return outcome
+}
+
+const scalarNumber = (value: unknown, label: string): number => {
+  if (typeof value === 'number') return value
+  if (typeof value === 'bigint') return Number(value)
+  throw new Error(`DuckDB returned an invalid ${label}: ${String(value)}`)
+}
+
+const optionalNumber = (value: unknown): number | null => (value === null || value === undefined ? null : scalarNumber(value, 'statistic'))
+
+const MAX_HISTOGRAM_BINS = 32
+const TOP_VALUES = 8
+
+/** Describe one column on demand: summary statistics and a histogram for numeric types, frequencies otherwise. */
+export async function profileColumn(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  requestedColumnId: string,
+): Promise<Result<ColumnProfile, ColumnProfileProblem>> {
+  const fingerprint = await fingerprintFile(source.file)
+  if (!fingerprint.ok) return err({ kind: 'column-profile-failed', detail: fingerprint.error.detail })
+  if (fingerprint.value !== profile.source.fingerprint) {
+    return err({ kind: 'source-changed', expected: profile.source.fingerprint, actual: fingerprint.value })
+  }
+  const column = profile.columns.find((candidate) => candidate.id === requestedColumnId)
+  if (!column) return err({ kind: 'column-not-found', id: requestedColumnId })
+
+  let running: Engine
+  try {
+    running = await engine()
+  } catch (cause) {
+    return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
+  }
+  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
+  try {
+    await running.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+  } catch (cause) {
+    return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
+  }
+  const relation = source.format === 'parquet'
+    ? `read_parquet(${sqlString(registeredPath)})`
+    : `read_csv_auto(${sqlString(registeredPath)}, header = true, sample_size = 20480)`
+  const name = sqlIdentifier(column.name)
+
+  let connection: duckdb.AsyncDuckDBConnection | null = null
+  let outcome: Result<ColumnProfile, ColumnProfileProblem>
+  try {
+    connection = await running.db.connect()
+    if (isNumericDuckDbType(column.duckdbType)) {
+      const summary = await connection.query(`
+        SELECT
+          count(${name}) AS present,
+          count(*) - count(${name}) AS nulls,
+          count(DISTINCT ${name}) AS distinct_values,
+          count(*) FILTER (WHERE ${name} = 0) AS zeros,
+          min(CAST(${name} AS DOUBLE)) AS minimum,
+          max(CAST(${name} AS DOUBLE)) AS maximum,
+          avg(CAST(${name} AS DOUBLE)) AS mean,
+          stddev_samp(CAST(${name} AS DOUBLE)) AS deviation,
+          quantile_cont(CAST(${name} AS DOUBLE), 0.25) AS lower_quartile,
+          quantile_cont(CAST(${name} AS DOUBLE), 0.5) AS median,
+          quantile_cont(CAST(${name} AS DOUBLE), 0.75) AS upper_quartile
+        FROM ${relation}
+      `)
+      const row = (field: string) => summary.getChild(field)?.get(0)
+      const present = scalarNumber(row('present'), 'count')
+      if (present === 0) {
+        outcome = err({ kind: 'column-profile-failed', detail: `${column.name} has no non-null values to describe.` })
+      } else {
+        const minimum = scalarNumber(row('minimum'), 'minimum')
+        const maximum = scalarNumber(row('maximum'), 'maximum')
+        const bins = minimum === maximum ? 1 : Math.max(4, Math.min(MAX_HISTOGRAM_BINS, Math.ceil(Math.sqrt(present))))
+        const width = (maximum - minimum) / bins
+        const counts = new Array<number>(bins).fill(0)
+        if (bins === 1) {
+          counts[0] = present
+        } else {
+          const buckets = await connection.query(`
+            SELECT
+              least(greatest(floor((CAST(${name} AS DOUBLE) - ${minimum}) / ${width}), 0), ${bins - 1})::INTEGER AS bucket,
+              count(*) AS n
+            FROM ${relation}
+            WHERE ${name} IS NOT NULL
+            GROUP BY bucket
+            ORDER BY bucket
+          `)
+          const bucketVector = buckets.getChild('bucket')
+          const countVector = buckets.getChild('n')
+          for (let index = 0; index < buckets.numRows; index += 1) {
+            const bucket = scalarNumber(bucketVector?.get(index), 'bucket')
+            counts[bucket] = scalarNumber(countVector?.get(index), 'bucket count')
+          }
+        }
+        const edges = Array.from({ length: bins + 1 }, (_, index) => (index === bins ? maximum : minimum + width * index))
+        outcome = ok({
+          kind: 'numeric-column-profile',
+          column: column.id,
+          sourceFingerprint: profile.source.fingerprint,
+          count: present,
+          nullCount: scalarNumber(row('nulls'), 'null count'),
+          distinctCount: scalarNumber(row('distinct_values'), 'distinct count'),
+          zeroCount: scalarNumber(row('zeros') ?? 0, 'zero count'),
+          min: minimum,
+          max: maximum,
+          mean: scalarNumber(row('mean'), 'mean'),
+          standardDeviation: optionalNumber(row('deviation')),
+          quartiles: {
+            lower: scalarNumber(row('lower_quartile'), 'lower quartile'),
+            median: scalarNumber(row('median'), 'median'),
+            upper: scalarNumber(row('upper_quartile'), 'upper quartile'),
+          },
+          histogram: { edges, counts },
+        })
+      }
+    } else {
+      const summary = await connection.query(`
+        SELECT count(${name}) AS present, count(*) - count(${name}) AS nulls, count(DISTINCT ${name}) AS distinct_values
+        FROM ${relation}
+      `)
+      const top = await connection.query(`
+        SELECT CAST(${name} AS VARCHAR) AS value, count(*) AS n
+        FROM ${relation}
+        WHERE ${name} IS NOT NULL
+        GROUP BY value
+        ORDER BY n DESC, value ASC
+        LIMIT ${TOP_VALUES}
+      `)
+      const valueVector = top.getChild('value')
+      const countVector = top.getChild('n')
+      outcome = ok({
+        kind: 'categorical-column-profile',
+        column: column.id,
+        sourceFingerprint: profile.source.fingerprint,
+        count: scalarNumber(summary.getChild('present')?.get(0), 'count'),
+        nullCount: scalarNumber(summary.getChild('nulls')?.get(0), 'null count'),
+        distinctCount: scalarNumber(summary.getChild('distinct_values')?.get(0), 'distinct count'),
+        top: Array.from({ length: top.numRows }, (_, index) => ({
+          value: String(valueVector?.get(index)),
+          count: scalarNumber(countVector?.get(index), 'value count'),
+        })),
+      })
+    }
+  } catch (cause) {
+    outcome = err({ kind: 'column-profile-failed', detail: detailOf(cause) })
+  }
+
+  const cleanupFailures: string[] = []
+  if (connection) {
+    try {
+      await connection.close()
+    } catch (cause) {
+      cleanupFailures.push(`connection: ${detailOf(cause)}`)
+    }
+  }
+  try {
+    await running.db.dropFile(registeredPath)
+  } catch (cause) {
+    cleanupFailures.push(`source handle: ${detailOf(cause)}`)
+  }
+  return cleanupFailures.length > 0
+    ? err({ kind: 'column-profile-failed', detail: cleanupFailures.join('; ') })
+    : outcome
+}
+
+/** Register the source, open a connection, run `work`, and release both; the relation expression is passed in. */
+async function withSource<Value, Problem>(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  failure: (detail: string) => Problem,
+  changed: (expected: SourceFingerprint, actual: SourceFingerprint) => Problem,
+  work: (connection: duckdb.AsyncDuckDBConnection, relation: string) => Promise<Result<Value, Problem>>,
+): Promise<Result<Value, Problem>> {
+  const fingerprint = await fingerprintFile(source.file)
+  if (!fingerprint.ok) return err(failure(fingerprint.error.detail))
+  if (fingerprint.value !== profile.source.fingerprint) return err(changed(profile.source.fingerprint, fingerprint.value))
+  let running: Engine
+  try {
+    running = await engine()
+  } catch (cause) {
+    return err(failure(detailOf(cause)))
+  }
+  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
+  try {
+    await running.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+  } catch (cause) {
+    return err(failure(detailOf(cause)))
+  }
+  const relation = source.format === 'parquet'
+    ? `read_parquet(${sqlString(registeredPath)})`
+    : `read_csv_auto(${sqlString(registeredPath)}, header = true, sample_size = 20480)`
+  let connection: duckdb.AsyncDuckDBConnection | null = null
+  let outcome: Result<Value, Problem>
+  try {
+    connection = await running.db.connect()
+    outcome = await work(connection, relation)
+  } catch (cause) {
+    outcome = err(failure(detailOf(cause)))
+  }
+  try {
+    await connection?.close()
+    await running.db.dropFile(registeredPath)
+  } catch (cause) {
+    return err(failure(`cleanup: ${detailOf(cause)}`))
+  }
+  return outcome
+}
+
+const MAX_SUMMARY_HISTOGRAMS = 64
+const EXACT_DISTINCT_ROWS = 200_000
+const CATEGORY_LIMIT = 30
+const SUMMARY_BINS = 16
+
+/** One `SUMMARIZE` pass for distinct counts and extremes, then a bucket query per numeric column and a value count per low-cardinality column. */
+export async function summarizeColumns(source: SelectedSource, profile: DatasetProfile): Promise<Result<DatasetSummary, DatasetSummaryProblem>> {
+  return withSource<DatasetSummary, DatasetSummaryProblem>(
+    source,
+    profile,
+    (detail) => ({ kind: 'summary-failed', detail }),
+    (expected, actual) => ({ kind: 'source-changed', expected, actual }),
+    async (connection, relation) => {
+      const summarized = await connection.query(`SUMMARIZE SELECT * FROM ${relation}`)
+      const names = summarized.getChild('column_name')
+      const mins = summarized.getChild('min')
+      const maxes = summarized.getChild('max')
+      const uniques = summarized.getChild('approx_unique')
+      const counts = summarized.getChild('count')
+      const byName = new Map<string, number>()
+      for (let index = 0; index < summarized.numRows; index += 1) byName.set(String(names?.get(index)), index)
+      // `approx_unique` can exceed the row count on small files; below the threshold the exact count is cheap.
+      const exact = profile.rowCount <= EXACT_DISTINCT_ROWS
+        ? await connection.query(`SELECT ${profile.columns.map((column, index) => `count(DISTINCT ${sqlIdentifier(column.name)})::UBIGINT AS ${sqlIdentifier(`d_${index}`)}`).join(', ')} FROM ${relation}`)
+        : null
+      const columns: ColumnSummary[] = []
+      let histograms = 0
+      for (const column of profile.columns) {
+        const row = byName.get(column.name)
+        if (row === undefined) return err({ kind: 'summary-failed', detail: `SUMMARIZE returned no row for ${column.name}.` })
+        const present = scalarNumber(counts?.get(row) ?? 0, 'count')
+        const columnIndex = profile.columns.indexOf(column)
+        const distinctCount = exact !== null
+          ? scalarNumber(exact.getChild(`d_${columnIndex}`)?.get(0) ?? 0, 'distinct count')
+          : Math.min(present, scalarNumber(uniques?.get(row) ?? 0, 'distinct count'))
+        const minRaw = mins?.get(row)
+        const maxRaw = maxes?.get(row)
+        const min = minRaw === null || minRaw === undefined ? null : String(minRaw)
+        const max = maxRaw === null || maxRaw === undefined ? null : String(maxRaw)
+        const name = sqlIdentifier(column.name)
+        let histogram: ColumnSummary['histogram'] = null
+        let categories: ColumnSummary['categories'] = null
+        if (isNumericDuckDbType(column.duckdbType) && present > 0 && histograms < MAX_SUMMARY_HISTOGRAMS) {
+          histograms += 1
+          const minimum = Number(min)
+          const maximum = Number(max)
+          if (Number.isFinite(minimum) && Number.isFinite(maximum)) {
+            const bins = minimum === maximum ? 1 : Math.max(1, Math.min(distinctCount, SUMMARY_BINS, Math.max(4, Math.ceil(Math.sqrt(present)))))
+            const width = (maximum - minimum) / bins
+            const binCounts = new Array<number>(bins).fill(0)
+            if (bins === 1) {
+              binCounts[0] = present
+            } else {
+              const buckets = await connection.query(`
+                SELECT least(greatest(floor((CAST(${name} AS DOUBLE) - ${minimum}) / ${width}), 0), ${bins - 1})::INTEGER AS bucket, count(*) AS n
+                FROM ${relation}
+                WHERE ${name} IS NOT NULL
+                GROUP BY bucket
+              `)
+              const bucketVector = buckets.getChild('bucket')
+              const countVector = buckets.getChild('n')
+              for (let index = 0; index < buckets.numRows; index += 1) {
+                binCounts[scalarNumber(bucketVector?.get(index), 'bucket')] = scalarNumber(countVector?.get(index), 'bucket count')
+              }
+            }
+            histogram = {
+              edges: Array.from({ length: bins + 1 }, (_, index) => (index === bins ? maximum : minimum + width * index)),
+              counts: binCounts,
+            }
+          }
+        } else if (!isNumericDuckDbType(column.duckdbType) && present > 0 && distinctCount <= CATEGORY_LIMIT) {
+          const top = await connection.query(`
+            SELECT CAST(${name} AS VARCHAR) AS value, count(*) AS n
+            FROM ${relation}
+            WHERE ${name} IS NOT NULL
+            GROUP BY value
+            ORDER BY n DESC, value ASC
+            LIMIT ${CATEGORY_LIMIT}
+          `)
+          const valueVector = top.getChild('value')
+          const countVector = top.getChild('n')
+          categories = Array.from({ length: top.numRows }, (_, index) => ({
+            value: String(valueVector?.get(index)),
+            count: scalarNumber(countVector?.get(index), 'value count'),
+          }))
+        }
+        columns.push({ column: column.id, distinctCount, min, max, histogram, categories })
+      }
+      return ok({ kind: 'dataset-summary', sourceFingerprint: profile.source.fingerprint, columns })
+    },
+  )
+}
+
+const sqlNumber = (value: number): string => (Number.isFinite(value) ? String(value) : 'NULL')
+
+const filterClause = (columnName: string, filter: PreviewFilter): string => {
+  const name = sqlIdentifier(columnName)
+  switch (filter.kind) {
+    case 'range': {
+      const parts: string[] = []
+      if (filter.min !== null) parts.push(`CAST(${name} AS DOUBLE) >= ${sqlNumber(filter.min)}`)
+      if (filter.max !== null) parts.push(`CAST(${name} AS DOUBLE) <= ${sqlNumber(filter.max)}`)
+      return parts.length === 0 ? 'TRUE' : `(${parts.join(' AND ')})`
+    }
+    case 'contains': return `CAST(${name} AS VARCHAR) ILIKE ${sqlString(`%${filter.text.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)} ESCAPE '\\'`
+    case 'one-of': return filter.values.length === 0 ? 'TRUE' : `CAST(${name} AS VARCHAR) IN (${filter.values.map(sqlString).join(', ')})`
+    case 'missing': return filter.missing ? `${name} IS NULL` : `${name} IS NOT NULL`
+    default: return assertNever(filter)
+  }
+}
+
+/** A sorted, filtered window onto the whole file; the row index is the file position before either. */
+export async function previewWindow(source: SelectedSource, profile: DatasetProfile, query: PreviewQuery): Promise<Result<PreviewWindow, PreviewWindowProblem>> {
+  return withSource<PreviewWindow, PreviewWindowProblem>(
+    source,
+    profile,
+    (detail) => ({ kind: 'preview-failed', detail }),
+    (expected, actual) => ({ kind: 'source-changed', expected, actual }),
+    async (connection, relation) => {
+      const columnName = (id: string): string | null => profile.columns.find((column) => column.id === id)?.name ?? null
+      const clauses: string[] = []
+      for (const filter of query.filters) {
+        const name = columnName(filter.column)
+        if (name === null) return err({ kind: 'preview-failed', detail: `Filter names an unknown column ${filter.column}.` })
+        clauses.push(filterClause(name, filter))
+      }
+      const search = query.search.trim()
+      if (search.length > 0) {
+        const pattern = sqlString(`%${search.replaceAll('%', '\\%').replaceAll('_', '\\_')}%`)
+        clauses.push(`(${profile.columns.map((column) => `CAST(${sqlIdentifier(column.name)} AS VARCHAR) ILIKE ${pattern} ESCAPE '\\'`).join(' OR ')})`)
+      }
+      const where = clauses.length === 0 ? '' : `WHERE ${clauses.join(' AND ')}`
+      let order = 'ORDER BY __row'
+      if (query.sort !== null) {
+        const name = columnName(query.sort.column)
+        if (name === null) return err({ kind: 'preview-failed', detail: `Sort names an unknown column ${query.sort.column}.` })
+        order = `ORDER BY ${sqlIdentifier(name)} ${query.sort.direction === 'asc' ? 'ASC' : 'DESC'} NULLS LAST, __row`
+      }
+      const projection = profile.columns.map((column) => sqlIdentifier(column.name)).join(', ')
+      const base = `WITH source AS (SELECT row_number() OVER () AS __row, ${projection} FROM ${relation})`
+      const counted = await connection.query(`${base} SELECT count(*)::UBIGINT AS total FROM source ${where}`)
+      const total = safeCount(counted.getChild('total')?.get(0))
+      if (!total.ok) return err({ kind: 'preview-failed', detail: total.error.kind === 'unsafe-row-count' ? 'The row count is outside the safe range.' : total.error.detail })
+      const table = await connection.query(`${base} SELECT * FROM source ${where} ${order} LIMIT ${query.limit} OFFSET ${query.offset}`)
+      const indexVector = table.getChild('__row')
+      const rows: PreviewRow[] = []
+      for (let rowIndex = 0; rowIndex < table.numRows; rowIndex += 1) {
+        rows.push({
+          index: scalarNumber(indexVector?.get(rowIndex), 'row index'),
+          cells: profile.columns.map((_, columnIndex) => previewCell(table.getChildAt(columnIndex + 1)?.get(rowIndex))),
+        })
+      }
+      return ok({ kind: 'preview-window', sourceFingerprint: profile.source.fingerprint, offset: query.offset, total: total.value, rows })
+    },
+  )
 }

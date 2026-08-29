@@ -1,8 +1,15 @@
 import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
-import type { DatasetProfile, DatasetProfileProblem } from './dataset'
+import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import type { DagDocument } from './dag'
 import type { DiscoveryRunArtifact } from './discovery'
+import type { GrangerEvidenceArtifact } from './granger'
+import type { InterventionQueryArtifact } from './intervention'
+import type { EstimationRunArtifact } from './estimation'
+import type { SensitivityRunArtifact } from './sensitivity'
+import type { CounterfactualRunArtifact } from './counterfactual'
+import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
+import type { PersistedProject } from './persistence'
 
 export type ProjectId = Brand<string, 'ProjectId'>
 export type ProjectName = Brand<string, 'ProjectName'>
@@ -21,6 +28,9 @@ export type ProjectNameProblem =
 export type SourceSelectionProblem =
   | { readonly kind: 'empty-file' }
   | { readonly kind: 'unsupported-format'; readonly extension: string }
+  /** The file chosen for a reopened project is not the one its artifacts were computed from. */
+  | { readonly kind: 'source-mismatch'; readonly expected: string }
+  | { readonly kind: 'fingerprint-failed'; readonly detail: string }
 
 export interface SelectedSource {
   readonly file: File
@@ -41,6 +51,8 @@ export type Workflow =
       readonly kind: 'awaiting-data'
       readonly project: Project
       readonly problem: SourceSelectionProblem | null
+      /** A saved project waiting for its source file; the artifacts return once the file's fingerprint matches. */
+      readonly restore: PersistedProject | null
     }
   | { readonly kind: 'source-selected'; readonly project: Project; readonly source: SelectedSource }
   | {
@@ -62,8 +74,18 @@ export type Workflow =
       readonly profile: DatasetProfile
       readonly prepared: PreparedDatasetArtifact | null
       readonly stationarity: StationarityEvidenceArtifact | null
+      readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
       readonly discoveryRuns: readonly DiscoveryRunArtifact[]
       readonly dagDocuments: readonly DagDocument[]
+      /** Do-queries asked of the graphs above; each records the revision it was asked of. */
+      readonly interventionQueries: readonly InterventionQueryArtifact[]
+      /** The treatment and outcome being bound, shared by the DAG Workspace and Study Design. */
+      readonly studyDraft: StudyDesignDraft
+      readonly studies: readonly StudySpecification[]
+      readonly identifications: readonly IdentificationArtifact[]
+      readonly estimationRuns: readonly EstimationRunArtifact[]
+      readonly sensitivityRuns: readonly SensitivityRunArtifact[]
+      readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
     }
 
 export type WorkflowEvent =
@@ -75,10 +97,21 @@ export type WorkflowEvent =
   | { readonly type: 'profile-failed'; readonly request: ImportRequestId; readonly problem: DatasetProfileProblem }
   | { readonly type: 'prepared-dataset-created'; readonly artifact: PreparedDatasetArtifact }
   | { readonly type: 'stationarity-evidence-created'; readonly evidence: StationarityEvidenceArtifact }
+  | { readonly type: 'granger-evidence-created'; readonly evidence: GrangerEvidenceArtifact }
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
   | { readonly type: 'dag-document-created'; readonly document: DagDocument }
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
+  | { readonly type: 'intervention-query-created'; readonly query: InterventionQueryArtifact }
+  | { readonly type: 'study-draft-changed'; readonly draft: StudyDesignDraft }
+  | { readonly type: 'study-identified'; readonly study: StudySpecification; readonly identification: IdentificationArtifact }
+  | { readonly type: 'estimation-run-created'; readonly run: EstimationRunArtifact }
+  | { readonly type: 'sensitivity-run-created'; readonly run: SensitivityRunArtifact }
+  | { readonly type: 'counterfactual-run-created'; readonly run: CounterfactualRunArtifact }
   | { readonly type: 'source-cleared' }
+  | { readonly type: 'project-reopened'; readonly snapshot: PersistedProject }
+  | { readonly type: 'project-restored'; readonly file: File }
+  | { readonly type: 'restore-rejected'; readonly problem: SourceSelectionProblem }
+  | { readonly type: 'source-persistence-changed'; readonly persistence: SourcePersistence }
 
 export const INITIAL_WORKFLOW: Workflow = {
   kind: 'awaiting-project',
@@ -142,14 +175,42 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'project-name-changed') {
         return { ...state, nameDraft: event.value, problem: null }
       }
+      if (event.type === 'project-reopened') {
+        return { kind: 'awaiting-data', project: event.snapshot.project, problem: null, restore: event.snapshot.profile === null ? null : event.snapshot }
+      }
+      if (event.type !== 'project-submitted') return state
       if (event.type !== 'project-submitted') return state
       const parsed = projectName(state.nameDraft)
       return parsed.ok
-        ? { kind: 'awaiting-data', project: newProject(parsed.value), problem: null }
+        ? { kind: 'awaiting-data', project: newProject(parsed.value), problem: null, restore: null }
         : { ...state, problem: parsed.error }
     }
     case 'awaiting-data': {
-      if (event.type !== 'file-selected') return state
+      if (event.type === 'restore-rejected') return { ...state, problem: event.problem }
+      if (event.type === 'project-restored' && state.restore !== null && state.restore.profile !== null) {
+        const parsed = selectSource(event.file)
+        if (!parsed.ok) return { ...state, problem: parsed.error }
+        const snapshot = state.restore
+        return {
+          kind: 'profiled',
+          project: snapshot.project,
+          source: parsed.value,
+          profile: snapshot.profile ?? (() => { throw new Error('unreachable') })(),
+          prepared: snapshot.prepared,
+          stationarity: snapshot.stationarity,
+          grangerEvidence: snapshot.grangerEvidence,
+          discoveryRuns: snapshot.discoveryRuns,
+          dagDocuments: snapshot.dagDocuments,
+          interventionQueries: snapshot.interventionQueries,
+          studyDraft: snapshot.studyDraft,
+          studies: snapshot.studies,
+          identifications: snapshot.identifications,
+          estimationRuns: snapshot.estimationRuns,
+          sensitivityRuns: snapshot.sensitivityRuns,
+          counterfactualRuns: snapshot.counterfactualRuns,
+        }
+      }
+      if (event.type !== 'file-selected' || state.restore !== null) return state
       const parsed = selectSource(event.file)
       return parsed.ok
         ? { kind: 'source-selected', project: state.project, source: parsed.value }
@@ -159,7 +220,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'profile-requested') {
         return { kind: 'profiling', project: state.project, source: state.source, request: event.request }
       }
-      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
       return state
     case 'profiling':
       if (event.type === 'profile-succeeded' && event.request === state.request) {
@@ -170,8 +231,16 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           profile: event.profile,
           prepared: null,
           stationarity: null,
+          grangerEvidence: [],
           discoveryRuns: [],
           dagDocuments: [],
+          interventionQueries: [],
+          studyDraft: EMPTY_STUDY_DRAFT,
+          studies: [],
+          identifications: [],
+          estimationRuns: [],
+          sensitivityRuns: [],
+          counterfactualRuns: [],
         }
       }
       if (event.type === 'profile-failed' && event.request === state.request) {
@@ -182,17 +251,25 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'profile-requested') {
         return { kind: 'profiling', project: state.project, source: state.source, request: event.request }
       }
-      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
       return state
     case 'profiled':
-      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null }
+      if (event.type === 'source-persistence-changed') {
+        return { ...state, profile: { ...state.profile, source: { ...state.profile.source, persistence: event.persistence } } }
+      }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, discoveryRuns: [], dagDocuments: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], discoveryRuns: [], dagDocuments: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
         && event.evidence.preparedDataset === state.prepared.id) {
         return { ...state, stationarity: event.evidence }
+      }
+      if (event.type === 'granger-evidence-created'
+        && state.prepared !== null
+        && event.evidence.preparedDataset === state.prepared.id) {
+        return { ...state, grangerEvidence: [...state.grangerEvidence, event.evidence] }
       }
       if (event.type === 'discovery-run-created'
         && state.prepared !== null
@@ -215,6 +292,42 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
             document.id === event.document.id ? event.document : document),
         }
       }
+      if (event.type === 'intervention-query-created'
+        && state.prepared !== null
+        && event.query.preparedDataset === state.prepared.id
+        && state.dagDocuments.some((document) => document.id === event.query.dagDocument)) {
+        return { ...state, interventionQueries: [...state.interventionQueries, event.query] }
+      }
+      if (event.type === 'study-draft-changed') return { ...state, studyDraft: event.draft }
+      if (event.type === 'study-identified'
+        && state.prepared !== null
+        && event.study.preparedDataset === state.prepared.id
+        && event.identification.study === event.study.id
+        && !state.studies.some((study) => study.id === event.study.id)) {
+        return {
+          ...state,
+          studies: [...state.studies, event.study],
+          identifications: [...state.identifications, event.identification],
+        }
+      }
+      if (event.type === 'estimation-run-created'
+        && state.prepared !== null
+        && event.run.preparedDataset === state.prepared.id
+        && state.identifications.some((identification) => identification.id === event.run.identification)) {
+        return { ...state, estimationRuns: [...state.estimationRuns, event.run] }
+      }
+      if (event.type === 'sensitivity-run-created'
+        && state.prepared !== null
+        && event.run.preparedDataset === state.prepared.id
+        && state.estimationRuns.some((run) => run.id === event.run.estimationRun)) {
+        return { ...state, sensitivityRuns: [...state.sensitivityRuns, event.run] }
+      }
+      if (event.type === 'counterfactual-run-created'
+        && state.prepared !== null
+        && event.run.preparedDataset === state.prepared.id
+        && state.identifications.some((identification) => identification.id === event.run.identification)) {
+        return { ...state, counterfactualRuns: [...state.counterfactualRuns, event.run] }
+      }
       return state
     default:
       return assertNever(state)
@@ -232,6 +345,8 @@ export function describeProjectNameProblem(problem: ProjectNameProblem): string 
 export function describeSourceSelectionProblem(problem: SourceSelectionProblem): string {
   switch (problem.kind) {
     case 'empty-file': return 'The selected file is empty.'
+    case 'source-mismatch': return `This is not the file the project was built from. Choose ${problem.expected}, unchanged, or start a new project.`
+    case 'fingerprint-failed': return `The file could not be checked: ${problem.detail}`
     case 'unsupported-format':
       return problem.extension
         ? `.${problem.extension} is not supported yet. Choose CSV, TSV, or Parquet.`

@@ -1,0 +1,489 @@
+import { Select } from '@/components/ui/Select'
+import { CausalHierarchy } from './CausalHierarchy'
+import { useId, useMemo, useReducer } from 'react'
+import type { RunActivity } from '@/domain/activity'
+import { useRunActivity } from '@/lib/useRunActivity'
+import { Icon } from '@/components/Icon'
+import { MethodCaveats } from '@/components/MethodCaveats'
+import { LagGraphViews } from '@/components/discovery/LagGraphViews'
+import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
+import { Alert } from '@/components/ui/Alert'
+import { RefusalTile } from '@/components/ui/figures'
+import { RadioList } from '@/components/ui/RadioList'
+import { button, field, fieldHint, fieldLabel, label, literal, num } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
+import { formatTime, formatTimestamp } from '@/lib/format/date'
+import { formatCount } from '@/lib/format/number'
+import type { DagDocument, DagDocumentId, DagNodeId } from '@/domain/dag'
+import { assertNever } from '@/domain/dop'
+import { lagGraphFromDag } from '@/domain/lagGraph'
+import { BACKDOOR_IDENTIFICATION_METHOD_ID, IDENTIFICATION_METHODS } from '@/domain/methods'
+import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
+import { roleWord } from '@/domain/dagFlow'
+import {
+  backdoorIdentificationCommand,
+  describeIdentificationFailure,
+  describeStudyDesignProblem,
+  describeVariableRole,
+  estimandSentence,
+  identifiedExpression,
+  CONSISTENCY_STATEMENT,
+  NO_INTERFERENCE_STATEMENT,
+  ESTIMAND_DEFERRALS,
+  studyDesignCategory,
+  dagBasisOf,
+  describeAssignmentKind,
+  describeStudyDesignCategory,
+  describeEstimand,
+  previewStudyBinding,
+  type AssignmentMechanism,
+  type Estimand,
+  identificationFrom,
+  newIdentificationId,
+  readyStudySpecification,
+  variableRoles,
+  type AdjustmentSetChoice,
+  type BackdoorIdentificationEvidence,
+  type IdentificationArtifact,
+  type StudyDesignDraft,
+  type StudySpecification,
+} from '@/domain/study'
+
+type Job =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'running' }
+  | { readonly kind: 'choosing-adjustment-set'; readonly study: StudySpecification; readonly evidence: BackdoorIdentificationEvidence }
+  | { readonly kind: 'failed'; readonly detail: string }
+
+type Event =
+  | { readonly type: 'run-started' }
+  | { readonly type: 'adjustment-set-choice-required'; readonly study: StudySpecification; readonly evidence: BackdoorIdentificationEvidence }
+  | { readonly type: 'run-failed'; readonly detail: string }
+  | { readonly type: 'run-finished' }
+
+const step = (state: Job, event: Event): Job => {
+  switch (event.type) {
+    case 'run-started': return { kind: 'running' }
+    case 'adjustment-set-choice-required': return { kind: 'choosing-adjustment-set', study: event.study, evidence: event.evidence }
+    case 'run-failed': return { kind: 'failed', detail: event.detail }
+    case 'run-finished': return { kind: 'idle' }
+    default: return assertNever(event)
+  }
+}
+
+const ASSIGNMENT_KINDS: readonly AssignmentMechanism['kind'][] = ['randomised', 'policy-change', 'observed-choice']
+const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated']
+
+const isValidated = (document: DagDocument): boolean => document.current.validation.kind === 'structurally-valid'
+
+
+/** One line on what each assignment mechanism means for the reader choosing it. */
+const assignmentHint = (kind: AssignmentMechanism['kind']): string => {
+  switch (kind) {
+    case 'randomised': return 'An experiment assigned the treatment by chance.'
+    case 'policy-change': return 'A rule, law or programme set the treatment at a known time.'
+    case 'observed-choice': return 'Units chose the treatment, or circumstances set it.'
+    default: return assertNever(kind)
+  }
+}
+
+function StudyRecord({ study, identification }: { readonly study: StudySpecification; readonly identification: IdentificationArtifact | null }) {
+  return (
+    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+      <summary className="cursor-pointer text-ink">Study record</summary>
+      <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
+        <dt>Study</dt><dd className={literal('m-0 break-all')}>{study.id}</dd>
+        <dt>Identification</dt><dd className={literal('m-0 break-all')}>{identification?.id ?? '—'}</dd>
+        <dt>Graph</dt><dd className="m-0">{study.dagName} · revision <span className={literal()}>{study.dagRevision.slice(0, 8)}</span></dd>
+        <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{study.preparedDataset}</dd>
+        <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(study.createdAt)}</dd>
+        <dt>Method</dt><dd className={literal('m-0')}>{identification?.method ?? '—'}</dd>
+      </dl>
+    </details>
+  )
+}
+
+function IdentificationCard({ study, identification, current, onContinue, onOpenDag }: {
+  readonly study: StudySpecification
+  readonly identification: IdentificationArtifact
+  readonly current: boolean
+  readonly onContinue: () => void
+  readonly onOpenDag: () => void
+}) {
+  const result = identification.result
+  const title = estimandSentence(study)
+  const selectedLabel = result.kind === 'identified'
+    ? result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
+    : null
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${title} identification`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <span className={label(result.kind === 'identified' ? 'text-ok' : 'text-muted')}>{result.kind === 'identified' ? 'Identified by back-door adjustment' : 'No back-door adjustment set'}</span>
+          <h3 className="mb-0 mt-1 text-title font-medium text-ink">{title}</h3>
+        </div>
+        <span className={num('text-micro text-faint')}>{formatCount(study.population.observations).text} rows · {study.dagName}</span>
+      </div>
+      <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
+        <span className="text-ink">{describeAssignmentKind(study.assignment.kind)} treatment</span> · {study.assignment.description} {describeStudyDesignCategory(studyDesignCategory(study))}
+      </p>
+      {result.kind === 'identified' ? (
+        <>
+          <Alert tone="ok" live={false} className="mt-3">
+            <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by back-door adjustment</p>
+            <p className="mb-0 mt-1 text-muted">
+              {result.adjustment.variables.length === 0
+                ? 'No adjustment is needed: no back-door path is open.'
+                : <>{selectedLabel} {result.adjustment.variables.map((variable, index) => <span key={variable.node}>{index > 0 ? ', ' : ''}<span className="inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink">{variable.name}</span></span>)}</>}
+            </p>
+            {result.adjustment.kind === 'minimal' && <p className="mb-0 mt-1 text-faint">Canonical set: {result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ') || 'none'}.</p>}
+            <details className="mt-2 text-muted">
+              <summary className="cursor-pointer text-body text-ink">Minimal valid sets · {result.minimalAdjustmentSets.sets.length}</summary>
+              <ol className="mb-0 mt-1 pl-5">
+                {result.minimalAdjustmentSets.sets.map((set, index) => (
+                  <li key={set.map((variable) => variable.node).join('|') || 'empty'}>
+                    {set.length === 0 ? 'No adjustment' : set.map((variable) => variable.name).join(', ')}
+                    <span className="text-faint"> · set {index + 1}</span>
+                  </li>
+                ))}
+              </ol>
+              {result.minimalAdjustmentSets.kind === 'truncated' && <p className="mb-0 mt-1 text-warn">The result limit was reached; additional minimal sets may exist.</p>}
+            </details>
+            <p className={literal('mb-0 mt-2 text-label text-muted')} aria-label="Identified expression">
+              {identifiedExpression(study, result.adjustment.variables)}
+            </p>
+          </Alert>
+          {current && (
+            <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>
+          )}
+        </>
+      ) : (
+        <div className="mt-3">
+          <RefusalTile
+            label="Average treatment effect"
+            headline="No measured back-door adjustment set"
+            reason={<><p className="m-0">This result assesses back-door adjustment only; it is not a claim that the effect is unidentified by every strategy.</p><ul className="mb-0 mt-2 list-disc pl-4">{result.reasons.map((reason) => <li key={`${reason.kind}-${describeIdentificationFailure(reason)}`}>{describeIdentificationFailure(reason)}</li>)}</ul><p className="mb-0 mt-2">Correct the graph only if its account of the data-generating process is wrong. Additional evidence might be a missing common cause for back-door adjustment, a mediator satisfying the front-door conditions, or an instrument satisfying relevance, exclusion and as-if-random assignment. Each strategy requires a separate identification check.</p></>}
+            rule={`${identification.method} · ${study.dagName} r${study.dagRevision.slice(0, 8)}`}
+            actions={<button type="button" className={button('outline')} onClick={onOpenDag}>Review the graph</button>}
+          />
+        </div>
+      )}
+      <StudyRecord study={study} identification={identification} />
+    </article>
+  )
+}
+
+function AdjustmentSetChoicePanel({ study, evidence, onChoose }: {
+  readonly study: StudySpecification
+  readonly evidence: BackdoorIdentificationEvidence
+  readonly onChoose: (choice: AdjustmentSetChoice) => void
+}) {
+  if (evidence.result.kind === 'notIdentified') return null
+  return (
+    <section className="mt-4 border-t border-hair pt-4" aria-labelledby="adjustment-set-choice-title">
+      <h4 id="adjustment-set-choice-title" className="m-0 text-body font-medium text-ink">Choose a valid adjustment set</h4>
+      <p className="mb-0 mt-1 max-w-[65ch] text-body text-muted">The graph has several minimal valid sets. Choose using measurement quality, observed support and the planned model—not the estimate, which has not been run.</p>
+      <div className="mt-3 grid gap-2">
+        {evidence.result.minimalSets.map((set, ordinal) => (
+          <button key={set.join('|')} type="button" className={button('outline', 'justify-start text-left')} onClick={() => onChoose({ kind: 'minimal', ordinal })}>
+            Minimal set {ordinal + 1} · {set.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') || 'no adjustment'}
+          </button>
+        ))}
+        <button type="button" className={button('quiet', 'justify-start text-left')} onClick={() => onChoose({ kind: 'canonical' })}>
+          Canonical set · {evidence.result.canonicalSet.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') || 'no adjustment'}
+        </button>
+      </div>
+      {evidence.result.truncated && <p className="mb-0 mt-2 text-body text-warn">The result limit was reached; additional minimal sets may exist.</p>}
+    </section>
+  )
+}
+
+export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, studies, identifications, onIdentified, onContinue, onOpenDag, onActivity }: {
+  readonly onActivity?: (activity: RunActivity | null) => void
+  readonly prepared: PreparedDatasetArtifact
+  readonly documents: readonly DagDocument[]
+  readonly draft: StudyDesignDraft
+  readonly onDraftChanged: (draft: StudyDesignDraft) => void
+  readonly studies: readonly StudySpecification[]
+  readonly identifications: readonly IdentificationArtifact[]
+  readonly onIdentified: (study: StudySpecification, identification: IdentificationArtifact) => void
+  readonly onContinue: () => void
+  readonly onOpenDag: () => void
+}) {
+  const [job, dispatch] = useReducer(step, { kind: 'idle' } as Job)
+  useRunActivity(onActivity, job.kind === 'running' ? { label: 'Identifying the effect', progress: null } : null)
+  const rationaleId = useId()
+  const state = { draft, job }
+  const chooseDag = (documentId: DagDocumentId | null) => onDraftChanged({ ...draft, dagDocument: documentId, treatment: null, outcome: null })
+  const chooseTreatment = (node: DagNodeId | null) => onDraftChanged({ ...draft, treatment: node })
+  const chooseOutcome = (node: DagNodeId | null) => onDraftChanged({ ...draft, outcome: node })
+  const document = documents.find((candidate) => candidate.id === state.draft.dagDocument) ?? null
+  const dagBasis = document === null ? null : dagBasisOf(document)
+  const observedNodes = document?.current.graph.nodes.filter((node) => node.kind === 'observed') ?? []
+  const readiness = useMemo(() => readyStudySpecification(state.draft, documents, prepared), [documents, prepared, state.draft])
+  const preview = useMemo(() => previewStudyBinding(state.draft, documents, prepared), [documents, prepared, state.draft])
+  const evidenceGraph = useMemo(() => (document === null ? null : lagGraphFromDag(document)), [document])
+  const latestIdentified = [...identifications].reverse().find((identification) => identification.result.kind === 'identified') ?? null
+  const adjustmentChoice = state.job.kind === 'choosing-adjustment-set' ? state.job : null
+
+  const recordIdentification = (study: StudySpecification, evidence: BackdoorIdentificationEvidence, choice: AdjustmentSetChoice) => {
+    const result = identificationFrom(study, evidence, choice)
+    if (!result.ok) {
+      dispatch({ type: 'run-failed', detail: `Adjustment set ${result.error.ordinal + 1} is not available; ${result.error.available} minimal sets were returned.` })
+      return
+    }
+    const identification: IdentificationArtifact = {
+      kind: 'identification',
+      id: newIdentificationId(),
+      study: study.id,
+      createdAt: new Date().toISOString(),
+      method: BACKDOOR_IDENTIFICATION_METHOD_ID,
+      evidence,
+      result: result.value,
+    }
+    onIdentified(study, identification)
+    dispatch({ type: 'run-finished' })
+  }
+
+  const execute = async () => {
+    const ready = readyStudySpecification(state.draft, documents, prepared)
+    if (!ready.ok || state.job.kind === 'running') return
+    dispatch({ type: 'run-started' })
+    try {
+      const analysis = await import('@/analysis/client')
+      const outcome = await analysis.identifyBackdoor(backdoorIdentificationCommand(ready.value))
+      if (!outcome.ok) {
+        dispatch({ type: 'run-failed', detail: outcome.error.detail })
+        return
+      }
+      if (outcome.value.result.kind === 'identified' && outcome.value.result.minimalSets.length > 1) {
+        dispatch({ type: 'adjustment-set-choice-required', study: ready.value, evidence: outcome.value })
+        return
+      }
+      recordIdentification(
+        ready.value,
+        outcome.value,
+        outcome.value.result.kind === 'identified' ? { kind: 'minimal', ordinal: 0 } : { kind: 'canonical' },
+      )
+    } catch (cause: unknown) {
+      dispatch({ type: 'run-failed', detail: cause instanceof Error ? cause.message : String(cause) })
+    }
+  }
+
+  const stage = (
+    <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">
+      <div>
+        <span className={label('text-signal')}>05 · Study design</span>
+        <h2 id="study-title" className="mb-2 mt-2 text-heading text-ink">Specify and identify the causal estimand</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">Define the causal effect to estimate by selecting a graph, treatment, outcome, population and assignment mechanism. The identification check then tests whether the graph provides a measured adjustment set.</p>
+      </div>
+
+      <CausalHierarchy />
+
+      <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="study-form-title">
+        <h3 id="study-form-title" className="mb-3 mt-0 text-title font-medium text-ink">Define the estimand and select a graph</h3>
+        {documents.length === 0 && (
+          <Alert tone="info" live={false}>
+            <p className="m-0">Draw and validate a causal graph in the DAG workspace first.</p>
+          </Alert>
+        )}
+        <div className="grid gap-3 @lg/panel:grid-cols-3">
+          <label className="block">
+            <span className={fieldLabel}>Causal graph</span>
+            <Select
+              className={field('text', 'mt-1')}
+              value={state.draft.dagDocument ?? ''}
+              onChange={(event) => chooseDag(event.target.value === '' ? null : (event.target.value as DagDocumentId))}
+            >
+              <option value="">Choose a graph</option>
+              {documents.map((candidate) => (
+                <option key={candidate.id} value={candidate.id} disabled={!isValidated(candidate)}>
+                  {candidate.name}{isValidated(candidate) ? '' : ' (needs validation)'}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>Treatment</span>
+            <Select
+              className={field('text', 'mt-1')}
+              value={state.draft.treatment ?? ''}
+              disabled={document === null}
+              onChange={(event) => chooseTreatment(event.target.value === '' ? null : (event.target.value as DagNodeId))}
+            >
+              <option value="">Choose a variable</option>
+              {observedNodes.map((node) => <option key={node.id} value={node.id} disabled={node.id === state.draft.outcome}>{node.name}</option>)}
+            </Select>
+          </label>
+          <label className="block">
+            <span className={fieldLabel}>Outcome</span>
+            <Select
+              className={field('text', 'mt-1')}
+              value={state.draft.outcome ?? ''}
+              disabled={document === null}
+              onChange={(event) => chooseOutcome(event.target.value === '' ? null : (event.target.value as DagNodeId))}
+            >
+              <option value="">Choose a variable</option>
+              {observedNodes.map((node) => <option key={node.id} value={node.id} disabled={node.id === state.draft.treatment}>{node.name}</option>)}
+            </Select>
+          </label>
+        </div>
+        <fieldset className="mt-4 min-w-0 border-t border-hair pt-4" aria-label="Design">
+          <legend className="float-left m-0 w-full p-0 text-body font-medium text-ink">Design</legend>
+          <div className="clear-both grid gap-x-4 gap-y-3 pt-3 @lg/panel:grid-cols-2">
+            <RadioList
+              legend="Target population"
+              value={state.draft.estimand}
+              onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
+              options={ESTIMAND_KINDS.map((kind) => ({
+                value: kind,
+                label: kind === 'average-treatment-effect' ? 'All prepared rows (ATE)' : 'Treated rows (ATT)',
+                hint: kind === 'average-treatment-effect'
+                  ? 'Average the treatment contrast over the prepared population.'
+                  : 'Average the treatment contrast among rows with treatment = 1. Requires a binary treatment and DML-IRM in this release.',
+              }))}
+            />
+            <RadioList
+              legend="Why the treatment varied"
+              value={state.draft.assignment.kind}
+              onChange={(kind) => onDraftChanged({ ...draft, assignment: { ...draft.assignment, kind } })}
+              options={ASSIGNMENT_KINDS.map((kind) => {
+                const withheld = kind === 'randomised' && dagBasis !== 'experimental-design'
+                return { value: kind, label: describeAssignmentKind(kind), disabled: withheld, hint: withheld ? 'Only for a graph built from an experimental design.' : assignmentHint(kind) }
+              })}
+            />
+            <label className="flex min-w-0 flex-col">
+              <span className={fieldLabel}>Assignment sentence</span>
+              <textarea
+                className={field('text', 'mt-1 min-h-24 flex-1 resize-y')}
+                placeholder="One sentence: who or what set the treatment, and when"
+                value={state.draft.assignment.description}
+                onChange={(event) => onDraftChanged({ ...draft, assignment: { ...draft.assignment, description: event.target.value } })}
+              />
+            </label>
+          </div>
+          <div className="mt-3 grid gap-3 @lg/panel:grid-cols-2">
+            <div className="grid gap-y-1 @lg/panel:row-span-3 @lg/panel:grid-rows-subgrid">
+              <label htmlFor={`${rationaleId}-consistency`} className={fieldLabel}>Consistency rationale</label>
+              <p id={`${rationaleId}-consistency-hint`} className={cn(fieldHint, 'm-0 max-w-[65ch]')}>{CONSISTENCY_STATEMENT}</p>
+              <input id={`${rationaleId}-consistency`} type="text" aria-describedby={`${rationaleId}-consistency-hint`} className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.consistencyRationale} onChange={(event) => onDraftChanged({ ...draft, consistencyRationale: event.target.value })} />
+            </div>
+            <div className="grid gap-y-1 @lg/panel:row-span-3 @lg/panel:grid-rows-subgrid">
+              <label htmlFor={`${rationaleId}-interference`} className={fieldLabel}>No-interference rationale</label>
+              <p id={`${rationaleId}-interference-hint`} className={cn(fieldHint, 'm-0 max-w-[65ch]')}>{NO_INTERFERENCE_STATEMENT}</p>
+              <input id={`${rationaleId}-interference`} type="text" aria-describedby={`${rationaleId}-interference-hint`} className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.noInterferenceRationale} onChange={(event) => onDraftChanged({ ...draft, noInterferenceRationale: event.target.value })} />
+            </div>
+          </div>
+          <p className="mb-0 mt-3 text-label text-faint">Literature: VanderWeele, “Concerning the consistency assumption in causal inference” (2009), doi:10.1097/EDE.0b013e3181bd5638; Hernán and Robins, <i>Causal Inference: What If</i> (2020).</p>
+        </fieldset>
+        <dl className="mb-0 mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body" aria-label="Estimand and population">
+          <dt className="text-faint">Estimand</dt>
+          <dd className="m-0 text-ink">{preview === null ? 'Average treatment effect · additive scale · total effect, mediators included' : describeEstimand(preview)}</dd>
+          <dt className="text-faint">Other targets</dt>
+          <dd className="m-0 text-muted">{ESTIMAND_DEFERRALS.map((deferral) => `${deferral.name}: ${deferral.reason}`).join(' ')}</dd>
+          <dt className="text-faint">Population</dt>
+          <dd className={num('m-0 text-ink')}>All {formatCount(prepared.observations).text} rows</dd>
+          <dt className="text-faint">Graph revision</dt>
+          <dd className="m-0 text-ink">{document === null ? '—' : <><span className={literal()}>{document.current.id.slice(0, 8)}</span> · {document.current.graph.edges.length} arrows{preview !== null && preview.graph.laggedArrows > 0 ? `, ${preview.graph.laggedArrows} lagged` : ''}</>}</dd>
+        </dl>
+        {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeStudyDesignProblem(readiness.error)}</p>}
+        {state.job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">Identification could not run: {state.job.detail}</p>}
+        {adjustmentChoice !== null && <AdjustmentSetChoicePanel study={adjustmentChoice.study} evidence={adjustmentChoice.evidence} onChoose={(choice) => recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)} />}
+        <button
+          type="button"
+          className={button('signal', 'mt-4')}
+          disabled={!readiness.ok || state.job.kind === 'running' || state.job.kind === 'choosing-adjustment-set'}
+          onClick={() => void execute()}
+        >
+          {state.job.kind === 'running' ? 'Identifying…' : 'Identify the effect'}
+        </button>
+      </section>
+
+      {studies.length > 0 && (
+        <section aria-labelledby="study-results-title" className="grid gap-4">
+          <div>
+            <span className={label('text-faint')}>Recorded studies</span>
+            <h2 id="study-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Identification results</h2>
+          </div>
+          {[...studies].reverse().map((study) => {
+            const identification = identifications.find((candidate) => candidate.study === study.id) ?? null
+            return identification === null
+              ? null
+              : (
+                <IdentificationCard
+                  key={study.id}
+                  study={study}
+                  identification={identification}
+                  current={latestIdentified?.id === identification.id}
+                  onContinue={onContinue}
+                  onOpenDag={onOpenDag}
+                />
+              )
+          })}
+        </section>
+      )}
+    </section>
+  )
+
+  const roles = preview === null ? null : variableRoles(preview)
+  const inspector = (
+    <div className="space-y-4">
+      <section aria-labelledby="study-graph-title">
+        <h3 id="study-graph-title" className="mb-2 mt-0 text-body font-medium text-ink">{document === null ? 'No graph chosen' : document.name}</h3>
+        {evidenceGraph !== null && (
+          <LagGraphViews
+            graph={evidenceGraph}
+            label={`${document?.name ?? 'Graph'} summary`}
+            highlighted={[state.draft.treatment, state.draft.outcome].filter((node): node is DagNodeId => node !== null)}
+            compact
+          />
+        )}
+      </section>
+      <section className="border-t border-hair pt-4" aria-labelledby="study-roles-title">
+        <h3 id="study-roles-title" className="mb-1 mt-0 text-body font-medium text-ink">Variable roles</h3>
+        {roles === null
+          ? <p className="m-0 text-body text-faint">Choose a graph, a treatment, and an outcome to see which variables may be adjusted for.</p>
+          : (
+            <ul className="m-0 list-none divide-y divide-line border-y border-line p-0 text-body" aria-label="Variable roles">
+              {roles.map(({ node, role }) => (
+                <li key={node.node} className="flex flex-col py-1.5">
+                  <span className="text-ink">{node.name} <span className="text-faint">· {roleWord(role)}</span></span>
+                  <span className="text-label text-faint">{describeVariableRole(role)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+      </section>
+      <MethodCaveats
+        methods={IDENTIFICATION_METHODS}
+        identification={latestIdentified?.result ?? null}
+      />
+    </div>
+  )
+
+  const ledger = (
+    <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Study ledger">
+      {studies.length === 0 && <li className="px-3 py-2 text-faint">Choose a graph, treatment and outcome, then run identification.</li>}
+      {[...studies].reverse().map((study) => {
+        const identification = identifications.find((candidate) => candidate.study === study.id) ?? null
+        return (
+          <li key={study.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
+            <span className="text-ink">{estimandSentence(study)}</span>
+            <span className={num('text-micro text-faint')}>
+              {identification === null ? 'pending' : identification.result.kind === 'identified' ? 'back-door identified' : 'no measured back-door set'} · {study.dagName} · {formatTime(study.createdAt)}
+            </span>
+          </li>
+        )
+      })}
+    </ul>
+  )
+
+  return (
+    <WorkbenchLayout
+      id="study"
+      stage={stage}
+      inspector={{ title: 'Graph, roles, and method requirements', body: inspector }}
+      bottom={{ title: `Studies · ${studies.length}`, body: ledger, defaultSize: 150 }}
+    />
+  )
+}
