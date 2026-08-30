@@ -5,6 +5,7 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { InterventionPanel } from './InterventionPanel'
 import type { InterventionOverlay, InterventionQueryArtifact } from '@/domain/intervention'
 import type { SelectedSource } from '@/domain/workflow'
+import type { AnalysisProgress } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
 import { button, field, iconControl, label, literal, pill, segment } from '@/components/ui/recipes'
@@ -44,10 +45,12 @@ import {
 import {
   describeDagStructuralIssue,
   planDagImplications,
+  recordDagCheck,
+  type DagCheckArtifact,
 } from '@/domain/dagValidation'
-import type { DatasetProfile } from '@/domain/dataset'
+import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DiscoveryRunArtifact, DiscoveryRunId } from '@/domain/discovery'
-import { assertNever } from '@/domain/dop'
+import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { DagCanvas } from './DagCanvas'
 import { EdgeLedgerTable } from './EdgeLedgerTable'
@@ -63,14 +66,21 @@ interface DagWorkspaceProps {
   readonly onInterventionQuery: (query: InterventionQueryArtifact) => void
   readonly discoveryRuns: readonly DiscoveryRunArtifact[]
   readonly documents: readonly DagDocument[]
+  readonly checks: readonly DagCheckArtifact[]
   readonly onDocumentCreated: (document: DagDocument) => void
   readonly onDocumentRevised: (document: DagDocument) => void
+  readonly onCheck: (check: DagCheckArtifact) => void
   /** Opens Study Design; offered only on a structurally valid revision. */
   readonly onUseForStudy: () => void
   /** The treatment and outcome being bound, shared with Study Design. */
   readonly studyDraft: StudyDesignDraft
   readonly onStudyDraftChanged: (draft: StudyDesignDraft) => void
 }
+
+type DagCheckJob =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'running'; readonly progress: AnalysisProgress | null }
+  | { readonly kind: 'failed'; readonly detail: string }
 
 type EdgeTimingDraft =
   | { readonly kind: 'contemporaneous' }
@@ -441,13 +451,171 @@ function ValidationPanel({ document, flow, onUseForStudy, onSelectEdge }: {
   )
 }
 
+function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck }: {
+  readonly source: SelectedSource
+  readonly profile: DatasetProfile
+  readonly prepared: PreparedDatasetArtifact
+  readonly document: DagDocument
+  readonly checks: readonly DagCheckArtifact[]
+  readonly onCheck: (check: DagCheckArtifact) => void
+}) {
+  const [job, setJob] = useState<DagCheckJob>({ kind: 'idle' })
+  const plan = useMemo(() => planDagImplications(document), [document])
+  const current = [...checks].reverse().find((check) => check.dagDocument === document.id && check.dagRevision === document.current.id)
+  const nodeName = (position: number): string => document.current.graph.nodes.filter((node) => node.kind === 'observed')[position]?.name ?? `Variable ${position + 1}`
+
+  const run = async () => {
+    if (plan.kind !== 'test') return
+    const observed = document.current.graph.nodes.filter((node) => node.kind === 'observed')
+    if (observed.length < 2) {
+      setJob({ kind: 'failed', detail: 'At least two observed variables are required.' })
+      return
+    }
+    setJob({ kind: 'running', progress: null })
+    const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runDagCheck }] = await Promise.all([
+      import('@/data/prepared'),
+      import('@/analysis/client'),
+    ])
+    const columns = observed.map((node) => node.column) as unknown as NonEmptyArray<ColumnId>
+    const matrix = await materialisePrepared(source, profile, prepared, columns)
+    if (!matrix.ok) {
+      setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) })
+      return
+    }
+    const positions = new Map(observed.map((node, index) => [node.id, index] as const))
+    const edgePositions = document.current.graph.edges.flatMap((edge) => {
+      if (edge.timing.kind !== 'contemporaneous') return []
+      const cause = positions.get(edge.cause)
+      const effect = positions.get(edge.effect)
+      return cause === undefined || effect === undefined ? [] : [[cause, effect] as const]
+    })
+    const implications = plan.implications.flatMap((implication) => {
+      const x = positions.get(implication.x)
+      const y = positions.get(implication.y)
+      const given = implication.given.flatMap((node) => {
+        const position = positions.get(node)
+        return position === undefined ? [] : [position]
+      })
+      return x === undefined || y === undefined || given.length !== implication.given.length
+        ? []
+        : [{ x, y, given }]
+    })
+    if (implications.length !== plan.implications.length) {
+      setJob({ kind: 'failed', detail: 'The graph implication plan refers to a variable outside the observed data projection.' })
+      return
+    }
+    const result = await runDagCheck(
+      Float64Array.from(matrix.value.values),
+      matrix.value.rowCount,
+      observed.length,
+      {
+        nodeColumns: observed.map((_, index) => index),
+        edges: edgePositions,
+        implications,
+        maximumObservations: plan.maxObservationsPerTest,
+        permutations: 200,
+        significanceLevel: plan.significanceLevel,
+        runFalsification: document.current.graph.nodes.every((node) => node.kind === 'observed'),
+      },
+      (progress) => setJob({ kind: 'running', progress }),
+    )
+    if (!result.ok) {
+      setJob({ kind: 'failed', detail: result.error.detail })
+      return
+    }
+    onCheck(recordDagCheck(document, result.value))
+    setJob({ kind: 'idle' })
+  }
+
+  const evidence = current?.evidence
+  const contradictions = evidence?.implications.filter((implication) => implication.decision === 'contradicted').length ?? 0
+  const systematicTension = evidence !== undefined && evidence.uniformity.pValue < evidence.significanceLevel
+  const progressText = job.kind === 'running' && job.progress !== null
+    ? job.progress.stage === 'dag-permutations'
+      ? `Comparing relabeled graphs · ${job.progress.completed} of ${job.progress.total}`
+      : `Testing graph implications · ${job.progress.completed} of ${job.progress.total}`
+    : 'Testing graph implications…'
+
+  return (
+    <section className="border-t border-hair pt-4" aria-labelledby="graph-check-title">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 id="graph-check-title" className="m-0 text-body font-medium text-ink">Graph checks</h3>
+          <p className="mb-0 mt-1 text-label text-faint">Test the conditional independences implied by this revision against the prepared data.</p>
+        </div>
+        {plan.kind === 'test' && (
+          <button type="button" className={button('outline')} disabled={job.kind === 'running'} onClick={() => void run()}>
+            {job.kind === 'running' ? 'Running…' : current === undefined ? 'Run checks' : 'Run again'}
+          </button>
+        )}
+      </div>
+      {job.kind === 'running' && <p role="status" className="mb-0 mt-2 text-label text-muted">{progressText}</p>}
+      {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
+      {plan.kind === 'not-testable' && <p className="mb-0 mt-2 text-body text-faint">No observed local-Markov implication is available to test for this revision.</p>}
+      {plan.kind === 'requires-lag-aware-validation' && <p className="mb-0 mt-2 text-body text-faint">Use the lag-aware CausalEffects validation route for this time-series graph.</p>}
+      {evidence !== undefined && (
+        <div className="mt-3">
+          <p className={`m-0 text-body font-medium ${contradictions > 0 || systematicTension || (evidence.falsification.kind === 'completed' && evidence.falsification.falsified) ? 'text-danger' : 'text-ink'}`}>
+            {contradictions > 0
+              ? `${contradictions} of ${evidence.implications.length} graph implications contradicted`
+              : systematicTension
+                ? 'The distribution of implication p-values is inconsistent with this graph'
+              : evidence.falsification.kind === 'completed' && evidence.falsification.falsified
+                ? 'Permutation falsification rejects this graph'
+                : evidence.falsification.kind === 'completed' && !evidence.falsification.falsifiable
+                  ? 'The permutation comparison is not informative for this graph'
+                : 'These checks did not reject this graph'}
+          </p>
+          <p className="mb-0 mt-1 text-label text-faint">Non-rejection is not proof that the graph is correct. These tests assess implications that are observable in this dataset; they cannot rule out every omitted variable or alternative graph.</p>
+          <details className="mt-3">
+            <summary className="cursor-pointer text-body text-ink">Conditional-independence results</summary>
+            <div className="mt-2 overflow-x-auto">
+              <table className="w-full border-collapse text-left text-label">
+                <thead><tr className="border-b border-line text-faint"><th className="py-1 pr-2 font-medium">Implication</th><th className="px-2 py-1 font-medium">Raw p</th><th className="px-2 py-1 font-medium">Holm p</th><th className="py-1 pl-2 font-medium">Decision</th></tr></thead>
+                <tbody>{evidence.implications.map((implication) => (
+                  <tr key={`${implication.x}:${implication.y}:${implication.given.join(',')}`} className="border-b border-hair">
+                    <td className="py-1.5 pr-2 text-ink">{nodeName(implication.x)} ⊥ {nodeName(implication.y)}{implication.given.length > 0 ? ` | ${implication.given.map(nodeName).join(', ')}` : ''}</td>
+                    <td className="px-2 py-1.5 tabular-nums">{implication.pValue.toPrecision(3)}</td>
+                    <td className="px-2 py-1.5 tabular-nums">{implication.adjustedPValue.toPrecision(3)}</td>
+                    <td className={`py-1.5 pl-2 ${implication.decision === 'contradicted' ? 'text-danger' : 'text-muted'}`}>{implication.decision === 'contradicted' ? 'Contradicted' : 'Not rejected'}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </details>
+          <div className="mt-3 grid gap-3 @sm/inspector:grid-cols-2">
+            <div className="rounded-lg border border-hair bg-well p-3">
+              <span className="block text-label text-faint">Raw p-value distribution</span>
+              <strong className="mt-1 block text-title font-medium tabular-nums text-ink">KS p = {evidence.uniformity.pValue.toPrecision(3)}</strong>
+              <p className="mb-0 mt-1 text-label text-muted">{evidence.uniformity.pValue < evidence.significanceLevel ? 'The raw p-values are inconsistent with a uniform distribution under the graph.' : 'The test did not find evidence that the raw p-values differ from a uniform distribution under the graph.'} Treat this as a supplementary check because the implication tests can be dependent.</p>
+            </div>
+            <div className="rounded-lg border border-hair bg-well p-3">
+              {evidence.falsification.kind === 'completed' ? (
+                <>
+                  <span className="block text-label text-faint">Relabeled-graph comparison</span>
+                  <strong className="mt-1 block text-title font-medium tabular-nums text-ink">p<sub>LMC</sub> = {evidence.falsification.pValueLmc.toPrecision(3)} · p<sub>TPA</sub> = {evidence.falsification.pValueTpa.toPrecision(3)}</strong>
+                  <p className="mb-0 mt-1 text-label text-muted">p<sub>LMC</sub> is the share of relabeled graphs with no more local-Markov violations than this graph. p<sub>TPA</sub> is the share in the same Markov-equivalence class. {evidence.falsification.falsified ? 'This graph has more violations than enough distinguishable relabelings to be rejected at the recorded threshold.' : !evidence.falsification.falsifiable ? 'Too many relabelings are observationally equivalent for this comparison to evaluate the graph.' : 'This graph is distinguishable from most relabelings and is not worse than enough of them to be rejected.'}</p>
+                </>
+              ) : (
+                <><span className="block text-label text-faint">Relabeled-graph comparison</span><p className="mb-0 mt-1 text-label text-muted">Not run. {evidence.falsification.reason}</p></>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export function DagWorkspace({
   profile,
   prepared,
   discoveryRuns,
   documents,
+  checks,
   onDocumentCreated,
   onDocumentRevised,
+  onCheck,
   onUseForStudy,
   studyDraft,
   onStudyDraftChanged, source, interventionQueries, onInterventionQuery }: DagWorkspaceProps) {
@@ -754,6 +922,7 @@ export function DagWorkspace({
   const inspector = (
     <div className="flex flex-col gap-4">
       <ValidationPanel document={document} flow={flow} onUseForStudy={() => { if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id }); onUseForStudy() }} onSelectEdge={(edge) => { setInspectorTab('selection'); selectEdge(document, edge) }} />
+      <GraphCheckPanel source={source} profile={profile} prepared={prepared} document={document} checks={checks} onCheck={onCheck} />
       {inspectorTab === 'selection' && (
         selectedEdge !== null && selectedEdgeDraft !== null ? (
           <aside className="border-t border-hair pt-4" aria-labelledby="selected-edge-title">

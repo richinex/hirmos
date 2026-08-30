@@ -42,6 +42,7 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
         <MetricTile label="Seasonal strength" size="compact" value={strength(facts.evidence.seasonalStrength)} context={period === null ? 'no period' : `period ${period}`} />
         <MetricTile label="Change points" size="compact" value={formatCount(facts.evidence.changePoints.length)} context="pruned exact linear time (PELT), L2 cost" />
       </div>
+      <p className="mb-0 mt-2 text-label text-muted">Strengths near 1 mean that the fitted trend or seasonal component accounts for most of the variation remaining after the other component is removed; values near 0 indicate little such structure. PELT locations are the optimum for this penalty and minimum-segment choice, not hypothesis-test rejections.</p>
       <EChart option={option} label={`${facts.name} with PELT change points`} className="mt-2 h-[180px]" testId="change-points" />
     </li>
   )

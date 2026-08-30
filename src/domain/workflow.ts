@@ -1,6 +1,7 @@
 import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import type { DagDocument } from './dag'
+import type { DagCheckArtifact } from './dagValidation'
 import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
 import type { InterventionQueryArtifact } from './intervention'
@@ -77,6 +78,7 @@ export type Workflow =
       readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
       readonly discoveryRuns: readonly DiscoveryRunArtifact[]
       readonly dagDocuments: readonly DagDocument[]
+      readonly dagChecks: readonly DagCheckArtifact[]
       /** Do-queries asked of the graphs above; each records the revision it was asked of. */
       readonly interventionQueries: readonly InterventionQueryArtifact[]
       /** The treatment and outcome being bound, shared by the DAG Workspace and Study Design. */
@@ -101,6 +103,7 @@ export type WorkflowEvent =
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
   | { readonly type: 'dag-document-created'; readonly document: DagDocument }
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
+  | { readonly type: 'dag-check-created'; readonly check: DagCheckArtifact }
   | { readonly type: 'intervention-query-created'; readonly query: InterventionQueryArtifact }
   | { readonly type: 'study-draft-changed'; readonly draft: StudyDesignDraft }
   | { readonly type: 'study-identified'; readonly study: StudySpecification; readonly identification: IdentificationArtifact }
@@ -201,6 +204,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           grangerEvidence: snapshot.grangerEvidence,
           discoveryRuns: snapshot.discoveryRuns,
           dagDocuments: snapshot.dagDocuments,
+          dagChecks: snapshot.dagChecks,
           interventionQueries: snapshot.interventionQueries,
           studyDraft: snapshot.studyDraft,
           studies: snapshot.studies,
@@ -234,6 +238,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           grangerEvidence: [],
           discoveryRuns: [],
           dagDocuments: [],
+          dagChecks: [],
           interventionQueries: [],
           studyDraft: EMPTY_STUDY_DRAFT,
           studies: [],
@@ -259,7 +264,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], discoveryRuns: [], dagDocuments: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
@@ -291,6 +296,12 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           dagDocuments: state.dagDocuments.map((document) =>
             document.id === event.document.id ? event.document : document),
         }
+      }
+      if (event.type === 'dag-check-created'
+        && state.prepared !== null
+        && event.check.preparedDataset === state.prepared.id
+        && state.dagDocuments.some((document) => document.id === event.check.dagDocument)) {
+        return { ...state, dagChecks: [...state.dagChecks, event.check] }
       }
       if (event.type === 'intervention-query-created'
         && state.prepared !== null

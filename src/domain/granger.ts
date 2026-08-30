@@ -107,7 +107,7 @@ export function describeGrangerReadiness(problem: GrangerReadinessProblem): stri
 export function describeGrangerVerdict(artifact: GrangerEvidenceArtifact, alpha = 0.05): string {
   const rejecting = artifact.result.tests.filter((test) => test.pValue < alpha).map((test) => test.lag)
   const pair = `past ${artifact.candidateCause.name} values`
-  if (rejecting.length === 0) return `At α ${alpha}, ${pair} add no predictive information about ${artifact.target.name} at any order up to ${artifact.maxLag}.`
+  if (rejecting.length === 0) return `At α ${alpha}, the tests did not find evidence that ${pair} add predictive information about ${artifact.target.name} at any order up to ${artifact.maxLag}.`
   const orders = rejecting.length === 1 ? `lag order ${rejecting[0]}` : `lag orders ${rejecting.join(', ')}`
   return `At α ${alpha}, ${pair} add predictive information about ${artifact.target.name} at ${orders}.`
 }

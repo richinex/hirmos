@@ -72,10 +72,18 @@ const buildDag = async (page: Page, fixture: Fixture) => {
 }
 
 for (const fixture of selected) {
-  test(`dagitty parity: ${fixture.label}`, async ({ page }) => {
+  test(`dagitty parity: ${fixture.label}`, async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'chromium', 'The numerical parity corpus runs once; mobile layout has separate workflow tests.')
     test.setTimeout(120_000 + fixture.edges.length * 8_000)
     await prepare(page, fixture)
     await buildDag(page, fixture)
+    if (fixture.slug === 'small-model-with-mediator') {
+      await page.getByRole('button', { name: 'Run checks' }).click()
+      await expect(page.getByText('Conditional-independence results', { exact: true })).toBeVisible({ timeout: 60_000 })
+      await page.getByText('Conditional-independence results', { exact: true }).click()
+      await expect(page.getByRole('columnheader', { name: 'Holm p' })).toBeVisible()
+      await expect(page.getByText('Relabeled-graph comparison', { exact: true })).toBeVisible()
+    }
     const adjustment = page.getByLabel('Adjustment')
     await expect(adjustment).toBeVisible()
     // Evidence for the side-by-side report: Hirmos's canvas and its verdict, beside dagitty's drawing and verdict.

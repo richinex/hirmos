@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { IntervalFigure } from '@/components/ui/figures'
+import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
 import { button, chip, label, literal, num, statusText, table, td, th, tr } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
@@ -8,7 +9,7 @@ import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
 import { describeDagBasis, describeDagValidation, type DagDocument } from '@/domain/dag'
 import type { DatasetProfile } from '@/domain/dataset'
-import { describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
+import { describeEstimator, intervalTypeOf, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
@@ -17,6 +18,7 @@ import { describeStationarityAssessment } from '@/domain/stationarityAssessment'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
+import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
 
 const scaleOf = (run: EstimationRunArtifact) => (run.estimate.effect.kind === 'incidenceRateRatio' ? { kind: 'ratio' as const, label: 'IRR' as const } : { kind: 'additive' as const, unit: '' })
 
@@ -63,17 +65,17 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <button type="button" className={button('outline')} onClick={download}>Export the manifest</button>
         </div>
         <div className="mt-3">
-          {estimate.interval.kind === 'confidence' && estimate.effect.kind !== 'path' ? (
+          {estimate.interval.kind !== 'none' && estimate.effect.kind !== 'path' ? (
             <IntervalFigure
               sentence={study === null ? run.method : estimandSentence(study)}
               estimate={estimate.effect.value}
               lower={estimate.interval.lower}
               upper={estimate.interval.upper}
-              type={{ kind: 'confidence', level: estimate.interval.level }}
+              type={intervalTypeOf(estimate.interval)}
               scale={scaleOf(run)}
               standardError={estimate.standardError ?? undefined}
               observations={estimate.sample.observations}
-              scaleLine={estimate.effect.kind === 'incidenceRateRatio' ? `incidence rate ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`}
+              scaleLine={study === null ? (estimate.effect.kind === 'incidenceRateRatio' ? `incidence rate ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`) : resultScaleLine(run, study, stepLabel)}
               accent
               testId="result-figure"
             />
@@ -90,6 +92,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
             </figure>
           )}
         </div>
+        {study !== null && <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />}
       </article>
 
       {manifest.warnings.length > 0 && (

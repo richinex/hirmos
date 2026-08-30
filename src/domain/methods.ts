@@ -39,6 +39,8 @@ export interface MethodDefinition {
   readonly name: string
   readonly family: MethodFamily
   readonly summary: string
+  /** The method's estimand as TeX with its plain-text reading, typeset where the summary is shown. */
+  readonly summaryTex?: { readonly tex: string; readonly plain: string }
   readonly caveats: NonEmptyArray<MethodCaveat>
 }
 
@@ -144,6 +146,7 @@ export const VECM_METHOD_ID = methodId('vecm')
 export const SYNTHETIC_CONTROL_METHOD_ID = methodId('synthetic-control')
 export const PANEL_INTERVENTION_METHOD_ID = methodId('panel-intervention')
 export const NEGBIN_NUTS_METHOD_ID = methodId('negbin-nuts')
+export const BAYESIAN_GAUSSIAN_METHOD_ID = methodId('bayesian-gaussian')
 export const DISCRETE_BN_METHOD_ID = methodId('discrete-bn-query')
 export const LINEAR_SCM_METHOD_ID = methodId('linear-scm-counterfactual')
 export const PLACEBO_REFUTER_METHOD_ID = methodId('placebo-treatment-refuter')
@@ -1264,6 +1267,61 @@ const NEGBIN_NUTS: MethodDefinition = {
   ],
 }
 
+const BAYESIAN_GAUSSIAN: MethodDefinition = {
+  id: BAYESIAN_GAUSSIAN_METHOD_ID,
+  name: 'Bayesian Gaussian regression',
+  family: 'estimation',
+  summary: 'A Gaussian regression of the outcome on the treatment and the identified adjustment set with Normal(0, 1) slope priors, sampled by the no-U-turn sampler (NUTS) over three chains. The effect is the posterior mean of the intervention contrast, with a 94% highest-density interval.',
+  summaryTex: {
+    tex: String.raw`\mathrm{ATE} = \mathbb{E}\bigl[\,Y \mid \mathrm{do}(T{=}1)\bigr] - \mathbb{E}\bigl[\,Y \mid \mathrm{do}(T{=}0)\bigr]`,
+    plain: 'ATE = E[Y | do(T=1)] − E[Y | do(T=0)]',
+  },
+  caveats: [
+    {
+      id: caveatId('bayes-gaussian-identified-adjustment'),
+      category: 'identification',
+      requirement: 'The covariates are an identified back-door adjustment set for the treatment–outcome pair.',
+      consequenceIfUnmet: 'The posterior summarises an association, not the intervention effect.',
+      sources: [PEARL_2009('§3.3.1 back-door adjustment'), hirmos('crates/causal-core/src/bayesian_gaussian.rs#effect_draws')],
+    },
+    {
+      id: caveatId('bayes-gaussian-binary-treatment'),
+      category: 'functional-form',
+      requirement: 'A 0/1 treatment; the outcome is linear and additive in treatment and covariates with one effect for every unit.',
+      consequenceIfUnmet: 'Effect modification is averaged away or missed, and do(0) versus do(1) has no meaning.',
+      sources: [hirmos('crates/causal-core/src/bayesian_gaussian.rs#BayesianGaussianScm'), paper('Structural Causal Models with PathMC (Orduz)', 'juanitorduz.github.io/intro_pathmc; two-equation Lalonde SCM and do(mean) semantics')],
+    },
+    {
+      id: caveatId('bayes-gaussian-prior-scale'),
+      category: 'functional-form',
+      requirement: 'The Normal(0, 1) slope priors and half-normal(10) residual prior suit the outcome scale; non-binary adjustment columns are standardised first.',
+      consequenceIfUnmet: 'On an outcome scale where plausible effects are large the prior shrinks the estimate toward zero.',
+      sources: [paper('Structural Causal Models with PathMC (Orduz)', 'juanitorduz.github.io/intro_pathmc; priors and standardisation'), hirmos('crates/causal-core/src/bayesian_gaussian.rs#try_adjustment_log_prob_grad')],
+    },
+    {
+      id: caveatId('bayes-gaussian-convergence'),
+      category: 'computation',
+      requirement: 'No divergent transitions and acceptance near the 0.8 target across all chains; warmup, draws and seed are recorded.',
+      consequenceIfUnmet: 'Posterior summaries from a chain with divergent transitions may not reliably represent the target distribution.',
+      sources: [HOFFMAN_GELMAN_2014, BETANCOURT_2017, hirmos('crates/causal-core/src/nuts.rs#multinomial_nuts')],
+    },
+    {
+      id: caveatId('bayes-gaussian-independence'),
+      category: 'noise-and-dependence',
+      requirement: 'Rows are independent; the model has no serial-correlation term.',
+      consequenceIfUnmet: 'The posterior interval is too narrow.',
+      sources: [hirmos('crates/causal-core/src/bayesian_gaussian.rs')],
+    },
+    {
+      id: caveatId('bayes-gaussian-interpretation'),
+      category: 'interpretation',
+      requirement: 'The interval is a 94% highest-density credible interval under the stated priors.',
+      consequenceIfUnmet: 'A credible interval is read as a confidence interval.',
+      sources: [NESS_CH11('§11.6 Bayesian estimation and credible intervals'), hirmos('crates/causal-core/src/bayesian_gaussian.rs#highest_density_interval')],
+    },
+  ],
+}
+
 const DISCRETE_BN: MethodDefinition = {
   id: DISCRETE_BN_METHOD_ID,
   name: 'Discrete Bayesian network do-query',
@@ -1376,6 +1434,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   SYNTHETIC_CONTROL,
   PANEL_INTERVENTION,
   NEGBIN_NUTS,
+  BAYESIAN_GAUSSIAN,
   DISCRETE_BN,
   LINEAR_SCM,
   PLACEBO_REFUTER,
@@ -1397,7 +1456,7 @@ export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_S
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, POISSON_GLM, NEGATIVE_BINOMIAL, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [

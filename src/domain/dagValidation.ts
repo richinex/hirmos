@@ -1,5 +1,6 @@
 import { canonicalAdjustment, type DagAdjustmentAnalysis } from './dagFlow'
-import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
+import { z } from 'zod'
+import { assertNever, brand, isNonEmpty, type Brand, type NonEmptyArray } from './dop'
 import type {
   DagDocument,
   DagEdgeId,
@@ -14,6 +15,102 @@ export interface DagConditionalIndependenceImplication {
   readonly y: DagNodeId
   readonly given: readonly DagNodeId[]
 }
+
+const probabilitySchema = z.number().finite().min(0).max(1)
+
+export const dagCheckEvidenceSchema = z.object({
+  kind: z.literal('dagCheck'),
+  observations: z.number().int().positive(),
+  significanceLevel: z.number().gt(0).lt(1),
+  correction: z.literal('holm'),
+  implications: z.array(z.object({
+    x: z.number().int().nonnegative(),
+    y: z.number().int().nonnegative(),
+    given: z.array(z.number().int().nonnegative()),
+    pValue: probabilitySchema,
+    adjustedPValue: probabilitySchema,
+    observations: z.number().int().positive(),
+    decision: z.enum(['contradicted', 'notRefuted']),
+  }).strict().superRefine((value, context) => {
+    if (value.adjustedPValue < value.pValue) {
+      context.addIssue({
+        code: 'custom',
+        path: ['adjustedPValue'],
+        message: 'Holm-adjusted p-value cannot be smaller than the raw p-value.',
+      })
+    }
+  })).min(1),
+  uniformity: z.object({
+    statistic: probabilitySchema,
+    pValue: probabilitySchema,
+    tests: z.number().int().positive(),
+  }).strict(),
+  falsification: z.discriminatedUnion('kind', [z.object({
+    kind: z.literal('completed'),
+    permutations: z.number().int().positive(),
+    givenLmcViolations: z.number().int().nonnegative(),
+    givenLmcTests: z.number().int().positive(),
+    givenLmcViolationFraction: probabilitySchema,
+    permutationLmcViolationFractions: z.array(probabilitySchema).min(1),
+    permutationTpaViolationFractions: z.array(probabilitySchema).min(1),
+    pValueLmc: probabilitySchema,
+    pValueTpa: probabilitySchema,
+    permutationsInMarkovEquivalenceClass: z.number().int().nonnegative(),
+    falsifiable: z.boolean(),
+    falsified: z.boolean(),
+  }).strict().superRefine((value, context) => {
+    if (value.permutationLmcViolationFractions.length !== value.permutations
+      || value.permutationTpaViolationFractions.length !== value.permutations) {
+      context.addIssue({
+        code: 'custom',
+        path: ['permutations'],
+        message: 'Permutation distributions must contain one score per relabeled graph.',
+      })
+    }
+    if (value.givenLmcViolations > value.givenLmcTests) {
+      context.addIssue({
+        code: 'custom',
+        path: ['givenLmcViolations'],
+        message: 'LMC violations cannot exceed the number of tested statements.',
+      })
+    }
+  }), z.object({
+    kind: z.literal('skipped'),
+    reason: z.string().min(1),
+  }).strict()]),
+}).strict().superRefine((value, context) => {
+  if (value.uniformity.tests !== value.implications.length) {
+    context.addIssue({
+      code: 'custom',
+      path: ['uniformity', 'tests'],
+      message: 'The uniformity diagnostic must use every raw implication p-value.',
+    })
+  }
+})
+
+export type DagCheckEvidence = z.infer<typeof dagCheckEvidenceSchema>
+
+export type DagCheckArtifactId = Brand<string, 'DagCheckArtifactId'>
+
+export interface DagCheckArtifact {
+  readonly kind: 'dag-check-artifact'
+  readonly id: DagCheckArtifactId
+  readonly createdAt: string
+  readonly preparedDataset: DagDocument['preparedDataset']
+  readonly dagDocument: DagDocument['id']
+  readonly dagRevision: DagDocument['current']['id']
+  readonly evidence: DagCheckEvidence
+}
+
+export const recordDagCheck = (document: DagDocument, evidence: DagCheckEvidence): DagCheckArtifact => ({
+  kind: 'dag-check-artifact',
+  id: brand<string, 'DagCheckArtifactId'>(crypto.randomUUID()),
+  createdAt: new Date().toISOString(),
+  preparedDataset: document.preparedDataset,
+  dagDocument: document.id,
+  dagRevision: document.current.id,
+  evidence,
+})
 
 export type DagImplicationPlan =
   | {

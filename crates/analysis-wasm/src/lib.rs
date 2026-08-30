@@ -11,7 +11,8 @@ use hirmos_causal_core::discrete_bn::{discretize_805, Dag as DiscreteDag, Discre
 use hirmos_causal_core::dynotears::dynotears_with_progress;
 use hirmos_causal_core::glm::{negative_binomial_p, poisson_glm};
 use hirmos_causal_core::lpcmci::run_lpcmci_with_progress;
-use hirmos_causal_core::negbin_nuts::{irr_summary, PbcNegBinModel};
+use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
+use hirmos_causal_core::negbin_nuts::{irr_summary, quantile, PbcNegBinModel};
 use hirmos_causal_core::nprandom::Mt19937;
 use hirmos_causal_core::nuts::NutsOptions;
 use hirmos_causal_core::ocse::{discover_network_with_progress, CmiMethod};
@@ -49,6 +50,7 @@ mod missingness;
 use missingness::{resolve_missingness, MissingnessExecution, MissingnessResolution};
 
 mod counterfactual;
+mod dag_check;
 mod discovery;
 mod estimation;
 mod identification;
@@ -59,6 +61,7 @@ mod sensitivity;
 mod stationarity;
 
 use counterfactual::*;
+use dag_check::*;
 use discovery::*;
 use estimation::*;
 use identification::*;
@@ -131,6 +134,29 @@ pub fn run_analysis(
             outcome,
             unobserved,
         } => backdoor_identification(nodes, &edges, treatment, outcome, &unobserved),
+        AnalysisCommand::DagCheck {
+            rows,
+            columns,
+            node_columns,
+            edges,
+            implications,
+            maximum_observations,
+            permutations,
+            significance_level,
+            run_falsification,
+        } => dag_check(
+            values,
+            rows,
+            columns,
+            &node_columns,
+            &edges,
+            &implications,
+            maximum_observations,
+            permutations,
+            significance_level,
+            run_falsification,
+            progress,
+        ),
         AnalysisCommand::BackdoorLinear {
             rows,
             columns,
@@ -374,6 +400,18 @@ pub fn run_analysis(
             seed,
         } => negbin_nuts(
             values, rows, columns, treatment, outcome, confounder, warmup, samples, seed,
+        ),
+        AnalysisCommand::BayesianGaussian {
+            rows,
+            columns,
+            treatment,
+            outcome,
+            adjustment,
+            warmup,
+            samples,
+            seed,
+        } => bayesian_gaussian(
+            values, rows, columns, treatment, outcome, &adjustment, warmup, samples, seed,
         ),
         AnalysisCommand::DiscreteBnQuery {
             rows,

@@ -1,8 +1,9 @@
 import { z } from 'zod'
+import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import { ardlEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema, type ArdlEvidence, type DiscreteBnEvidence, type DoubleMlEvidence, type NegbinNutsEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type VecmEvidence } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type DiscreteBnEvidence, type DoubleMlEvidence, type NegbinNutsEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { linearScmEvidenceSchema, type LinearScmEvidence } from '@/domain/counterfactual'
 import { brand, err, ok, type Brand, type Result } from '@/domain/dop'
@@ -143,6 +144,24 @@ export type AnalysisWorkerCommand =
       readonly treatment: number
       readonly outcome: number
       readonly unobserved: readonly number[]
+    }
+  | {
+      readonly kind: 'dag-check'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly nodeColumns: readonly number[]
+      readonly edges: readonly (readonly [number, number])[]
+      readonly implications: readonly {
+        readonly x: number
+        readonly y: number
+        readonly given: readonly number[]
+      }[]
+      readonly maximumObservations: number
+      readonly permutations: number
+      readonly significanceLevel: number
+      readonly runFalsification: boolean
     }
   | {
       readonly kind: 'backdoor-linear'
@@ -313,6 +332,19 @@ export type AnalysisWorkerCommand =
       readonly seed: number
     }
   | {
+      readonly kind: 'bayesian-gaussian'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly warmup: number
+      readonly samples: number
+      readonly seed: number
+    }
+  | {
       readonly kind: 'discrete-bn-query'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -415,6 +447,7 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: BackdoorIdentificationEvidence
     }
+  | { readonly kind: 'dag-check-succeeded'; readonly request: WorkerRequestId; readonly result: DagCheckEvidence }
   | {
       readonly kind: 'backdoor-linear-succeeded'
       readonly request: WorkerRequestId
@@ -433,6 +466,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
   | { readonly kind: 'panel-intervention-succeeded'; readonly request: WorkerRequestId; readonly result: PanelInterventionEvidence }
   | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
+  | { readonly kind: 'bayesian-gaussian-succeeded'; readonly request: WorkerRequestId; readonly result: BayesianGaussianEvidence }
   | { readonly kind: 'discrete-bn-succeeded'; readonly request: WorkerRequestId; readonly result: DiscreteBnEvidence }
   | { readonly kind: 'linear-scm-succeeded'; readonly request: WorkerRequestId; readonly result: LinearScmEvidence }
   | { readonly kind: 'dml-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: DmlRefutationEvidence }
@@ -529,6 +563,24 @@ const commandSchema = z.discriminatedUnion('kind', [
     treatment: z.number().int().nonnegative(),
     outcome: z.number().int().nonnegative(),
     unobserved: z.array(z.number().int().nonnegative()),
+  }).strict(),
+  z.object({
+    kind: z.literal('dag-check'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(4),
+    columns: z.number().int().min(2).max(256),
+    nodeColumns: z.array(z.number().int().nonnegative()).min(2).max(64),
+    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+    implications: z.array(z.object({
+      x: z.number().int().nonnegative(),
+      y: z.number().int().nonnegative(),
+      given: z.array(z.number().int().nonnegative()),
+    }).strict()).min(1),
+    maximumObservations: z.number().int().min(4).max(2_000),
+    permutations: z.number().int().min(20).max(2_000),
+    significanceLevel: z.number().gt(0).lte(0.25),
+    runFalsification: z.boolean(),
   }).strict(),
   z.object({
     kind: z.literal('backdoor-linear'),
@@ -699,6 +751,19 @@ const commandSchema = z.discriminatedUnion('kind', [
     seed: z.number().int().nonnegative(),
   }).strict(),
   z.object({
+    kind: z.literal('bayesian-gaussian'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(64),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    adjustment: z.array(z.number().int().nonnegative()),
+    warmup: z.number().int().min(10).max(5000),
+    samples: z.number().int().min(10).max(5000),
+    seed: z.number().int().nonnegative(),
+  }).strict(),
+  z.object({
     kind: z.literal('discrete-bn-query'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -811,6 +876,7 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: backdoorIdentificationEvidenceSchema,
   }).strict(),
+  z.object({ kind: z.literal('dag-check-succeeded'), request: requestSchema, result: dagCheckEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('backdoor-linear-succeeded'),
     request: requestSchema,
@@ -829,6 +895,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('panel-intervention-succeeded'), request: requestSchema, result: panelInterventionEvidenceSchema }).strict(),
   z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('bayesian-gaussian-succeeded'), request: requestSchema, result: bayesianGaussianEvidenceSchema }).strict(),
   z.object({ kind: z.literal('discrete-bn-succeeded'), request: requestSchema, result: discreteBnEvidenceSchema }).strict(),
   z.object({ kind: z.literal('linear-scm-succeeded'), request: requestSchema, result: linearScmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('dml-refutation-succeeded'), request: requestSchema, result: dmlRefutationEvidenceSchema }).strict(),
@@ -918,6 +985,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
       ? ok({ kind: 'backdoor-identification-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
+  if (parsed.data.kind === 'dag-check-succeeded') {
+    const result = dagCheckEvidenceSchema.safeParse(parsed.data.result)
+    return result.success
+      ? ok({ kind: 'dag-check-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
   if (parsed.data.kind === 'backdoor-linear-succeeded') {
     const result = parseBackdoorLinearEvidence(parsed.data.result)
     return result.ok
@@ -971,6 +1044,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'negbin-nuts-succeeded') {
     const result = negbinNutsEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'negbin-nuts-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'bayesian-gaussian-succeeded') {
+    const result = bayesianGaussianEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'bayesian-gaussian-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'discrete-bn-succeeded') {
     const result = discreteBnEvidenceSchema.safeParse(parsed.data.result)

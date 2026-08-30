@@ -1,15 +1,20 @@
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useMemo, useReducer } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
+import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
 import { impactPathOption } from '@/charts/estimation/impactPath'
+import { posteriorDensityOption } from '@/charts/estimation/posteriorDensity'
+import { runComparisonOption, type RunComparisonRow } from '@/charts/estimation/runComparison'
 import { useChartTheme } from '@/charts/theme'
 import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
+import { Formula } from '@/components/ui/Formula'
 import { IntervalFigure, MetricTile } from '@/components/ui/figures'
+import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, field, fieldHint, fieldLabel, label, literal, num } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
@@ -25,6 +30,7 @@ import {
   describeEstimator,
   ESTIMATOR_IDS,
   evaluateEstimatorEligibility,
+  intervalTypeOf,
   interventionStartFromTreatment,
   methodIdOf,
   newEstimationRunId,
@@ -48,6 +54,7 @@ import { formatCount, formatEstimate, formatInterval, formatP, formatStatistic, 
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
+import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import type { AnalysisProgress } from '@/workers/analysisProtocol'
 
@@ -127,9 +134,9 @@ const headline = (estimate: CausalEstimate): Formatted => {
 }
 
 const intervalText = (estimate: CausalEstimate): string => {
-  if (estimate.interval.kind !== 'confidence') return 'none'
+  if (estimate.interval.kind === 'none') return 'none'
   const value = estimate.effect.kind === 'path' ? estimate.effect.aggregate.cumulative : estimate.effect.value
-  const figure = formatInterval(value, estimate.interval.lower, estimate.interval.upper, { kind: 'confidence', level: estimate.interval.level }, scaleOf(estimate))
+  const figure = formatInterval(value, estimate.interval.lower, estimate.interval.upper, intervalTypeOf(estimate.interval), scaleOf(estimate))
   return `[${figure.bounds.lower}, ${figure.bounds.upper}]`
 }
 
@@ -301,6 +308,14 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Dispersion r', value: formatStatistic('raw', evidence.dispersionMean), context: `${formatCount(evidence.warmup).text} warmup · ${formatCount(evidence.samples).text} draws · seed ${evidence.seed}` },
         ]
       }
+      case 'bayesian-gaussian-run': {
+        const { evidence } = run
+        return [
+          { label: 'Divergences', value: formatCount(evidence.divergences), context: `${formatCount(evidence.chains).text} chains · acceptance ${formatStatistic('score', evidence.acceptanceRate).text} · step ${formatStatistic('raw', evidence.stepSize).text}` },
+          { label: 'P(effect > 0)', value: formatStatistic('score', evidence.probabilityPositive), context: `posterior mean ${formatStatistic('raw', evidence.effectMean).text} · sd ${formatStatistic('raw', evidence.effectSd).text} · median ${formatStatistic('raw', evidence.effectMedian).text}` },
+          { label: 'Residual sd', value: formatStatistic('raw', evidence.sigmaMean), context: `${formatCount(evidence.warmup).text} warmup · ${formatCount(evidence.samples).text} draws per chain · seed ${evidence.seed}` },
+        ]
+      }
       case 'discrete-bn-run': {
         const { evidence } = run
         return [
@@ -351,25 +366,48 @@ function ResultCard({ run, study, current, stepLabel }: { readonly run: Estimati
   const theme = useChartTheme()
   const estimate = run.estimate
   const sentence = estimandSentence(study)
-  const scaleLine = estimate.effect.kind === 'incidenceRateRatio'
-    ? `incidence rate ratio · multiplicative change in ${study.outcome.name} per unit of ${study.treatment.name}`
-    : estimate.effect.kind === 'path'
-      ? `additive · ${study.outcome.name} minus its counterfactual per ${stepLabel}`
-      : `additive · units of ${study.outcome.name} per unit of ${study.treatment.name}`
+  const scaleLine = resultScaleLine(run, study, stepLabel)
   const chart = useMemo(() => (estimate.effect.kind === 'path'
     ? impactPathOption({ outcome: study.outcome.name, points: estimate.effect.values, stepLabel }, theme)
     : null), [estimate.effect, stepLabel, study.outcome.name, theme])
+  // Runs recorded before the histogram was added carry no draws, so they keep the summary alone.
+  const posterior = useMemo(() => (run.kind === 'bayesian-gaussian-run' && (run.evidence.histogramCounts ?? []).length > 0
+    ? posteriorDensityOption({
+      outcome: study.outcome.name,
+      treatment: study.treatment.name,
+      histogramStart: run.evidence.histogramStart,
+      histogramBinWidth: run.evidence.histogramBinWidth,
+      histogramCounts: run.evidence.histogramCounts,
+      mean: run.evidence.effectMean,
+      hdiLower: run.evidence.hdiLower,
+      hdiUpper: run.evidence.hdiUpper,
+    }, theme)
+    : null), [run, study.outcome.name, study.treatment.name, theme])
+  const [chosenCurve, setChosenCurve] = useState(0)
+  const curves = run.kind === 'bayesian-gaussian-run' ? run.evidence.curves ?? [] : []
+  const curveIndex = Math.min(chosenCurve, Math.max(0, curves.length - 1))
+  const curveChart = useMemo(() => {
+    const curve = curves[curveIndex]
+    return curve === undefined
+      ? null
+      : counterfactualCurvesOption({
+        outcome: study.outcome.name,
+        treatment: study.treatment.name,
+        covariate: estimate.adjustmentSet[curveIndex]?.name ?? `covariate ${curveIndex + 1}`,
+        curve,
+      }, theme)
+  }, [curves, curveIndex, estimate.adjustmentSet, study.outcome.name, study.treatment.name, theme])
   const stamp = `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''} · ${formatTime(run.createdAt)}`
   const body = (
     <>
       <div className="mt-3">
-        {estimate.interval.kind === 'confidence' && estimate.effect.kind !== 'path' ? (
+        {estimate.interval.kind !== 'none' && estimate.effect.kind !== 'path' ? (
           <IntervalFigure
             sentence={sentence}
             estimate={estimate.effect.value}
             lower={estimate.interval.lower}
             upper={estimate.interval.upper}
-            type={{ kind: 'confidence', level: estimate.interval.level }}
+            type={intervalTypeOf(estimate.interval)}
             scale={scaleOf(estimate)}
             standardError={estimate.standardError ?? undefined}
             observations={estimate.sample.observations}
@@ -395,6 +433,22 @@ function ResultCard({ run, study, current, stepLabel }: { readonly run: Estimati
           <EChart option={chart} label={`${study.outcome.name} against its counterfactual after the intervention`} className="h-[260px]" testId="impact-path" />
         </div>
       )}
+      {posterior !== null && (
+        <div className="mt-3">
+          <EChart option={posterior} label={`Posterior density of the effect of ${study.treatment.name} on ${study.outcome.name}`} className="h-[220px]" testId="posterior-density" />
+        </div>
+      )}
+      {curveChart !== null && (
+        <div className="mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className={label('m-0 text-muted')}>Expected outcome across a covariate</p>
+            <Select aria-label="Curve covariate" className={field('text', 'w-40')} value={curveIndex} onChange={(event) => setChosenCurve(Number(event.target.value))}>
+              {curves.map((_, index) => <option key={index} value={index}>{estimate.adjustmentSet[index]?.name ?? `covariate ${index + 1}`}</option>)}
+            </Select>
+          </div>
+          <EChart option={curveChart} label={`Expected ${study.outcome.name} across the chosen covariate under both interventions`} className="mt-2 h-[240px]" testId="counterfactual-curves" />
+        </div>
+      )}
       {run.kind === 'backdoor-linear-run' && (
         <p className="mb-0 mt-3 text-body text-muted">
           {estimate.interval.kind === 'confidence' && (estimate.interval.lower > 0 || estimate.interval.upper < 0) ? 'The interval excludes zero.' : 'The interval includes zero: the data do not rule out no effect.'}{' '}
@@ -404,6 +458,7 @@ function ResultCard({ run, study, current, stepLabel }: { readonly run: Estimati
       {run.kind === 'count-glm-run' && !run.evidence.converged && (
         <Alert tone="warn" live={false} className="mt-3"><p className="m-0">The optimiser did not converge; treat the estimate and its interval as provisional.</p></Alert>
       )}
+      <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />
       <Diagnostics run={run} />
       {run.kind === 'panel-intervention-run' && <PanelEvidenceDetails run={run} />}
       <RunRecord run={run} />
@@ -451,6 +506,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   readonly onOpenStudy: () => void
 }) {
   const identified = identifications.filter((identification) => identification.result.kind === 'identified')
+  const chartTheme = useChartTheme()
   const latestStudy = studies.find((candidate) => candidate.id === identified.at(-1)?.study) ?? null
   const [state, dispatch] = useReducer(step, null, (): State => ({
     identification: identified.at(-1)?.id ?? null,
@@ -593,7 +649,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const run = { kind: 'vecm-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact,
-            evidence.value.rank === 0 ? 'The Johansen trace test found no cointegrating relation, so no long-run effect exists to report.' : `The trace test found ${evidence.value.rank} cointegrating relations; a single long-run effect is read only at rank one.`)
+            evidence.value.rank === 0 ? 'The Johansen trace test did not identify a cointegrating relation under this specification, so no long-run coefficient is reported.' : `The trace test found ${evidence.value.rank} cointegrating relations; a single long-run coefficient is read only at rank one.`)
           return
         }
         case 'synthetic-control': {
@@ -646,6 +702,17 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const evidence = await analysis.runNegbinNuts(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, confounder: 2, warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
           const run = { kind: 'negbin-nuts-run', configuration, evidence: evidence.value } as const
+          const estimate = causalEstimateFrom(study, identification, run)
+          finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
+          return
+        }
+        case 'bayesian-gaussian': {
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
+          const matrix = await materialise(columns)
+          if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the Gaussian model needs a 0/1 treatment.` }); return }
+          const evidence = await analysis.runBayesianGaussian(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          const run = { kind: 'bayesian-gaussian-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
           return
@@ -850,6 +917,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <p className="m-0 self-end text-body text-faint">Gamma-Poisson likelihood, standardised treatment and confounder, NUTS with step-size and diagonal mass adaptation at target acceptance 0.8.</p>
           </div>
         )
+      case 'bayesian-gaussian':
+        return (
+          <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            <label className="block"><span className={fieldLabel}>Warmup</span><input type="number" min={10} max={5000} aria-label="Warmup" className={field('text', 'mt-1')} value={configuration.warmup} onChange={(event) => configure({ ...configuration, warmup: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
+            <label className="block"><span className={fieldLabel}>Draws per chain</span><input type="number" min={10} max={5000} aria-label="Draws per chain" className={field('text', 'mt-1')} value={configuration.samples} onChange={(event) => configure({ ...configuration, samples: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
+            <label className="block"><span className={fieldLabel}>Seed</span><input type="number" min={0} aria-label="Sampler seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <p className="m-0 self-end text-body text-faint">Normal(0, 10) intercepts, Normal(0, 1) slopes, half-normal(10) residual scale; non-binary adjustment columns are standardised; three NUTS chains with step-size and diagonal mass adaptation at target acceptance 0.8.</p>
+          </div>
+        )
       case 'discrete-bn-query':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
@@ -954,6 +1030,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                   })}
                 />
                 {method.ok && <p className={cn(fieldHint, 'max-w-[65ch]')}>{method.value.summary}</p>}
+                {method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>
               <div>{controls}</div>
             </div>
@@ -1008,14 +1085,34 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     </div>
   )
 
+  // Runs for the selected study whose additive estimates share one axis; the newest carries the accent.
+  const comparison = useMemo(() => {
+    const comparable = runs.filter((run) => run.study === identification?.study && run.estimate.effect.kind === 'additive')
+    if (comparable.length < 2) return null
+    const rows: RunComparisonRow[] = comparable.map((run, index) => ({
+      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''} · ${formatTime(run.createdAt)}`,
+      estimate: run.estimate.effect.kind === 'additive' ? run.estimate.effect.value : 0,
+      lower: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.lower,
+      upper: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.upper,
+      current: index === comparable.length - 1,
+    }))
+    return { option: runComparisonOption(rows, chartTheme), height: rows.length * 30 + 56 }
+  }, [runs, identification, chartTheme])
+
   const ledger = (
-    <table className="w-full border-collapse text-body" aria-label="Estimation runs">
+    <>
+      {comparison !== null && (
+        <div className="border-b border-hair px-3 pb-1 pt-2">
+          <EChart option={comparison.option} label="Recorded estimates compared on one axis" className="w-full" style={{ height: comparison.height }} testId="run-comparison" />
+        </div>
+      )}
+      <table className="w-full border-collapse text-body" aria-label="Estimation runs">
       <thead>
         <tr className="text-left">
           <th scope="col" className={label('px-3 py-1.5 font-normal text-muted')}>Estimand</th>
           <th scope="col" className={label('px-3 py-1.5 font-normal text-muted')}>Estimator</th>
           <th scope="col" className={label('px-3 py-1.5 text-right font-normal text-muted')}>Estimate</th>
-          <th scope="col" className={label('px-3 py-1.5 text-right font-normal text-muted')}>95% confidence interval</th>
+          <th scope="col" className={label('px-3 py-1.5 text-right font-normal text-muted')}>Interval</th>
           <th scope="col" className={label('px-3 py-1.5 font-normal text-muted')}>Created</th>
         </tr>
       </thead>
@@ -1034,7 +1131,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           )
         })}
       </tbody>
-    </table>
+      </table>
+    </>
   )
 
   return (
@@ -1042,7 +1140,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       id="estimation"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
-      bottom={{ title: `Runs · ${runs.length}`, body: ledger, defaultSize: 150 }}
+      bottom={{ title: `Runs · ${runs.length}`, body: ledger, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
     />
   )
 }

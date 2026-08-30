@@ -49,6 +49,7 @@ function QueryRecord({ query, open }: { readonly query: InterventionQueryArtifac
         </summary>
         <div className="px-3 pb-3">
           <p className="m-0 text-body text-muted">{describeInterventionVerdict(query)}</p>
+          <p className="mb-0 mt-1 text-label text-faint">This is a model-based contrast between discretised treatment states. Its causal interpretation depends on the recorded DAG, valid adjustment, the BDeu conditional probability tables, and the selected quantile bins; no uncertainty interval is reported.</p>
           <div className="mt-3 grid gap-2 @sm/inspector:grid-cols-3">
             <MetricTile label={`${query.read.name} if ${query.set.name} set low`} size="compact" value={formatStatistic('raw', result.expectations[0])} context={`bin ${result.treatmentStates[0]}`} />
             <MetricTile label={`${query.read.name} if ${query.set.name} set high`} size="compact" value={formatStatistic('raw', result.expectations[1])} context={`bin ${result.treatmentStates[1]}`} />

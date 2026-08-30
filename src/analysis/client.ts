@@ -10,12 +10,13 @@ import type {
 import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalImpactEvidence, CountGlmEvidence } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import type { ArdlEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
+import type { ArdlEvidence, BayesianGaussianEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
 import type { DmlRefutationEvidence } from '@/domain/sensitivity'
 import type { LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import type { StationarityBattery } from '@/domain/stationarity'
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
+import type { DagCheckEvidence } from '@/domain/dagValidation'
 import {
   newWorkerRequestId,
   parseAnalysisWorkerEvent,
@@ -33,6 +34,7 @@ type DynotearsOutcome = Result<DynotearsEvidence, AnalysisWorkerProblem>
 type VarLingamOutcome = Result<VarLingamEvidence, AnalysisWorkerProblem>
 type OcseOutcome = Result<OcseEvidence, AnalysisWorkerProblem>
 type BackdoorIdentificationOutcome = Result<BackdoorIdentificationEvidence, AnalysisWorkerProblem>
+type DagCheckOutcome = Result<DagCheckEvidence, AnalysisWorkerProblem>
 type BackdoorLinearOutcome = Result<BackdoorLinearEvidence, AnalysisWorkerProblem>
 type CountGlmOutcome = Result<CountGlmEvidence, AnalysisWorkerProblem>
 type CausalEffectsOutcome = Result<CausalEffectsEvidence, AnalysisWorkerProblem>
@@ -49,6 +51,7 @@ type VecmOutcome = Result<VecmEvidence, AnalysisWorkerProblem>
 type SyntheticOutcome = Result<SyntheticControlEvidence, AnalysisWorkerProblem>
 type PanelInterventionOutcome = Result<PanelInterventionEvidence, AnalysisWorkerProblem>
 type NegbinNutsOutcome = Result<NegbinNutsEvidence, AnalysisWorkerProblem>
+type BayesianGaussianOutcome = Result<BayesianGaussianEvidence, AnalysisWorkerProblem>
 type DiscreteBnOutcome = Result<DiscreteBnEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type PendingRun =
@@ -60,6 +63,7 @@ type PendingRun =
   | { readonly kind: 'ocse'; readonly resolve: (outcome: OcseOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'granger'; readonly resolve: (outcome: GrangerOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'backdoor-identify'; readonly resolve: (outcome: BackdoorIdentificationOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'dag-check'; readonly resolve: (outcome: DagCheckOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'backdoor-linear'; readonly resolve: (outcome: BackdoorLinearOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'count-glm'; readonly resolve: (outcome: CountGlmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'causal-effects-total'; readonly resolve: (outcome: CausalEffectsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
@@ -76,6 +80,7 @@ type PendingRun =
   | { readonly kind: 'synthetic-control'; readonly resolve: (outcome: SyntheticOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'panel-intervention'; readonly resolve: (outcome: PanelInterventionOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'negbin-nuts'; readonly resolve: (outcome: NegbinNutsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'bayesian-gaussian'; readonly resolve: (outcome: BayesianGaussianOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'discrete-bn-query'; readonly resolve: (outcome: DiscreteBnOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'linear-scm-counterfactual'; readonly resolve: (outcome: LinearScmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
 
@@ -151,6 +156,10 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an identification request.' })
       return
     }
+    if (run.kind === 'dag-check' && parsed.value.kind !== 'dag-check-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a DAG check request.' })
+      return
+    }
     if (run.kind === 'backdoor-linear' && parsed.value.kind !== 'backdoor-linear-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an adjusted regression request.' })
       return
@@ -215,6 +224,10 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a NUTS request.' })
       return
     }
+    if (run.kind === 'bayesian-gaussian' && parsed.value.kind !== 'bayesian-gaussian-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a Bayesian Gaussian request.' })
+      return
+    }
     if (run.kind === 'discrete-bn-query' && parsed.value.kind !== 'discrete-bn-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a discrete BN query.' })
       return
@@ -253,6 +266,10 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'backdoor-identify' && parsed.value.kind === 'backdoor-identification-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'dag-check' && parsed.value.kind === 'dag-check-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -317,6 +334,10 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'negbin-nuts' && parsed.value.kind === 'negbin-nuts-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'bayesian-gaussian' && parsed.value.kind === 'bayesian-gaussian-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -663,9 +684,42 @@ export function runNegbinNuts(values: Float64Array, rows: number, columns: numbe
   return post<NegbinNutsOutcome>('negbin-nuts', { kind: 'negbin-nuts', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'negbin-nuts', resolve }))
 }
 
+export function runBayesianGaussian(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly warmup: number; readonly samples: number; readonly seed: number }): Promise<BayesianGaussianOutcome> {
+  const request = newWorkerRequestId()
+  return post<BayesianGaussianOutcome>('bayesian-gaussian', { kind: 'bayesian-gaussian', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'bayesian-gaussian', resolve }))
+}
+
 export function runDiscreteBnQuery(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly bins: number; readonly equivalentSampleSize: number }): Promise<DiscreteBnOutcome> {
   const request = newWorkerRequestId()
   return post<DiscreteBnOutcome>('discrete-bn-query', { kind: 'discrete-bn-query', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'discrete-bn-query', resolve }))
+}
+
+export function runDagCheck(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly nodeColumns: readonly number[]
+    readonly edges: readonly (readonly [number, number])[]
+    readonly implications: readonly { readonly x: number; readonly y: number; readonly given: readonly number[] }[]
+    readonly maximumObservations: number
+    readonly permutations: number
+    readonly significanceLevel: number
+    readonly runFalsification: boolean
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<DagCheckOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'dag-check', resolve, onProgress })
+    const command: AnalysisWorkerCommand = { kind: 'dag-check', request, values, rows, columns, ...design }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
 }
 
 export function runLinearScmCounterfactual(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly interventions: readonly [number, number]; readonly observationNoise: number | null }): Promise<LinearScmOutcome> {

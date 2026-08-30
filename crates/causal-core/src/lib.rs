@@ -53,6 +53,8 @@ pub mod ziggurat;
 pub use var_lingam::{direct_lingam, run_var_lingam, var_lingam_bootstrap, VarBootstrapResult, VarLingamResult};
 
 pub mod glm;
+pub mod graph_falsification;
+pub mod kci;
 pub mod bfgs;
 pub mod causal_impact;
 pub mod ucm;
@@ -70,6 +72,7 @@ pub mod vecm;
 pub mod coint;
 pub mod nuts;
 pub mod negbin_nuts;
+pub mod bayesian_gaussian;
 pub mod stl;
 pub mod pelt;
 pub mod preprocess;
@@ -77,6 +80,13 @@ pub mod preprocess;
 pub use coint::{coint, coint_johansen, CointResult, JohansenResult};
 pub use dml::{dml_irm, dml_plr, DmlResult, SensitivityResult, SensitivityScenario};
 pub use preprocess::{cluster_redundant, shapiro, vif_redundant};
+pub use graph_falsification::{
+    check_dag, falsify_graph, falsify_graph_with_progress, holm_adjust, test_implications,
+    uniformity_test, DagCheckResult,
+    DagImplication, DagImplicationTest, GraphCheckError, GraphFalsificationResult,
+    ImplicationDecision, UniformityTest,
+};
+pub use kci::{kernel_conditional_independence, KciError, KciResult};
 pub use refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, RefutationOutcome,
     WorkerStudy,

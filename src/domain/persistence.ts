@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
+import type { DagCheckArtifact } from './dagValidation'
 import { parseDatasetProfile, type DatasetProfile } from './dataset'
 import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
@@ -38,6 +39,7 @@ export interface PersistedProject {
   readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
   readonly discoveryRuns: readonly DiscoveryRunArtifact[]
   readonly dagDocuments: readonly DagDocument[]
+  readonly dagChecks: readonly DagCheckArtifact[]
   readonly interventionQueries: readonly InterventionQueryArtifact[]
   readonly studyDraft: StudyDesignDraft
   readonly studies: readonly StudySpecification[]
@@ -83,7 +85,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       if (workflow.restore !== null) return null
       return {
         kind: 'hirmos-project', version: 1, savedAt, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
-        grangerEvidence: [], discoveryRuns: [], dagDocuments: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [],
+        grangerEvidence: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [],
       }
     case 'source-selected':
     case 'profiling':
@@ -102,6 +104,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         grangerEvidence: workflow.grangerEvidence,
         discoveryRuns: workflow.discoveryRuns,
         dagDocuments: workflow.dagDocuments,
+        dagChecks: workflow.dagChecks,
         interventionQueries: workflow.interventionQueries,
         studyDraft: workflow.studyDraft,
         studies: workflow.studies,
@@ -147,6 +150,7 @@ const envelopeSchema = z.object({
   grangerEvidence: z.array(artifact).default([]),
   discoveryRuns: z.array(artifact),
   dagDocuments: z.array(artifact),
+  dagChecks: z.array(artifact).default([]),
   interventionQueries: z.array(artifact).default([]),
   studyDraft: z.object({}).passthrough(),
   studies: z.array(artifact),

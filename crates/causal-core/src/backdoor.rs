@@ -5,6 +5,7 @@
 use nalgebra::{DMatrix, DVector};
 use std::collections::BTreeSet;
 
+#[derive(Clone, Debug)]
 pub struct Dag {
     pub n: usize,
     /// edges[i] holds the children of node i.

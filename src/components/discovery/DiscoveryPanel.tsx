@@ -3,6 +3,7 @@ import { Select } from '@/components/ui/Select'
 import { useReducer, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
+import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { EligibilityView } from '@/components/EligibilityView'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
@@ -45,6 +46,7 @@ import {
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { useRunActivity } from '@/lib/useRunActivity'
+import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
@@ -146,7 +148,10 @@ function ResultCard({ run, method, title, meta, open, current, children }: {
             <p className="m-0 text-body text-faint">{meta}</p>
           </div>
         </summary>
-        <div className="px-4 pb-4">{children}</div>
+        <div className="px-4 pb-4">
+          <ResultInterpretation interpretation={interpretDiscoveryResult(run)} className="mb-3" />
+          {children}
+        </div>
       </details>
     </article>
   )

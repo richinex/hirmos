@@ -74,6 +74,20 @@ pub(crate) enum AnalysisCommand {
         outcome: usize,
         unobserved: Vec<usize>,
     },
+    DagCheck {
+        rows: usize,
+        columns: usize,
+        /// One numeric matrix column per observed DAG node, in node order.
+        node_columns: Vec<usize>,
+        /// Directed edges as node positions.
+        edges: Vec<(usize, usize)>,
+        implications: Vec<DagImplicationCommand>,
+        maximum_observations: usize,
+        permutations: usize,
+        significance_level: f64,
+        /// Whole-graph relabeling is invalid after projecting latent nodes out of the DAG.
+        run_falsification: bool,
+    },
     BackdoorLinear {
         rows: usize,
         columns: usize,
@@ -206,6 +220,16 @@ pub(crate) enum AnalysisCommand {
         samples: usize,
         seed: u64,
     },
+    BayesianGaussian {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        warmup: usize,
+        samples: usize,
+        seed: u64,
+    },
     DiscreteBnQuery {
         rows: usize,
         columns: usize,
@@ -253,6 +277,14 @@ pub(crate) enum AnalysisCommand {
         validity: Vec<u8>,
         resolution: MissingnessResolution,
     },
+}
+
+#[derive(Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct DagImplicationCommand {
+    pub(crate) x: usize,
+    pub(crate) y: usize,
+    pub(crate) given: Vec<usize>,
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -391,6 +423,73 @@ pub(crate) struct PanelMethodEvidence {
     pub(crate) noise_level: f64,
 }
 
+/// Posterior expected-outcome curve over one adjustment covariate under both interventions.
+/// Bands are the 3% and 97% posterior quantiles, matching the 94% summary interval.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BayesianGaussianCurve {
+    pub standardised: bool,
+    pub grid: Vec<f64>,
+    pub control_lower: Vec<f64>,
+    pub control_median: Vec<f64>,
+    pub control_upper: Vec<f64>,
+    pub treated_lower: Vec<f64>,
+    pub treated_median: Vec<f64>,
+    pub treated_upper: Vec<f64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DagImplicationEvidence {
+    pub(crate) x: usize,
+    pub(crate) y: usize,
+    pub(crate) given: Vec<usize>,
+    pub(crate) p_value: f64,
+    pub(crate) adjusted_p_value: f64,
+    pub(crate) observations: usize,
+    pub(crate) decision: DagImplicationDecision,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DagImplicationDecision {
+    Contradicted,
+    NotRefuted,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DagUniformityEvidence {
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
+    pub(crate) tests: usize,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DagFalsificationEvidence {
+    Completed {
+        permutations: usize,
+        given_lmc_violations: usize,
+        given_lmc_tests: usize,
+        given_lmc_violation_fraction: f64,
+        permutation_lmc_violation_fractions: Vec<f64>,
+        permutation_tpa_violation_fractions: Vec<f64>,
+        p_value_lmc: f64,
+        p_value_tpa: f64,
+        permutations_in_markov_equivalence_class: usize,
+        falsifiable: bool,
+        falsified: bool,
+    },
+    Skipped {
+        reason: &'static str,
+    },
+}
+
 #[derive(Serialize)]
 #[serde(
     tag = "kind",
@@ -463,6 +562,14 @@ pub(crate) enum AnalysisResult {
         outcome: usize,
         unobserved: Vec<usize>,
         result: BackdoorAdjustmentSetEvidence,
+    },
+    DagCheck {
+        observations: usize,
+        significance_level: f64,
+        correction: &'static str,
+        implications: Vec<DagImplicationEvidence>,
+        uniformity: DagUniformityEvidence,
+        falsification: DagFalsificationEvidence,
     },
     BackdoorLinear {
         observations: usize,
@@ -636,6 +743,28 @@ pub(crate) enum AnalysisResult {
         acceptance_rate: f64,
         mean_accept_probability: f64,
         step_size: f64,
+    },
+    BayesianGaussian {
+        observations: usize,
+        warmup: usize,
+        samples: usize,
+        chains: usize,
+        seed: u64,
+        effect_mean: f64,
+        effect_sd: f64,
+        effect_median: f64,
+        hdi_lower: f64,
+        hdi_upper: f64,
+        probability_positive: f64,
+        sigma_mean: f64,
+        divergences: usize,
+        acceptance_rate: f64,
+        mean_accept_probability: f64,
+        step_size: f64,
+        histogram_start: f64,
+        histogram_bin_width: f64,
+        histogram_counts: Vec<u32>,
+        curves: Vec<BayesianGaussianCurve>,
     },
     DiscreteBnQuery {
         observations: usize,

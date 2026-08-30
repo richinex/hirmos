@@ -66,6 +66,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'synthetic-control',
     'panel-intervention',
     'negbin-nuts',
+    'bayesian-gaussian',
     'discrete-bn-query',
     'linear-scm-counterfactual',
     'placebo-treatment-refuter',

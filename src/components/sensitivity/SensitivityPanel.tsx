@@ -8,6 +8,7 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { MetricTile } from '@/components/ui/figures'
+import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, field, fieldLabel, label, literal, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -38,6 +39,7 @@ import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
+import { interpretSensitivityResult } from '@/domain/resultInterpretation'
 
 type Job = { readonly kind: 'idle' } | { readonly kind: 'running' } | { readonly kind: 'failed'; readonly detail: string }
 
@@ -93,6 +95,7 @@ function DmlRefutationCard({ run, estimation, study, current }: { readonly run: 
       </div>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Double machine learning probe batch on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Main estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.mainEstimate).text}</span>. The placebo and random-common-cause probes use the same seeded stream in the recorded order.</p>
+      <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
       <ul className="m-0 mt-3 list-none divide-y divide-hair border-y border-hair p-0" aria-label="Double machine learning probes">
         {run.refuters.map((fact) => (
           <li key={fact.id} className="py-2">
@@ -133,6 +136,7 @@ function RefutationCard({ run, estimation, study, current }: { readonly run: Ext
       </div>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Perturbation probes on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Original linear back-door estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.estimate).text}</span>. Interpret each diagnostic according to its stated perturbation and reference value.</p>
+      <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
       <ul className="m-0 mt-3 grid list-none gap-2 p-0 @2xl/panel:grid-cols-3" aria-label="Refuters">
         {run.refuters.map((fact) => (
           <li key={fact.id}>
@@ -195,6 +199,7 @@ function UnobservedCard({ run, estimation, study, current }: { readonly run: Ext
       </div>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Simulated unmeasured confounder</h3>
       <p className="m-0 text-body text-muted">Rows vary the simulated effect on treatment assignment. Columns vary the simulated outcome shift. Each cell reports a refitted linear back-door estimate. Original estimate: <span className={num('text-ink')}>{formatStatistic('raw', evidence.originalEffect).text}</span>.</p>
+      <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
       {flat.length === 1 && <Alert tone="info" live={false} className="mt-3"><p className="m-0">The inferred strengths collapsed to one point because a single observed common cause bounds them. Set explicit ranges to sweep a grid.</p></Alert>}
       <div className="mt-3 grid gap-2 @2xl/panel:grid-cols-3" aria-label="Grid facts">
         <MetricTile label="Smallest effect" size="compact" value={formatStatistic('raw', least)} context="over the grid" />

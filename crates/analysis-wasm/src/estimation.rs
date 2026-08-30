@@ -807,6 +807,190 @@ pub(crate) fn negbin_nuts(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub(crate) fn bayesian_gaussian(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    treatment: usize,
+    outcome: usize,
+    adjustment: &[usize],
+    warmup: usize,
+    samples: usize,
+    seed: u64,
+) -> Result<AnalysisResult, String> {
+    validate_dense_matrix("Bayesian Gaussian regression", values, rows, columns)?;
+    let mut used = vec![treatment, outcome];
+    used.extend_from_slice(adjustment);
+    if used.iter().any(|&column| column >= columns) {
+        return Err("Bayesian Gaussian regression columns must index the numeric matrix".to_owned());
+    }
+    let mut distinct = used.clone();
+    distinct.sort_unstable();
+    distinct.dedup();
+    if distinct.len() != used.len() {
+        return Err("Bayesian Gaussian regression needs distinct treatment, outcome, and adjustment columns".to_owned());
+    }
+    if rows < 20 {
+        return Err("Bayesian Gaussian regression needs at least 20 rows".to_owned());
+    }
+    if !(10..=5000).contains(&warmup) || !(10..=5000).contains(&samples) {
+        return Err("Bayesian Gaussian regression warmup and samples must be between 10 and 5000".to_owned());
+    }
+    let data = DMatrix::from_column_slice(rows, columns, values);
+    let column = |index: usize| -> Vec<f64> { (0..rows).map(|row| data[(row, index)]).collect() };
+    let d = column(treatment);
+    if d.iter().any(|value| *value != 0.0 && *value != 1.0) {
+        return Err("Bayesian Gaussian regression needs a 0/1 treatment".to_owned());
+    }
+    if d.iter().all(|value| *value == d[0]) {
+        return Err("Bayesian Gaussian regression treatment must vary".to_owned());
+    }
+    let y = column(outcome);
+    // Non-binary adjustment columns are divided by their population standard deviation so the
+    // Normal(0, 1) slope priors are weakly informative regardless of covariate units. The
+    // treatment coefficient, and so the effect, is unchanged by this scaling.
+    let mut series_by_column: Vec<Vec<f64>> = adjustment.iter().map(|&index| column(index)).collect();
+    for series in &mut series_by_column {
+        if series.iter().all(|value| *value == 0.0 || *value == 1.0) {
+            continue;
+        }
+        let mean = series.iter().sum::<f64>() / rows as f64;
+        let sd = (series.iter().map(|value| (value - mean).powi(2)).sum::<f64>() / rows as f64).sqrt();
+        if sd > 0.0 {
+            for value in series.iter_mut() {
+                *value /= sd;
+            }
+        }
+    }
+    let covariates: Vec<Vec<f64>> = (0..rows)
+        .map(|row| series_by_column.iter().map(|series| series[row]).collect())
+        .collect();
+    let describe = |error: hirmos_causal_core::bayesian_gaussian::GaussianScmError| {
+        format!("Bayesian Gaussian regression failed: {error:?}")
+    };
+    let model = BayesianGaussianScm::new(d, covariates, y).map_err(describe)?;
+    const CHAINS: usize = 3;
+    let mut effects = Vec::new();
+    let mut sigmas = Vec::new();
+    let mut pooled_samples: Vec<Vec<f64>> = Vec::new();
+    let mut divergences = 0usize;
+    let mut acceptance_sum = 0.0;
+    let mut mean_accept_sum = 0.0;
+    let mut step_sum = 0.0;
+    for chain in 0..CHAINS {
+        let options = NutsOptions {
+            warmup,
+            samples,
+            ..NutsOptions::default()
+        };
+        let result = model.sample_adjustment(options, seed.wrapping_add(chain as u64));
+        divergences += result.divergences;
+        acceptance_sum += result.acceptance_rate;
+        mean_accept_sum += result.mean_accept_probability;
+        step_sum += result.step_size;
+        effects.extend(
+            model
+                .adjustment_effect_draws(&result.samples, 0.0, 1.0)
+                .map_err(describe)?,
+        );
+        sigmas.extend(
+            result
+                .samples
+                .iter()
+                .map(|draw| draw.last().copied().unwrap_or(0.0).exp()),
+        );
+        pooled_samples.extend(result.samples);
+    }
+    let summary = posterior_effect_summary(&effects, 0.94).map_err(describe)?;
+    let sigma_mean = sigmas.iter().sum::<f64>() / sigmas.len() as f64;
+    // Expected outcome across each covariate under do(0) and do(1), the other covariates at
+    // their sample means, summarised per grid point by posterior quantiles across all draws.
+    let covariate_count = adjustment.len();
+    let column_means: Vec<f64> = (0..covariate_count)
+        .map(|index| series_by_column[index].iter().sum::<f64>() / rows as f64)
+        .collect();
+    let curves: Vec<BayesianGaussianCurve> = (0..covariate_count)
+        .map(|target| {
+            let series = &series_by_column[target];
+            let standardised = !series.iter().all(|value| *value == 0.0 || *value == 1.0);
+            let series_low = series.iter().copied().fold(f64::INFINITY, f64::min);
+            let series_high = series.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+            let grid: Vec<f64> = if standardised {
+                (0..25)
+                    .map(|step| series_low + (series_high - series_low) * step as f64 / 24.0)
+                    .collect()
+            } else {
+                vec![0.0, 1.0]
+            };
+            let bases: Vec<(f64, f64, f64)> = pooled_samples
+                .iter()
+                .map(|draw| {
+                    let mut base = draw[0];
+                    for (index, mean) in column_means.iter().enumerate() {
+                        if index != target {
+                            base += draw[2 + index] * mean;
+                        }
+                    }
+                    (base, draw[1], draw[2 + target])
+                })
+                .collect();
+            let mut curve = BayesianGaussianCurve {
+                standardised,
+                grid: grid.clone(),
+                control_lower: Vec::new(),
+                control_median: Vec::new(),
+                control_upper: Vec::new(),
+                treated_lower: Vec::new(),
+                treated_median: Vec::new(),
+                treated_upper: Vec::new(),
+            };
+            for x in grid {
+                let control: Vec<f64> = bases.iter().map(|(base, _, slope)| base + slope * x).collect();
+                let treated: Vec<f64> = bases.iter().map(|(base, tau, slope)| base + tau + slope * x).collect();
+                curve.control_lower.push(quantile(&control, 0.03));
+                curve.control_median.push(quantile(&control, 0.5));
+                curve.control_upper.push(quantile(&control, 0.97));
+                curve.treated_lower.push(quantile(&treated, 0.03));
+                curve.treated_median.push(quantile(&treated, 0.5));
+                curve.treated_upper.push(quantile(&treated, 0.97));
+            }
+            curve
+        })
+        .collect();
+    let low = effects.iter().copied().fold(f64::INFINITY, f64::min);
+    let high = effects.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let bins = 60usize;
+    let bin_width = ((high - low) / bins as f64).max(f64::EPSILON);
+    let mut counts = vec![0u32; bins];
+    for value in &effects {
+        let index = (((value - low) / bin_width) as usize).min(bins - 1);
+        counts[index] += 1;
+    }
+    Ok(AnalysisResult::BayesianGaussian {
+        observations: rows,
+        warmup,
+        samples,
+        chains: CHAINS,
+        seed,
+        effect_mean: summary.mean,
+        effect_sd: summary.standard_deviation,
+        effect_median: summary.median,
+        hdi_lower: summary.hdi_lower,
+        hdi_upper: summary.hdi_upper,
+        probability_positive: summary.probability_positive,
+        sigma_mean,
+        divergences,
+        acceptance_rate: acceptance_sum / CHAINS as f64,
+        mean_accept_probability: mean_accept_sum / CHAINS as f64,
+        step_size: step_sum / CHAINS as f64,
+        histogram_start: low,
+        histogram_bin_width: bin_width,
+        histogram_counts: counts,
+        curves,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn discrete_bn_query(
     values: &[f64],
     rows: usize,

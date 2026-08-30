@@ -635,10 +635,12 @@ function App() {
                       prepared={workflow.prepared}
                       discoveryRuns={workflow.discoveryRuns}
                       documents={workflow.dagDocuments}
+                      checks={workflow.dagChecks}
                       interventionQueries={workflow.interventionQueries}
                       onInterventionQuery={(query) => dispatch({ type: 'intervention-query-created', query })}
                       onDocumentCreated={(document) => dispatch({ type: 'dag-document-created', document })}
                       onDocumentRevised={(document) => dispatch({ type: 'dag-document-revised', document })}
+                      onCheck={(check) => dispatch({ type: 'dag-check-created', check })}
                       onUseForStudy={() => navigateToChapter('study')}
                       studyDraft={workflow.studyDraft}
                       onStudyDraftChanged={(draft) => dispatch({ type: 'study-draft-changed', draft })}

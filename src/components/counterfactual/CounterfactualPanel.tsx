@@ -9,6 +9,7 @@ import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { MetricTile } from '@/components/ui/figures'
+import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, field, fieldLabel, label, literal, num } from '@/components/ui/recipes'
 import { DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualRunArtifact, type LinearScmConfiguration } from '@/domain/counterfactual'
@@ -20,6 +21,7 @@ import { estimandSentence, type IdentificationArtifact, type IdentificationId, t
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatStatistic, type Formatted } from '@/lib/format/number'
 import { useRunActivity } from '@/lib/useRunActivity'
+import { interpretCounterfactualResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime } from '@/lib/format/date'
 
@@ -116,6 +118,7 @@ function RunCard({ run, study, current, stepLabel }: { readonly run: Counterfact
         <MetricTile label="Interventions" size="compact" value={text(`${evidence.interventions[0]} → ${evidence.interventions[1]}`)} context={`${study.treatment.name} set for every ${stepLabel}`} />
         <MetricTile label="Equations" size="compact" value={formatCount(evidence.equations.length)} context={`order ${evidence.order.map((node) => run.nodes[node]?.name ?? node).join(' → ')}`} />
       </div>
+      <ResultInterpretation interpretation={interpretCounterfactualResult(run, study, stepLabel)} className="mt-3" />
       <EChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" />
       <div className="mt-3 grid items-start gap-3 rounded-lg border border-hair bg-well p-3 @md/panel:grid-cols-[auto_1fr]">
         <label className="block text-body text-ink"><span className={fieldLabel}>Inspect {stepLabel}</span><input type="number" min={1} max={evidence.observations} aria-label={`Inspect ${stepLabel}`} className={field('text', 'mt-1 w-28')} value={row} onChange={(event) => setRow(Math.max(1, Math.min(evidence.observations, Math.floor(Number(event.target.value) || 1))))} /></label>

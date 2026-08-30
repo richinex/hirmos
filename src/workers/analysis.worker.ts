@@ -14,12 +14,13 @@ import { assertNever } from '@/domain/dop'
 import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence } from '@/domain/estimation'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
-import { ardlEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import { linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
+import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import {
   analysisProgressSchema,
   parseAnalysisWorkerCommand,
@@ -104,6 +105,19 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         outcome: command.outcome,
         unobserved: command.unobserved,
       }
+    case 'dag-check':
+      return {
+        kind: 'dagCheck',
+        rows: command.rows,
+        columns: command.columns,
+        nodeColumns: command.nodeColumns,
+        edges: command.edges,
+        implications: command.implications,
+        maximumObservations: command.maximumObservations,
+        permutations: command.permutations,
+        significanceLevel: command.significanceLevel,
+        runFalsification: command.runFalsification,
+      }
     case 'backdoor-linear':
       return {
         kind: 'backdoorLinear',
@@ -141,6 +155,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times }
     case 'negbin-nuts':
       return { kind: 'negbinNuts', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, confounder: command.confounder, warmup: command.warmup, samples: command.samples, seed: command.seed }
+    case 'bayesian-gaussian':
+      return { kind: 'bayesianGaussian', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, warmup: command.warmup, samples: command.samples, seed: command.seed }
     case 'discrete-bn-query':
       return { kind: 'discreteBnQuery', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, bins: command.bins, equivalentSampleSize: command.equivalentSampleSize }
     case 'linear-scm-counterfactual':
@@ -264,6 +280,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'backdoor-identification-succeeded', request: command.request, result: result.value })
         return
       }
+      case 'dag-check': {
+        const result = dagCheckEvidenceSchema.safeParse(decoded)
+        if (!result.success) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) })
+          return
+        }
+        emit({ kind: 'dag-check-succeeded', request: command.request, result: result.data })
+        return
+      }
       case 'backdoor-linear': {
         const result = parseBackdoorLinearEvidence(decoded)
         if (!result.ok) {
@@ -343,6 +368,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = negbinNutsEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'negbin-nuts-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'bayesian-gaussian': {
+        const result = bayesianGaussianEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'bayesian-gaussian-succeeded', request: command.request, result: result.data })
         return
       }
       case 'discrete-bn-query': {

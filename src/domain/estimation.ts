@@ -11,6 +11,7 @@ import {
   DISCRETE_BN_METHOD_ID,
   DML_IRM_METHOD_ID,
   DML_PLR_METHOD_ID,
+  BAYESIAN_GAUSSIAN_METHOD_ID,
   NEGBIN_NUTS_METHOD_ID,
   SYNTHETIC_CONTROL_METHOD_ID,
   VECM_METHOD_ID,
@@ -112,6 +113,13 @@ export interface NegbinNutsConfiguration {
   readonly seed: number
 }
 
+export interface BayesianGaussianConfiguration {
+  readonly kind: 'bayesian-gaussian'
+  readonly warmup: number
+  readonly samples: number
+  readonly seed: number
+}
+
 export interface DiscreteBnConfiguration {
   readonly kind: 'discrete-bn-query'
   readonly bins: number
@@ -126,6 +134,7 @@ export type EstimatorConfiguration =
   | VecmConfiguration
   | SyntheticControlConfiguration
   | NegbinNutsConfiguration
+  | BayesianGaussianConfiguration
   | DiscreteBnConfiguration
   | CausalEffectsConfiguration
   | CausalImpactConfiguration
@@ -133,7 +142,7 @@ export type EstimatorConfiguration =
 
 export type EstimatorId = EstimatorConfiguration['kind']
 
-export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = ['backdoor-linear-regression', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 'causal-effects-total', 'causal-impact', 'synthetic-control', 'panel-intervention', 'ardl-pss', 'vecm', 'discrete-bn-query']
+export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 'causal-effects-total', 'causal-impact', 'synthetic-control', 'panel-intervention', 'ardl-pss', 'vecm', 'discrete-bn-query']
 
 export const methodIdOf = (estimator: EstimatorId): MethodId => {
   switch (estimator) {
@@ -147,6 +156,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
     case 'synthetic-control': return SYNTHETIC_CONTROL_METHOD_ID
     case 'panel-intervention': return PANEL_INTERVENTION_METHOD_ID
     case 'negbin-nuts': return NEGBIN_NUTS_METHOD_ID
+    case 'bayesian-gaussian': return BAYESIAN_GAUSSIAN_METHOD_ID
     case 'discrete-bn-query': return DISCRETE_BN_METHOD_ID
     case 'causal-effects-total': return CAUSAL_EFFECTS_TOTAL_METHOD_ID
     case 'causal-impact': return CAUSAL_IMPACT_METHOD_ID
@@ -173,6 +183,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     }
     case 'panel-intervention': return { kind: estimator }
     case 'negbin-nuts': return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
+    case 'bayesian-gaussian': return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
     case 'discrete-bn-query': return { kind: estimator, bins: 3, equivalentSampleSize: 5 }
     case 'causal-effects-total': return { kind: estimator, estimator: { kind: 'linear' }, treatmentLag: 0, interventions: [0, 1] }
     case 'causal-impact': {
@@ -375,6 +386,42 @@ export const negbinNutsEvidenceSchema = z.object({
 
 export type NegbinNutsEvidence = z.infer<typeof negbinNutsEvidenceSchema>
 
+export const bayesianGaussianEvidenceSchema = z.object({
+  kind: z.literal('bayesianGaussian'),
+  observations: z.number().int().positive(),
+  warmup: z.number().int().positive(),
+  samples: z.number().int().positive(),
+  chains: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  effectMean: z.number().finite(),
+  effectSd: z.number().finite().nonnegative(),
+  effectMedian: z.number().finite(),
+  hdiLower: z.number().finite(),
+  hdiUpper: z.number().finite(),
+  probabilityPositive: z.number().min(0).max(1),
+  sigmaMean: z.number().finite().positive(),
+  divergences: z.number().int().nonnegative(),
+  acceptanceRate: z.number().min(0).max(1),
+  meanAcceptProbability: z.number().min(0).max(1),
+  stepSize: z.number().finite().positive(),
+  histogramStart: z.number().finite(),
+  histogramBinWidth: z.number().finite().positive(),
+  histogramCounts: z.array(z.number().int().nonnegative()).min(1),
+  curves: z.array(z.object({
+    standardised: z.boolean(),
+    grid: z.array(z.number().finite()).min(2),
+    controlLower: z.array(z.number().finite()),
+    controlMedian: z.array(z.number().finite()),
+    controlUpper: z.array(z.number().finite()),
+    treatedLower: z.array(z.number().finite()),
+    treatedMedian: z.array(z.number().finite()),
+    treatedUpper: z.array(z.number().finite()),
+  }).strict()),
+}).strict()
+
+export type BayesianGaussianEvidence = z.infer<typeof bayesianGaussianEvidenceSchema>
+export type BayesianGaussianCurve = BayesianGaussianEvidence['curves'][number]
+
 export const discreteBnEvidenceSchema = z.object({
   kind: z.literal('discreteBnQuery'),
   observations: z.number().int().positive(),
@@ -483,7 +530,14 @@ export type EffectEstimate =
 
 export type EstimateInterval =
   | { readonly kind: 'confidence'; readonly level: number; readonly lower: number; readonly upper: number }
+  | { readonly kind: 'credible'; readonly level: number; readonly summary: 'HDI' | 'ETI'; readonly lower: number; readonly upper: number }
   | { readonly kind: 'none'; readonly reason: string }
+
+/** The typed interval label for the number formatter: confidence stays a CI, credible carries its summary. */
+export const intervalTypeOf = (interval: Exclude<EstimateInterval, { readonly kind: 'none' }>) =>
+  interval.kind === 'confidence'
+    ? { kind: 'confidence' as const, level: interval.level }
+    : { kind: 'credible' as const, level: interval.level, summary: interval.summary }
 
 export interface CausalEstimate {
   readonly kind: 'causal-estimate'
@@ -518,6 +572,7 @@ export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
   | RunIdentity & { readonly kind: 'panel-intervention-run'; readonly method: typeof PANEL_INTERVENTION_METHOD_ID; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence; readonly timeLabels: NonEmptyArray<string> }
   | RunIdentity & { readonly kind: 'negbin-nuts-run'; readonly method: typeof NEGBIN_NUTS_METHOD_ID; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
+  | RunIdentity & { readonly kind: 'bayesian-gaussian-run'; readonly method: typeof BAYESIAN_GAUSSIAN_METHOD_ID; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
   | RunIdentity & { readonly kind: 'discrete-bn-run'; readonly method: typeof DISCRETE_BN_METHOD_ID; readonly configuration: DiscreteBnConfiguration; readonly evidence: DiscreteBnEvidence }
   | RunIdentity & { readonly kind: 'causal-effects-run'; readonly method: typeof CAUSAL_EFFECTS_TOTAL_METHOD_ID; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence }
   | RunIdentity & { readonly kind: 'causal-impact-run'; readonly method: typeof CAUSAL_IMPACT_METHOD_ID; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence }
@@ -814,6 +869,18 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       satisfy('nuts-interpretation', 'The rate ratio is the posterior median of exp(beta / sd(treatment)) with 2.5% and 97.5% quantiles.')
       break
     }
+    case 'bayesian-gaussian': {
+      if (adjustment === null) violate('bayes-gaussian-identified-adjustment', 'No measured back-door adjustment set was found, so the regression has no identified set to condition on.')
+      else satisfy('bayes-gaussian-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
+      leave('bayes-gaussian-binary-treatment', 'The treatment column is checked for 0/1 values when the run starts.')
+      leave('bayes-gaussian-prior-scale', 'Slope priors are Normal(0, 1) and the residual scale prior is half-normal(10). Non-binary adjustment columns are standardised, but the outcome keeps its units: on a scale where plausible effects lie far outside ±2, the prior pulls the estimate toward zero.')
+      leave('bayes-gaussian-convergence', `Divergences and the acceptance rate are reported with the run; warmup ${configuration.warmup} and ${configuration.samples} draws in each of 3 chains, seed ${configuration.seed}.`)
+      if (panel) leave('bayes-gaussian-independence', 'Rows are a panel; the model assumes independent rows.')
+      else if (timeSeries) leave('bayes-gaussian-independence', 'Rows are a time series; the model assumes independent rows.')
+      else satisfy('bayes-gaussian-independence', 'The prepared dataset holds independent rows.')
+      satisfy('bayes-gaussian-interpretation', 'The interval is a 94% highest-density credible interval: the posterior probability region under these priors, not a frequentist confidence interval.')
+      break
+    }
     case 'discrete-bn-query': {
       if (context.study === null) leave('bn-observed-graph', 'No study is loaded, so the graph cannot be checked.')
       else {
@@ -895,6 +962,7 @@ export function causalEstimateFrom(
     | { readonly kind: 'synthetic-control-run'; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
     | { readonly kind: 'panel-intervention-run'; readonly configuration: PanelInterventionConfiguration; readonly evidence: PanelInterventionEvidence }
     | { readonly kind: 'negbin-nuts-run'; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
+    | { readonly kind: 'bayesian-gaussian-run'; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
     | { readonly kind: 'discrete-bn-run'; readonly configuration: DiscreteBnConfiguration; readonly evidence: DiscreteBnEvidence }
     | { readonly kind: 'causal-effects-run'; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence }
     | { readonly kind: 'causal-impact-run'; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence },
@@ -1000,10 +1068,22 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'incidenceRateRatio', value: evidence.irrMedian },
-        interval: { kind: 'confidence', level: 0.95, lower: evidence.irrLower, upper: evidence.irrUpper },
+        interval: { kind: 'credible', level: 0.95, summary: 'ETI', lower: evidence.irrLower, upper: evidence.irrUpper },
         standardError: null,
         adjustmentSet,
         sample: { observations: evidence.observations, parameters: 4, degreesOfFreedom: null },
+      }
+    }
+    case 'bayesian-gaussian-run': {
+      const { evidence } = run
+      return {
+        kind: 'causal-estimate',
+        estimand: study.estimand,
+        effect: { kind: 'additive', value: evidence.effectMean, unit: '' },
+        interval: { kind: 'credible', level: 0.94, summary: 'HDI', lower: evidence.hdiLower, upper: evidence.hdiUpper },
+        standardError: null,
+        adjustmentSet,
+        sample: { observations: evidence.observations, parameters: adjustmentSet.length + 3, degreesOfFreedom: null },
       }
     }
     case 'discrete-bn-run': {
@@ -1078,6 +1158,7 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'synthetic-control': return 'Synthetic control'
     case 'panel-intervention': return 'Panel DID / synthetic DID'
     case 'negbin-nuts': return 'Bayesian negative binomial'
+    case 'bayesian-gaussian': return 'Bayesian Gaussian regression'
     case 'discrete-bn-query': return 'Discrete BN do-query'
     case 'causal-effects-total': return 'CausalEffects total effect'
     case 'causal-impact': return 'Causal impact'
