@@ -411,7 +411,7 @@ function App() {
       skipTarget="stage"
       mode={fullBleed ? 'full' : 'reading'}
       header={header}
-      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} sheetOpen={phoneNavOpen} onSheetClose={() => setPhoneNavOpen(false)} />}
+      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} phoneOpen={phoneNavOpen} onPhoneClose={() => setPhoneNavOpen(false)} />}
       stage={(
         <>
             {!route.ok && (

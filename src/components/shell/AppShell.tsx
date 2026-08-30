@@ -11,7 +11,7 @@ interface AppShellProps {
   readonly footer?: ReactNode
 }
 
-/** Header, chapter nav, and the stage as flex siblings behind hairlines: no overlays or shadows on desktop. */
+/** Header, chapter nav, and the stage as flex siblings behind hairlines: no overlays or shadows on desktop. The row is the shell container the nav queries. */
 export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppShellProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-stage text-ink">
@@ -20,7 +20,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppSh
         {header}
       </header>
 
-      <div className="flex min-h-0 flex-1">
+      <div className="@container/shell relative flex min-h-0 flex-1">
         {nav}
         <main id={skipTarget} className="flex min-w-0 flex-1">
           {mode === 'reading' ? (

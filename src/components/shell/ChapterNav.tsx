@@ -1,5 +1,4 @@
 import { Icon } from '@/components/Icon'
-import { Sheet } from '@/components/ui/Sheet'
 import { label } from '@/components/ui/recipes'
 import type { ChapterId } from '@/domain/navigation'
 import { assertNever } from '@/domain/dop'
@@ -48,56 +47,30 @@ interface ChapterNavProps {
   readonly active: ChapterId
   readonly collapsed: boolean
   readonly onNavigate: (chapter: ChapterId) => void
-  /** Phone only: whether the full list is open as a sheet; session state, not the persisted desktop preference. */
-  readonly sheetOpen: boolean
-  readonly onSheetClose: () => void
+  /** Phone only: whether the list is slid in over the stage; session state, not the persisted desktop preference. */
+  readonly phoneOpen: boolean
+  readonly onPhoneClose: () => void
 }
 
 /**
- * The chapter list: 208px with numbers and names, or the 48px icon rail. On a phone there is no
- * rail, so the stage has the full width; the header button opens the list as a left-edge sheet,
- * the only place a focus trap belongs (docs/design-suggestions/sidebars-and-panels.md).
- * Gated chapters stay in the tab order.
+ * The chapter list: 208px with numbers and names, or the 48px icon rail. When the shell container
+ * is narrower than md the list leaves the flow and slides in under the header, over the stage, so
+ * the header and its toggle stay put and the stage keeps the full width. Gated chapters stay in
+ * the tab order.
  */
-export function ChapterNav({ chapters, active, collapsed, onNavigate, sheetOpen, onSheetClose }: ChapterNavProps) {
+export function ChapterNav({ chapters, active, collapsed, onNavigate, phoneOpen, onPhoneClose }: ChapterNavProps) {
   const phone = useIsMobile()
+  const rail = collapsed && !phone
   return (
-    <>
-    <Sheet side="left" open={phone && sheetOpen} onClose={onSheetClose} title="Chapters">
-      <ol className="m-0 flex list-none flex-col gap-1 p-0" aria-label="Chapter list">
-        {chapters.map((chapter, index) => {
-          const isActive = chapter.id === active
-          const locked = chapter.status === 'locked'
-          const glyph = statusGlyph(chapter.status)
-          return (
-            <li key={chapter.id}>
-              <button
-                type="button"
-                aria-current={isActive ? 'page' : undefined}
-                aria-disabled={locked || undefined}
-                onClick={() => { if (!locked) { onNavigate(chapter.id); onSheetClose() } }}
-                className={cn(
-                  'flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-body',
-                  isActive ? 'border-edge bg-raised text-ink' : 'border-transparent text-faint',
-                  locked && 'cursor-not-allowed text-dim',
-                )}
-              >
-                <Icon name={chapter.icon} size={18} fill={isActive} />
-                <span className="min-w-0 flex-1 truncate"><span className="tabular-nums text-faint">{number(index)}</span> · {chapter.name}</span>
-                {glyph && <Icon name={glyph.icon} size={14} className={glyph.tone} />}
-                {glyph && <span className="sr-only">, {glyph.text}</span>}
-              </button>
-            </li>
-          )
-        })}
-      </ol>
-    </Sheet>
-    {!phone && <nav
+    <nav
       aria-label="Workspace chapters"
       data-chapter-nav
+      inert={phone && !phoneOpen ? true : undefined}
       className={cn(
-        'flex shrink-0 flex-col gap-1 overflow-hidden border-r border-line bg-panel py-2 transition-[width] duration-200 ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
-        collapsed ? 'w-12 items-center' : 'w-52 px-2',
+        'flex shrink-0 flex-col gap-1 overflow-hidden border-r border-line bg-panel py-2 transition-[width,transform] duration-200 ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+        rail ? 'w-12 items-center' : 'w-52 px-2',
+        '@max-md/shell:absolute @max-md/shell:inset-y-0 @max-md/shell:left-0 @max-md/shell:z-(--z-overlay) @max-md/shell:w-[min(85vw,320px)] @max-md/shell:px-2 @max-md/shell:shadow-[8px_0_24px_-12px_rgb(0_0_0/0.35)]',
+        phoneOpen ? '@max-md/shell:translate-x-0' : '@max-md/shell:-translate-x-full',
       )}
     >
       <ol className="m-0 flex list-none flex-col gap-1 p-0">
@@ -113,24 +86,24 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, sheetOpen,
                 type="button"
                 aria-current={isActive ? 'page' : undefined}
                 aria-disabled={locked || undefined}
-                aria-label={collapsed ? chapter.name : undefined}
-                title={collapsed ? (busy === null ? name : `${name}, ${Math.round(busy * 100)}% done`) : undefined}
-                onClick={() => { if (!locked) onNavigate(chapter.id) }}
+                aria-label={rail ? chapter.name : undefined}
+                title={rail ? (busy === null ? name : `${name}, ${Math.round(busy * 100)}% done`) : undefined}
+                onClick={() => { if (!locked) { onNavigate(chapter.id); onPhoneClose() } }}
                 className={cn(
                   'relative flex items-center gap-2 rounded-lg border text-left text-body transition-colors duration-150',
-                  collapsed ? 'grid h-9 w-9 place-items-center pointer-coarse:h-10 pointer-coarse:w-10' : 'w-full px-2.5 py-2',
+                  rail ? 'grid h-9 w-9 place-items-center pointer-coarse:h-10 pointer-coarse:w-10' : 'w-full px-2.5 py-2',
                   isActive ? 'border-edge bg-raised text-ink' : 'border-transparent text-faint hover:text-ink',
                   locked && 'cursor-not-allowed text-dim hover:text-dim',
                 )}
               >
-                <Icon name={chapter.icon} size={collapsed ? 19 : 16} fill={isActive} className={busy !== null ? 'text-signal' : undefined} />
-                {!collapsed && (
+                <Icon name={chapter.icon} size={rail ? 19 : 16} fill={isActive} className={busy !== null ? 'text-signal' : undefined} />
+                {!rail && (
                   <span className="min-w-0 flex-1 truncate">
                     <span className="tabular-nums text-faint">{number(index)}</span> · {chapter.name}
                   </span>
                 )}
                 {glyph && (
-                  <Icon name={glyph.icon} size={12} className={cn(glyph.tone, collapsed && 'absolute right-0.5 top-0.5')} />
+                  <Icon name={glyph.icon} size={12} className={cn(glyph.tone, rail && 'absolute right-0.5 top-0.5')} />
                 )}
                 {glyph && <span className="sr-only">, {glyph.text}</span>}
                 {busy !== null && <BusyBar fraction={busy} className="bottom-[3px] left-[5px] right-[5px]" />}
@@ -139,7 +112,6 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, sheetOpen,
           )
         })}
       </ol>
-    </nav>}
-    </>
+    </nav>
   )
 }

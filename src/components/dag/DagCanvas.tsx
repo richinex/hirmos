@@ -26,6 +26,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { Icon } from '@/components/Icon'
+import { Tooltip } from '@/components/ui/Tooltip'
 import { iconControl, label, literal } from '@/components/ui/recipes'
 import {
   describeDagEditProblem,
@@ -40,7 +41,7 @@ import {
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
 import { affectedDagEdges } from '@/domain/dagValidation'
 import { assertNever } from '@/domain/dop'
-import { layoutDagForCanvas } from './dagCanvasModel'
+import { layoutDagForCanvas, type DagLayoutOrientation } from './dagCanvasModel'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
 import type { InterventionOverlay } from '@/domain/intervention'
 import { dagPointerTarget, type DagPointerTarget, type ScreenTargetBox } from './dagPointerTarget'
@@ -363,8 +364,12 @@ function DagGrid() {
 }
 
 /** Refits the view when the canvas box changes size, so a pane resize or a taller stage never leaves the graph cut off. */
-function RefitOnResize({ host }: { readonly host: React.RefObject<HTMLDivElement | null> }) {
+function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTMLDivElement | null>; readonly layoutKey: string }) {
   const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void fitView({ ...FIT_VIEW, duration: 160 }) }, 60)
+    return () => window.clearTimeout(timer)
+  }, [fitView, layoutKey])
   useEffect(() => {
     const element = host.current
     if (element === null) return
@@ -471,13 +476,13 @@ const describeConnectionNotice = (notice: ConnectionNotice): string => {
   }
 }
 
-const IDLE_HINT = 'Drag from a variable’s handle onto another variable to draw a causal arrow. Select an arrow to reverse, reconnect, or remove it.'
+const IDLE_HINT = 'Drag from a card’s handle onto another card to draw an arrow. Select an arrow to reverse, reconnect or remove it.'
 
-const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null): {
+const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation): {
   readonly nodes: CanvasNode[]
   readonly edges: CanvasEdge[]
 } => {
-  const placements = new Map(layoutDagForCanvas(document.current.graph, flow === null ? null : { treatment: flow.treatment, outcome: flow.outcome }).map((placed) => [placed.id, placed]))
+  const placements = new Map(layoutDagForCanvas(document.current.graph, flow === null ? null : { treatment: flow.treatment, outcome: flow.outcome }, orientation).map((placed) => [placed.id, placed]))
   const highlighted = evidenceColumns(candidate)
   const validation = document.current.validation
   const problemEdges = new Set(validation.kind === 'invalid' ? validation.issues.flatMap(affectedDagEdges) : [])
@@ -583,7 +588,16 @@ export function DagCanvas({
   readonly onEdgeSelected: (edge: DagEdgeId | null) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention), [document, flow, intervention, selectedEvidence])
+  // A canvas narrower than three rails runs the layout down the page instead of across it.
+  const [orientation, setOrientation] = useState<DagLayoutOrientation>('across')
+  useEffect(() => {
+    const host = hostRef.current
+    if (host === null) return
+    const observer = new ResizeObserver(([entry]) => { setOrientation(entry.contentRect.width < 600 ? 'down' : 'across') })
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [])
+  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, orientation), [document, flow, intervention, orientation, selectedEvidence])
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(model.nodes)
   const [connectingFrom, setConnectingFrom] = useState<DagNodeId | null>(null)
   const [connectionNotice, setConnectionNotice] = useState<ConnectionNotice | null>(null)
@@ -616,8 +630,8 @@ export function DagCanvas({
   const tidy = () => {
     setNodes(model.nodes)
   }
-  // Binding the study changes every card's role, so the drawing is laid out again around the new baseline.
-  const bindingKey = flow === null ? '' : `${flow.treatment}\u0000${flow.outcome}`
+  // Binding the study changes every card's role, and turning the layout changes every slot, so the drawing is laid out again.
+  const bindingKey = `${flow === null ? '' : `${flow.treatment}\u0000${flow.outcome}`}\u0000${orientation}`
   const previousBinding = useRef(bindingKey)
   useEffect(() => {
     if (previousBinding.current === bindingKey) return
@@ -853,7 +867,7 @@ export function DagCanvas({
       ref={hostRef}
       className={expanded
         ? 'fixed inset-3 z-(--z-dialog) flex flex-col overflow-hidden rounded-xl border border-edge bg-well float'
-        : 'relative flex min-h-[16rem] flex-1 flex-col overflow-hidden rounded-xl border border-edge bg-well'}
+        : 'relative flex min-h-[16rem] flex-1 flex-col overflow-hidden rounded-xl border border-edge bg-well @max-md/panel:min-h-[26rem]'}
       aria-label="Causal DAG editor"
       onKeyDown={keyDown}
     >
@@ -940,17 +954,21 @@ export function DagCanvas({
             />
           )}
           <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} />
-          <RefitOnResize host={hostRef} />
+          <RefitOnResize host={hostRef} layoutKey={bindingKey} />
         </ReactFlow>
         </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-hair bg-panel px-3 py-1.5">
-        <p
-          role="status"
-          className={`m-0 min-w-0 flex-1 text-label ${refusedNotice ? 'text-warn' : connectionNotice !== null ? 'text-ink' : 'text-faint'}`}
-        >
-          {connectionNotice === null ? IDLE_HINT : describeConnectionNotice(connectionNotice)}
-        </p>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Tooltip text={IDLE_HINT}>
+            <button type="button" className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-faint transition-colors hover:text-ink" aria-label="How to draw and edit arrows">
+              <Icon name="help" size={15} />
+            </button>
+          </Tooltip>
+          <p role="status" className={`m-0 min-w-0 flex-1 text-label ${refusedNotice ? 'text-warn' : 'text-ink'}`}>
+            {connectionNotice === null ? '' : describeConnectionNotice(connectionNotice)}
+          </p>
+        </div>
         {flow !== null && (
           <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-label text-faint" aria-label="Arrow legend">
             <span className="flex items-center gap-1.5"><span aria-hidden className="h-[2px] w-4 rounded bg-ok" />directed causal path</span>

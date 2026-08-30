@@ -19,9 +19,11 @@ const MARGIN = 34
  * left of effects, crossings minimised, long arrows given room between the columns they skip. Lagged
  * arrows count as arrows; self-loops do not.
  */
-export function layoutEditableDag(graph: EditableDag): readonly DagNodePlacement[] {
+export type DagLayoutOrientation = 'across' | 'down'
+
+export function layoutEditableDag(graph: EditableDag, orientation: DagLayoutOrientation = 'across'): readonly DagNodePlacement[] {
   const layout = new dagre.graphlib.Graph()
-  layout.setGraph({ rankdir: 'LR', nodesep: ROW_GAP, ranksep: COLUMN_GAP, marginx: MARGIN, marginy: MARGIN })
+  layout.setGraph({ rankdir: orientation === 'across' ? 'LR' : 'TB', nodesep: ROW_GAP, ranksep: COLUMN_GAP, marginx: MARGIN, marginy: MARGIN })
   layout.setDefaultEdgeLabel(() => ({}))
   for (const node of graph.nodes) layout.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
   for (const edge of graph.edges) {
@@ -152,10 +154,35 @@ export function layoutBoundDag(graph: EditableDag, binding: DagBinding): readonl
 }
 
 /** The rail layout once treatment and outcome are bound and both are in the graph; dagre until then. */
-export function layoutDagForCanvas(graph: EditableDag, binding: DagBinding | null): readonly DagNodePlacement[] {
+export function layoutDagForCanvas(graph: EditableDag, binding: DagBinding | null, orientation: DagLayoutOrientation = 'across'): readonly DagNodePlacement[] {
   const bound = binding !== null
     && binding.treatment !== binding.outcome
     && graph.nodes.some((node) => node.id === binding.treatment)
     && graph.nodes.some((node) => node.id === binding.outcome)
-  return bound ? layoutBoundDag(graph, binding) : layoutEditableDag(graph)
+  if (!bound) return layoutEditableDag(graph, orientation)
+  const across = layoutBoundDag(graph, binding)
+  return orientation === 'across' ? across : transposeRails(across)
+}
+
+/**
+ * The rail layout turned to run down a narrow canvas: each across-column becomes a row, the
+ * treatment at the top and the outcome at the bottom, and the cards that shared a column sit side
+ * by side, centred, so nothing is wider than two cards.
+ */
+const DOWN_PITCH = NODE_WIDTH + 40
+const transposeRails = (placements: readonly DagNodePlacement[]): readonly DagNodePlacement[] => {
+  const columns = new Map<number, DagNodePlacement[]>()
+  for (const placed of placements) {
+    const column = Math.round((placed.x + NODE_WIDTH / 2) / RAIL_COLUMN)
+    columns.set(column, [...(columns.get(column) ?? []), placed])
+  }
+  const ordered = [...columns.keys()].sort((a, b) => a - b)
+  return ordered.flatMap((column, row) => {
+    const members = [...(columns.get(column) ?? [])].sort((a, b) => a.y - b.y)
+    return members.map((placed, index) => ({
+      id: placed.id,
+      x: MARGIN + (index - (members.length - 1) / 2) * DOWN_PITCH,
+      y: MARGIN + row * RAIL_ROW,
+    }))
+  })
 }
