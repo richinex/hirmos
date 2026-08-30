@@ -69,9 +69,10 @@ test('profiles the pinned Seatbelts Parquet through the same canonical worker', 
   await page.getByRole('button', { name: 'Inspect data' }).click()
 
   await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  // Each figure renders a screen-reader form beside the visible one, so assert the visible span.
   const profileFacts = page.locator('dl[aria-label="Dataset size"]')
-  await expect(profileFacts.locator('dd').nth(0)).toHaveText('192')
-  await expect(profileFacts.locator('dd').nth(1)).toHaveText('9')
+  await expect(profileFacts.locator('dd').nth(0).locator('[aria-hidden]')).toHaveText('192')
+  await expect(profileFacts.locator('dd').nth(1).locator('[aria-hidden]')).toHaveText('9')
   await expect(page.getByRole('columnheader', { name: 'DriversKilled', exact: true })).toBeVisible()
   await expect(page.getByText(/SHA-256 8e1ce6d1b4e6/)).toBeVisible()
   const firstPreviewRow = page.getByLabel('Preview').getByRole('row').nth(1)

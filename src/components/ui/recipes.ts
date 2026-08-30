@@ -143,6 +143,9 @@ export const label = (extra?: string): string => cn('text-label uppercase tracki
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
 
+/** A hairline-joined grid of figure cells: the 1px gaps draw the rules, so the cells carry no borders of their own. */
+export const figureGrid = (extra?: string): string => cn('grid gap-px overflow-hidden rounded-lg border border-hair bg-hair', extra)
+
 /** Text colour for a machine-state verdict, from the status ramp; muted for a state that is neither good nor bad. */
 export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 

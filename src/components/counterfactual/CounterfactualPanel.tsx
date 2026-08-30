@@ -11,7 +11,7 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, field, fieldLabel, label, literal, num } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualRunArtifact, type LinearScmConfiguration } from '@/domain/counterfactual'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
@@ -19,7 +19,7 @@ import { COUNTERFACTUAL_METHODS, LINEAR_SCM_METHOD_ID, methodDefinition } from '
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { estimandSentence, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatCount, formatStatistic, type Formatted } from '@/lib/format/number'
+import { formatCount, formatStatistic, formatWords } from '@/lib/format/number'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretCounterfactualResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
@@ -51,7 +51,6 @@ const step = (state: State, event: Event): State => {
   }
 }
 
-const text = (value: string): Formatted => ({ text: value, parts: [{ kind: 'digits', text: value }], exact: '', srText: value })
 
 function EquationsTable({ run }: { readonly run: CounterfactualRunArtifact }) {
   const name = (node: number) => run.nodes[node]?.name ?? String(node)
@@ -110,13 +109,13 @@ function RunCard({ run, study, current, stepLabel }: { readonly run: Counterfact
       </div>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">What {study.outcome.name} would have been with {study.treatment.name} set to {evidence.interventions[1]} instead of {evidence.interventions[0]}</h3>
       <p className="m-0 text-body text-muted">For each {stepLabel}, the model infers disturbance terms from the observed values. It then sets {study.treatment.name} to each specified value and predicts {study.outcome.name}. The difference is the observation-specific effect implied by the fitted equations.</p>
-      <div className="mt-3 grid gap-2 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4" aria-label="Counterfactual summary">
-        <MetricTile label={constant ? 'Effect for every row' : 'Average individual effect'} size="compact" value={formatStatistic('raw', evidence.averageEffect)} context={constant ? 'the same for all rows: a linear model with exact abduction gives coefficient × change' : `SD across ${stepLabel}s ${formatStatistic('sd', sd).text}`} />
+      <div className={figureGrid('mt-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Counterfactual summary">
+        <MetricTile label={constant ? 'Effect for every row' : 'Average individual effect'} size="compact" frame="cell" value={formatStatistic('raw', evidence.averageEffect)} context={constant ? 'the same for all rows: a linear model with exact abduction gives coefficient × change' : `SD across ${stepLabel}s ${formatStatistic('sd', sd).text}`} />
         {constant
-          ? <MetricTile label="Rows" size="compact" value={formatCount(evidence.observations)} context="one model-implied outcome pair per observation" />
-          : <MetricTile label="Share positive" size="compact" value={formatStatistic('score', evidence.sharePositive)} context={`of ${formatCount(evidence.observations).text} ${stepLabel}s`} />}
-        <MetricTile label="Interventions" size="compact" value={text(`${evidence.interventions[0]} → ${evidence.interventions[1]}`)} context={`${study.treatment.name} set for every ${stepLabel}`} />
-        <MetricTile label="Equations" size="compact" value={formatCount(evidence.equations.length)} context={`order ${evidence.order.map((node) => run.nodes[node]?.name ?? node).join(' → ')}`} />
+          ? <MetricTile label="Rows" size="compact" frame="cell" value={formatCount(evidence.observations)} context="one model-implied outcome pair per observation" />
+          : <MetricTile label="Share positive" size="compact" frame="cell" value={formatStatistic('score', evidence.sharePositive)} context={`of ${formatCount(evidence.observations).text} ${stepLabel}s`} />}
+        <MetricTile label="Interventions" size="compact" frame="cell" value={formatWords(`${evidence.interventions[0]} → ${evidence.interventions[1]}`)} context={`${study.treatment.name} set for every ${stepLabel}`} />
+        <MetricTile label="Equations" size="compact" frame="cell" value={formatCount(evidence.equations.length)} context={`order ${evidence.order.map((node) => run.nodes[node]?.name ?? node).join(' → ')}`} />
       </div>
       <ResultInterpretation interpretation={interpretCounterfactualResult(run, study, stepLabel)} className="mt-3" />
       <EChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" />

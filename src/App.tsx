@@ -475,10 +475,17 @@ function App() {
                                 : `${entry.sourceName} · every chapter filled in`}
                             </span>
                           </div>
+                          {/* Every row renders all four action slots, hidden where a control does not apply, so the columns align down the list. */}
                           <button type="button" className={button('outline')} onClick={() => void (example ? openExample() : reopenProject(entry.id))}>Open</button>
-                          {example && stored && <button type="button" className={iconControl('quiet')} aria-label="Reset the example" title="Put the example back as shipped, discarding changes to this copy" onClick={() => void openExample(true)}><Icon name="restart_alt" size={14} /></button>}
-                          {stored && <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>}
-                          {stored && <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>}
+                          {example && stored
+                            ? <button type="button" className={iconControl('quiet')} aria-label="Reset the example" title="Put the example back as shipped, discarding changes to this copy" onClick={() => void openExample(true)}><Icon name="restart_alt" size={14} /></button>
+                            : <span aria-hidden className={iconControl('quiet', 'invisible')} />}
+                          {stored
+                            ? <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
+                            : <span aria-hidden className={iconControl('quiet', 'invisible')} />}
+                          {stored
+                            ? <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
+                            : <span aria-hidden className={iconControl('danger', 'invisible')} />}
                         </li>
                       )
                     })}

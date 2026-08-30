@@ -300,6 +300,11 @@ export function formatStatistic(kind: StatisticKind, value: number, opts: { read
 }
 
 /** Refusal and absence tokens. Always a token with screen-reader text; never an empty string. */
+/** A words-only figure, for a tile whose value is a phrase rather than a number. */
+export function formatWords(value: string): Formatted {
+  return assemble([{ kind: 'digits', text: value }], value, value)
+}
+
 export function formatAbsent(reason: AbsenceReason, detail?: string): Formatted {
   const token = ((): { readonly text: string; readonly srText: string } => {
     switch (reason) {

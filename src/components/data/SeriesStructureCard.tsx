@@ -5,7 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { MetricTile } from '@/components/ui/figures'
-import { button, field, label, num } from '@/components/ui/recipes'
+import { button, field, figureGrid, label, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { SERIES_STRUCTURE_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -37,10 +37,10 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
         <span className="text-body font-medium text-ink">{facts.name}</span>
         <span className={num('text-micro text-faint')}>{facts.evidence.changePoints.length === 0 ? 'no change points' : `change points at ${facts.evidence.changePoints.join(', ')}`} · penalty {formatStatistic('raw', facts.evidence.peltPenalty).text}</span>
       </div>
-      <div className="mt-2 grid gap-2 @2xl/panel:grid-cols-3">
-        <MetricTile label="Trend strength" size="compact" value={strength(facts.evidence.trendStrength)} context="seasonal-trend decomposition using loess (STL), 0 to 1" />
-        <MetricTile label="Seasonal strength" size="compact" value={strength(facts.evidence.seasonalStrength)} context={period === null ? 'no period' : `period ${period}`} />
-        <MetricTile label="Change points" size="compact" value={formatCount(facts.evidence.changePoints.length)} context="pruned exact linear time (PELT), L2 cost" />
+      <div className={figureGrid('mt-2 @2xl/panel:grid-cols-3')}>
+        <MetricTile label="Trend strength" size="compact" frame="cell" value={strength(facts.evidence.trendStrength)} context="seasonal-trend decomposition using loess (STL), 0 to 1" />
+        <MetricTile label="Seasonal strength" size="compact" frame="cell" value={strength(facts.evidence.seasonalStrength)} context={period === null ? 'no period' : `period ${period}`} />
+        <MetricTile label="Change points" size="compact" frame="cell" value={formatCount(facts.evidence.changePoints.length)} context="pruned exact linear time (PELT), L2 cost" />
       </div>
       <p className="mb-0 mt-2 text-label text-muted">Strengths near 1 mean that the fitted trend or seasonal component accounts for most of the variation remaining after the other component is removed; values near 0 indicate little such structure. PELT locations are the optimum for this penalty and minimum-segment choice, not hypothesis-test rejections.</p>
       <EChart option={option} label={`${facts.name} with PELT change points`} className="mt-2 h-[180px]" testId="change-points" />

@@ -60,7 +60,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <span className={label('text-signal')}>Estimate and uncertainty</span>
-            <p className="mb-0 mt-1 text-body text-muted">{describeEstimator(run.configuration.kind)} · {run.eligibility.kind === 'eligible' ? 'all assessed requirements met' : `${run.eligibility.unresolved.length} requirements not checked`}</p>
+            <p className="mb-0 mt-1 text-body text-muted">{describeEstimator(run.configuration.kind)} · {run.eligibility.kind === 'eligible' ? 'all pre-run checks completed' : `${run.eligibility.unresolved.length} pre-run requirements to review`}</p>
           </div>
           <button type="button" className={button('outline')} onClick={download}>Export the manifest</button>
         </div>
@@ -97,7 +97,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
 
       {manifest.warnings.length > 0 && (
         <section className="rounded-xl border border-hair bg-panel p-4" aria-label="Unresolved requirements">
-          <h3 className={label('mb-2 mt-0 text-warn')}>Requirements not checked</h3>
+          <h3 className={label('mb-2 mt-0 text-warn')}>Requirements to review</h3>
           <ul className="m-0 space-y-1 pl-4 text-body text-muted">
             {manifest.warnings.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
@@ -108,7 +108,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       <Section title="Estimator">
         <Row term="Method">{describeEstimator(run.configuration.kind)}</Row>
         <Row term="Configuration"><span className={literal('text-muted')}>{Object.entries(run.configuration).filter(([key]) => key !== 'kind').map(([key, value]) => `${key} ${JSON.stringify(value)}`).join(' · ') || 'defaults'}</span></Row>
-        <Row term="Eligibility">{run.eligibility.kind === 'eligible' ? 'all requirements met' : `${run.eligibility.unresolved.length} unresolved`}</Row>
+        <Row term="Pre-run eligibility">{run.eligibility.kind === 'eligible' ? 'all checks completed' : `${run.eligibility.unresolved.length} requirements to review`}</Row>
         <Row term="Rows">{formatCount(estimate.sample.observations).text}</Row>
         <Row term="Run">{shortId(run.id)} · {formatTimestamp(run.createdAt)}</Row>
       </Section>

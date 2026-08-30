@@ -10,7 +10,7 @@ import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceT
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { OcsePlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, field, label, literal, num } from '@/components/ui/recipes'
+import { button, field, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
 import {
   DISCOVERY_LAG_OPTIONS,
@@ -106,7 +106,7 @@ const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => num
 function ResultEligibility({ eligibility }: { readonly eligibility: MethodEligibility }) {
   switch (eligibility.kind) {
     case 'eligible': return <span className="text-ok">Available · {eligibility.satisfied.length} requirements checked</span>
-    case 'caution': return <span className="text-warn">Available · {eligibility.unresolved.length} requirements not checked</span>
+    case 'caution': return <span className="text-warn">Available · {eligibility.unresolved.length} requirements to review</span>
     case 'refused': return <span className="text-danger">Unavailable · {eligibility.violations.length} requirements fail</span>
     default: return assertNever(eligibility)
   }
@@ -404,7 +404,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     <div className="flex flex-col gap-4">
       <section aria-labelledby="prepared-input-title">
         <h3 id="prepared-input-title" className="mb-3 mt-0 text-body font-medium text-ink">Prepared dataset</h3>
-        <dl className="m-0 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-hair bg-hair">
+        <dl className={figureGrid('m-0 grid-cols-2')}>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Structure</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind === 'prepared-time-series' ? `Regular ${prepared.sampling.frequency} series` : prepared.kind === 'prepared-panel' ? `Panel · ${prepared.panel.units} units × ${prepared.panel.periods} periods` : 'Independent observations'}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Rows</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatCount(prepared.observations).text}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Variables</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{prepared.columns.length}</dd></div>

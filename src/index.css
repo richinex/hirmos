@@ -185,7 +185,7 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
 }
 
 /* Tailwind v4's preflight sets buttons to cursor:default; restore the affordance for clickables. */
-button:not(:disabled),
+button:not(:disabled):not([aria-disabled='true']),
 [role='button'],
 summary,
 select,
@@ -194,8 +194,9 @@ label:has(> input[type='radio']) {
   cursor: pointer;
 }
 button:disabled { cursor: not-allowed; }
-/* Physical press: a 1px settle on :active. Transform-only, so it costs nothing. */
-button:not(:disabled):active, [role='button']:active { transform: translateY(1px); }
+/* Physical press: a 1px settle on :active. Transform-only, so it costs nothing. Controls disabled
+   through aria-disabled (kept focusable so their reason stays reachable) must not depress either. */
+button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([aria-disabled='true']):active { transform: translateY(1px); }
 /* One keyboard-focus contract for the whole app: signal ring at 2px offset — the DEFAULT for every
    focusable thing, including text fields (they were missing, so no input or textarea in the app had a
    focus ring at all; those are the controls a keyboard user spends the most time in).
@@ -322,6 +323,8 @@ button[aria-busy="true"]::after {
    adds a theme-aware drop shadow for surfaces that leave the plane (Rnd windows, modals), replacing the flat
    shadow-2xl so panels visibly lift off the stage. */
 .lift { box-shadow: inset 0 1px 0 var(--color-highlight); }
+/* Non-interactive texture: a faint 45° hatch says "not usable here" as a pattern, not a colour. */
+.hatch { background-image: repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-muted) 14%, transparent) 0 2px, transparent 2px 9px); }
 :root { --shadow-float: 0 24px 50px -12px rgba(0, 0, 0, 0.55); }
 :root[data-theme="light"] { --shadow-float: 0 18px 48px rgba(47, 52, 55, 0.10); }
 :root[data-theme="sketchbook"] { --shadow-float: 0 18px 48px rgba(87, 62, 30, 0.16); }

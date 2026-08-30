@@ -684,7 +684,9 @@ const applyLevelRule = (
 }
 
 const findCaveat = (method: MethodDefinition, id: string): MethodDefinition['caveats'][number] =>
-  method.caveats.find((caveat) => caveat.id === (id as MethodDefinition['caveats'][number]['id'])) ?? method.caveats[0]
+  method.caveats.find((caveat) => caveat.id === id) ?? (() => {
+    throw new Error(`Method catalogue invariant failed: ${method.name} has no condition “${id}”.`)
+  })()
 
 const isNonEmpty = <Value>(values: readonly Value[]): values is NonEmptyArray<Value> => values.length > 0
 
@@ -697,7 +699,7 @@ const TARGET_COMPATIBILITY_CAVEAT: MethodCaveat = {
 }
 
 const verdict = (satisfied: Satisfied[], unresolved: Unresolved[], violations: Violated[]): MethodEligibility => {
-  if (isNonEmpty(violations)) return { kind: 'refused', violations }
+  if (isNonEmpty(violations)) return { kind: 'refused', satisfied, unresolved, violations }
   if (isNonEmpty(unresolved)) return { kind: 'caution', satisfied, unresolved }
   return { kind: 'eligible', satisfied }
 }
@@ -866,19 +868,19 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (panel) leave('nuts-independence', 'Rows are a panel; the model assumes independent counts.')
       else if (timeSeries) leave('nuts-independence', 'Rows are a time series; the model assumes independent counts.')
       else satisfy('nuts-independence', 'The prepared dataset holds independent rows.')
-      satisfy('nuts-interpretation', 'The rate ratio is the posterior median of exp(beta / sd(treatment)) with 2.5% and 97.5% quantiles.')
       break
     }
     case 'bayesian-gaussian': {
       if (adjustment === null) violate('bayes-gaussian-identified-adjustment', 'No measured back-door adjustment set was found, so the regression has no identified set to condition on.')
       else satisfy('bayes-gaussian-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
-      leave('bayes-gaussian-binary-treatment', 'The treatment column is checked for 0/1 values when the run starts.')
+      if (context.treatmentIsBinary === null) leave('bayes-gaussian-binary-treatment', 'The treatment column has not been read yet; it is checked before the estimator runs.')
+      else if (context.treatmentIsBinary) satisfy('bayes-gaussian-binary-treatment', 'Every treatment value is 0 or 1.')
+      else violate('bayes-gaussian-binary-treatment', 'The treatment holds values other than 0 and 1, so do(0) versus do(1) is not the recorded treatment contrast.')
       leave('bayes-gaussian-prior-scale', 'Slope priors are Normal(0, 1) and the residual scale prior is half-normal(10). Non-binary adjustment columns are standardised, but the outcome keeps its units: on a scale where plausible effects lie far outside ±2, the prior pulls the estimate toward zero.')
       leave('bayes-gaussian-convergence', `Divergences and the acceptance rate are reported with the run; warmup ${configuration.warmup} and ${configuration.samples} draws in each of 3 chains, seed ${configuration.seed}.`)
       if (panel) leave('bayes-gaussian-independence', 'Rows are a panel; the model assumes independent rows.')
       else if (timeSeries) leave('bayes-gaussian-independence', 'Rows are a time series; the model assumes independent rows.')
       else satisfy('bayes-gaussian-independence', 'The prepared dataset holds independent rows.')
-      satisfy('bayes-gaussian-interpretation', 'The interval is a 94% highest-density credible interval: the posterior probability region under these priors, not a frequentist confidence interval.')
       break
     }
     case 'discrete-bn-query': {
@@ -889,9 +891,10 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         else satisfy('bn-observed-graph', `All ${context.study.graph.nodes.length} DAG nodes are measured; the query adjusts for the treatment’s parents.`)
       }
       satisfy('bn-discretisation', `Each variable is cut into ${configuration.bins} quantile bins. The run records the mean value for each state.`)
-      if (context.study !== null && prepared.observations < configuration.bins ** 2 * 5) leave('bn-sample-per-cell', `${prepared.observations} rows over ${configuration.bins} bins leaves few rows per parent configuration. The Bayesian Dirichlet equivalent uniform (BDeu) prior, with equivalent sample size ${configuration.equivalentSampleSize}, carries weight.`)
-      else satisfy('bn-sample-per-cell', `${prepared.observations} rows with a Bayesian Dirichlet equivalent uniform prior sample size of ${configuration.equivalentSampleSize}.`)
-      satisfy('bn-treatment-states', 'The effect is the expected outcome under the highest treatment bin minus the lowest.')
+      leave('bn-sample-per-cell', `${prepared.observations} total rows do not establish support in every parent configuration. Cell counts are not reported in this release; sparse cells receive BDeu pseudo-counts with equivalent sample size ${configuration.equivalentSampleSize}.`)
+      if (timeSeries) violate('bn-independent-rows', 'The prepared rows are a time series; this discrete network has no lag or serial-dependence model.')
+      else if (panel) violate('bn-independent-rows', 'The prepared rows repeat units through time; this discrete network has no unit or serial-dependence model.')
+      else leave('bn-independent-rows', 'Cross-sectional structure does not by itself establish independent sampling. Confirm that clustering or repeated observations are absent.')
       break
     }
     case 'causal-effects-total': {

@@ -158,7 +158,7 @@ export function evaluateGrangerEligibility(
         unresolved.push({ kind: 'unresolved', caveat, missingEvidence: 'No recorded evidence covers this condition.' })
     }
   }
-  if (isNonEmpty(violations)) return { kind: 'refused', violations }
+  if (isNonEmpty(violations)) return { kind: 'refused', satisfied, unresolved, violations }
   if (isNonEmpty(unresolved)) return { kind: 'caution', satisfied, unresolved }
   return { kind: 'eligible', satisfied }
 }

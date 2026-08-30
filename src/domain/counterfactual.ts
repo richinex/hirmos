@@ -67,7 +67,9 @@ type Unresolved = Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>
 type Violated = Extract<CaveatEvaluation, { readonly kind: 'violated' }>
 
 const findCaveat = (method: MethodDefinition, id: string): MethodDefinition['caveats'][number] =>
-  method.caveats.find((caveat) => caveat.id === (id as MethodDefinition['caveats'][number]['id'])) ?? method.caveats[0]
+  method.caveats.find((caveat) => caveat.id === id) ?? (() => {
+    throw new Error(`Method catalogue invariant failed: ${method.name} has no condition “${id}”.`)
+  })()
 
 /** Rules over the study's graph, the identification, and the configuration. */
 export function evaluateCounterfactualEligibility(method: MethodDefinition, context: {
@@ -94,9 +96,7 @@ export function evaluateCounterfactualEligibility(method: MethodDefinition, cont
   leave('scm-modularity', 'The run assumes intervention changes only the treatment equation and carries each row’s inferred disturbance terms unchanged into both intervention worlds; this cross-world structural assumption is not testable from the observed rows.')
   if (prepared.kind === 'prepared-time-series' || study.graph.laggedArrows > 0) leave('scm-contemporaneous', study.graph.laggedArrows > 0 ? `${study.graph.laggedArrows} lagged arrows are collapsed; each row is treated as one unit.` : 'Rows are a time series; each row is treated as one unit.')
   else satisfy('scm-contemporaneous', 'Independent observations with no lagged arrows.')
-  satisfy('scm-reading', `Setting ${study.treatment.name} to ${configuration.interventions[0]} and to ${configuration.interventions[1]} for every row; the difference is the fitted SCM’s model-implied individual effect.`)
-
-  if (isNonEmpty(violations)) return { kind: 'refused', violations }
+  if (isNonEmpty(violations)) return { kind: 'refused', satisfied, unresolved, violations }
   if (isNonEmpty(unresolved)) return { kind: 'caution', satisfied, unresolved }
   return { kind: 'eligible', satisfied }
 }

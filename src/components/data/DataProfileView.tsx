@@ -2,7 +2,8 @@ import type { ReactNode } from 'react'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { isNumericDuckDbType } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
-import { label, literal, num } from '@/components/ui/recipes'
+import { FigureParts } from '@/components/ui/figures'
+import { figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { formatCount } from '@/lib/format/number'
 import { PreviewTable } from './PreviewTable'
 import { SchemaTable } from './SchemaTable'
@@ -22,6 +23,11 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
 }) {
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType)).length
   const summary = useDatasetSummary(source, profile)
+  const sizeFigures = [
+    { name: 'Rows', figure: formatCount(profile.rowCount) },
+    { name: 'Columns', figure: formatCount(profile.columns.length) },
+    { name: 'Numeric', figure: formatCount(numericColumns) },
+  ]
   return (
     <section className="rise @container/studio flex w-full flex-col gap-5" aria-labelledby="data-profile-title">
       <header className="flex flex-wrap items-end justify-between gap-3">
@@ -30,19 +36,13 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
           <h2 id="data-profile-title" className="mb-0 mt-2 text-heading text-ink">Data profile</h2>
           <p className="mb-0 mt-1 text-body text-muted">{profile.source.fileName}</p>
         </div>
-        <dl aria-label="Dataset size" className="m-0 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-hair bg-hair">
-          <div className="bg-panel px-3 py-2">
-            <dt className={label('text-faint')}>Rows</dt>
-            <dd className={num('m-0 mt-1 text-title text-ink')}>{formatCount(profile.rowCount).text}</dd>
-          </div>
-          <div className="bg-panel px-3 py-2">
-            <dt className={label('text-faint')}>Columns</dt>
-            <dd className={num('m-0 mt-1 text-title text-ink')}>{profile.columns.length}</dd>
-          </div>
-          <div className="bg-panel px-3 py-2">
-            <dt className={label('text-faint')}>Numeric</dt>
-            <dd className={num('m-0 mt-1 text-title text-ink')}>{numericColumns}</dd>
-          </div>
+        <dl aria-label="Dataset size" className={figureGrid('m-0 grid-cols-3')}>
+          {sizeFigures.map(({ name, figure }) => (
+            <div key={name} className="bg-panel px-3 py-2">
+              <dt className={label('text-faint')}>{name}</dt>
+              <dd className={num('m-0 mt-1 text-title leading-none tracking-tight text-ink')} title={figure.exact}><FigureParts value={figure} /></dd>
+            </div>
+          ))}
         </dl>
       </header>
 

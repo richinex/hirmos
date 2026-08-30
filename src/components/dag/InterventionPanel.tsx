@@ -5,7 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { MetricTile } from '@/components/ui/figures'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, num } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DagDocument, DagNodeId } from '@/domain/dag'
 import type { NonEmptyArray } from '@/domain/dop'
@@ -50,10 +50,10 @@ function QueryRecord({ query, open }: { readonly query: InterventionQueryArtifac
         <div className="px-3 pb-3">
           <p className="m-0 text-body text-muted">{describeInterventionVerdict(query)}</p>
           <p className="mb-0 mt-1 text-label text-faint">This is a model-based contrast between discretised treatment states. Its causal interpretation depends on the recorded DAG, valid adjustment, the BDeu conditional probability tables, and the selected quantile bins; no uncertainty interval is reported.</p>
-          <div className="mt-3 grid gap-2 @sm/inspector:grid-cols-3">
-            <MetricTile label={`${query.read.name} if ${query.set.name} set low`} size="compact" value={formatStatistic('raw', result.expectations[0])} context={`bin ${result.treatmentStates[0]}`} />
-            <MetricTile label={`${query.read.name} if ${query.set.name} set high`} size="compact" value={formatStatistic('raw', result.expectations[1])} context={`bin ${result.treatmentStates[1]}`} />
-            <MetricTile label="Difference" size="compact" value={formatStatistic('raw', result.effect)} context={`${result.bins} bins · equivalent sample size ${result.equivalentSampleSize}`} />
+          <div className={figureGrid('mt-3 @sm/inspector:grid-cols-3')}>
+            <MetricTile label={`${query.read.name} if ${query.set.name} set low`} size="compact" frame="cell" value={formatStatistic('raw', result.expectations[0])} context={`bin ${result.treatmentStates[0]}`} />
+            <MetricTile label={`${query.read.name} if ${query.set.name} set high`} size="compact" frame="cell" value={formatStatistic('raw', result.expectations[1])} context={`bin ${result.treatmentStates[1]}`} />
+            <MetricTile label="Difference" size="compact" frame="cell" value={formatStatistic('raw', result.effect)} context={`${result.bins} bins · equivalent sample size ${result.equivalentSampleSize}`} />
           </div>
           <div className="mt-3 rounded-lg border border-hair bg-well p-2">
             <EChart option={option} label={`${query.read.name} distribution under do(${query.set.name})`} className="h-[200px]" />

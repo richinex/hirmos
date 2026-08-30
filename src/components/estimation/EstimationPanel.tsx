@@ -13,10 +13,10 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { Formula } from '@/components/ui/Formula'
-import { IntervalFigure, MetricTile } from '@/components/ui/figures'
+import { FigureParts, IntervalFigure, MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, field, fieldHint, fieldLabel, label, literal, num } from '@/components/ui/recipes'
+import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -50,7 +50,7 @@ import {
 } from '@/domain/panel'
 import { estimandSentence, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatCount, formatEstimate, formatInterval, formatP, formatStatistic, type Formatted } from '@/lib/format/number'
+import { formatCount, formatEstimate, formatInterval, formatP, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
@@ -75,6 +75,18 @@ interface PanelBinding {
   readonly treatment: ColumnId
 }
 
+interface StudyDataBinding {
+  readonly prepared: PreparedDatasetArtifact['id']
+  readonly treatment: ColumnId
+  readonly outcome: ColumnId
+}
+
+type StudyDataPreflightJob =
+  | { readonly kind: 'not-required' }
+  | { readonly kind: 'loading'; readonly binding: StudyDataBinding }
+  | { readonly kind: 'ready'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean }
+  | { readonly kind: 'failed'; readonly binding: StudyDataBinding; readonly detail: string }
+
 type PanelPreflightJob =
   | { readonly kind: 'not-required' }
   | { readonly kind: 'loading'; readonly binding: PanelBinding }
@@ -87,6 +99,7 @@ interface State {
   readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>>
   readonly job: Job
   readonly panelPreflight: PanelPreflightJob
+  readonly studyDataPreflight: StudyDataPreflightJob
 }
 
 type Event =
@@ -101,6 +114,10 @@ type Event =
   | { readonly type: 'panel-preflight-started'; readonly binding: PanelBinding }
   | { readonly type: 'panel-preflight-succeeded'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
   | { readonly type: 'panel-preflight-refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
+  | { readonly type: 'study-data-preflight-not-required' }
+  | { readonly type: 'study-data-preflight-started'; readonly binding: StudyDataBinding }
+  | { readonly type: 'study-data-preflight-succeeded'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean }
+  | { readonly type: 'study-data-preflight-failed'; readonly binding: StudyDataBinding; readonly detail: string }
 
 const step = (state: State, event: Event): State => {
   switch (event.type) {
@@ -115,6 +132,10 @@ const step = (state: State, event: Event): State => {
     case 'panel-preflight-started': return { ...state, panelPreflight: { kind: 'loading', binding: event.binding } }
     case 'panel-preflight-succeeded': return { ...state, panelPreflight: { kind: 'ready', binding: event.binding, matrix: event.matrix, layout: event.layout } }
     case 'panel-preflight-refused': return { ...state, panelPreflight: { kind: 'refused', binding: event.binding, problem: event.problem } }
+    case 'study-data-preflight-not-required': return { ...state, studyDataPreflight: { kind: 'not-required' } }
+    case 'study-data-preflight-started': return { ...state, studyDataPreflight: { kind: 'loading', binding: event.binding } }
+    case 'study-data-preflight-succeeded': return { ...state, studyDataPreflight: { kind: 'ready', binding: event.binding, treatmentIsBinary: event.treatmentIsBinary, outcomeIsCount: event.outcomeIsCount } }
+    case 'study-data-preflight-failed': return { ...state, studyDataPreflight: { kind: 'failed', binding: event.binding, detail: event.detail } }
     default: return assertNever(event)
   }
 }
@@ -140,7 +161,6 @@ const intervalText = (estimate: CausalEstimate): string => {
   return `[${figure.bounds.lower}, ${figure.bounds.upper}]`
 }
 
-const text = (value: string): Formatted => ({ text: value, parts: [{ kind: 'digits', text: value }], exact: '', srText: value })
 
 const samePanelBinding = (left: PanelBinding, right: PanelBinding): boolean =>
   left.prepared === right.prepared
@@ -148,6 +168,11 @@ const samePanelBinding = (left: PanelBinding, right: PanelBinding): boolean =>
   && left.time === right.time
   && left.outcome === right.outcome
   && left.treatment === right.treatment
+
+const sameStudyDataBinding = (left: StudyDataBinding, right: StudyDataBinding): boolean =>
+  left.prepared === right.prepared
+  && left.treatment === right.treatment
+  && left.outcome === right.outcome
 
 const eligibilityLabel = (eligibility: MethodEligibility): string => {
   switch (eligibility.kind) {
@@ -168,7 +193,8 @@ const eligibilityTone = (eligibility: MethodEligibility): string => {
 }
 
 function EstimatorOptionLabel({ name, eligibility }: { readonly name: string; readonly eligibility: MethodEligibility }) {
-  return <span>{name} <span className={cn('ml-1 text-label', eligibilityTone(eligibility))}>· {eligibilityLabel(eligibility)}</span></span>
+  // A refused chip is already grey and hatched; a fully saturated red status word would outshout it.
+  return <span>{name} <span className={cn('ml-1 text-label', eligibility.kind === 'refused' ? 'text-danger/60' : eligibilityTone(eligibility))}>· {eligibilityLabel(eligibility)}</span></span>
 }
 
 const panelWeight = (values: readonly number[], index: number): string => formatStatistic('score', values[index] ?? Number.NaN).text
@@ -254,7 +280,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           evidence.family === 'poisson'
             ? { label: 'Deviance', value: formatStatistic('raw', evidence.deviance ?? Number.NaN), context: `${formatCount(evidence.degreesOfFreedom).text} degrees of freedom` }
             : { label: 'Dispersion alpha', value: formatStatistic('raw', evidence.alpha ?? Number.NaN), context: `log likelihood ${formatStatistic('raw', evidence.logLikelihood ?? Number.NaN).text}` },
-          { label: 'Convergence', value: text(evidence.converged ? 'converged' : 'not converged'), context: `${formatCount(evidence.iterations).text} iterations` },
+          { label: 'Convergence', value: formatWords(evidence.converged ? 'converged' : 'not converged'), context: `${formatCount(evidence.iterations).text} iterations` },
         ]
       }
       case 'ardl-run': {
@@ -262,18 +288,18 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const reading = boundsReading(evidence)
         const [lower, upper] = evidence.boundsCritical[1] ?? [Number.NaN, Number.NaN]
         return [
-          { label: 'Bounds test', value: text(reading === 'level-relation' ? 'level relation' : reading === 'no-level-relation' ? 'no level relation' : 'inconclusive'), context: `F ${formatStatistic('raw', evidence.boundsStatistic).text} against 5% bounds ${formatStatistic('raw', lower).text} to ${formatStatistic('raw', upper).text}` },
+          { label: 'Bounds test', value: formatWords(reading === 'level-relation' ? 'level relation' : reading === 'no-level-relation' ? 'no level relation' : 'inconclusive'), context: `F ${formatStatistic('raw', evidence.boundsStatistic).text} against 5% bounds ${formatStatistic('raw', lower).text} to ${formatStatistic('raw', upper).text}` },
           { label: 'Bounds p', value: formatP(evidence.boundsPUpper, { withLabel: false }), context: `I(1) bound · I(0) bound p ${formatP(evidence.boundsPLower, { withLabel: false }).text}` },
-          { label: 'Lag orders', value: text(`ARDL(${evidence.arLag}, ${evidence.dlLag})`), context: `AIC over ${formatCount(evidence.grid.length).text} candidates · ${evidence.trend === 'ct' ? 'constant and trend' : 'constant'} · case ${evidence.case}` },
+          { label: 'Lag orders', value: formatWords(`ARDL(${evidence.arLag}, ${evidence.dlLag})`), context: `AIC over ${formatCount(evidence.grid.length).text} candidates · ${evidence.trend === 'ct' ? 'constant and trend' : 'constant'} · case ${evidence.case}` },
         ]
       }
       case 'vecm-run': {
         const { evidence } = run
         return [
           { label: 'Cointegration rank', value: formatCount(evidence.rank), context: `Johansen trace at ${['90', '95', '99'][evidence.significance] ?? ''}% · ${evidence.kArDiff} lagged differences` },
-          { label: 'Adjustment p', value: text(evidence.pvaluesAlpha.map((row) => formatP(row[0] ?? Number.NaN, { withLabel: false }).text).join(' · ')), context: `alpha per equation · terms “${evidence.deterministic}”` },
+          { label: 'Adjustment p', value: formatWords(evidence.pvaluesAlpha.map((row) => formatP(row[0] ?? Number.NaN, { withLabel: false }).text).join(' · ')), context: `alpha per equation · terms “${evidence.deterministic}”` },
           evidence.chow === null
-            ? { label: 'Chow break', value: text('not requested'), context: 'set a break row to test stability' }
+            ? { label: 'Chow break', value: formatWords('not requested'), context: 'set a break row to test stability' }
             : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: `F ${formatStatistic('raw', evidence.chow[0]).text} at the chosen row` },
         ]
       }
@@ -281,7 +307,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const { evidence } = run
         const donorNames = run.columns.slice(2).map((variable) => variable.name)
         return [
-          { label: 'Donor weights', value: text(evidence.weights.map((weight, index) => `${donorNames[index] ?? index} ${formatStatistic('score', weight).text}`).join(' · ')), context: `${formatCount(evidence.weights.length).text} donors · sum to one` },
+          { label: 'Donor weights', value: formatWords(evidence.weights.map((weight, index) => `${donorNames[index] ?? index} ${formatStatistic('score', weight).text}`).join(' · ')), context: `${formatCount(evidence.weights.length).text} donors · sum to one` },
           { label: 'Pre-period loss', value: formatStatistic('raw', evidence.loss), context: `${formatCount(evidence.nPre).text} pre rows · ${formatCount(evidence.iterations).text} active-set steps` },
           { label: 'Average post gap', value: formatStatistic('raw', evidence.att), context: `over ${formatCount(evidence.nPost).text} post rows` },
         ]
@@ -295,9 +321,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           .map(({ weight, unit }) => `${unit} ${formatStatistic('score', weight).text}`)
           .join(' · ')
         return [
-          { label: 'Estimator comparison', value: text(`DID ${formatStatistic('raw', evidence.did.estimate).text} · SC ${formatStatistic('raw', evidence.syntheticControl.estimate).text} · SDID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: `${formatCount(evidence.nPost).text} post periods` },
-          { label: 'Panel layout', value: text(`${evidence.treatedUnits} treated · ${evidence.controlUnits} controls`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
-          { label: 'Largest SDID weights', value: text(topWeights || 'none'), context: `noise level ${formatStatistic('raw', evidence.syntheticDid.noiseLevel).text}` },
+          { label: 'Estimator comparison', value: formatWords(`DID ${formatStatistic('raw', evidence.did.estimate).text} · SC ${formatStatistic('raw', evidence.syntheticControl.estimate).text} · SDID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: `${formatCount(evidence.nPost).text} post periods` },
+          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated · ${evidence.controlUnits} controls`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
+          { label: 'Largest SDID weights', value: formatWords(topWeights || 'none'), context: `noise level ${formatStatistic('raw', evidence.syntheticDid.noiseLevel).text}` },
         ]
       }
       case 'negbin-nuts-run': {
@@ -319,17 +345,17 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       case 'discrete-bn-run': {
         const { evidence } = run
         return [
-          { label: 'Treatment bins', value: text(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: `${evidence.bins} quantile bins · states ${evidence.stateCounts.join('/')}` },
-          { label: 'Expected outcome', value: text(`${formatStatistic('raw', evidence.expectations[0]).text} → ${formatStatistic('raw', evidence.expectations[1]).text}`), context: 'under do(low) and do(high)' },
+          { label: 'Treatment bins', value: formatWords(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: `${evidence.bins} quantile bins · states ${evidence.stateCounts.join('/')}` },
+          { label: 'Expected outcome', value: formatWords(`${formatStatistic('raw', evidence.expectations[0]).text} → ${formatStatistic('raw', evidence.expectations[1]).text}`), context: 'under do(low) and do(high)' },
           ...(evidence.parentsAdjusted.join(', ') === run.estimate.adjustmentSet.map((variable) => variable.name).join(', ') ? [] : [
-  { label: 'Adjustment set', value: text(evidence.parentsAdjusted.length === 0 ? 'none' : evidence.parentsAdjusted.join(', ')), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : evidence.minimalAdjustmentSet.join(', ')}` },
+  { label: 'Adjustment set', value: formatWords(evidence.parentsAdjusted.length === 0 ? 'none' : evidence.parentsAdjusted.join(', ')), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : evidence.minimalAdjustmentSet.join(', ')}` },
           ]),
         ]
       }
       case 'double-ml-run': {
         const { evidence } = run
         return [
-          { label: 'Model', value: text(evidence.model === 'plr' ? 'partially linear' : evidence.att ? 'interactive · effect on the treated' : 'interactive · average effect'), context: evidence.treatBinary ? 'binary treatment' : 'continuous treatment' },
+          { label: 'Model', value: formatWords(evidence.model === 'plr' ? 'partially linear' : evidence.att ? 'interactive · effect on the treated' : 'interactive · average effect'), context: evidence.treatBinary ? 'binary treatment' : 'continuous treatment' },
           { label: 'Standard error', value: formatStatistic('raw', evidence.standardError), context: 'sandwich, cross-fitted' },
           { label: 'Fold seed', value: formatCount(evidence.seed), context: '5 folds · 200 trees · learner seed 7' },
         ]
@@ -338,8 +364,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const { evidence } = run
         const nodeName = (node: readonly [number, number]) => `${run.columns[node[0]]?.name ?? node[0]}${node[1] === 0 ? '' : ` (t${node[1]})`}`
         return [
-          { label: 'Adjustment set', value: text(evidence.adjustmentSet.length === 0 ? 'None' : evidence.adjustmentSet.map(nodeName).join(', ')), context: `τ max ${evidence.tauMax}` },
-          { label: 'Predictions', value: text(evidence.predictions.map((value) => formatStatistic('raw', value).text).join(' → ')), context: `at ${evidence.interventions[0]} and ${evidence.interventions[1]}` },
+          { label: 'Adjustment set', value: formatWords(evidence.adjustmentSet.length === 0 ? 'None' : evidence.adjustmentSet.map(nodeName).join(', ')), context: `τ max ${evidence.tauMax}` },
+          { label: 'Predictions', value: formatWords(evidence.predictions.map((value) => formatStatistic('raw', value).text).join(' → ')), context: `at ${evidence.interventions[0]} and ${evidence.interventions[1]}` },
           { label: 'Fitted rows', value: formatCount(evidence.fittedObservations), context: evidence.mediators.length === 0 ? 'no mediators' : `${evidence.mediators.length} mediator nodes` },
         ]
       }
@@ -355,9 +381,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
     }
   })()
   return (
-    <div className="mt-4 grid gap-2 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4" aria-label="Diagnostics">
-      <MetricTile label="Adjustment set" size="compact" value={text(run.estimate.adjustmentSet.length === 0 ? 'None' : run.estimate.adjustmentSet.map((variable) => variable.name).join(', '))} />
-      {tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" value={tile.value} context={tile.context} />)}
+    <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
+      <MetricTile label="Adjustment set" size="compact" frame="cell" value={formatWords(run.estimate.adjustmentSet.length === 0 ? 'None' : run.estimate.adjustmentSet.map((variable) => variable.name).join(', '))} />
+      {tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </div>
   )
 }
@@ -418,7 +444,7 @@ function ResultCard({ run, study, current, stepLabel }: { readonly run: Estimati
         ) : (
           <figure className="m-0" data-testid="effect-estimate">
             <figcaption className="text-title text-ink">{sentence}</figcaption>
-            <p className={num(`mb-0 mt-1 text-metric font-semibold ${current ? 'text-signal' : 'text-ink'}`)}>{headline(estimate).text}</p>
+            <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${current ? 'text-signal' : 'text-ink'}`)} title={headline(estimate).exact}><FigureParts value={headline(estimate)} /></p>
             <p className={num('mb-0 mt-1 text-body text-bone')}>
               {estimate.effect.kind === 'path' ? `cumulative over ${formatCount(estimate.effect.values.length).text} ${stepLabel}s · average ${formatStatistic('raw', estimate.effect.aggregate.average).text} per ${stepLabel} · ` : ''}
               no interval · n = {formatCount(estimate.sample.observations).text}
@@ -514,6 +540,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, latestStudy)])) as Record<EstimatorId, EstimatorConfiguration>,
     job: { kind: 'idle' },
     panelPreflight: { kind: 'not-required' },
+    studyDataPreflight: { kind: 'not-required' },
   }))
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
   const study = identification === null ? null : studies.find((candidate) => candidate.id === identification.study) ?? null
@@ -524,6 +551,25 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const panelBinding = useMemo<PanelBinding | null>(() => prepared.kind === 'prepared-panel' && study !== null
     ? { prepared: prepared.id, unit: prepared.sampling.unitColumn, time: prepared.sampling.timeColumn, outcome: study.outcome.column, treatment: study.treatment.column }
     : null, [prepared, study])
+  const studyDataBinding = useMemo<StudyDataBinding | null>(() => study === null
+    ? null
+    : { prepared: prepared.id, treatment: study.treatment.column, outcome: study.outcome.column }, [prepared.id, study])
+  const studyDataFacts = useMemo(() => {
+    if (studyDataBinding === null) return { treatmentIsBinary: null, outcomeIsCount: null } as const
+    const job = state.studyDataPreflight
+    if (job.kind !== 'ready' || !sameStudyDataBinding(job.binding, studyDataBinding)) return { treatmentIsBinary: null, outcomeIsCount: null } as const
+    return { treatmentIsBinary: job.treatmentIsBinary, outcomeIsCount: job.outcomeIsCount } as const
+  }, [state.studyDataPreflight, studyDataBinding])
+  const studyDataPending = studyDataBinding !== null
+    && (state.studyDataPreflight.kind === 'not-required'
+      || !('binding' in state.studyDataPreflight)
+      || !sameStudyDataBinding(state.studyDataPreflight.binding, studyDataBinding)
+      || state.studyDataPreflight.kind === 'loading')
+  const studyDataError = studyDataBinding !== null
+    && state.studyDataPreflight.kind === 'failed'
+    && sameStudyDataBinding(state.studyDataPreflight.binding, studyDataBinding)
+    ? state.studyDataPreflight.detail
+    : null
   const panelPreflight = useMemo<PanelInterventionPreflight>(() => {
     if (panelBinding === null) return { kind: 'not-applicable' }
     const job = state.panelPreflight
@@ -566,6 +612,33 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     return () => { cancelled = true }
   }, [panelBinding, prepared.kind, profile, source.file])
 
+  useEffect(() => {
+    if (studyDataBinding === null || study === null) {
+      dispatch({ type: 'study-data-preflight-not-required' })
+      return
+    }
+    let cancelled = false
+    dispatch({ type: 'study-data-preflight-started', binding: studyDataBinding })
+    void (async () => {
+      const { materialisePrepared, describePreparedMaterialisationProblem } = await import('@/data/prepared')
+      const matrix = await materialisePrepared(source, profile, prepared, [study.treatment.column, study.outcome.column])
+      if (cancelled) return
+      if (!matrix.ok) {
+        dispatch({ type: 'study-data-preflight-failed', binding: studyDataBinding, detail: describePreparedMaterialisationProblem(matrix.error) })
+        return
+      }
+      const treatment = matrix.value.values.subarray(0, matrix.value.rowCount)
+      const outcome = matrix.value.values.subarray(matrix.value.rowCount, matrix.value.rowCount * 2)
+      dispatch({
+        type: 'study-data-preflight-succeeded',
+        binding: studyDataBinding,
+        treatmentIsBinary: treatment.every((value) => value === 0 || value === 1),
+        outcomeIsCount: outcome.every((value) => Number.isInteger(value) && value >= 0),
+      })
+    })()
+    return () => { cancelled = true }
+  }, [prepared, profile, source, study, studyDataBinding])
+
   const eligibilityByEstimator = useMemo<ReadonlyMap<EstimatorId, MethodEligibility>>(() => {
     const evaluations = new Map<EstimatorId, MethodEligibility>()
     if (identification === null) return evaluations
@@ -577,15 +650,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         prepared,
         stationarity,
         configuration: state.configurations[estimator],
-        outcomeIsCount: null,
-        treatmentIsBinary: null,
+        outcomeIsCount: studyDataFacts.outcomeIsCount,
+        treatmentIsBinary: studyDataFacts.treatmentIsBinary,
         document,
         study,
         panelPreflight,
       }))
     }
     return evaluations
-  }, [document, identification, panelPreflight, prepared, state.configurations, stationarity, study])
+  }, [document, identification, panelPreflight, prepared, state.configurations, stationarity, study, studyDataFacts])
   const eligibility = eligibilityByEstimator.get(state.estimator) ?? null
   const configure = (next: EstimatorConfiguration) => dispatch({ type: 'configured', configuration: next })
 
@@ -1015,29 +1088,34 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 )}
               </label>
               <div>
-                <span className={fieldLabel}>Estimator</span>
+                <span className={fieldLabel}>Estimation methods</span>
                 <SegmentedControl
                   className="mt-1"
-                  ariaLabel="Estimator"
+                  ariaLabel="Estimation methods"
+            wrap
                   value={state.estimator}
                   onChange={(estimator) => dispatch({ type: 'estimator-chosen', estimator })}
                   options={ESTIMATOR_IDS.flatMap((id) => {
                     const definition = methodDefinition(methodIdOf(id))
                     const candidateEligibility = eligibilityByEstimator.get(id)
                     return definition.ok && candidateEligibility !== undefined
-                      ? [{ value: id, label: <EstimatorOptionLabel name={definition.value.name} eligibility={candidateEligibility} />, disabled: candidateEligibility.kind === 'refused', title: `${definition.value.name}: ${eligibilityLabel(candidateEligibility)}` }]
+                      ? [{ value: id, label: <EstimatorOptionLabel name={definition.value.name} eligibility={candidateEligibility} />, disabled: candidateEligibility.kind === 'refused', title: candidateEligibility.kind === 'refused'
+              ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
+              : `${definition.value.name}: ${eligibilityLabel(candidateEligibility)}` }]
                       : []
                   })}
                 />
+                <p className={cn(fieldHint, 'max-w-[65ch]')}>Available: pre-run checks completed. Review: runnable, with conditions to assess. Unavailable: a known requirement is not met.</p>
                 {method.ok && <p className={cn(fieldHint, 'max-w-[65ch]')}>{method.value.summary}</p>}
                 {method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>
               <div>{controls}</div>
             </div>
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
+            {studyDataError !== null && <Alert tone="danger" className="mt-3"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The estimate could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
-              {configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
+            <button type="button" className={button('signal', 'mt-4')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              {studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
             </button>
           </>
         )}

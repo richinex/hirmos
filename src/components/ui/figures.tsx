@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils'
  * result's place when the machine declines. Every digit comes through `src/lib/format/number.ts`.
  */
 
-function Parts({ value, unitClass = 'text-bone' }: { readonly value: Formatted; readonly unitClass?: string }) {
+/** Renders a `Formatted` with its screen-reader form and per-part styling; every figure outside a chart should pass through here. */
+export function FigureParts({ value, unitClass = 'text-bone' }: { readonly value: Formatted; readonly unitClass?: string }) {
   return (
     <>
       <span className="sr-only">{value.srText}</span>
@@ -26,19 +27,22 @@ function Parts({ value, unitClass = 'text-bone' }: { readonly value: Formatted; 
   )
 }
 
-export function MetricTile({ label, value, context, size = 'default', className }: {
+export function MetricTile({ label, value, context, size = 'default', frame = 'card', className }: {
   readonly label: string
   readonly value: Formatted
   readonly context?: ReactNode
   readonly size?: 'hero' | 'default' | 'compact'
+  /** `cell` drops the tile's own border for a hairline-joined grid, where the container's 1px gaps draw the rules. */
+  readonly frame?: 'card' | 'cell'
   readonly className?: string
 }) {
-  const figure = size === 'hero' ? 'text-metric' : 'text-heading'
+  const figure = size === 'hero' ? 'text-metric' : size === 'compact' ? 'text-title' : 'text-heading'
   return (
-    <div className={cn('rounded-lg border border-hair bg-well px-4 py-3', className)}>
+    // Its own container, so a tile squeezed by the grid sheds the context line rather than wrapping it.
+    <div className={cn('@container bg-well', frame === 'card' && 'rounded-lg border border-hair', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
       <span className={labelCn('block text-muted')}>{label}</span>
-      <p className={cn('mb-0 mt-1 font-semibold text-ink', figure)} title={value.exact}><Parts value={value} /></p>
-      {context && <p className={num('mb-0 mt-1 text-body text-bone')}>{context}</p>}
+      <p className={cn('mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
+      {context && <p className={num('mb-0 mt-1 text-body text-bone @max-[11rem]:hidden')}>{context}</p>}
     </div>
   )
 }
@@ -64,7 +68,7 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
   return (
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title text-ink">{sentence}</figcaption>
-      <p className={cn('mb-0 mt-1 text-metric font-semibold', accent ? 'text-signal' : 'text-ink')} title={figure.exact}>
+      <p className={cn('mb-0 mt-1 text-metric font-semibold leading-none tracking-tight', accent ? 'text-signal' : 'text-ink')} title={figure.exact}>
         <span className="sr-only">{figure.srText}</span>
         <span aria-hidden className={num()}>
           {point.map((part, index) => part.kind === 'unit'

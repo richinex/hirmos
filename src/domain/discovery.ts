@@ -494,6 +494,8 @@ export function evaluateDiscoveryEligibility(
     const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat
     return {
       kind: 'refused',
+      satisfied: [],
+      unresolved: [],
       violations: [{
         kind: 'violated',
         caveat: samplingCaveat,

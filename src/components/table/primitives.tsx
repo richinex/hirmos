@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils'
 
 /**
  * The pieces every data table shares: the panel shell with its toolbar and live count line, the
- * sortable header cell, the filter field, facet pills, the density switch, the inline sparklines, and
- * the per-column action menu. Styling comes from the recipes; nothing here knows what the rows are.
+ * sortable header cell, the filter field, facet pills, the density switch, and the per-column action
+ * menu. Styling comes from the recipes; nothing here knows what the rows are.
  */
 
 /** Row pitch per density, hairline included; the recipes' `rowPadding` is derived to hit it exactly. */

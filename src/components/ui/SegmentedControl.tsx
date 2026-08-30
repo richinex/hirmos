@@ -17,8 +17,9 @@ import { cn } from '@/lib/utils'
  * text and hit areas never move and the knob stays right when the group wraps onto a second line. The
  * house ease-out carries the slide; reduced motion drops it to a jump.
  *
- * Keep to two to five options with short noun labels. Past five, or when labels will not fit on one
- * line, use `Select` instead of letting the group wrap.
+ * Keep to two to five options with short noun labels while the knob slides. Past five, pass `wrap`:
+ * the knob gives way to a per-chip selected surface, so a wrapping catalogue stays calm instead of
+ * sending the knob travelling across rows.
  */
 
 export interface SegmentOption<V extends string> {
@@ -39,6 +40,8 @@ export interface SegmentedControlProps<V extends string> {
   readonly size?: 'sm' | 'md'
   /** Stretch to the container and give every segment the same width. Use only with labels of similar length. */
   readonly fill?: boolean
+  /** A wrapping choice grid for longer catalogues: no sliding knob; each chip carries its own selected surface, focus ring, press acknowledgement, and a hatch when disabled. */
+  readonly wrap?: boolean
   readonly disabled?: boolean
 }
 
@@ -57,11 +60,24 @@ const SIZE: Record<'sm' | 'md', string> = {
   md: 'px-3 py-1.5 text-body',
 }
 
-export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', fill = false, disabled = false }: SegmentedControlProps<V>) {
+/**
+ * Wrap-grid chips draw their states on two pseudo-element layers, so selection and keyboard focus
+ * never fight: `after` is the selected surface arriving from the centre behind the label, `before`
+ * an outset signal ring that converges on focus, replacing the app-wide outline.
+ */
+const CHIP_LAYERS = [
+  'isolate',
+  "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:scale-90 after:rounded-md after:border after:border-edge after:bg-raised after:opacity-0 after:transition-[opacity,transform] after:duration-150 after:content-['']",
+  "before:pointer-events-none before:absolute before:-inset-[3px] before:scale-110 before:rounded-lg before:border-2 before:border-signal before:opacity-0 before:transition-[opacity,transform] before:duration-150 before:content-['']",
+  'focus-visible:outline-none focus-visible:before:scale-100 focus-visible:before:opacity-100',
+].join(' ')
+
+export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', fill = false, wrap = false, disabled = false }: SegmentedControlProps<V>) {
   const host = useRef<HTMLDivElement>(null)
   const [knob, setKnob] = useState<Frame | null>(null)
 
   const measure = useCallback(() => {
+    if (wrap) { setKnob(null); return }
     const element = host.current
     if (element === null) return
     const checked = element.querySelector<HTMLButtonElement>('[role="radio"][aria-checked="true"]')
@@ -71,7 +87,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     const rect = checked.getBoundingClientRect()
     const next = { left: rect.left - hostRect.left - element.clientLeft, top: rect.top - hostRect.top - element.clientTop, width: rect.width, height: rect.height }
     setKnob((previous) => (sameFrame(previous, next) ? previous : next))
-  }, [])
+  }, [wrap])
 
   useLayoutEffect(measure)
 
@@ -136,7 +152,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
         className,
       )}
     >
-      {knob !== null && (
+      {!wrap && knob !== null && (
         <span
           aria-hidden
           className="pointer-events-none absolute left-0 top-0 rounded-md border border-edge bg-raised transition-[transform,width,height] duration-200 ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none"
@@ -161,7 +177,12 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
               'relative whitespace-nowrap rounded-md border border-transparent transition-colors duration-150 pointer-coarse:min-h-10',
               SIZE[size],
               fill && 'min-w-0 flex-1 basis-0 truncate text-center',
-              !enabled ? 'cursor-not-allowed text-faint' : checked ? 'text-ink' : 'text-muted hover:text-ink',
+              wrap && CHIP_LAYERS,
+              !enabled
+                ? cn('cursor-not-allowed text-faint', wrap && 'hatch')
+                : checked
+                  ? cn('text-ink', wrap && 'after:scale-100 after:opacity-100')
+                  : cn('text-muted hover:text-ink', wrap && 'active:after:scale-100 active:after:opacity-40'),
             )}
           >
             {option.label}

@@ -17,13 +17,13 @@ export function EligibilityView({ eligibility, subject = 'this prepared dataset'
     case 'eligible':
       return (
         <Alert tone="ok" live={false} className="mt-4">
-          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Available; all requirements checked</p>
+          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Available; all pre-run checks completed</p>
         </Alert>
       )
     case 'caution':
       return (
         <Alert tone="warn" live={false} className="mt-4">
-          <p className="m-0 flex items-center gap-2"><Icon name="warning" size={16} /> Available; some requirements not checked</p>
+          <p className="m-0 flex items-center gap-2"><Icon name="warning" size={16} /> Review required; the estimator remains runnable</p>
           {stationarityNote !== null && <p className="mb-0 mt-1 text-muted">{stationarityNote}</p>}
         </Alert>
       )

@@ -20,14 +20,13 @@ const eligibilityEvaluations = (eligibility: MethodEligibility | null | undefine
   switch (eligibility.kind) {
     case 'eligible': return eligibility.satisfied
     case 'caution': return [...eligibility.satisfied, ...eligibility.unresolved]
-    case 'refused': return eligibility.violations
+    case 'refused': return [...eligibility.satisfied, ...eligibility.unresolved, ...eligibility.violations]
     default: return assertNever(eligibility)
   }
 }
 
-function Status({ evaluation, refused }: { readonly evaluation: CaveatEvaluation | undefined; readonly refused: boolean }) {
-  // A refusal reports only what failed; the other conditions were not reached, so they carry no status.
-  if (evaluation === undefined) return refused ? null : <span className="whitespace-nowrap text-label text-faint">Not checked</span>
+function Status({ evaluation }: { readonly evaluation: CaveatEvaluation | undefined }) {
+  if (evaluation === undefined) return <span className="whitespace-nowrap text-label text-faint">Not checked</span>
   switch (evaluation.kind) {
     case 'satisfied': return <span className="whitespace-nowrap text-label text-ok">Checked</span>
     case 'unresolved':
@@ -55,7 +54,7 @@ const evidenceText = (evaluation: CaveatEvaluation | undefined): string | null =
 const conditions = (method: MethodDefinition): readonly MethodCaveat[] => method.caveats.filter((caveat) => caveat.category !== 'interpretation')
 const readingRules = (method: MethodDefinition): readonly MethodCaveat[] => method.caveats.filter((caveat) => caveat.category === 'interpretation')
 
-/** "2 checked · 1 not checked" for the disclosure row; the plain count when nothing was evaluated. */
+/** "2 checked · 1 to review" for the disclosure row; the plain count when nothing was evaluated. */
 const tally = (method: MethodDefinition, evaluations: ReadonlyMap<string, CaveatEvaluation>): string => {
   const counts = { satisfied: 0, unresolved: 0, violated: 0 }
   for (const caveat of conditions(method)) {
@@ -64,7 +63,7 @@ const tally = (method: MethodDefinition, evaluations: ReadonlyMap<string, Caveat
   }
   const parts = [
     counts.satisfied > 0 ? `${counts.satisfied} checked` : null,
-    counts.unresolved > 0 ? `${counts.unresolved} not checked` : null,
+    counts.unresolved > 0 ? `${counts.unresolved} to review` : null,
     counts.violated > 0 ? `${counts.violated} fail${counts.violated === 1 ? 's' : ''}` : null,
   ].filter((part): part is string => part !== null)
   const total = conditions(method).length
@@ -101,7 +100,7 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
                   return (
                     <li key={caveat.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2 text-body">
                       <p className="m-0 text-ink">{caveat.requirement}</p>
-                      {reading ? <span className="whitespace-nowrap text-label text-faint">Interpretation</span> : <Status evaluation={evaluation} refused={eligibility?.kind === 'refused'} />}
+                      {reading ? <span className="whitespace-nowrap text-label text-faint">Interpretation</span> : <Status evaluation={evaluation} />}
                       {evidence !== null && evidence.length > 0 && <p className="col-span-2 m-0 text-muted">{evidence}</p>}
                       {!reading && evaluation?.kind !== 'satisfied' && <p className="col-span-2 m-0 text-faint">If this is not met: {caveat.consequenceIfUnmet}</p>}
                     </li>

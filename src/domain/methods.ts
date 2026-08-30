@@ -65,6 +65,8 @@ export type MethodEligibility =
     }
   | {
       readonly kind: 'refused'
+      readonly satisfied: readonly Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>[]
+      readonly unresolved: readonly Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>[]
       readonly violations: NonEmptyArray<Extract<CaveatEvaluation, { readonly kind: 'violated' }>>
     }
 
@@ -1348,6 +1350,13 @@ const DISCRETE_BN: MethodDefinition = {
       requirement: 'Enough rows per parent configuration; the Dirichlet pseudo-counts smooth sparse cells and are recorded.',
       consequenceIfUnmet: 'Posterior conditional probabilities are dominated by the Dirichlet prior in sparsely observed configurations.',
       sources: [paper('Causal AI (Ness, Manning), chapter 3', '§3.1.9 Dirichlet prior as smoothing'), hirmos('crates/causal-core/src/discrete_bn.rs#estimate_cpd')],
+    },
+    {
+      id: caveatId('bn-independent-rows'),
+      category: 'sampling-structure',
+      requirement: 'Rows represent independent observational units; this network does not model repeated units or serial dependence.',
+      consequenceIfUnmet: 'Repeated or serially dependent rows are treated as independent evidence, overstating the information in the conditional tables.',
+      sources: [hirmos('crates/causal-core/src/discrete_bn.rs#DiscreteBayesianNetwork')],
     },
     {
       id: caveatId('bn-treatment-states'),
