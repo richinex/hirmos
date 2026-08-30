@@ -14,11 +14,12 @@ import { PreprocessingPanel } from '@/components/data/PreprocessingPanel'
 import { DiscoveryPanel } from '@/components/discovery/DiscoveryPanel'
 import { chapterPath, CHAPTER_IDS, describeRouteProblem, isCanonicalLocation, type ChapterId } from '@/domain/navigation'
 import type { ChapterActivity, RunActivity } from '@/domain/activity'
-import { describeSnapshotProblem, snapshotWorkflow, type SavedProjectHeader } from '@/domain/persistence'
+import { describeSnapshotProblem, snapshotWorkflow, type PersistedProject, type SavedProjectHeader } from '@/domain/persistence'
+import { EXAMPLE_BUNDLE_URL, EXAMPLE_PROJECT_ID, EXAMPLE_PROJECT_NAME, EXAMPLE_SOURCE_NAME } from '@/domain/example'
 import { deleteProject, listProjects, loadProject, saveProject } from '@/data/projectStore'
 import { lastStorageFailure, subscribeStorageHealth, type StorageFailure } from '@/data/storageHealth'
 import { cacheSource, readCachedSource, removeCachedSource, sourceCacheAvailable } from '@/data/sourceCache'
-import { buildBundle, bundleFileName, describeBundleProblem, parseBundle, serialiseBundle } from '@/domain/bundle'
+import { buildBundle, bundleFileName, describeBundleProblem, parseBundle, serialiseBundle, type BundleData, type ProjectBundle } from '@/domain/bundle'
 import { decodeSourceFile, downloadText, encodeSourceFile } from '@/data/bundleFiles'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { navigate, replace, useRoute } from '@/lib/router'
@@ -181,6 +182,9 @@ function App() {
     return { ...current, [chapter]: run }
   })])) as Record<ChapterId, (run: RunActivity | null) => void>, [])
   const [saved, setSaved] = useState<readonly SavedProjectHeader[]>([])
+  /** The example's row: its saved copy when there is one, otherwise the shipped bundle as it would be listed. */
+  const exampleEntry: SavedProjectHeader = saved.find((entry) => entry.id === EXAMPLE_PROJECT_ID)
+    ?? { id: EXAMPLE_PROJECT_ID, name: EXAMPLE_PROJECT_NAME, savedAt: '', sourceName: EXAMPLE_SOURCE_NAME, cachedSource: null, estimationRuns: 0 }
   const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(() => lastStorageFailure())
   const [reopenProblem, setReopenProblem] = useState<string | null>(null)
   const refreshSaved = useCallback(() => { void listProjects().then(setSaved) }, [])
@@ -235,34 +239,49 @@ function App() {
     const bundle = buildBundle(loaded.value, { kind: 'not-included' }, new Date().toISOString())
     downloadText(bundleFileName(bundle), serialiseBundle(bundle))
   }
+  /** Opens a project with the data file a bundle carried, when that file is the one the project was built from. */
+  const openWithBundleData = async (snapshot: PersistedProject, data: BundleData) => {
+    dispatch({ type: 'project-reopened', snapshot })
+    if (data.kind !== 'source-file' || snapshot.profile === null) return
+    const source = decodeSourceFile(data)
+    const { fingerprintFile } = await import('@/data/fingerprint')
+    const fingerprint = await fingerprintFile(source)
+    if (fingerprint.ok && fingerprint.value === snapshot.profile.source.fingerprint) dispatch({ type: 'project-restored', file: source })
+    else dispatch({ type: 'restore-rejected', problem: { kind: 'source-mismatch', expected: snapshot.source?.name ?? 'the original file' } })
+  }
+  const adoptBundle = async (bundle: ProjectBundle) => {
+    await saveProject(bundle.project)
+    refreshSaved()
+    await openWithBundleData(bundle.project, bundle.data)
+  }
   const importBundle = async (file: File | undefined) => {
     if (!file) return
     setImportProblem(null)
     const parsed = parseBundle(await file.text())
     if (!parsed.ok) { setImportProblem(describeBundleProblem(parsed.error)); return }
-    const snapshot = parsed.value.project
-    await saveProject(snapshot)
-    refreshSaved()
-    dispatch({ type: 'project-reopened', snapshot })
-    if (parsed.value.data.kind === 'source-file' && snapshot.profile !== null) {
-      const source = decodeSourceFile(parsed.value.data)
-      const { fingerprintFile } = await import('@/data/fingerprint')
-      const fingerprint = await fingerprintFile(source)
-      if (fingerprint.ok && fingerprint.value === snapshot.profile.source.fingerprint) dispatch({ type: 'project-restored', file: source })
-      else dispatch({ type: 'restore-rejected', problem: { kind: 'source-mismatch', expected: snapshot.source?.name ?? 'the original file' } })
-    }
+    await adoptBundle(parsed.value)
   }
-  /** The shipped Seatbelts bundle, imported like any other; the source file travels inside it. */
-  const openExample = async () => {
+  /**
+   * The shipped example. Its saved copy is reopened with the data file from the bundle, so it never
+   * asks for a file; a reset, or no saved copy, takes the bundle's own state.
+   */
+  const openExample = async (reset = false) => {
     setImportProblem(null)
+    let bundle: ProjectBundle
     try {
-      const response = await fetch('/examples/seatbelts.hirmos.json')
+      const response = await fetch(EXAMPLE_BUNDLE_URL)
       // A missing file comes back as the app shell in development, so the content type is the reliable check.
       if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) { setImportProblem('The example bundle is not part of this build.'); return }
-      await importBundle(new File([await response.text()], 'seatbelts.hirmos.json', { type: 'application/json' }))
+      const parsed = parseBundle(await response.text())
+      if (!parsed.ok) { setImportProblem(describeBundleProblem(parsed.error)); return }
+      bundle = parsed.value
     } catch (cause: unknown) {
       setImportProblem(`The example could not be loaded: ${cause instanceof Error ? cause.message : String(cause)}`)
+      return
     }
+    const existing = reset ? null : await loadProject(EXAMPLE_PROJECT_ID)
+    if (existing !== null && existing.ok) await openWithBundleData(existing.value, bundle.data)
+    else await adoptBundle(bundle)
   }
   const changeSourcePersistence = async (kind: 'ephemeral' | 'cached-locally') => {
     if (workflow.kind !== 'profiled') return
@@ -411,7 +430,7 @@ function App() {
       skipTarget="stage"
       mode={fullBleed ? 'full' : 'reading'}
       header={header}
-      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} phoneOpen={phoneNavOpen} onPhoneClose={() => setPhoneNavOpen(false)} />}
+      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} phoneOpen={phoneNavOpen} onPhoneOpen={() => setPhoneNavOpen(true)} onPhoneClose={() => setPhoneNavOpen(false)} />}
       stage={(
         <>
             {!route.ok && (
@@ -431,44 +450,46 @@ function App() {
                       value={workflow.nameDraft}
                       onChange={(event) => dispatch({ type: 'project-name-changed', value: event.target.value })}
                       className={field('text')}
-                      placeholder="For example: seat-belt law and road fatalities"
+                      placeholder="For example: minimum wage and employment"
                     />
                   </label>
                   {workflow.problem && <p role="alert" className="text-body text-danger">{describeProjectNameProblem(workflow.problem)}</p>}
                   <button type="submit" className={button('signal')}>Create project</button>
                 </form>
-                <section className="mt-8" aria-labelledby="example-title">
-                  <h3 id="example-title" className="mb-2 text-title font-medium text-ink">Open the example</h3>
-                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">The Seatbelts walkthrough, complete: a monthly time series prepared and tested, a graph, an identified study, three estimates, a probe and an intervention. Open it to see every chapter filled in.</p>
-                  <button type="button" className={button('outline')} onClick={() => void openExample()}>Open the Seatbelts example</button>
+                <section className="mt-8" aria-labelledby="projects-title">
+                  <h3 id="projects-title" className="mb-2 text-title font-medium text-ink">Projects</h3>
+                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file; the example brings its own.</p>
+                  {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
+                  {importProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{importProblem}</p>}
+                  <ul className="m-0 list-none divide-y divide-hair rounded-lg border border-hair p-0" aria-label="Projects">
+                    {[exampleEntry, ...saved.filter((entry) => entry.id !== EXAMPLE_PROJECT_ID)].map((entry) => {
+                      const example = entry.id === EXAMPLE_PROJECT_ID
+                      const stored = saved.some((other) => other.id === entry.id)
+                      return (
+                        <li key={entry.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-well">
+                          <div className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2 text-body text-ink"><span className="truncate">{entry.name}</span>{example && <span className={label('shrink-0 text-faint')}>Example</span>}</span>
+                            <span className={num('block truncate text-label text-faint')}>
+                              {stored
+                                ? `${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`
+                                : `${entry.sourceName} · every chapter filled in`}
+                            </span>
+                          </div>
+                          <button type="button" className={button('outline')} onClick={() => void (example ? openExample() : reopenProject(entry.id))}>Open</button>
+                          {example && stored && <button type="button" className={iconControl('quiet')} aria-label="Reset the example" title="Put the example back as shipped, discarding changes to this copy" onClick={() => void openExample(true)}><Icon name="restart_alt" size={14} /></button>}
+                          {stored && <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>}
+                          {stored && <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>}
+                        </li>
+                      )
+                    })}
+                  </ul>
                 </section>
                 <section className="mt-8" aria-labelledby="import-bundle-title">
                   <h3 id="import-bundle-title" className="mb-2 text-title font-medium text-ink">Import a project bundle</h3>
                   <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">If the bundle does not include its source file, select the file after import.</p>
                   <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Project bundle" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
                   <button type="button" className={button('outline')} onClick={() => bundleInput.current?.click()}>Choose a bundle</button>
-                  {importProblem !== null && <p role="alert" className="mb-0 mt-3 text-body text-danger">{importProblem}</p>}
                 </section>
-                {(saved.length > 0 || reopenProblem !== null) && (
-                  <section className="mt-8" aria-labelledby="saved-projects-title">
-                    <h3 id="saved-projects-title" className="mb-2 text-title font-medium text-ink">Saved projects</h3>
-                    <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file.</p>
-                    {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
-                    <ul className="m-0 list-none divide-y divide-hair rounded-lg border border-hair p-0" aria-label="Saved projects">
-                      {saved.map((entry) => (
-                        <li key={entry.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-well">
-                          <div className="min-w-0 flex-1">
-                            <span className="block truncate text-body text-ink">{entry.name}</span>
-                            <span className={num('block truncate text-label text-faint')}>{entry.sourceName ?? 'no data yet'}{entry.cachedSource !== null ? ' · cached' : ''} · {entry.estimationRuns} {entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved {formatTimestamp(entry.savedAt)}</span>
-                          </div>
-                          <button type="button" className={button('outline')} onClick={() => void reopenProject(entry.id)}>Open project</button>
-                          <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
-                          <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
-                        </li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
               </section>
             )}
 

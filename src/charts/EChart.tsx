@@ -35,12 +35,22 @@ export function EChart({ option, label, renderer = 'svg', className = 'h-[260px]
     let cancelled = false
     let resize: ResizeObserver | null = null
     void import('./registry').then(({ createChart }) => {
-      if (cancelled || !host.current) return
-      const instance = createChart(host.current, renderer)
-      chart.current = instance
-      instance.setOption(latestOption.current, { notMerge: true })
-      resize = new ResizeObserver(() => instance.resize())
-      resize.observe(host.current)
+      const element = host.current
+      if (cancelled || !element) return
+      const sized = () => element.clientWidth > 0 && element.clientHeight > 0
+      const mount = () => {
+        const instance = createChart(element, renderer)
+        chart.current = instance
+        instance.setOption(latestOption.current, { notMerge: true })
+      }
+      // A host in a hidden pane has no size yet; the chart mounts when it first gets one.
+      resize = new ResizeObserver(() => {
+        if (!sized()) return
+        if (chart.current === null) mount()
+        else chart.current.resize()
+      })
+      resize.observe(element)
+      if (sized()) mount()
     }).catch(() => { if (!cancelled) setFailed(true) })
     return () => {
       cancelled = true

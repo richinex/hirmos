@@ -1,5 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
+import { EXAMPLE_PROJECT_ID } from '../../src/domain/example'
 
 /**
  * Builds the shipped example: the Seatbelts walkthrough run end to end through the product's own
@@ -119,4 +121,8 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: /Export project/ }).click()
   await (await download).saveAs(target)
+  // The app recognises its saved copy of the example by this id, whichever build produced the bundle.
+  const bundle = JSON.parse(await readFile(target, 'utf8')) as { project: { project: { id: string } } }
+  bundle.project.project.id = EXAMPLE_PROJECT_ID
+  await writeFile(target, JSON.stringify(bundle, null, 2))
 })
