@@ -1,5 +1,7 @@
 import { Alert } from '@/components/ui/Alert'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { RunFold } from '@/components/ui/RunFold'
 import { Select } from '@/components/ui/Select'
 import { useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
@@ -84,7 +86,7 @@ function EquationsTable({ run }: { readonly run: CounterfactualRunArtifact }) {
   )
 }
 
-function RunCard({ run, study, current, stepLabel }: { readonly run: CounterfactualRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string }) {
+function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: CounterfactualRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: () => void }) {
   const theme = useChartTheme()
   const { evidence } = run
   const [row, setRow] = useState(1)
@@ -101,12 +103,9 @@ function RunCard({ run, study, current, stepLabel }: { readonly run: Counterfact
   const sd = Math.sqrt(evidence.effects.reduce((sum, value) => sum + (value - evidence.averageEffect) ** 2, 0) / Math.max(1, evidence.effects.length - 1))
   // A linear model with exact abduction gives every row the same difference: the coefficient times the change in treatment.
   const constant = evidence.observationNoise === null && Math.max(...evidence.effects) - Math.min(...evidence.effects) < 1e-9 * Math.max(1, Math.abs(evidence.averageEffect))
-  return (
-    <article className={`rounded-xl border bg-panel p-4 ${current ? 'border-edge' : 'border-hair'}`} aria-label={`${estimandSentence(study)} counterfactual`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label(current ? 'text-signal' : 'text-faint')}>{current ? 'Current counterfactual' : 'Earlier run'}</span>
-        <span className={num('text-micro text-faint')}>linear structural causal model · {evidence.observationNoise === null ? 'exact disturbance terms' : `observation noise ${evidence.observationNoise}`} · {formatTime(run.createdAt)}</span>
-      </div>
+  const stamp = `linear structural causal model · ${evidence.observationNoise === null ? 'exact disturbance terms' : `observation noise ${evidence.observationNoise}`} · ${formatTime(run.createdAt)}`
+  const record = (
+    <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">What {study.outcome.name} would have been with {study.treatment.name} set to {evidence.interventions[1]} instead of {evidence.interventions[0]}</h3>
       <p className="m-0 text-body text-muted">For each {stepLabel}, the model infers disturbance terms from the observed values. It then sets {study.treatment.name} to each specified value and predicts {study.outcome.name}. The difference is the observation-specific effect implied by the fitted equations.</p>
       <div className={figureGrid('mt-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Counterfactual summary">
@@ -138,11 +137,27 @@ function RunCard({ run, study, current, stepLabel }: { readonly run: Counterfact
           <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
         </dl>
       </details>
+    </>
+  )
+  if (!current) {
+    return (
+      <RunFold title={`${study.treatment.name} ${evidence.interventions[0]} → ${evidence.interventions[1]}`} figure={`average ${formatStatistic('raw', evidence.averageEffect).text}`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
+        {record}
+      </RunFold>
+    )
+  }
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} counterfactual`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className={label('text-signal')}>Current counterfactual</span>
+        <span className={num('text-micro text-faint')}>{stamp}</span>
+      </div>
+      {record}
     </article>
   )
 }
 
-export function CounterfactualPanel({ source, profile, prepared, studies, identifications, runs, onRun, onActivity }: {
+export function CounterfactualPanel({ source, profile, prepared, studies, identifications, runs, onRun, onDeleteRun, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -151,6 +166,7 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
   readonly identifications: readonly IdentificationArtifact[]
   readonly runs: readonly CounterfactualRunArtifact[]
   readonly onRun: (run: CounterfactualRunArtifact) => void
+  readonly onDeleteRun: (run: CounterfactualRunArtifact['id']) => void
 }) {
   const identified = identifications.filter((identification) => identification.result.kind === 'identified')
   const [state, dispatch] = useReducer(step, null, (): State => ({ identification: identified.at(-1)?.id ?? null, configuration: DEFAULT_LINEAR_SCM, job: { kind: 'idle' } }))
@@ -207,6 +223,7 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
   }
 
   const latest = runs.at(-1) ?? null
+  const [pendingDelete, setPendingDelete] = useState<CounterfactualRunArtifact | null>(null)
   const stage = (
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
@@ -249,16 +266,16 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
           </>
         )}
       </section>
-      {runs.length > 0 && (
+      {latest !== null && (
         <section aria-labelledby="counterfactual-results-title" className="grid gap-4">
           <div>
             <span className={label('text-faint')}>Recorded results</span>
             <h2 id="counterfactual-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Counterfactuals</h2>
           </div>
-          {[...runs].reverse().map((run) => {
-            const bound = studies.find((candidate) => candidate.id === run.study)
-            return bound === undefined ? null : <RunCard key={run.id} run={run} study={bound} current={latest?.id === run.id} stepLabel={stepLabel} />
-          })}
+          {(() => {
+            const bound = studies.find((candidate) => candidate.id === latest.study)
+            return bound === undefined ? null : <RunCard run={latest} study={bound} current stepLabel={stepLabel} />
+          })()}
         </section>
       )}
       {runs.length === 0 && identified.length > 0 && (
@@ -292,21 +309,32 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
   const ledger = (
     <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Counterfactual ledger">
       {runs.length === 0 && <li className="px-3 py-2 text-faint">Choose 2 treatment values and run the counterfactual.</li>}
-      {[...runs].reverse().map((run) => (
-        <li key={run.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
-          <span className="text-ink">{studies.find((candidate) => candidate.id === run.study)?.treatment.name ?? run.study} {run.evidence.interventions[0]} → {run.evidence.interventions[1]}</span>
-          <span className={num('text-micro text-faint')}>average {formatStatistic('raw', run.evidence.averageEffect).text} · {formatTime(run.createdAt)}</span>
-        </li>
-      ))}
+      {[...runs].reverse().map((run) => {
+        const bound = studies.find((candidate) => candidate.id === run.study)
+        return bound === undefined ? null : (
+          <RunCard key={run.id} run={run} study={bound} current={false} stepLabel={stepLabel} onDelete={() => setPendingDelete(run)} />
+        )
+      })}
     </ul>
   )
 
   return (
+    <>
+    <ConfirmDialog
+      open={pendingDelete !== null}
+      title="Delete this counterfactual?"
+      danger
+      confirmLabel="Delete run"
+      message="Removes this counterfactual record. Recorded results cannot be restored."
+      onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
+      onClose={() => setPendingDelete(null)}
+    />
     <WorkbenchLayout
       id="counterfactual"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
       bottom={{ title: `Runs · ${runs.length}`, body: ledger, defaultSize: 150 }}
     />
+    </>
   )
 }

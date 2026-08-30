@@ -12,7 +12,9 @@ import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Formula } from '@/components/ui/Formula'
+import { RunFold } from '@/components/ui/RunFold'
 import { FigureParts, IntervalFigure, MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -42,6 +44,7 @@ import {
 } from '@/domain/estimation'
 import { ESTIMATION_METHODS, methodDefinition, type MethodEligibility } from '@/domain/methods'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import {
   assessPanelInterventionLayout,
   type PanelInterventionLayout,
@@ -388,7 +391,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   )
 }
 
-function ResultCard({ run, study, current, stepLabel }: { readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string }) {
+function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: () => void }) {
   const theme = useChartTheme()
   const estimate = run.estimate
   const sentence = estimandSentence(study)
@@ -491,26 +494,17 @@ function ResultCard({ run, study, current, stepLabel }: { readonly run: Estimati
     </>
   )
   if (!current) {
-    // Earlier runs fold to one line, so the current estimate keeps the page; the ledger below lists every run.
+    // History rows fold to one line in the runs drawer; only the current estimate keeps the stage.
     return (
-      <article className="rounded-xl border border-hair bg-panel" aria-label={`${sentence} estimate`}>
-        <details className="group">
-          <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl p-4 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
-            <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
-            <span className={label('text-faint')}>Earlier run</span>
-            <span className="min-w-0 text-body text-ink">{sentence}</span>
-            <span className={num('text-body font-medium text-ink')}>{headline(estimate).text}</span>
-            <span className={num('ml-auto text-micro text-faint')}>{stamp}</span>
-          </summary>
-          <div className="px-4 pb-4">{body}</div>
-        </details>
-      </article>
+      <RunFold title={sentence} figure={headline(estimate).text} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
+        {body}
+      </RunFold>
     )
   }
   return (
     <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${sentence} estimate`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label(current ? 'text-signal' : 'text-faint')}>{current ? 'Current estimate' : 'Earlier run'}</span>
+        <span className={label('text-signal')}>Current estimate</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       {body}
@@ -518,7 +512,7 @@ function ResultCard({ run, study, current, stepLabel }: { readonly run: Estimati
   )
 }
 
-export function EstimationPanel({ source, profile, prepared, stationarity, documents, studies, identifications, runs, onRun, onOpenStudy, onActivity }: {
+export function EstimationPanel({ source, profile, prepared, stationarity, documents, studies, identifications, runs, sensitivityRuns, onRun, onDeleteRun, onOpenStudy, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -528,11 +522,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   readonly studies: readonly StudySpecification[]
   readonly identifications: readonly IdentificationArtifact[]
   readonly runs: readonly EstimationRunArtifact[]
+  /** The recorded probes, so deleting a run can say which of them go with it. */
+  readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly onRun: (run: EstimationRunArtifact) => void
+  readonly onDeleteRun: (run: EstimationRunArtifact['id']) => void
   readonly onOpenStudy: () => void
 }) {
   const identified = identifications.filter((identification) => identification.result.kind === 'identified')
   const chartTheme = useChartTheme()
+  const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
   const latestStudy = studies.find((candidate) => candidate.id === identified.at(-1)?.study) ?? null
   const [state, dispatch] = useReducer(step, null, (): State => ({
     identification: identified.at(-1)?.id ?? null,
@@ -1121,16 +1119,16 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         )}
       </section>
 
-      {runs.length > 0 && (
+      {latestRun !== null && (
         <section aria-labelledby="estimation-results-title" className="grid grid-cols-1 gap-4">
           <div>
             <span className={label('text-faint')}>Recorded results</span>
             <h2 id="estimation-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Estimates</h2>
           </div>
-          {[...runs].reverse().map((run) => {
-            const bound = studies.find((candidate) => candidate.id === run.study)
-            return bound === undefined ? null : <ResultCard key={run.id} run={run} study={bound} current={latestRun?.id === run.id} stepLabel={stepLabel} />
-          })}
+          {(() => {
+            const bound = studies.find((candidate) => candidate.id === latestRun.study)
+            return bound === undefined ? null : <ResultCard run={latestRun} study={bound} current stepLabel={stepLabel} />
+          })()}
         </section>
       )}
       {runs.length === 0 && identified.length > 0 && (
@@ -1184,41 +1182,36 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <EChart option={comparison.option} label="Recorded estimates compared on one axis" className="w-full" style={{ height: comparison.height }} testId="run-comparison" />
         </div>
       )}
-      <table className="w-full border-collapse text-body" aria-label="Estimation runs">
-      <thead>
-        <tr className="text-left">
-          <th scope="col" className={label('px-3 py-1.5 font-normal text-muted')}>Estimand</th>
-          <th scope="col" className={label('px-3 py-1.5 font-normal text-muted')}>Estimator</th>
-          <th scope="col" className={label('px-3 py-1.5 text-right font-normal text-muted')}>Estimate</th>
-          <th scope="col" className={label('px-3 py-1.5 text-right font-normal text-muted')}>Interval</th>
-          <th scope="col" className={label('px-3 py-1.5 font-normal text-muted')}>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-        {runs.length === 0 && <tr><td colSpan={5} className="px-3 py-2 text-faint">Choose an estimator and run it.</td></tr>}
+      <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Estimation runs">
+        {runs.length === 0 && <li className="px-3 py-2 text-faint">Choose an estimator and run it.</li>}
         {[...runs].reverse().map((run) => {
           const bound = studies.find((candidate) => candidate.id === run.study)
-          return (
-            <tr key={run.id} className="border-t border-hair">
-              <td className="px-3 py-1.5 text-ink">{bound === undefined ? run.study : estimandSentence(bound)}</td>
-              <td className="px-3 py-1.5 text-muted">{describeEstimator(run.configuration.kind)}{run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''}</td>
-              <td className={num('whitespace-nowrap px-3 py-1.5 text-right text-ink')}>{headline(run.estimate).text}</td>
-              <td className={num('whitespace-nowrap px-3 py-1.5 text-right text-bone')}>{intervalText(run.estimate)}</td>
-              <td className={num('whitespace-nowrap px-3 py-1.5 text-faint')}>{formatTime(run.createdAt)}</td>
-            </tr>
+          return bound === undefined ? null : (
+            <ResultCard key={run.id} run={run} study={bound} current={false} stepLabel={stepLabel} onDelete={() => setPendingDelete(run)} />
           )
         })}
-      </tbody>
-      </table>
+      </ul>
     </>
   )
+  const dependentProbes = pendingDelete === null ? 0 : sensitivityRuns.filter((probe) => probe.estimationRun === pendingDelete.id).length
 
   return (
+    <>
+    <ConfirmDialog
+      open={pendingDelete !== null}
+      title="Delete this estimate?"
+      danger
+      confirmLabel="Delete run"
+      message={pendingDelete === null ? '' : `Removes the ${describeEstimator(pendingDelete.configuration.kind)} run${dependentProbes > 0 ? ` and the ${dependentProbes} sensitivity ${dependentProbes === 1 ? 'probe' : 'probes'} recorded against it` : ''}. Recorded results cannot be restored.`}
+      onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
+      onClose={() => setPendingDelete(null)}
+    />
     <WorkbenchLayout
       id="estimation"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
       bottom={{ title: `Runs · ${runs.length}`, body: ledger, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
     />
+    </>
   )
 }

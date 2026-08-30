@@ -35,14 +35,16 @@ const mix = (from: string, to: string, share: number): string => {
 }
 
 /** Link colour from its strength: negative pulls toward `info`, positive toward `signal`, assumptions are `bone`. */
+// Weak links anchor on `muted`, not the panel: a mix toward the background disappears on light
+// themes, while muted is contrast-tuned against the panel in every theme.
 const strengthColour = (strength: LagLinkStrength, scale: number, theme: ChartTheme): string => {
   switch (strength.kind) {
     case 'signed-unit':
     case 'signed-weight': {
-      const share = 0.35 + 0.65 * Math.min(1, Math.abs(strength.value) / Math.max(scale, 1e-9))
-      return mix(theme.panel, strength.value < 0 ? theme.info : theme.signal, share)
+      const share = Math.min(1, Math.abs(strength.value) / Math.max(scale, 1e-9))
+      return mix(theme.muted, strength.value < 0 ? theme.info : theme.signal, share)
     }
-    case 'nonnegative': return mix(theme.panel, theme.signal, 0.35 + 0.65 * Math.min(1, strength.value / Math.max(scale, 1e-9)))
+    case 'nonnegative': return mix(theme.muted, theme.signal, Math.min(1, strength.value / Math.max(scale, 1e-9)))
     case 'assumption': return theme.bone
     default: return assertNever(strength)
   }

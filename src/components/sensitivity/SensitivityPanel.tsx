@@ -1,6 +1,8 @@
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { RunFold } from '@/components/ui/RunFold'
 import { Select } from '@/components/ui/Select'
-import { useMemo, useReducer } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
 import { useChartTheme } from '@/charts/theme'
@@ -85,14 +87,31 @@ const refuterInterpretation = (fact: RefuterFact): string => {
   }
 }
 
-function DmlRefutationCard({ run, estimation, study, current }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'dml-refutation-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean }) {
+function DmlRefutationCard({ run, estimation, study, current, onDelete }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'dml-refutation-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly onDelete?: () => void }) {
+  const { evidence } = run
+  const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · order ${evidence.order.join(' → ')} · ${formatTime(run.createdAt)}`
+  if (!current) {
+    return (
+      <RunFold title="Double machine learning probe batch" figure={`placebo ${formatStatistic('raw', evidence.placebo.refutedEffect).text} · robustness ${formatStatistic('score', evidence.sensitivity.robustnessValue).text}`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+        <DmlRefutationRecord run={run} study={study} />
+      </RunFold>
+    )
+  }
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} DML refutation`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className={label('text-signal')}>Latest probe</span>
+        <span className={num('text-micro text-faint')}>{stamp}</span>
+      </div>
+      <DmlRefutationRecord run={run} study={study} />
+    </article>
+  )
+}
+
+function DmlRefutationRecord({ run, study }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'dml-refutation-run' }>; readonly study: StudySpecification }) {
   const { evidence } = run
   return (
-    <article className={`rounded-xl border bg-panel p-4 ${current ? 'border-edge' : 'border-hair'}`} aria-label={`${estimandSentence(study)} DML refutation`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label(current ? 'text-signal' : 'text-faint')}>{current ? 'Latest probe' : 'Earlier probe'}</span>
-        <span className={num('text-micro text-faint')}>{describeEstimator(estimation.configuration.kind)} · seed {evidence.seed} · order {evidence.order.join(' → ')} · {formatTime(run.createdAt)}</span>
-      </div>
+    <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Double machine learning probe batch on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Main estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.mainEstimate).text}</span>. The placebo and random-common-cause probes use the same seeded stream in the recorded order.</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
@@ -122,18 +141,35 @@ function DmlRefutationCard({ run, estimation, study, current }: { readonly run: 
         </table>
         <p className={num('mb-0 mt-2 text-body text-muted')}>Robustness value {formatStatistic('score', evidence.sensitivity.robustnessValue).text} (interval {formatStatistic('score', evidence.sensitivity.robustnessValueCi).text}): the equal confounding share that would move the effect, or its interval, to zero.</p>
       </div>
+    </>
+  )
+}
+
+function RefutationCard({ run, estimation, study, current, onDelete }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'linear-refutation-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly onDelete?: () => void }) {
+  const { evidence } = run
+  const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · ${formatCount(evidence.simulations).text} simulations · ${formatTime(run.createdAt)}`
+  if (!current) {
+    return (
+      <RunFold title="Perturbation and residual probes" figure={`placebo ${formatStatistic('raw', evidence.placeboEffect).text} · subset ${formatStatistic('raw', evidence.subsetEffect).text}`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+        <RefutationRecord run={run} study={study} />
+      </RunFold>
+    )
+  }
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} refutation`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className={label('text-signal')}>Latest probe</span>
+        <span className={num('text-micro text-faint')}>{stamp}</span>
+      </div>
+      <RefutationRecord run={run} study={study} />
     </article>
   )
 }
 
-function RefutationCard({ run, estimation, study, current }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'linear-refutation-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean }) {
+function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'linear-refutation-run' }>; readonly study: StudySpecification }) {
   const { evidence } = run
   return (
-    <article className={`rounded-xl border bg-panel p-4 ${current ? 'border-edge' : 'border-hair'}`} aria-label={`${estimandSentence(study)} refutation`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label(current ? 'text-signal' : 'text-faint')}>{current ? 'Latest probe' : 'Earlier probe'}</span>
-        <span className={num('text-micro text-faint')}>{describeEstimator(estimation.configuration.kind)} · seed {evidence.seed} · {formatCount(evidence.simulations).text} simulations · {formatTime(run.createdAt)}</span>
-      </div>
+    <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Perturbation probes on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Original linear back-door estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.estimate).text}</span>. Interpret each diagnostic according to its stated perturbation and reference value.</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
@@ -172,11 +208,11 @@ function RefutationCard({ run, estimation, study, current }: { readonly run: Ext
           <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         </dl>
       </details>
-    </article>
+    </>
   )
 }
 
-function UnobservedCard({ run, estimation, study, current }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'unobserved-confounding-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean }) {
+function UnobservedCard({ run, estimation, study, current, onDelete }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'unobserved-confounding-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly onDelete?: () => void }) {
   const theme = useChartTheme()
   const { evidence } = run
   const flat = evidence.effects.flat()
@@ -191,12 +227,9 @@ function UnobservedCard({ run, estimation, study, current }: { readonly run: Ext
     scale: 'signed',
     quantity: 'refitted effect',
   }, theme), [evidence, theme])
-  return (
-    <article className={`rounded-xl border bg-panel p-4 ${current ? 'border-edge' : 'border-hair'}`} aria-label={`${estimandSentence(study)} unmeasured confounder`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label(current ? 'text-signal' : 'text-faint')}>{current ? 'Latest probe' : 'Earlier probe'}</span>
-        <span className={num('text-micro text-faint')}>{describeEstimator(estimation.configuration.kind)} · seed {evidence.seed} · {formatTime(run.createdAt)}</span>
-      </div>
+  const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · ${formatTime(run.createdAt)}`
+  const record = (
+    <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Simulated unmeasured confounder</h3>
       <p className="m-0 text-body text-muted">Rows vary the simulated effect on treatment assignment. Columns vary the simulated outcome shift. Each cell reports a refitted linear back-door estimate. Original estimate: <span className={num('text-ink')}>{formatStatistic('raw', evidence.originalEffect).text}</span>.</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
@@ -217,11 +250,27 @@ function UnobservedCard({ run, estimation, study, current }: { readonly run: Ext
           <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         </dl>
       </details>
+    </>
+  )
+  if (!current) {
+    return (
+      <RunFold title="Unmeasured confounder" figure={`${evidence.kappaT.length}×${evidence.kappaY.length} grid`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+        {record}
+      </RunFold>
+    )
+  }
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} unmeasured confounder`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className={label('text-signal')}>Latest probe</span>
+        <span className={num('text-micro text-faint')}>{stamp}</span>
+      </div>
+      {record}
     </article>
   )
 }
 
-export function SensitivityPanel({ source, profile, prepared, studies, estimationRuns, runs, onRun, onActivity }: {
+export function SensitivityPanel({ source, profile, prepared, studies, estimationRuns, runs, onRun, onDeleteRun, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -230,6 +279,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   readonly estimationRuns: readonly EstimationRunArtifact[]
   readonly runs: readonly SensitivityRunArtifact[]
   readonly onRun: (run: SensitivityRunArtifact) => void
+  readonly onDeleteRun: (run: SensitivityRunArtifact['id']) => void
 }) {
   const [state, dispatch] = useReducer(step, null, (): State => ({
     estimationRun: [...estimationRuns].reverse().find((run) => run.kind === 'backdoor-linear-run')?.id ?? estimationRuns.at(-1)?.id ?? null,
@@ -306,6 +356,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   }
 
   const latest = runs.at(-1) ?? null
+  const [pendingDelete, setPendingDelete] = useState<SensitivityRunArtifact | null>(null)
   const stage = (
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
@@ -385,23 +436,23 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
         )}
       </section>
 
-      {runs.length > 0 ? (
+      {latest !== null ? (
         <section aria-labelledby="sensitivity-results-title" className="grid gap-4">
           <div>
             <span className={label('text-faint')}>Recorded results</span>
             <h2 id="sensitivity-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Probes</h2>
           </div>
-          {[...runs].reverse().map((run) => {
-            const target = estimationRuns.find((candidate) => candidate.id === run.estimationRun)
+          {(() => {
+            const target = estimationRuns.find((candidate) => candidate.id === latest.estimationRun)
             const bound = target === undefined ? undefined : studies.find((candidate) => candidate.id === target.study)
             if (target === undefined || bound === undefined) return null
-            switch (run.kind) {
-              case 'linear-refutation-run': return <RefutationCard key={run.id} run={run} estimation={target} study={bound} current={latest?.id === run.id} />
-              case 'unobserved-confounding-run': return <UnobservedCard key={run.id} run={run} estimation={target} study={bound} current={latest?.id === run.id} />
-              case 'dml-refutation-run': return <DmlRefutationCard key={run.id} run={run} estimation={target} study={bound} current={latest?.id === run.id} />
-              default: return assertNever(run)
+            switch (latest.kind) {
+              case 'linear-refutation-run': return <RefutationCard run={latest} estimation={target} study={bound} current />
+              case 'unobserved-confounding-run': return <UnobservedCard run={latest} estimation={target} study={bound} current />
+              case 'dml-refutation-run': return <DmlRefutationCard run={latest} estimation={target} study={bound} current />
+              default: return assertNever(latest)
             }
-          })}
+          })()}
         </section>
       ) : estimationRuns.length > 0 ? (
         <EmptyState>Choose a probe and run it against the selected estimate.</EmptyState>
@@ -428,21 +479,38 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   const ledger = (
     <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Probe ledger">
       {runs.length === 0 && <li className="px-3 py-2 text-faint">Choose a probe and run it against an estimate.</li>}
-      {[...runs].reverse().map((run) => (
-        <li key={run.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
-          <span className="text-ink">{run.kind === 'linear-refutation-run' ? 'Perturbation and residual probes' : run.kind === 'dml-refutation-run' ? 'Double machine learning probe batch' : 'Unmeasured confounder'}</span>
-          <span className={num('text-micro text-faint')}>{run.kind === 'linear-refutation-run' ? `placebo ${formatStatistic('raw', run.evidence.placeboEffect).text} · subset ${formatStatistic('raw', run.evidence.subsetEffect).text}` : run.kind === 'dml-refutation-run' ? `placebo ${formatStatistic('raw', run.evidence.placebo.refutedEffect).text} · robustness ${formatStatistic('score', run.evidence.sensitivity.robustnessValue).text}` : `${run.evidence.kappaT.length}×${run.evidence.kappaY.length} grid`} · {formatTime(run.createdAt)}</span>
-        </li>
-      ))}
+      {[...runs].reverse().map((run) => {
+        const target = estimationRuns.find((candidate) => candidate.id === run.estimationRun)
+        const bound = target === undefined ? undefined : studies.find((candidate) => candidate.id === target.study)
+        if (target === undefined || bound === undefined) return null
+        const remove = () => setPendingDelete(run)
+        switch (run.kind) {
+          case 'linear-refutation-run': return <RefutationCard key={run.id} run={run} estimation={target} study={bound} current={false} onDelete={remove} />
+          case 'unobserved-confounding-run': return <UnobservedCard key={run.id} run={run} estimation={target} study={bound} current={false} onDelete={remove} />
+          case 'dml-refutation-run': return <DmlRefutationCard key={run.id} run={run} estimation={target} study={bound} current={false} onDelete={remove} />
+          default: return assertNever(run)
+        }
+      })}
     </ul>
   )
 
   return (
+    <>
+    <ConfirmDialog
+      open={pendingDelete !== null}
+      title="Delete this probe?"
+      danger
+      confirmLabel="Delete probe"
+      message="Removes this probe record. Recorded results cannot be restored."
+      onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
+      onClose={() => setPendingDelete(null)}
+    />
     <WorkbenchLayout
       id="sensitivity"
       stage={stage}
       inspector={{ title: 'Estimate and method requirements', body: inspector }}
       bottom={{ title: `Probes · ${runs.length}`, body: ledger, defaultSize: 150 }}
     />
+    </>
   )
 }

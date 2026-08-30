@@ -688,7 +688,9 @@ function App() {
                       studies={workflow.studies}
                       identifications={workflow.identifications}
                       runs={workflow.estimationRuns}
+                      sensitivityRuns={workflow.sensitivityRuns}
                       onRun={(run) => dispatch({ type: 'estimation-run-created', run })}
+                      onDeleteRun={(run) => dispatch({ type: 'estimation-run-deleted', run })}
                       onOpenStudy={() => navigateToChapter('study')}
                     />
                   </Suspense>
@@ -707,6 +709,7 @@ function App() {
                       estimationRuns={workflow.estimationRuns}
                       runs={workflow.sensitivityRuns}
                       onRun={(run) => dispatch({ type: 'sensitivity-run-created', run })}
+                      onDeleteRun={(run) => dispatch({ type: 'sensitivity-run-deleted', run })}
                     />
                   </Suspense>
                   </ChapterBoundary>
@@ -724,6 +727,7 @@ function App() {
                       identifications={workflow.identifications}
                       runs={workflow.counterfactualRuns}
                       onRun={(run) => dispatch({ type: 'counterfactual-run-created', run })}
+                      onDeleteRun={(run) => dispatch({ type: 'counterfactual-run-deleted', run })}
                     />
                   </Suspense>
                   </ChapterBoundary>

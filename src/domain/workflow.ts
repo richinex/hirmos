@@ -5,9 +5,9 @@ import type { DagCheckArtifact } from './dagValidation'
 import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
 import type { InterventionQueryArtifact } from './intervention'
-import type { EstimationRunArtifact } from './estimation'
-import type { SensitivityRunArtifact } from './sensitivity'
-import type { CounterfactualRunArtifact } from './counterfactual'
+import type { EstimationRunArtifact, EstimationRunId } from './estimation'
+import type { SensitivityRunArtifact, SensitivityRunId } from './sensitivity'
+import type { CounterfactualRunArtifact, CounterfactualRunId } from './counterfactual'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { PersistedProject } from './persistence'
@@ -110,6 +110,9 @@ export type WorkflowEvent =
   | { readonly type: 'estimation-run-created'; readonly run: EstimationRunArtifact }
   | { readonly type: 'sensitivity-run-created'; readonly run: SensitivityRunArtifact }
   | { readonly type: 'counterfactual-run-created'; readonly run: CounterfactualRunArtifact }
+  | { readonly type: 'estimation-run-deleted'; readonly run: EstimationRunId }
+  | { readonly type: 'sensitivity-run-deleted'; readonly run: SensitivityRunId }
+  | { readonly type: 'counterfactual-run-deleted'; readonly run: CounterfactualRunId }
   | { readonly type: 'source-cleared' }
   | { readonly type: 'project-reopened'; readonly snapshot: PersistedProject }
   | { readonly type: 'project-restored'; readonly file: File }
@@ -338,6 +341,20 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         && event.run.preparedDataset === state.prepared.id
         && state.identifications.some((identification) => identification.id === event.run.identification)) {
         return { ...state, counterfactualRuns: [...state.counterfactualRuns, event.run] }
+      }
+      if (event.type === 'estimation-run-deleted') {
+        // The probes recorded against a run describe nothing once it is gone, so they go with it.
+        return {
+          ...state,
+          estimationRuns: state.estimationRuns.filter((run) => run.id !== event.run),
+          sensitivityRuns: state.sensitivityRuns.filter((run) => run.estimationRun !== event.run),
+        }
+      }
+      if (event.type === 'sensitivity-run-deleted') {
+        return { ...state, sensitivityRuns: state.sensitivityRuns.filter((run) => run.id !== event.run) }
+      }
+      if (event.type === 'counterfactual-run-deleted') {
+        return { ...state, counterfactualRuns: state.counterfactualRuns.filter((run) => run.id !== event.run) }
       }
       return state
     default:
