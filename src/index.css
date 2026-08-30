@@ -493,6 +493,10 @@ button[aria-busy="true"]::after {
 .formula { position: relative; line-height: 1.7; }
 .formula .katex { white-space: normal; font-size: 1.05em; color: var(--color-ink); }
 
+/* React Flow declares touch-action only on its pane. A connection starts on a node, so without this a
+   finger on a card is a scroll candidate and the browser can cancel the drag. */
+.react-flow__node, .react-flow__handle { touch-action: none; }
+
 .panel-scroll { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
 .panel-scroll::-webkit-scrollbar { width: 6px; }
 .panel-scroll::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }

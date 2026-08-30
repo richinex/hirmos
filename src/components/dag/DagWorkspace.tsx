@@ -664,18 +664,19 @@ export function DagWorkspace({
           <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'new-document-requested' })}>Create a DAG</button>
         </div>
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2" role="group" aria-label="Study binding">
-        <label className="flex items-center gap-2 text-body text-ink">Treatment
-            <Select aria-label="Treatment" className={field('text', 'w-40')} value={boundTreatment ?? ''} onChange={(event) => bind('treatment', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
-              <option value="">Choose</option>
-              {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundOutcome}>{node.name}</option>)}
-            </Select>
+      {/* A fixed label width keeps the two selects aligned whether they sit side by side or wrap onto their own lines. */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label="Study binding">
+        <label className="flex items-center gap-3 text-body text-ink"><span className="w-20 shrink-0">Treatment</span>
+          <Select aria-label="Treatment" className={field('text', 'w-40')} value={boundTreatment ?? ''} onChange={(event) => bind('treatment', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
+            <option value="">Choose</option>
+            {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundOutcome}>{node.name}</option>)}
+          </Select>
         </label>
-        <label className="flex items-center gap-2 text-body text-ink">Outcome
-            <Select aria-label="Outcome" className={field('text', 'w-40')} value={boundOutcome ?? ''} onChange={(event) => bind('outcome', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
-              <option value="">Choose</option>
-              {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundTreatment}>{node.name}</option>)}
-            </Select>
+        <label className="flex items-center gap-3 text-body text-ink"><span className="w-20 shrink-0">Outcome</span>
+          <Select aria-label="Outcome" className={field('text', 'w-40')} value={boundOutcome ?? ''} onChange={(event) => bind('outcome', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
+            <option value="">Choose</option>
+            {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundTreatment}>{node.name}</option>)}
+          </Select>
         </label>
       </div>
       {state.latentVariable.kind === 'adding' && (
@@ -777,7 +778,7 @@ export function DagWorkspace({
         ) : (
           <>
             {addEdgeForm}
-            <p className="m-0 text-body text-faint">Or drag from a variable’s handle onto another variable. Select an arrow to record its rationale, change its timing, reverse it, replace it with an unmeasured cause, or remove it.</p>
+            <p className="m-0 text-body text-faint">Or drag from one variable onto another. Select an arrow to record its rationale, change its timing, reverse it, replace it with an unmeasured cause, or remove it, or drag either of its ends to another variable.</p>
           </>
         )
       )}
