@@ -877,6 +877,7 @@ export function DagCanvas({
         </>
       )}
       <div className="relative min-h-0 flex-1">
+        <div className="absolute inset-0">
         <ReactFlow<CanvasNode, CanvasEdge>
           nodes={displayedNodes}
           edges={model.edges.map((edge) => edge.id === selectedEdge
@@ -941,6 +942,7 @@ export function DagCanvas({
           <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} />
           <RefitOnResize host={hostRef} />
         </ReactFlow>
+        </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-hair bg-panel px-3 py-1.5">
         <p

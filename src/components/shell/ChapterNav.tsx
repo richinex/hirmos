@@ -54,14 +54,13 @@ interface ChapterNavProps {
 }
 
 /**
- * The chapter list: 208px with numbers and names, or the 48px icon rail. On a phone the rail stays
- * on the left at every width, as Recursis keeps its rail, and expanding it opens the full list as a
- * left-edge sheet, the only place a focus trap belongs (docs/design-suggestions/sidebars-and-panels.md).
+ * The chapter list: 208px with numbers and names, or the 48px icon rail. On a phone there is no
+ * rail, so the stage has the full width; the header button opens the list as a left-edge sheet,
+ * the only place a focus trap belongs (docs/design-suggestions/sidebars-and-panels.md).
  * Gated chapters stay in the tab order.
  */
-export function ChapterNav({ chapters, active, collapsed: collapsedOnDesktop, onNavigate, sheetOpen, onSheetClose }: ChapterNavProps) {
+export function ChapterNav({ chapters, active, collapsed, onNavigate, sheetOpen, onSheetClose }: ChapterNavProps) {
   const phone = useIsMobile()
-  const collapsed = phone || collapsedOnDesktop
   return (
     <>
     <Sheet side="left" open={phone && sheetOpen} onClose={onSheetClose} title="Chapters">
@@ -93,7 +92,7 @@ export function ChapterNav({ chapters, active, collapsed: collapsedOnDesktop, on
         })}
       </ol>
     </Sheet>
-    <nav
+    {!phone && <nav
       aria-label="Workspace chapters"
       data-chapter-nav
       className={cn(
@@ -140,7 +139,7 @@ export function ChapterNav({ chapters, active, collapsed: collapsedOnDesktop, on
           )
         })}
       </ol>
-    </nav>
+    </nav>}
     </>
   )
 }
