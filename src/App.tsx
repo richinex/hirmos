@@ -485,10 +485,10 @@ function App() {
                   </ul>
                 </section>
                 <section className="mt-8" aria-labelledby="import-bundle-title">
-                  <h3 id="import-bundle-title" className="mb-2 text-title font-medium text-ink">Import a project bundle</h3>
-                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">If the bundle does not include its source file, select the file after import.</p>
-                  <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Project bundle" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
-                  <button type="button" className={button('outline')} onClick={() => bundleInput.current?.click()}>Choose a bundle</button>
+                  <h3 id="import-bundle-title" className="mb-2 text-title font-medium text-ink">Open an exported project</h3>
+                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">A <span className="font-mono">.hirmos.json</span> file from Export project. If it was exported without its data file, you choose the file after opening.</p>
+                  <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
+                  <button type="button" className={button('outline')} onClick={() => bundleInput.current?.click()}>Choose a file</button>
                 </section>
               </section>
             )}

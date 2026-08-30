@@ -1,11 +1,12 @@
-import { lazy, Suspense, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { HirmosMark } from '@/components/HirmosMark'
 import { choreographLanding } from './choreography'
+import type { HirmosGraph } from './HirmosGraph'
 
-const HirmosGraph = lazy(async () => {
-  const module = await import('./HirmosGraph')
-  return { default: module.HirmosGraph }
-})
+// Fetched with the page and mounted the moment it arrives. Not React.lazy: a Suspense boundary holds
+// its fallback for React's reveal window, and the fallback here is the same empty placeholder the
+// static shell in index.html already paints, so nothing may appear and move in between.
+const graphChunk = import('./HirmosGraph')
 
 const WORKFLOW = [
   { number: '01', title: 'Prepare', copy: 'Profile the source, define the observation structure, resolve missingness, and record transformations.' },
@@ -16,15 +17,16 @@ const WORKFLOW = [
   { number: '06', title: 'Assess', copy: 'Examine sensitivity to assumptions, apply appropriate refutation checks, and evaluate counterfactual questions when the fitted causal model supports them.' },
 ] as const
 
-function SceneFallback() {
+function Scene() {
+  const [Graph, setGraph] = useState<typeof HirmosGraph | null>(null)
+  useEffect(() => {
+    let mounted = true
+    void graphChunk.then((module) => { if (mounted) setGraph(() => module.HirmosGraph) })
+    return () => { mounted = false }
+  }, [])
   return (
     <div className="landing-scene landing-scene--fallback" aria-hidden="true">
-      <div className="fallback-graph">
-        <i className="fallback-node fallback-node--c">C</i>
-        <i className="fallback-node fallback-node--x">X</i>
-        <i className="fallback-node fallback-node--m">M</i>
-        <i className="fallback-node fallback-node--y">Y</i>
-      </div>
+      {Graph !== null && <Graph className="landing-scene__canvas" />}
     </div>
   )
 }
@@ -86,9 +88,7 @@ export function Landing() {
   useEffect(() => (root.current === null ? undefined : choreographLanding(root.current)), [])
   return (
     <main ref={root} className="landing-root">
-      <Suspense fallback={<SceneFallback />}>
-        <HirmosGraph className="landing-scene" />
-      </Suspense>
+      <Scene />
       <div className="landing-scrim" aria-hidden="true" />
 
       <div className="landing-width landing-hero-shell">
