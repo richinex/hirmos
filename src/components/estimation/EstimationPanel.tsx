@@ -959,8 +959,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             </div>
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The estimate could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running' || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} onClick={() => void execute()}>
-              {state.job.kind === 'running' ? 'Estimating…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
+            <button type="button" className={button('signal', 'mt-4')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              {configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
             </button>
           </>
         )}

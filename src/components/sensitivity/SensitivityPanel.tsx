@@ -373,8 +373,8 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
             </div>
             {eligibility.kind === 'refused' && <Alert tone="warn" live={false} className="mt-4"><p className="m-0">{eligibility.reason}</p></Alert>}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The probe could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={eligibility.kind === 'refused' || state.job.kind === 'running'} onClick={() => void execute()}>
-              {state.job.kind === 'running' ? 'Probing…' : `Run ${lowerFirst(describeProbe(state.probe))}`}
+            <button type="button" className={button('signal', 'mt-4')} disabled={eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              Run {lowerFirst(describeProbe(state.probe))}
             </button>
           </>
         )}

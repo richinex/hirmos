@@ -19,8 +19,8 @@ export function outcomePathsOption(view: OutcomePathsView, theme: ChartTheme): E
   const steps = view.factual.map((_, index) => index + 1)
   return {
     ...baseOption(theme, description),
-    grid: gridAuto({ bottom: 46 }),
-    legend: legend(theme),
+    grid: gridAuto({ top: 30, bottom: 40 }),
+    legend: { ...legend(theme), bottom: 'auto', top: 0 },
     tooltip: {
       ...tooltip(theme, 'axis'),
       axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } },

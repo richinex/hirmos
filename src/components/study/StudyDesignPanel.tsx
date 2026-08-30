@@ -10,7 +10,9 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
 import { RadioList } from '@/components/ui/RadioList'
-import { button, field, fieldHint, fieldLabel, label, literal, num } from '@/components/ui/recipes'
+import { Formula } from '@/components/ui/Formula'
+import { button, chip, field, fieldHint, fieldLabel, label, literal, num } from '@/components/ui/recipes'
+import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { cn } from '@/lib/utils'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
@@ -27,6 +29,7 @@ import {
   describeVariableRole,
   estimandSentence,
   identifiedExpression,
+  identifiedExpressionTex,
   CONSISTENCY_STATEMENT,
   NO_INTERFERENCE_STATEMENT,
   ESTIMAND_DEFERRALS,
@@ -91,14 +94,14 @@ function StudyRecord({ study, identification }: { readonly study: StudySpecifica
   return (
     <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
       <summary className="cursor-pointer text-ink">Study record</summary>
-      <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
-        <dt>Study</dt><dd className={literal('m-0 break-all')}>{study.id}</dd>
-        <dt>Identification</dt><dd className={literal('m-0 break-all')}>{identification?.id ?? '—'}</dd>
-        <dt>Graph</dt><dd className="m-0">{study.dagName} · revision <span className={literal()}>{study.dagRevision.slice(0, 8)}</span></dd>
-        <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{study.preparedDataset}</dd>
-        <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(study.createdAt)}</dd>
-        <dt>Method</dt><dd className={literal('m-0')}>{identification?.method ?? '—'}</dd>
-      </dl>
+      <RecordList className="mt-2 text-label">
+        <RecordRow term="Study"><span className={literal('text-muted')} title={study.id}>{study.id.slice(0, 8)}</span></RecordRow>
+        <RecordRow term="Identification">{identification === null ? '—' : <span className={literal('text-muted')} title={identification.id}>{identification.id.slice(0, 8)}</span>}</RecordRow>
+        <RecordRow term="Graph">{study.dagName} · revision <span className={literal('text-muted')} title={study.dagRevision}>{study.dagRevision.slice(0, 8)}</span></RecordRow>
+        <RecordRow term="Prepared dataset"><span className={literal('text-muted')} title={study.preparedDataset}>{study.preparedDataset.slice(0, 8)}</span></RecordRow>
+        <RecordRow term="Created">{formatTimestamp(study.createdAt)}</RecordRow>
+        <RecordRow term="Method">{identification?.method ?? '—'}</RecordRow>
+      </RecordList>
     </details>
   )
 }
@@ -134,7 +137,7 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
             <p className="mb-0 mt-1 text-muted">
               {result.adjustment.variables.length === 0
                 ? 'No adjustment is needed: no back-door path is open.'
-                : <>{selectedLabel} {result.adjustment.variables.map((variable, index) => <span key={variable.node}>{index > 0 ? ', ' : ''}<span className="inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink">{variable.name}</span></span>)}</>}
+                : <>{selectedLabel} {result.adjustment.variables.map((variable, index) => <span key={variable.node}>{index > 0 ? ', ' : ''}<span className={chip()}>{variable.name}</span></span>)}</>}
             </p>
             {result.adjustment.kind === 'minimal' && <p className="mb-0 mt-1 text-faint">Canonical set: {result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ') || 'none'}.</p>}
             <details className="mt-2 text-muted">
@@ -149,9 +152,12 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
               </ol>
               {result.minimalAdjustmentSets.kind === 'truncated' && <p className="mb-0 mt-1 text-warn">The result limit was reached; additional minimal sets may exist.</p>}
             </details>
-            <p className={literal('mb-0 mt-2 text-label text-muted')} aria-label="Identified expression">
-              {identifiedExpression(study, result.adjustment.variables)}
-            </p>
+            <figure className="mb-0 mt-2">
+              <figcaption className={label('text-faint')}>Identified expression</figcaption>
+              <div className="mt-1">
+                <Formula tex={identifiedExpressionTex(study, result.adjustment.variables)} plain={identifiedExpression(study, result.adjustment.variables)} />
+              </div>
+            </figure>
           </Alert>
           {current && (
             <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>
@@ -392,10 +398,11 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         <button
           type="button"
           className={button('signal', 'mt-4')}
-          disabled={!readiness.ok || state.job.kind === 'running' || state.job.kind === 'choosing-adjustment-set'}
-          onClick={() => void execute()}
+          disabled={!readiness.ok || state.job.kind === 'choosing-adjustment-set'}
+          aria-busy={state.job.kind === 'running'}
+          onClick={state.job.kind === 'running' ? undefined : () => void execute()}
         >
-          {state.job.kind === 'running' ? 'Identifying…' : 'Identify the effect'}
+          Identify the effect
         </button>
       </section>
 

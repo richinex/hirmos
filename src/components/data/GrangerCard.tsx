@@ -167,8 +167,8 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
             {GRANGER_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
           </Select>
         </label>
-        <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running'} onClick={() => void run()}>
-          {job.kind === 'running' ? 'Testing…' : 'Run Granger test'}
+        <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused'} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>
+          Run Granger test
         </button>
       </div>
       {!readiness.ok && <p role="status" className="mb-0 mt-2 text-body text-faint">{describeGrangerReadiness(readiness.error)}</p>}

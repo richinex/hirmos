@@ -46,8 +46,8 @@ const PATHS_SHOWN = 8
 
 function PathRow({ entry }: { readonly entry: PathEntry }) {
   return (
-    <li title={entry.statement} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 px-2 py-1">
-      <span className="min-w-0 text-muted">
+    <li title={entry.statement} className="grid grid-cols-1 items-baseline gap-x-3 px-2 py-1 @sm/record:grid-cols-[minmax(0,1fr)_auto]">
+      <span className="min-w-0 text-muted [overflow-wrap:anywhere]">
         {entry.nodes.map((node, index) => (
           <span key={`${node}-${index}`}>
             {index > 0 && <span className="text-faint"> {entry.arrows[index - 1] ?? '–'} </span>}
@@ -55,7 +55,7 @@ function PathRow({ entry }: { readonly entry: PathEntry }) {
           </span>
         ))}
       </span>
-      <span className={num('whitespace-nowrap text-right text-ink')}>
+      <span className={num('min-w-0 text-ink [overflow-wrap:anywhere] @sm/record:whitespace-nowrap @sm/record:text-right')}>
         <span className="sr-only">{entry.closure === 'collider' ? 'blocked at collider ' : 'blocked at '}</span>{entry.blockedAt.join(', ')}
       </span>
     </li>
@@ -117,7 +117,7 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
 export function IdentificationRecord({ identification }: { readonly identification: Identification }) {
   if (identification.kind === 'backdoor-not-identified') {
     return (
-      <section aria-label="Identification record" className="mb-3 border-t border-hair pt-3">
+      <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
         <span className="block text-body font-medium text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment set</p>
         <p className="mb-1 mt-1 text-body text-muted">Front-door, instrumental-variable and other identification strategies were not assessed.</p>
@@ -143,7 +143,7 @@ export function IdentificationRecord({ identification }: { readonly identificati
     : `${plural(paths.length, 'back-door path')} · ${closersAreTheSet ? `blocked at ${closers.join(', ')}` : 'all blocked'}`
 
   return (
-    <section aria-label="Identification record" className="mb-3 border-t border-hair pt-3">
+    <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
       <span className="block text-body font-medium text-ink">Identification record</span>
       <ul className="m-0 mt-1 list-none space-y-0.5 p-0 text-body">
         <li className="flex items-center gap-2 text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {pathSummary}</li>

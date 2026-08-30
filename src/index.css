@@ -47,6 +47,10 @@
   --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
 
+  /* The house curve is the default for every transition utility, so a button's 150ms colour change
+     rides the same ease-out as .pop and .rise instead of Tailwind's own curve. */
+  --default-transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+
   /* THE TYPE RAMP — seven named tiers, and no other font size exists in the workspace UI.
      The app once had nineteen: 61% of all type sat in a 9.5/10/10.5/11px cluster whose half-pixel
      steps nobody can see, so hierarchy was being faked with colour and tracking. Six tiers with
@@ -300,6 +304,20 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
 }
 @media (prefers-reduced-motion: reduce) { .bar-live::after { animation: none; opacity: 0; } }
 
+/* A button at work: aria-busy="true" keeps the label and its width and runs the bar-live sweep along a
+   2px track on the inside bottom edge, in the button's own text colour so it reads on any tone. */
+button[aria-busy="true"] { position: relative; overflow: hidden; }
+button[aria-busy="true"]::before,
+button[aria-busy="true"]::after { content: ""; position: absolute; bottom: 0; height: 2px; }
+button[aria-busy="true"]::before { inset-inline: 0; background: color-mix(in srgb, currentColor 30%, transparent); }
+button[aria-busy="true"]::after {
+  left: -48px;
+  width: 48px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  animation: bar-sweep 1.8s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::after { animation: none; left: 0; width: 100%; opacity: 0.5; } }
+
 /* Elevation utilities. `.lift` is just the top-edge highlight for inline surfaces (cards, legend). `.float`
    adds a theme-aware drop shadow for surfaces that leave the plane (Rnd windows, modals), replacing the flat
    shadow-2xl so panels visibly lift off the stage. */
@@ -468,6 +486,12 @@ button:not(:disabled):active, [role='button']:active { transform: translateY(1px
 .seam:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 0; }
 .seam-v { cursor: col-resize; }
 .seam-h { cursor: row-resize; }
+
+/* A typeset formula wraps like a sentence: KaTeX sets nowrap, and lifting it lets inline maths break
+   after top-level relations and operators. The block is positioned so KaTeX's clipped MathML twin
+   anchors to it and not to the page. */
+.formula { position: relative; line-height: 1.7; }
+.formula .katex { white-space: normal; font-size: 1.05em; color: var(--color-ink); }
 
 .panel-scroll { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
 .panel-scroll::-webkit-scrollbar { width: 6px; }

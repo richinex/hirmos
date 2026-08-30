@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { IntervalFigure } from '@/components/ui/figures'
-import { button, label, literal, num, table, td, th, tr } from '@/components/ui/recipes'
+import { Formula } from '@/components/ui/Formula'
+import { button, chip, label, literal, num, statusText, table, td, th, tr } from '@/components/ui/recipes'
+import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
-import type { DagDocument } from '@/domain/dag'
+import { describeDagBasis, describeDagValidation, type DagDocument } from '@/domain/dag'
 import type { DatasetProfile } from '@/domain/dataset'
 import { describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
-import { describeAssignmentKind, describeEstimand, describeStudyDesignCategory, estimandSentence, identifiedExpression, studyDesignCategory, type IdentificationArtifact, type StudySpecification } from '@/domain/study'
+import { describeAssignmentKind, describeEstimand, describeStudyDesignCategory, estimandSentence, identifiedExpression, identifiedExpressionTex, studyDesignCategory, type IdentificationArtifact, type StudySpecification, type StudyVariable } from '@/domain/study'
 import { describeStationarityAssessment } from '@/domain/stationarityAssessment'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
@@ -18,20 +20,20 @@ import { formatTime, formatTimestamp } from '@/lib/format/date'
 
 const scaleOf = (run: EstimationRunArtifact) => (run.estimate.effect.kind === 'incidenceRateRatio' ? { kind: 'ratio' as const, label: 'IRR' as const } : { kind: 'additive' as const, unit: '' })
 
-function Row({ term, children }: { readonly term: string; readonly children: React.ReactNode }) {
-  return (
-    <>
-      <dt className="text-faint">{term}</dt>
-      <dd className="m-0 min-w-0 text-ink">{children}</dd>
-    </>
-  )
-}
+const Row = RecordRow
+
+/** A set of variables the reader counts; empty sets read as a word. */
+const names = (variables: readonly StudyVariable[]): React.ReactNode =>
+  variables.length === 0 ? 'none' : variables.map((variable) => <span key={variable.node} className={chip('mr-1')}>{variable.name}</span>)
+
+/** An id the reader may need to match: mono, quiet, and short, with the whole value on hover. */
+const shortId = (id: string) => <span className={literal('text-muted')} title={id}>{id.slice(0, 8)}</span>
 
 function Section({ title, children }: { readonly title: string; readonly children: React.ReactNode }) {
   return (
     <section className="border-t border-hair pt-3 first:border-0 first:pt-0" aria-label={title}>
       <h3 className="mb-2 mt-0 text-body font-medium text-ink">{title}</h3>
-      <dl className="m-0 grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-4 gap-y-1.5 text-body">{children}</dl>
+      <RecordList className="text-body">{children}</RecordList>
     </section>
   )
 }
@@ -102,10 +104,10 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       <div className="space-y-3 rounded-xl border border-hair bg-panel p-4" aria-label="Analysis record">
       <Section title="Estimator">
         <Row term="Method">{describeEstimator(run.configuration.kind)}</Row>
-        <Row term="Configuration"><span className={literal('break-all text-muted')}>{Object.entries(run.configuration).filter(([key]) => key !== 'kind').map(([key, value]) => `${key} ${JSON.stringify(value)}`).join(' · ') || 'defaults'}</span></Row>
+        <Row term="Configuration"><span className={literal('text-muted')}>{Object.entries(run.configuration).filter(([key]) => key !== 'kind').map(([key, value]) => `${key} ${JSON.stringify(value)}`).join(' · ') || 'defaults'}</span></Row>
         <Row term="Eligibility">{run.eligibility.kind === 'eligible' ? 'all requirements met' : `${run.eligibility.unresolved.length} unresolved`}</Row>
         <Row term="Rows">{formatCount(estimate.sample.observations).text}</Row>
-        <Row term="Run"><span className={literal('break-all text-muted')}>{run.id}</span> · {formatTimestamp(run.createdAt)}</Row>
+        <Row term="Run">{shortId(run.id)} · {formatTimestamp(run.createdAt)}</Row>
       </Section>
 
       {study !== null && (
@@ -114,13 +116,13 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <Row term="Treatment">{study.treatment.name}</Row>
           <Row term="Outcome">{study.outcome.name}</Row>
           <Row term="Design category">{describeAssignmentKind(study.assignment.kind)} · {describeStudyDesignCategory(studyDesignCategory(study))}</Row>
-          <Row term="Selected adjustment set">{estimate.adjustmentSet.length === 0 ? 'none' : estimate.adjustmentSet.map((variable) => variable.name).join(', ')}</Row>
+          <Row term="Selected adjustment set">{names(estimate.adjustmentSet)}</Row>
           <Row term="Identification">{manifest.identification === null ? 'not recorded' : manifest.identification.result.kind === 'identified' ? 'back-door adjustment' : 'no measured back-door adjustment set; other strategies not assessed'}</Row>
           {manifest.identification?.result.kind === 'identified' && (
             <>
-              <Row term="Canonical adjustment set">{manifest.identification.result.canonicalAdjustmentSet.length === 0 ? 'none' : manifest.identification.result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ')}</Row>
-              <Row term="Minimal valid sets">{manifest.identification.result.minimalAdjustmentSets.sets.map((set) => set.length === 0 ? 'none' : `{${set.map((variable) => variable.name).join(', ')}}`).join(' or ')}{manifest.identification.result.minimalAdjustmentSets.kind === 'truncated' ? ' · result limit reached' : ''}</Row>
-              <Row term="Identified expression"><span className={literal('break-words')}>{identifiedExpression(study, manifest.identification.result.adjustment.variables)}</span></Row>
+              <Row term="Canonical adjustment set">{names(manifest.identification.result.canonicalAdjustmentSet)}</Row>
+              <Row term="Minimal valid sets">{manifest.identification.result.minimalAdjustmentSets.sets.map((set, index) => <span key={index}>{index > 0 && <span className="text-faint"> or </span>}{names(set)}</span>)}{manifest.identification.result.minimalAdjustmentSets.kind === 'truncated' ? <span className="text-faint"> · result limit reached</span> : null}</Row>
+              <Row term="Identified expression"><Formula tex={identifiedExpressionTex(study, manifest.identification.result.adjustment.variables)} plain={identifiedExpression(study, manifest.identification.result.adjustment.variables)} /></Row>
             </>
           )}
         </Section>
@@ -129,19 +131,30 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       {manifest.dag !== null && (
         <Section title="Graph">
           <Row term="Name">{manifest.dag.name}</Row>
-          <Row term="Revision"><span className={literal()}>{String(manifest.dag.revision).slice(0, 8)}</span> · {manifest.dag.validation}</Row>
-          <Row term="Origin">{manifest.dag.origin.kind === 'user-authored' ? manifest.dag.origin.basis : 'discovery-informed'}</Row>
+          <Row term="Revision">{shortId(String(manifest.dag.revision))} · {describeDagValidation(manifest.dag.validation)}</Row>
+          <Row term="Origin">{manifest.dag.origin.kind === 'user-authored' ? describeDagBasis(manifest.dag.origin.basis) : 'substantive review of discovery results'}</Row>
           <Row term="Arrows">{formatCount(manifest.dag.graph.edges.length).text} over {formatCount(manifest.dag.graph.nodes.length).text} nodes</Row>
         </Section>
       )}
 
       <Section title="Data">
         <Row term="Source">{manifest.source.name} · {formatCount(manifest.source.bytes).text} bytes · rows not included</Row>
-        <Row term="Prepared dataset version"><span className={literal()}>{String(manifest.prepared.id).slice(0, 8)}</span> · {manifest.prepared.kind === 'prepared-time-series' ? `${manifest.prepared.sampling.frequency} series` : manifest.prepared.kind === 'prepared-panel' ? `panel · ${manifest.prepared.panel.units} units × ${manifest.prepared.panel.periods} periods` : 'independent rows'} · {formatCount(manifest.prepared.observations).text} rows</Row>
+        <Row term="Prepared dataset">{shortId(String(manifest.prepared.id))} ·{manifest.prepared.kind === 'prepared-time-series' ? `${manifest.prepared.sampling.frequency} series` : manifest.prepared.kind === 'prepared-panel' ? `panel · ${manifest.prepared.panel.units} units × ${manifest.prepared.panel.periods} periods` : 'independent rows'} · {formatCount(manifest.prepared.observations).text} rows</Row>
         <Row term="Missing data">{manifest.prepared.resolution.kind === 'none' ? 'none' : manifest.prepared.resolution.kind === 'window' ? `rows ${manifest.prepared.resolution.start + 1} to ${manifest.prepared.resolution.endExclusive}` : `${manifest.prepared.resolution.method}, ${manifest.prepared.resolution.cells} cells`}</Row>
         <Row term="Seasonal adjustment">{manifest.prepared.seasonalAdjustment.kind === 'none' ? 'none' : `seasonal-trend decomposition using loess (STL), period ${manifest.prepared.seasonalAdjustment.period}`}</Row>
         {manifest.stationarity !== null && (
-          <Row term="Stationarity">{manifest.stationarity.variables.map((variable) => `${manifest.schema.find((column) => column.id === String(variable.column))?.name ?? variable.column}: ${describeStationarityAssessment(variable.assessment).verdict}`).join(' · ')}</Row>
+          <Row term="Stationarity">
+            {manifest.stationarity.variables.map((variable, index) => {
+              const assessment = describeStationarityAssessment(variable.assessment)
+              return (
+                <span key={String(variable.column)}>
+                  {index > 0 && <span className="text-faint"> · </span>}
+                  {manifest.schema.find((column) => column.id === String(variable.column))?.name ?? variable.column}
+                  <span className={statusText[assessment.tone]}> {assessment.verdict}</span>
+                </span>
+              )
+            })}
+          </Row>
         )}
       </Section>
 
@@ -184,7 +197,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         <h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Read and export a result</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">Select an estimate to review its study, method, data and requirements. Compare 2 runs to see which recorded fields differ.</p>
       </div>
-      <div className="grid gap-3 @lg/panel:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
         <label className="block">
           <span className="block text-body font-medium text-ink">Estimate</span>
           <Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={selected ?? ''} onChange={(event) => setSelected(event.target.value === '' ? null : (event.target.value as EstimationRunId))}>

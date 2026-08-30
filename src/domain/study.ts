@@ -239,6 +239,28 @@ export function identifiedExpression(study: StudySpecification, adjustmentSet: r
   }
 }
 
+/** A variable name inside TeX: upright text, with TeX's special characters escaped. */
+const texName = (name: string): string =>
+  `\\text{${name.replace(/[\\{}$&#_%^~]/g, (char) => (char === '\\' ? '\\textbackslash{}' : char === '^' || char === '~' ? `\\${char}{}` : `\\${char}`))}}`
+
+/** The identified expression as TeX for typesetting; `identifiedExpression` stays the plain-text record. */
+export function identifiedExpressionTex(study: StudySpecification, adjustmentSet: readonly StudyVariable[]): string {
+  const t = texName(study.treatment.name)
+  const y = texName(study.outcome.name)
+  const z = adjustmentSet.map((variable) => texName(variable.name)).join(', ')
+  switch (study.estimand.kind) {
+    case 'average-treatment-effect':
+      return adjustmentSet.length === 0
+        ? String.raw`\mathrm{ATE}(t_1,t_0) = \mathbb{E}[${y} \mid ${t}=t_1] - \mathbb{E}[${y} \mid ${t}=t_0]`
+        : String.raw`\mathrm{ATE}(t_1,t_0) = \sum_{z} \bigl\{\mathbb{E}[${y} \mid ${t}=t_1, Z=z] - \mathbb{E}[${y} \mid ${t}=t_0, Z=z]\bigr\}\, P(Z=z),\allowbreak\quad Z=\{${z}\}`
+    case 'average-treatment-effect-on-treated':
+      return adjustmentSet.length === 0
+        ? String.raw`\mathrm{ATT} = \mathbb{E}[${y} \mid ${t}=1] - \mathbb{E}[${y} \mid ${t}=0]`
+        : String.raw`\mathrm{ATT} = \sum_{z} \bigl\{\mathbb{E}[${y} \mid ${t}=1, Z=z] - \mathbb{E}[${y} \mid ${t}=0, Z=z]\bigr\}\, P(Z=z \mid ${t}=1),\allowbreak\quad Z=\{${z}\}`
+    default: return assertNever(study.estimand)
+  }
+}
+
 /** Study-design category implied by the recorded assignment mechanism and DAG basis. */
 export function studyDesignCategory(study: StudySpecification): StudyDesignCategory {
   switch (study.assignment.kind) {

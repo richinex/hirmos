@@ -12,15 +12,27 @@ import { cn } from '@/lib/utils'
  */
 
 /** `signal` is the one affirmative action on a surface, so a panel never has two (index.css rule 2).
- * `outline` is the ordinary action, `quiet` the dismissive one, and `mono` the small-caps drafting-label
- * register used by the eval and compile chrome. */
-export type ButtonTone = 'signal' | 'danger' | 'outline' | 'quiet' | 'mono'
+ * `soft` is the signal wash for a control that is live but not the primary action. `outline` is the
+ * ordinary action, `quiet` the dismissive one, and `mono` the small-caps drafting-label register used by
+ * the eval and compile chrome. */
+export type ButtonTone = 'signal' | 'soft' | 'danger' | 'outline' | 'quiet' | 'mono'
 
-const BUTTON_BASE = 'rounded-md border border-transparent px-3 py-1.5 text-body transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.99] disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:hover:brightness-100 pointer-coarse:min-h-10'
+/** The signal wash: a tint and a translucent border, so a live control reads as live without a second fill on the surface. */
+const SIGNAL_WASH = 'border-signal/40 bg-signal/10 text-signal hover:bg-signal/15'
+
+/** A filled tone carries the inset top highlight the house uses for elevation, and drops it on press: the
+ * button reads as pushed in, with no drop shadow. The press itself is the 1px settle in index.css. */
+const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-highlight)] hover:brightness-110 active:shadow-none'
+
+/** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
+ * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
+ * remains "not ready"; a busy button keeps focus so nothing jumps when the run ends. */
+const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-150 aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
-  signal: 'bg-signal font-medium text-signal-ink hover:brightness-110',
-  danger: 'bg-danger font-medium text-signal-ink hover:brightness-110',
+  signal: cn('bg-signal', FILLED),
+  soft: SIGNAL_WASH,
+  danger: cn('bg-danger', FILLED),
   outline: 'border border-hair text-ink hover:border-edge',
   quiet: 'border border-hair text-muted hover:text-ink',
   // Named for its register, not its typeface. It carried font-mono until the typography pass, which only
@@ -28,8 +40,16 @@ const BUTTON_TONE: Record<ButtonTone, string> = {
   mono: 'border border-hair text-label uppercase tracking-[0.1em] text-muted hover:border-edge hover:text-ink',
 }
 
-export const button = (tone: ButtonTone = 'outline', extra?: string): string =>
-  cn(BUTTON_BASE, BUTTON_TONE[tone], extra)
+/** `md` is the 30px field height that matches `field()` and `SegmentedControl`; `sm` the 24px chrome step. */
+export type ButtonSize = 'sm' | 'md'
+
+const BUTTON_SIZE: Record<ButtonSize, string> = {
+  sm: 'px-2.5 py-1 text-label',
+  md: 'px-3 py-1.5 text-body',
+}
+
+export const button = (tone: ButtonTone = 'outline', extra?: string, size: ButtonSize = 'md'): string =>
+  cn(BUTTON_BASE, BUTTON_SIZE[size], BUTTON_TONE[tone], extra)
 
 /** Segmented-control segment. Selected is a surface, never a signal fill. */
 export const segment = (active: boolean, extra?: string): string =>
@@ -47,7 +67,7 @@ export type ChromeTone = 'quiet' | 'selected' | 'signal' | 'danger'
 const CHROME_TONE: Record<ChromeTone, string> = {
   quiet: 'border-transparent text-faint hover:bg-well hover:text-ink',
   selected: 'border-edge bg-raised text-ink',
-  signal: 'border-signal/40 bg-signal/10 text-signal hover:bg-signal/15',
+  signal: SIGNAL_WASH,
   danger: 'border-transparent text-faint hover:bg-danger/[0.08] hover:text-danger',
 }
 
@@ -119,6 +139,12 @@ export const literal = (extra?: string): string => cn('font-mono', extra)
  * is reserved for timings and keycaps. Ships the app's one label tracking (0.1em); call sites had
  * invented twelve values for that one job. */
 export const label = (extra?: string): string => cn('text-label uppercase tracking-[0.1em]', extra)
+
+/** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
+export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
+
+/** Text colour for a machine-state verdict, from the status ramp; muted for a state that is neither good nor bad. */
+export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 
 /** The title of a floating surface: panel, drawer or sheet. A step above `label()` in size, same voice.
  *  The app once had four registers for this, from 9.5px to 13px across three trackings. */

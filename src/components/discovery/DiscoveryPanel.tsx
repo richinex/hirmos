@@ -567,10 +567,11 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           <button
             type="button"
             className={button('signal', 'mt-4')}
-            disabled={!readiness.ok || eligibility.kind === 'refused' || draft.job.kind === 'running'}
-            onClick={() => void execute()}
+            disabled={!readiness.ok || eligibility.kind === 'refused'}
+            aria-busy={draft.job.kind === 'running'}
+            onClick={draft.job.kind === 'running' ? undefined : () => void execute()}
           >
-            {draft.job.kind === 'running' ? 'Running…' : `Run ${method.name}`}
+            Run {method.name}
           </button>
         </section>
       </div>

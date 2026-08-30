@@ -92,8 +92,8 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-body text-ink"><span className={label('block text-faint')}>Min segment</span><input type="number" min={1} max={200} className={field('text', 'mt-1 w-20')} value={minSize} onChange={(event) => setMinSize(Math.max(1, Math.min(200, Number(event.target.value) || 1)))} /></label>
-          <button type="button" className={button('quiet')} disabled={job.kind === 'running'} onClick={() => void run()}>
-            {job.kind === 'running' ? `Checking ${job.completed}/${job.total}` : 'Find breaks and seasonality'}
+          <button type="button" className={button('quiet')} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>
+            Find breaks and seasonality
           </button>
         </div>
       </div>

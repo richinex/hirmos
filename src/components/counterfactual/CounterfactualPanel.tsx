@@ -241,8 +241,8 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
             {method.ok && <p className="mb-0 mt-3 max-w-[65ch] text-body text-faint">{method.value.summary}</p>}
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The counterfactual could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running'} onClick={() => void execute()}>
-              {state.job.kind === 'running' ? 'Computing…' : 'Run counterfactual'}
+            <button type="button" className={button('signal', 'mt-4')} disabled={eligibility === null || eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              Run counterfactual
             </button>
           </>
         )}

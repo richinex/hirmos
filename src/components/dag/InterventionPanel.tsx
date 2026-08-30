@@ -164,8 +164,8 @@ export function InterventionPanel({ document, source, profile, prepared, queries
       </div>
       {!readiness.ok && <p role="status" className="mb-0 mt-2 text-body text-faint">{describeInterventionReadiness(readiness.error)}</p>}
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
-      <button type="button" className={button('signal', 'mt-3')} disabled={!readiness.ok || job.kind === 'running'} onClick={() => void run()}>
-        {job.kind === 'running' ? 'Asking…' : 'Ask the network'}
+      <button type="button" className={button('signal', 'mt-3')} disabled={!readiness.ok} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>
+        Ask the network
       </button>
       {recorded.length > 0 && (
         <ul className="m-0 mt-4 list-none space-y-2 p-0" aria-label="Intervention queries">

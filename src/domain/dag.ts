@@ -722,13 +722,23 @@ export function describeDagEditProblem(problem: DagEditProblem): string {
   }
 }
 
+export const describeDagBasis = (basis: 'domain-knowledge' | 'experimental-design'): string =>
+  basis === 'domain-knowledge' ? 'substantive and institutional knowledge' : 'experimental assignment mechanism'
+
 export function describeDagOrigin(origin: DagOrigin): string {
   switch (origin.kind) {
-    case 'user-authored': return origin.basis === 'domain-knowledge'
-      ? 'Basis: substantive and institutional knowledge'
-      : 'Basis: experimental assignment mechanism'
+    case 'user-authored': return `Basis: ${describeDagBasis(origin.basis)}`
     case 'discovery-informed': return `Basis: substantive review of ${origin.reports.length} discovery result${origin.reports.length === 1 ? '' : 's'}`
     default: return assertNever(origin)
+  }
+}
+
+export function describeDagValidation(kind: DagStructuralValidation['kind']): string {
+  switch (kind) {
+    case 'structurally-valid': return 'structurally valid'
+    case 'incomplete': return 'incomplete'
+    case 'invalid': return 'invalid'
+    default: return assertNever(kind)
   }
 }
 

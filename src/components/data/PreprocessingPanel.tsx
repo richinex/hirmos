@@ -627,10 +627,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <button
             type="button"
             className={button('signal')}
-            disabled={!readiness.ok || draft.preparation.kind === 'running'}
-            onClick={() => void createPreparedVersion()}
+            disabled={!readiness.ok}
+            aria-busy={draft.preparation.kind === 'running'}
+            onClick={draft.preparation.kind === 'running' ? undefined : () => void createPreparedVersion()}
           >
-            {draft.preparation.kind === 'running' ? 'Preparing…' : 'Create prepared dataset version'}
+            Create prepared dataset version
           </button>
         </div>
         {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeReadinessProblem(readiness.error)}</p>}
@@ -680,10 +681,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             <button
               type="button"
               className={button('quiet')}
-              disabled={preparedTimeSeries === null || draft.stationarity.kind === 'running'}
-              onClick={() => void runDiagnostics()}
+              disabled={preparedTimeSeries === null}
+              aria-busy={draft.stationarity.kind === 'running'}
+              onClick={draft.stationarity.kind === 'running' ? undefined : () => void runDiagnostics()}
             >
-              {draft.stationarity.kind === 'running' ? `Testing ${draft.stationarity.completed}/${draft.stationarity.total}` : 'Run stationarity tests'}
+              Run stationarity tests
             </button>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />

@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
 import { cellPadding, countLine, FacetPills, FilterField, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
-import { literal, num, table as tableCn, td, tr } from '@/components/ui/recipes'
+import { num, table as tableCn, td, tr } from '@/components/ui/recipes'
 import type { DagDocument, DagEdgeId, DirectedDagEdge, EdgeSupport, EdgeTiming } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
 import { cn } from '@/lib/utils'
@@ -68,8 +68,8 @@ export function EdgeLedgerTable({ document, selectedEdge, onSelectEdge }: {
 
   const columns = useMemo(() => [
     helper.accessor('arrow', { header: 'Arrow', cell: (context) => <span className="text-ink">{context.getValue()}</span> }),
-    helper.accessor('lag', { header: 'Timing', meta: { align: 'right' }, cell: (context) => <span className={literal('text-muted')}>{context.row.original.timing}</span> }),
-    helper.accessor('support', { header: 'Support', cell: (context) => <span className={cn(literal(), context.getValue() === 'unstated' ? 'text-warn' : 'text-faint')}>{context.getValue()}</span> }),
+    helper.accessor('lag', { header: 'Timing', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{context.row.original.timing}</span> }),
+    helper.accessor('support', { header: 'Support', cell: (context) => <span className={context.getValue() === 'unstated' ? 'text-warn' : 'text-faint'}>{context.getValue()}</span> }),
     helper.accessor('rationale', { header: 'Rationale', cell: (context) => context.getValue().length === 0 ? <span className="text-warn">Rationale required</span> : <span className="text-muted">{context.getValue()}</span> }),
     helper.accessor('evidence', { header: 'Evidence', meta: { align: 'right' }, cell: (context) => <span className={context.getValue() === 0 ? 'text-faint' : 'text-ink'}>{context.getValue()}</span> }),
   ], [])
