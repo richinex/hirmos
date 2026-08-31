@@ -227,6 +227,36 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await expect(page.getByLabel('Discovered relations').getByRole('button')).not.toHaveCount(0)
 })
 
+test('saves per-column time-series transformations and previews the materialized values', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Prepared transformation workflow runs once')
+  await createProject(page)
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'prepared-transformations.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('time,x,y\n1,10,1\n2,12,4\n3,15,9\n4,19,16\n5,24,25\n6,30,36\n'),
+  })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await expect(page.getByRole('heading', { name: 'Set the analysis dataset' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('radio', { name: 'Regular time series' }).click()
+  await choose(page.getByLabel('Time column'), { label: 'time' })
+  await page.getByRole('checkbox', { name: 'x', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'y', exact: true }).check()
+  await page.getByRole('radiogroup', { name: 'Transformation for x' }).getByRole('radio', { name: 'First difference' }).click()
+  await page.getByRole('radiogroup', { name: 'Transformation for y' }).getByRole('radio', { name: 'Linear detrend' }).click()
+  await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
+  await expect(page.getByText('Prepared time series · 5 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/x: first difference, y: linear detrend/)).toBeVisible()
+
+  await page.getByRole('button', { name: 'Preview prepared values' }).click()
+  const plots = page.getByRole('list', { name: 'Prepared series plots' })
+  await expect(plots.getByTestId('prepared-series')).toHaveCount(2, { timeout: 30_000 })
+  await expect(plots).toContainText('x')
+  await expect(plots).toContainText('first difference')
+  await expect(plots).toContainText('linear detrend')
+  await expect(page.getByText('5 aligned rows')).toBeVisible()
+  await expect(page.getByText('first source row removed for alignment')).toBeVisible()
+})
+
 test('keeps the current chapter visible until a cold lazy chapter is ready', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Cold chunk navigation runs once')
   let releaseChunk: () => void = () => undefined

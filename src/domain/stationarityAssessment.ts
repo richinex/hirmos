@@ -4,7 +4,8 @@ import type { StationarityBattery } from './stationarity'
 /**
  * The interpreted stationarity route per DESIGN.md §6.4: evidence rules over ADF and KPSS in `c` and
  * `ct`, Zivot–Andrews for a one-time break, and the same battery on the first difference before a
- * series is called I(1). The assessment recommends a route; it never applies one.
+ * series is called I(1). Here “levels” means the values in the prepared dataset; the assessment
+ * recommends a route and never changes that dataset.
  */
 
 export type DeterministicSpecification = 'c' | 'ct'
@@ -133,7 +134,7 @@ export function levelModelVerdict(name: string, assessment: StationarityAssessme
     case 'levelStationary': return { kind: 'allowed', reason: `${name} is level-stationary.` }
     case 'trendStationary': return { kind: 'allowed', reason: `${name} is trend-stationary; a trend term or detrending is still owed.` }
     case 'breakStationary': return { kind: 'unresolved', reason: `${name} is stationary only around a break at ${assessment.break + 1}; the model does not include it.` }
-    case 'differenceStationary': return { kind: 'refused', reason: `${name} is I(1): a level regression risks a spurious relation. Differencing in Data studio or a cointegration method might be needed.` }
+    case 'differenceStationary': return { kind: 'refused', reason: `${name} is I(1) on the prepared scale: a regression on those values risks a spurious relation. Create a differenced prepared version or use a suitable cointegration method.` }
     case 'higherOrderOrUnresolved': return { kind: 'refused', reason: `${name} is I(2) or unresolved; no I(0)/I(1) method applies until its order is settled.` }
     case 'inconclusive': return { kind: 'unresolved', reason: `${name}'s stationarity evidence is inconclusive: ${assessment.conflicts.map(describeStationarityConflict).join(' ')}` }
     default: return assertNever(assessment)

@@ -619,15 +619,11 @@ export function evaluateDiscoveryEligibility(
         unresolved.push({ kind: 'unresolved', caveat, missingEvidence: 'Run stationarity tests for this prepared dataset version in Data studio.' })
         continue
       }
-      if (stationarity.transform.kind === 'difference') {
-        satisfied.push({ kind: 'satisfied', caveat, evidence: 'The stationarity view is the first difference; the run reads the prepared levels, so difference the series in the recipe before trusting links found on levels.' })
-        continue
-      }
       const verdicts = prepared.columns.map((column) => ({ name: columnNameOf(column), verdict: levelModelVerdict(columnNameOf(column), stationarity.variables.find((variable) => variable.column === column)?.assessment ?? null) }))
       const integrated = verdicts.filter((entry) => entry.verdict.kind === 'refused').map((entry) => entry.name)
       const open = verdicts.filter((entry) => entry.verdict.kind === 'unresolved').map((entry) => entry.verdict.reason)
       if (integrated.length === 0 && open.length === 0) {
-        satisfied.push({ kind: 'satisfied', caveat, evidence: `${verdicts.map((entry) => entry.name).join(', ')} ${verdicts.length === 1 ? 'is' : 'are'} stationary in levels.` })
+        satisfied.push({ kind: 'satisfied', caveat, evidence: `${verdicts.map((entry) => entry.name).join(', ')} ${verdicts.length === 1 ? 'is' : 'are'} stationary on the prepared scale.` })
         continue
       }
       const integratedText = integrated.length === 0 ? '' : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) in levels, so links found on levels can be spurious; a differenced version is the safer input.`

@@ -44,7 +44,7 @@ import {
   type EstimatorId,
 } from '@/domain/estimation'
 import { ESTIMATION_METHODS, methodDefinition, type MethodEligibility } from '@/domain/methods'
-import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import {
   assessPanelInterventionLayout,
@@ -576,6 +576,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   }))
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
   const study = identification === null ? null : studies.find((candidate) => candidate.id === identification.study) ?? null
+  const studyScale = prepared.kind === 'prepared-time-series' && study !== null
+    ? [study.treatment, study.outcome].map((variable) => `${variable.name}: ${describeSeriesTransform(seriesTransformFor(prepared.seriesTransforms, variable.column))}`).join(' · ')
+    : null
   const document = study === null ? null : documents.find((candidate) => candidate.id === study.dagDocument) ?? null
   const configuration = state.configurations[state.estimator]
   const method = methodDefinition(methodIdOf(state.estimator))
@@ -1266,6 +1269,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <dt className="text-faint">Graph</dt><dd className="m-0 text-ink">{study.dagName} · <span className={literal()}>{study.dagRevision.slice(0, 8)}</span></dd>
               <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{identification.result.kind === 'identified' ? 'Back-door adjustment' : identification.result.kind === 'counterfactually-identified' ? 'IDC* counterfactual identification' : 'Front-door identification'}</dd>
               <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Independent'} · {formatCount(prepared.observations).text}</dd>
+              {studyScale !== null && <><dt className="text-faint">Analysis scale</dt><dd className="m-0 text-ink">{studyScale}</dd></>}
             </dl>
           </>
         )}

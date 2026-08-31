@@ -45,7 +45,7 @@ import {
   type MethodDefinition,
   type MethodEligibility,
 } from '@/domain/methods'
-import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
@@ -490,6 +490,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Variables</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{prepared.columns.length}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Stationarity</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind !== 'prepared-time-series' ? 'Not applicable' : stationarity === null ? 'Tests not run' : `${formatCount(stationarity.observations).text} rows tested`}</dd></div>
         </dl>
+        {prepared.kind === 'prepared-time-series' && prepared.seriesTransforms.some((record) => record.transform.kind !== 'levels') && (
+          <p className="mb-0 mt-3 text-body text-muted"><span className={label('text-faint')}>Prepared scale</span><br />{prepared.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${profile.columns.find((column) => column.id === record.column)?.name ?? record.column}: ${describeSeriesTransform(record.transform)}`).join(' · ')}</p>
+        )}
         <p className={literal('mb-0 mt-3 break-all text-micro text-faint')}>Dataset version {prepared.id.slice(0, 8)}</p>
       </section>
       <MethodCaveats methods={[method]} eligibility={eligibility} />

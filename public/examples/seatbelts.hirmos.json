@@ -588,14 +588,32 @@
       },
       "seasonalAdjustment": {
         "kind": "none"
-      }
+      },
+      "seriesTransforms": [
+        {
+          "column": "1:DriversKilled",
+          "transform": { "kind": "levels" }
+        },
+        {
+          "column": "5:kms",
+          "transform": { "kind": "levels" }
+        },
+        {
+          "column": "6:PetrolPrice",
+          "transform": { "kind": "levels" }
+        },
+        {
+          "column": "8:law",
+          "transform": { "kind": "levels" }
+        }
+      ]
     },
     "stationarity": {
       "id": "6a02ff5e-4d8f-44c4-a7d3-cd8757668776",
       "kind": "stationarity-evidence",
       "preparedDataset": "855efccf-0540-48c3-b7f0-4620b6744971",
       "observations": 192,
-      "transform": {
+      "diagnosticTransform": {
         "kind": "levels"
       },
       "variables": [

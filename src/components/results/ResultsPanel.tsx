@@ -10,7 +10,7 @@ import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
 import { describeDagBasis, describeDagValidation, type DagDocument } from '@/domain/dag'
 import type { DatasetProfile } from '@/domain/dataset'
 import { describeEstimator, intervalTypeOf, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
-import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import { describeAssignmentKind, describeEstimand, describeStudyDesignCategory, estimandSentence, identifiedExpression, identifiedExpressionTex, studyDesignCategory, type IdentificationArtifact, type StudySpecification, type StudyVariable } from '@/domain/study'
@@ -156,6 +156,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
         <Row term="Prepared dataset">{shortId(String(manifest.prepared.id))} ·{manifest.prepared.kind === 'prepared-time-series' ? `${manifest.prepared.sampling.frequency} series` : manifest.prepared.kind === 'prepared-panel' ? `panel · ${manifest.prepared.panel.units} units × ${manifest.prepared.panel.periods} periods` : 'independent rows'} · {formatCount(manifest.prepared.observations).text} rows</Row>
         <Row term="Missing data">{manifest.prepared.resolution.kind === 'none' ? 'none' : manifest.prepared.resolution.kind === 'window' ? `rows ${manifest.prepared.resolution.start + 1} to ${manifest.prepared.resolution.endExclusive}` : `${manifest.prepared.resolution.method}, ${manifest.prepared.resolution.cells} cells`}</Row>
         <Row term="Seasonal adjustment">{manifest.prepared.seasonalAdjustment.kind === 'none' ? 'none' : `seasonal-trend decomposition using loess (STL), period ${manifest.prepared.seasonalAdjustment.period}`}</Row>
+        <Row term="Series transformations">{manifest.prepared.kind !== 'prepared-time-series' ? 'not applicable' : manifest.prepared.seriesTransforms.map((record, index) => <span key={String(record.column)}>{index > 0 && <span className="text-faint"> · </span>}{manifest.schema.find((column) => column.id === String(record.column))?.name ?? record.column}: {describeSeriesTransform(record.transform)}</span>)}</Row>
         {manifest.stationarity !== null && (
           <Row term="Stationarity">
             {manifest.stationarity.variables.map((variable, index) => {

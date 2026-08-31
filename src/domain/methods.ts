@@ -789,7 +789,7 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
     {
       id: caveatId('linear-level-stationarity'),
       category: 'stationarity-and-dynamics',
-      requirement: 'On time-series rows the treatment and outcome are stationary in levels, or differenced; I(1) levels need a cointegration route.',
+      requirement: 'On time-series rows the prepared treatment and outcome are stationary, or the study uses a suitable cointegration route for I(1) variables retained in levels.',
       consequenceIfUnmet: 'A regression between integrated series is spurious.',
       sources: [GRANGER_NEWBOLD_1974, hirmos('src/domain/stationarityAssessment.ts#assessStationarity')],
     },

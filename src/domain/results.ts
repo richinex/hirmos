@@ -2,7 +2,7 @@ import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
 import type { DatasetProfile } from './dataset'
 import type { EstimationRunArtifact } from './estimation'
-import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
+import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import type { IdentificationArtifact, StudySpecification } from './study'
 import type { SelectedSource } from './workflow'
@@ -121,6 +121,10 @@ const describeConfiguration = (run: EstimationRunArtifact): string =>
     .map(([key, value]) => `${key} ${JSON.stringify(value)}`)
     .join(', ')
 
+const describePreparedTransforms = (prepared: PreparedDatasetArtifact): string => prepared.kind === 'prepared-time-series'
+  ? prepared.seriesTransforms.map((record) => `${record.column}:${describeSeriesTransform(record.transform)}`).join('|')
+  : 'not applicable'
+
 /** The fields that differ between two runs, so a comparison highlights what changed and nothing else. */
 export function compareResults(left: ResultManifest, right: ResultManifest): readonly ResultDifference[] {
   const differences: ResultDifference[] = []
@@ -128,6 +132,7 @@ export function compareResults(left: ResultManifest, right: ResultManifest): rea
   add('Prepared version', String(left.prepared.id), String(right.prepared.id))
   add('Missingness resolution', left.prepared.resolution.kind, right.prepared.resolution.kind)
   add('Seasonal adjustment', left.prepared.seasonalAdjustment.kind, right.prepared.seasonalAdjustment.kind)
+  add('Series transformations', describePreparedTransforms(left.prepared), describePreparedTransforms(right.prepared))
   add('Graph', left.dag?.name ?? 'none', right.dag?.name ?? 'none')
   add('Graph revision', String(left.dag?.revision ?? 'none'), String(right.dag?.revision ?? 'none'))
   add('Arrows', String(left.dag?.graph.edges.length ?? 0), String(right.dag?.graph.edges.length ?? 0))

@@ -108,6 +108,115 @@ test('keeps null and zero distinct in a materialized numeric buffer', async ({ p
   expect(raw).toEqual({ firstIsNaN: true, second: 2, validityByte: 2, missing: 1 })
 })
 
+test('materializes saved per-column time-series transformations on one aligned grid', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Prepared transformation boundary runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const [dataModule, workflowModule, preparedModule] = await Promise.all([
+      import(new URL('/src/data/client.ts', window.location.href).href),
+      import(new URL('/src/domain/workflow.ts', window.location.href).href),
+      import(new URL('/src/data/prepared.ts', window.location.href).href),
+    ])
+    const file = new File(['time,x,y,z\n1,10,100,1\n2,12,101,4\n3,15,103,9\n4,19,106,16\n'], 'transforms.csv', { type: 'text/csv' })
+    const profiled = await dataModule.profileSourceInWorker(workflowModule.newImportRequestId(), file)
+    if (!profiled.ok) throw new Error(`Profile failed: ${profiled.error.kind}`)
+    const column = (name: string) => {
+      const found = profiled.value.columns.find((candidate: { readonly name: string }) => candidate.name === name)
+      if (!found) throw new Error(`${name} was not profiled.`)
+      return found.id
+    }
+    const time = column('time')
+    const x = column('x')
+    const y = column('y')
+    const z = column('z')
+    const source = { file, name: file.name, bytes: file.size, mediaType: file.type, lastModified: file.lastModified, format: 'csv' as const }
+    const prepared = {
+      kind: 'prepared-time-series' as const,
+      id: 'prepared-transform-test',
+      recipe: 'recipe-transform-test',
+      sourceProfile: profiled.value.id,
+      observations: 3,
+      columns: [x, y, z],
+      sampling: { kind: 'regular-series' as const, timeColumn: time, frequency: 'daily' as const },
+      missingness: { kind: 'not-present' as const },
+      resolution: { kind: 'none' as const },
+      seasonalAdjustment: { kind: 'none' as const },
+      seriesTransforms: [
+        { column: x, transform: { kind: 'difference' as const, order: 1 as const } },
+        { column: y, transform: { kind: 'levels' as const } },
+        { column: z, transform: { kind: 'linear-detrend' as const } },
+      ],
+    }
+    const materialized = await preparedModule.materialisePrepared(source, profiled.value, prepared, [x, y, z])
+    if (!materialized.ok) throw new Error(`Prepared materialization failed: ${materialized.error.kind}`)
+    const yOnly = await preparedModule.materialisePrepared(source, profiled.value, prepared, [y])
+    if (!yOnly.ok) throw new Error(`Subset materialization failed: ${yOnly.error.kind}`)
+    return {
+      values: Array.from(materialized.value.values),
+      rows: materialized.value.rowCount,
+      leadingRowsRemoved: materialized.value.leadingRowsRemoved,
+      yOnly: Array.from(yOnly.value.values),
+      yOnlyRows: yOnly.value.rowCount,
+      yOnlyLeadingRowsRemoved: yOnly.value.leadingRowsRemoved,
+    }
+  })
+
+  expect(raw).toEqual({
+    values: [2, 3, 4, 101, 103, 106, -1, -1, 1],
+    rows: 3,
+    leadingRowsRemoved: 1,
+    yOnly: [101, 103, 106],
+    yOnlyRows: 3,
+    yOnlyLeadingRowsRemoved: 1,
+  })
+})
+
+test('upgrades saved version-1 transformation fields at the persistence boundary', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Saved-project compatibility runs once')
+  await page.goto('/app')
+  const raw = await page.evaluate(async () => {
+    const persistence = await import(new URL('/src/domain/persistence.ts', window.location.href).href)
+    const parsed = persistence.parseSnapshotValue({
+      kind: 'hirmos-project',
+      version: 1,
+      savedAt: '2026-08-31T00:00:00.000Z',
+      project: { id: 'project', name: 'Legacy prepared project', createdAt: '2026-08-30T00:00:00.000Z' },
+      source: null,
+      profile: null,
+      prepared: { id: 'prepared', kind: 'prepared-time-series', columns: ['x', 'y'] },
+      stationarity: { id: 'stationarity', kind: 'stationarity-evidence', transform: { kind: 'difference', order: 1 } },
+      grangerEvidence: [],
+      discoveryRuns: [],
+      dagDocuments: [],
+      dagChecks: [],
+      interventionQueries: [],
+      studyDraft: {},
+      studies: [],
+      identifications: [],
+      estimationRuns: [],
+      sensitivityRuns: [],
+      counterfactualRuns: [],
+    })
+    if (!parsed.ok) return parsed
+    return {
+      ok: true,
+      transforms: parsed.value.prepared?.kind === 'prepared-time-series' ? parsed.value.prepared.seriesTransforms : null,
+      diagnosticTransform: parsed.value.stationarity?.diagnosticTransform ?? null,
+      legacyTransformRetained: parsed.value.stationarity !== null && 'transform' in parsed.value.stationarity,
+    }
+  })
+
+  expect(raw).toEqual({
+    ok: true,
+    transforms: [
+      { column: 'x', transform: { kind: 'levels' } },
+      { column: 'y', transform: { kind: 'levels' } },
+    ],
+    diagnosticTransform: { kind: 'difference', order: 1 },
+    legacyTransformRetained: false,
+  })
+})
+
 test('validates, materializes, and estimates a balanced long panel through both workers', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Panel boundary runs once')
   await page.goto('/app')

@@ -139,7 +139,6 @@ export function evaluateGrangerEligibility(
         break
       case 'stationarity-and-dynamics': {
         if (stationarity === null) { unresolved.push({ kind: 'unresolved', caveat, missingEvidence: 'Run the stationarity tests above for this prepared dataset version.' }); break }
-        if (stationarity.transform.kind === 'difference') { satisfied.push({ kind: 'satisfied', caveat, evidence: 'The stationarity view is the first difference; the test reads the prepared levels, so difference the series in the recipe before trusting a level result.' }); break }
         if (pair === null) { unresolved.push({ kind: 'unresolved', caveat, missingEvidence: 'Choose the candidate cause and the target; their stationarity verdicts are checked here.' }); break }
         const verdicts = [pair.candidateCause, pair.target].map((column) => {
           const assessment = stationarity.variables.find((variable) => variable.column === column.id)?.assessment ?? null

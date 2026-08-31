@@ -110,3 +110,75 @@ test('DirectLiNGAM is eligible only for complete independent cross-sectional obs
     expect.objectContaining({ caveat: expect.objectContaining({ category: 'sampling-structure' }) }),
   ]))
 })
+
+test('cointegration eligibility reads saved transformations, not the diagnostic display scale', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Time-series transformation contract runs once')
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const estimation = await import(new URL('/src/domain/estimation.ts', window.location.href).href)
+    const methods = await import(new URL('/src/domain/methods.ts', window.location.href).href)
+    const treatment = { node: 'price', column: 'price', name: 'Price' }
+    const outcome = { node: 'demand', column: 'demand', name: 'Demand' }
+    const study = {
+      estimand: { kind: 'average-treatment-effect', scale: 'additive' },
+      treatment,
+      outcome,
+      graph: { nodes: [treatment, outcome], laggedArrows: 0 },
+    }
+    const identification = { kind: 'identified', adjustment: { kind: 'canonical', variables: [] } }
+    const battery = { observations: 120 }
+    const stationarity = {
+      kind: 'stationarity-evidence',
+      preparedDataset: 'prepared',
+      diagnosticTransform: { kind: 'difference' },
+      variables: [treatment, outcome].map((variable) => ({
+        column: variable.column,
+        result: battery,
+        levels: battery,
+        differenced: battery,
+        assessment: { kind: 'levelStationary', evidence: [{ test: 'adf', specification: 'c', series: 'levels', pValue: 0.01 }] },
+      })),
+    }
+    const prepared = (transformed: boolean) => ({
+      kind: 'prepared-time-series',
+      observations: 120,
+      columns: ['price', 'demand'],
+      sampling: { frequency: 'monthly' },
+      missingness: { kind: 'not-present' },
+      seriesTransforms: [
+        { column: 'price', transform: transformed ? { kind: 'difference', order: 1 } : { kind: 'levels' } },
+        { column: 'demand', transform: { kind: 'levels' } },
+      ],
+    })
+    const definition = methods.methodDefinition(estimation.methodIdOf('ardl-pss'))
+    if (!definition.ok) throw new Error('ARDL method definition is missing.')
+    const evaluate = (transformed: boolean) => {
+      const dataset = prepared(transformed)
+      return estimation.evaluateEstimatorEligibility(definition.value, {
+        identification,
+        prepared: dataset,
+        stationarity,
+        configuration: estimation.defaultConfiguration('ardl-pss', dataset, study),
+        outcomeIsCount: false,
+        treatmentIsBinary: false,
+        observedGraphIsBinary: false,
+        document: null,
+        study,
+        panelPreflight: { kind: 'not-applicable' },
+      })
+    }
+    return { levels: evaluate(false), transformed: evaluate(true) }
+  })
+
+  expect(result.levels.kind).toBe('caution')
+  expect(result.levels.satisfied).toEqual(expect.arrayContaining([
+    expect.objectContaining({ caveat: expect.objectContaining({ id: 'ardl-orders-assessed' }) }),
+  ]))
+  expect(result.transformed.kind).toBe('refused')
+  expect(result.transformed.violations).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      caveat: expect.objectContaining({ id: 'ardl-orders-assessed' }),
+      evidence: expect.stringContaining('first difference for Price'),
+    }),
+  ]))
+})

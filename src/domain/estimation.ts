@@ -21,7 +21,7 @@ import {
   POISSON_GLM_METHOD_ID,
   PANEL_INTERVENTION_METHOD_ID,
 } from './methods'
-import type { PreparedDatasetArtifact, PreparedDatasetVersionId, StationarityEvidenceArtifact } from './preprocessing'
+import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type PreparedDatasetVersionId, type StationarityEvidenceArtifact } from './preprocessing'
 import { describePanelInterventionPreflight, type PanelInterventionPreflight } from './panel'
 import { describeStationarityConflict, levelModelVerdict, type LevelModelVerdict, type StationarityAssessment } from './stationarityAssessment'
 import { treatmentDescendants, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type StudyId, type StudySpecification, type StudyVariable } from './study'
@@ -693,6 +693,16 @@ const levelReadings = (context: EligibilityContext): readonly { readonly name: s
 const levelVerdicts = (context: EligibilityContext): readonly LevelModelVerdict[] =>
   levelReadings(context).map((reading) => levelModelVerdict(reading.name, reading.assessment))
 
+/** Cointegration procedures must receive the study variables in levels, not a prepared transform. */
+const transformedStudyVariables = (context: EligibilityContext): readonly { readonly name: string; readonly transform: string }[] => {
+  if (context.prepared.kind !== 'prepared-time-series' || context.study === null) return []
+  const variables = [context.study.treatment, context.study.outcome, ...(context.identification.kind === 'identified' ? context.identification.adjustment.variables : [])]
+  return variables.flatMap((variable) => {
+    const transform = seriesTransformFor(context.prepared.kind === 'prepared-time-series' ? context.prepared.seriesTransforms : [], variable.column)
+    return transform.kind === 'levels' ? [] : [{ name: variable.name, transform: describeSeriesTransform(transform) }]
+  })
+}
+
 /** Integration-order rule for the long-run estimators: every study variable I(0) or I(1), or every one I(1). */
 const applyOrderRule = (
   id: string,
@@ -746,7 +756,6 @@ const applyLevelRule = (
   if (context.prepared.kind === 'prepared-panel') { leave(id, 'Rows are a panel; trends are assessed within units, which this rule does not cover.'); return }
   if (context.prepared.kind !== 'prepared-time-series') { satisfy(id, 'Independent observations carry no stochastic trend.'); return }
   if (context.stationarity === null) { leave(id, 'Run stationarity tests for this prepared dataset version in Data studio.'); return }
-  if (context.stationarity.transform.kind === 'difference') { satisfy(id, 'The stationarity view is the first difference; the run reads the prepared levels, so difference the series in the recipe before trusting a level coefficient.'); return }
   const readings = levelReadings(context)
   // I(2) or an unsettled order refuses (DESIGN.md, integration table); I(1) warns in one sentence, since the verdict is itself a test.
   const higher = readings.filter((reading) => reading.assessment?.kind === 'higherOrderOrUnresolved')
@@ -759,7 +768,7 @@ const applyLevelRule = (
     .map((verdict) => verdict.reason)
   const integratedText = integrated.length === 0
     ? ''
-    : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) in levels, so a level regression can show a spurious relation. Differencing in Data studio or a cointegration method might be needed.`
+    : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) on the prepared scale, so a regression on those values can show a spurious relation. Create a differenced prepared version or use a suitable cointegration method.`
   if (integrated.length > 0 || open.length > 0) { leave(id, [integratedText, ...open].filter((text) => text.length > 0).join(' ')); return }
   satisfy(id, levelVerdicts(context).map((verdict) => verdict.reason).join(' ') || 'No study variables to check.')
 }
@@ -922,7 +931,11 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (adjustment === null) violate('ardl-single-regressor', 'No measured back-door adjustment set was found for this study.')
       else if (identification.kind === 'identified' && identification.adjustment.variables.length > 0) violate('ardl-single-regressor', `The identified adjustment set (${adjustment}) is not empty, and the port fits one exogenous variable.`)
       else satisfy('ardl-single-regressor', 'No adjustment is needed, so the treatment is the single exogenous variable.')
-      applyOrderRule('ardl-orders-assessed', context, 'i0-or-i1', satisfy, leave, violate)
+      {
+        const transformed = transformedStudyVariables(context)
+        if (transformed.length > 0) violate('ardl-orders-assessed', `ARDL bounds inference and its long-run coefficient require level variables. This prepared version uses ${transformed.map((variable) => `${variable.transform} for ${variable.name}`).join(', ')}.`)
+        else applyOrderRule('ardl-orders-assessed', context, 'i0-or-i1', satisfy, leave, violate)
+      }
       leave('ardl-bounds-reading', 'The bounds test is read with the run: only a statistic above the I(1) bound establishes a level relation.')
       satisfy('ardl-deterministic-case', `The run records ${configuration.trend === 'ct' ? 'a constant and trend' : 'a constant'} with Pesaran–Shin–Smith case ${configuration.case}.`)
       break
@@ -931,7 +944,11 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (!timeSeries) violate('vecm-sample', 'A vector error correction model needs an ordered time series. This prepared dataset holds independent rows.')
       else if (prepared.observations < (configuration.maxLags + 2) * (2 + (identification.kind === 'identified' ? identification.adjustment.variables.length : 0)) * 3 + 10) violate('vecm-sample', `${prepared.observations} rows is too few for the variables at ${configuration.maxLags} lags.`)
       else satisfy('vecm-sample', `Prepared as a regular ${prepared.sampling.frequency} time series; deterministic terms “${configuration.deterministic}” and up to ${configuration.maxLags} lags are recorded.`)
-      applyOrderRule('vecm-all-i1', context, 'i1-only', satisfy, leave, violate)
+      {
+        const transformed = transformedStudyVariables(context)
+        if (transformed.length > 0) violate('vecm-all-i1', `VECM estimates cointegration among variables in levels. This prepared version uses ${transformed.map((variable) => `${variable.transform} for ${variable.name}`).join(', ')}.`)
+        else applyOrderRule('vecm-all-i1', context, 'i1-only', satisfy, leave, violate)
+      }
       leave('vecm-rank', 'The Johansen trace test decides the rank when the run starts; rank zero reports no effect.')
       leave('vecm-single-relation', 'A long-run effect is read only when the rank is one.')
       leave('vecm-no-interval', 'The port reports the long-run vector without a standard error.')

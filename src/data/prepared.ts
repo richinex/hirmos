@@ -1,7 +1,13 @@
 import type { ColumnId, DatasetProfile, NumericColumnSelection } from '@/domain/dataset'
 import { assertNever, err, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { resolutionCommandFor } from '@/domain/missingness'
-import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
+import {
+  seriesTransformFor,
+  transformSeries,
+  transformWarmup,
+  type ColumnSeriesTransform,
+  type PreparedDatasetArtifact,
+} from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 
 /** A dense column-major matrix over the prepared version's retained rows. */
@@ -11,6 +17,8 @@ export interface PreparedMatrix {
   readonly columns: NonEmptyArray<NumericColumnSelection>
   /** Cells the resolution imputed, as [row, column] over the retained rows. */
   readonly imputedCells: readonly (readonly [number, number])[]
+  /** Leading resolved rows excluded to align columns after their recorded transformations. */
+  readonly leadingRowsRemoved: number
 }
 
 export type PreparedMaterialisationProblem =
@@ -38,14 +46,75 @@ export async function materialisePrepared(
   prepared: PreparedDatasetArtifact,
   columnIds: NonEmptyArray<ColumnId>,
 ): Promise<Result<PreparedMatrix, PreparedMaterialisationProblem>> {
+  const stages = await materialisePreparedStages(source, profile, prepared, columnIds)
+  return stages.ok ? ok(stages.value.final) : stages
+}
+
+/** The pipeline's intermediate matrices, for before-and-after inspection of the recipe. */
+export interface PreparedStageMatrices {
+  readonly resolved: PreparedMatrix
+  /** After the recorded STL adjustment; null when no requested column is adjusted. */
+  readonly adjusted: PreparedMatrix | null
+  readonly final: PreparedMatrix
+}
+
+export async function materialisePreparedStages(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  prepared: PreparedDatasetArtifact,
+  columnIds: NonEmptyArray<ColumnId>,
+): Promise<Result<PreparedStageMatrices, PreparedMaterialisationProblem>> {
   const resolved = await materialiseResolved(source, profile, prepared, columnIds)
-  if (!resolved.ok || prepared.seasonalAdjustment.kind === 'none') return resolved
-  const adjust = resolved.value.columns.flatMap((column, index) => (prepared.seasonalAdjustment.kind === 'stl' && prepared.seasonalAdjustment.columns.includes(column.id) ? [index] : []))
-  if (adjust.length === 0) return resolved
-  const { seasonalAdjustInWorker } = await import('@/analysis/client')
-  const adjusted = await seasonalAdjustInWorker(resolved.value.values, resolved.value.rowCount, resolved.value.columns.length, { period: prepared.seasonalAdjustment.period, robust: prepared.seasonalAdjustment.robust, adjust })
-  if (!adjusted.ok) return err({ kind: 'seasonal-adjustment-refused', detail: adjusted.error.detail })
-  return ok({ ...resolved.value, values: Float64Array.from(adjusted.value.values) })
+  if (!resolved.ok) return resolved
+  let adjusted: PreparedMatrix | null = null
+  if (prepared.seasonalAdjustment.kind === 'stl') {
+    const matrix = resolved.value
+    const adjust = matrix.columns.flatMap((column, index) => (prepared.seasonalAdjustment.kind === 'stl' && prepared.seasonalAdjustment.columns.includes(column.id) ? [index] : []))
+    if (adjust.length > 0) {
+      const { seasonalAdjustInWorker } = await import('@/analysis/client')
+      const result = await seasonalAdjustInWorker(matrix.values, matrix.rowCount, matrix.columns.length, { period: prepared.seasonalAdjustment.period, robust: prepared.seasonalAdjustment.robust, adjust })
+      if (!result.ok) return err({ kind: 'seasonal-adjustment-refused', detail: result.error.detail })
+      adjusted = { ...matrix, values: Float64Array.from(result.value.values) }
+    }
+  }
+  const final = prepared.kind === 'prepared-time-series'
+    ? applySeriesTransforms(adjusted ?? resolved.value, prepared.seriesTransforms)
+    : adjusted ?? resolved.value
+  return ok({ resolved: resolved.value, adjusted, final })
+}
+
+/**
+ * Apply each column's recorded transform and align every output to one common time grid. If any
+ * prepared column is differenced, all materialisations of that version start at the second retained
+ * source row—even when a caller requests only an unchanged column.
+ */
+export function applySeriesTransforms(
+  matrix: PreparedMatrix,
+  transforms: readonly ColumnSeriesTransform[],
+): PreparedMatrix {
+  const leadingRowsRemoved = transformWarmup(transforms)
+  const outputRows = Math.max(0, matrix.rowCount - leadingRowsRemoved)
+  const values = new Float64Array(outputRows * matrix.columns.length)
+  const imputedSource = new Set(matrix.imputedCells.map(([row, column]) => `${row}:${column}`))
+  const imputedCells: (readonly [number, number])[] = []
+
+  for (let columnIndex = 0; columnIndex < matrix.columns.length; columnIndex += 1) {
+    const start = columnIndex * matrix.rowCount
+    const source = matrix.values.slice(start, start + matrix.rowCount)
+    const transform = seriesTransformFor(transforms, matrix.columns[columnIndex].id)
+    const transformed = transformSeries(source, transform)
+    const transformedOffset = transform.kind === 'difference' ? 0 : leadingRowsRemoved
+    values.set(transformed.subarray(transformedOffset, transformedOffset + outputRows), columnIndex * outputRows)
+
+    for (let outputRow = 0; outputRow < outputRows; outputRow += 1) {
+      const sourceRow = outputRow + leadingRowsRemoved
+      const directlyImputed = imputedSource.has(`${sourceRow}:${columnIndex}`)
+      const priorImputed = transform.kind === 'difference' && imputedSource.has(`${sourceRow - 1}:${columnIndex}`)
+      if (directlyImputed || priorImputed) imputedCells.push([outputRow, columnIndex])
+    }
+  }
+
+  return { ...matrix, values, rowCount: outputRows, imputedCells, leadingRowsRemoved: matrix.leadingRowsRemoved + leadingRowsRemoved }
 }
 
 /** The retained rows with the missingness resolution applied and nothing else. */
@@ -65,7 +134,7 @@ async function materialiseResolved(
   const record = prepared.resolution
   switch (record.kind) {
     case 'none':
-      return missingCells > 0 ? err({ kind: 'missing-values-remain', cells: missingCells }) : ok({ values, rowCount, columns, imputedCells: [] })
+      return missingCells > 0 ? err({ kind: 'missing-values-remain', cells: missingCells }) : ok({ values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0 })
     case 'window': {
       const rows = record.endExclusive - record.start
       const sliced = new Float64Array(rows * columns.length)
@@ -78,10 +147,10 @@ async function materialiseResolved(
           sliced[columnIndex * rows + row] = values[sourceIndex]
         }
       })
-      return missing > 0 ? err({ kind: 'missing-values-remain', cells: missing }) : ok({ values: sliced, rowCount: rows, columns, imputedCells: [] })
+      return missing > 0 ? err({ kind: 'missing-values-remain', cells: missing }) : ok({ values: sliced, rowCount: rows, columns, imputedCells: [], leadingRowsRemoved: 0 })
     }
     case 'imputed': {
-      if (missingCells === 0) return ok({ values, rowCount, columns, imputedCells: [] })
+      if (missingCells === 0) return ok({ values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0 })
       const command = resolutionCommandFor(prepared.missingness)
       if (command === null || command.kind !== 'imputation') return err({ kind: 'resolution-refused', detail: 'The prepared version records an imputation its policy does not describe.' })
       const { resolveMissingnessInWorker } = await import('@/analysis/client')
@@ -91,7 +160,7 @@ async function materialiseResolved(
         const { describeMissingnessRefusal } = await import('@/domain/missingness')
         return err({ kind: 'resolution-refused', detail: resolved.value.outcome.reasons.map(describeMissingnessRefusal).join(' ') })
       }
-      return ok({ values: Float64Array.from(resolved.value.outcome.values), rowCount, columns, imputedCells: resolved.value.outcome.imputedCells })
+      return ok({ values: Float64Array.from(resolved.value.outcome.values), rowCount, columns, imputedCells: resolved.value.outcome.imputedCells, leadingRowsRemoved: 0 })
     }
     default:
       return assertNever(record)

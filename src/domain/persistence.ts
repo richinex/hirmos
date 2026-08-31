@@ -137,6 +137,11 @@ export type SnapshotProblem =
   | { readonly kind: 'unsupported-version'; readonly version: number }
 
 const artifact = z.object({ id: z.string().min(1) }).passthrough()
+const seriesTransformSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('levels') }).strict(),
+  z.object({ kind: z.literal('difference'), order: z.literal(1) }).strict(),
+  z.object({ kind: z.literal('linear-detrend') }).strict(),
+])
 
 const envelopeSchema = z.object({
   kind: z.literal('hirmos-project'),
@@ -159,6 +164,7 @@ const envelopeSchema = z.object({
   sensitivityRuns: z.array(artifact),
   counterfactualRuns: z.array(artifact),
 })
+type ParsedEnvelope = z.output<typeof envelopeSchema>
 
 /**
  * Reads a stored record back. The envelope, the project and the dataset profile are parsed in full;
@@ -175,10 +181,33 @@ export function parseSnapshot(raw: string): Result<PersistedProject, SnapshotPro
 export const taggedJsonReplacer = (_key: string, value: unknown): unknown => (value instanceof Float64Array ? { [F64]: Array.from(value) } : value)
 export const taggedJsonReviver = revive
 
+/** Upgrade the one version-1 artifact shape written before prepared transformations were persisted. */
+const upgradePreparedTransformRecord = (value: ParsedEnvelope['prepared']): Result<ParsedEnvelope['prepared'], SnapshotProblem> => {
+  if (value === null || Reflect.get(value, 'kind') !== 'prepared-time-series' || Array.isArray(Reflect.get(value, 'seriesTransforms'))) return ok(value)
+  const columns = Reflect.get(value, 'columns')
+  if (!Array.isArray(columns) || !columns.every((column) => typeof column === 'string')) {
+    return err({ kind: 'invalid-snapshot', detail: 'prepared time series: columns are missing' })
+  }
+  return ok({ ...value, seriesTransforms: columns.map((column) => ({ column, transform: { kind: 'levels' } })) })
+}
+
+/** Rename the version-1 stationarity display field; no numerical evidence is recomputed. */
+const upgradeStationarityTransformRecord = (value: ParsedEnvelope['stationarity']): Result<ParsedEnvelope['stationarity'], SnapshotProblem> => {
+  if (value === null || Reflect.get(value, 'kind') !== 'stationarity-evidence' || Reflect.get(value, 'diagnosticTransform') !== undefined) return ok(value)
+  const legacy = seriesTransformSchema.safeParse(Reflect.get(value, 'transform'))
+  if (!legacy.success) return err({ kind: 'invalid-snapshot', detail: 'stationarity evidence: diagnostic transform is missing' })
+  const { transform: _legacyTransform, ...rest } = value
+  return ok({ ...rest, diagnosticTransform: legacy.data })
+}
+
 export function parseSnapshotValue(value: unknown): Result<PersistedProject, SnapshotProblem> {
   const parsed = envelopeSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-snapshot', detail: z.prettifyError(parsed.error) })
   if (parsed.data.version !== 1) return err({ kind: 'unsupported-version', version: parsed.data.version })
+  const prepared = upgradePreparedTransformRecord(parsed.data.prepared)
+  if (!prepared.ok) return prepared
+  const stationarity = upgradeStationarityTransformRecord(parsed.data.stationarity)
+  if (!stationarity.ok) return stationarity
   let profile: DatasetProfile | null = null
   if (parsed.data.profile !== null) {
     const profileParsed = parseDatasetProfile(parsed.data.profile)
@@ -189,7 +218,15 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const discoveryRuns = parsed.data.discoveryRuns.filter((run) => Reflect.get(run, 'kind') !== 'granger-ssr-f-run')
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
-  return ok({ ...(parsed.data as unknown as PersistedProject), version: 1, profile, studyDraft, discoveryRuns: discoveryRuns as unknown as PersistedProject['discoveryRuns'] })
+  return ok({
+    ...(parsed.data as unknown as PersistedProject),
+    version: 1,
+    profile,
+    prepared: prepared.value as PreparedDatasetArtifact | null,
+    stationarity: stationarity.value as StationarityEvidenceArtifact | null,
+    studyDraft,
+    discoveryRuns: discoveryRuns as unknown as PersistedProject['discoveryRuns'],
+  })
 }
 
 export function describeSnapshotProblem(problem: SnapshotProblem): string {

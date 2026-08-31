@@ -8,6 +8,7 @@ import { Alert } from '@/components/ui/Alert'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { SeriesStructureCard } from './SeriesStructureCard'
 import { GrangerCard } from './GrangerCard'
+import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import { describeMissingnessRefusal, describeResolutionRecord, resolutionCommandFor, type MissingnessResolutionRecord } from '@/domain/missingness'
 import { button, field, fieldLabel, label, num, table, td, th, tr } from '@/components/ui/recipes'
@@ -18,13 +19,16 @@ import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
 import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
   describeReadinessProblem,
+  describeSeriesTransform,
   initialPreprocessingDraft,
   newPreparedDatasetVersionId,
   newStationarityEvidenceId,
   newTransformRecipeId,
   readyPreprocessingRecipe,
+  seriesTransformFor,
   stepPreprocessing,
   transformSeries,
+  transformWarmup,
   type Frequency,
   type MissingnessDraft,
   type PreparedDatasetArtifact,
@@ -74,9 +78,9 @@ const FREQUENCIES: readonly { readonly value: Frequency; readonly label: string 
 ]
 
 const TRANSFORMS: readonly { readonly value: SeriesTransform; readonly label: string; readonly detail: string }[] = [
-  { value: { kind: 'levels' }, label: 'Keep levels', detail: 'Original units and observations.' },
-  { value: { kind: 'difference', order: 1 }, label: 'First difference', detail: 'Change per sampling interval; removes one leading observation.' },
-  { value: { kind: 'linear-detrend' }, label: 'Linear detrend', detail: 'Residual from an explicit intercept-and-time trend.' },
+  { value: { kind: 'levels' }, label: 'Keep levels', detail: 'Use the recorded values in their original units.' },
+  { value: { kind: 'difference', order: 1 }, label: 'First difference', detail: 'Use the change from the previous interval; one leading observation is removed.' },
+  { value: { kind: 'linear-detrend' }, label: 'Linear detrend', detail: 'Subtract a fitted intercept and linear time trend; use deviations from that trend.' },
 ]
 
 type MissingnessChoiceKind = 'unresolved' | 'lag-aware-exclusion' | 'complete-interval' | 'imputation'
@@ -153,7 +157,13 @@ function preparedArtifact(
     resolution,
   }
   switch (recipe.kind) {
-    case 'regular-series': return ok({ ...identity, kind: 'prepared-time-series', sampling: recipe.sampling, seasonalAdjustment: recipe.seasonalAdjustment })
+    case 'regular-series': return ok({
+      ...identity,
+      kind: 'prepared-time-series',
+      sampling: recipe.sampling,
+      seasonalAdjustment: recipe.seasonalAdjustment,
+      seriesTransforms: recipe.seriesTransforms,
+    })
     case 'cross-sectional': return ok({ ...identity, kind: 'prepared-cross-section', sampling: recipe.sampling, seasonalAdjustment: { kind: 'none' } })
     case 'regular-panel': {
       if (panel === null) return err({ kind: 'panel-evidence-missing' })
@@ -193,6 +203,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const missingnessChoices = crossSectionSelected
     ? MISSINGNESS_CHOICES.filter((kind) => kind !== 'lag-aware-exclusion')
     : MISSINGNESS_CHOICES
+  const selectedTransformKinds = selectedIds.map((column) => seriesTransformFor(draft.seriesTransforms, column).kind)
+  const allSelectedTransformKind = selectedTransformKinds.length > 0 && selectedTransformKinds.every((kind) => kind === selectedTransformKinds[0])
+    ? selectedTransformKinds[0]
+    : null
 
   const createPreparedVersion = async () => {
     const recipe = readyPreprocessingRecipe(draft)
@@ -253,6 +267,15 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         }
       }
 
+      if (recipe.value.kind === 'regular-series') {
+        const leadingRows = transformWarmup(recipe.value.seriesTransforms)
+        if (observations <= leadingRows) {
+          dispatch({ type: 'preparation-failed', detail: 'First differencing needs at least two retained observations. Choose a longer interval or keep the series in levels.' })
+          return
+        }
+        observations -= leadingRows
+      }
+
       const artifact = preparedArtifact(recipe.value, profile, observations, resolution, panelStructure)
       if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
       dispatch({ type: 'preparation-succeeded', artifact: artifact.value })
@@ -291,11 +314,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         }
         const differencedBattery = await runStationarityBattery(transformSeries(levels, { kind: 'difference', order: 1 }))
         const differenced = differencedBattery.ok ? differencedBattery.value : null
-        const viewed = draft.transform.kind === 'levels'
+        const viewed = draft.diagnosticTransform.kind === 'levels'
           ? ok(levelsBattery.value)
-          : draft.transform.kind === 'difference' && differenced !== null
+          : draft.diagnosticTransform.kind === 'difference' && differenced !== null
             ? ok(differenced)
-            : await runStationarityBattery(transformSeries(levels, draft.transform))
+            : await runStationarityBattery(transformSeries(levels, draft.diagnosticTransform))
         if (!viewed.ok) {
           dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${viewed.error.detail}` })
           return
@@ -313,7 +336,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         id: newStationarityEvidenceId(),
         preparedDataset: prepared.id,
         observations: firstEvidence.result.observations,
-        transform: draft.transform,
+        diagnosticTransform: draft.diagnosticTransform,
         variables: evidence,
       }
       dispatch({
@@ -424,7 +447,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           </div>
         </section>
 
-        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="missingness-title">
+        <section className="@container/card rounded-xl border border-hair bg-panel p-4 @3xl/panel:col-span-2" aria-labelledby="missingness-title">
           <span className={label('text-faint')}>Missing values</span>
           <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose how to handle missing data</h3>
           {draft.missingness.kind === 'not-present' ? (
@@ -556,21 +579,13 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           )}
         </section>
 
-        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="transform-title">
-          <span className={label('text-faint')}>Time-series transformation</span>
-          <h3 id="transform-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose a time-series transformation</h3>
+        <section className="@container/card rounded-xl border border-hair bg-panel p-4 @3xl/panel:col-span-2" aria-labelledby="transform-title">
+          <span className={label('text-faint')}>Time-series values</span>
+          <h3 id="transform-title" className="mb-1 mt-1 text-title font-medium text-ink">Prepare the analysis scale</h3>
           {timeSeriesSelected ? (
             <>
-              <SegmentedControl
-                ariaLabel="Stationarity view"
-                value={TRANSFORMS.find((transform) => transformIsSelected(draft.transform, transform.value))?.value.kind ?? null}
-                onChange={(next) => { const transform = TRANSFORMS.find((candidate) => candidate.value.kind === next); if (transform) dispatch({ type: 'transform-selected', transform: transform.value }) }}
-                options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
-              />
-              <p className="mb-0 mt-2 text-body text-faint">
-                {TRANSFORMS.find((transform) => transformIsSelected(draft.transform, transform.value))?.detail}
-              </p>
-              <div className="mt-4 border-t border-hair pt-3">
+              <p className="mb-0 mt-1 text-body text-faint">The saved version resolves missing values, removes any selected seasonal component, then applies each column’s transformation.</p>
+              <div className="mt-4">
                 <label className="flex items-start gap-2 text-body text-ink">
                   <input
                     type="checkbox"
@@ -580,7 +595,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   />
                   <span>
                     Remove the seasonal component with seasonal-trend decomposition using loess (STL){seasonalPeriod === null ? ' (no period for yearly rows)' : ` at period ${seasonalPeriod}`}
-                    <span className="block text-faint">The prepared dataset version stores this adjustment. The seasonal strength card reports any remaining seasonality.</span>
+                    <span className="block text-faint">Choose columns with a recurring seasonal pattern. The saved recipe records the period and whether the robust fit was used.</span>
                   </span>
                 </label>
                 {draft.seasonal.kind === 'stl' && (
@@ -607,6 +622,53 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       <span>Robust fit (down-weights outliers)</span>
                     </label>
                   </div>
+                )}
+              </div>
+              <div className="mt-4 border-t border-hair pt-3">
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <span className={fieldLabel}>Apply to all selected columns</span>
+                    <p className="mb-0 mt-1 text-label text-faint">You can then change individual columns below.</p>
+                  </div>
+                  <SegmentedControl
+                    size="sm"
+                    ariaLabel="Set transformation for all selected columns"
+                    value={allSelectedTransformKind}
+                    onChange={(next) => {
+                      const selected = TRANSFORMS.find((candidate) => candidate.value.kind === next)
+                      if (selected) dispatch({ type: 'all-series-transforms-selected', transform: selected.value })
+                    }}
+                    options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
+                  />
+                </div>
+                <div className="mt-3 grid gap-3" role="group" aria-label="Transformations by column">
+                  {selectedIds.map((column) => {
+                    const name = columnName(column)
+                    const selected = seriesTransformFor(draft.seriesTransforms, column)
+                    const definition = TRANSFORMS.find((candidate) => transformIsSelected(selected, candidate.value))
+                    return (
+                      <div key={column} className="rounded-lg border border-hair bg-well p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <span className="text-body font-medium text-ink">{name}</span>
+                          <SegmentedControl
+                            size="sm"
+                            ariaLabel={`Transformation for ${name}`}
+                            value={selected.kind}
+                            onChange={(next) => {
+                              const chosen = TRANSFORMS.find((candidate) => candidate.value.kind === next)
+                              if (chosen) dispatch({ type: 'series-transform-selected', column, transform: chosen.value })
+                            }}
+                            options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
+                          />
+                        </div>
+                        <p className="mb-0 mt-2 text-label text-faint">{definition?.detail}</p>
+                      </div>
+                    )
+                  })}
+                  {selectedIds.length === 0 && <p className="m-0 text-body text-faint">Select analysis columns first.</p>}
+                </div>
+                {draft.seriesTransforms.some((record) => record.transform.kind === 'difference') && (
+                  <p className="mb-0 mt-3 text-body text-faint">First difference replaces xₜ with xₜ − xₜ₋₁. The first retained row is removed from every column so timestamps remain aligned.</p>
                 )}
               </div>
             </>
@@ -643,12 +705,15 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             {draft.preparation.artifact.observations.toLocaleString()} rows
             {describeResolutionRecord(draft.preparation.artifact.resolution) !== null && <> · {describeResolutionRecord(draft.preparation.artifact.resolution)}</>}
             {describeSeasonalAdjustment(draft.preparation.artifact.seasonalAdjustment, columnName) !== null && <> · {describeSeasonalAdjustment(draft.preparation.artifact.seasonalAdjustment, columnName)}</>}
+            {draft.preparation.artifact.kind === 'prepared-time-series' && draft.preparation.artifact.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <> · {draft.preparation.artifact.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</>}
           </p>
         )}
         {draft.preparation.kind === 'succeeded' && draft.preparation.artifact.kind === 'prepared-panel' && (
           <p className="mb-0 mt-1 text-body text-faint">{draft.preparation.artifact.panel.units.toLocaleString()} units × {draft.preparation.artifact.panel.periods.toLocaleString()} periods · balanced unit–time grid</p>
         )}
       </section>
+
+      {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
       {(timeSeriesSelected || preparedTimeSeries !== null) && (
         <section className="mt-4 rounded-xl border border-hair bg-panel p-4" aria-labelledby="diagnostics-title">
@@ -676,7 +741,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-              <p className="mb-0 mt-1 text-body text-faint">Augmented Dickey–Fuller (ADF), Kwiatkowski–Phillips–Schmidt–Shin (KPSS), and Zivot–Andrews tests.</p>
+              <p className="mb-0 mt-1 text-body text-faint">ADF and KPSS assess the prepared values and their first difference; Zivot–Andrews allows one structural break.</p>
             </div>
             <button
               type="button"
@@ -689,17 +754,40 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             </button>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-hair bg-well p-3">
+            <div>
+              <span className={fieldLabel}>Diagnostic scale</span>
+              <p className="mb-0 mt-1 text-label text-faint">Changes the stationarity table only. It does not create another prepared dataset version.</p>
+            </div>
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Stationarity diagnostic scale"
+              value={draft.diagnosticTransform.kind}
+              onChange={(next) => {
+                const selected = TRANSFORMS.find((candidate) => candidate.value.kind === next)
+                if (selected) dispatch({ type: 'diagnostic-transform-selected', transform: selected.value })
+              }}
+              options={TRANSFORMS.map((transform) => ({
+                value: transform.value.kind,
+                label: transform.value.kind === 'levels'
+                  ? 'Prepared values'
+                  : transform.value.kind === 'difference'
+                    ? 'First difference of prepared values'
+                    : 'Linear detrend of prepared values',
+              }))}
+            />
+          </div>
           {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
           {stationarityEvidence !== null && (
           <div className="mt-4 overflow-x-auto">
             <p role="status" className="mb-3 mt-0 flex flex-wrap items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" />
               Stationarity tests · {stationarityEvidence.observations.toLocaleString()} rows · {
-                stationarityEvidence.transform.kind === 'levels'
-                  ? 'levels'
-                  : stationarityEvidence.transform.kind === 'difference'
-                    ? 'first difference'
-                    : 'linear detrend'
+                stationarityEvidence.diagnosticTransform.kind === 'levels'
+                  ? 'prepared values'
+                  : stationarityEvidence.diagnosticTransform.kind === 'difference'
+                    ? 'first difference of prepared values'
+                    : 'linear detrend of prepared values'
               }
             </p>
             <table className={table}>

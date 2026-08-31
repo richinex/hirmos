@@ -1,5 +1,5 @@
 import type { MissingnessResolutionRecord } from './missingness'
-import { assertNever, brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import { assertNever, brand, err, isNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { ColumnId, DatasetProfile } from './dataset'
 import { seasonalPeriodOf, type SeasonalAdjustmentRecord } from './seasonal'
 import type { StationarityBattery } from './stationarity'
@@ -58,6 +58,12 @@ export type SeriesTransform =
   | { readonly kind: 'difference'; readonly order: 1 }
   | { readonly kind: 'linear-detrend' }
 
+/** The transformation applied to one analysis column when a time-series version is materialised. */
+export interface ColumnSeriesTransform {
+  readonly column: ColumnId
+  readonly transform: SeriesTransform
+}
+
 export type PreparationJob =
   | { readonly kind: 'idle' }
   | { readonly kind: 'running' }
@@ -80,7 +86,10 @@ export interface PreprocessingDraft {
   readonly variables: VariableDraft
   readonly missingness: MissingnessDraft
   readonly seasonal: SeasonalAdjustmentDraft
-  readonly transform: SeriesTransform
+  /** Preparation choices. Missing entries are levels until the recipe is made. */
+  readonly seriesTransforms: readonly ColumnSeriesTransform[]
+  /** A display-only scale for the stationarity table; it never changes the prepared matrix. */
+  readonly diagnosticTransform: SeriesTransform
   readonly preparation: PreparationJob
   readonly stationarity: StationarityJob
 }
@@ -94,6 +103,7 @@ export type ReadyPreprocessingRecipe =
       readonly columns: NonEmptyArray<ColumnId>
       readonly missingness: DenseReadyMissingness
       readonly seasonalAdjustment: SeasonalAdjustmentRecord
+      readonly seriesTransforms: NonEmptyArray<ColumnSeriesTransform>
     }
   | {
       readonly kind: 'cross-sectional'
@@ -110,7 +120,7 @@ export type ReadyPreprocessingRecipe =
 
 export interface VariableStationarityEvidence {
   readonly column: ColumnId
-  /** The battery under the chosen stationarity view. */
+  /** The battery under the chosen diagnostic scale. */
   readonly result: StationarityBattery
   readonly levels: StationarityBattery
   readonly differenced: StationarityBattery | null
@@ -121,7 +131,7 @@ interface PreparedDatasetIdentity {
   readonly id: PreparedDatasetVersionId
   readonly recipe: TransformRecipeId
   readonly sourceProfile: DatasetProfile['id']
-  /** Rows every chapter reads: the source rows, or the retained window of a complete-interval resolution. */
+  /** Rows every chapter reads after missingness resolution and the shared transformation warm-up. */
   readonly observations: number
   readonly columns: NonEmptyArray<ColumnId>
   /** What the data-preparation core did about missing cells when this version was created. */
@@ -135,6 +145,8 @@ export type PreparedDatasetArtifact =
       readonly kind: 'prepared-time-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
       readonly missingness: DenseReadyMissingness
+      /** One record per analysis column. Materialisation applies these after missingness and STL. */
+      readonly seriesTransforms: NonEmptyArray<ColumnSeriesTransform>
     }
   | PreparedDatasetIdentity & {
       readonly kind: 'prepared-panel'
@@ -153,7 +165,8 @@ export interface StationarityEvidenceArtifact {
   readonly id: StationarityEvidenceId
   readonly preparedDataset: PreparedDatasetVersionId
   readonly observations: number
-  readonly transform: SeriesTransform
+  /** The scale shown in `result`; `levels` and `differenced` always describe prepared values. */
+  readonly diagnosticTransform: SeriesTransform
   readonly variables: NonEmptyArray<VariableStationarityEvidence>
 }
 
@@ -167,7 +180,9 @@ export type PreprocessingEvent =
   | { readonly type: 'variable-toggled'; readonly column: ColumnId }
   | { readonly type: 'missingness-selected'; readonly resolution: MissingnessDraft }
   | { readonly type: 'seasonal-adjustment-selected'; readonly seasonal: SeasonalAdjustmentDraft }
-  | { readonly type: 'transform-selected'; readonly transform: SeriesTransform }
+  | { readonly type: 'series-transform-selected'; readonly column: ColumnId; readonly transform: SeriesTransform }
+  | { readonly type: 'all-series-transforms-selected'; readonly transform: SeriesTransform }
+  | { readonly type: 'diagnostic-transform-selected'; readonly transform: SeriesTransform }
   | { readonly type: 'preparation-started' }
   | { readonly type: 'preparation-failed'; readonly detail: string }
   | { readonly type: 'preparation-succeeded'; readonly artifact: PreparedDatasetArtifact }
@@ -197,7 +212,8 @@ export const initialPreprocessingDraft = (profile: DatasetProfile): Preprocessin
       ? { kind: 'not-present' }
       : { kind: 'unresolved', cells: missingCells },
     seasonal: { kind: 'none' },
-    transform: { kind: 'levels' },
+    seriesTransforms: [],
+    diagnosticTransform: { kind: 'levels' },
     preparation: { kind: 'idle' },
     stationarity: { kind: 'idle' },
   }
@@ -216,6 +232,32 @@ const toggleColumn = (variables: VariableDraft, column: ColumnId): VariableDraft
   return isNonEmpty(next) ? { kind: 'selected', columns: next } : { kind: 'empty' }
 }
 
+export const seriesTransformFor = (
+  transforms: readonly ColumnSeriesTransform[],
+  column: ColumnId,
+): SeriesTransform => transforms.find((candidate) => candidate.column === column)?.transform ?? { kind: 'levels' }
+
+export const transformWarmup = (transforms: readonly ColumnSeriesTransform[]): number =>
+  transforms.some((record) => record.transform.kind === 'difference') ? 1 : 0
+
+export function describeSeriesTransform(transform: SeriesTransform): string {
+  switch (transform.kind) {
+    case 'levels': return 'levels'
+    case 'difference': return 'first difference'
+    case 'linear-detrend': return 'linear detrend'
+    default: return assertNever(transform)
+  }
+}
+
+const setSeriesTransform = (
+  transforms: readonly ColumnSeriesTransform[],
+  column: ColumnId,
+  transform: SeriesTransform,
+): readonly ColumnSeriesTransform[] => [
+  ...transforms.filter((candidate) => candidate.column !== column),
+  { column, transform },
+]
+
 export function stepPreprocessing(state: PreprocessingDraft, event: PreprocessingEvent): PreprocessingDraft {
   switch (event.type) {
     case 'regular-series-selected':
@@ -231,7 +273,8 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         ...state,
         sampling: { kind: 'cross-sectional' },
         seasonal: { kind: 'none' },
-        transform: { kind: 'levels' },
+        seriesTransforms: [],
+        diagnosticTransform: { kind: 'levels' },
         ...resetStructuralWork(),
       }
     case 'regular-panel-selected':
@@ -240,7 +283,7 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         sampling: state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys'
           ? state.sampling
           : { kind: 'regular-panel-awaiting-keys', unitColumn: null, timeColumn: null, frequency: 'yearly' },
-        seasonal: { kind: 'none' }, transform: { kind: 'levels' }, ...resetStructuralWork(),
+        seasonal: { kind: 'none' }, seriesTransforms: [], diagnosticTransform: { kind: 'levels' }, ...resetStructuralWork(),
       }
     case 'unit-column-selected': {
       if (state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
@@ -285,14 +328,22 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
       const variables = toggleColumn(state.variables, event.column)
       const kept: readonly ColumnId[] = variables.kind === 'selected' ? variables.columns : []
       const seasonal: SeasonalAdjustmentDraft = state.seasonal.kind === 'stl' ? { ...state.seasonal, columns: state.seasonal.columns.filter((column) => kept.includes(column)) } : state.seasonal
-      return { ...state, variables, seasonal, ...resetStructuralWork() }
+      const seriesTransforms = state.seriesTransforms.filter((candidate) => kept.includes(candidate.column))
+      return { ...state, variables, seasonal, seriesTransforms, ...resetStructuralWork() }
     }
     case 'seasonal-adjustment-selected':
       return { ...state, seasonal: event.seasonal, ...resetStructuralWork() }
     case 'missingness-selected':
       return { ...state, missingness: event.resolution, ...resetStructuralWork() }
-    case 'transform-selected':
-      return { ...state, transform: event.transform, stationarity: { kind: 'idle' } }
+    case 'series-transform-selected':
+      if (state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
+      return { ...state, seriesTransforms: setSeriesTransform(state.seriesTransforms, event.column, event.transform), ...resetStructuralWork() }
+    case 'all-series-transforms-selected':
+      return state.variables.kind === 'selected'
+        ? { ...state, seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({ column, transform: event.transform })), ...resetStructuralWork() }
+        : state
+    case 'diagnostic-transform-selected':
+      return { ...state, diagnosticTransform: event.transform, stationarity: { kind: 'idle' } }
     case 'preparation-started':
       return { ...state, preparation: { kind: 'running' }, stationarity: { kind: 'idle' } }
     case 'preparation-failed':
@@ -357,6 +408,10 @@ export function readyPreprocessingRecipe(
             columns: state.variables.columns,
             missingness: state.missingness,
             seasonalAdjustment,
+            seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({
+              column,
+              transform: seriesTransformFor(state.seriesTransforms, column),
+            })),
           })
         }
         case 'regular-panel':
