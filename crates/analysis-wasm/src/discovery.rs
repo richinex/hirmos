@@ -1,4 +1,4 @@
-//! Time-series discovery façades: PCMCI+, LPCMCI, DYNOTEARS, VAR-LiNGAM, oCSE, Granger.
+//! Cross-sectional and time-series discovery façades.
 
 use super::*;
 
@@ -139,6 +139,57 @@ where
         lambda_a,
         contemporaneous_weights,
         lagged_weights,
+    })
+}
+
+/// DirectLiNGAM over independent observations in a dense column-major matrix.
+///
+/// The core matrix is target-by-source, matching lingam's `adjacency_matrix_`; the browser
+/// contract is source-by-target so every discovery plot and DAG adapter uses one orientation.
+pub(crate) fn direct_lingam_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    if !(2..=12).contains(&columns) {
+        return Err(
+            "DirectLiNGAM requires between 2 and 12 selected variables in the browser".to_owned(),
+        );
+    }
+    validate_dense_matrix("DirectLiNGAM", values, rows, columns)?;
+    if rows < columns + 16 {
+        return Err(
+            "DirectLiNGAM has too few independent observations for the selected variables"
+                .to_owned(),
+        );
+    }
+    for column in 0..columns {
+        let series = &values[column * rows..(column + 1) * rows];
+        let first = series[0];
+        if series.iter().all(|value| *value == first) {
+            return Err(format!(
+                "DirectLiNGAM requires every variable to vary; column {column} is constant"
+            ));
+        }
+    }
+    let matrix = DMatrix::from_fn(rows, columns, |row, column| values[column * rows + row]);
+    let (causal_order, adjacency) = direct_lingam_with_progress(&matrix, progress);
+    let weights = (0..columns)
+        .map(|source| {
+            (0..columns)
+                .map(|target| adjacency[(target, source)])
+                .collect()
+        })
+        .collect();
+    Ok(AnalysisResult::DirectLingam {
+        observations: rows,
+        variables: columns,
+        causal_order,
+        weights,
     })
 }
 
@@ -377,11 +428,14 @@ mod tests {
             AnalysisCommand::StationarityBattery
             | AnalysisCommand::Lpcmci { .. }
             | AnalysisCommand::Dynotears { .. }
+            | AnalysisCommand::DirectLingam { .. }
             | AnalysisCommand::VarLingam { .. }
             | AnalysisCommand::Ocse { .. }
             | AnalysisCommand::GrangerSsrF { .. }
             | AnalysisCommand::BackdoorIdentify { .. }
+            | AnalysisCommand::DagCheck { .. }
             | AnalysisCommand::BackdoorLinear { .. }
+            | AnalysisCommand::FrontdoorTwoStage { .. }
             | AnalysisCommand::CountGlm { .. }
             | AnalysisCommand::CausalEffectsTotal { .. }
             | AnalysisCommand::CausalImpact { .. }
@@ -397,7 +451,9 @@ mod tests {
             | AnalysisCommand::PanelIntervention { .. }
             | AnalysisCommand::LinearScmCounterfactual { .. }
             | AnalysisCommand::NegbinNuts { .. }
+            | AnalysisCommand::BayesianGaussian { .. }
             | AnalysisCommand::DiscreteBnQuery { .. }
+            | AnalysisCommand::BinaryEtt { .. }
             | AnalysisCommand::ResolveMissingness { .. } => {
                 panic!("parsed the wrong command variant")
             }
@@ -454,6 +510,32 @@ mod tests {
             Err(message) => assert!(message.contains("constant")),
             Ok(_) => panic!("a constant column must be refused"),
         }
+    }
+
+    #[test]
+    fn direct_lingam_serializes_cross_sectional_order_and_weights() {
+        let rows = 96;
+        let columns = 3;
+        let mut values = vec![0.0; rows * columns];
+        for row in 0..rows {
+            let u = ((row * 37 % 101) as f64 - 50.0) / 25.0;
+            let v = ((row * 61 % 103) as f64 - 51.0) / 30.0;
+            let w = ((row * 73 % 107) as f64 - 53.0) / 35.0;
+            values[row] = u;
+            values[rows + row] = 0.8 * u + v;
+            values[2 * rows + row] = -0.5 * values[rows + row] + w;
+        }
+        let mut stages = Vec::new();
+        let result = direct_lingam_evidence(&values, rows, columns, |stage, done, total| {
+            stages.push((stage, done, total));
+        })
+        .expect("DirectLiNGAM fixture should run");
+        let json = serde_json::to_value(result).expect("DirectLiNGAM result serializes");
+        assert_eq!(json["kind"], "directLingam");
+        assert_eq!(json["causalOrder"].as_array().unwrap().len(), columns);
+        assert_eq!(json["weights"].as_array().unwrap().len(), columns);
+        assert!(stages.iter().any(|(stage, _, _)| *stage == "causal-order"));
+        assert_eq!(stages.last(), Some(&("complete", columns + 1, columns + 1)));
     }
 
     #[test]

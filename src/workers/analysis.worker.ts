@@ -5,16 +5,17 @@ import { parseGrangerSsrEvidence } from '@/domain/granger'
 import initWasm, { runAnalysis } from '@/generated/analysis-wasm/hirmos_analysis'
 import {
   parseDynotearsEvidence,
+  parseDirectLingamEvidence,
   parseLpcmciEvidence,
   parseOcseEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
-import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence } from '@/domain/estimation'
+import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence } from '@/domain/estimation'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import { linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -75,6 +76,12 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         lambdaW: command.lambdaW,
         lambdaA: command.lambdaA,
       }
+    case 'direct-lingam':
+      return {
+        kind: 'directLingam',
+        rows: command.rows,
+        columns: command.columns,
+      }
     case 'var-lingam':
       return {
         kind: 'varLingam',
@@ -100,10 +107,12 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return {
         kind: 'backdoorIdentify',
         nodes: command.nodes,
+        names: command.names,
         edges: command.edges,
         treatment: command.treatment,
         outcome: command.outcome,
         unobserved: command.unobserved,
+        estimand: command.estimand,
       }
     case 'dag-check':
       return {
@@ -128,6 +137,20 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         adjustment: command.adjustment,
         hacMaxLags: command.hacMaxLags,
         level: command.level,
+      }
+    case 'frontdoor-two-stage':
+      return {
+        kind: 'frontdoorTwoStage',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        mediator: command.mediator,
+        outcome: command.outcome,
+        firstStageAdjustment: command.firstStageAdjustment,
+        secondStageAdjustment: command.secondStageAdjustment,
+        controlValue: command.controlValue,
+        treatmentValue: command.treatmentValue,
+        uncertainty: command.uncertainty,
       }
     case 'count-glm':
       return { kind: 'countGlm', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, family: command.family }
@@ -159,6 +182,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'bayesianGaussian', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, warmup: command.warmup, samples: command.samples, seed: command.seed }
     case 'discrete-bn-query':
       return { kind: 'discreteBnQuery', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, bins: command.bins, equivalentSampleSize: command.equivalentSampleSize }
+    case 'binary-ett':
+      return { kind: 'binaryEtt', rows: command.rows, columns: command.columns, observedNodes: command.observedNodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, unobserved: command.unobserved }
     case 'linear-scm-counterfactual':
       return { kind: 'linearScmCounterfactual', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, interventions: command.interventions, observationNoise: command.observationNoise }
     case 'dml-refutation-batch':
@@ -244,6 +269,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'dynotears-succeeded', request: command.request, result: result.value })
         return
       }
+      case 'direct-lingam': {
+        const result = parseDirectLingamEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'direct-lingam-succeeded', request: command.request, result: result.value })
+        return
+      }
       case 'var-lingam': {
         const result = parseVarLingamEvidence(decoded)
         if (!result.ok) {
@@ -296,6 +330,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'backdoor-linear-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'frontdoor-two-stage': {
+        const result = parseFrontdoorTwoStageEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'frontdoor-two-stage-succeeded', request: command.request, result: result.value })
         return
       }
       case 'count-glm': {
@@ -380,6 +420,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = discreteBnEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'discrete-bn-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'binary-ett': {
+        const result = binaryEttEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'binary-ett-succeeded', request: command.request, result: result.data })
         return
       }
       case 'linear-scm-counterfactual': {

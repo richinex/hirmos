@@ -14,6 +14,7 @@ import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/do
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import { describeAssignmentKind, describeEstimand, describeStudyDesignCategory, estimandSentence, identifiedExpression, identifiedExpressionTex, studyDesignCategory, type IdentificationArtifact, type StudySpecification, type StudyVariable } from '@/domain/study'
+import { assertNever } from '@/domain/dop'
 import { describeStationarityAssessment } from '@/domain/stationarityAssessment'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
@@ -27,6 +28,16 @@ const Row = RecordRow
 /** A set of variables the reader counts; empty sets read as a word. */
 const names = (variables: readonly StudyVariable[]): React.ReactNode =>
   variables.length === 0 ? 'none' : variables.map((variable) => <span key={variable.node} className={chip('mr-1')}>{variable.name}</span>)
+
+const identificationMethod = (identification: IdentificationArtifact): string => {
+  switch (identification.result.kind) {
+    case 'identified': return 'back-door adjustment'
+    case 'graphically-identified': return 'general ID expression'
+    case 'counterfactually-identified': return 'IDC* counterfactual expressions'
+    case 'backdoor-not-identified': return 'not identified from the observational distribution'
+    default: return assertNever(identification.result)
+  }
+}
 
 /** An id the reader may need to match: mono, quiet, and short, with the whole value on hover. */
 const shortId = (id: string) => <span className={literal('text-muted')} title={id}>{id.slice(0, 8)}</span>
@@ -120,7 +131,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <Row term="Outcome">{study.outcome.name}</Row>
           <Row term="Design category">{describeAssignmentKind(study.assignment.kind)} · {describeStudyDesignCategory(studyDesignCategory(study))}</Row>
           <Row term="Selected adjustment set">{names(estimate.adjustmentSet)}</Row>
-          <Row term="Identification">{manifest.identification === null ? 'not recorded' : manifest.identification.result.kind === 'identified' ? 'back-door adjustment' : 'no measured back-door adjustment set; other strategies not assessed'}</Row>
+          <Row term="Identification">{manifest.identification === null ? 'not recorded' : identificationMethod(manifest.identification)}</Row>
           {manifest.identification?.result.kind === 'identified' && (
             <>
               <Row term="Canonical adjustment set">{names(manifest.identification.result.canonicalAdjustmentSet)}</Row>
@@ -197,8 +208,8 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
     <section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5">
       <div>
         <span className={label('text-signal')}>09 · Results</span>
-        <h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Read and export a result</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Select an estimate to review its study, method, data and requirements. Compare 2 runs to see which recorded fields differ.</p>
+        <h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.</p>
       </div>
       <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
         <label className="block">

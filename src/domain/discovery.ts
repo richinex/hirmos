@@ -3,6 +3,7 @@ import { assertNever, brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray
 import { columnNameOf, type NumericColumnSelection } from './dataset'
 import {
   DYNOTEARS_METHOD_ID,
+  DIRECT_LINGAM_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
   OCSE_METHOD_ID,
@@ -50,6 +51,16 @@ export const dynotearsEvidenceSchema = z.object({
 
 export type DynotearsEvidence = z.infer<typeof dynotearsEvidenceSchema>
 
+export const directLingamEvidenceSchema = z.object({
+  kind: z.literal('directLingam'),
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(12),
+  causalOrder: z.array(z.number().int().nonnegative()),
+  weights: z.array(z.array(z.number().finite())),
+}).strict()
+
+export type DirectLingamEvidence = z.infer<typeof directLingamEvidenceSchema>
+
 export const varLingamEvidenceSchema = z.object({
   kind: z.literal('varLingam'),
   observations: z.number().int().positive(),
@@ -93,7 +104,7 @@ export type PcmciPlusBoundaryProblem = {
 
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
+  readonly method: 'LPCMCI' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE'
   readonly detail: string
 }
 
@@ -149,6 +160,23 @@ export function parseDynotearsEvidence(value: unknown): Result<DynotearsEvidence
   return ok(parsed.data)
 }
 
+export function parseDirectLingamEvidence(value: unknown): Result<DirectLingamEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = directLingamEvidenceSchema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'DirectLiNGAM', detail: z.prettifyError(parsed.error) })
+  }
+  const square = parsed.data.weights.length === parsed.data.variables
+    && parsed.data.weights.every((row) => row.length === parsed.data.variables)
+  if (!square) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'DirectLiNGAM', detail: 'DirectLiNGAM returned a weight matrix with inconsistent dimensions.' })
+  }
+  const order = [...parsed.data.causalOrder].sort((left, right) => left - right)
+  if (order.length !== parsed.data.variables || order.some((index, position) => index !== position)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'DirectLiNGAM', detail: 'DirectLiNGAM causal order is not a permutation of the variables.' })
+  }
+  return ok(parsed.data)
+}
+
 export function parseVarLingamEvidence(value: unknown): Result<VarLingamEvidence, DiscoveryMatrixBoundaryProblem> {
   const parsed = varLingamEvidenceSchema.safeParse(value)
   if (!parsed.success) {
@@ -197,10 +225,11 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'pcmci-plus' | 'lpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
+export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
 export type DiscoveryConfiguration =
+  | { readonly kind: 'direct-lingam' }
   | {
       readonly kind: 'pcmci-plus'
       readonly tauMax: DiscoveryLag
@@ -232,6 +261,16 @@ export type DiscoveryConfiguration =
     }
 
 export type DiscoveryRunArtifact =
+  | {
+      readonly kind: 'direct-lingam-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof DIRECT_LINGAM_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: DirectLingamEvidence
+    }
   | {
       readonly kind: 'pcmci-plus-run'
       readonly id: DiscoveryRunId
@@ -327,6 +366,13 @@ export const INITIAL_DISCOVERY_DRAFT: DiscoveryDraft = {
   job: { kind: 'idle' },
 }
 
+export const initialDiscoveryDraftFor = (prepared: PreparedDatasetArtifact): DiscoveryDraft => ({
+  configuration: prepared.kind === 'prepared-cross-section'
+    ? { kind: 'direct-lingam' }
+    : INITIAL_DISCOVERY_DRAFT.configuration,
+  job: { kind: 'idle' },
+})
+
 export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): DiscoveryDraft {
   switch (event.type) {
     case 'method-selected':
@@ -382,6 +428,7 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
 
 function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfiguration {
   switch (method) {
+    case 'direct-lingam': return { kind: 'direct-lingam' }
     case 'pcmci-plus': return { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }
     case 'lpcmci': return { kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }
     case 'dynotears': return { kind: 'dynotears', maxLag: 2, lambdaW: 0.1, lambdaA: 0.1 }
@@ -392,6 +439,7 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
 }
 
 export type ReadyDiscoverySpecification =
+  | { readonly kind: 'direct-lingam' }
   | {
       readonly kind: 'pcmci-plus'
       readonly tauMax: DiscoveryLag
@@ -424,18 +472,28 @@ export type ReadyDiscoverySpecification =
 
 export type DiscoveryReadinessProblem =
   | { readonly kind: 'time-series-required' }
+  | { readonly kind: 'cross-section-required' }
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number; readonly available: number }
   | { readonly kind: 'browser-lag-limit'; readonly method: 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number }
 
 export function readyDiscoverySpecification(
   configuration: DiscoveryConfiguration,
   prepared: PreparedDatasetArtifact,
 ): Result<ReadyDiscoverySpecification, DiscoveryReadinessProblem> {
-  if (prepared.kind !== 'prepared-time-series') return err({ kind: 'time-series-required' })
   if (prepared.missingness.kind !== 'not-present') return err({ kind: 'dense-browser-boundary-required' })
+  if (configuration.kind === 'direct-lingam') {
+    if (prepared.kind !== 'prepared-cross-section') return err({ kind: 'cross-section-required' })
+    if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+    if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'DirectLiNGAM', maximum: 12, available: prepared.columns.length })
+    const required = prepared.columns.length + 16
+    return prepared.observations < required
+      ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+      : ok(configuration)
+  }
+  if (prepared.kind !== 'prepared-time-series') return err({ kind: 'time-series-required' })
   switch (configuration.kind) {
     case 'pcmci-plus': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
@@ -490,6 +548,40 @@ export function evaluateDiscoveryEligibility(
   stationarity: StationarityEvidenceArtifact | null,
 ): MethodEligibility {
   const [firstCaveat] = method.caveats
+  if (method.id === DIRECT_LINGAM_METHOD_ID) {
+    if (prepared.kind !== 'prepared-cross-section') {
+      const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat
+      return {
+        kind: 'refused',
+        satisfied: [],
+        unresolved: [],
+        violations: [{
+          kind: 'violated',
+          caveat: samplingCaveat,
+          evidence: prepared.kind === 'prepared-time-series'
+            ? 'This prepared dataset is a time series; adjacent rows can be serially dependent.'
+            : 'This prepared dataset is a panel; repeated observations from the same unit are not independent rows.',
+        }],
+      }
+    }
+    const satisfied: Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>[] = []
+    const unresolved: Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>[] = []
+    for (const caveat of method.caveats) {
+      if (caveat.category === 'interpretation') continue
+      if (caveat.category === 'sampling-structure') {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: 'Prepared as independent cross-sectional observations.' })
+        continue
+      }
+      if (caveat.category === 'missingness' && prepared.missingness.kind === 'not-present') {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: 'The prepared dataset contains no missing values.' })
+        continue
+      }
+      unresolved.push({ kind: 'unresolved', caveat, missingEvidence: '' })
+    }
+    return isNonEmpty(unresolved)
+      ? { kind: 'caution', satisfied, unresolved }
+      : { kind: 'eligible', satisfied }
+  }
   if (prepared.kind !== 'prepared-time-series') {
     const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat
     return {
@@ -553,9 +645,10 @@ export const newDiscoveryRunId = (): DiscoveryRunId =>
 
 export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): string {
   switch (problem.kind) {
-    case 'time-series-required': return 'Temporal discovery needs a time series. This prepared dataset holds independent rows.'
+    case 'time-series-required': return 'Temporal discovery needs a regular time series. This prepared dataset has another observation structure.'
+    case 'cross-section-required': return 'DirectLiNGAM needs independent cross-sectional observations. Prepare this dataset as a cross-section.'
     case 'at-least-two-variables-required': return 'Select at least 2 variables.'
-    case 'too-few-observations': return `This configuration needs at least ${problem.required} rows; ${problem.available} are available. Lower the maximum lag or use more rows.`
+    case 'too-few-observations': return `This configuration needs at least ${problem.required} rows; ${problem.available} are available. Use more rows or choose a smaller configuration.`
     case 'dense-browser-boundary-required': return 'Choose a complete interval or imputation. This method needs complete numeric columns in the browser.'
     case 'browser-variable-limit': return `${problem.method} accepts up to ${problem.maximum} variables in the browser; ${problem.available} are selected. Deselect ${problem.available - problem.maximum}.`
     case 'browser-lag-limit': return `${problem.method} accepts a maximum lag of ${problem.maximum} in the browser. Lower the maximum lag.`

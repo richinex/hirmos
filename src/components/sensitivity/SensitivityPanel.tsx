@@ -1,3 +1,4 @@
+import { Orb } from '@/components/ui/Orb'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
@@ -361,8 +362,8 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
         <span className={label('text-signal')}>07 · Sensitivity</span>
-        <h2 id="sensitivity-title" className="mb-2 mt-2 text-heading text-ink">Test how much the estimate moves</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Choose a probe to recompute the estimate after a defined perturbation or simulated confounding scenario. Read each result against that probe's reference value.</p>
+        <h2 id="sensitivity-title" className="mb-2 mt-2 text-heading text-ink">Assess sensitivity to assumptions</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
 
       <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="sensitivity-setup-title">
@@ -429,9 +430,12 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
             </div>
             {eligibility.kind === 'refused' && <Alert tone="warn" live={false} className="mt-4"><p className="m-0">{eligibility.reason}</p></Alert>}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The probe could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
-              Run {lowerFirst(describeProbe(state.probe))}
-            </button>
+            <div className="mt-4 flex items-center gap-3">
+              <button type="button" className={button('signal')} disabled={eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+                Run {lowerFirst(describeProbe(state.probe))}
+              </button>
+              {state.job.kind === 'running' && <Orb state="working" aria-label="Probe running" />}
+            </div>
           </>
         )}
       </section>

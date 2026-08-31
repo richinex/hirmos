@@ -159,7 +159,7 @@ fn minimal_adjustment_set_matches() {
 }
 
 #[test]
-fn do_calculus_matches() {
+fn interventional_query_matches() {
     let root = fixture();
     let (bn, _) = build(&root);
     let means: HashMap<String, HashMap<String, f64>> =
@@ -191,7 +191,7 @@ fn do_calculus_matches() {
         }
     }
     println!("do and observational distributions maxdev {worst:.3e}");
-    assert!(worst <= 1e-12, "do-calculus deviation {worst}");
+    assert!(worst <= 1e-12, "do-query deviation {worst}");
 
     // The per-unit ATE 805 prints.
     let tm = &means["treatment"];

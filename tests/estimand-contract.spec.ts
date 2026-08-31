@@ -28,3 +28,49 @@ test('locks DML-IRM to the study target and refuses a mismatched result contract
   expect(result.matched?.estimand.kind).toBe('average-treatment-effect-on-treated')
   expect(result.mismatched).toBeNull()
 })
+
+test('binds a binary ETT estimate to the IDC* expressions recorded by identification', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Domain contract runs once')
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const estimation = await import(new URL('/src/domain/estimation.ts', window.location.href).href)
+    const treatedExpression = 'P(Y_{X=1} = 1 | X = 1)'
+    const untreatedExpression = 'P(Y_{X=0} = 1 | X = 1)'
+    const study = { estimand: { kind: 'average-treatment-effect-on-treated', scale: 'additive', treatedValue: 1 } }
+    const identification = {
+      result: { kind: 'counterfactually-identified', treatedExpression, untreatedExpression },
+    }
+    const configuration = { kind: 'binary-ett-idc-star' }
+    const evidence = {
+      kind: 'binaryEtt', observations: 100, treatment: 'X', outcome: 'Y',
+      treatedPotentialOutcomeMean: 0.70, untreatedPotentialOutcomeMean: 0.45,
+      effectOnTreated: 0.25, treatedExpression, untreatedExpression,
+    }
+    const matched = estimation.causalEstimateFrom(study, identification, { kind: 'binary-ett-run', configuration, evidence })
+    const mismatched = estimation.causalEstimateFrom(study, identification, {
+      kind: 'binary-ett-run', configuration, evidence: { ...evidence, untreatedExpression: 'different expression' },
+    })
+    return { matched, mismatched }
+  })
+  expect(result.matched).toMatchObject({
+    estimand: { kind: 'average-treatment-effect-on-treated' },
+    effect: { kind: 'additive', value: 0.25 },
+    interval: { kind: 'none' },
+  })
+  expect(result.mismatched).toBeNull()
+})
+
+test('unlocks estimation for every identified result and not for an identification failure', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Domain contract runs once')
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const study = await import(new URL('/src/domain/study.ts', window.location.href).href)
+    return {
+      backdoor: study.identificationAllowsEstimation('identified'),
+      levelTwo: study.identificationAllowsEstimation('graphically-identified'),
+      levelThree: study.identificationAllowsEstimation('counterfactually-identified'),
+      failure: study.identificationAllowsEstimation('backdoor-not-identified'),
+    }
+  })
+  expect(result).toEqual({ backdoor: true, levelTwo: true, levelThree: true, failure: false })
+})

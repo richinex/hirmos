@@ -5,10 +5,12 @@ import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Resul
 import type { CaveatEvaluation, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
 import {
   BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
+  FRONTDOOR_TWO_STAGE_METHOD_ID,
   CAUSAL_EFFECTS_TOTAL_METHOD_ID,
   CAUSAL_IMPACT_METHOD_ID,
   ARDL_PSS_METHOD_ID,
   DISCRETE_BN_METHOD_ID,
+  BINARY_ETT_METHOD_ID,
   DML_IRM_METHOD_ID,
   DML_PLR_METHOD_ID,
   BAYESIAN_GAUSSIAN_METHOD_ID,
@@ -40,6 +42,15 @@ export interface BackdoorLinearConfiguration {
   readonly kind: 'backdoor-linear-regression'
   readonly covariance: CovarianceChoice
   readonly level: typeof CONFIDENCE_LEVEL
+}
+
+export interface FrontdoorTwoStageConfiguration {
+  readonly kind: 'frontdoor-two-stage'
+  readonly interventions: readonly [number, number]
+  readonly simulations: number
+  readonly sampleSizeFraction: number
+  readonly level: typeof CONFIDENCE_LEVEL
+  readonly seed: number
 }
 
 export interface CountGlmConfiguration {
@@ -126,8 +137,13 @@ export interface DiscreteBnConfiguration {
   readonly equivalentSampleSize: number
 }
 
+export interface BinaryEttConfiguration {
+  readonly kind: 'binary-ett-idc-star'
+}
+
 export type EstimatorConfiguration =
   | BackdoorLinearConfiguration
+  | FrontdoorTwoStageConfiguration
   | CountGlmConfiguration
   | DoubleMlConfiguration
   | ArdlConfiguration
@@ -136,17 +152,19 @@ export type EstimatorConfiguration =
   | NegbinNutsConfiguration
   | BayesianGaussianConfiguration
   | DiscreteBnConfiguration
+  | BinaryEttConfiguration
   | CausalEffectsConfiguration
   | CausalImpactConfiguration
   | PanelInterventionConfiguration
 
 export type EstimatorId = EstimatorConfiguration['kind']
 
-export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 'causal-effects-total', 'causal-impact', 'synthetic-control', 'panel-intervention', 'ardl-pss', 'vecm', 'discrete-bn-query']
+export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = ['backdoor-linear-regression', 'frontdoor-two-stage', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 'causal-effects-total', 'causal-impact', 'synthetic-control', 'panel-intervention', 'ardl-pss', 'vecm', 'discrete-bn-query', 'binary-ett-idc-star']
 
 export const methodIdOf = (estimator: EstimatorId): MethodId => {
   switch (estimator) {
     case 'backdoor-linear-regression': return BACKDOOR_LINEAR_REGRESSION_METHOD_ID
+    case 'frontdoor-two-stage': return FRONTDOOR_TWO_STAGE_METHOD_ID
     case 'poisson-glm': return POISSON_GLM_METHOD_ID
     case 'negative-binomial-p': return NEGATIVE_BINOMIAL_METHOD_ID
     case 'dml-plr': return DML_PLR_METHOD_ID
@@ -158,6 +176,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
     case 'negbin-nuts': return NEGBIN_NUTS_METHOD_ID
     case 'bayesian-gaussian': return BAYESIAN_GAUSSIAN_METHOD_ID
     case 'discrete-bn-query': return DISCRETE_BN_METHOD_ID
+    case 'binary-ett-idc-star': return BINARY_ETT_METHOD_ID
     case 'causal-effects-total': return CAUSAL_EFFECTS_TOTAL_METHOD_ID
     case 'causal-impact': return CAUSAL_IMPACT_METHOD_ID
     default: return assertNever(estimator)
@@ -167,6 +186,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
 export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorConfiguration => {
   switch (estimator) {
     case 'backdoor-linear-regression': return { kind: estimator, covariance: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical', level: CONFIDENCE_LEVEL }
+    case 'frontdoor-two-stage': return { kind: estimator, interventions: [0, 1], simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
     case 'poisson-glm':
     case 'negative-binomial-p': return { kind: estimator }
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
@@ -185,6 +205,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'negbin-nuts': return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
     case 'bayesian-gaussian': return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
     case 'discrete-bn-query': return { kind: estimator, bins: 3, equivalentSampleSize: 5 }
+    case 'binary-ett-idc-star': return { kind: estimator }
     case 'causal-effects-total': return { kind: estimator, estimator: { kind: 'linear' }, treatmentLag: 0, interventions: [0, 1] }
     case 'causal-impact': {
       // A control the treatment itself moves would absorb the effect, so DAG descendants of the
@@ -223,6 +244,38 @@ export const backdoorLinearEvidenceSchema = z.object({
 }).strict()
 
 export type BackdoorLinearEvidence = z.infer<typeof backdoorLinearEvidenceSchema>
+
+const frontdoorUncertaintySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({
+    kind: z.literal('bootstrap'),
+    simulations: z.number().int().positive(),
+    sampleSizeFraction: z.number().finite().positive(),
+    confidenceLevel: z.number().gt(0).lt(1),
+    seed: z.number().int().nonnegative(),
+    interval: z.tuple([z.number().finite(), z.number().finite()]),
+  }).strict(),
+])
+
+export const frontdoorTwoStageEvidenceSchema = z.object({
+  kind: z.literal('frontdoorTwoStage'),
+  observations: z.number().int().positive(),
+  treatment: z.number().int().nonnegative(),
+  mediator: z.number().int().nonnegative(),
+  outcome: z.number().int().nonnegative(),
+  firstStageAdjustment: z.array(z.number().int().nonnegative()),
+  secondStageAdjustment: z.array(z.number().int().nonnegative()),
+  controlValue: z.number().finite(),
+  treatmentValue: z.number().finite(),
+  firstStageParams: z.array(z.number().finite()).min(2),
+  secondStageParams: z.array(z.number().finite()).min(2),
+  firstStageEffect: z.number().finite(),
+  secondStageEffect: z.number().finite(),
+  estimate: z.number().finite(),
+  uncertainty: frontdoorUncertaintySchema,
+}).strict()
+
+export type FrontdoorTwoStageEvidence = z.infer<typeof frontdoorTwoStageEvidenceSchema>
 
 /** Rust serialises NaN as null; the count families leave each other's statistics null. */
 const nullableNumber = z.number().finite().nullable()
@@ -439,6 +492,21 @@ export const discreteBnEvidenceSchema = z.object({
 
 export type DiscreteBnEvidence = z.infer<typeof discreteBnEvidenceSchema>
 
+export const binaryEttEvidenceSchema = z.object({
+  kind: z.literal('binaryEtt'),
+  observations: z.number().int().positive(),
+  treatment: z.number().int().nonnegative(),
+  outcome: z.number().int().nonnegative(),
+  treatedPotentialOutcomeMean: z.number().min(0).max(1),
+  untreatedPotentialOutcomeMean: z.number().min(0).max(1),
+  effectOnTreated: z.number().min(-1).max(1),
+  treatedExpression: z.string().min(1),
+  untreatedExpression: z.string().min(1),
+}).strict()
+
+export type BinaryEttEvidence = z.infer<typeof binaryEttEvidenceSchema>
+export const parseBinaryEttEvidence = (value: unknown): Result<BinaryEttEvidence, EstimationEvidenceProblem> => parseWith(binaryEttEvidenceSchema, value)
+
 const nodeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])
 
 export const causalEffectsEvidenceSchema = z.object({
@@ -488,6 +556,15 @@ export function parseBackdoorLinearEvidence(value: unknown): Result<BackdoorLine
   if (!parsed.ok) return parsed
   if (parsed.value.interval[0] > parsed.value.interval[1] || parsed.value.hacInterval[0] > parsed.value.hacInterval[1]) {
     return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+  }
+  return parsed
+}
+
+export function parseFrontdoorTwoStageEvidence(value: unknown): Result<FrontdoorTwoStageEvidence, EstimationEvidenceProblem> {
+  const parsed = parseWith(frontdoorTwoStageEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (parsed.value.uncertainty.kind === 'bootstrap' && parsed.value.uncertainty.interval[0] > parsed.value.uncertainty.interval[1]) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The front-door confidence interval has its bounds reversed.' })
   }
   return parsed
 }
@@ -565,6 +642,7 @@ interface RunIdentity {
 
 export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
+  | RunIdentity & { readonly kind: 'frontdoor-two-stage-run'; readonly method: typeof FRONTDOOR_TWO_STAGE_METHOD_ID; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
   | RunIdentity & { readonly kind: 'count-glm-run'; readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
   | RunIdentity & { readonly kind: 'double-ml-run'; readonly method: typeof DML_PLR_METHOD_ID | typeof DML_IRM_METHOD_ID; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
   | RunIdentity & { readonly kind: 'ardl-run'; readonly method: typeof ARDL_PSS_METHOD_ID; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
@@ -574,6 +652,7 @@ export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'negbin-nuts-run'; readonly method: typeof NEGBIN_NUTS_METHOD_ID; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
   | RunIdentity & { readonly kind: 'bayesian-gaussian-run'; readonly method: typeof BAYESIAN_GAUSSIAN_METHOD_ID; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
   | RunIdentity & { readonly kind: 'discrete-bn-run'; readonly method: typeof DISCRETE_BN_METHOD_ID; readonly configuration: DiscreteBnConfiguration; readonly evidence: DiscreteBnEvidence }
+  | RunIdentity & { readonly kind: 'binary-ett-run'; readonly method: typeof BINARY_ETT_METHOD_ID; readonly configuration: BinaryEttConfiguration; readonly evidence: BinaryEttEvidence }
   | RunIdentity & { readonly kind: 'causal-effects-run'; readonly method: typeof CAUSAL_EFFECTS_TOTAL_METHOD_ID; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence }
   | RunIdentity & { readonly kind: 'causal-impact-run'; readonly method: typeof CAUSAL_IMPACT_METHOD_ID; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence }
 
@@ -593,6 +672,8 @@ export interface EligibilityContext {
   readonly outcomeIsCount: boolean | null
   /** Whether the treatment column holds only 0 and 1; null until the data has been read. */
   readonly treatmentIsBinary: boolean | null
+  /** Whether every observed graph variable holds only 0 and 1; null until those columns have been read. */
+  readonly observedGraphIsBinary: boolean | null
   /** The DAG behind the study, for the time-graph rules. */
   readonly document: DagDocument | null
   /** The study whose variables the stationarity rules look up; null when the identification has no study loaded. */
@@ -721,8 +802,10 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
 
   if (context.study !== null) {
     const targetIsAtt = context.study.estimand.kind === 'average-treatment-effect-on-treated'
-    if (targetIsAtt && configuration.kind !== 'dml-irm') {
-      violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: 'This study targets ATT. In this release, only DML interactive reports ATT.' })
+    if (targetIsAtt && configuration.kind !== 'dml-irm' && configuration.kind !== 'binary-ett-idc-star') {
+      violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: 'This study targets ATT. DML interactive and the binary IDC* evaluator report ATT.' })
+    } else if (!targetIsAtt && configuration.kind === 'binary-ett-idc-star') {
+      violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: 'The binary IDC* evaluator reports ETT/ATT, but this study records ATE.' })
     } else if (configuration.kind === 'dml-irm' && configuration.att !== targetIsAtt) {
       violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: `The DML configuration reports ${configuration.att ? 'ATT' : 'ATE'}, but the study records ${targetIsAtt ? 'ATT' : 'ATE'}.` })
     } else {
@@ -743,6 +826,21 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (timeSeries) leave('linear-not-time-graph', 'Lagged effects are not estimated by this method.')
       else satisfy('linear-not-time-graph', 'Independent observations carry no lag structure.')
       applyLevelRule('linear-level-stationarity', context, satisfy, leave, violate)
+      break
+    }
+    case 'frontdoor-two-stage': {
+      if (identification.kind !== 'graphically-identified' || identification.frontdoor.kind !== 'identified') {
+        violate('frontdoor-identified-mediator', 'The identification record does not contain a front-door set for this treatment and outcome.')
+        violate('frontdoor-single-mediator', 'No front-door mediator is available to the estimator.')
+      } else {
+        satisfy('frontdoor-identified-mediator', `The graph identifies ${identification.frontdoor.mediators.map((mediator) => mediator.name).join(', ')} as the front-door set.`)
+        if (identification.frontdoor.mediators.length === 1) satisfy('frontdoor-single-mediator', `${identification.frontdoor.mediators[0].name} is the single identified mediator.`)
+        else violate('frontdoor-single-mediator', `The identified front-door set contains ${identification.frontdoor.mediators.length} mediators; this estimator supports one.`)
+      }
+      leave('frontdoor-linear-stages', 'Assess whether treatment–mediator and mediator–outcome relations are adequately represented by additive linear regressions over the chosen contrast.')
+      if (timeSeries) violate('frontdoor-bootstrap-rows', 'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.')
+      else if (panel) violate('frontdoor-bootstrap-rows', 'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.')
+      else leave('frontdoor-bootstrap-rows', `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`)
       break
     }
     case 'panel-intervention': {
@@ -897,6 +995,19 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else leave('bn-independent-rows', 'Cross-sectional structure does not by itself establish independent sampling. Confirm that clustering or repeated observations are absent.')
       break
     }
+    case 'binary-ett-idc-star': {
+      if (identification.kind === 'counterfactually-identified') satisfy('ett-identified-expression', 'IDC* identified both conditional potential-outcome distributions in this record.')
+      else violate('ett-identified-expression', 'This identification record does not contain the two IDC* expressions for binary ETT.')
+      if (context.observedGraphIsBinary === null) leave('ett-binary-table', 'The observed graph columns have not been read yet.')
+      else if (context.observedGraphIsBinary) satisfy('ett-binary-table', 'Every observed graph variable contains only 0 and 1.')
+      else violate('ett-binary-table', 'At least one observed graph variable contains a value other than 0 or 1; no discretisation is applied.')
+      leave('ett-positive-conditioning-mass', 'The run evaluates every conditional denominator and refuses zero observed mass.')
+      if (timeSeries) violate('ett-independent-rows', 'The prepared rows are a time series; the empirical table would count serially dependent rows as independent.')
+      else if (panel) violate('ett-independent-rows', 'The prepared rows repeat units; the empirical table would count dependent rows as independent.')
+      else leave('ett-independent-rows', 'Confirm that the cross-sectional rows are independently sampled.')
+      satisfy('ett-no-interval', 'The run is recorded as a point estimate with no sampling interval.')
+      break
+    }
     case 'causal-effects-total': {
       if (!timeSeries) violate('causal-effects-time-series', 'A time-series graph needs a regular time series. This prepared dataset holds independent rows.')
       else satisfy('causal-effects-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series.`)
@@ -958,6 +1069,7 @@ export function causalEstimateFrom(
   identification: IdentificationArtifact,
   run:
     | { readonly kind: 'backdoor-linear-run'; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
+    | { readonly kind: 'frontdoor-two-stage-run'; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
     | { readonly kind: 'count-glm-run'; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
     | { readonly kind: 'double-ml-run'; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
     | { readonly kind: 'ardl-run'; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
@@ -967,9 +1079,46 @@ export function causalEstimateFrom(
     | { readonly kind: 'negbin-nuts-run'; readonly configuration: NegbinNutsConfiguration; readonly evidence: NegbinNutsEvidence }
     | { readonly kind: 'bayesian-gaussian-run'; readonly configuration: BayesianGaussianConfiguration; readonly evidence: BayesianGaussianEvidence }
     | { readonly kind: 'discrete-bn-run'; readonly configuration: DiscreteBnConfiguration; readonly evidence: DiscreteBnEvidence }
+    | { readonly kind: 'binary-ett-run'; readonly configuration: BinaryEttConfiguration; readonly evidence: BinaryEttEvidence }
     | { readonly kind: 'causal-effects-run'; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence }
     | { readonly kind: 'causal-impact-run'; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence },
 ): CausalEstimate | null {
+  if (run.kind === 'frontdoor-two-stage-run') {
+    if (identification.result.kind !== 'graphically-identified' || identification.result.frontdoor.kind !== 'identified' || identification.result.frontdoor.mediators.length !== 1) return null
+    const interval = run.evidence.uncertainty
+    return {
+      kind: 'causal-estimate',
+      estimand: study.estimand,
+      effect: { kind: 'additive', value: run.evidence.estimate, unit: '' },
+      interval: interval.kind === 'bootstrap'
+        ? { kind: 'confidence', level: interval.confidenceLevel, lower: interval.interval[0], upper: interval.interval[1] }
+        : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
+      standardError: null,
+      adjustmentSet: [],
+      sample: {
+        observations: run.evidence.observations,
+        parameters: Math.max(run.evidence.firstStageParams.length, run.evidence.secondStageParams.length),
+        degreesOfFreedom: null,
+      },
+    }
+  }
+  if (run.kind === 'binary-ett-run') {
+    if (
+      identification.result.kind !== 'counterfactually-identified'
+      || study.estimand.kind !== 'average-treatment-effect-on-treated'
+      || run.evidence.treatedExpression !== identification.result.treatedExpression
+      || run.evidence.untreatedExpression !== identification.result.untreatedExpression
+    ) return null
+    return {
+      kind: 'causal-estimate',
+      estimand: study.estimand,
+      effect: { kind: 'additive', value: run.evidence.effectOnTreated, unit: '' },
+      interval: { kind: 'none', reason: 'This empirical IDC* evaluator reports a plug-in point estimate without a sampling interval.' },
+      standardError: null,
+      adjustmentSet: [],
+      sample: { observations: run.evidence.observations, parameters: 0, degreesOfFreedom: null },
+    }
+  }
   if (identification.result.kind !== 'identified') return null
   const adjustmentSet = identification.result.adjustment.variables
   switch (run.kind) {
@@ -1152,6 +1301,7 @@ export function describeCovariance(choice: CovarianceChoice): string {
 export function describeEstimator(estimator: EstimatorId): string {
   switch (estimator) {
     case 'backdoor-linear-regression': return 'Adjusted linear regression'
+    case 'frontdoor-two-stage': return 'Linear front-door regression'
     case 'poisson-glm': return 'Poisson GLM'
     case 'negative-binomial-p': return 'Negative binomial'
     case 'dml-plr': return 'Double machine learning, partially linear'
@@ -1163,6 +1313,7 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'negbin-nuts': return 'Bayesian negative binomial'
     case 'bayesian-gaussian': return 'Bayesian Gaussian regression'
     case 'discrete-bn-query': return 'Discrete BN do-query'
+    case 'binary-ett-idc-star': return 'Binary ETT by IDC*'
     case 'causal-effects-total': return 'CausalEffects total effect'
     case 'causal-impact': return 'Causal impact'
     default: return assertNever(estimator)

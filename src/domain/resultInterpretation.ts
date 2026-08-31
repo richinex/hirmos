@@ -105,6 +105,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
   switch (run.kind) {
     case 'backdoor-linear-run':
     case 'double-ml-run': return `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
+    case 'frontdoor-two-stage-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
     case 'count-glm-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1-unit increase in ${study.treatment.name}`
     case 'negbin-nuts-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1 standard deviation increase in ${study.treatment.name}`
     case 'bayesian-gaussian-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0`
@@ -114,6 +115,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'causal-impact-run': return `additive · observed ${study.outcome.name} minus its counterfactual per ${stepLabel}`
     case 'panel-intervention-run': return `additive · average post-adoption ${study.outcome.name} effect among treated units`
     case 'discrete-bn-run': return `additive · expected ${study.outcome.name} in the high rather than low ${study.treatment.name} bin`
+    case 'binary-ett-run': return `additive · expected ${study.outcome.name}(1) minus ${study.outcome.name}(0) among rows with ${study.treatment.name} = 1`
     case 'causal-effects-run': return `additive · total effect of setting ${study.treatment.name} from ${run.evidence.interventions[0]} to ${run.evidence.interventions[1]}`
     default: return assertNever(run)
   }
@@ -127,6 +129,15 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
 export function interpretEstimationResult(run: EstimationRunArtifact, study: StudySpecification, stepLabel: string): ResultInterpretation {
   const { estimate } = run
   switch (run.kind) {
+    case 'frontdoor-two-stage-run': {
+      const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
+      const mediator = run.columns[run.evidence.mediator]?.name ?? 'the mediator'
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `Under the fitted two-stage model, setting ${study.treatment.name} from ${number(run.evidence.controlValue)} to ${number(run.evidence.treatmentValue)} changes expected ${study.outcome.name} by ${number(effect)} through ${mediator}.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
+        { kind: 'qualification', text: `The estimate is the product of the fitted ${study.treatment.name} → ${mediator} and ${mediator} → ${study.outcome.name} coefficients. Its causal interpretation requires the recorded front-door conditions and adequate additive linear models for both stages.` },
+      ] }
+    }
     case 'backdoor-linear-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const statements: NonEmptyArray<InterpretationStatement> = [
@@ -220,6 +231,14 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'qualification', text: 'The contrast is between quantile-bin states, not a 1-unit change on the original continuous scale. Its causal interpretation depends on the graph, adjustment and discretisation choices.' },
       ] }
     }
+    case 'binary-ett-run': {
+      const { evidence } = run
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `Among rows with ${study.treatment.name} = 1, the identified model gives mean ${study.outcome.name}(1) of ${number(evidence.treatedPotentialOutcomeMean)} and mean ${study.outcome.name}(0) of ${number(evidence.untreatedPotentialOutcomeMean)}. Their difference is ${number(evidence.effectOnTreated)}.` },
+        noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No uncertainty interval is available.'),
+        { kind: 'qualification', text: 'This is the binary effect on the treated under the recorded graph and empirical joint distribution. It is not an ATE, and no continuous variable was discretised automatically.' },
+      ] }
+    }
     case 'causal-effects-run': {
       const [low, high] = run.evidence.interventions
       const effect = run.evidence.totalEffect ?? Number.NaN
@@ -246,6 +265,10 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
 /** Discovery numbers describe fitted structural evidence, not identified intervention effects. */
 export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInterpretation {
   switch (run.kind) {
+    case 'direct-lingam-run': return { kind: 'result-interpretation', statements: [
+      { kind: 'magnitude', text: `The reported order places the ${run.result.variables} variables in the sequence inferred from non-Gaussianity. Each nonzero weight is the fitted linear structural coefficient from its source to its target after adaptive-lasso pruning.` },
+      { kind: 'qualification', text: 'The order and weights identify a causal structure only under the linear, acyclic, causally sufficient model with mutually independent non-Gaussian disturbances. They are not intervention-effect estimates.' },
+    ] }
     case 'pcmci-plus-run': return { kind: 'result-interpretation', statements: [
       { kind: 'magnitude', text: `A marked cell records a conditional-dependence relation selected at alpha ${run.result.pcAlpha}. Its lag says how many time steps the source precedes the target; ParCorr gives the signed conditional association.` },
       { kind: 'qualification', text: 'Same-period o–o endpoints remain unoriented. The resulting time-series CPDAG represents an equivalence class, not a completed causal DAG or an intervention-effect estimate.' },

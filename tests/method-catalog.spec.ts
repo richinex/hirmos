@@ -50,10 +50,14 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'pcmci-plus-parcorr',
     'lpcmci-parcorr',
     'dynotears',
+    'direct-lingam',
     'var-lingam',
     'ocse',
     'backdoor-identification',
+    'graphical-identification-id',
+    'counterfactual-identification-id-star',
     'backdoor-linear-regression',
+    'frontdoor-two-stage',
     'poisson-glm',
     'negative-binomial-p',
     'causal-effects-total',
@@ -68,6 +72,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'negbin-nuts',
     'bayesian-gaussian',
     'discrete-bn-query',
+    'binary-ett-idc-star',
     'linear-scm-counterfactual',
     'placebo-treatment-refuter',
     'data-subset-refuter',
@@ -98,6 +103,8 @@ test('requires sourced caveats for every registered method', async ({ page }, te
   expect(dynotears?.caveats.some((caveat) => caveat.requirement.includes('sparse linear dynamic'))).toBe(true)
   const varLingam = parsed.data.find((method) => method.id === 'var-lingam')
   expect(varLingam?.caveats.some((caveat) => caveat.requirement.includes('non-Gaussian errors'))).toBe(true)
+  const directLingam = parsed.data.find((method) => method.id === 'direct-lingam')
+  expect(directLingam?.caveats.some((caveat) => caveat.requirement.includes('independent and non-Gaussian'))).toBe(true)
   const ocse = parsed.data.find((method) => method.id === 'ocse')
   expect(ocse?.caveats.some((caveat) => caveat.requirement.includes('not identified intervention effects'))).toBe(true)
 

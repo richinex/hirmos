@@ -3,15 +3,17 @@ import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValid
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type DiscreteBnEvidence, type DoubleMlEvidence, type NegbinNutsEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type VecmEvidence } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type DiscreteBnEvidence, type DoubleMlEvidence, type NegbinNutsEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { linearScmEvidenceSchema, type LinearScmEvidence } from '@/domain/counterfactual'
 import { brand, err, ok, type Brand, type Result } from '@/domain/dop'
 import {
   dynotearsEvidenceSchema,
+  directLingamEvidenceSchema,
   lpcmciEvidenceSchema,
   ocseEvidenceSchema,
   parseDynotearsEvidence,
+  parseDirectLingamEvidence,
   parseLpcmciEvidence,
   parseOcseEvidence,
   parsePcmciPlusEvidence,
@@ -19,6 +21,7 @@ import {
   pcmciPlusEvidenceSchema,
   varLingamEvidenceSchema,
   type DynotearsEvidence,
+  type DirectLingamEvidence,
   type LpcmciEvidence,
   type OcseEvidence,
   type PcmciPlusEvidence,
@@ -26,14 +29,17 @@ import {
 } from '@/domain/discovery'
 import {
   backdoorLinearEvidenceSchema,
+  frontdoorTwoStageEvidenceSchema,
   causalEffectsEvidenceSchema,
   causalImpactEvidenceSchema,
   countGlmEvidenceSchema,
   parseBackdoorLinearEvidence,
+  parseFrontdoorTwoStageEvidence,
   parseCausalEffectsEvidence,
   parseCausalImpactEvidence,
   parseCountGlmEvidence,
   type BackdoorLinearEvidence,
+  type FrontdoorTwoStageEvidence,
   type CausalEffectsEvidence,
   type CausalImpactEvidence,
   type CountGlmEvidence,
@@ -108,6 +114,13 @@ export type AnalysisWorkerCommand =
       readonly lambdaA: number
     }
   | {
+      readonly kind: 'direct-lingam'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+    }
+  | {
       readonly kind: 'var-lingam'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -140,10 +153,12 @@ export type AnalysisWorkerCommand =
       readonly request: WorkerRequestId
       readonly values: Float64Array
       readonly nodes: number
+      readonly names: readonly string[]
       readonly edges: readonly (readonly [number, number])[]
       readonly treatment: number
       readonly outcome: number
       readonly unobserved: readonly number[]
+      readonly estimand: 'ate' | 'att'
     }
   | {
       readonly kind: 'dag-check'
@@ -174,6 +189,27 @@ export type AnalysisWorkerCommand =
       readonly adjustment: readonly number[]
       readonly hacMaxLags: number | null
       readonly level: number
+    }
+  | {
+      readonly kind: 'frontdoor-two-stage'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly mediator: number
+      readonly outcome: number
+      readonly firstStageAdjustment: readonly number[]
+      readonly secondStageAdjustment: readonly number[]
+      readonly controlValue: number
+      readonly treatmentValue: number
+      readonly uncertainty: {
+        readonly kind: 'bootstrap'
+        readonly simulations: number
+        readonly sampleSizeFraction: number
+        readonly confidenceLevel: number
+        readonly seed: number
+      }
     }
   | {
       readonly kind: 'count-glm'
@@ -359,6 +395,19 @@ export type AnalysisWorkerCommand =
       readonly equivalentSampleSize: number
     }
   | {
+      readonly kind: 'binary-ett'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly observedNodes: readonly number[]
+      readonly names: readonly string[]
+      readonly edges: readonly (readonly [number, number])[]
+      readonly treatment: number
+      readonly outcome: number
+      readonly unobserved: readonly number[]
+    }
+  | {
       readonly kind: 'linear-scm-counterfactual'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -428,6 +477,11 @@ export type AnalysisWorkerEvent =
       readonly result: DynotearsEvidence
     }
   | {
+      readonly kind: 'direct-lingam-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: DirectLingamEvidence
+    }
+  | {
       readonly kind: 'var-lingam-succeeded'
       readonly request: WorkerRequestId
       readonly result: VarLingamEvidence
@@ -453,6 +507,7 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: BackdoorLinearEvidence
     }
+  | { readonly kind: 'frontdoor-two-stage-succeeded'; readonly request: WorkerRequestId; readonly result: FrontdoorTwoStageEvidence }
   | { readonly kind: 'count-glm-succeeded'; readonly request: WorkerRequestId; readonly result: CountGlmEvidence }
   | { readonly kind: 'causal-effects-succeeded'; readonly request: WorkerRequestId; readonly result: CausalEffectsEvidence }
   | { readonly kind: 'causal-impact-succeeded'; readonly request: WorkerRequestId; readonly result: CausalImpactEvidence }
@@ -468,6 +523,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
   | { readonly kind: 'bayesian-gaussian-succeeded'; readonly request: WorkerRequestId; readonly result: BayesianGaussianEvidence }
   | { readonly kind: 'discrete-bn-succeeded'; readonly request: WorkerRequestId; readonly result: DiscreteBnEvidence }
+  | { readonly kind: 'binary-ett-succeeded'; readonly request: WorkerRequestId; readonly result: BinaryEttEvidence }
   | { readonly kind: 'linear-scm-succeeded'; readonly request: WorkerRequestId; readonly result: LinearScmEvidence }
   | { readonly kind: 'dml-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: DmlRefutationEvidence }
   | { readonly kind: 'missingness-resolved'; readonly request: WorkerRequestId; readonly result: MissingnessResolvedEvidence }
@@ -527,6 +583,13 @@ const commandSchema = z.discriminatedUnion('kind', [
     lambdaA: z.number().finite().nonnegative(),
   }).strict(),
   z.object({
+    kind: z.literal('direct-lingam'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(12),
+  }).strict(),
+  z.object({
     kind: z.literal('var-lingam'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -559,10 +622,12 @@ const commandSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     values: z.instanceof(Float64Array),
     nodes: z.number().int().min(2).max(64),
+    names: z.array(z.string().trim().min(1)).min(2).max(64),
     edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
     treatment: z.number().int().nonnegative(),
     outcome: z.number().int().nonnegative(),
     unobserved: z.array(z.number().int().nonnegative()),
+    estimand: z.enum(['ate', 'att']),
   }).strict(),
   z.object({
     kind: z.literal('dag-check'),
@@ -593,6 +658,27 @@ const commandSchema = z.discriminatedUnion('kind', [
     adjustment: z.array(z.number().int().nonnegative()),
     hacMaxLags: z.number().int().nonnegative().nullable(),
     level: z.number().gt(0.5).lt(1),
+  }).strict(),
+  z.object({
+    kind: z.literal('frontdoor-two-stage'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(3).max(64),
+    treatment: z.number().int().nonnegative(),
+    mediator: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    firstStageAdjustment: z.array(z.number().int().nonnegative()),
+    secondStageAdjustment: z.array(z.number().int().nonnegative()),
+    controlValue: z.number().finite(),
+    treatmentValue: z.number().finite(),
+    uncertainty: z.object({
+      kind: z.literal('bootstrap'),
+      simulations: z.number().int().min(20).max(10_000),
+      sampleSizeFraction: z.number().gt(0).max(2),
+      confidenceLevel: z.number().gt(0.5).lt(1),
+      seed: z.number().int().nonnegative(),
+    }).strict(),
   }).strict(),
   z.object({
     kind: z.literal('count-glm'),
@@ -778,6 +864,19 @@ const commandSchema = z.discriminatedUnion('kind', [
     equivalentSampleSize: z.number().positive(),
   }).strict(),
   z.object({
+    kind: z.literal('binary-ett'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(64),
+    observedNodes: z.array(z.number().int().nonnegative()).min(2).max(64),
+    names: z.array(z.string().trim().min(1)).min(2).max(64),
+    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    unobserved: z.array(z.number().int().nonnegative()),
+  }).strict(),
+  z.object({
     kind: z.literal('linear-scm-counterfactual'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -857,6 +956,11 @@ const eventSchema = z.discriminatedUnion('kind', [
     result: dynotearsEvidenceSchema,
   }).strict(),
   z.object({
+    kind: z.literal('direct-lingam-succeeded'),
+    request: requestSchema,
+    result: directLingamEvidenceSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('var-lingam-succeeded'),
     request: requestSchema,
     result: varLingamEvidenceSchema,
@@ -882,6 +986,7 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: backdoorLinearEvidenceSchema,
   }).strict(),
+  z.object({ kind: z.literal('frontdoor-two-stage-succeeded'), request: requestSchema, result: frontdoorTwoStageEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count-glm-succeeded'), request: requestSchema, result: countGlmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-effects-succeeded'), request: requestSchema, result: causalEffectsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-impact-succeeded'), request: requestSchema, result: causalImpactEvidenceSchema }).strict(),
@@ -897,6 +1002,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('bayesian-gaussian-succeeded'), request: requestSchema, result: bayesianGaussianEvidenceSchema }).strict(),
   z.object({ kind: z.literal('discrete-bn-succeeded'), request: requestSchema, result: discreteBnEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('binary-ett-succeeded'), request: requestSchema, result: binaryEttEvidenceSchema }).strict(),
   z.object({ kind: z.literal('linear-scm-succeeded'), request: requestSchema, result: linearScmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('dml-refutation-succeeded'), request: requestSchema, result: dmlRefutationEvidenceSchema }).strict(),
   z.object({ kind: z.literal('missingness-resolved'), request: requestSchema, result: missingnessResolvedEvidenceSchema }).strict(),
@@ -929,6 +1035,12 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   if (parsed.data.kind === 'backdoor-identify' && parsed.data.values.length !== 0) {
     return err({ kind: 'invalid-command', detail: 'Identification takes a graph, not data.' })
   }
+  if (parsed.data.kind === 'backdoor-identify' && (
+    parsed.data.names.length !== parsed.data.nodes
+    || new Set(parsed.data.names).size !== parsed.data.names.length
+  )) {
+    return err({ kind: 'invalid-command', detail: 'Identification requires one distinct name for every graph node.' })
+  }
   if (parsed.data.kind === 'resolve-missingness' && parsed.data.validity.length !== parsed.data.rows * parsed.data.columns) {
     return err({ kind: 'invalid-command', detail: 'The validity bytes do not match the matrix dimensions.' })
   }
@@ -959,6 +1071,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseDynotearsEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'dynotears-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'direct-lingam-succeeded') {
+    const result = parseDirectLingamEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'direct-lingam-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'var-lingam-succeeded') {
@@ -995,6 +1113,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseBackdoorLinearEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'backdoor-linear-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'frontdoor-two-stage-succeeded') {
+    const result = parseFrontdoorTwoStageEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'frontdoor-two-stage-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'count-glm-succeeded') {
@@ -1052,6 +1176,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'discrete-bn-succeeded') {
     const result = discreteBnEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'discrete-bn-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'binary-ett-succeeded') {
+    const result = binaryEttEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'binary-ett-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'linear-scm-succeeded') {
     const result = linearScmEvidenceSchema.safeParse(parsed.data.result)

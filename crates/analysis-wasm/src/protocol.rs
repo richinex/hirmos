@@ -20,6 +20,67 @@ pub(crate) enum BackdoorAdjustmentSetEvidence {
     NotIdentified,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LatentProjectionEvidence {
+    pub(crate) directed_edges: Vec<(usize, usize)>,
+    pub(crate) bidirected_edges: Vec<(usize, usize)>,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum GraphicalIdentificationEvidence {
+    Identified {
+        expression: String,
+        latex: String,
+        projection: LatentProjectionEvidence,
+    },
+    Unidentifiable {
+        hedge_graph: Vec<usize>,
+        hedge_subgraph: Vec<usize>,
+        projection: LatentProjectionEvidence,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum FrontdoorSetEvidence {
+    Identified { mediators: Vec<usize> },
+    NotIdentified,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum IdentificationEstimand {
+    Ate,
+    Att,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CounterfactualIdentificationEvidence {
+    NotApplicable,
+    Identified {
+        treated_expression: String,
+        untreated_expression: String,
+    },
+    Unidentifiable {
+        reason: String,
+    },
+}
+
 #[derive(serde::Deserialize)]
 #[serde(
     tag = "kind",
@@ -48,6 +109,10 @@ pub(crate) enum AnalysisCommand {
         lambda_w: f64,
         lambda_a: f64,
     },
+    DirectLingam {
+        rows: usize,
+        columns: usize,
+    },
     VarLingam {
         rows: usize,
         columns: usize,
@@ -69,10 +134,12 @@ pub(crate) enum AnalysisCommand {
     },
     BackdoorIdentify {
         nodes: usize,
+        names: Vec<String>,
         edges: Vec<(usize, usize)>,
         treatment: usize,
         outcome: usize,
         unobserved: Vec<usize>,
+        estimand: IdentificationEstimand,
     },
     DagCheck {
         rows: usize,
@@ -96,6 +163,18 @@ pub(crate) enum AnalysisCommand {
         adjustment: Vec<usize>,
         hac_max_lags: Option<usize>,
         level: f64,
+    },
+    FrontdoorTwoStage {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        mediator: usize,
+        outcome: usize,
+        first_stage_adjustment: Vec<usize>,
+        second_stage_adjustment: Vec<usize>,
+        control_value: f64,
+        treatment_value: f64,
+        uncertainty: FrontdoorUncertainty,
     },
     CountGlm {
         rows: usize,
@@ -243,6 +322,18 @@ pub(crate) enum AnalysisCommand {
         bins: usize,
         equivalent_sample_size: f64,
     },
+    BinaryEtt {
+        rows: usize,
+        columns: usize,
+        /// One matrix column per observed graph node, in the same order.
+        observed_nodes: Vec<usize>,
+        /// Names and directed edges cover the full graph, including unobserved nodes.
+        names: Vec<String>,
+        edges: Vec<(usize, usize)>,
+        treatment: usize,
+        outcome: usize,
+        unobserved: Vec<usize>,
+    },
     LinearScmCounterfactual {
         rows: usize,
         columns: usize,
@@ -303,6 +394,39 @@ pub(crate) enum CountFamily {
 pub(crate) enum TotalEffectEstimator {
     Linear,
     Knn { k: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum FrontdoorUncertainty {
+    None,
+    Bootstrap {
+        simulations: usize,
+        sample_size_fraction: f64,
+        confidence_level: f64,
+        seed: u32,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum FrontdoorUncertaintyEvidence {
+    None,
+    Bootstrap {
+        simulations: usize,
+        sample_size_fraction: f64,
+        confidence_level: f64,
+        seed: u32,
+        interval: [f64; 2],
+    },
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -530,6 +654,12 @@ pub(crate) enum AnalysisResult {
         contemporaneous_weights: Vec<Vec<f64>>,
         lagged_weights: Vec<Vec<Vec<f64>>>,
     },
+    DirectLingam {
+        observations: usize,
+        variables: usize,
+        causal_order: Vec<usize>,
+        weights: Vec<Vec<f64>>,
+    },
     VarLingam {
         observations: usize,
         variables: usize,
@@ -562,6 +692,9 @@ pub(crate) enum AnalysisResult {
         outcome: usize,
         unobserved: Vec<usize>,
         result: BackdoorAdjustmentSetEvidence,
+        frontdoor: FrontdoorSetEvidence,
+        graphical_identification: GraphicalIdentificationEvidence,
+        counterfactual_identification: CounterfactualIdentificationEvidence,
     },
     DagCheck {
         observations: usize,
@@ -589,6 +722,22 @@ pub(crate) enum AnalysisResult {
         hac_interval: [f64; 2],
         hac_p_value: f64,
         durbin_watson: f64,
+    },
+    FrontdoorTwoStage {
+        observations: usize,
+        treatment: usize,
+        mediator: usize,
+        outcome: usize,
+        first_stage_adjustment: Vec<usize>,
+        second_stage_adjustment: Vec<usize>,
+        control_value: f64,
+        treatment_value: f64,
+        first_stage_params: Vec<f64>,
+        second_stage_params: Vec<f64>,
+        first_stage_effect: f64,
+        second_stage_effect: f64,
+        estimate: f64,
+        uncertainty: FrontdoorUncertaintyEvidence,
     },
     CountGlm {
         observations: usize,
@@ -783,6 +932,16 @@ pub(crate) enum AnalysisResult {
         minimal_adjustment_set: Option<Vec<String>>,
         /// The parents the do-query itself adjusted for.
         parents_adjusted: Vec<String>,
+    },
+    BinaryEtt {
+        observations: usize,
+        treatment: usize,
+        outcome: usize,
+        treated_potential_outcome_mean: f64,
+        untreated_potential_outcome_mean: f64,
+        effect_on_treated: f64,
+        treated_expression: String,
+        untreated_expression: String,
     },
     LinearScmCounterfactual {
         observations: usize,

@@ -38,7 +38,7 @@ const markMeanings = (semantics: LagGraphSemantics): readonly MarkMeaning[] => {
 
 export function LagGraphViews({ graph, label, highlighted = [], initial = 'summary', compact = false }: {
   readonly graph: LagGraph
-  /** Accessible name for the container, for example "PCMCI+ evidence graph". */
+  /** Accessible name for the rendered chart, for example "PCMCI+ evidence graph". */
   readonly label: string
   /** Variable ids to outline in the summary graph, for example the selected candidate's endpoints. */
   readonly highlighted?: readonly string[]
@@ -65,10 +65,12 @@ export function LagGraphViews({ graph, label, highlighted = [], initial = 'summa
   const height = view === 'summary' ? summaryMetrics.height : Math.min(gridSize.height, 520)
   const meanings = markMeanings(graph.semantics)
   return (
-    <div className="rounded-lg border border-hair bg-well p-2" aria-label={label}>
+    <div className="rounded-lg border border-hair bg-well p-2">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
-        <SegmentedControl size="sm" className="bg-panel" ariaLabel="Structure view" value={view} onChange={setView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
-        <span className="text-micro text-faint">{graph.links.length} link{graph.links.length === 1 ? '' : 's'} · τ max {graph.tauMax}</span>
+        {graph.tauMax > 0
+          ? <SegmentedControl size="sm" className="bg-panel" ariaLabel="Structure view" value={view} onChange={setView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
+          : <span className="text-micro text-faint">Directed structure</span>}
+        <span className="text-micro text-faint">{graph.links.length} link{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}</span>
       </div>
       <div ref={host} className={view === 'lag-grid' ? 'panel-scroll overflow-x-auto' : 'flex justify-center'}>
         {view === 'summary'

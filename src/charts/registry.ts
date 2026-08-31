@@ -16,13 +16,12 @@ import {
   VisualMapComponent,
 } from 'echarts/components'
 import { init, use, type EChartsType } from 'echarts/core'
-import { CanvasRenderer, SVGRenderer } from 'echarts/renderers'
+import { SVGRenderer } from 'echarts/renderers'
 
 use([
   AriaComponent,
   BarChart,
   BrushComponent,
-  CanvasRenderer,
   CustomChart,
   DataZoomInsideComponent,
   DataZoomSliderComponent,
@@ -43,8 +42,6 @@ use([
   VisualMapComponent,
 ])
 
-export type ChartRenderer = 'svg' | 'canvas'
-
-/** SVG by default so every chart is crisp, themeable, and exportable as text; canvas for very large series. */
-export const createChart = (element: HTMLElement, renderer: ChartRenderer = 'svg'): EChartsType =>
-  init(element, undefined, { renderer })
+/** SVG only: every chart stays crisp, themeable, and exportable as text, and the canvas renderer stays out of the bundle. */
+export const createChart = (element: HTMLElement): EChartsType =>
+  init(element, undefined, { renderer: 'svg' })

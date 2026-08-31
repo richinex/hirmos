@@ -129,6 +129,8 @@ interface ChapterNavProps {
   readonly active: ChapterId
   readonly collapsed: boolean
   readonly onNavigate: (chapter: ChapterId) => void
+  /** Warms a chapter's code chunk on hover or focus, ahead of the click. */
+  readonly onPrefetch: (chapter: ChapterId) => void
   /** Phone only: whether the list is slid in over the stage; session state, not the persisted desktop preference. */
   readonly phoneOpen: boolean
   readonly onPhoneOpen: () => void
@@ -141,7 +143,7 @@ interface ChapterNavProps {
  * the header and its toggle stay put and the stage keeps the full width; a swipe from the left
  * edge opens it and a drag closes it. Gated chapters stay in the tab order.
  */
-export function ChapterNav({ chapters, active, collapsed, onNavigate, phoneOpen, onPhoneOpen, onPhoneClose }: ChapterNavProps) {
+export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch, phoneOpen, onPhoneOpen, onPhoneClose }: ChapterNavProps) {
   const phone = useIsMobile()
   const rail = collapsed && !phone
   const list = useRef<HTMLElement>(null)
@@ -197,6 +199,8 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, phoneOpen,
                 aria-label={rail ? chapter.name : undefined}
                 title={rail ? (busy === null ? name : `${name}, ${Math.round(busy * 100)}% done`) : undefined}
                 onClick={() => { if (!locked) { onNavigate(chapter.id); onPhoneClose() } }}
+                onPointerEnter={locked ? undefined : () => onPrefetch(chapter.id)}
+                onFocus={locked ? undefined : () => onPrefetch(chapter.id)}
                 className={cn(
                   'relative flex items-center gap-2 rounded-lg border text-left text-body transition-colors duration-150',
                   rail ? 'grid h-9 w-9 place-items-center pointer-coarse:h-10 pointer-coarse:w-10' : 'w-full px-2.5 py-2',

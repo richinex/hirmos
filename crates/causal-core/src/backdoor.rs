@@ -105,7 +105,7 @@ impl Dag {
     }
 
     /// The backdoor graph: outgoing edges of the treatment removed.
-    fn backdoor_graph(&self, treatment: usize) -> Dag {
+    pub(crate) fn backdoor_graph(&self, treatment: usize) -> Dag {
         let mut edges = Vec::new();
         for (a, chs) in self.children.iter().enumerate() {
             for &b in chs {
@@ -114,6 +114,38 @@ impl Dag {
                 }
             }
         }
+        Dag::new(self.n, &edges)
+    }
+
+    /// The intervention graph used by DoWhy's first front-door condition: incoming edges of
+    /// `treatment` removed.
+    pub(crate) fn without_incoming(&self, treatment: usize) -> Dag {
+        let edges = self
+            .children
+            .iter()
+            .enumerate()
+            .flat_map(|(source, children)| {
+                children
+                    .iter()
+                    .copied()
+                    .filter_map(move |target| (target != treatment).then_some((source, target)))
+            })
+            .collect::<Vec<_>>();
+        Dag::new(self.n, &edges)
+    }
+
+    /// Graph surgery for a mediator set: remove every outgoing edge of every selected node.
+    pub(crate) fn without_outgoing_set(&self, selected: &BTreeSet<usize>) -> Dag {
+        let edges = self
+            .children
+            .iter()
+            .enumerate()
+            .flat_map(|(source, children)| {
+                children.iter().copied().filter_map(move |target| {
+                    (!selected.contains(&source)).then_some((source, target))
+                })
+            })
+            .collect::<Vec<_>>();
         Dag::new(self.n, &edges)
     }
 
@@ -140,7 +172,7 @@ impl Dag {
     }
 }
 
-fn combinations(pool: &[usize], k: usize) -> Vec<Vec<usize>> {
+pub(crate) fn combinations(pool: &[usize], k: usize) -> Vec<Vec<usize>> {
     let mut out = Vec::new();
     if k > pool.len() {
         return out;

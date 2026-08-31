@@ -2,15 +2,16 @@ import { err, type Result } from '@/domain/dop'
 import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
   DynotearsEvidence,
+  DirectLingamEvidence,
   LpcmciEvidence,
   OcseEvidence,
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
-import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalImpactEvidence, CountGlmEvidence } from '@/domain/estimation'
+import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import type { ArdlEvidence, BayesianGaussianEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
+import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
 import type { DmlRefutationEvidence } from '@/domain/sensitivity'
 import type { LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -31,11 +32,13 @@ type PcmciPlusOutcome = Result<PcmciPlusEvidence, AnalysisWorkerProblem>
 type GrangerOutcome = Result<GrangerSsrEvidence, AnalysisWorkerProblem>
 type LpcmciOutcome = Result<LpcmciEvidence, AnalysisWorkerProblem>
 type DynotearsOutcome = Result<DynotearsEvidence, AnalysisWorkerProblem>
+type DirectLingamOutcome = Result<DirectLingamEvidence, AnalysisWorkerProblem>
 type VarLingamOutcome = Result<VarLingamEvidence, AnalysisWorkerProblem>
 type OcseOutcome = Result<OcseEvidence, AnalysisWorkerProblem>
 type BackdoorIdentificationOutcome = Result<BackdoorIdentificationEvidence, AnalysisWorkerProblem>
 type DagCheckOutcome = Result<DagCheckEvidence, AnalysisWorkerProblem>
 type BackdoorLinearOutcome = Result<BackdoorLinearEvidence, AnalysisWorkerProblem>
+type FrontdoorTwoStageOutcome = Result<FrontdoorTwoStageEvidence, AnalysisWorkerProblem>
 type CountGlmOutcome = Result<CountGlmEvidence, AnalysisWorkerProblem>
 type CausalEffectsOutcome = Result<CausalEffectsEvidence, AnalysisWorkerProblem>
 type CausalImpactOutcome = Result<CausalImpactEvidence, AnalysisWorkerProblem>
@@ -53,18 +56,21 @@ type PanelInterventionOutcome = Result<PanelInterventionEvidence, AnalysisWorker
 type NegbinNutsOutcome = Result<NegbinNutsEvidence, AnalysisWorkerProblem>
 type BayesianGaussianOutcome = Result<BayesianGaussianEvidence, AnalysisWorkerProblem>
 type DiscreteBnOutcome = Result<DiscreteBnEvidence, AnalysisWorkerProblem>
+type BinaryEttOutcome = Result<BinaryEttEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type PendingRun =
   | { readonly kind: 'stationarity'; readonly resolve: (outcome: StationarityOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'pcmci-plus'; readonly resolve: (outcome: PcmciPlusOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'lpcmci'; readonly resolve: (outcome: LpcmciOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'dynotears'; readonly resolve: (outcome: DynotearsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'direct-lingam'; readonly resolve: (outcome: DirectLingamOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'var-lingam'; readonly resolve: (outcome: VarLingamOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'ocse'; readonly resolve: (outcome: OcseOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'granger'; readonly resolve: (outcome: GrangerOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'backdoor-identify'; readonly resolve: (outcome: BackdoorIdentificationOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'dag-check'; readonly resolve: (outcome: DagCheckOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'backdoor-linear'; readonly resolve: (outcome: BackdoorLinearOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'frontdoor-two-stage'; readonly resolve: (outcome: FrontdoorTwoStageOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'count-glm'; readonly resolve: (outcome: CountGlmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'causal-effects-total'; readonly resolve: (outcome: CausalEffectsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'causal-impact'; readonly resolve: (outcome: CausalImpactOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
@@ -82,6 +88,7 @@ type PendingRun =
   | { readonly kind: 'negbin-nuts'; readonly resolve: (outcome: NegbinNutsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'bayesian-gaussian'; readonly resolve: (outcome: BayesianGaussianOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'discrete-bn-query'; readonly resolve: (outcome: DiscreteBnOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'binary-ett'; readonly resolve: (outcome: BinaryEttOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'linear-scm-counterfactual'; readonly resolve: (outcome: LinearScmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
 
 let worker: Worker | null = null
@@ -140,6 +147,10 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a DYNOTEARS request.' })
       return
     }
+    if (run.kind === 'direct-lingam' && parsed.value.kind !== 'direct-lingam-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a DirectLiNGAM request.' })
+      return
+    }
     if (run.kind === 'var-lingam' && parsed.value.kind !== 'var-lingam-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a VAR-LiNGAM request.' })
       return
@@ -162,6 +173,10 @@ const analysisWorker = (): Worker => {
     }
     if (run.kind === 'backdoor-linear' && parsed.value.kind !== 'backdoor-linear-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an adjusted regression request.' })
+      return
+    }
+    if (run.kind === 'frontdoor-two-stage' && parsed.value.kind !== 'frontdoor-two-stage-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a front-door estimate.' })
       return
     }
     if (run.kind === 'count-glm' && parsed.value.kind !== 'count-glm-succeeded') {
@@ -232,6 +247,10 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a discrete BN query.' })
       return
     }
+    if (run.kind === 'binary-ett' && parsed.value.kind !== 'binary-ett-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a binary ETT request.' })
+      return
+    }
     if (run.kind === 'linear-scm-counterfactual' && parsed.value.kind !== 'linear-scm-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a counterfactual request.' })
       return
@@ -250,6 +269,10 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'dynotears' && parsed.value.kind === 'dynotears-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'direct-lingam' && parsed.value.kind === 'direct-lingam-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -274,6 +297,10 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'backdoor-linear' && parsed.value.kind === 'backdoor-linear-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'frontdoor-two-stage' && parsed.value.kind === 'frontdoor-two-stage-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -342,6 +369,10 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'discrete-bn-query' && parsed.value.kind === 'discrete-bn-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'binary-ett' && parsed.value.kind === 'binary-ett-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -508,6 +539,27 @@ export function runGrangerSsrF(
   })
 }
 
+export function runDirectLingam(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<DirectLingamOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'direct-lingam', resolve, onProgress })
+    const command: AnalysisWorkerCommand = {
+      kind: 'direct-lingam', request, values, rows, columns,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
 export function runVarLingam(
   values: Float64Array,
   rows: number,
@@ -533,10 +585,12 @@ export function runVarLingam(
 
 export function identifyBackdoor(graph: {
   readonly nodes: number
+  readonly names: readonly string[]
   readonly edges: readonly (readonly [number, number])[]
   readonly treatment: number
   readonly outcome: number
   readonly unobserved: readonly number[]
+  readonly estimand: 'ate' | 'att'
 }): Promise<BackdoorIdentificationOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
@@ -574,6 +628,37 @@ export function runBackdoorLinear(
       resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }
   })
+}
+
+export function runFrontdoorTwoStage(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly treatment: number
+    readonly mediator: number
+    readonly outcome: number
+    readonly firstStageAdjustment: readonly number[]
+    readonly secondStageAdjustment: readonly number[]
+    readonly controlValue: number
+    readonly treatmentValue: number
+    readonly uncertainty: {
+      readonly kind: 'bootstrap'
+      readonly simulations: number
+      readonly sampleSizeFraction: number
+      readonly confidenceLevel: number
+      readonly seed: number
+    }
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<FrontdoorTwoStageOutcome> {
+  const request = newWorkerRequestId()
+  return post<FrontdoorTwoStageOutcome>(
+    'frontdoor-two-stage',
+    { kind: 'frontdoor-two-stage', request, values, rows, columns, ...design },
+    values,
+    (resolve) => ({ kind: 'frontdoor-two-stage', resolve, onProgress }),
+  )
 }
 
 const post = <Outcome>(kind: PendingRun['kind'], command: AnalysisWorkerCommand, values: Float64Array, register: (resolve: (outcome: Outcome) => void) => PendingRun): Promise<Outcome> =>
@@ -692,6 +777,11 @@ export function runBayesianGaussian(values: Float64Array, rows: number, columns:
 export function runDiscreteBnQuery(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly bins: number; readonly equivalentSampleSize: number }): Promise<DiscreteBnOutcome> {
   const request = newWorkerRequestId()
   return post<DiscreteBnOutcome>('discrete-bn-query', { kind: 'discrete-bn-query', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'discrete-bn-query', resolve }))
+}
+
+export function runBinaryEtt(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[] }): Promise<BinaryEttOutcome> {
+  const request = newWorkerRequestId()
+  return post<BinaryEttOutcome>('binary-ett', { kind: 'binary-ett', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'binary-ett', resolve }))
 }
 
 export function runDagCheck(

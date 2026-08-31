@@ -132,10 +132,14 @@ export const GRANGER_SSR_F_METHOD_ID = methodId('granger-ssr-f')
 export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
 export const LPCMCI_PAR_CORR_METHOD_ID = methodId('lpcmci-parcorr')
 export const DYNOTEARS_METHOD_ID = methodId('dynotears')
+export const DIRECT_LINGAM_METHOD_ID = methodId('direct-lingam')
 export const VAR_LINGAM_METHOD_ID = methodId('var-lingam')
 export const OCSE_METHOD_ID = methodId('ocse')
 export const BACKDOOR_IDENTIFICATION_METHOD_ID = methodId('backdoor-identification')
+export const GRAPHICAL_IDENTIFICATION_METHOD_ID = methodId('graphical-identification-id')
+export const COUNTERFACTUAL_IDENTIFICATION_METHOD_ID = methodId('counterfactual-identification-id-star')
 export const BACKDOOR_LINEAR_REGRESSION_METHOD_ID = methodId('backdoor-linear-regression')
+export const FRONTDOOR_TWO_STAGE_METHOD_ID = methodId('frontdoor-two-stage')
 export const POISSON_GLM_METHOD_ID = methodId('poisson-glm')
 export const NEGATIVE_BINOMIAL_METHOD_ID = methodId('negative-binomial-p')
 export const CAUSAL_EFFECTS_TOTAL_METHOD_ID = methodId('causal-effects-total')
@@ -150,6 +154,7 @@ export const PANEL_INTERVENTION_METHOD_ID = methodId('panel-intervention')
 export const NEGBIN_NUTS_METHOD_ID = methodId('negbin-nuts')
 export const BAYESIAN_GAUSSIAN_METHOD_ID = methodId('bayesian-gaussian')
 export const DISCRETE_BN_METHOD_ID = methodId('discrete-bn-query')
+export const BINARY_ETT_METHOD_ID = methodId('binary-ett-idc-star')
 export const LINEAR_SCM_METHOD_ID = methodId('linear-scm-counterfactual')
 export const PLACEBO_REFUTER_METHOD_ID = methodId('placebo-treatment-refuter')
 export const DATA_SUBSET_REFUTER_METHOD_ID = methodId('data-subset-refuter')
@@ -168,6 +173,9 @@ const RUIZ_DE_VILLA_CH7 = (locator: string): MethodSource => paper('Causal Infer
 const RUIZ_DE_VILLA_CH8 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 8', locator)
 const NESS_CH4 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 4', locator)
 const NESS_CH11 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 11', locator)
+const NESS_CH10 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 10', locator)
+const SHPITSER_PEARL_ID = paper('Identification of joint interventional distributions in recursive semi-Markovian causal models (Shpitser and Pearl, 2006)', 'AAAI 2006, ID algorithm')
+const SHPITSER_PEARL_COUNTERFACTUAL = paper('Complete identification methods for the causal hierarchy (Shpitser and Pearl, 2008)', 'JMLR 9:1941–1979; ID* and IDC*')
 const CINELLI_FORNEY_PEARL = paper('A crash course in good and bad controls (Cinelli, Forney and Pearl, 2022)', 'good, neutral and bad controls')
 const HENCKEL_2019 = paper('Graphical criteria for efficient total effect estimation via adjustment in causal linear models (Henckel, Perković and Maathuis, 2019)', 'efficient adjustment sets')
 const ROTNITZKY_SMUCLER_2019 = paper('Efficient adjustment sets for population average treatment effect estimation in nonparametric causal graphical models (Rotnitzky and Smucler, 2019)', 'efficient adjustment sets')
@@ -200,6 +208,7 @@ const ARKHANGELSKY_2021 = paper('Synthetic Difference-in-Differences (Arkhangels
 const BRODERSEN_2015 = paper('Inferring causal impact using Bayesian structural time-series models (Brodersen and others, 2015)', 'Annals of Applied Statistics 9(1), 247–274')
 const CHERNOZHUKOV_OVB = paper('Long Story Short: Omitted Variable Bias in Causal Machine Learning (Chernozhukov, Cinelli, Newey, Sharma and Syrgkanis, 2022)', 'NBER Working Paper 30302; sensitivity bounds')
 const HYVARINEN_2010 = paper('Estimation of a Structural Vector Autoregression Model Using Non-Gaussianity (Hyvärinen, Zhang, Shimizu and Hoyer, 2010)', 'Journal of Machine Learning Research 11, 1709–1731')
+const SHIMIZU_2011 = paper('DirectLiNGAM: A Direct Method for Learning a Linear Non-Gaussian Structural Equation Model (Shimizu and others, 2011)', 'Journal of Machine Learning Research 12, 1225–1248')
 const PAMFIL_2020 = paper('DYNOTEARS: Structure Learning from Time-Series Data (Pamfil and others, 2020)', 'Proceedings of AISTATS, PMLR 108, 1595–1605')
 const SUN_2015 = paper('Causal Network Inference by Optimal Causation Entropy (Sun, Taylor and Bollt, 2015)', 'SIAM Journal on Applied Dynamical Systems 14(1), 65–83')
 const RUNGE_2020 = paper('Discovering contemporaneous and lagged causal relations in autocorrelated nonlinear time series datasets (Runge, 2020)', 'Proceedings of UAI, PMLR 124; PCMCI+')
@@ -465,6 +474,64 @@ const VAR_LINGAM: MethodDefinition = {
   ],
 }
 
+const DIRECT_LINGAM: MethodDefinition = {
+  id: DIRECT_LINGAM_METHOD_ID,
+  name: 'DirectLiNGAM',
+  family: 'discovery',
+  summary: 'Estimates a causal order and weighted directed graph from independent observations under a linear non-Gaussian acyclic model.',
+  caveats: [
+    {
+      id: caveatId('direct-lingam-independent-observations'),
+      category: 'sampling-structure',
+      requirement: 'Rows are independent observations from one unchanged data-generating process.',
+      consequenceIfUnmet: 'Serial dependence, repeated units, or a changing process can be mistaken for causal structure.',
+      sources: [SHIMIZU_2011],
+    },
+    {
+      id: caveatId('direct-lingam-linear-acyclic-sem'),
+      category: 'functional-form',
+      requirement: 'The variables follow a linear acyclic structural equation model.',
+      consequenceIfUnmet: 'Nonlinearity or feedback can produce an order and weights that do not represent the underlying structure.',
+      sources: [SHIMIZU_2011],
+    },
+    {
+      id: caveatId('direct-lingam-independent-non-gaussian-errors'),
+      category: 'noise-and-dependence',
+      requirement: 'The structural disturbances are mutually independent and non-Gaussian.',
+      consequenceIfUnmet: 'The causal order is not identified by the LiNGAM argument.',
+      sources: [SHIMIZU_2011],
+    },
+    {
+      id: caveatId('direct-lingam-no-hidden-common-causes'),
+      category: 'identification',
+      requirement: 'There is no unmeasured common cause among the selected variables.',
+      consequenceIfUnmet: 'Latent confounding can be reported as a directed edge.',
+      sources: [SHIMIZU_2011],
+    },
+    {
+      id: caveatId('direct-lingam-pruning'),
+      category: 'computation',
+      requirement: 'The reported adjacency uses adaptive-lasso pruning after the causal order is selected.',
+      consequenceIfUnmet: 'A zero weight is treated as absence of a relation without accounting for the pruning rule.',
+      sources: [SHIMIZU_2011, hirmos('crates/causal-core/src/var_lingam.rs#direct_lingam')],
+    },
+    {
+      id: caveatId('direct-lingam-browser-boundary'),
+      category: 'missingness',
+      requirement: 'Between 2 and 12 complete, varying numeric columns are selected.',
+      consequenceIfUnmet: 'The browser refuses the run before the numerical kernel is called.',
+      sources: [hirmos('crates/analysis-wasm/src/discovery.rs#direct_lingam_evidence')],
+    },
+    {
+      id: caveatId('direct-lingam-weight-interpretation'),
+      category: 'interpretation',
+      requirement: 'The order and weights are candidate structural evidence under the model assumptions, not identified intervention effects.',
+      consequenceIfUnmet: 'A fitted structural coefficient is presented as the effect of an intervention.',
+      sources: [SHIMIZU_2011],
+    },
+  ],
+}
+
 const DYNOTEARS: MethodDefinition = {
   id: DYNOTEARS_METHOD_ID,
   name: 'DYNOTEARS',
@@ -604,9 +671,69 @@ const BACKDOOR_IDENTIFICATION: MethodDefinition = {
     {
       id: caveatId('backdoor-not-the-only-strategy'),
       category: 'interpretation',
-      requirement: 'A refusal means no back-door set over measured nodes; front-door and instrument routes are not searched.',
-      consequenceIfUnmet: 'Failure of back-door identification is incorrectly treated as failure of every possible identification strategy.',
-      sources: [NESS_CH11('§11.3 back-door, instrument and front-door estimands'), hirmos('crates/analysis-wasm/src/lib.rs#backdoor_identification')],
+      requirement: 'The adjustment-set result and the general ID result are reported separately. A general identifying expression need not be estimable by an adjustment estimator.',
+      consequenceIfUnmet: 'An identified functional is passed to an estimator that targets a different functional.',
+      sources: [NESS_CH10('query, model, identification, estimation workflow'), NESS_CH11('§11.3 back-door and front-door estimands')],
+    },
+  ],
+}
+
+const GRAPHICAL_IDENTIFICATION: MethodDefinition = {
+  id: GRAPHICAL_IDENTIFICATION_METHOD_ID,
+  name: 'Graphical identification (ID)',
+  family: 'identification',
+  summary: 'Derives an observational expression for an interventional distribution from an acyclic directed mixed graph, or returns the hedge that prevents identification.',
+  caveats: [
+    {
+      id: caveatId('id-causal-model'),
+      category: 'identification',
+      requirement: 'The directed and latent-confounding edges encode the relevant causal model, and the observed distribution is compatible with that model.',
+      consequenceIfUnmet: 'The returned expression identifies the query in the recorded graph, not necessarily in the data-generating process.',
+      sources: [SHPITSER_PEARL_ID, NESS_CH10('queries, models, and identification')],
+    },
+    {
+      id: caveatId('id-level-two-query'),
+      category: 'interpretation',
+      requirement: 'This implementation identifies unconditional level-2 queries P(Y | do(X)) from observational P(V).',
+      consequenceIfUnmet: 'Conditional interventions or level-3 counterfactual queries are treated as if ID, rather than IDC or ID*/IDC*, had established them.',
+      sources: [SHPITSER_PEARL_ID, NESS_CH10('ID, IDC, ID*, and IDC*')],
+    },
+    {
+      id: caveatId('id-estimator-separate'),
+      category: 'interpretation',
+      requirement: 'Identification supplies a functional; estimation requires an implementation that evaluates that same functional.',
+      consequenceIfUnmet: 'A back-door estimator is used for a front-door or more general ID expression.',
+      sources: [NESS_CH10('query → model → identify → estimate')],
+    },
+  ],
+}
+
+const COUNTERFACTUAL_IDENTIFICATION: MethodDefinition = {
+  id: COUNTERFACTUAL_IDENTIFICATION_METHOD_ID,
+  name: 'Counterfactual identification (ID*/IDC*)',
+  family: 'identification',
+  summary: 'Identifies the conditional potential-outcome distributions required for the binary effect on the treated, or records that the query is not identifiable from the observational distribution.',
+  caveats: [
+    {
+      id: caveatId('id-star-causal-model'),
+      category: 'identification',
+      requirement: 'The directed and latent-confounding edges encode the causal model relevant to the counterfactual query.',
+      consequenceIfUnmet: 'The expressions are identified in the recorded graph, not necessarily in the data-generating process.',
+      sources: [SHPITSER_PEARL_COUNTERFACTUAL, NESS_CH10('counterfactual graphs and ID*/IDC*')],
+    },
+    {
+      id: caveatId('id-star-query-scope'),
+      category: 'interpretation',
+      requirement: 'The current product query is binary ETT: E[Y(1) − Y(0) | X=1].',
+      consequenceIfUnmet: 'Identification of this ETT is presented as identification of a different counterfactual target such as PN, PS, or PNS.',
+      sources: [SHPITSER_PEARL_COUNTERFACTUAL, NESS_CH10('level-3 counterfactual queries')],
+    },
+    {
+      id: caveatId('id-star-estimator-separate'),
+      category: 'interpretation',
+      requirement: 'The identified expressions and their numerical evaluation remain separate records.',
+      consequenceIfUnmet: 'A symbolic identification result is reported as an estimate before the observed distribution has been evaluated.',
+      sources: [NESS_CH10('query → model → identify → estimate')],
     },
   ],
 }
@@ -665,6 +792,43 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
       requirement: 'On time-series rows the treatment and outcome are stationary in levels, or differenced; I(1) levels need a cointegration route.',
       consequenceIfUnmet: 'A regression between integrated series is spurious.',
       sources: [GRANGER_NEWBOLD_1974, hirmos('src/domain/stationarityAssessment.ts#assessStationarity')],
+    },
+  ],
+}
+
+const FRONTDOOR_TWO_STAGE: MethodDefinition = {
+  id: FRONTDOOR_TWO_STAGE_METHOD_ID,
+  name: 'Linear front-door regression',
+  family: 'estimation',
+  summary: 'Fits the treatment-to-mediator and mediator-to-outcome regressions and multiplies their intervention contrasts.',
+  caveats: [
+    {
+      id: caveatId('frontdoor-identified-mediator'),
+      category: 'identification',
+      requirement: 'An observed mediator satisfies all three front-door conditions for the treatment and outcome in the recorded graph.',
+      consequenceIfUnmet: 'The product of the two regression coefficients does not identify the requested intervention effect.',
+      sources: [NESS_CH10('front-door identification'), NESS_CH11('§11.3 front-door estimand'), PEARL_2009('§3.3.2 front-door criterion')],
+    },
+    {
+      id: caveatId('frontdoor-linear-stages'),
+      category: 'functional-form',
+      requirement: 'Both stage regressions are linear and additive over the requested intervention contrast.',
+      consequenceIfUnmet: 'Multiplying two constant slopes does not evaluate the nonparametric front-door functional.',
+      sources: [NESS_CH11('§11.4 two-stage regression for the front-door estimand')],
+    },
+    {
+      id: caveatId('frontdoor-single-mediator'),
+      category: 'functional-form',
+      requirement: 'The identified front-door set contains one mediator.',
+      consequenceIfUnmet: 'The two-stage implementation cannot represent the joint mediator intervention.',
+      sources: [NESS_CH11('§11.4 front-door estimation with one mediator')],
+    },
+    {
+      id: caveatId('frontdoor-bootstrap-rows'),
+      category: 'noise-and-dependence',
+      requirement: 'The row bootstrap is appropriate for the sampling design; dependent rows require a dependence-aware resampling scheme.',
+      consequenceIfUnmet: 'The confidence interval does not represent the estimator’s sampling variation.',
+      sources: [NESS_CH11('§11.4 confidence interval for the front-door estimate')],
     },
   ],
 }
@@ -1368,6 +1532,54 @@ const DISCRETE_BN: MethodDefinition = {
   ],
 }
 
+const BINARY_ETT: MethodDefinition = {
+  id: BINARY_ETT_METHOD_ID,
+  name: 'Binary ETT by IDC*',
+  family: 'estimation',
+  summary: 'Evaluates the identified expressions for E[Y(1) | X=1] and E[Y(0) | X=1] against the observed binary joint distribution and reports their difference.',
+  summaryTex: {
+    tex: String.raw`\mathrm{ETT}=\mathbb{E}[Y(1)-Y(0)\mid X=1]`,
+    plain: 'ETT = E[Y(1) − Y(0) | X=1]',
+  },
+  caveats: [
+    {
+      id: caveatId('ett-identified-expression'),
+      category: 'identification',
+      requirement: 'IDC* identifies both conditional potential-outcome distributions for the recorded graph.',
+      consequenceIfUnmet: 'The observed distribution does not determine the requested ETT under the graph.',
+      sources: [SHPITSER_PEARL_COUNTERFACTUAL, NESS_CH10('ID* and IDC*')],
+    },
+    {
+      id: caveatId('ett-binary-table'),
+      category: 'functional-form',
+      requirement: 'Treatment, outcome, and every other observed graph variable are recorded as 0 or 1; no automatic discretisation is applied.',
+      consequenceIfUnmet: 'The empirical binary distribution does not represent the supplied variables.',
+      sources: [SHPITSER_PEARL_COUNTERFACTUAL, hirmos('crates/causal-core/src/counterfactual_evaluator.rs#estimate_binary_ett')],
+    },
+    {
+      id: caveatId('ett-positive-conditioning-mass'),
+      category: 'finite-sample',
+      requirement: 'Treated observations and every conditional configuration used by the identified expressions have positive observed mass.',
+      consequenceIfUnmet: 'The plug-in conditional probability has a zero denominator and the run is refused.',
+      sources: [PEARL_2009('§3.2 positivity for adjustment'), NESS_CH11('positivity and support')],
+    },
+    {
+      id: caveatId('ett-independent-rows'),
+      category: 'sampling-structure',
+      requirement: 'Rows are independent observational units.',
+      consequenceIfUnmet: 'Repeated or serially dependent rows are counted as independent observations in the empirical distribution.',
+      sources: [NESS_CH11('observational estimation assumptions')],
+    },
+    {
+      id: caveatId('ett-no-interval'),
+      category: 'interpretation',
+      requirement: 'The result is a plug-in point estimate; this implementation does not report a sampling interval.',
+      consequenceIfUnmet: 'The point estimate is presented with unsupported precision.',
+      sources: [hirmos('crates/causal-core/src/counterfactual_evaluator.rs#estimate_binary_ett')],
+    },
+  ],
+}
+
 const LINEAR_SCM: MethodDefinition = {
   id: LINEAR_SCM_METHOD_ID,
   name: 'Linear SCM counterfactual',
@@ -1427,10 +1639,14 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   PCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
   DYNOTEARS,
+  DIRECT_LINGAM,
   VAR_LINGAM,
   OCSE,
   BACKDOOR_IDENTIFICATION,
+  GRAPHICAL_IDENTIFICATION,
+  COUNTERFACTUAL_IDENTIFICATION,
   BACKDOOR_LINEAR_REGRESSION,
+  FRONTDOOR_TWO_STAGE,
   POISSON_GLM,
   NEGATIVE_BINOMIAL,
   CAUSAL_EFFECTS_TOTAL,
@@ -1445,6 +1661,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   NEGBIN_NUTS,
   BAYESIAN_GAUSSIAN,
   DISCRETE_BN,
+  BINARY_ETT,
   LINEAR_SCM,
   PLACEBO_REFUTER,
   DATA_SUBSET_REFUTER,
@@ -1460,14 +1677,15 @@ export const REFUTER_METHODS: NonEmptyArray<MethodDefinition> = [PLACEBO_REFUTER
 export const SENSITIVITY_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [LJUNG_BOX, SHAPIRO_WILK]
 export const SERIES_STRUCTURE_METHODS: NonEmptyArray<MethodDefinition> = [PELT, STL]
 
-export const IDENTIFICATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_IDENTIFICATION]
+export const IDENTIFICATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_IDENTIFICATION, GRAPHICAL_IDENTIFICATION, COUNTERFACTUAL_IDENTIFICATION]
 export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_SCM]
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
+export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [DIRECT_LINGAM]
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   GRANGER_SSR_F,
   PCMCI_PLUS_PAR_CORR,

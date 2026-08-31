@@ -3,6 +3,7 @@ import { Icon } from '@/components/Icon'
 import { HirmosMark } from '@/components/HirmosMark'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
+import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { useShellLayout } from '@/components/shell/useShellLayout'
@@ -33,36 +34,42 @@ import {
   stepWorkflow,
   type SelectedSource,
 } from '@/domain/workflow'
+import { identificationAllowsEstimation } from '@/domain/study'
 
-const DagWorkspace = lazy(async () => {
-  const module = await import('@/components/dag/DagWorkspace')
-  return { default: module.DagWorkspace }
-})
+const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
+const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
+const loadEstimationPanel = () => import('@/components/estimation/EstimationPanel')
+const loadSensitivityPanel = () => import('@/components/sensitivity/SensitivityPanel')
+const loadCounterfactualPanel = () => import('@/components/counterfactual/CounterfactualPanel')
+const loadResultsPanel = () => import('@/components/results/ResultsPanel')
 
-const StudyDesignPanel = lazy(async () => {
-  const module = await import('@/components/study/StudyDesignPanel')
-  return { default: module.StudyDesignPanel }
-})
+/** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk `lazy` will ask for. */
+const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
+  dag: loadDagWorkspace,
+  study: loadStudyDesignPanel,
+  estimation: loadEstimationPanel,
+  sensitivity: loadSensitivityPanel,
+  counterfactual: loadCounterfactualPanel,
+  results: loadResultsPanel,
+}
 
-const EstimationPanel = lazy(async () => {
-  const module = await import('@/components/estimation/EstimationPanel')
-  return { default: module.EstimationPanel }
-})
+/** A failed prefetch is dropped silently; navigation retries the import for real. */
+const prefetchChapter = (chapter: ChapterId): void => {
+  const load = PANEL_LOADERS[chapter]
+  if (load !== undefined) void load().catch(() => undefined)
+}
 
-const SensitivityPanel = lazy(async () => {
-  const module = await import('@/components/sensitivity/SensitivityPanel')
-  return { default: module.SensitivityPanel }
-})
+const DagWorkspace = lazy(async () => ({ default: (await loadDagWorkspace()).DagWorkspace }))
 
-const CounterfactualPanel = lazy(async () => {
-  const module = await import('@/components/counterfactual/CounterfactualPanel')
-  return { default: module.CounterfactualPanel }
-})
+const StudyDesignPanel = lazy(async () => ({ default: (await loadStudyDesignPanel()).StudyDesignPanel }))
 
-const ResultsPanel = lazy(async () => {
-  const module = await import('@/components/results/ResultsPanel')
-  return { default: module.ResultsPanel }
-})
+const EstimationPanel = lazy(async () => ({ default: (await loadEstimationPanel()).EstimationPanel }))
+
+const SensitivityPanel = lazy(async () => ({ default: (await loadSensitivityPanel()).SensitivityPanel }))
+
+const CounterfactualPanel = lazy(async () => ({ default: (await loadCounterfactualPanel()).CounterfactualPanel }))
+
+const ResultsPanel = lazy(async () => ({ default: (await loadResultsPanel()).ResultsPanel }))
 
 type Chapter = Omit<ChapterEntry, 'status'>
 
@@ -300,7 +307,7 @@ function App() {
   const validatedDag = workflow.kind === 'profiled'
     && workflow.dagDocuments.some((document) => document.current.validation.kind === 'structurally-valid')
   const identifiedStudy = workflow.kind === 'profiled'
-    && workflow.identifications.some((identification) => identification.result.kind === 'identified')
+    && workflow.identifications.some((identification) => identificationAllowsEstimation(identification.result.kind))
 
   const chapterIsAvailable = (chapter: ChapterId): boolean => {
     if (chapter === 'projects') return workflow.kind === 'awaiting-project'
@@ -348,6 +355,22 @@ function App() {
   const requestedChapter = route.ok && route.value.kind === 'chapter' ? route.value.chapter : defaultChapter
   const activeChapter = chapterIsAvailable(requestedChapter) ? requestedChapter : defaultChapter
   const activeName = CHAPTERS.find((chapter) => chapter.id === activeChapter)?.name ?? 'Hirmos'
+
+  // The workflow is linear, so on idle the next chapter's chunk and the chart registry are warmed;
+  // the first navigation then finds its module already resolved instead of paying the fetch.
+  useEffect(() => {
+    const warm = () => {
+      const next = CHAPTERS[CHAPTERS.findIndex((chapter) => chapter.id === activeChapter) + 1]
+      if (next !== undefined) prefetchChapter(next.id)
+      void import('@/charts/registry')
+    }
+    if (typeof window.requestIdleCallback !== 'function') {
+      const handle = window.setTimeout(warm, 300)
+      return () => window.clearTimeout(handle)
+    }
+    const handle = window.requestIdleCallback(warm)
+    return () => window.cancelIdleCallback(handle)
+  }, [activeChapter])
 
   // The URL always names the chapter on screen: a legacy `?chapter=` link and a gated chapter both
   // rewrite to the canonical path without adding history, and the tab title follows.
@@ -430,7 +453,7 @@ function App() {
       skipTarget="stage"
       mode={fullBleed ? 'full' : 'reading'}
       header={header}
-      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} phoneOpen={phoneNavOpen} onPhoneOpen={() => setPhoneNavOpen(true)} onPhoneClose={() => setPhoneNavOpen(false)} />}
+      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} onPrefetch={prefetchChapter} phoneOpen={phoneNavOpen} onPhoneOpen={() => setPhoneNavOpen(true)} onPhoneClose={() => setPhoneNavOpen(false)} />}
       stage={(
         <>
             {!route.ok && (
@@ -623,6 +646,7 @@ function App() {
                 )}
                 {activeChapter === 'discovery' && workflow.prepared !== null && (
                   <DiscoveryPanel
+                    key={workflow.prepared.id}
                     onActivity={reportActivity.discovery}
                     source={workflow.source}
                     profile={workflow.profile}
@@ -634,7 +658,7 @@ function App() {
                 )}
                 {activeChapter === 'dag' && workflow.prepared !== null && (
                   <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<p role="status" className="text-body text-faint">Loading DAG editor…</p>}>
+                  <Suspense fallback={<ChapterSkeleton label="Loading DAG editor…" />}>
                     <DagWorkspace
                       key={workflow.prepared.id}
                       source={workflow.source}
@@ -657,7 +681,7 @@ function App() {
                 )}
                 {activeChapter === 'study' && workflow.prepared !== null && (
                   <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<p role="status" className="text-body text-faint">Loading study design…</p>}>
+                  <Suspense fallback={<ChapterSkeleton label="Loading study design…" />}>
                     <StudyDesignPanel
                     onActivity={reportActivity.study}
                       key={workflow.prepared.id}
@@ -676,7 +700,7 @@ function App() {
                 )}
                 {activeChapter === 'estimation' && workflow.prepared !== null && (
                   <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<p role="status" className="text-body text-faint">Loading estimation…</p>}>
+                  <Suspense fallback={<ChapterSkeleton label="Loading estimation…" />}>
                     <EstimationPanel
                     onActivity={reportActivity.estimation}
                       key={workflow.prepared.id}
@@ -698,7 +722,7 @@ function App() {
                 )}
                 {activeChapter === 'sensitivity' && workflow.prepared !== null && (
                   <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<p role="status" className="text-body text-faint">Loading sensitivity…</p>}>
+                  <Suspense fallback={<ChapterSkeleton label="Loading sensitivity…" />}>
                     <SensitivityPanel
                     onActivity={reportActivity.sensitivity}
                       key={workflow.prepared.id}
@@ -716,7 +740,7 @@ function App() {
                 )}
                 {activeChapter === 'counterfactual' && workflow.prepared !== null && (
                   <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<p role="status" className="text-body text-faint">Loading counterfactuals…</p>}>
+                  <Suspense fallback={<ChapterSkeleton label="Loading counterfactuals…" />}>
                     <CounterfactualPanel
                     onActivity={reportActivity.counterfactual}
                       key={workflow.prepared.id}
@@ -734,7 +758,7 @@ function App() {
                 )}
                 {activeChapter === 'results' && workflow.prepared !== null && (
                   <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<p role="status" className="text-body text-faint">Loading results…</p>}>
+                  <Suspense fallback={<ChapterSkeleton label="Loading results…" />}>
                     <ResultsPanel
                       key={workflow.prepared.id}
                       source={workflow.source}

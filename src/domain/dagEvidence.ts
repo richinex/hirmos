@@ -36,7 +36,7 @@ export type DiscoveryCandidate =
     }
   | CandidateBase & {
       readonly kind: 'weighted-directed'
-      readonly method: 'DYNOTEARS' | 'VAR-LiNGAM'
+      readonly method: 'DirectLiNGAM' | 'DYNOTEARS' | 'VAR-LiNGAM'
       readonly lag: number
       readonly weight: number
     }
@@ -50,7 +50,7 @@ export type DiscoveryCandidate =
 
 export interface DiscoveryEvidenceView {
   readonly run: DiscoveryRunArtifact
-  readonly method: 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
+  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
   readonly semantics: 'stationary-lag-graph' | 'pag' | 'weighted-directed-evidence' | 'lagged-information'
   readonly candidates: readonly DiscoveryCandidate[]
 }
@@ -117,11 +117,13 @@ const matrixCandidates = (
 
 /** Every nonzero fitted weight, strongest first; weights[lag][source][target] with lag 0 contemporaneous. */
 const weightedCandidates = (
-  run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' | 'var-lingam-run' }>,
-  method: 'DYNOTEARS' | 'VAR-LiNGAM',
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>,
+  method: 'DirectLiNGAM' | 'DYNOTEARS' | 'VAR-LiNGAM',
 ): readonly DiscoveryCandidate[] => {
   const candidates: Extract<DiscoveryCandidate, { readonly kind: 'weighted-directed' }>[] = []
-  const matrices = [run.result.contemporaneousWeights, ...run.result.laggedWeights]
+  const matrices = run.kind === 'direct-lingam-run'
+    ? [run.result.weights]
+    : [run.result.contemporaneousWeights, ...run.result.laggedWeights]
   for (let lag = 0; lag < matrices.length; lag += 1) {
     for (let sourceIndex = 0; sourceIndex < run.result.variables; sourceIndex += 1) {
       for (let targetIndex = 0; targetIndex < run.result.variables; targetIndex += 1) {
@@ -154,6 +156,12 @@ const weightedCandidates = (
 
 export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvidenceView {
   switch (run.kind) {
+    case 'direct-lingam-run': return {
+      run,
+      method: 'DirectLiNGAM',
+      semantics: 'weighted-directed-evidence',
+      candidates: weightedCandidates(run, 'DirectLiNGAM'),
+    }
     case 'pcmci-plus-run': return {
       run,
       method: 'PCMCI+',
@@ -212,7 +220,7 @@ export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
   switch (view.semantics) {
     case 'stationary-lag-graph': return 'Conditional-dependence marks over lagged variables'
     case 'pag': return 'Partial ancestral graph marks; circles and bidirected endpoints remain unresolved'
-    case 'weighted-directed-evidence': return 'Fitted directed dynamic weights'
+    case 'weighted-directed-evidence': return 'Fitted directed structural weights'
     case 'lagged-information': return 'Selected lagged conditional-information relations'
     default: return assertNever(view.semantics)
   }

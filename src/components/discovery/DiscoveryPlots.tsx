@@ -10,7 +10,7 @@ import { lagGraphFromRun } from '@/domain/lagGraph'
 import { LagGraphViews } from './LagGraphViews'
 
 type TimeGraphRun = Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>
-type WeightRun = Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' | 'var-lingam-run' }>
+type WeightRun = Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>
 type OcseRun = Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }>
 
 function LagSelect({ lags, value, onChange, contemporaneous }: { readonly lags: number; readonly value: number; readonly onChange: (lag: number) => void; readonly contemporaneous: boolean }) {
@@ -56,22 +56,29 @@ export function WeightPlot({ run }: { readonly run: WeightRun }) {
   const theme = useChartTheme()
   const [lag, setLag] = useState(0)
   const names = run.variables.map((variable) => variable.name)
-  const matrices = [run.result.contemporaneousWeights, ...run.result.laggedWeights]
+  const matrices = run.kind === 'direct-lingam-run'
+    ? [run.result.weights]
+    : [run.result.contemporaneousWeights, ...run.result.laggedWeights]
+  const method = run.kind === 'direct-lingam-run' ? 'DirectLiNGAM' : run.kind === 'var-lingam-run' ? 'VAR-LiNGAM' : 'DYNOTEARS'
   const option = useMemo(() => matrixHeatmapOption({
-    title: `${run.kind === 'var-lingam-run' ? 'VAR-LiNGAM' : 'DYNOTEARS'} weights at lag ${lag}`,
+    title: run.kind === 'direct-lingam-run' ? 'DirectLiNGAM weights' : `${method} weights at lag ${lag}`,
     sources: names,
     targets: names,
     values: (matrices[lag] ?? []).map((targets) => targets.map((weight) => (weight === 0 ? null : weight))),
     scale: 'signed',
     quantity: 'weight',
-  }, theme), [lag, matrices, names, run.kind, theme])
+  }, theme), [lag, matrices, method, names, run.kind, theme])
   return (
     <div className="mt-3 rounded-lg border border-hair bg-well p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={label('m-0 text-faint')}>Nonzero weights · source(t−lag) → target(t)</p>
-        <LagSelect lags={run.result.laggedWeights.length} value={lag} onChange={setLag} contemporaneous />
+        <p className={label('m-0 text-faint')}>{run.kind === 'direct-lingam-run' ? 'Nonzero weights · source → target' : 'Nonzero weights · source(t−lag) → target(t)'}</p>
+        {run.kind !== 'direct-lingam-run' && <LagSelect lags={run.result.laggedWeights.length} value={lag} onChange={setLag} contemporaneous />}
       </div>
-      <EChart option={option} label={`Weight heatmap at lag ${lag}`} className="h-[clamp(220px,34cqb,320px)]" />
+      <EChart
+        option={option}
+        label={run.kind === 'direct-lingam-run' ? 'DirectLiNGAM weight heatmap' : `Weight heatmap at lag ${lag}`}
+        className="h-[clamp(220px,34cqb,320px)]"
+      />
     </div>
   )
 }
@@ -109,4 +116,3 @@ export function StructurePlot({ run, label: name }: { readonly run: DiscoveryRun
     </div>
   )
 }
-

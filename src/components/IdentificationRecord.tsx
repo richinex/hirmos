@@ -120,10 +120,31 @@ export function IdentificationRecord({ identification }: { readonly identificati
       <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
         <span className="block text-body font-medium text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment set</p>
-        <p className="mb-1 mt-1 text-body text-muted">Front-door, instrumental-variable and other identification strategies were not assessed.</p>
+        <p className="mb-1 mt-1 text-body text-muted">The general ID result and its hedge, when present, are listed below.</p>
         <ul className="m-0 list-disc pl-4 text-body text-muted">
           {identification.reasons.map((reason) => <li key={reason.kind + describeIdentificationFailure(reason)}>{describeIdentificationFailure(reason)}</li>)}
         </ul>
+      </section>
+    )
+  }
+  if (identification.kind === 'graphically-identified' || identification.kind === 'counterfactually-identified') {
+    const assumed = identification.basis.filter(isOwned)
+    const derived = identification.basis.filter((entry) => !isOwned(entry))
+    return (
+      <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
+        <span className="block text-body font-medium text-ink">Identification record</span>
+        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {identification.kind === 'graphically-identified' ? 'The ID algorithm returned an observational expression' : 'IDC* returned the two expressions required for binary ETT'}</p>
+        <p className="mb-2 mt-1 text-body text-muted">{identification.kind === 'graphically-identified' ? 'No back-door adjustment estimator is enabled for this expression.' : 'The binary ETT evaluator is enabled when every observed graph variable contains only 0 and 1.'}</p>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
+            <Icon name="expand_more" size={14} className="transition-transform duration-150 group-open:rotate-180" />
+            Show the full record · {plural(identification.basis.length, 'entry').replace('entrys', 'entries')}
+          </summary>
+          <div className="mt-2 space-y-3">
+            {assumed.length > 0 && <ul className="m-0 list-none space-y-2 p-0">{assumed.map((entry) => <OwnedRow key={entry.id} entry={entry} />)}</ul>}
+            <ul className="m-0 list-none space-y-2 p-0">{derived.map((entry) => <DerivedRow key={entry.id} entry={entry} />)}</ul>
+          </div>
+        </details>
       </section>
     )
   }

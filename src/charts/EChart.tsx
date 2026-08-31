@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { EChartsCoreOption, EChartsType } from 'echarts/core'
-import type { ChartRenderer } from './registry'
 
 /**
  * The one chart host. The registry loads lazily on first mount so chart code stays out of the initial
@@ -16,10 +15,9 @@ const describe = (option: EChartsCoreOption): string | undefined => {
   return typeof description === 'string' ? description : undefined
 }
 
-export function EChart({ option, label, renderer = 'svg', className = 'h-[260px]', style, testId }: {
+export function EChart({ option, label, className = 'h-[260px]', style, testId }: {
   readonly option: EChartsCoreOption
   readonly label: string
-  readonly renderer?: ChartRenderer
   readonly className?: string
   /** Explicit pixel size for charts with a natural size, such as the lag grid. */
   readonly style?: React.CSSProperties
@@ -29,6 +27,7 @@ export function EChart({ option, label, renderer = 'svg', className = 'h-[260px]
   const chart = useRef<EChartsType | null>(null)
   const latestOption = useRef(option)
   const [failed, setFailed] = useState(false)
+  const [mounted, setMounted] = useState(false)
   latestOption.current = option
 
   useEffect(() => {
@@ -39,9 +38,10 @@ export function EChart({ option, label, renderer = 'svg', className = 'h-[260px]
       if (cancelled || !element) return
       const sized = () => element.clientWidth > 0 && element.clientHeight > 0
       const mount = () => {
-        const instance = createChart(element, renderer)
+        const instance = createChart(element)
         chart.current = instance
         instance.setOption(latestOption.current, { notMerge: true })
+        setMounted(true)
       }
       // A host in a hidden pane has no size yet; the chart mounts when it first gets one.
       resize = new ResizeObserver(() => {
@@ -58,10 +58,10 @@ export function EChart({ option, label, renderer = 'svg', className = 'h-[260px]
       chart.current?.dispose()
       chart.current = null
     }
-  }, [renderer])
+  }, [])
 
   useEffect(() => { chart.current?.setOption(option, { notMerge: true }) }, [option])
 
   if (failed) return <p role="alert" className="grid min-h-40 place-items-center text-body text-danger">The chart could not be loaded.</p>
-  return <div ref={host} role="img" aria-label={label} aria-description={describe(option)} data-testid={testId} style={style} className={`min-w-0 w-full ${className}`} />
+  return <div ref={host} role="img" aria-label={label} aria-description={describe(option)} data-testid={testId} style={style} aria-busy={mounted ? undefined : true} className={`min-w-0 w-full ${className}${mounted ? '' : ' skeleton rounded-lg'}`} />
 }

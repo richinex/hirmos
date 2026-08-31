@@ -14,6 +14,7 @@ import { lagGraphFromRun } from '@/domain/lagGraph'
 
 const methodTitle = (run: DiscoveryRunArtifact): string => {
   switch (run.kind) {
+    case 'direct-lingam-run': return 'DirectLiNGAM'
     case 'pcmci-plus-run': return 'PCMCI+'
     case 'lpcmci-run': return 'LPCMCI'
     case 'dynotears-run': return 'DYNOTEARS'
@@ -25,6 +26,7 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
 
 const variablesOf = (view: DiscoveryEvidenceView) => {
   switch (view.run.kind) {
+    case 'direct-lingam-run':
     case 'pcmci-plus-run':
     case 'lpcmci-run':
     case 'dynotears-run':

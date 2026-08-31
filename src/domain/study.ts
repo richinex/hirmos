@@ -4,7 +4,7 @@ import { analyseDagCausalFlow, describeDagCausalRole, type DagCausalFlow, type D
 import { inspectDagStudyBinding, type DagStudyBindingProblem } from './dagValidation'
 import type { ColumnId } from './dataset'
 import { assertNever, brand, err, isNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import { BACKDOOR_IDENTIFICATION_METHOD_ID } from './methods'
+import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID } from './methods'
 import type { PreparedDatasetArtifact, PreparedDatasetVersionId } from './preprocessing'
 
 /**
@@ -292,22 +292,62 @@ export function describeStudyDesignCategory(category: StudyDesignCategory): stri
 /** The façade's identification command, derived from the specification and nothing else. */
 export function backdoorIdentificationCommand(study: StudySpecification): {
   readonly nodes: number
+  readonly names: readonly string[]
   readonly edges: readonly (readonly [number, number])[]
   readonly treatment: number
   readonly outcome: number
   readonly unobserved: readonly number[]
+  readonly estimand: 'ate' | 'att'
 } {
   const position = (node: DagNodeId): number => study.graph.nodes.findIndex((candidate) => candidate.node === node)
   return {
     nodes: study.graph.nodes.length,
+    names: study.graph.nodes.map((node) => node.name),
     edges: study.graph.edges,
     treatment: position(study.treatment.node),
     outcome: position(study.outcome.node),
     unobserved: study.graph.nodes.flatMap((node, index) => (node.column === null ? [index] : [])),
+    estimand: study.estimand.kind === 'average-treatment-effect' ? 'ate' : 'att',
   }
 }
 
 const adjustmentIndexSetSchema = z.array(z.number().int().nonnegative())
+const projectedEdgeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
+const latentProjectionEvidenceSchema = z.object({
+  directedEdges: z.array(projectedEdgeSchema),
+  bidirectedEdges: z.array(projectedEdgeSchema),
+}).strict()
+
+const graphicalIdentificationEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('identified'),
+    expression: z.string().min(1),
+    latex: z.string().min(1),
+    projection: latentProjectionEvidenceSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('unidentifiable'),
+    hedgeGraph: z.array(z.number().int().nonnegative()).min(1),
+    hedgeSubgraph: z.array(z.number().int().nonnegative()).min(1),
+    projection: latentProjectionEvidenceSchema,
+  }).strict(),
+])
+export type GraphicalIdentificationEvidence = z.infer<typeof graphicalIdentificationEvidenceSchema>
+
+const frontdoorSetEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('identified'), mediators: z.array(z.number().int().nonnegative()).min(1) }).strict(),
+  z.object({ kind: z.literal('notIdentified') }).strict(),
+])
+
+const counterfactualIdentificationEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('notApplicable') }).strict(),
+  z.object({
+    kind: z.literal('identified'),
+    treatedExpression: z.string().min(1),
+    untreatedExpression: z.string().min(1),
+  }).strict(),
+  z.object({ kind: z.literal('unidentifiable'), reason: z.string().min(1) }).strict(),
+])
 
 export const backdoorIdentificationEvidenceSchema = z.object({
   kind: z.literal('backdoorIdentification'),
@@ -324,6 +364,9 @@ export const backdoorIdentificationEvidenceSchema = z.object({
     }).strict(),
     z.object({ kind: z.literal('notIdentified') }).strict(),
   ]),
+  frontdoor: frontdoorSetEvidenceSchema,
+  graphicalIdentification: graphicalIdentificationEvidenceSchema,
+  counterfactualIdentification: counterfactualIdentificationEvidenceSchema,
 }).strict()
 
 export type BackdoorIdentificationEvidence = z.infer<typeof backdoorIdentificationEvidenceSchema>
@@ -336,9 +379,24 @@ export function parseBackdoorIdentificationEvidence(value: unknown): Result<Back
   const adjustmentNodes = parsed.data.result.kind === 'identified'
     ? [...parsed.data.result.canonicalSet, ...parsed.data.result.minimalSets.flat()]
     : []
-  const inRange = [parsed.data.treatment, parsed.data.outcome, ...parsed.data.unobserved, ...adjustmentNodes]
+  const graphicalNodes = parsed.data.graphicalIdentification.kind === 'unidentifiable'
+    ? [...parsed.data.graphicalIdentification.hedgeGraph, ...parsed.data.graphicalIdentification.hedgeSubgraph]
+    : []
+  const frontdoorNodes = parsed.data.frontdoor.kind === 'identified' ? parsed.data.frontdoor.mediators : []
+  const projectedNodes = [
+    ...parsed.data.graphicalIdentification.projection.directedEdges.flat(),
+    ...parsed.data.graphicalIdentification.projection.bidirectedEdges.flat(),
+  ]
+  const inRange = [parsed.data.treatment, parsed.data.outcome, ...parsed.data.unobserved, ...adjustmentNodes, ...graphicalNodes, ...frontdoorNodes, ...projectedNodes]
     .every((index) => index < parsed.data.nodes)
   if (!inRange) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'An index exceeds the node count.' })
+  if (parsed.data.frontdoor.kind === 'identified') {
+    const mediators = new Set(parsed.data.frontdoor.mediators)
+    const unobserved = new Set(parsed.data.unobserved)
+    if (mediators.size !== parsed.data.frontdoor.mediators.length) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'The front-door mediator set contains a duplicate node.' })
+    if (mediators.has(parsed.data.treatment) || mediators.has(parsed.data.outcome)) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'A front-door mediator must differ from the treatment and outcome.' })
+    if (parsed.data.frontdoor.mediators.some((index) => unobserved.has(index))) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'A front-door mediator must be observed.' })
+  }
   return ok(parsed.data)
 }
 
@@ -355,6 +413,8 @@ export type IdentificationFailure =
   | { readonly kind: 'unmeasured-confounding'; readonly latent: NonEmptyArray<string> }
   | { readonly kind: 'open-backdoor-path'; readonly path: NonEmptyArray<string>; readonly through: readonly string[] }
   | { readonly kind: 'no-observed-backdoor-set' }
+  | { readonly kind: 'id-hedge'; readonly graph: NonEmptyArray<string>; readonly subgraph: NonEmptyArray<string> }
+  | { readonly kind: 'att-requires-counterfactual-identification'; readonly estimand: 'ATT' }
 
 export type AdjustmentSetChoice =
   | { readonly kind: 'canonical' }
@@ -378,14 +438,46 @@ export type Identification =
       readonly mediators: readonly StudyGraphNode[]
       readonly basis: NonEmptyArray<IdentificationBasisEntry>
     }
+  | {
+      readonly kind: 'graphically-identified'
+      readonly strategy: 'id-algorithm'
+      readonly expression: string
+      readonly latex: string
+      readonly projection: GraphicalIdentificationEvidence['projection']
+      readonly frontdoor:
+        | { readonly kind: 'identified'; readonly mediators: NonEmptyArray<StudyVariable> }
+        | { readonly kind: 'not-identified' }
+      readonly basis: NonEmptyArray<IdentificationBasisEntry>
+    }
+  | {
+      readonly kind: 'counterfactually-identified'
+      readonly strategy: 'idc-star'
+      readonly treatedExpression: string
+      readonly untreatedExpression: string
+      readonly projection: GraphicalIdentificationEvidence['projection']
+      readonly basis: NonEmptyArray<IdentificationBasisEntry>
+    }
   | { readonly kind: 'backdoor-not-identified'; readonly reasons: NonEmptyArray<IdentificationFailure> }
+
+export function identificationAllowsEstimation(kind: Identification['kind']): boolean {
+  switch (kind) {
+    case 'identified':
+    case 'graphically-identified':
+    case 'counterfactually-identified':
+      return true
+    case 'backdoor-not-identified':
+      return false
+    default:
+      return assertNever(kind)
+  }
+}
 
 export interface IdentificationArtifact {
   readonly kind: 'identification'
   readonly id: IdentificationId
   readonly study: StudyId
   readonly createdAt: string
-  readonly method: typeof BACKDOOR_IDENTIFICATION_METHOD_ID
+  readonly method: typeof BACKDOOR_IDENTIFICATION_METHOD_ID | typeof GRAPHICAL_IDENTIFICATION_METHOD_ID | typeof COUNTERFACTUAL_IDENTIFICATION_METHOD_ID
   readonly evidence: BackdoorIdentificationEvidence
   readonly result: Identification
 }
@@ -434,6 +526,10 @@ export function identificationFrom(
   choice: AdjustmentSetChoice = { kind: 'canonical' },
 ): Result<Identification, IdentificationConstructionProblem> {
   const latent = study.graph.nodes.filter((node) => node.column === null).map((node) => node.name)
+  const variablesFrom = (indexes: readonly number[]): readonly StudyVariable[] => indexes.flatMap((index): StudyVariable[] => {
+    const node = study.graph.nodes[index]
+    return node === undefined || node.column === null ? [] : [{ node: node.node, column: node.column, name: node.name }]
+  })
   if (evidence.result.kind === 'notIdentified') {
     const flow = studyFlow(study)
     const name = (node: DagNodeId): string => study.graph.nodes.find((candidate) => candidate.node === node)?.name ?? String(node)
@@ -445,12 +541,80 @@ export function identificationFrom(
       ...openPaths,
       { kind: 'no-observed-backdoor-set' },
     ]
+    if (study.estimand.kind === 'average-treatment-effect-on-treated' && evidence.counterfactualIdentification.kind === 'identified') {
+      const basis: NonEmptyArray<IdentificationBasisEntry> = [
+        {
+          kind: 'graph-result',
+          id: 'idc-star-expressions',
+          statement: `IDC* derived observational expressions for E[${study.outcome.name}(1) | ${study.treatment.name}=1] and E[${study.outcome.name}(0) | ${study.treatment.name}=1].`,
+        },
+        {
+          kind: 'graph-assumption',
+          id: 'counterfactual-latent-projection',
+          statement: `The expressions use the observed-variable projection of “${study.dagName}”; bidirected edges represent the common causes recorded as unmeasured nodes.`,
+        },
+        {
+          kind: 'qualification',
+          id: 'binary-ett-estimator',
+          statement: 'The current evaluator requires every observed graph variable to be recorded as 0 or 1 and reports a plug-in estimate without a sampling interval.',
+        },
+      ]
+      return ok({
+        kind: 'counterfactually-identified',
+        strategy: 'idc-star',
+        treatedExpression: evidence.counterfactualIdentification.treatedExpression,
+        untreatedExpression: evidence.counterfactualIdentification.untreatedExpression,
+        projection: evidence.graphicalIdentification.projection,
+        basis,
+      })
+    }
+    if (study.estimand.kind === 'average-treatment-effect' && evidence.graphicalIdentification.kind === 'identified') {
+      const frontdoorVariables = evidence.frontdoor.kind === 'identified' ? variablesFrom(evidence.frontdoor.mediators) : []
+      const frontdoor = isNonEmpty(frontdoorVariables)
+        ? { kind: 'identified' as const, mediators: frontdoorVariables }
+        : { kind: 'not-identified' as const }
+      const basis: NonEmptyArray<IdentificationBasisEntry> = [
+        {
+          kind: 'graph-result',
+          id: 'id-expression',
+          statement: `The ID algorithm derived an observational expression for P(${study.outcome.name} | do(${study.treatment.name})).`,
+        },
+        {
+          kind: 'graph-assumption',
+          id: 'latent-projection',
+          statement: `The expression uses the observed-variable projection of “${study.dagName}”; bidirected edges represent the common causes recorded as unmeasured nodes.`,
+        },
+        {
+          kind: 'qualification',
+          id: 'estimator-required',
+          statement: frontdoor.kind === 'identified'
+            ? 'The front-door two-stage estimator can evaluate this expression under its linear stage-model assumptions.'
+            : 'This record establishes graphical identification. Estimation requires an estimator that evaluates this identified expression.',
+        },
+      ]
+      return ok({
+        kind: 'graphically-identified',
+        strategy: 'id-algorithm',
+        expression: evidence.graphicalIdentification.expression,
+        latex: evidence.graphicalIdentification.latex,
+        projection: evidence.graphicalIdentification.projection,
+        frontdoor,
+        basis,
+      })
+    }
+    if (evidence.graphicalIdentification.kind === 'unidentifiable') {
+      const nameAt = (index: number): string => study.graph.nodes[index]?.name ?? String(index)
+      reasons.push({
+        kind: 'id-hedge',
+        graph: evidence.graphicalIdentification.hedgeGraph.map(nameAt) as unknown as NonEmptyArray<string>,
+        subgraph: evidence.graphicalIdentification.hedgeSubgraph.map(nameAt) as unknown as NonEmptyArray<string>,
+      })
+    }
+    if (study.estimand.kind === 'average-treatment-effect-on-treated') {
+      reasons.push({ kind: 'att-requires-counterfactual-identification', estimand: 'ATT' })
+    }
     return ok({ kind: 'backdoor-not-identified', reasons: reasons as unknown as NonEmptyArray<IdentificationFailure> })
   }
-  const variablesFrom = (indexes: readonly number[]): readonly StudyVariable[] => indexes.flatMap((index): StudyVariable[] => {
-    const node = study.graph.nodes[index]
-    return node === undefined || node.column === null ? [] : [{ node: node.node, column: node.column, name: node.name }]
-  })
   const canonicalAdjustmentSet = variablesFrom(evidence.result.canonicalSet)
   const minimalSets = mapNonEmpty(evidence.result.minimalSets, variablesFrom)
   let adjustment: AdjustmentSetSelection
@@ -587,7 +751,9 @@ export function describeIdentificationFailure(failure: IdentificationFailure): s
   switch (failure.kind) {
     case 'unmeasured-confounding': return `${failure.latent.join(', ')} ${failure.latent.length === 1 ? 'is' : 'are'} unmeasured, so the back-door criterion cannot be satisfied with the recorded columns.`
     case 'open-backdoor-path': return `The back-door path ${failure.path.join(' – ')} remains open${failure.through.length > 0 ? ` because ${failure.through.join(', ')} ${failure.through.length === 1 ? 'is' : 'are'} unmeasured` : ''}.`
-    case 'no-observed-backdoor-set': return 'No measured adjustment set blocks every back-door path in this graph. Front-door and instrumental-variable identification were not assessed.'
+    case 'no-observed-backdoor-set': return 'No measured adjustment set blocks every back-door path in this graph.'
+    case 'id-hedge': return `The ID algorithm found a hedge: ${failure.subgraph.join(', ')} remains inside the confounded component ${failure.graph.join(', ')} after intervention. The level-2 effect is not identifiable from the observational distribution under this graph.`
+    case 'att-requires-counterfactual-identification': return `${failure.estimand} conditions on the factual treated group. The unconditional level-2 ID expression does not identify this counterfactual target; it requires counterfactual identification or a valid adjustment strategy.`
     default: return assertNever(failure)
   }
 }

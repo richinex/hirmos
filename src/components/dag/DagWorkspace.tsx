@@ -1,3 +1,4 @@
+import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
 import { useEffect, useMemo, useReducer, useState } from 'react'
@@ -549,7 +550,12 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
           </button>
         )}
       </div>
-      {job.kind === 'running' && <p role="status" className="mb-0 mt-2 text-label text-muted">{progressText}</p>}
+      {job.kind === 'running' && (
+        <div className="mt-2 flex items-center gap-2">
+          <Orb state="weaving" aria-label="Graph checks running" />
+          <p role="status" className="m-0 text-label text-muted">{progressText}</p>
+        </div>
+      )}
       {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
       {plan.kind === 'not-testable' && <p className="mb-0 mt-2 text-body text-faint">No observed local-Markov implication is available to test for this revision.</p>}
       {plan.kind === 'requires-lag-aware-validation' && <p className="mb-0 mt-2 text-body text-faint">Use the lag-aware CausalEffects validation route for this time-series graph.</p>}
@@ -772,8 +778,8 @@ export function DagWorkspace({
     <div className="mb-3">
       <div>
         <span className={label('text-signal')}>04 · DAG workspace</span>
-        <h2 id="dag-workspace-title" className="mb-2 mt-2 text-heading text-ink">Build the causal model</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Draw the arrows supported by theory, prior evidence, institutional knowledge, and the treatment-assignment mechanism. Review discovery results alongside this evidence.</p>
+        <h2 id="dag-workspace-title" className="mb-2 mt-2 text-heading text-ink">Represent the causal assumptions</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">A directed acyclic graph (DAG) represents a data-generating process: nodes are variables, and each arrow states a direct causal relationship. In this chapter, construct the graph for the causal question and record the basis for each arrow. Discovery results can contribute empirical evidence, but they do not determine the graph.</p>
       </div>
     </div>
   )

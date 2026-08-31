@@ -1,3 +1,4 @@
+import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
 import { useReducer, useState, type ReactNode } from 'react'
@@ -15,12 +16,12 @@ import type { DatasetProfile } from '@/domain/dataset'
 import {
   DISCOVERY_LAG_OPTIONS,
   DYNOTEARS_PENALTY_OPTIONS,
-  INITIAL_DISCOVERY_DRAFT,
   OCSE_SHUFFLE_OPTIONS,
   PCMCI_ALPHA_OPTIONS,
   describeDiscoveryReadiness,
   describeDiscoveryRunProblem,
   evaluateDiscoveryEligibility,
+  initialDiscoveryDraftFor,
   newDiscoveryRunId,
   readyDiscoverySpecification,
   stepDiscovery,
@@ -35,6 +36,7 @@ import {
 import { assertNever } from '@/domain/dop'
 import {
   DYNOTEARS_METHOD_ID,
+  DIRECT_LINGAM_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
@@ -50,8 +52,11 @@ import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
+import { cn } from '@/lib/utils'
 
-const DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
+const CROSS_SECTIONAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['direct-lingam', 'DirectLiNGAM']]
+const TEMPORAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
+const DISCOVERY_METHODS = [...CROSS_SECTIONAL_DISCOVERY_METHODS, ...TEMPORAL_DISCOVERY_METHODS] as const
 
 interface DiscoveryPanelProps {
   readonly source: SelectedSource
@@ -75,15 +80,32 @@ const penaltyFromValue = (value: string): DynotearsPenalty | null =>
 const shufflesFromValue = (value: string): OcseShuffles | null =>
   OCSE_SHUFFLE_OPTIONS.find((candidate) => String(candidate) === value) ?? null
 
-const methodIdOf = (configuration: DiscoveryConfiguration) => {
-  switch (configuration.kind) {
+const methodIdForChoice = (method: DiscoveryMethodChoice) => {
+  switch (method) {
+    case 'direct-lingam': return DIRECT_LINGAM_METHOD_ID
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
     case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
     case 'dynotears': return DYNOTEARS_METHOD_ID
     case 'var-lingam': return VAR_LINGAM_METHOD_ID
     case 'ocse': return OCSE_METHOD_ID
-    default: return assertNever(configuration)
+    default: return assertNever(method)
   }
+}
+
+const methodIdOf = (configuration: DiscoveryConfiguration) => methodIdForChoice(configuration.kind)
+
+const eligibilityLabel = (eligibility: MethodEligibility): string => {
+  switch (eligibility.kind) {
+    case 'eligible': return 'available'
+    case 'caution': return 'review'
+    case 'refused': return 'unavailable'
+    default: return assertNever(eligibility)
+  }
+}
+
+function DiscoveryMethodOptionLabel({ name, eligibility }: { readonly name: string; readonly eligibility: MethodEligibility }) {
+  const tone = eligibility.kind === 'eligible' ? 'text-ok' : eligibility.kind === 'caution' ? 'text-warn' : 'text-danger/60'
+  return <span>{name} <span className={cn('ml-1 text-label', tone)}>· {eligibilityLabel(eligibility)}</span></span>
 }
 
 const pValue = (value: number): string => value < 0.0001 ? '<0.0001' : value.toFixed(4)
@@ -252,6 +274,39 @@ function VarLingamResult({ run, open, current }: { readonly open: boolean; reado
   )
 }
 
+function DirectLingamResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' }> }) {
+  const rows = run.result.weights.flatMap((targets, source) => targets.map((weight, target) => ({
+    key: `${source}:${target}`,
+    source: run.variables[source].name,
+    target: run.variables[target].name,
+    weight,
+  })))
+  const order = run.result.causalOrder.map((index) => run.variables[index]?.name ?? String(index))
+  return (
+    <ResultCard run={run} open={open} current={current} method="DirectLiNGAM" title={<>Linear non-Gaussian directed structure</>} meta={<>{formatCount(run.result.observations).text} independent observations · {run.result.variables} variables · adaptive-lasso adjacency</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <p className="mb-1 mt-3 text-body text-muted">Causal order inferred from non-Gaussianity:</p>
+      <p className={num('mb-3 mt-0 text-body text-ink')} aria-label="DirectLiNGAM causal order">{order.join(' → ')}</p>
+      <StructurePlot run={run} label="DirectLiNGAM structure" />
+      <WeightPlot run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">A nonzero row denotes source → target. The coefficient is a fitted structural weight on the variables' observed scales, not an intervention-effect estimate.</p>
+      <EvidenceTable<typeof rows[number]>
+        title="DirectLiNGAM raw weights"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="weight"
+        empty="The run reported no weight."
+        columns={[
+          { id: 'source', header: 'Source', value: (row) => row.source },
+          { id: 'target', header: 'Target', value: (row) => row.target },
+          figureColumn<typeof rows[number]>('weight', 'Weight', (row) => row.weight),
+        ]}
+      />
+    </ResultCard>
+  )
+}
+
 function OcseResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
   const rows = run.result.edges.map((edge, index) => ({ key: `${edge.source}:${edge.target}:${edge.lag}:${index}`, source: run.variables[edge.source].name, target: run.variables[edge.target].name, lag: edge.lag, cmi: edge.cmi, pValue: edge.pValue }))
   return (
@@ -275,6 +330,7 @@ function OcseResult({ run, open, current }: { readonly open: boolean; readonly c
 
 function DiscoveryResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: DiscoveryRunArtifact }) {
   switch (run.kind) {
+    case 'direct-lingam-run': return <DirectLingamResult run={run} open={open} current={current} />
     case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'dynotears-run': return <DynotearsResult run={run} open={open} current={current} />
@@ -285,7 +341,7 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
 }
 
 export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, onRun, onActivity }: DiscoveryPanelProps) {
-  const [draft, dispatch] = useReducer(stepDiscovery, INITIAL_DISCOVERY_DRAFT)
+  const [draft, dispatch] = useReducer(stepDiscovery, prepared, initialDiscoveryDraftFor)
   const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
   useRunActivity(onActivity, draft.job.kind === 'running' ? { label: DISCOVERY_METHODS.find(([value]) => value === draft.configuration.kind)?.[1] ?? 'Discovery', progress: draft.job.progress === null ? null : draft.job.progress.completed / Math.max(1, draft.job.progress.total) } : null)
   const preparedColumns = profile.columns.filter((column) => prepared.columns.includes(column.id))
@@ -298,6 +354,19 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const method: MethodDefinition = selectedMethod.value
   const eligibility = evaluateDiscoveryEligibility(method, prepared, stationarity)
   const readiness = readyDiscoverySpecification(configuration, prepared)
+  const methodOptions = DISCOVERY_METHODS.flatMap(([value, name]) => {
+    const definition = methodDefinition(methodIdForChoice(value))
+    if (!definition.ok) return []
+    const candidateEligibility = evaluateDiscoveryEligibility(definition.value, prepared, stationarity)
+    return [{
+      value,
+      label: <DiscoveryMethodOptionLabel name={name} eligibility={candidateEligibility} />,
+      disabled: candidateEligibility.kind === 'refused',
+      title: candidateEligibility.kind === 'refused'
+        ? `${name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
+        : `${name}: ${eligibilityLabel(candidateEligibility)}`,
+    }]
+  })
 
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
@@ -317,6 +386,17 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       }
 
       switch (specification.value.kind) {
+      case 'direct-lingam': {
+        const result = await analysis.runDirectLingam(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
       case 'pcmci-plus': {
         const result = await analysis.runPcmciPlus(
           matrix.value.values,
@@ -408,7 +488,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Structure</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind === 'prepared-time-series' ? `Regular ${prepared.sampling.frequency} series` : prepared.kind === 'prepared-panel' ? `Panel · ${prepared.panel.units} units × ${prepared.panel.periods} periods` : 'Independent observations'}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Rows</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatCount(prepared.observations).text}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Variables</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{prepared.columns.length}</dd></div>
-          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Stationarity</dt><dd className="m-0 mt-1 text-body text-ink">{stationarity === null ? 'Tests not run' : `${formatCount(stationarity.observations).text} rows tested`}</dd></div>
+          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Stationarity</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind !== 'prepared-time-series' ? 'Not applicable' : stationarity === null ? 'Tests not run' : `${formatCount(stationarity.observations).text} rows tested`}</dd></div>
         </dl>
         <p className={literal('mb-0 mt-3 break-all text-micro text-faint')}>Dataset version {prepared.id.slice(0, 8)}</p>
       </section>
@@ -420,19 +500,22 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     <section aria-labelledby="discovery-title" className="@container/panel flex flex-col gap-5">
       <div>
         <span className={label('text-signal')}>03 · Discovery lab</span>
-        <h2 id="discovery-title" className="mb-2 mt-2 text-heading text-ink">Explore temporal structure</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Run a temporal discovery method to estimate candidate lagged and same-period relations. Review its requirements before using the result to inform a causal graph.</p>
+        <h2 id="discovery-title" className="mb-2 mt-2 text-heading text-ink">Examine candidate relationships</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">Causal discovery uses patterns in data to propose relations between variables, including same-period and lagged relations when time is part of the study. In this chapter, choose a method suited to the observation structure and compare the candidate relations it produces. The result depends on the method's assumptions and does not establish a causal graph on its own.</p>
       </div>
 
       <div className="grid gap-4">
         <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="discovery-method-title">
-            <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Temporal evidence</h3>
+            <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
           <SegmentedControl
+            className="mt-1"
             ariaLabel="Discovery method"
+            wrap
             value={configuration.kind}
             onChange={(method) => dispatch({ type: 'method-selected', method })}
-            options={DISCOVERY_METHODS.map(([value, label]) => ({ value, label }))}
+            options={methodOptions}
           />
+          <p className="mb-0 mt-2 max-w-[65ch] text-body text-faint">Available: pre-run checks completed. Review: runnable, with conditions to assess. Unavailable: the prepared observation structure does not meet a method requirement.</p>
 
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
@@ -569,15 +652,18 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
               <progress className="block h-1.5 w-full accent-signal" max={draft.job.progress.total} value={draft.job.progress.completed} />
             </div>
           )}
-          <button
-            type="button"
-            className={button('signal', 'mt-4')}
-            disabled={!readiness.ok || eligibility.kind === 'refused'}
-            aria-busy={draft.job.kind === 'running'}
-            onClick={draft.job.kind === 'running' ? undefined : () => void execute()}
-          >
-            Run {method.name}
-          </button>
+          <div className="mt-4 flex items-center gap-3">
+            <button
+              type="button"
+              className={button('signal')}
+              disabled={!readiness.ok || eligibility.kind === 'refused'}
+              aria-busy={draft.job.kind === 'running'}
+              onClick={draft.job.kind === 'running' ? undefined : () => void execute()}
+            >
+              Run {method.name}
+            </button>
+            {draft.job.kind === 'running' && <Orb state="searching" aria-label="Discovery method running" />}
+          </div>
         </section>
       </div>
 

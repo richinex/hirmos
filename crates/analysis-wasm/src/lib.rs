@@ -4,14 +4,16 @@
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
 use hirmos_causal_core::ardl::{ardl_select_order, bounds_test, uecm, Trend};
+use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
 use hirmos_causal_core::causal_effects::{mark, CausalEffects, Estimator, Node, StationaryGraph};
 use hirmos_causal_core::causal_impact::causal_impact;
 use hirmos_causal_core::counterfactual::{Equation, LinearScm};
+use hirmos_causal_core::counterfactual_evaluator::{estimate_binary_ett, identify_binary_ett};
 use hirmos_causal_core::discrete_bn::{discretize_805, Dag as DiscreteDag, DiscreteBn};
 use hirmos_causal_core::dynotears::dynotears_with_progress;
 use hirmos_causal_core::glm::{negative_binomial_p, poisson_glm};
+use hirmos_causal_core::identified_expression::DiscreteTable;
 use hirmos_causal_core::lpcmci::run_lpcmci_with_progress;
-use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
 use hirmos_causal_core::negbin_nuts::{irr_summary, quantile, PbcNegBinModel};
 use hirmos_causal_core::nprandom::Mt19937;
 use hirmos_causal_core::nuts::NutsOptions;
@@ -28,21 +30,22 @@ use hirmos_causal_core::stl::{stl, strength, StlConfig};
 use hirmos_causal_core::synthetic_control::synthetic_effect;
 use hirmos_causal_core::tsdiag::granger_ssr_ftest;
 use hirmos_causal_core::tsdiag::ljung_box;
-use hirmos_causal_core::var_lingam::run_var_lingam;
+use hirmos_causal_core::var_lingam::{direct_lingam_with_progress, run_var_lingam};
 use hirmos_causal_core::vecm::{chow_break, select_coint_rank, vecm_fit, vecm_select_order};
 use hirmos_causal_core::{
     adfuller, kpss, zivot_andrews, AdfResult, KpssResult, Regression, ZaModel, ZaResult,
 };
 use hirmos_causal_core::{
-    backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, infer_kappa_t, infer_kappa_y,
-    ols_hac, refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
-    unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag,
+    backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_frontdoor_set,
+    identify_outcomes, infer_kappa_t, infer_kappa_y, latent_projection, ols_hac,
+    refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
+    unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag, IdentificationError,
 };
 use nalgebra::DMatrix;
 use nalgebra::DVector;
 use serde::Serialize;
 use spec_math::cephes64::{ndtri, stdtri};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use wasm_bindgen::prelude::*;
 
 mod missingness;
@@ -109,6 +112,9 @@ pub fn run_analysis(
             lambda_w,
             lambda_a,
         } => dynotears_evidence(values, rows, columns, max_lag, lambda_w, lambda_a, progress),
+        AnalysisCommand::DirectLingam { rows, columns } => {
+            direct_lingam_evidence(values, rows, columns, progress)
+        }
         AnalysisCommand::VarLingam {
             rows,
             columns,
@@ -129,11 +135,21 @@ pub fn run_analysis(
         AnalysisCommand::GrangerSsrF { rows, max_lag } => granger_evidence(values, rows, max_lag),
         AnalysisCommand::BackdoorIdentify {
             nodes,
+            names,
             edges,
             treatment,
             outcome,
             unobserved,
-        } => backdoor_identification(nodes, &edges, treatment, outcome, &unobserved),
+            estimand,
+        } => backdoor_identification(
+            nodes,
+            &names,
+            &edges,
+            treatment,
+            outcome,
+            &unobserved,
+            estimand,
+        ),
         AnalysisCommand::DagCheck {
             rows,
             columns,
@@ -174,6 +190,31 @@ pub fn run_analysis(
             &adjustment,
             hac_max_lags,
             level,
+        ),
+        AnalysisCommand::FrontdoorTwoStage {
+            rows,
+            columns,
+            treatment,
+            mediator,
+            outcome,
+            first_stage_adjustment,
+            second_stage_adjustment,
+            control_value,
+            treatment_value,
+            uncertainty,
+        } => frontdoor_two_stage_evidence(
+            values,
+            rows,
+            columns,
+            treatment,
+            mediator,
+            outcome,
+            &first_stage_adjustment,
+            &second_stage_adjustment,
+            control_value,
+            treatment_value,
+            uncertainty,
+            progress,
         ),
         AnalysisCommand::CountGlm {
             rows,
@@ -411,7 +452,15 @@ pub fn run_analysis(
             samples,
             seed,
         } => bayesian_gaussian(
-            values, rows, columns, treatment, outcome, &adjustment, warmup, samples, seed,
+            values,
+            rows,
+            columns,
+            treatment,
+            outcome,
+            &adjustment,
+            warmup,
+            samples,
+            seed,
         ),
         AnalysisCommand::DiscreteBnQuery {
             rows,
@@ -434,6 +483,26 @@ pub fn run_analysis(
             outcome,
             bins,
             equivalent_sample_size,
+        ),
+        AnalysisCommand::BinaryEtt {
+            rows,
+            columns,
+            observed_nodes,
+            names,
+            edges,
+            treatment,
+            outcome,
+            unobserved,
+        } => binary_ett(
+            values,
+            rows,
+            columns,
+            &observed_nodes,
+            &names,
+            &edges,
+            treatment,
+            outcome,
+            &unobserved,
         ),
         AnalysisCommand::ResolveMissingness {
             rows,

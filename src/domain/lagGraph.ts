@@ -118,9 +118,11 @@ export function lagGraphFromTimeGraphRun(
 
 /** Fitted weight matrices into links: every nonzero coefficient is a tail → arrow link at its lag. */
 export function lagGraphFromWeightRun(
-  run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' | 'var-lingam-run' }>,
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>,
 ): LagGraph {
-  const matrices = [run.result.contemporaneousWeights, ...run.result.laggedWeights]
+  const matrices = run.kind === 'direct-lingam-run'
+    ? [run.result.weights]
+    : [run.result.contemporaneousWeights, ...run.result.laggedWeights]
   const links: LagLink[] = []
   matrices.forEach((matrix, lag) => matrix.forEach((targets, source) => targets.forEach((weight, target) => {
     if (weight === 0) return
@@ -149,6 +151,7 @@ export function lagGraphFromOcseRun(run: Extract<DiscoveryRunArtifact, { readonl
 
 export function lagGraphFromRun(run: DiscoveryRunArtifact): Result<LagGraph, LagGraphProblem> {
   switch (run.kind) {
+    case 'direct-lingam-run': return ok(lagGraphFromWeightRun(run))
     case 'pcmci-plus-run':
     case 'lpcmci-run': return lagGraphFromTimeGraphRun(run)
     case 'dynotears-run':

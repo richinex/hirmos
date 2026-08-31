@@ -1,3 +1,4 @@
+import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
@@ -80,6 +81,7 @@ interface PanelBinding {
 
 interface StudyDataBinding {
   readonly prepared: PreparedDatasetArtifact['id']
+  readonly dagRevision: StudySpecification['dagRevision']
   readonly treatment: ColumnId
   readonly outcome: ColumnId
 }
@@ -87,7 +89,7 @@ interface StudyDataBinding {
 type StudyDataPreflightJob =
   | { readonly kind: 'not-required' }
   | { readonly kind: 'loading'; readonly binding: StudyDataBinding }
-  | { readonly kind: 'ready'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean }
+  | { readonly kind: 'ready'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean; readonly observedGraphIsBinary: boolean }
   | { readonly kind: 'failed'; readonly binding: StudyDataBinding; readonly detail: string }
 
 type PanelPreflightJob =
@@ -106,7 +108,7 @@ interface State {
 }
 
 type Event =
-  | { readonly type: 'identification-chosen'; readonly identification: IdentificationId | null; readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>> }
+  | { readonly type: 'identification-chosen'; readonly identification: IdentificationId | null; readonly estimator: EstimatorId; readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>> }
   | { readonly type: 'estimator-chosen'; readonly estimator: EstimatorId }
   | { readonly type: 'configured'; readonly configuration: EstimatorConfiguration }
   | { readonly type: 'run-started' }
@@ -119,12 +121,12 @@ type Event =
   | { readonly type: 'panel-preflight-refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
   | { readonly type: 'study-data-preflight-not-required' }
   | { readonly type: 'study-data-preflight-started'; readonly binding: StudyDataBinding }
-  | { readonly type: 'study-data-preflight-succeeded'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean }
+  | { readonly type: 'study-data-preflight-succeeded'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean; readonly observedGraphIsBinary: boolean }
   | { readonly type: 'study-data-preflight-failed'; readonly binding: StudyDataBinding; readonly detail: string }
 
 const step = (state: State, event: Event): State => {
   switch (event.type) {
-    case 'identification-chosen': return { ...state, identification: event.identification, configurations: event.configurations, job: { kind: 'idle' } }
+    case 'identification-chosen': return { ...state, identification: event.identification, estimator: event.estimator, configurations: event.configurations, job: { kind: 'idle' } }
     case 'estimator-chosen': return { ...state, estimator: event.estimator, job: { kind: 'idle' } }
     case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration }, job: { kind: 'idle' } }
     case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
@@ -137,7 +139,7 @@ const step = (state: State, event: Event): State => {
     case 'panel-preflight-refused': return { ...state, panelPreflight: { kind: 'refused', binding: event.binding, problem: event.problem } }
     case 'study-data-preflight-not-required': return { ...state, studyDataPreflight: { kind: 'not-required' } }
     case 'study-data-preflight-started': return { ...state, studyDataPreflight: { kind: 'loading', binding: event.binding } }
-    case 'study-data-preflight-succeeded': return { ...state, studyDataPreflight: { kind: 'ready', binding: event.binding, treatmentIsBinary: event.treatmentIsBinary, outcomeIsCount: event.outcomeIsCount } }
+    case 'study-data-preflight-succeeded': return { ...state, studyDataPreflight: { kind: 'ready', binding: event.binding, treatmentIsBinary: event.treatmentIsBinary, outcomeIsCount: event.outcomeIsCount, observedGraphIsBinary: event.observedGraphIsBinary } }
     case 'study-data-preflight-failed': return { ...state, studyDataPreflight: { kind: 'failed', binding: event.binding, detail: event.detail } }
     default: return assertNever(event)
   }
@@ -174,6 +176,7 @@ const samePanelBinding = (left: PanelBinding, right: PanelBinding): boolean =>
 
 const sameStudyDataBinding = (left: StudyDataBinding, right: StudyDataBinding): boolean =>
   left.prepared === right.prepared
+  && left.dagRevision === right.dagRevision
   && left.treatment === right.treatment
   && left.outcome === right.outcome
 
@@ -268,6 +271,15 @@ function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
 function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   const tiles = ((): readonly { readonly label: string; readonly value: Formatted; readonly context?: string }[] => {
     switch (run.kind) {
+      case 'frontdoor-two-stage-run': {
+        const { evidence } = run
+        const mediator = run.columns[evidence.mediator]?.name ?? 'Mediator'
+        return [
+          { label: 'Mediator', value: formatWords(mediator), context: `${formatStatistic('raw', evidence.controlValue).text} → ${formatStatistic('raw', evidence.treatmentValue).text} treatment contrast` },
+          { label: 'Treatment → mediator', value: formatStatistic('raw', evidence.firstStageEffect), context: `${formatCount(evidence.firstStageParams.length).text} first-stage parameters` },
+          { label: 'Mediator → outcome', value: formatStatistic('raw', evidence.secondStageEffect), context: `${formatCount(evidence.secondStageParams.length).text} second-stage parameters` },
+        ]
+      }
       case 'backdoor-linear-run': {
         const { evidence } = run
         return [
@@ -355,6 +367,14 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           ]),
         ]
       }
+      case 'binary-ett-run': {
+        const { evidence } = run
+        return [
+          { label: 'E[Y(1) | X=1]', value: formatStatistic('raw', evidence.treatedPotentialOutcomeMean), context: 'treated potential-outcome mean among treated rows' },
+          { label: 'E[Y(0) | X=1]', value: formatStatistic('raw', evidence.untreatedPotentialOutcomeMean), context: 'untreated potential-outcome mean among treated rows' },
+          { label: 'ETT', value: formatStatistic('raw', evidence.effectOnTreated), context: `${formatCount(evidence.observations).text} rows · plug-in estimate` },
+        ]
+      }
       case 'double-ml-run': {
         const { evidence } = run
         return [
@@ -385,7 +405,14 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   })()
   return (
     <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
-      <MetricTile label="Adjustment set" size="compact" frame="cell" value={formatWords(run.estimate.adjustmentSet.length === 0 ? 'None' : run.estimate.adjustmentSet.map((variable) => variable.name).join(', '))} />
+      <MetricTile
+        label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : 'Adjustment set'}
+        size="compact"
+        frame="cell"
+        value={formatWords(run.kind === 'frontdoor-two-stage-run'
+          ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
+          : run.estimate.adjustmentSet.length === 0 ? 'None' : run.estimate.adjustmentSet.map((variable) => variable.name).join(', '))}
+      />
       {tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </div>
   )
@@ -528,13 +555,20 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   readonly onDeleteRun: (run: EstimationRunArtifact['id']) => void
   readonly onOpenStudy: () => void
 }) {
-  const identified = identifications.filter((identification) => identification.result.kind === 'identified')
+  const identified = identifications.filter((identification) => identification.result.kind === 'identified'
+    || identification.result.kind === 'counterfactually-identified'
+    || (identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified'))
   const chartTheme = useChartTheme()
   const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
-  const latestStudy = studies.find((candidate) => candidate.id === identified.at(-1)?.study) ?? null
+  const latestIdentification = identified.at(-1) ?? null
+  const latestStudy = studies.find((candidate) => candidate.id === latestIdentification?.study) ?? null
   const [state, dispatch] = useReducer(step, null, (): State => ({
-    identification: identified.at(-1)?.id ?? null,
-    estimator: prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression',
+    identification: latestIdentification?.id ?? null,
+    estimator: latestIdentification?.result.kind === 'graphically-identified'
+      ? 'frontdoor-two-stage'
+      : latestIdentification?.result.kind === 'counterfactually-identified'
+        ? 'binary-ett-idc-star'
+        : prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression',
     configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, latestStudy)])) as Record<EstimatorId, EstimatorConfiguration>,
     job: { kind: 'idle' },
     panelPreflight: { kind: 'not-required' },
@@ -551,12 +585,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     : null, [prepared, study])
   const studyDataBinding = useMemo<StudyDataBinding | null>(() => study === null
     ? null
-    : { prepared: prepared.id, treatment: study.treatment.column, outcome: study.outcome.column }, [prepared.id, study])
+    : { prepared: prepared.id, dagRevision: study.dagRevision, treatment: study.treatment.column, outcome: study.outcome.column }, [prepared.id, study])
   const studyDataFacts = useMemo(() => {
-    if (studyDataBinding === null) return { treatmentIsBinary: null, outcomeIsCount: null } as const
+    if (studyDataBinding === null) return { treatmentIsBinary: null, outcomeIsCount: null, observedGraphIsBinary: null } as const
     const job = state.studyDataPreflight
-    if (job.kind !== 'ready' || !sameStudyDataBinding(job.binding, studyDataBinding)) return { treatmentIsBinary: null, outcomeIsCount: null } as const
-    return { treatmentIsBinary: job.treatmentIsBinary, outcomeIsCount: job.outcomeIsCount } as const
+    if (job.kind !== 'ready' || !sameStudyDataBinding(job.binding, studyDataBinding)) return { treatmentIsBinary: null, outcomeIsCount: null, observedGraphIsBinary: null } as const
+    return { treatmentIsBinary: job.treatmentIsBinary, outcomeIsCount: job.outcomeIsCount, observedGraphIsBinary: job.observedGraphIsBinary } as const
   }, [state.studyDataPreflight, studyDataBinding])
   const studyDataPending = studyDataBinding !== null
     && (state.studyDataPreflight.kind === 'not-required'
@@ -619,19 +653,23 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     dispatch({ type: 'study-data-preflight-started', binding: studyDataBinding })
     void (async () => {
       const { materialisePrepared, describePreparedMaterialisationProblem } = await import('@/data/prepared')
-      const matrix = await materialisePrepared(source, profile, prepared, [study.treatment.column, study.outcome.column])
+      const observedColumns = study.graph.nodes.flatMap((node) => node.column === null ? [] : [node.column]) as unknown as NonEmptyArray<ColumnId>
+      const matrix = await materialisePrepared(source, profile, prepared, observedColumns)
       if (cancelled) return
       if (!matrix.ok) {
         dispatch({ type: 'study-data-preflight-failed', binding: studyDataBinding, detail: describePreparedMaterialisationProblem(matrix.error) })
         return
       }
-      const treatment = matrix.value.values.subarray(0, matrix.value.rowCount)
-      const outcome = matrix.value.values.subarray(matrix.value.rowCount, matrix.value.rowCount * 2)
+      const treatmentPosition = observedColumns.findIndex((column) => column === study.treatment.column)
+      const outcomePosition = observedColumns.findIndex((column) => column === study.outcome.column)
+      const treatment = matrix.value.values.subarray(treatmentPosition * matrix.value.rowCount, (treatmentPosition + 1) * matrix.value.rowCount)
+      const outcome = matrix.value.values.subarray(outcomePosition * matrix.value.rowCount, (outcomePosition + 1) * matrix.value.rowCount)
       dispatch({
         type: 'study-data-preflight-succeeded',
         binding: studyDataBinding,
         treatmentIsBinary: treatment.every((value) => value === 0 || value === 1),
         outcomeIsCount: outcome.every((value) => Number.isInteger(value) && value >= 0),
+        observedGraphIsBinary: matrix.value.values.every((value) => value === 0 || value === 1),
       })
     })()
     return () => { cancelled = true }
@@ -650,6 +688,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         configuration: state.configurations[estimator],
         outcomeIsCount: studyDataFacts.outcomeIsCount,
         treatmentIsBinary: studyDataFacts.treatmentIsBinary,
+        observedGraphIsBinary: studyDataFacts.observedGraphIsBinary,
         document,
         study,
         panelPreflight,
@@ -663,7 +702,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   useRunActivity(onActivity, state.job.kind === 'running' ? { label: describeEstimator(state.estimator), progress: state.job.progress === null ? null : state.job.progress.completed / Math.max(1, state.job.progress.total) } : null)
   const execute = async () => {
     if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running' || !method.ok) return
-    if (identification.result.kind !== 'identified') return
+    if (identification.result.kind !== 'identified'
+      && identification.result.kind !== 'counterfactually-identified'
+      && !(identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified')) return
     dispatch({ type: 'run-started' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
@@ -678,6 +719,65 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         if (run === null) { dispatch({ type: 'run-failed', detail }); return }
         onRun(run)
         dispatch({ type: 'run-finished' })
+      }
+      if (configuration.kind === 'frontdoor-two-stage') {
+        if (identification.result.kind !== 'graphically-identified' || identification.result.frontdoor.kind !== 'identified' || identification.result.frontdoor.mediators.length !== 1) {
+          dispatch({ type: 'run-failed', detail: 'This identification record does not contain one observed front-door mediator.' })
+          return
+        }
+        const mediator = identification.result.frontdoor.mediators[0]
+        const columns: NonEmptyArray<StudyVariable> = [study.treatment, mediator, study.outcome]
+        const matrix = await materialise(columns)
+        const evidence = await analysis.runFrontdoorTwoStage(matrix.values, matrix.rowCount, columns.length, {
+          treatment: 0,
+          mediator: 1,
+          outcome: 2,
+          firstStageAdjustment: [],
+          secondStageAdjustment: [0],
+          controlValue: configuration.interventions[0],
+          treatmentValue: configuration.interventions[1],
+          uncertainty: {
+            kind: 'bootstrap',
+            simulations: configuration.simulations,
+            sampleSizeFraction: configuration.sampleSizeFraction,
+            confidenceLevel: configuration.level,
+            seed: configuration.seed,
+          },
+        }, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+        const run = { kind: 'frontdoor-two-stage-run', configuration, evidence: evidence.value } as const
+        const estimate = causalEstimateFrom(study, identification, run)
+        finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The front-door identification record is no longer available.')
+        return
+      }
+      if (configuration.kind === 'binary-ett-idc-star') {
+        if (identification.result.kind !== 'counterfactually-identified') {
+          dispatch({ type: 'run-failed', detail: 'This identification record does not contain binary ETT expressions from IDC*.' })
+          return
+        }
+        const observed = study.graph.nodes.flatMap((node, nodeIndex) => node.column === null ? [] : [{ node: node.node, column: node.column, name: node.name, nodeIndex }])
+        if (observed.length < 2) { dispatch({ type: 'run-failed', detail: 'Binary ETT needs measured treatment and outcome nodes.' }); return }
+        const columns = observed.map(({ node, column, name }) => ({ node, column, name })) as unknown as NonEmptyArray<StudyVariable>
+        const matrix = await materialise(columns)
+        const treatment = study.graph.nodes.findIndex((node) => node.node === study.treatment.node)
+        const outcome = study.graph.nodes.findIndex((node) => node.node === study.outcome.node)
+        const evidence = await analysis.runBinaryEtt(matrix.values, matrix.rowCount, columns.length, {
+          observedNodes: observed.map((node) => node.nodeIndex),
+          names: study.graph.nodes.map((node) => node.name),
+          edges: study.graph.edges,
+          treatment,
+          outcome,
+          unobserved: study.graph.nodes.flatMap((node, index) => node.column === null ? [index] : []),
+        })
+        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+        const run = { kind: 'binary-ett-run', configuration, evidence: evidence.value } as const
+        const estimate = causalEstimateFrom(study, identification, run)
+        finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The IDC* identification record is no longer available.')
+        return
+      }
+      if (identification.result.kind !== 'identified') {
+        dispatch({ type: 'run-failed', detail: 'This estimator requires a back-door identification record.' })
+        return
       }
       switch (configuration.kind) {
         case 'backdoor-linear-regression': {
@@ -888,6 +988,16 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
 
   const controls = ((): React.ReactNode => {
     switch (configuration.kind) {
+      case 'frontdoor-two-stage':
+        return (
+          <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            <label className="block"><span className={fieldLabel}>Control value</span><input type="number" step="any" aria-label="Front-door control value" className={field('text', 'mt-1')} value={configuration.interventions[0]} onChange={(event) => configure({ ...configuration, interventions: [Number(event.target.value) || 0, configuration.interventions[1]] })} /></label>
+            <label className="block"><span className={fieldLabel}>Treatment value</span><input type="number" step="any" aria-label="Front-door treatment value" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
+            <label className="block"><span className={fieldLabel}>Bootstrap resamples</span><input type="number" min={20} max={5000} aria-label="Front-door bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
+            <label className="block"><span className={fieldLabel}>Bootstrap seed</span><input type="number" min={0} aria-label="Front-door bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The first regression estimates treatment → mediator. The second estimates mediator → outcome while adjusting for treatment. Their product gives the linear front-door contrast; the interval uses a seeded row bootstrap.</p>
+          </div>
+        )
       case 'backdoor-linear-regression':
         return (
           <div>
@@ -1005,6 +1115,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Every DAG node is cut into quantile bins; the BDeu prior smooths the conditional tables; the effect contrasts the highest and lowest treatment bins.</p>
           </div>
         )
+      case 'binary-ett-idc-star':
+        return <p className="m-0 text-body text-faint">The run evaluates the two recorded IDC* expressions against the empirical binary joint distribution. It applies no discretisation and reports no sampling interval.</p>
       case 'poisson-glm':
       case 'negative-binomial-p':
         return <p className="m-0 text-body text-faint">Log link on the expected count of {study?.outcome.name ?? 'the outcome'}; the treatment coefficient exponentiates to an incidence rate ratio with a 95% normal interval.</p>
@@ -1060,8 +1172,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     <section aria-labelledby="estimation-title" className="@container/panel flex flex-col gap-5">
       <div>
         <span className={label('text-signal')}>06 · Estimation</span>
-        <h2 id="estimation-title" className="mb-2 mt-2 text-heading text-ink">Estimate the specified causal effect</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Choose an estimator that meets the identified study's design, sampling and variable requirements. Review the method requirements before interpreting the estimate.</p>
+        <h2 id="estimation-title" className="mb-2 mt-2 text-heading text-ink">Estimate the identified effect</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 
       <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="estimation-setup-title">
@@ -1075,15 +1187,14 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <div className="grid grid-cols-1 gap-4">
               <label className="block">
                 <span className={fieldLabel}>Identified study</span>
-                <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => { const chosen = event.target.value === '' ? null : (event.target.value as IdentificationId); const chosenStudy = studies.find((candidate) => candidate.id === identifications.find((identification) => identification.id === chosen)?.study) ?? null; dispatch({ type: 'identification-chosen', identification: chosen, configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, chosenStudy)])) as Record<EstimatorId, EstimatorConfiguration> }) }}>
+                <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => { const chosen = event.target.value === '' ? null : (event.target.value as IdentificationId); const chosenIdentification = identifications.find((candidate) => candidate.id === chosen) ?? null; const chosenStudy = studies.find((candidate) => candidate.id === chosenIdentification?.study) ?? null; dispatch({ type: 'identification-chosen', identification: chosen, estimator: chosenIdentification?.result.kind === 'graphically-identified' ? 'frontdoor-two-stage' : chosenIdentification?.result.kind === 'counterfactually-identified' ? 'binary-ett-idc-star' : prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression', configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, chosenStudy)])) as Record<EstimatorId, EstimatorConfiguration> }) }}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
                   return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} · ${bound.dagName}`}</option>
                 })}
               </Select>
-                {identification !== null && identification.result.kind === 'identified' && (
-                  <span className={cn(fieldHint, 'block max-w-[65ch]')}>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>
-                )}
+                {identification !== null && identification.result.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
+                {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
               </label>
               <div>
                 <span className={fieldLabel}>Estimation methods</span>
@@ -1112,9 +1223,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {studyDataError !== null && <Alert tone="danger" className="mt-3"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The estimate could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
-              {studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
-            </button>
+            <div className="mt-4 flex items-center gap-3">
+              <button type="button" className={button('signal')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+                {studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
+              </button>
+              {state.job.kind === 'running' && <Orb state="solving" aria-label="Estimator running" />}
+            </div>
           </>
         )}
       </section>
@@ -1141,13 +1255,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     <div className="space-y-4">
       <section aria-labelledby="estimation-study-title">
         <h3 id="estimation-study-title" className="mb-2 mt-1 text-body font-medium text-ink">{study === null ? 'No study chosen' : estimandSentence(study)}</h3>
-        {study !== null && identification !== null && identification.result.kind === 'identified' && (
+        {study !== null && identification !== null && (identification.result.kind === 'identified' || identification.result.kind === 'counterfactually-identified' || (identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified')) && (
           <>
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Study binding">
               <dt className="text-faint">Treatment</dt><dd className="m-0 text-ink">{study.treatment.name}</dd>
               <dt className="text-faint">Outcome</dt><dd className="m-0 text-ink">{study.outcome.name}</dd>
               <dt className="text-faint">Graph</dt><dd className="m-0 text-ink">{study.dagName} · <span className={literal()}>{study.dagRevision.slice(0, 8)}</span></dd>
-              <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">Back-door adjustment</dd>
+              <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{identification.result.kind === 'identified' ? 'Back-door adjustment' : identification.result.kind === 'counterfactually-identified' ? 'IDC* counterfactual identification' : 'Front-door identification'}</dd>
               <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Independent'} · {formatCount(prepared.observations).text}</dd>
             </dl>
           </>

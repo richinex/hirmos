@@ -19,7 +19,7 @@ import { formatCount } from '@/lib/format/number'
 import type { DagDocument, DagDocumentId, DagNodeId } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
 import { lagGraphFromDag } from '@/domain/lagGraph'
-import { BACKDOOR_IDENTIFICATION_METHOD_ID, IDENTIFICATION_METHODS } from '@/domain/methods'
+import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID, IDENTIFICATION_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { roleWord } from '@/domain/dagFlow'
 import {
@@ -74,6 +74,26 @@ const step = (state: Job, event: Event): Job => {
   }
 }
 
+const resultLabel = (result: IdentificationArtifact['result']): string => {
+  switch (result.kind) {
+    case 'identified': return 'Identified by back-door adjustment'
+    case 'graphically-identified': return 'Identified by the ID algorithm'
+    case 'counterfactually-identified': return 'Identified by IDC*'
+    case 'backdoor-not-identified': return 'Not identified from the observational distribution'
+    default: return assertNever(result)
+  }
+}
+
+const ledgerLabel = (result: IdentificationArtifact['result']): string => {
+  switch (result.kind) {
+    case 'identified': return 'back-door identified'
+    case 'graphically-identified': return 'ID expression derived'
+    case 'counterfactually-identified': return 'IDC* expressions derived'
+    case 'backdoor-not-identified': return 'not identified'
+    default: return assertNever(result)
+  }
+}
+
 const ASSIGNMENT_KINDS: readonly AssignmentMechanism['kind'][] = ['randomised', 'policy-change', 'observed-choice']
 const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated']
 
@@ -122,7 +142,7 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
     <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${title} identification`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <span className={label(result.kind === 'identified' ? 'text-ok' : 'text-muted')}>{result.kind === 'identified' ? 'Identified by back-door adjustment' : 'No back-door adjustment set'}</span>
+          <span className={label(result.kind === 'backdoor-not-identified' ? 'text-muted' : 'text-ok')}>{resultLabel(result)}</span>
           <h3 className="mb-0 mt-1 text-title font-medium text-ink">{title}</h3>
         </div>
         <span className={num('text-micro text-faint')}>{formatCount(study.population.observations).text} rows · {study.dagName}</span>
@@ -163,12 +183,42 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
             <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>
           )}
         </>
+      ) : result.kind === 'graphically-identified' ? (
+        <Alert tone="ok" live={false} className="mt-3">
+          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by the general ID algorithm</p>
+          <p className="mb-0 mt-1 text-muted">The graph has no measured back-door adjustment set, but the interventional distribution can be written using observed probabilities.</p>
+          <figure className="mb-0 mt-2">
+            <figcaption className={label('text-faint')}>Identified expression</figcaption>
+            <div className="mt-1"><Formula tex={result.latex} plain={result.expression} /></div>
+          </figure>
+          <p className="mb-0 mt-2 text-muted">{result.frontdoor.kind === 'identified' && result.frontdoor.mediators.length === 1
+            ? 'The linear two-stage front-door estimator can evaluate this expression under its recorded stage-model assumptions.'
+            : 'No available estimator evaluates this expression. Back-door estimators target a different functional.'}</p>
+          {current && result.frontdoor.kind === 'identified' && result.frontdoor.mediators.length === 1 && <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>}
+        </Alert>
+      ) : result.kind === 'counterfactually-identified' ? (
+        <Alert tone="ok" live={false} className="mt-3">
+          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by IDC*</p>
+          <p className="mb-0 mt-1 text-muted">The effect on the treated is identified through two conditional counterfactual distributions.</p>
+          <div className="mt-2 grid gap-2">
+            <figure className="m-0">
+              <figcaption className={label('text-faint')}>Treated potential outcome</figcaption>
+              <code className={literal('mt-1 block overflow-x-auto whitespace-nowrap text-body text-ink')}>{result.treatedExpression}</code>
+            </figure>
+            <figure className="m-0">
+              <figcaption className={label('text-faint')}>Untreated potential outcome</figcaption>
+              <code className={literal('mt-1 block overflow-x-auto whitespace-nowrap text-body text-ink')}>{result.untreatedExpression}</code>
+            </figure>
+          </div>
+          <p className="mb-0 mt-2 text-muted">The available evaluator requires all observed graph variables to be binary and reports a plug-in estimate without a sampling interval.</p>
+          {current && <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>}
+        </Alert>
       ) : (
         <div className="mt-3">
           <RefusalTile
-            label="Average treatment effect"
-            headline="No measured back-door adjustment set"
-            reason={<><p className="m-0">This result assesses back-door adjustment only; it is not a claim that the effect is unidentified by every strategy.</p><ul className="mb-0 mt-2 list-disc pl-4">{result.reasons.map((reason) => <li key={`${reason.kind}-${describeIdentificationFailure(reason)}`}>{describeIdentificationFailure(reason)}</li>)}</ul><p className="mb-0 mt-2">Correct the graph only if its account of the data-generating process is wrong. Additional evidence might be a missing common cause for back-door adjustment, a mediator satisfying the front-door conditions, or an instrument satisfying relevance, exclusion and as-if-random assignment. Each strategy requires a separate identification check.</p></>}
+            label={title}
+            headline="No identifying expression was found"
+            reason={<><p className="m-0">This record includes measured adjustment-set enumeration and the level-2 ID algorithm.</p><ul className="mb-0 mt-2 list-disc pl-4">{result.reasons.map((reason) => <li key={`${reason.kind}-${describeIdentificationFailure(reason)}`}>{describeIdentificationFailure(reason)}</li>)}</ul><p className="mb-0 mt-2">Revise the graph only when its causal assumptions are incorrect. Otherwise identification requires additional measurements, study-design information, experimental distributions, or stronger assumptions.</p></>}
             rule={`${identification.method} · ${study.dagName} r${study.dagRevision.slice(0, 8)}`}
             actions={<button type="button" className={button('outline')} onClick={onOpenDag}>Review the graph</button>}
           />
@@ -229,7 +279,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
   const readiness = useMemo(() => readyStudySpecification(state.draft, documents, prepared), [documents, prepared, state.draft])
   const preview = useMemo(() => previewStudyBinding(state.draft, documents, prepared), [documents, prepared, state.draft])
   const evidenceGraph = useMemo(() => (document === null ? null : lagGraphFromDag(document)), [document])
-  const latestIdentified = [...identifications].reverse().find((identification) => identification.result.kind === 'identified') ?? null
+  const latestIdentified = [...identifications].reverse().find((identification) => identification.result.kind !== 'backdoor-not-identified') ?? null
   const adjustmentChoice = state.job.kind === 'choosing-adjustment-set' ? state.job : null
 
   const recordIdentification = (study: StudySpecification, evidence: BackdoorIdentificationEvidence, choice: AdjustmentSetChoice) => {
@@ -243,7 +293,11 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       id: newIdentificationId(),
       study: study.id,
       createdAt: new Date().toISOString(),
-      method: BACKDOOR_IDENTIFICATION_METHOD_ID,
+      method: result.value.kind === 'graphically-identified'
+        ? GRAPHICAL_IDENTIFICATION_METHOD_ID
+        : result.value.kind === 'counterfactually-identified'
+          ? COUNTERFACTUAL_IDENTIFICATION_METHOD_ID
+          : BACKDOOR_IDENTIFICATION_METHOD_ID,
       evidence,
       result: result.value,
     }
@@ -280,8 +334,8 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
     <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">
       <div>
         <span className={label('text-signal')}>05 · Study design</span>
-        <h2 id="study-title" className="mb-2 mt-2 text-heading text-ink">Specify and identify the causal estimand</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Define the causal effect to estimate by selecting a graph, treatment, outcome, population and assignment mechanism. The identification check then tests whether the graph provides a measured adjustment set.</p>
+        <h2 id="study-title" className="mb-2 mt-2 text-heading text-ink">Define and identify the causal question</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. Bind the question to a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
       </div>
 
       <CausalHierarchy />
@@ -346,7 +400,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                 label: kind === 'average-treatment-effect' ? 'All prepared rows (ATE)' : 'Treated rows (ATT)',
                 hint: kind === 'average-treatment-effect'
                   ? 'Average the treatment contrast over the prepared population.'
-                  : 'Average the treatment contrast among rows with treatment = 1. Requires a binary treatment and DML-IRM in this release.',
+                  : 'Average the treatment contrast among rows with treatment = 1. Current ETT estimators require a binary treatment; eligibility also depends on the identifying strategy.',
               }))}
             />
             <RadioList
@@ -477,7 +531,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
           <li key={study.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
             <span className="text-ink">{estimandSentence(study)}</span>
             <span className={num('text-micro text-faint')}>
-              {identification === null ? 'pending' : identification.result.kind === 'identified' ? 'back-door identified' : 'no measured back-door set'} · {study.dagName} · {formatTime(study.createdAt)}
+              {identification === null ? 'pending' : ledgerLabel(identification.result)} · {study.dagName} · {formatTime(study.createdAt)}
             </span>
           </li>
         )

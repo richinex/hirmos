@@ -4,8 +4,10 @@ use serde_json::Value;
 
 #[test]
 fn identification_respects_unobserved_nodes() {
-    let root: Value =
-        serde_json::from_str(include_str!("../oracle/fixtures/backdoor_identification.json")).unwrap();
+    let root: Value = serde_json::from_str(include_str!(
+        "../oracle/fixtures/backdoor_identification.json"
+    ))
+    .unwrap();
     for fx in root["identifications"].as_array().unwrap() {
         let name = fx["name"].as_str().unwrap();
         let nodes: Vec<String> = serde_json::from_value(fx["nodes"].clone()).unwrap();

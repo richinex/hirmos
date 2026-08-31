@@ -1,6 +1,6 @@
 //! pgmpy's discrete Bayesian network lane, which is step 3g of `805_dag.py`: quantile
 //! discretisation, BDeu conditional probability tables, variable elimination, the minimal
-//! adjustment set, and the do-calculus query by adjustment.
+//! adjustment set, and the interventional do-query by parent adjustment.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 

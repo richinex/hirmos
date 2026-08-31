@@ -156,11 +156,24 @@ fn search_causal_order(x: &DMatrix<f64>, u: &[usize]) -> usize {
 
 /// DirectLiNGAM with the pwling measure and adaptive-lasso adjacency.
 pub fn direct_lingam(x: &DMatrix<f64>) -> (Vec<usize>, DMatrix<f64>) {
+    direct_lingam_with_progress(x, |_, _, _| {})
+}
+
+/// DirectLiNGAM with progress at each causal-order selection and the final adjacency fit.
+pub fn direct_lingam_with_progress<F>(
+    x: &DMatrix<f64>,
+    mut progress: F,
+) -> (Vec<usize>, DMatrix<f64>)
+where
+    F: FnMut(&'static str, usize, usize),
+{
     let n = x.ncols();
+    let total = n + 1;
     let mut u: Vec<usize> = (0..n).collect();
     let mut order: Vec<usize> = Vec::new();
     let mut work = x.clone();
-    for _ in 0..n {
+    for step in 0..n {
+        progress("causal-order", step, total);
         let m = search_causal_order(&work, &u);
         for &i in u.clone().iter() {
             if i != m {
@@ -176,6 +189,7 @@ pub fn direct_lingam(x: &DMatrix<f64>) -> (Vec<usize>, DMatrix<f64>) {
         u.retain(|&v| v != m);
     }
 
+    progress("adaptive-lasso", n, total);
     let mut b = DMatrix::<f64>::zeros(n, n);
     for i in 1..n {
         let target = order[i];
@@ -185,6 +199,7 @@ pub fn direct_lingam(x: &DMatrix<f64>) -> (Vec<usize>, DMatrix<f64>) {
             b[(target, p)] = coef[k];
         }
     }
+    progress("complete", total, total);
     (order, b)
 }
 

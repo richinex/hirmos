@@ -165,3 +165,51 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await expect(page.getByRole('group', { name: 'Panes' }).getByRole('button', { name: 'Prepared dataset and method requirements' })).toBeFocused()
 })
 
+test('runs DirectLiNGAM for independent observations and carries its relations into the DAG workspace', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Cross-sectional discovery workflow runs once')
+  await createProject(page)
+  const records = ['x,y,z']
+  for (let row = 0; row < 96; row += 1) {
+    const x = ((row * 37 % 101) - 50) / 25
+    const y = 0.8 * x + ((row * 61 % 103) - 51) / 30
+    const z = -0.5 * y + ((row * 73 % 107) - 53) / 35
+    records.push(`${x},${y},${z}`)
+  }
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'direct-lingam-cross-section.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`${records.join('\n')}\n`),
+  })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await expect(page.getByRole('heading', { name: 'Set the analysis dataset' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('radio', { name: 'Independent observations' }).click()
+  await page.getByRole('checkbox', { name: 'x', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'y', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'z', exact: true }).check()
+  await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
+  await expect(page.getByText('Prepared cross-section · 96 rows')).toBeVisible({ timeout: 30_000 })
+
+  const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
+  await navigation.getByRole('button', { name: /Discovery lab/ }).click()
+  await expect(page.getByRole('heading', { name: 'Examine candidate relationships' })).toBeVisible()
+  const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method' })
+  await expect(discoveryMethods.getByRole('radio')).toHaveCount(6)
+  await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
+  await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toHaveAttribute('aria-disabled', 'true')
+  await expect(discoveryMethods.getByRole('radio', { name: /VAR-LiNGAM/ })).toHaveAttribute('aria-disabled', 'true')
+  await page.getByRole('button', { name: 'Run DirectLiNGAM' }).click()
+
+  await expect(page.getByLabel('DirectLiNGAM causal order')).toContainText('→', { timeout: 30_000 })
+  await expect(page.getByRole('img', { name: 'DirectLiNGAM structure' })).toBeVisible()
+  await expect(page.getByRole('img', { name: 'DirectLiNGAM weight heatmap' })).toBeVisible()
+  const weights = page.getByRole('region', { name: 'DirectLiNGAM raw weights' })
+  await expect(weights.getByRole('row')).toHaveCount(10)
+
+  await navigation.getByRole('button', { name: /DAG workspace/ }).click()
+  await page.getByRole('button', { name: 'Discovery-informed' }).click()
+  await page.getByLabel('DAG name').fill('DirectLiNGAM review')
+  await page.getByRole('button', { name: 'Create DAG draft' }).click()
+  await expect(page.getByRole('heading', { name: 'DirectLiNGAM', exact: true })).toBeVisible()
+  await expect(page.getByLabel('DirectLiNGAM evidence graph')).toBeVisible()
+  await expect(page.getByLabel('Discovered relations').getByRole('button')).not.toHaveCount(0)
+})

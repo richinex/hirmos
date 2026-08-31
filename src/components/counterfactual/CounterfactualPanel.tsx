@@ -1,3 +1,4 @@
+import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -228,8 +229,8 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
         <span className={label('text-signal')}>08 · Counterfactuals</span>
-        <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Work out what would have happened</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Counterfactual level: fit a structural causal model, infer the disturbance terms for each row and compare outcomes under 2 treatment values. The calculation assumes the non-treatment mechanisms remain invariant and carries the same inferred disturbances into both intervention worlds.</p>
+        <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate individual counterfactual outcomes</h2>
+        <p className="m-0 max-w-[65ch] text-body text-muted">A counterfactual compares the outcomes that the same unit would have under different interventions. In this chapter, fit a linear structural causal model, infer each row's disturbance terms, hold them fixed, and predict the outcome under two treatment values. These are model-implied counterfactuals and require stronger structural assumptions than an average intervention effect.</p>
       </div>
       <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="counterfactual-setup-title">
         <h3 id="counterfactual-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">Linear SCM counterfactual</h3>
@@ -260,9 +261,12 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
             {method.ok && <p className="mb-0 mt-3 max-w-[65ch] text-body text-faint">{method.value.summary}</p>}
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The counterfactual could not run: {state.job.detail}</p></Alert>}
-            <button type="button" className={button('signal', 'mt-4')} disabled={eligibility === null || eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
-              Run counterfactual
-            </button>
+            <div className="mt-4 flex items-center gap-3">
+              <button type="button" className={button('signal')} disabled={eligibility === null || eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+                Run counterfactual
+              </button>
+              {state.job.kind === 'running' && <Orb state="shaping" aria-label="Counterfactual running" />}
+            </div>
           </>
         )}
       </section>

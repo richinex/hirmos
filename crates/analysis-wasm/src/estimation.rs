@@ -1,6 +1,252 @@
 //! Estimator façades: regression, count models, CausalEffects, causal impact, DML, ARDL, VECM, synthetic control, panel DID / SC / SDID, NUTS, discrete BN.
 
 use super::*;
+use hirmos_causal_core::frontdoor::{
+    frontdoor_two_stage_with_progress, FrontdoorBootstrap, FrontdoorInput, FrontdoorOptions,
+};
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn binary_ett(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    observed_nodes: &[usize],
+    names: &[String],
+    edges: &[(usize, usize)],
+    treatment: usize,
+    outcome: usize,
+    unobserved: &[usize],
+) -> Result<AnalysisResult, String> {
+    validate_dense_matrix("binary ETT", values, rows, columns)?;
+    let nodes = names.len();
+    if nodes < 2
+        || names.iter().any(|name| name.trim().is_empty())
+        || names
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != nodes
+    {
+        return Err("binary ETT needs at least two distinctly named graph nodes".to_owned());
+    }
+    if treatment >= nodes || outcome >= nodes || treatment == outcome {
+        return Err("binary ETT needs distinct observed treatment and outcome nodes".to_owned());
+    }
+    if edges
+        .iter()
+        .any(|&(source, target)| source >= nodes || target >= nodes || source == target)
+    {
+        return Err("binary ETT edges must join two distinct graph nodes".to_owned());
+    }
+    let observed = observed_nodes
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    let hidden = unobserved
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    if observed_nodes.len() != columns
+        || observed.len() != observed_nodes.len()
+        || hidden.len() != unobserved.len()
+        || observed
+            .iter()
+            .chain(hidden.iter())
+            .any(|&node| node >= nodes)
+        || !observed.is_disjoint(&hidden)
+        || observed.len() + hidden.len() != nodes
+        || !observed.contains(&treatment)
+        || !observed.contains(&outcome)
+    {
+        return Err("binary ETT needs one matrix column for every observed node and an exact partition of observed and unobserved graph nodes".to_owned());
+    }
+    let named_edges = edges
+        .iter()
+        .map(|&(source, target)| (names[source].clone(), names[target].clone()))
+        .collect::<Vec<_>>();
+    let hidden_names = unobserved
+        .iter()
+        .map(|&node| names[node].clone())
+        .collect::<Vec<_>>();
+    let graph = latent_projection(names.to_vec(), named_edges, hidden_names)
+        .map_err(|error| format!("binary ETT latent projection failed: {error}"))?;
+    let mut table_columns = BTreeMap::new();
+    for (column, &node) in observed_nodes.iter().enumerate() {
+        let mut states = Vec::with_capacity(rows);
+        for row in 0..rows {
+            let value = values[column * rows + row];
+            if value != 0.0 && value != 1.0 {
+                return Err(format!(
+                    "binary ETT requires every observed graph variable to contain only 0 and 1; {} has {value}",
+                    names[node]
+                ));
+            }
+            states.push(if value == 0.0 { "0" } else { "1" }.to_owned());
+        }
+        table_columns.insert(names[node].clone(), states);
+    }
+    let table = DiscreteTable::from_columns(table_columns)
+        .map_err(|error| format!("binary ETT table failed: {error}"))?;
+    let estimate = estimate_binary_ett(&graph, &table, &names[treatment], &names[outcome])
+        .map_err(|error| format!("binary ETT failed: {error}"))?;
+    Ok(AnalysisResult::BinaryEtt {
+        observations: rows,
+        treatment,
+        outcome,
+        treated_potential_outcome_mean: estimate.treated_potential_outcome_mean,
+        untreated_potential_outcome_mean: estimate.untreated_potential_outcome_mean,
+        effect_on_treated: estimate.effect_on_treated,
+        treated_expression: estimate
+            .treated_query
+            .identified_to_y0(&estimate.treated_expression),
+        untreated_expression: estimate
+            .untreated_query
+            .identified_to_y0(&estimate.untreated_expression),
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn frontdoor_two_stage_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    treatment: usize,
+    mediator: usize,
+    outcome: usize,
+    first_stage_adjustment: &[usize],
+    second_stage_adjustment: &[usize],
+    control_value: f64,
+    treatment_value: f64,
+    uncertainty: FrontdoorUncertainty,
+    mut progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    validate_dense_matrix("front-door two-stage estimate", values, rows, columns)?;
+    let endpoints = [treatment, mediator, outcome];
+    if endpoints.iter().any(|&column| column >= columns)
+        || endpoints
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len()
+            != endpoints.len()
+    {
+        return Err(
+            "front-door estimation needs distinct treatment, mediator, and outcome columns"
+                .to_owned(),
+        );
+    }
+    let valid_adjustment = |stage: &str, excluded: &[usize], adjustment: &[usize]| {
+        if adjustment.iter().any(|&column| column >= columns) {
+            return Err(format!(
+                "front-door {stage} adjustment columns must index the numeric matrix"
+            ));
+        }
+        let distinct = adjustment
+            .iter()
+            .copied()
+            .collect::<std::collections::BTreeSet<_>>();
+        if distinct.len() != adjustment.len()
+            || excluded.iter().any(|column| distinct.contains(column))
+        {
+            return Err(format!(
+                "front-door {stage} adjustment columns must be distinct and exclude its treatment, response, and outcome columns"
+            ));
+        }
+        Ok(())
+    };
+    valid_adjustment(
+        "first-stage",
+        &[treatment, mediator, outcome],
+        first_stage_adjustment,
+    )?;
+    valid_adjustment(
+        "second-stage",
+        &[mediator, outcome],
+        second_stage_adjustment,
+    )?;
+
+    let data = DMatrix::from_column_slice(rows, columns, values);
+    let column = |index: usize| (0..rows).map(|row| data[(row, index)]).collect::<Vec<_>>();
+    let treatment_values = column(treatment);
+    let mediator_values = column(mediator);
+    let outcome_values = column(outcome);
+    let adjustment_matrix = |selected: &[usize]| {
+        (!selected.is_empty()).then(|| {
+            DMatrix::from_fn(rows, selected.len(), |row, column| {
+                data[(row, selected[column])]
+            })
+        })
+    };
+    let first_adjustment = adjustment_matrix(first_stage_adjustment);
+    let second_adjustment = adjustment_matrix(second_stage_adjustment);
+    let bootstrap = match uncertainty {
+        FrontdoorUncertainty::None => None,
+        FrontdoorUncertainty::Bootstrap {
+            simulations,
+            sample_size_fraction,
+            confidence_level,
+            seed,
+        } => Some(FrontdoorBootstrap {
+            simulations,
+            sample_size_fraction,
+            confidence_level,
+            seed,
+        }),
+    };
+    let result = frontdoor_two_stage_with_progress(
+        FrontdoorInput {
+            treatment: &treatment_values,
+            mediator: &mediator_values,
+            outcome: &outcome_values,
+            first_stage_adjustment: first_adjustment.as_ref(),
+            second_stage_adjustment: second_adjustment.as_ref(),
+        },
+        FrontdoorOptions {
+            control_value,
+            treatment_value,
+            bootstrap,
+        },
+        |completed, total| progress("frontdoor-bootstrap", completed, total),
+    )
+    .map_err(|error| error.to_string())?;
+    let uncertainty = match (uncertainty, result.confidence_interval) {
+        (FrontdoorUncertainty::None, None) => FrontdoorUncertaintyEvidence::None,
+        (
+            FrontdoorUncertainty::Bootstrap {
+                simulations,
+                sample_size_fraction,
+                confidence_level,
+                seed,
+            },
+            Some(interval),
+        ) => FrontdoorUncertaintyEvidence::Bootstrap {
+            simulations,
+            sample_size_fraction,
+            confidence_level,
+            seed,
+            interval,
+        },
+        _ => return Err("front-door uncertainty result did not match its request".to_owned()),
+    };
+    Ok(AnalysisResult::FrontdoorTwoStage {
+        observations: rows,
+        treatment,
+        mediator,
+        outcome,
+        first_stage_adjustment: first_stage_adjustment.to_vec(),
+        second_stage_adjustment: second_stage_adjustment.to_vec(),
+        control_value,
+        treatment_value,
+        first_stage_params: result.first_stage_params,
+        second_stage_params: result.second_stage_params,
+        first_stage_effect: result.first_stage_effect,
+        second_stage_effect: result.second_stage_effect,
+        estimate: result.ate,
+        uncertainty,
+    })
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn backdoor_linear(
@@ -822,7 +1068,9 @@ pub(crate) fn bayesian_gaussian(
     let mut used = vec![treatment, outcome];
     used.extend_from_slice(adjustment);
     if used.iter().any(|&column| column >= columns) {
-        return Err("Bayesian Gaussian regression columns must index the numeric matrix".to_owned());
+        return Err(
+            "Bayesian Gaussian regression columns must index the numeric matrix".to_owned(),
+        );
     }
     let mut distinct = used.clone();
     distinct.sort_unstable();
@@ -834,7 +1082,10 @@ pub(crate) fn bayesian_gaussian(
         return Err("Bayesian Gaussian regression needs at least 20 rows".to_owned());
     }
     if !(10..=5000).contains(&warmup) || !(10..=5000).contains(&samples) {
-        return Err("Bayesian Gaussian regression warmup and samples must be between 10 and 5000".to_owned());
+        return Err(
+            "Bayesian Gaussian regression warmup and samples must be between 10 and 5000"
+                .to_owned(),
+        );
     }
     let data = DMatrix::from_column_slice(rows, columns, values);
     let column = |index: usize| -> Vec<f64> { (0..rows).map(|row| data[(row, index)]).collect() };
@@ -849,13 +1100,19 @@ pub(crate) fn bayesian_gaussian(
     // Non-binary adjustment columns are divided by their population standard deviation so the
     // Normal(0, 1) slope priors are weakly informative regardless of covariate units. The
     // treatment coefficient, and so the effect, is unchanged by this scaling.
-    let mut series_by_column: Vec<Vec<f64>> = adjustment.iter().map(|&index| column(index)).collect();
+    let mut series_by_column: Vec<Vec<f64>> =
+        adjustment.iter().map(|&index| column(index)).collect();
     for series in &mut series_by_column {
         if series.iter().all(|value| *value == 0.0 || *value == 1.0) {
             continue;
         }
         let mean = series.iter().sum::<f64>() / rows as f64;
-        let sd = (series.iter().map(|value| (value - mean).powi(2)).sum::<f64>() / rows as f64).sqrt();
+        let sd = (series
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / rows as f64)
+            .sqrt();
         if sd > 0.0 {
             for value in series.iter_mut() {
                 *value /= sd;
@@ -945,8 +1202,14 @@ pub(crate) fn bayesian_gaussian(
                 treated_upper: Vec::new(),
             };
             for x in grid {
-                let control: Vec<f64> = bases.iter().map(|(base, _, slope)| base + slope * x).collect();
-                let treated: Vec<f64> = bases.iter().map(|(base, tau, slope)| base + tau + slope * x).collect();
+                let control: Vec<f64> = bases
+                    .iter()
+                    .map(|(base, _, slope)| base + slope * x)
+                    .collect();
+                let treated: Vec<f64> = bases
+                    .iter()
+                    .map(|(base, tau, slope)| base + tau + slope * x)
+                    .collect();
                 curve.control_lower.push(quantile(&control, 0.03));
                 curve.control_median.push(quantile(&control, 0.5));
                 curve.control_upper.push(quantile(&control, 0.97));
@@ -1147,6 +1410,78 @@ mod tests {
         assert!(backdoor_linear(&values, rows, 3, 0, 0, &[2], None, 0.95).is_err());
         assert!(backdoor_linear(&values, rows, 3, 0, 1, &[2], Some(rows), 0.95).is_err());
         assert!(backdoor_linear(&values, rows, 3, 0, 1, &[2], None, 0.4).is_err());
+    }
+
+    #[test]
+    fn frontdoor_two_stage_serializes_stages_interval_and_progress() {
+        let rows = 80;
+        let treatment: Vec<f64> = (0..rows).map(|row| (row % 7) as f64 - 3.0).collect();
+        let mediator: Vec<f64> = treatment
+            .iter()
+            .enumerate()
+            .map(|(row, treatment)| 4.0 + 2.0 * treatment + ((row * 3) % 5) as f64 * 0.01)
+            .collect();
+        let outcome: Vec<f64> = mediator
+            .iter()
+            .zip(&treatment)
+            .map(|(mediator, treatment)| 8.0 + 3.0 * mediator + 5.0 * treatment)
+            .collect();
+        let mut values = Vec::with_capacity(rows * 3);
+        values.extend(&treatment);
+        values.extend(&mediator);
+        values.extend(&outcome);
+        let mut progress_events = Vec::new();
+        let result = frontdoor_two_stage_evidence(
+            &values,
+            rows,
+            3,
+            0,
+            1,
+            2,
+            &[],
+            &[0],
+            0.0,
+            1.0,
+            FrontdoorUncertainty::Bootstrap {
+                simulations: 20,
+                sample_size_fraction: 1.0,
+                confidence_level: 0.95,
+                seed: 0,
+            },
+            |stage, completed, total| progress_events.push((stage, completed, total)),
+        )
+        .unwrap();
+        let value = serde_json::to_value(result).unwrap();
+        assert_eq!(value["kind"], "frontdoorTwoStage");
+        assert_eq!(value["observations"], rows);
+        assert_eq!(value["secondStageAdjustment"], serde_json::json!([0]));
+        assert!((value["estimate"].as_f64().unwrap() - 6.0).abs() < 0.02);
+        assert_eq!(value["uncertainty"]["kind"], "bootstrap");
+        assert_eq!(value["uncertainty"]["simulations"], 20);
+        assert_eq!(
+            progress_events.first(),
+            Some(&("frontdoor-bootstrap", 0, 20))
+        );
+        assert_eq!(
+            progress_events.last(),
+            Some(&("frontdoor-bootstrap", 20, 20))
+        );
+
+        assert!(frontdoor_two_stage_evidence(
+            &values,
+            rows,
+            3,
+            0,
+            0,
+            2,
+            &[],
+            &[0],
+            0.0,
+            1.0,
+            FrontdoorUncertainty::None,
+            |_, _, _| {},
+        )
+        .is_err());
     }
 
     #[test]
@@ -1525,5 +1860,66 @@ mod tests {
         assert!(
             discrete_bn_query(&values, rows, 3, &[0, 1, 2], &names, &edges, 0, 1, 1, 5.0).is_err()
         );
+    }
+
+    #[test]
+    fn binary_ett_facade_preserves_the_exact_g_formula_result() {
+        let cells = [
+            (0.0, 0.0, 0.0, 30),
+            (0.0, 0.0, 1.0, 10),
+            (0.0, 1.0, 0.0, 5),
+            (0.0, 1.0, 1.0, 5),
+            (1.0, 0.0, 0.0, 5),
+            (1.0, 0.0, 1.0, 5),
+            (1.0, 1.0, 0.0, 10),
+            (1.0, 1.0, 1.0, 30),
+        ];
+        let mut z = Vec::new();
+        let mut x = Vec::new();
+        let mut y = Vec::new();
+        for (z_value, x_value, y_value, count) in cells {
+            for _ in 0..count {
+                z.push(z_value);
+                x.push(x_value);
+                y.push(y_value);
+            }
+        }
+        let rows = z.len();
+        let values = z.into_iter().chain(x).chain(y).collect::<Vec<_>>();
+        let names = vec!["Z".to_owned(), "X".to_owned(), "Y".to_owned()];
+        let result = serde_json::to_value(
+            binary_ett(
+                &values,
+                rows,
+                3,
+                &[0, 1, 2],
+                &names,
+                &[(0, 1), (0, 2), (1, 2)],
+                1,
+                2,
+                &[],
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["kind"], "binaryEtt");
+        assert!((result["treatedPotentialOutcomeMean"].as_f64().unwrap() - 0.70).abs() < 1e-12);
+        assert!((result["untreatedPotentialOutcomeMean"].as_f64().unwrap() - 0.45).abs() < 1e-12);
+        assert!((result["effectOnTreated"].as_f64().unwrap() - 0.25).abs() < 1e-12);
+
+        let mut invalid = values;
+        invalid[0] = 2.0;
+        assert!(binary_ett(
+            &invalid,
+            rows,
+            3,
+            &[0, 1, 2],
+            &names,
+            &[(0, 1), (0, 2), (1, 2)],
+            1,
+            2,
+            &[],
+        )
+        .is_err());
     }
 }
