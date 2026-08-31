@@ -321,8 +321,7 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
     </ul>
   )
 
-  return (
-    <>
+  const deleteDialog = (
     <ConfirmDialog
       open={pendingDelete !== null}
       title="Delete this counterfactual?"
@@ -332,11 +331,15 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
       onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
       onClose={() => setPendingDelete(null)}
     />
+  )
+
+  return (
+    <>
     <WorkbenchLayout
       id="counterfactual"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
-      bottom={{ title: `Runs · ${runs.length}`, body: ledger, defaultSize: 150 }}
+      bottom={{ title: `Runs · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>
   )

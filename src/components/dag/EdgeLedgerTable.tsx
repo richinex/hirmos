@@ -4,6 +4,7 @@ import { cellPadding, countLine, FacetPills, FilterField, SortHeader, TableShell
 import { num, table as tableCn, td, tr } from '@/components/ui/recipes'
 import type { DagDocument, DagEdgeId, DirectedDagEdge, EdgeSupport, EdgeTiming } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
+import { useOpenPane } from '@/components/shell/WorkbenchLayout'
 import { cn } from '@/lib/utils'
 
 interface LedgerRow {
@@ -43,6 +44,7 @@ export function EdgeLedgerTable({ document, selectedEdge, onSelectEdge }: {
   readonly selectedEdge: DagEdgeId | null
   readonly onSelectEdge: (edge: DagEdgeId) => void
 }) {
+  const openPane = useOpenPane()
   const titleId = useId()
   const [density] = useTableDensity()
   const [search, setSearch] = useState('')
@@ -121,7 +123,7 @@ export function EdgeLedgerTable({ document, selectedEdge, onSelectEdge }: {
           {table.getRowModel().rows.map((row) => {
             const selected = row.original.id === selectedEdge
             return (
-              <tr key={row.id} className={tr(selected ? 'selected' : 'action')} onClick={() => onSelectEdge(row.original.id)}>
+              <tr key={row.id} className={tr(selected ? 'selected' : 'action')} onClick={() => { onSelectEdge(row.original.id); openPane('inspector') }}>
                 {row.getVisibleCells().map((cell) => {
                   const align = (cell.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined)?.align
                   return (

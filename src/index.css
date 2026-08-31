@@ -276,6 +276,12 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
 }
 @media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
 
+/* A placeholder that resolves within the dwell never paints: the skeleton's promise is only made
+   when the wait is real. The delay sits on the appearing state alone; removal is instant, so a
+   late arrival is never held back by its own placeholder. */
+@keyframes hold-appear { to { opacity: 1; } }
+.hold-appear { opacity: 0; animation: hold-appear 150ms var(--default-transition-timing-function) 200ms both; }
+
 /* A determinate bar that is also alive: `.bar-live` is the TRACK. A 48px highlight crosses the whole
    track at one speed whatever the fill, and a 14px bright edge marks the fill's frontier. 1.8s and linear:
    a travelling highlight, not a breath, so it does not try to match the 0.9s house loop. */

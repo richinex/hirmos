@@ -497,8 +497,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     </ul>
   )
 
-  return (
-    <>
+  const deleteDialog = (
     <ConfirmDialog
       open={pendingDelete !== null}
       title="Delete this probe?"
@@ -508,11 +507,15 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
       onClose={() => setPendingDelete(null)}
     />
+  )
+
+  return (
+    <>
     <WorkbenchLayout
       id="sensitivity"
       stage={stage}
       inspector={{ title: 'Estimate and method requirements', body: inspector }}
-      bottom={{ title: `Probes · ${runs.length}`, body: ledger, defaultSize: 150 }}
+      bottom={{ title: `Probes · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>
   )

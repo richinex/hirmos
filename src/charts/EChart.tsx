@@ -63,5 +63,5 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId }
   useEffect(() => { chart.current?.setOption(option, { notMerge: true }) }, [option])
 
   if (failed) return <p role="alert" className="grid min-h-40 place-items-center text-body text-danger">The chart could not be loaded.</p>
-  return <div ref={host} role="img" aria-label={label} aria-description={describe(option)} data-testid={testId} style={style} aria-busy={mounted ? undefined : true} className={`min-w-0 w-full ${className}${mounted ? '' : ' skeleton rounded-lg'}`} />
+  return <div ref={host} role="img" aria-label={label} aria-description={describe(option)} data-testid={testId} style={style} aria-busy={mounted ? undefined : true} className={`min-w-0 w-full ${className}${mounted ? '' : ' skeleton hold-appear rounded-lg'}`} />
 }

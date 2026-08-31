@@ -34,7 +34,8 @@ export function runComparisonOption(rows: readonly RunComparisonRow[], theme: Ch
       type: 'value',
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
+      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize, hideOverlap: true, formatter: (value: number) => formatStatistic('raw', value).text },
+      splitNumber: 4,
       splitLine: { lineStyle: { color: theme.hair } },
     },
     yAxis: {

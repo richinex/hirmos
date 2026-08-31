@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/ui/Sheet'
@@ -49,6 +49,15 @@ const PANE_HEADER_HEIGHT = 36
 
 type PhonePane = 'inspector' | 'bottom'
 
+/**
+ * Lets content inside a pane surface another pane on phones, where panes are sheets: selecting an
+ * arrow in the ledger opens the inspector that edits it. On desktop every pane is already visible,
+ * so the default request is a no-op.
+ */
+const PaneRequestContext = createContext<(pane: PhonePane) => void>(() => {})
+
+export const useOpenPane = (): ((pane: PhonePane) => void) => useContext(PaneRequestContext)
+
 /** Below `md` the panes become bottom sheets opened from a bar under the stage, as Octopus does for its drawer. */
 function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
   readonly stage: ReactNode
@@ -58,6 +67,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
 }) {
   const [open, setOpen] = useState<PhonePane | null>(null)
   return (
+    <PaneRequestContext.Provider value={setOpen}>
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="panel-scroll min-h-0 flex-1 overflow-y-auto">
         <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'px-4 py-5')}>{stage}</div>
@@ -85,6 +95,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
         </Sheet>
       )}
     </div>
+    </PaneRequestContext.Provider>
   )
 }
 

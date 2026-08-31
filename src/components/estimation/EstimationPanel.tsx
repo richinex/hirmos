@@ -1214,8 +1214,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                       : []
                   })}
                 />
-                <p className={cn(fieldHint, 'max-w-[65ch]')}>Available: pre-run checks completed. Review: runnable, with conditions to assess. Unavailable: a known requirement is not met.</p>
-                {method.ok && <p className={cn(fieldHint, 'max-w-[65ch]')}>{method.value.summary}</p>}
+                <dl className={cn(fieldHint, 'm-0 grid max-w-[65ch] grid-cols-[auto_1fr] gap-x-3 gap-y-0.5')}>
+                  <dt className="text-muted">Available</dt><dd className="m-0">Pre-run checks completed.</dd>
+                  <dt className="text-muted">Review</dt><dd className="m-0">Runnable, with conditions to assess.</dd>
+                  <dt className="text-muted">Unavailable</dt><dd className="m-0">A known requirement is not met.</dd>
+                </dl>
+                {method.ok && <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{method.value.summary}</p>}
                 {method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>
               <div>{controls}</div>
@@ -1308,8 +1312,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   )
   const dependentProbes = pendingDelete === null ? 0 : sensitivityRuns.filter((probe) => probe.estimationRun === pendingDelete.id).length
 
-  return (
-    <>
+  const deleteDialog = (
     <ConfirmDialog
       open={pendingDelete !== null}
       title="Delete this estimate?"
@@ -1319,11 +1322,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
       onClose={() => setPendingDelete(null)}
     />
+  )
+
+  return (
+    <>
     <WorkbenchLayout
       id="estimation"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
-      bottom={{ title: `Runs · ${runs.length}`, body: ledger, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
+      bottom={{ title: `Runs · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
     />
     </>
   )
