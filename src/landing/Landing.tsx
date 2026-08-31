@@ -108,9 +108,7 @@ export function Landing() {
             <strong>causal estimate</strong>
           </h1>
           <p className="landing-lede">
-            With Hirmos, prepare and diagnose data, use discovery methods and domain knowledge to develop a
-            causal graph, define and identify a causal question, then estimate the effect and assess its
-            sensitivity to assumptions.
+            Hirmos provides the framework for asking and answering questions about your data.
           </p>
           <div className="landing-actions">
             <a className="landing-primary" href="/app">Start an analysis</a>
