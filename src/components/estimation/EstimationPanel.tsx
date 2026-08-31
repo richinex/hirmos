@@ -1171,7 +1171,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const stage = (
     <section aria-labelledby="estimation-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-signal')}>06 · Estimation</span>
+        <span className={label('text-faint')}>06 · Estimation</span>
         <h2 id="estimation-title" className="mb-2 mt-2 text-heading text-ink">Estimate the identified effect</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
@@ -1236,8 +1236,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       {latestRun !== null && (
         <section aria-labelledby="estimation-results-title" className="grid grid-cols-1 gap-4">
           <div>
-            <span className={label('text-faint')}>Recorded results</span>
-            <h2 id="estimation-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Estimates</h2>
+            <h2 id="estimation-results-title" className="m-0 text-title font-medium text-ink">Estimates</h2>
           </div>
           {(() => {
             const bound = studies.find((candidate) => candidate.id === latestRun.study)

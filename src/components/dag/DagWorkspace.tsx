@@ -777,7 +777,7 @@ export function DagWorkspace({
   const header = (
     <div className="mb-3">
       <div>
-        <span className={label('text-signal')}>04 · DAG workspace</span>
+        <span className={label('text-faint')}>04 · DAG workspace</span>
         <h2 id="dag-workspace-title" className="mb-2 mt-2 text-heading text-ink">Represent the causal assumptions</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A directed acyclic graph (DAG) represents a data-generating process: nodes are variables, and each arrow states a direct causal relationship. In this chapter, construct the graph for the causal question and record the basis for each arrow. Discovery results can contribute empirical evidence, but they do not determine the graph.</p>
       </div>

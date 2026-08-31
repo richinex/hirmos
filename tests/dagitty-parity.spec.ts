@@ -120,8 +120,9 @@ for (const fixture of selected) {
       await expect(page.getByRole('button', { name: 'Canonical set · A, B, Z' })).toBeVisible()
 
       await page.getByRole('button', { name: 'Minimal set 1 · A, Z' }).click()
-      await expect(page.getByText('Minimal adjustment set 1', { exact: false })).toBeVisible()
-      await expect(page.getByText('Canonical set: A, B, Z.', { exact: true })).toBeVisible()
+      const canvas = page.getByTestId('canvas')
+      await expect(canvas.getByText('Minimal adjustment set 1', { exact: false })).toBeVisible()
+      await expect(canvas.getByText('Canonical set: A, B, Z.', { exact: true })).toBeVisible()
     }
   })
 }

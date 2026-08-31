@@ -1,3 +1,4 @@
+import { RunFold } from '@/components/ui/RunFold'
 import { Select } from '@/components/ui/Select'
 import { CausalHierarchy } from './CausalHierarchy'
 import { useId, useMemo, useReducer } from 'react'
@@ -74,15 +75,6 @@ const step = (state: Job, event: Event): Job => {
   }
 }
 
-const resultLabel = (result: IdentificationArtifact['result']): string => {
-  switch (result.kind) {
-    case 'identified': return 'Identified by back-door adjustment'
-    case 'graphically-identified': return 'Identified by the ID algorithm'
-    case 'counterfactually-identified': return 'Identified by IDC*'
-    case 'backdoor-not-identified': return 'Not identified from the observational distribution'
-    default: return assertNever(result)
-  }
-}
 
 const ledgerLabel = (result: IdentificationArtifact['result']): string => {
   switch (result.kind) {
@@ -113,7 +105,7 @@ const assignmentHint = (kind: AssignmentMechanism['kind']): string => {
 function StudyRecord({ study, identification }: { readonly study: StudySpecification; readonly identification: IdentificationArtifact | null }) {
   return (
     <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
-      <summary className="cursor-pointer text-ink">Study record</summary>
+      <summary className="cursor-pointer text-ink">Study details</summary>
       <RecordList className="mt-2 text-label">
         <RecordRow term="Study"><span className={literal('text-muted')} title={study.id}>{study.id.slice(0, 8)}</span></RecordRow>
         <RecordRow term="Identification">{identification === null ? '—' : <span className={literal('text-muted')} title={identification.id}>{identification.id.slice(0, 8)}</span>}</RecordRow>
@@ -138,15 +130,8 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
   const selectedLabel = result.kind === 'identified'
     ? result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
     : null
-  return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${title} identification`}>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div>
-          <span className={label(result.kind === 'backdoor-not-identified' ? 'text-muted' : 'text-ok')}>{resultLabel(result)}</span>
-          <h3 className="mb-0 mt-1 text-title font-medium text-ink">{title}</h3>
-        </div>
-        <span className={num('text-micro text-faint')}>{formatCount(study.population.observations).text} rows · {study.dagName}</span>
-      </div>
+  const body = (
+    <>
       <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
         <span className="text-ink">{describeAssignmentKind(study.assignment.kind)} treatment</span> · {study.assignment.description} {describeStudyDesignCategory(studyDesignCategory(study))}
       </p>
@@ -225,6 +210,26 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
         </div>
       )}
       <StudyRecord study={study} identification={identification} />
+    </>
+  )
+  if (!current) {
+    // History rows fold to one line in the studies drawer; only the newest record keeps the stage.
+    return (
+      <RunFold title={title} figure={ledgerLabel(result)} stamp={`${study.dagName} · ${formatTime(study.createdAt)}`}>
+        {body}
+      </RunFold>
+    )
+  }
+  return (
+    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${title} identification`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <span className={label('text-signal')}>Current study</span>
+          <h3 className="mb-0 mt-1 text-title font-medium text-ink">{title}</h3>
+        </div>
+        <span className={num('text-micro text-faint')}>{formatCount(study.population.observations).text} rows · {study.dagName}</span>
+      </div>
+      {body}
     </article>
   )
 }
@@ -280,6 +285,10 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
   const preview = useMemo(() => previewStudyBinding(state.draft, documents, prepared), [documents, prepared, state.draft])
   const evidenceGraph = useMemo(() => (document === null ? null : lagGraphFromDag(document)), [document])
   const latestIdentified = [...identifications].reverse().find((identification) => identification.result.kind !== 'backdoor-not-identified') ?? null
+  const newestRecorded = [...studies].reverse().flatMap((study) => {
+    const identification = identifications.find((candidate) => candidate.study === study.id)
+    return identification === undefined ? [] : [{ study, identification }]
+  })[0] ?? null
   const adjustmentChoice = state.job.kind === 'choosing-adjustment-set' ? state.job : null
 
   const recordIdentification = (study: StudySpecification, evidence: BackdoorIdentificationEvidence, choice: AdjustmentSetChoice) => {
@@ -333,7 +342,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
   const stage = (
     <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-signal')}>05 · Study design</span>
+        <span className={label('text-faint')}>05 · Study design</span>
         <h2 id="study-title" className="mb-2 mt-2 text-heading text-ink">Define and identify the causal question</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. Bind the question to a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
       </div>
@@ -460,27 +469,19 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         </button>
       </section>
 
-      {studies.length > 0 && (
+      {newestRecorded !== null && (
         <section aria-labelledby="study-results-title" className="grid gap-4">
           <div>
-            <span className={label('text-faint')}>Recorded studies</span>
-            <h2 id="study-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Identification results</h2>
+            <h2 id="study-results-title" className="m-0 text-title font-medium text-ink">Identified studies</h2>
           </div>
-          {[...studies].reverse().map((study) => {
-            const identification = identifications.find((candidate) => candidate.study === study.id) ?? null
-            return identification === null
-              ? null
-              : (
-                <IdentificationCard
-                  key={study.id}
-                  study={study}
-                  identification={identification}
-                  current={latestIdentified?.id === identification.id}
-                  onContinue={onContinue}
-                  onOpenDag={onOpenDag}
-                />
-              )
-          })}
+          <IdentificationCard
+            key={newestRecorded.study.id}
+            study={newestRecorded.study}
+            identification={newestRecorded.identification}
+            current
+            onContinue={onContinue}
+            onOpenDag={onOpenDag}
+          />
         </section>
       )}
     </section>
@@ -527,14 +528,23 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       {studies.length === 0 && <li className="px-3 py-2 text-faint">Choose a graph, treatment and outcome, then run identification.</li>}
       {[...studies].reverse().map((study) => {
         const identification = identifications.find((candidate) => candidate.study === study.id) ?? null
-        return (
-          <li key={study.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
-            <span className="text-ink">{estimandSentence(study)}</span>
-            <span className={num('text-micro text-faint')}>
-              {identification === null ? 'pending' : ledgerLabel(identification.result)} · {study.dagName} · {formatTime(study.createdAt)}
-            </span>
-          </li>
-        )
+        return identification === null
+          ? (
+            <li key={study.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
+              <span className="text-ink">{estimandSentence(study)}</span>
+              <span className={num('text-micro text-faint')}>pending · {study.dagName} · {formatTime(study.createdAt)}</span>
+            </li>
+          )
+          : (
+            <IdentificationCard
+              key={study.id}
+              study={study}
+              identification={identification}
+              current={false}
+              onContinue={onContinue}
+              onOpenDag={onOpenDag}
+            />
+          )
       })}
     </ul>
   )

@@ -228,7 +228,7 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
   const stage = (
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-signal')}>08 · Counterfactuals</span>
+        <span className={label('text-faint')}>08 · Counterfactuals</span>
         <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate individual counterfactual outcomes</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A counterfactual compares the outcomes that the same unit would have under different interventions. In this chapter, fit a linear structural causal model, infer each row's disturbance terms, hold them fixed, and predict the outcome under two treatment values. These are model-implied counterfactuals and require stronger structural assumptions than an average intervention effect.</p>
       </div>
@@ -273,8 +273,7 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
       {latest !== null && (
         <section aria-labelledby="counterfactual-results-title" className="grid gap-4">
           <div>
-            <span className={label('text-faint')}>Recorded results</span>
-            <h2 id="counterfactual-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Counterfactuals</h2>
+            <h2 id="counterfactual-results-title" className="m-0 text-title font-medium text-ink">Counterfactuals</h2>
           </div>
           {(() => {
             const bound = studies.find((candidate) => candidate.id === latest.study)

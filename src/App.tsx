@@ -94,8 +94,6 @@ const THEME_ICON: Record<ThemeChoice, string> = {
   system: 'brightness_auto',
 }
 
-const navigateToChapter = (chapter: ChapterId) => navigate(chapterPath(chapter))
-
 const formatBytes = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
@@ -356,13 +354,33 @@ function App() {
   const activeChapter = chapterIsAvailable(requestedChapter) ? requestedChapter : defaultChapter
   const activeName = CHAPTERS.find((chapter) => chapter.id === activeChapter)?.name ?? 'Hirmos'
 
-  // The workflow is linear, so on idle the next chapter's chunk and the chart registry are warmed;
-  // the first navigation then finds its module already resolved instead of paying the fetch.
+  // Keep the current chapter on screen while a cold code chunk is fetched. The request counter prevents
+  // a slower first click from winning if the user chooses a different chapter before it has loaded.
+  const navigationRequest = useRef(0)
+  const navigateToChapter = useCallback((chapter: ChapterId) => {
+    const request = ++navigationRequest.current
+    const commit = () => {
+      if (navigationRequest.current === request) navigate(chapterPath(chapter))
+    }
+    const load = PANEL_LOADERS[chapter]
+    if (load === undefined) { commit(); return }
+    void load().then(commit, commit)
+  }, [])
+
+  const warmableChapterKey = chapters
+    .filter((chapter) => chapter.status !== 'locked' && PANEL_LOADERS[chapter.id] !== undefined)
+    .map((chapter) => chapter.id)
+    .join('|')
+  const chartsAreReachable = workflow.kind === 'profiled' && workflow.prepared !== null
+
+  // Warm every available lazy chapter and the shared chart registry during idle time. Availability can
+  // expand as the study progresses, so the key changes only when another chapter becomes reachable.
   useEffect(() => {
     const warm = () => {
-      const next = CHAPTERS[CHAPTERS.findIndex((chapter) => chapter.id === activeChapter) + 1]
-      if (next !== undefined) prefetchChapter(next.id)
-      void import('@/charts/registry')
+      for (const chapter of warmableChapterKey.split('|')) {
+        if (chapter !== '') prefetchChapter(chapter as ChapterId)
+      }
+      if (chartsAreReachable) void import('@/charts/registry')
     }
     if (typeof window.requestIdleCallback !== 'function') {
       const handle = window.setTimeout(warm, 300)
@@ -370,7 +388,7 @@ function App() {
     }
     const handle = window.requestIdleCallback(warm)
     return () => window.cancelIdleCallback(handle)
-  }, [activeChapter])
+  }, [chartsAreReachable, warmableChapterKey])
 
   // The URL always names the chapter on screen: a legacy `?chapter=` link and a gated chapter both
   // rewrite to the canonical path without adding history, and the tab title follows.
@@ -463,7 +481,7 @@ function App() {
             )}
             {workflow.kind === 'awaiting-project' && (
               <section className="rise my-auto max-w-xl" aria-labelledby="new-analysis-title">
-                <span className={label('text-signal')}>01 · Projects</span>
+                <span className={label('text-faint')}>01 · Projects</span>
                 <h2 id="new-analysis-title" className="mb-6 mt-3 text-heading text-ink">Create an analysis</h2>
                 <form onSubmit={createProject} className="max-w-md space-y-3">
                   <label className="block">

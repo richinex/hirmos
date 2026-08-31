@@ -101,7 +101,7 @@ function DmlRefutationCard({ run, estimation, study, current, onDelete }: { read
   return (
     <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} DML refutation`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Latest probe</span>
+        <span className={label('text-signal')}>Current probe</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       <DmlRefutationRecord run={run} study={study} />
@@ -159,7 +159,7 @@ function RefutationCard({ run, estimation, study, current, onDelete }: { readonl
   return (
     <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} refutation`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Latest probe</span>
+        <span className={label('text-signal')}>Current probe</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       <RefutationRecord run={run} study={study} />
@@ -263,7 +263,7 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
   return (
     <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} unmeasured confounder`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Latest probe</span>
+        <span className={label('text-signal')}>Current probe</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       {record}
@@ -361,7 +361,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   const stage = (
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-signal')}>07 · Sensitivity</span>
+        <span className={label('text-faint')}>07 · Sensitivity</span>
         <h2 id="sensitivity-title" className="mb-2 mt-2 text-heading text-ink">Assess sensitivity to assumptions</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
@@ -443,8 +443,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       {latest !== null ? (
         <section aria-labelledby="sensitivity-results-title" className="grid gap-4">
           <div>
-            <span className={label('text-faint')}>Recorded results</span>
-            <h2 id="sensitivity-results-title" className="mb-0 mt-1 text-title font-medium text-ink">Probes</h2>
+            <h2 id="sensitivity-results-title" className="m-0 text-title font-medium text-ink">Probes</h2>
           </div>
           {(() => {
             const target = estimationRuns.find((candidate) => candidate.id === latest.estimationRun)

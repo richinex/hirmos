@@ -147,7 +147,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <Row term="Name">{manifest.dag.name}</Row>
           <Row term="Revision">{shortId(String(manifest.dag.revision))} · {describeDagValidation(manifest.dag.validation)}</Row>
           <Row term="Origin">{manifest.dag.origin.kind === 'user-authored' ? describeDagBasis(manifest.dag.origin.basis) : 'substantive review of discovery results'}</Row>
-          <Row term="Arrows">{formatCount(manifest.dag.graph.edges.length).text} over {formatCount(manifest.dag.graph.nodes.length).text} nodes</Row>
+          <Row term="Arrows">{formatCount(manifest.dag.graph.edges.length).text} among {formatCount(manifest.dag.graph.nodes.length).text} nodes</Row>
         </Section>
       )}
 
@@ -207,7 +207,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   const stage = (
     <section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-signal')}>09 · Results</span>
+        <span className={label('text-faint')}>09 · Results</span>
         <h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.</p>
       </div>

@@ -70,7 +70,7 @@ export function LagGraphViews({ graph, label, highlighted = [], initial = 'summa
         {graph.tauMax > 0
           ? <SegmentedControl size="sm" className="bg-panel" ariaLabel="Structure view" value={view} onChange={setView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
           : <span className="text-micro text-faint">Directed structure</span>}
-        <span className="text-micro text-faint">{graph.links.length} link{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}</span>
+        <span className="text-micro text-faint">{graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}</span>
       </div>
       <div ref={host} className={view === 'lag-grid' ? 'panel-scroll overflow-x-auto' : 'flex justify-center'}>
         {view === 'summary'

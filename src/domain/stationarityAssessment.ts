@@ -133,7 +133,7 @@ export function levelModelVerdict(name: string, assessment: StationarityAssessme
     case 'levelStationary': return { kind: 'allowed', reason: `${name} is level-stationary.` }
     case 'trendStationary': return { kind: 'allowed', reason: `${name} is trend-stationary; a trend term or detrending is still owed.` }
     case 'breakStationary': return { kind: 'unresolved', reason: `${name} is stationary only around a break at ${assessment.break + 1}; the model does not include it.` }
-    case 'differenceStationary': return { kind: 'refused', reason: `${name} is I(1): a level regression risks a spurious relation. Difference it in Data studio or use a cointegration method.` }
+    case 'differenceStationary': return { kind: 'refused', reason: `${name} is I(1): a level regression risks a spurious relation. Differencing in Data studio or a cointegration method might be needed.` }
     case 'higherOrderOrUnresolved': return { kind: 'refused', reason: `${name} is I(2) or unresolved; no I(0)/I(1) method applies until its order is settled.` }
     case 'inconclusive': return { kind: 'unresolved', reason: `${name}'s stationarity evidence is inconclusive: ${assessment.conflicts.map(describeStationarityConflict).join(' ')}` }
     default: return assertNever(assessment)

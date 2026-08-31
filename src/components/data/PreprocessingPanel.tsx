@@ -333,7 +333,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     <section aria-labelledby="preprocessing-title" className="@container/panel">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <span className={label('text-signal')}>Prepare data</span>
+          <span className={label('text-faint')}>Prepare data</span>
           <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">Set the analysis dataset</h2>
         </div>
         <span className="max-w-[52ch] text-body text-faint">Set how rows are organised, handle missing values, and choose any time-series transformations.</span>

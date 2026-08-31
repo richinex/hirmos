@@ -759,7 +759,7 @@ const applyLevelRule = (
     .map((verdict) => verdict.reason)
   const integratedText = integrated.length === 0
     ? ''
-    : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) in levels, so a level regression can show a spurious relation. Difference ${integrated.length === 1 ? 'it' : 'them'} in Data studio or use a cointegration method.`
+    : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) in levels, so a level regression can show a spurious relation. Differencing in Data studio or a cointegration method might be needed.`
   if (integrated.length > 0 || open.length > 0) { leave(id, [integratedText, ...open].filter((text) => text.length > 0).join(' ')); return }
   satisfy(id, levelVerdicts(context).map((verdict) => verdict.reason).join(' ') || 'No study variables to check.')
 }

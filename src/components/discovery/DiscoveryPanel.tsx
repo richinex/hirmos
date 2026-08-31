@@ -165,7 +165,7 @@ function ResultCard({ run, method, title, meta, open, current, children }: {
         <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl p-4 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
           <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-150 group-open:rotate-180" />
           <div className="min-w-0 flex-1">
-            <span className={label('text-signal')}>{method}</span>
+            <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
             <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{title}</h3>
             <p className="m-0 text-body text-faint">{meta}</p>
           </div>
@@ -499,7 +499,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const stage = (
     <section aria-labelledby="discovery-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-signal')}>03 · Discovery lab</span>
+        <span className={label('text-faint')}>03 · Discovery lab</span>
         <h2 id="discovery-title" className="mb-2 mt-2 text-heading text-ink">Examine candidate relationships</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">Causal discovery uses patterns in data to propose relations between variables, including same-period and lagged relations when time is part of the study. In this chapter, choose a method suited to the observation structure and compare the candidate relations it produces. The result depends on the method's assumptions and does not establish a causal graph on its own.</p>
       </div>
@@ -670,8 +670,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       <section aria-labelledby="discovery-runs-title">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <span className={label('text-faint')}>Discovery runs</span>
-            <h2 id="discovery-runs-title" className="mb-0 mt-1 text-title font-medium text-ink">Results</h2>
+            <h2 id="discovery-runs-title" className="m-0 text-title font-medium text-ink">Discovery runs</h2>
           </div>
           <div className="flex items-center gap-2">
             {runs.length > 1 && (

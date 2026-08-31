@@ -153,6 +153,19 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('button', { name: 'Expand chapter list' }).click()
   await mobileNav.getByRole('button', { name: /Discovery lab/ }).click()
 
+  const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method' })
+  const pcmci = discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })
+  const lpcmci = discoveryMethods.getByRole('radio', { name: /LPCMCI/ })
+  const ocse = discoveryMethods.getByRole('radio', { name: /oCSE/ })
+  expect(await pcmci.evaluate((element) => element instanceof HTMLInputElement && element.type === 'radio')).toBe(true)
+  await pcmci.focus()
+  await pcmci.press('ArrowRight')
+  await expect(lpcmci).toBeChecked()
+  await lpcmci.press('End')
+  await expect(ocse).toBeChecked()
+  await ocse.press('Home')
+  await expect(pcmci).toBeChecked()
+
   const pageWidth = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
   expect(pageWidth.document).toBeLessThanOrEqual(pageWidth.viewport)
 
@@ -212,4 +225,42 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await expect(page.getByRole('heading', { name: 'DirectLiNGAM', exact: true })).toBeVisible()
   await expect(page.getByLabel('DirectLiNGAM evidence graph')).toBeVisible()
   await expect(page.getByLabel('Discovered relations').getByRole('button')).not.toHaveCount(0)
+})
+
+test('keeps the current chapter visible until a cold lazy chapter is ready', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Cold chunk navigation runs once')
+  let releaseChunk: () => void = () => undefined
+  const chunkGate = new Promise<void>((resolve) => { releaseChunk = resolve })
+  let reportChunkRequest: () => void = () => undefined
+  const chunkRequested = new Promise<void>((resolve) => { reportChunkRequest = resolve })
+  await page.route('**/src/components/dag/DagWorkspace.tsx*', async (route) => {
+    reportChunkRequest()
+    await chunkGate
+    await route.continue()
+  })
+
+  await createProject(page)
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'cold-chapter.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('x,y\n1,2\n2,4\n3,6\n4,8\n'),
+  })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await expect(page.getByRole('heading', { name: 'Set the analysis dataset' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('radio', { name: 'Independent observations' }).click()
+  await page.getByRole('checkbox', { name: 'x', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'y', exact: true }).check()
+  await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
+  await expect(page.getByText('Prepared cross-section · 4 rows')).toBeVisible({ timeout: 30_000 })
+
+  const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
+  await navigation.getByRole('button', { name: /DAG workspace/ }).click()
+  await chunkRequested
+  await expect(page).toHaveURL(/\/app$/)
+  await expect(page.getByRole('heading', { name: 'Set the analysis dataset' })).toBeVisible()
+  await expect(page.getByRole('status', { name: 'Loading DAG editor…' })).toHaveCount(0)
+
+  releaseChunk()
+  await expect(page).toHaveURL(/\/app\/dag$/)
+  await expect(page.getByRole('button', { name: 'Substantive knowledge' })).toBeVisible()
 })
