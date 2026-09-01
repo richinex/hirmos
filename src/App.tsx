@@ -636,7 +636,7 @@ function App() {
                       <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>
                       <div className="flex flex-wrap gap-2">
                         <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
-                        <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Explore discovery evidence</button>
+                        <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Run discovery</button>
                       </div>
                     </section>
                   )}

@@ -53,8 +53,8 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
 
       {children}
 
-      <p className={label('m-0 truncate text-faint')} title={profile.source.fingerprint}>
-        SHA-256 <span className={literal('normal-case tracking-normal')}>{profile.source.fingerprint.slice(0, 12)}</span> · DuckDB {profile.parser.engineVersion}
+      <p className="m-0 truncate text-label text-faint" title={profile.source.fingerprint}>
+        SHA-256 <span className={literal()}>{profile.source.fingerprint.slice(0, 12)}</span> · DuckDB {profile.parser.engineVersion}
       </p>
     </section>
   )
