@@ -247,9 +247,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     initialPreprocessingDraft,
   )
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
+  const [stationarityOpen, setStationarityOpen] = useState(true)
+  const [savedRecipe, setSavedRecipe] = useState<string | null>(null)
   const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
   const readiness = readyPreprocessingRecipe(draft)
+  const recipeDirty = readiness.ok && JSON.stringify(readiness.value) !== savedRecipe
   const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
   // The version this panel just made, or the one the project reopened with.
   const preparedCurrent = draft.preparation.kind === 'succeeded' ? draft.preparation.artifact : preparedVersion
@@ -341,6 +344,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
       dispatch({ type: 'preparation-succeeded', artifact: artifact.value })
       onPrepared(artifact.value)
+      setSavedRecipe(JSON.stringify(recipe.value))
     } catch (cause: unknown) {
       dispatch({
         type: 'preparation-failed',
@@ -494,8 +498,14 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               <h3 id="variables-title" className="mb-0 mt-1 text-title font-medium text-ink">Select analysis columns</h3>
             </div>
             <div className="flex items-center gap-2">
-              <button type="button" className={button('quiet')} onClick={() => numericColumns.forEach((column) => { if (column.id !== currentTime && column.id !== currentUnit && !selectedIds.includes(column.id)) dispatch({ type: 'variable-toggled', column: column.id }) })}>Select all</button>
-              <button type="button" className={button('quiet')} onClick={() => selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))}>Clear</button>
+              <button type="button" className={button('quiet')} aria-label="Select all columns" title="Select all columns" onClick={() => numericColumns.forEach((column) => { if (column.id !== currentTime && column.id !== currentUnit && !selectedIds.includes(column.id)) dispatch({ type: 'variable-toggled', column: column.id }) })}>
+                <Icon name="select_all" size={15} className="@md/card:hidden" />
+                <span className="hidden @md/card:inline">Select all</span>
+              </button>
+              <button type="button" className={button('quiet')} aria-label="Clear selected columns" title="Clear selected columns" onClick={() => selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))}>
+                <Icon name="deselect" size={15} className="@md/card:hidden" />
+                <span className="hidden @md/card:inline">Clear</span>
+              </button>
             </div>
           </div>
           <div className="grid max-h-40 gap-1 overflow-y-auto @md/card:grid-cols-2">
@@ -626,15 +636,20 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 </div>
               )}
               {draft.missingness.kind === 'imputation' && (
-                <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[auto_auto] sm:items-end">
+                <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                   <div>
                     <span className={fieldLabel}>Method</span>
-                    <SegmentedControl
+                    <RadioList
                       className="mt-1"
-                      ariaLabel="Imputation method"
+                      legend="Imputation method"
+                      legendHidden
                       value={draft.missingness.kind === 'imputation' ? draft.missingness.method : null}
                       onChange={(method) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), method } })}
-                      options={[{ value: 'linearInterior', label: 'Linear inside the series' }, { value: 'forwardFill', label: 'Carry forward' }, { value: 'structuralZero', label: 'Structural zero' }]}
+                      options={[
+                        { value: 'linearInterior', label: 'Linear inside the series', hint: 'Fill each gap on a straight line between its neighbouring values.' },
+                        { value: 'forwardFill', label: 'Carry forward', hint: 'Repeat the last recorded value through the gap.' },
+                        { value: 'structuralZero', label: 'Structural zero', hint: 'Treat each missing cell as a true zero; asks for confirmation.' },
+                      ]}
                     />
                   </div>
                   {draft.missingness.method !== 'structuralZero' ? (
@@ -745,6 +760,16 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         )}
       </div>
 
+      {preparedCurrent !== null && (
+        <p role="status" className="mb-0 mt-4 flex flex-wrap items-center gap-1.5 text-body text-muted">
+          <Icon name="check_circle" size={14} className="text-ok" />
+          {preparedCurrent.kind === 'prepared-time-series' ? 'Prepared time series' : preparedCurrent.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'} · <span className={num()}>{preparedCurrent.observations.toLocaleString()} rows</span>
+          {describeResolutionRecord(preparedCurrent.resolution) !== null && <> · {describeResolutionRecord(preparedCurrent.resolution)}</>}
+          {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName) !== null && <> · {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName)}</>}
+          {preparedCurrent.kind === 'prepared-time-series' && preparedCurrent.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <> · {preparedCurrent.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</>}
+          {preparedCurrent.kind === 'prepared-panel' && <> · {preparedCurrent.panel.units.toLocaleString()} units × {preparedCurrent.panel.periods.toLocaleString()} periods</>}
+        </p>
+      )}
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
       {(timeSeriesSelected || preparedTimeSeries !== null) && (
@@ -761,7 +786,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               onChange={setDiagnostic}
               options={[
                 { value: 'stationarity', label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
-                { value: 'structure', label: <DiagnosticLabel text="Breaks and seasonality" done={structureChecked} /> },
+                { value: 'structure', label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
                 { value: 'granger', label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
               ]}
             />
@@ -770,30 +795,17 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             <p role="status" className="mb-0 mt-3 text-body text-faint">Create a prepared dataset version to run these diagnostics.</p>
           )}
           <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-              <p className="mb-0 mt-1 text-body text-faint">ADF and KPSS assess the prepared values and their first difference; Zivot–Andrews allows one structural break.</p>
-            </div>
-            <button
-              type="button"
-              className={button('quiet')}
-              disabled={preparedTimeSeries === null}
-              aria-busy={draft.stationarity.kind === 'running'}
-              onClick={draft.stationarity.kind === 'running' ? undefined : () => void runDiagnostics()}
-            >
-              Run stationarity tests
-            </button>
+          <div>
+            <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
+            <p className="mb-0 mt-1 text-body text-faint">ADF and KPSS assess the prepared values and their first difference; Zivot–Andrews allows one structural break.</p>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />
-          <div className="mt-3 flex flex-wrap items-end justify-between gap-3 rounded-lg border border-hair bg-well p-3">
-            <div>
-              <span className={fieldLabel}>Diagnostic scale</span>
-              <p className="mb-0 mt-1 text-label text-faint">Changes the stationarity table only. It does not create another prepared dataset version.</p>
-            </div>
-            <SegmentedControl
-              size="sm"
-              ariaLabel="Stationarity diagnostic scale"
+          <div className="mt-3">
+            <span className={fieldLabel}>Run the tests on</span>
+            <RadioList
+              className="mt-2"
+              legend="Run the stationarity tests on"
+              legendHidden
               value={draft.diagnosticTransform.kind}
               onChange={(next) => {
                 const selected = TRANSFORMS.find((candidate) => candidate.value.kind === next)
@@ -801,27 +813,50 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               }}
               options={TRANSFORMS.map((transform) => ({
                 value: transform.value.kind,
-                label: transform.value.kind === 'levels'
-                  ? 'Prepared values'
+                label: transform.value.kind === 'levels' ? 'Values as prepared' : transform.value.kind === 'difference' ? 'Their first difference' : 'Their linear detrend',
+                hint: transform.value.kind === 'levels'
+                  ? 'Test the data exactly as saved.'
                   : transform.value.kind === 'difference'
-                    ? 'First difference of prepared values'
-                    : 'Linear detrend of prepared values',
+                    ? 'Test period-to-period changes; shows whether one difference is enough.'
+                    : 'Test deviations from a fitted straight-line trend.',
               }))}
             />
+            <div className="mt-3">
+              <button
+                type="button"
+                className={button('quiet')}
+                disabled={preparedTimeSeries === null}
+                aria-busy={draft.stationarity.kind === 'running'}
+                onClick={draft.stationarity.kind === 'running' ? undefined : () => void runDiagnostics()}
+              >
+                Run stationarity tests
+              </button>
+            </div>
           </div>
           {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
           {stationarityEvidence !== null && (
-          <div className="mt-4">
-            <p role="status" className="mb-3 mt-0 flex flex-wrap items-center gap-2 text-body text-muted">
-              <Icon name="check_circle" size={16} className="text-ok" />
-              Stationarity tests · {stationarityEvidence.observations.toLocaleString()} rows · {
-                stationarityEvidence.diagnosticTransform.kind === 'levels'
-                  ? 'prepared values'
-                  : stationarityEvidence.diagnosticTransform.kind === 'difference'
-                    ? 'first difference of prepared values'
-                    : 'linear detrend of prepared values'
-              }
-            </p>
+          <div className="mt-4 rounded-md border border-line bg-panel">
+            <button
+              type="button"
+              onClick={() => setStationarityOpen((value) => !value)}
+              aria-expanded={stationarityOpen}
+              className={label('flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-muted transition-colors hover:text-ink')}
+            >
+              <span className="flex flex-wrap items-center gap-2">
+                <Icon name="check_circle" size={14} className="text-ok" />
+                Stationarity tests · {stationarityEvidence.variables.length} variables · {stationarityEvidence.observations.toLocaleString()} rows · {
+                  stationarityEvidence.diagnosticTransform.kind === 'levels'
+                    ? 'prepared values'
+                    : stationarityEvidence.diagnosticTransform.kind === 'difference'
+                      ? 'first difference of prepared values'
+                      : 'linear detrend of prepared values'
+                }
+              </span>
+              <Icon name={stationarityOpen ? 'expand_less' : 'expand_more'} size={14} className="shrink-0" />
+            </button>
+            <div className="grid transition-[grid-template-rows] duration-200" style={{ gridTemplateRows: stationarityOpen ? '1fr' : '0fr' }}>
+            <div className="overflow-hidden">
+            <div className="border-t border-hair px-2.5 pb-3">
             <div className="figure-strip overflow-x-auto">
             <table className={table}>
               <thead>
@@ -914,10 +949,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 )
               })}
             </div>
-            <details className="mt-3">
-              <summary className="cursor-pointer text-label text-muted">About these tests</summary>
-              <p className="mb-0 mt-2 text-body text-faint">The ADF null hypothesis is a unit root. The KPSS null hypothesis is stationarity. These tests do not transform the source.</p>
-            </details>
+            </div>
+            </div>
+            </div>
           </div>
           )}
           </div>
@@ -945,23 +979,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       )}
 
       {draft.preparation.kind === 'failed' && <Alert tone="danger" className="mt-4"><p className="m-0">{draft.preparation.detail}</p></Alert>}
-      {readiness.ok && (
-      <div className={cn('pop sticky bottom-3 z-(--z-sticky) ml-auto mt-4 flex w-fit max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1.5', draft.preparation.kind === 'succeeded' && 'float rounded-lg border border-hair bg-panel py-2 pl-3.5 pr-2')}>
-        {draft.preparation.kind === 'succeeded'
-            ? (
-              <p role="status" className="m-0 flex flex-wrap items-center gap-1.5 text-body text-muted">
-                <Icon name="check_circle" size={14} className="text-ok" />
-                {draft.preparation.artifact.kind === 'prepared-time-series' ? 'Prepared time series' : draft.preparation.artifact.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'} · <span className={num()}>{draft.preparation.artifact.observations.toLocaleString()} rows</span>
-                {describeResolutionRecord(draft.preparation.artifact.resolution) !== null && <> · {describeResolutionRecord(draft.preparation.artifact.resolution)}</>}
-                {describeSeasonalAdjustment(draft.preparation.artifact.seasonalAdjustment, columnName) !== null && <> · {describeSeasonalAdjustment(draft.preparation.artifact.seasonalAdjustment, columnName)}</>}
-                {draft.preparation.artifact.kind === 'prepared-time-series' && draft.preparation.artifact.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <> · {draft.preparation.artifact.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</>}
-                {draft.preparation.artifact.kind === 'prepared-panel' && <> · {draft.preparation.artifact.panel.units.toLocaleString()} units × {draft.preparation.artifact.panel.periods.toLocaleString()} periods</>}
-              </p>
-            )
-            : null}
+      {recipeDirty && (
+      <div className="pop sticky bottom-3 z-(--z-sticky) ml-auto mt-4 w-fit max-w-full">
         <button
           type="button"
-          className={button('signal', draft.preparation.kind === 'succeeded' ? undefined : 'float')}
+          className={button('signal', 'float')}
           aria-busy={draft.preparation.kind === 'running'}
           onClick={draft.preparation.kind === 'running' ? undefined : () => void createPreparedVersion()}
         >

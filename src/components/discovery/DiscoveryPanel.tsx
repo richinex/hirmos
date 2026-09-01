@@ -10,7 +10,7 @@ import { EligibilityView } from '@/components/EligibilityView'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { OcsePlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { RadioList } from '@/components/ui/RadioList'
 import { button, field, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
 import {
@@ -52,7 +52,6 @@ import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
-import { cn } from '@/lib/utils'
 
 const CROSS_SECTIONAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['direct-lingam', 'DirectLiNGAM']]
 const TEMPORAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
@@ -94,18 +93,13 @@ const methodIdForChoice = (method: DiscoveryMethodChoice) => {
 
 const methodIdOf = (configuration: DiscoveryConfiguration) => methodIdForChoice(configuration.kind)
 
-const eligibilityLabel = (eligibility: MethodEligibility): string => {
+const eligibilityHint = (eligibility: MethodEligibility): string => {
   switch (eligibility.kind) {
-    case 'eligible': return 'available'
-    case 'caution': return 'review'
-    case 'refused': return 'unavailable'
+    case 'eligible': return 'Available: pre-run checks completed.'
+    case 'caution': return 'Review: runnable, with conditions to assess.'
+    case 'refused': return `Unavailable: ${eligibility.violations[0]?.evidence ?? 'a requirement is not met.'}`
     default: return assertNever(eligibility)
   }
-}
-
-function DiscoveryMethodOptionLabel({ name, eligibility }: { readonly name: string; readonly eligibility: MethodEligibility }) {
-  const tone = eligibility.kind === 'eligible' ? 'text-ok' : eligibility.kind === 'caution' ? 'text-warn' : 'text-danger/60'
-  return <span>{name} <span className={cn('ml-1 text-label', tone)}>· {eligibilityLabel(eligibility)}</span></span>
 }
 
 const pValue = (value: number): string => value < 0.0001 ? '<0.0001' : value.toFixed(4)
@@ -360,11 +354,12 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     const candidateEligibility = evaluateDiscoveryEligibility(definition.value, prepared, stationarity)
     return [{
       value,
-      label: <DiscoveryMethodOptionLabel name={name} eligibility={candidateEligibility} />,
+      label: name,
+      hint: eligibilityHint(candidateEligibility),
       disabled: candidateEligibility.kind === 'refused',
       title: candidateEligibility.kind === 'refused'
         ? `${name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
-        : `${name}: ${eligibilityLabel(candidateEligibility)}`,
+        : undefined,
     }]
   })
 
@@ -510,15 +505,14 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       <div className="grid gap-4">
         <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="discovery-method-title">
             <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
-          <SegmentedControl
+          <RadioList
             className="mt-1"
-            ariaLabel="Discovery method"
-            wrap
+            legend="Discovery method"
+            legendHidden
             value={configuration.kind}
             onChange={(method) => dispatch({ type: 'method-selected', method })}
             options={methodOptions}
           />
-          <p className="mb-0 mt-2 max-w-[65ch] text-body text-faint">Available: pre-run checks completed. Review: runnable, with conditions to assess. Unavailable: the prepared observation structure does not meet a method requirement.</p>
 
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">

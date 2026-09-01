@@ -13,7 +13,7 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
-import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { RadioList } from '@/components/ui/RadioList'
 import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualRunArtifact, type LinearScmConfiguration } from '@/domain/counterfactual'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -250,9 +250,16 @@ export function CounterfactualPanel({ source, profile, prepared, studies, identi
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               <label className="block"><span className={fieldLabel}>Set {study?.treatment.name ?? 'treatment'} to</span><input type="number" step="any" aria-label="First intervention value" className={field('text', 'mt-1')} value={state.configuration.interventions[0]} onChange={(event) => configure({ ...state.configuration, interventions: [Number(event.target.value) || 0, state.configuration.interventions[1]] })} /></label>
               <label className="block"><span className={fieldLabel}>and to</span><input type="number" step="any" aria-label="Second intervention value" className={field('text', 'mt-1')} value={state.configuration.interventions[1]} onChange={(event) => configure({ ...state.configuration, interventions: [state.configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
-              <div>
-                <span className={fieldLabel}>Infer disturbance terms</span>
-                <SegmentedControl className="mt-1" ariaLabel="Infer disturbance terms" value={state.configuration.observationNoise === null ? 'exact' : 'noise'} onChange={(mode) => configure({ ...state.configuration, observationNoise: mode === 'exact' ? null : 0.1 })} options={[{ value: 'exact', label: 'Exactly' }, { value: 'noise', label: 'Allow observation noise' }]} />
+              <div className="@md/panel:col-span-2">
+                <RadioList
+                  legend="Infer disturbance terms"
+                  value={state.configuration.observationNoise === null ? 'exact' : 'noise'}
+                  onChange={(mode) => configure({ ...state.configuration, observationNoise: mode === 'exact' ? null : 0.1 })}
+                  options={[
+                    { value: 'exact', label: 'Exactly', hint: 'Recovers each disturbance term exactly from the fitted equations.' },
+                    { value: 'noise', label: 'Allow observation noise', hint: 'Infers disturbance terms allowing observation noise at the chosen scale.' },
+                  ]}
+                />
               </div>
               {state.configuration.observationNoise !== null && (
                 <label className="block"><span className={fieldLabel}>Noise scale</span><input type="number" step="any" min={0.0001} aria-label="Observation noise scale" className={field('text', 'mt-1')} value={state.configuration.observationNoise} onChange={(event) => configure({ ...state.configuration, observationNoise: Math.max(0.0001, Number(event.target.value) || 0.0001) })} /></label>

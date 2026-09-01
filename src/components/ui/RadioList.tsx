@@ -13,6 +13,8 @@ export interface RadioOption<V extends string> {
   readonly label: string
   readonly hint?: string
   readonly disabled?: boolean
+  /** Shown on hover; use it for the reason an option is disabled. */
+  readonly title?: string
 }
 
 export function RadioList<V extends string>({ legend, legendHidden = false, value, onChange, options, className }: {
@@ -34,6 +36,7 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
           return (
             <label
               key={option.value}
+              title={option.title}
               className={cn(
                 'relative grid grid-cols-[auto_1fr] items-start gap-x-2.5 rounded-md border px-2.5 py-1.5 transition-colors duration-150',
                 option.disabled ? 'cursor-not-allowed text-faint' : 'cursor-pointer',

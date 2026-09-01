@@ -651,7 +651,7 @@ function App() {
                           ariaLabel="Source file storage"
                           value={workflow.profile.source.persistence.kind}
                           onChange={(kind) => void changeSourcePersistence(kind)}
-                          options={[{ value: 'ephemeral', label: 'Not stored' }, { value: 'cached-locally', label: 'Cached in this browser', disabled: !sourceCacheAvailable(), title: sourceCacheAvailable() ? undefined : 'This browser does not offer a private file store.' }]}
+                          options={[{ value: 'ephemeral', label: 'Not stored' }, { value: 'cached-locally', label: 'Cached locally', disabled: !sourceCacheAvailable(), title: sourceCacheAvailable() ? undefined : 'This browser does not offer a private file store.' }]}
                         />
                         <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
                           Choose another file

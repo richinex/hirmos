@@ -18,6 +18,7 @@ import { Formula } from '@/components/ui/Formula'
 import { RunFold } from '@/components/ui/RunFold'
 import { FigureParts, IntervalFigure, MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
+import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
@@ -180,27 +181,13 @@ const sameStudyDataBinding = (left: StudyDataBinding, right: StudyDataBinding): 
   && left.treatment === right.treatment
   && left.outcome === right.outcome
 
-const eligibilityLabel = (eligibility: MethodEligibility): string => {
+const eligibilityHint = (eligibility: MethodEligibility): string => {
   switch (eligibility.kind) {
-    case 'eligible': return 'available'
-    case 'caution': return 'review'
-    case 'refused': return 'unavailable'
+    case 'eligible': return 'Available: pre-run checks completed.'
+    case 'caution': return 'Review: runnable, with conditions to assess.'
+    case 'refused': return `Unavailable: ${eligibility.violations[0]?.evidence ?? 'a known requirement is not met.'}`
     default: return assertNever(eligibility)
   }
-}
-
-const eligibilityTone = (eligibility: MethodEligibility): string => {
-  switch (eligibility.kind) {
-    case 'eligible': return 'text-ok'
-    case 'caution': return 'text-warn'
-    case 'refused': return 'text-danger'
-    default: return assertNever(eligibility)
-  }
-}
-
-function EstimatorOptionLabel({ name, eligibility }: { readonly name: string; readonly eligibility: MethodEligibility }) {
-  // A refused chip is already grey and hatched; a fully saturated red status word would outshout it.
-  return <span>{name} <span className={cn('ml-1 text-label', eligibility.kind === 'refused' ? 'text-danger/60' : eligibilityTone(eligibility))}>· {eligibilityLabel(eligibility)}</span></span>
 }
 
 const panelWeight = (values: readonly number[], index: number): string => formatStatistic('score', values[index] ?? Number.NaN).text
@@ -1030,7 +1017,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <label className="block"><span className={fieldLabel}>Maximum lag</span><input type="number" min={1} max={24} aria-label="Maximum lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => configure({ ...configuration, maxLag: Math.max(1, Math.min(24, Number(event.target.value) || 1)) })} /></label>
             <div>
               <span className={fieldLabel}>Deterministic terms</span>
-              <SegmentedControl className="mt-1" ariaLabel="Deterministic terms" value={configuration.trend} onChange={(trend) => configure({ ...configuration, trend, case: trend === 'c' ? 3 : 4 })} options={[{ value: 'c', label: 'Constant' }, { value: 'ct', label: 'Constant and trend' }]} />
+              <SegmentedControl className="mt-1" fill ariaLabel="Deterministic terms" value={configuration.trend} onChange={(trend) => configure({ ...configuration, trend, case: trend === 'c' ? 3 : 4 })} options={[{ value: 'c', label: 'Constant' }, { value: 'ct', label: 'Constant and trend' }]} />
             </div>
             <div>
               <span className={fieldLabel}>PSS case</span>
@@ -1062,7 +1049,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <div>
               <span className={fieldLabel}>Intervention start</span>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <SegmentedControl ariaLabel="Synthetic intervention start" value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(3, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
+                <RadioList legend="Synthetic intervention start" legendHidden value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(3, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
                 {configuration.start.kind === 'row' && (
                   <label className="text-body text-ink">First post-intervention row<input type="number" min={3} max={prepared.observations} aria-label="First post-intervention row" className={field('text', 'ml-2 w-28')} value={configuration.start.row} onChange={(event) => configure({ ...configuration, start: { kind: 'row', row: Math.max(3, Math.min(prepared.observations, Number(event.target.value) || 3)) } })} /></label>
                 )}
@@ -1128,7 +1115,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <div>
               <span className={fieldLabel}>First-stage estimator</span>
-              <SegmentedControl className="mt-1" ariaLabel="First-stage estimator" value={configuration.estimator.kind} onChange={(kind) => configure({ ...configuration, estimator: kind === 'linear' ? { kind: 'linear' } : { kind: 'knn', k: 15 } })} options={[{ value: 'linear', label: 'Linear' }, { value: 'knn', label: 'k-nearest neighbours' }]} />
+              <SegmentedControl className="mt-1" ariaLabel="First-stage estimator" value={configuration.estimator.kind} onChange={(kind) => configure({ ...configuration, estimator: kind === 'linear' ? { kind: 'linear' } : { kind: 'knn', k: 15 } })} options={[{ value: 'linear', label: 'Linear' }, { value: 'knn', label: 'k-NN' }]} />
             </div>
             {configuration.estimator.kind === 'knn' && (
               <label className="block"><span className={fieldLabel}>Neighbours k</span><input type="number" min={1} max={100} className={field('text', 'mt-1')} value={configuration.estimator.k} onChange={(event) => configure({ ...configuration, estimator: { kind: 'knn', k: Math.max(1, Math.min(100, Number(event.target.value) || 1)) } })} /></label>
@@ -1146,7 +1133,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <div>
               <span className={fieldLabel}>Intervention start</span>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <SegmentedControl ariaLabel="Intervention start" value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(9, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
+                <RadioList legend="Intervention start" legendHidden value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(9, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
                 {configuration.start.kind === 'row' && (
                   <label className="text-body text-ink">First post-intervention row<input type="number" min={9} max={prepared.observations} aria-label="First post-intervention row" className={field('text', 'ml-2 w-28')} value={configuration.start.row} onChange={(event) => configure({ ...configuration, start: { kind: 'row', row: Math.max(9, Math.min(prepared.observations, Number(event.target.value) || 9)) } })} /></label>
                 )}
@@ -1200,28 +1187,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
               </label>
               <div>
-                <span className={fieldLabel}>Estimation methods</span>
-                <SegmentedControl
-                  className="mt-1"
-                  ariaLabel="Estimation methods"
-            wrap
+                <RadioList
+                  legend="Estimation methods"
                   value={state.estimator}
                   onChange={(estimator) => dispatch({ type: 'estimator-chosen', estimator })}
                   options={ESTIMATOR_IDS.flatMap((id) => {
                     const definition = methodDefinition(methodIdOf(id))
                     const candidateEligibility = eligibilityByEstimator.get(id)
                     return definition.ok && candidateEligibility !== undefined
-                      ? [{ value: id, label: <EstimatorOptionLabel name={definition.value.name} eligibility={candidateEligibility} />, disabled: candidateEligibility.kind === 'refused', title: candidateEligibility.kind === 'refused'
-              ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
-              : `${definition.value.name}: ${eligibilityLabel(candidateEligibility)}` }]
+                      ? [{ value: id, label: definition.value.name, hint: eligibilityHint(candidateEligibility), disabled: candidateEligibility.kind === 'refused', title: candidateEligibility.kind === 'refused' ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}` : undefined }]
                       : []
                   })}
                 />
-                <dl className={cn(fieldHint, 'm-0 grid max-w-[65ch] grid-cols-[auto_1fr] gap-x-3 gap-y-0.5')}>
-                  <dt className="text-muted">Available</dt><dd className="m-0">Pre-run checks completed.</dd>
-                  <dt className="text-muted">Review</dt><dd className="m-0">Runnable, with conditions to assess.</dd>
-                  <dt className="text-muted">Unavailable</dt><dd className="m-0">A known requirement is not met.</dd>
-                </dl>
                 {method.ok && <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{method.value.summary}</p>}
                 {method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>

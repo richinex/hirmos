@@ -12,6 +12,7 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
+import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -74,6 +75,15 @@ const step = (state: State, event: Event): State => {
 }
 
 const PROBES: NonEmptyArray<SensitivityProbe> = ['linear-refutation', 'unobserved-confounding', 'dml-refutation']
+
+const probeHint = (probe: SensitivityProbe): string => {
+  switch (probe) {
+    case 'linear-refutation': return 'Refits the linear back-door estimate under placebo-treatment, data-subset and random-common-cause perturbations, with residual diagnostics.'
+    case 'unobserved-confounding': return 'Adds a simulated confounder sized from the observed common causes and refits the linear back-door estimate.'
+    case 'dml-refutation': return 'Repeats the double machine learning fit, then runs the placebo, random common cause and confounding bounds probes from one seed.'
+    default: return assertNever(probe)
+  }
+}
 
 const refuterInterpretation = (fact: RefuterFact): string => {
   switch (fact.interpretation.kind) {
@@ -384,8 +394,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               </Select>
             </label>
             <div className="mt-4">
-              <span className={fieldLabel}>Probe</span>
-              <SegmentedControl className="mt-1" ariaLabel="Probe" value={state.probe} onChange={(probe) => dispatch({ type: 'probe-chosen', probe })} options={PROBES.map((probe) => ({ value: probe, label: describeProbe(probe) }))} />
+              <RadioList legend="Probe" value={state.probe} onChange={(probe) => dispatch({ type: 'probe-chosen', probe })} options={PROBES.map((probe) => ({ value: probe, label: describeProbe(probe), hint: probeHint(probe) }))} />
             </div>
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               {configuration.kind === 'linear-refutation' && (
