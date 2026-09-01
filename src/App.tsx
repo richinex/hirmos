@@ -629,8 +629,23 @@ function App() {
                       grangerEvidence={workflow.grangerEvidence}
                       onGrangerEvidence={(evidence) => dispatch({ type: 'granger-evidence-created', evidence })}
                     />
-                    <div>
-                      <span className="mb-1 block text-body font-medium text-ink">Source file</span>
+                  {workflow.prepared !== null && (
+                    <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
+                      <span className={label('text-faint')}>Continue</span>
+                      <h3 id="prepared-next-title" className="mb-1 mt-1 text-title font-medium text-ink">Build a DAG or run discovery</h3>
+                      <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
+                        <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Explore discovery evidence</button>
+                      </div>
+                    </section>
+                  )}
+                  <details className="group rounded-md border border-line bg-panel">
+                    <summary className={label('flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-muted transition-colors marker:content-none hover:text-ink')}>
+                      <span>Source file · storage and export</span>
+                      <Icon name="expand_more" size={14} className="shrink-0 transition-transform group-open:rotate-180" />
+                    </summary>
+                    <div className="border-t border-hair px-2.5 py-3">
                       <div className="flex flex-wrap items-center gap-3">
                         <SegmentedControl
                           ariaLabel="Source file storage"
@@ -651,17 +666,7 @@ function App() {
                       <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">{workflow.profile.source.persistence.kind === 'cached-locally' ? 'Reopening this project reads the file from the browser store.' : 'Reopening this project asks for the file again.'}</p>
                       {cacheProblem !== null && <p role="alert" className="mb-0 mt-1 text-body text-danger">{cacheProblem}</p>}
                     </div>
-                  {workflow.prepared !== null && (
-                    <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
-                      <span className={label('text-faint')}>Continue</span>
-                      <h3 id="prepared-next-title" className="mb-1 mt-1 text-title font-medium text-ink">Build a DAG or run discovery</h3>
-                      <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
-                        <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Explore discovery evidence</button>
-                      </div>
-                    </section>
-                  )}
+                  </details>
                   </DataStudio>
                 )}
                 {activeChapter === 'discovery' && workflow.prepared !== null && (

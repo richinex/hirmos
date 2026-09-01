@@ -3,7 +3,7 @@ import { EChart } from '@/charts/EChart'
 import { changePointsOption } from '@/charts/sensitivity/changePoints'
 import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
-import { button, label, num } from '@/components/ui/recipes'
+import { button, label } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
@@ -25,7 +25,6 @@ interface PreparedSeries {
 
 type PreviewJob =
   | { readonly kind: 'idle' }
-  | { readonly kind: 'loading' }
   | { readonly kind: 'failed'; readonly detail: string }
   | { readonly kind: 'ready'; readonly rows: number; readonly leadingRowsRemoved: number; readonly series: readonly PreparedSeries[] }
 
@@ -71,9 +70,11 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
   readonly prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>
 }) {
   const [job, setJob] = useState<PreviewJob>({ kind: 'idle' })
+  const [open, setOpen] = useState(true)
+  const [busy, setBusy] = useState(false)
 
   const load = async () => {
-    setJob({ kind: 'loading' })
+    setBusy(true)
     try {
       const { materialisePreparedStages, describePreparedMaterialisationProblem } = await import('@/data/prepared')
       const stages = await materialisePreparedStages(source, profile, prepared, prepared.columns)
@@ -101,6 +102,8 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
       setJob({ kind: 'ready', rows: final.rowCount, leadingRowsRemoved: final.leadingRowsRemoved, series })
     } catch (cause: unknown) {
       setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -111,22 +114,30 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
           <h3 id="prepared-preview-title" className="m-0 text-title font-medium text-ink">Prepared values</h3>
           <p className="mb-0 mt-1 text-body text-faint">Inspect the exact values passed to diagnostics, discovery methods, and estimators. An adjusted column shows each station of its recipe.</p>
         </div>
-        <button type="button" className={button('quiet')} aria-busy={job.kind === 'loading'} onClick={job.kind === 'loading' ? undefined : () => void load()}>
+        <button type="button" className={button('quiet')} aria-busy={busy} onClick={busy ? undefined : () => void load()}>
           {job.kind === 'ready' ? 'Refresh preview' : 'Preview prepared values'}
         </button>
       </div>
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{job.detail}</p>}
       {job.kind === 'ready' && (
-        <>
-          <p role="status" className="mb-3 mt-4 flex flex-wrap items-center gap-2 text-body text-muted">
-            <Icon name="check_circle" size={16} className="text-ok" />
-            <span className={num()}>{formatCount(job.rows, { noun: 'aligned rows' }).text}</span>
-            {job.leadingRowsRemoved > 0 && <span>· first source row removed for alignment</span>}
-          </p>
-          <ul className="m-0 grid list-none gap-2 p-0 @2xl/panel:grid-cols-2" aria-label="Prepared series plots">
-            {job.series.map((series) => <PreparedSeriesCell key={series.column} series={series} />)}
-          </ul>
-        </>
+        <div className="mt-4 rounded-md border border-line bg-panel">
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            className={label('flex w-full items-center justify-between px-2.5 py-1.5 text-muted transition-colors hover:text-ink')}
+          >
+            <span>Prepared series · {formatCount(job.rows, { noun: 'aligned rows' }).text}{job.leadingRowsRemoved > 0 ? ' · first source row removed for alignment' : ''}</span>
+            <Icon name={open ? 'expand_less' : 'expand_more'} size={14} className="shrink-0" />
+          </button>
+          <div className="grid transition-[grid-template-rows] duration-200" style={{ gridTemplateRows: open ? '1fr' : '0fr' }}>
+            <div className="overflow-hidden">
+              <ul className="m-0 grid list-none gap-2 border-t border-hair p-2 @2xl/panel:grid-cols-2" aria-label="Prepared series plots">
+                {job.series.map((series) => <PreparedSeriesCell key={series.column} series={series} />)}
+              </ul>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   )
