@@ -946,7 +946,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
 
       {draft.preparation.kind === 'failed' && <Alert tone="danger" className="mt-4"><p className="m-0">{draft.preparation.detail}</p></Alert>}
       {readiness.ok && (
-      <div className="pop float sticky bottom-3 z-(--z-sticky) ml-auto mt-4 flex w-fit max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1.5 rounded-lg border border-hair bg-panel py-2 pl-3.5 pr-2">
+      <div className={cn('pop sticky bottom-3 z-(--z-sticky) ml-auto mt-4 flex w-fit max-w-full flex-wrap items-center justify-end gap-x-3 gap-y-1.5', draft.preparation.kind === 'succeeded' && 'float rounded-lg border border-hair bg-panel py-2 pl-3.5 pr-2')}>
         {draft.preparation.kind === 'succeeded'
             ? (
               <p role="status" className="m-0 flex flex-wrap items-center gap-1.5 text-body text-muted">
@@ -961,7 +961,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             : null}
         <button
           type="button"
-          className={button('signal')}
+          className={button('signal', draft.preparation.kind === 'succeeded' ? undefined : 'float')}
           aria-busy={draft.preparation.kind === 'running'}
           onClick={draft.preparation.kind === 'running' ? undefined : () => void createPreparedVersion()}
         >
