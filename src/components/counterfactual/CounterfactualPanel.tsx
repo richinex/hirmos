@@ -58,7 +58,7 @@ const step = (state: State, event: Event): State => {
 function EquationsTable({ run }: { readonly run: CounterfactualRunArtifact }) {
   const name = (node: number) => run.nodes[node]?.name ?? String(node)
   return (
-    <div className="mt-3 overflow-x-auto">
+    <div className="figure-strip mt-3 overflow-x-auto">
       <table className="w-full border-collapse text-left text-body" aria-label="Structural equations">
         <thead className="text-faint">
           <tr>

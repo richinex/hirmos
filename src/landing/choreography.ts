@@ -1,4 +1,4 @@
-import { animate, stagger, utils } from 'animejs'
+import { animate, cubicBezier, stagger, utils } from 'animejs'
 
 /**
  * The landing page's motion, in the house register: one ease-out for everything, every reveal once,
@@ -7,7 +7,7 @@ import { animate, stagger, utils } from 'animejs'
  * state, because the stylesheet never hides content on its own.
  */
 
-const EASE = 'cubicBezier(0.2, 0.7, 0.2, 1)'
+const EASE = cubicBezier(0.2, 0.7, 0.2, 1)
 
 const groups: readonly { readonly selector: string; readonly children: string }[] = [
   { selector: '.workflow-section .section-intro', children: ':scope > *' },
@@ -16,7 +16,6 @@ const groups: readonly { readonly selector: string; readonly children: string }[
   { selector: '.feature-section--identify', children: ':scope > .backdoor-figure, :scope > .feature-copy > *' },
   { selector: '.structures-section .section-intro', children: ':scope > *' },
   { selector: '.structure-grid', children: ':scope > article' },
-  { selector: '.audit-section', children: ':scope > div > *, :scope > dl > div' },
   { selector: '.final-cta', children: ':scope > *' },
 ]
 

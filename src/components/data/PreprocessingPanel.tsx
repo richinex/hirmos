@@ -12,7 +12,8 @@ import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import { describeMissingnessRefusal, describeResolutionRecord, resolutionCommandFor, type MissingnessResolutionRecord } from '@/domain/missingness'
 import { button, field, fieldLabel, label, num, table, td, th, tr } from '@/components/ui/recipes'
-import { cellPadding, useTableDensity } from '@/components/table/primitives'
+import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
+import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
@@ -137,6 +138,71 @@ const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): Missi
 }
 
 const pValue = (value: number): string => formatP(value, { withLabel: false }).text
+
+interface TestStatisticRow {
+  readonly name: string
+  readonly statistic: number
+  readonly p: number
+  readonly fit: string
+  readonly critical: readonly number[]
+}
+
+const statisticHelper = createColumnHelper<TestStatisticRow>()
+
+const statisticColumns = [
+  statisticHelper.accessor('name', { header: 'Specification', cell: (context) => <span className="text-ink">{context.getValue()}</span> }),
+  statisticHelper.accessor('statistic', { header: 'Statistic', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span> }),
+  statisticHelper.accessor('p', { header: 'p-value', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span> }),
+  statisticHelper.accessor('fit', { header: 'Fit', cell: (context) => <span className="text-muted">{context.getValue()}</span> }),
+  statisticHelper.accessor('critical', { header: 'Critical values · reference order', enableSorting: false, cell: (context) => <span className="text-muted">{criticalValues(context.getValue())}</span> }),
+]
+
+function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestStatisticRow[]; readonly density: Parameters<typeof cellPadding>[0] }) {
+  const [sorting, setSorting] = useState<SortingState>([])
+  const statisticsTable = useReactTable({
+    data: rows as TestStatisticRow[],
+    columns: statisticColumns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  })
+  const padding = cellPadding(density)
+  return (
+    <div className="figure-strip mt-2 overflow-x-auto">
+      <table className={table}>
+        <thead>
+          {statisticsTable.getHeaderGroups().map((group) => (
+            <tr key={group.id}>
+              {group.headers.map((header) => (
+                <SortHeader
+                  key={header.id}
+                  sorted={header.column.getIsSorted()}
+                  canSort={header.column.getCanSort()}
+                  onToggle={() => header.column.toggleSorting()}
+                  align={(header.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined)?.align ?? 'left'}
+                >
+                  {flexRender(header.column.columnDef.header, header.getContext())}
+                </SortHeader>
+              ))}
+            </tr>
+          ))}
+        </thead>
+        <tbody>
+          {statisticsTable.getRowModel().rows.map((row) => (
+            <tr key={row.id} className={tr()}>
+              {row.getVisibleCells().map((cell) => {
+                const align = (cell.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined)?.align
+                return <td key={cell.id} className={td(cn(padding, align === 'right' && num('whitespace-nowrap text-right')))}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 const rawNumber = (value: number): string => formatStatistic('raw', value).text
 const criticalValues = (values: readonly number[]): string => values.map(rawNumber).join(' · ')
 
@@ -779,7 +845,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           </div>
           {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
           {stationarityEvidence !== null && (
-          <div className="mt-4 overflow-x-auto">
+          <div className="mt-4">
             <p role="status" className="mb-3 mt-0 flex flex-wrap items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" />
               Stationarity tests · {stationarityEvidence.observations.toLocaleString()} rows · {
@@ -790,6 +856,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     : 'linear detrend of prepared values'
               }
             </p>
+            <div className="figure-strip overflow-x-auto">
             <table className={table}>
               <thead>
                 <tr>
@@ -815,6 +882,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 })}
               </tbody>
             </table>
+            </div>
             <div className="mt-4 space-y-2" aria-label="Stationarity raw evidence">
               {stationarityEvidence.variables.map((evidence) => {
                 const column = profile.columns.find((candidate) => candidate.id === evidence.column)
@@ -873,32 +941,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 return (
                   <details key={evidence.column} className="rounded-lg border border-hair bg-well px-3 py-2">
                     <summary className="cursor-pointer text-body font-medium text-ink">
-                      {column?.name ?? evidence.column} · complete numerical evidence
+                      {column?.name ?? evidence.column} · test statistics
                     </summary>
-                    <div className="mt-2 overflow-x-auto">
-                      <table className={table}>
-                        <thead>
-                          <tr>
-                            <th className={th()}>Specification</th>
-                            <th className={th('text-right')}>Statistic</th>
-                            <th className={th('text-right')}>p-value</th>
-                            <th className={th()}>Fit</th>
-                            <th className={th()}>Critical values · reference order</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {rows.map((row) => (
-                            <tr key={row.name} className={tr()}>
-                              <td className={td(cn('text-ink', cellPadding(density)))}>{row.name}</td>
-                              <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{rawNumber(row.statistic)}</td>
-                              <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{rawNumber(row.p)}</td>
-                              <td className={td(cn(num('text-muted'), cellPadding(density)))}>{row.fit}</td>
-                              <td className={td(cn(num('text-muted'), cellPadding(density)))}>{criticalValues(row.critical)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <TestStatisticsTable rows={rows} density={density} />
                   </details>
                 )
               })}

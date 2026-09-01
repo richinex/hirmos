@@ -72,7 +72,7 @@ export function LagGraphViews({ graph, label, highlighted = [], initial = 'summa
           : <span className="text-micro text-faint">Directed structure</span>}
         <span className="text-micro text-faint">{graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}</span>
       </div>
-      <div ref={host} className={view === 'lag-grid' ? 'panel-scroll overflow-x-auto' : 'flex justify-center'}>
+      <div ref={host} className={view === 'lag-grid' ? 'figure-strip overflow-x-auto' : 'flex justify-center'}>
         {view === 'summary'
           ? (hostWidth > 0 && <EChart key="summary" option={option} label={label} className="block" style={{ width: summaryMetrics.width, height }} testId="summary-graph" />)
           : <EChart key="lag-grid" option={option} label={label} className="block" style={{ width: gridSize.width, height, minWidth: gridSize.width }} testId="lag-grid" />}

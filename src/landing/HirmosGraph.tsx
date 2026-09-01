@@ -48,8 +48,19 @@ const SEGMENTS = 48
 const point = ([x, y, z]: Point): THREE.Vector3 => new THREE.Vector3(x, y, z)
 
 const colourToken = (style: CSSStyleDeclaration, token: string, fallback: string): THREE.Color => {
-  const value = style.getPropertyValue(token).trim()
-  return new THREE.Color(value || fallback)
+  const value = style.getPropertyValue(token).trim() || fallback
+  const canvas = document.createElement('canvas')
+  canvas.width = 1
+  canvas.height = 1
+  const context = canvas.getContext('2d', { willReadFrequently: true })
+  if (context === null) return new THREE.Color(fallback)
+
+  context.fillStyle = fallback
+  context.fillStyle = value
+  context.fillRect(0, 0, 1, 1)
+  const [red, green, blue] = context.getImageData(0, 0, 1, 1).data
+  const hex = [red, green, blue].map((channel) => channel.toString(16).padStart(2, '0')).join('')
+  return new THREE.Color(`#${hex}`)
 }
 
 /** A deterministic generator, so the cloud is the same on every visit and the entrance can be tuned. */

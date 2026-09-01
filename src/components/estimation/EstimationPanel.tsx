@@ -221,25 +221,25 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
     <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
       <summary className="cursor-pointer text-ink">Panel weights and period effects</summary>
       <div className="mt-3 grid gap-4">
-        <div className="overflow-x-auto">
+        <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel estimator comparison">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Estimator</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Estimate</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Noise level</th></tr></thead>
             <tbody>{estimates.map(([name, estimate]) => <tr key={name}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{name}{name.startsWith('Synthetic difference') ? ' · primary' : ''}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.estimate).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.noiseLevel).text}</td></tr>)}</tbody>
           </table>
         </div>
-        <div className="overflow-x-auto">
+        <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel unit weights">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Control unit</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
             <tbody>{controls.map((unit, index) => <tr key={unit}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{unit}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.did.omega, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticControl.omega, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticDid.omega, index)}</td></tr>)}</tbody>
           </table>
         </div>
-        <div className="overflow-x-auto">
+        <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel time weights">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Pre-period</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
             <tbody>{preLabels.map((period, index) => <tr key={`${period}-${index}`}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{period}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.did.lambda, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticControl.lambda, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticDid.lambda, index)}</td></tr>)}</tbody>
           </table>
         </div>
-        <div className="overflow-x-auto">
+        <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel post-period effects">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Post-period</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
             <tbody>{postLabels.map((period, index) => <tr key={`${period}-${index}`}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{period}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.did.effectCurve[index] ?? Number.NaN).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.syntheticControl.effectCurve[index] ?? Number.NaN).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.syntheticDid.effectCurve[index] ?? Number.NaN).text}</td></tr>)}</tbody>

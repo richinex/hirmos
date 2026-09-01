@@ -188,11 +188,11 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
           <div className="mt-2 grid gap-2">
             <figure className="m-0">
               <figcaption className={label('text-faint')}>Treated potential outcome</figcaption>
-              <code className={literal('mt-1 block overflow-x-auto whitespace-nowrap text-body text-ink')}>{result.treatedExpression}</code>
+              <code className={literal('figure-strip mt-1 block overflow-x-auto whitespace-nowrap text-body text-ink')}>{result.treatedExpression}</code>
             </figure>
             <figure className="m-0">
               <figcaption className={label('text-faint')}>Untreated potential outcome</figcaption>
-              <code className={literal('mt-1 block overflow-x-auto whitespace-nowrap text-body text-ink')}>{result.untreatedExpression}</code>
+              <code className={literal('figure-strip mt-1 block overflow-x-auto whitespace-nowrap text-body text-ink')}>{result.untreatedExpression}</code>
             </figure>
           </div>
           <p className="mb-0 mt-2 text-muted">The available evaluator requires all observed graph variables to be binary and reports a plug-in estimate without a sampling interval.</p>

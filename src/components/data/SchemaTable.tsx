@@ -204,6 +204,9 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
         </>
       )}
       count={countLine(visible.length, rows.length, 'column', sortText)}
+      foot={summary.kind === 'failed'
+        ? <p role="status" className="m-0 flex items-center gap-1.5 border-t border-hair px-3.5 py-1.5 text-label text-faint"><Icon name="info" size={12} /> Column summaries could not be computed for this file.</p>
+        : undefined}
     >
       <table className={tableCn}>
         <thead>
@@ -244,9 +247,6 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
           })}
         </tbody>
       </table>
-      {summary.kind === 'failed' && (
-        <p role="status" className="m-0 flex items-center gap-1.5 border-t border-hair px-3.5 py-1.5 text-label text-faint"><Icon name="info" size={12} /> Column summaries could not be computed for this file.</p>
-      )}
     </TableShell>
   )
 }

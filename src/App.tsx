@@ -23,6 +23,7 @@ import { cacheSource, readCachedSource, removeCachedSource, sourceCacheAvailable
 import { buildBundle, bundleFileName, describeBundleProblem, parseBundle, serialiseBundle, type BundleData, type ProjectBundle } from '@/domain/bundle'
 import { decodeSourceFile, downloadText, encodeSourceFile } from '@/data/bundleFiles'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { InternalLink } from '@/components/ui/InternalLink'
 import { navigate, replace, useRoute } from '@/lib/router'
 import {
   datasetProfileProblemDetail,
@@ -88,6 +89,7 @@ const CHAPTERS: readonly Chapter[] = [
 /** The icon previews the next stop in the theme cycle, so the button reads as "switch to". */
 const THEME_ICON: Record<ThemeChoice, string> = {
   dark: 'dark_mode',
+  operational: 'grid_view',
   light: 'light_mode',
   sketchbook: 'palette',
   'sketchbook-white': 'contrast',
@@ -418,10 +420,10 @@ function App() {
           <Icon name={navOpen ? 'left_panel_close' : 'left_panel_open'} size={16} />
         </button>
         <h1 className="m-0">
-          <a href="/" className="flex items-center gap-2 text-body font-medium uppercase tracking-[0.1em] text-ink transition-opacity hover:opacity-70" title="Hirmos home">
+          <InternalLink href="/" className="flex items-center gap-2 text-body font-medium uppercase tracking-[0.1em] text-ink transition-opacity hover:opacity-70" title="Hirmos home">
             <HirmosMark className="text-signal" />
             hirmos
-          </a>
+          </InternalLink>
         </h1>
         {project !== null && (
           <>

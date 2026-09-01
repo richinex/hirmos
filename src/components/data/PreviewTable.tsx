@@ -275,20 +275,24 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
         </>
       )}
       count={count}
+      lead={(
+        <>
+          {editing !== null && (
+            <FilterEditor
+              draft={editing}
+              onChange={setEditing}
+              onApply={() => { replaceFilters(editing.column.id, filtersFromDraft(editing)); setEditing(null) }}
+              onCancel={() => setEditing(null)}
+            />
+          )}
+          {windows.problem !== null && (
+            <Alert tone="danger" className="m-3">
+              <p className="m-0">The preview could not be read: {windows.problem.kind === 'source-changed' ? 'the file changed on disk.' : windows.problem.detail}</p>
+            </Alert>
+          )}
+        </>
+      )}
     >
-      {editing !== null && (
-        <FilterEditor
-          draft={editing}
-          onChange={setEditing}
-          onApply={() => { replaceFilters(editing.column.id, filtersFromDraft(editing)); setEditing(null) }}
-          onCancel={() => setEditing(null)}
-        />
-      )}
-      {windows.problem !== null && (
-        <Alert tone="danger" className="m-3">
-          <p className="m-0">The preview could not be read: {windows.problem.kind === 'source-changed' ? 'the file changed on disk.' : windows.problem.detail}</p>
-        </Alert>
-      )}
       <table className={cn(tableCn, 'min-w-full table-fixed')} aria-rowcount={total + 1} aria-busy={windows.loading || undefined}>
         <colgroup>
           <col style={{ width: rowNumberWidth }} />

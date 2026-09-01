@@ -125,7 +125,7 @@ function DmlRefutationRecord({ run, study }: { readonly run: Extract<Sensitivity
           </li>
         ))}
       </ul>
-      <div className="mt-3 overflow-x-auto">
+      <div className="figure-strip mt-3 overflow-x-auto">
         <table className="w-full border-collapse text-left text-body" aria-label="Confounding scenarios">
           <thead className="text-faint">
             <tr><th className="border-b border-hair px-2 py-1.5 font-normal">Confounding share</th><th className="border-b border-hair px-2 py-1.5 text-right font-normal">Effect bounds</th><th className="border-b border-hair px-2 py-1.5 text-right font-normal">Interval bounds</th></tr>
@@ -140,8 +140,8 @@ function DmlRefutationRecord({ run, study }: { readonly run: Extract<Sensitivity
             ))}
           </tbody>
         </table>
-        <p className={num('mb-0 mt-2 text-body text-muted')}>Robustness value {formatStatistic('score', evidence.sensitivity.robustnessValue).text} (interval {formatStatistic('score', evidence.sensitivity.robustnessValueCi).text}): the equal confounding share that would move the effect, or its interval, to zero.</p>
       </div>
+      <p className={num('mb-0 mt-2 text-body text-muted')}>Robustness value {formatStatistic('score', evidence.sensitivity.robustnessValue).text} (interval {formatStatistic('score', evidence.sensitivity.robustnessValueCi).text}): the equal confounding share that would move the effect, or its interval, to zero.</p>
     </>
   )
 }
@@ -187,7 +187,8 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
       </ul>
       <details className="mt-3 text-body">
         <summary className="cursor-pointer text-ink">Ljung–Box by lag</summary>
-        <table className="mt-2 w-full border-collapse text-body" aria-label="Ljung-Box by lag">
+        <div className="figure-strip mt-2 overflow-x-auto">
+        <table className="w-full border-collapse text-body" aria-label="Ljung-Box by lag">
           <thead><tr className="text-left"><th scope="col" className={label('px-2 py-1 font-normal text-muted')}>Lag</th><th scope="col" className={label('px-2 py-1 text-right font-normal text-muted')}>Q</th><th scope="col" className={label('px-2 py-1 text-right font-normal text-muted')}>p</th></tr></thead>
           <tbody>
             {evidence.ljungBoxLags.map((lag, index) => (
@@ -199,6 +200,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
             ))}
           </tbody>
         </table>
+        </div>
       </details>
       <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
         <summary className="cursor-pointer text-ink">Run details</summary>

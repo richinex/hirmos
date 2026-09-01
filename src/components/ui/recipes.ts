@@ -173,7 +173,7 @@ export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: s
   )
 
 /** A body cell. Text cells truncate with the full value in `title`; figure cells add `text-right`. */
-export const td = (extra?: string): string => cn('px-3.5 align-top', rowPadding.comfortable, extra)
+export const td = (extra?: string): string => cn('max-w-[300px] truncate px-3.5 align-top', rowPadding.comfortable, extra)
 
 /** The row-count line under a table; `aria-live="polite"` so a sort or filter is announced. */
 export const tableFoot = label('border-t border-hair px-3.5 py-1.5 text-faint')

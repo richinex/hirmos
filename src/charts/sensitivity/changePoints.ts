@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { baseOption, gridAuto, tooltip, valueAxis } from '../grammar'
+import { baseOption, gridAuto, responsive, tooltip, valueAxis } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface ChangePointsChartView {
@@ -14,7 +14,7 @@ export interface ChangePointsChartView {
 /** The series as a hairline with a dashed rule at every PELT segment boundary. */
 export function changePointsOption(view: ChangePointsChartView, theme: ChartTheme): EChartsCoreOption {
   const description = `${view.name} across ${formatCount(view.values.length).text} ${view.stepLabel}s with ${formatCount(view.changePoints.length).text} change point${view.changePoints.length === 1 ? '' : 's'}${view.changePoints.length > 0 ? ` at ${view.changePoints.join(', ')}` : ''}.`
-  return {
+  return responsive({
     ...baseOption(theme, description),
     grid: gridAuto({ bottom: 6 }),
     tooltip: {
@@ -49,11 +49,13 @@ export function changePointsOption(view: ChangePointsChartView, theme: ChartThem
       markLine: {
         symbol: 'none',
         silent: true,
-        // Only the line's ends keep the label horizontal; neighbours alternate ends so close boundaries do not collide.
-        label: { show: true, position: 'end', color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, formatter: (params: { readonly value?: unknown }) => String(params.value ?? '') },
+        label: { show: true, position: 'insideEndTop', color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, formatter: (params: { readonly value?: unknown }) => String(params.value ?? '') },
         lineStyle: { color: theme.signal, type: 'dashed', width: 1 },
-        data: view.changePoints.map((point, index) => ({ xAxis: point, value: point, label: { position: index % 2 === 0 ? 'end' : 'start' } })),
+        data: view.changePoints.map((point, index) => ({ xAxis: point, value: point, label: { position: index % 2 === 0 ? 'insideEndTop' : 'insideEndBottom' } })),
       },
     }],
-  }
+  }, {
+    wide: { xAxis: { nameGap: 16 } },
+    narrow: { xAxis: { name: '', nameGap: 0 } },
+  })
 }

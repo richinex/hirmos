@@ -232,7 +232,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         <section className="rounded-xl border border-hair bg-panel p-4" aria-label="Differences">
           <h3 className={label('mb-2 mt-0 text-faint')}>Differences · {differences.length}</h3>
           {differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : (
-            <div className="overflow-x-auto">
+            <div className="figure-strip overflow-x-auto">
               <table className={table}>
                 <thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead>
                 <tbody>
@@ -254,7 +254,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   )
 
   const ledger = (
-    <div className="overflow-x-auto">
+    <div className="figure-strip overflow-x-auto">
       <table className={table} aria-label="Estimates">
         <thead>
           <tr>

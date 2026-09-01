@@ -27,9 +27,14 @@ const readLocation = (): Location => {
 }
 const serverLocation = (): Location => ({ pathname: '/app', search: '' })
 
+/** The live browser location, shared by the document-level surface router and workbench router. */
+export function useLocation(): Location {
+  return useSyncExternalStore(subscribe, readLocation, serverLocation)
+}
+
 /** The live location as a parsed route, with the raw location beside it for canonical-URL checks. */
 export function useRoute(): { readonly location: Location; readonly route: Result<Route, RouteProblem> } {
-  const location = useSyncExternalStore(subscribe, readLocation, serverLocation)
+  const location = useLocation()
   return { location, route: parseRoute(location.pathname, location.search) }
 }
 

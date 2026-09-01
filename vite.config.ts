@@ -6,12 +6,12 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
 
-/** Serve every client-side workbench route from the app entry in development and preview. */
+/** Serve every client-side workbench route from the single document entry in development and preview. */
 const appRoute = (): Plugin => {
   const rewrite = (request: { url?: string }) => {
     if (request.url === undefined) return
     const url = new URL(request.url, 'http://hirmos.local')
-    if (url.pathname === '/app' || url.pathname.startsWith('/app/')) request.url = `/app.html${url.search}`
+    if (url.pathname === '/app' || url.pathname.startsWith('/app/')) request.url = `/index.html${url.search}`
   }
   return {
     name: 'hirmos:app-route',
@@ -51,14 +51,6 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0') },
   plugins: [react(), tailwindcss(), appRoute(), duckdbBinaries()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
-  build: {
-    rollupOptions: {
-      input: {
-        app: fileURLToPath(new URL('./app.html', import.meta.url)),
-        landing: fileURLToPath(new URL('./index.html', import.meta.url)),
-      },
-    },
-  },
   server: {
     port: 5179,
     // Tailwind's plugin reloads the page whenever a file it scans changes; keep non-app files out of the watcher.

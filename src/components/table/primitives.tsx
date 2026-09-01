@@ -34,13 +34,15 @@ export function DensityToggle({ density, onChange }: { readonly density: TableDe
   )
 }
 
-export function TableShell({ title, titleId, toolbar, count, children, className, scrollRef, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]' }: {
+export function TableShell({ title, titleId, toolbar, lead, count, foot, children, className, scrollRef, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]' }: {
   readonly title: string
   readonly titleId: string
   /** Search, facets, chips: the row under the title. */
   readonly toolbar?: ReactNode
+  readonly lead?: ReactNode
   /** The live row-count line under the table. */
   readonly count: ReactNode
+  readonly foot?: ReactNode
   readonly children: ReactNode
   readonly className?: string
   readonly scrollRef?: React.RefObject<HTMLDivElement | null>
@@ -52,9 +54,11 @@ export function TableShell({ title, titleId, toolbar, count, children, className
         <h3 id={titleId} className={label('m-0 text-muted')}>{title}</h3>
         {toolbar && <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
       </div>
+      {lead}
       <div ref={scrollRef} className={cn('figure-strip panel-scroll min-h-0 overflow-auto', maxHeight)}>
         {children}
       </div>
+      {foot}
       <p aria-live="polite" className={cn(tableFoot, 'm-0')}>{count}</p>
     </section>
   )

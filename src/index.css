@@ -14,7 +14,7 @@
       discs (2D); tracePath and geometryFor still take a `shape` argument so call sites did not have to
       change, and both ignore it.
 
-   2. ONE SIGNAL COLOUR, FEW MEANINGS. --color-signal (vermilion) means "this is live": the answer to
+   2. ONE SIGNAL COLOUR, FEW MEANINGS. --color-signal (the active theme's single accent) means "this is live": the answer to
       your question, an in-progress compile (JobFlow's source card), and links. It is NOT a category
       colour and never encodes a node's type — that is what the group ramp is for. The original rule
       here was "the answer and nothing else"; the compile flow legitimately needed one attention colour
@@ -35,8 +35,8 @@
       loop on its own curve — which is exactly how a vocabulary stops being one. If you need a new
       motion, first check whether one of these already means what you are trying to say.
 
-   Everything else is a graphite/bone neutral ramp. FOUR THEMES: dark (default), light, and two paper
-   sketchbook variants, switched by :root[data-theme=...] with a pre-paint boot script in index.html.
+   Everything else is a graphite/bone neutral ramp. FIVE THEMES: dark (default), Operational,
+   light, and two paper sketchbook variants, switched by :root[data-theme=...] with a pre-paint boot script in index.html.
    (An earlier version was dark-only on the grounds that emissive-on-black contrast could not survive a
    paper stage. That turned out to be solvable — the paper themes drop emissive entirely and lean on
    heavier strokes instead; see `pal.glow`.)
@@ -148,6 +148,34 @@
   --z-drag: 110;
 }
 :root[data-theme="light"], :root[data-theme="sketchbook"], :root[data-theme="sketchbook-white"] { color-scheme: light; }
+
+/* OPERATIONAL */
+:root[data-theme="operational"] {
+  --color-stage: #080A0B;
+  --color-panel: #101416;
+  --color-column: #0A0D0E;
+  --color-well: #101416;
+  --color-raised: #1D2425;
+
+  --color-line: rgba(241, 241, 236, 0.10);
+  --color-hair: rgba(241, 241, 236, 0.16);
+  --color-edge: rgba(241, 241, 236, 0.28);
+  --color-control: #92999C;
+
+  --color-ink: #F1F1EC;
+  --color-bone: #D6D8D6;
+  --color-muted: #92999C;
+  --color-faint: #9FA5A7;
+  --color-dim: rgba(241, 241, 236, 0.22);
+
+  --color-signal: #B7D8CD;
+  --color-signal-ink: #080A0B;
+  --color-signal-line: #45524F;
+
+  --color-highlight: rgba(241, 241, 236, 0.05);
+}
+
+:root[data-theme="operational"] body { background: #080A0B; }
 
 html, body { height: 100%; margin: 0; }
 /* The root grows with the viewport above 1280px (16px there, 18px at 1920px) so every rem tier scales
@@ -507,7 +535,7 @@ button[aria-busy="true"]::after {
 .react-flow__node, .react-flow__handle { touch-action: none; }
 
 .panel-scroll { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
-.panel-scroll::-webkit-scrollbar { width: 6px; }
+.panel-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
 .panel-scroll::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }
 .panel-scroll::-webkit-scrollbar-track { background: transparent; }
 /* The live log: edge fades say "more above / more below" without a bar. Driven by the two data

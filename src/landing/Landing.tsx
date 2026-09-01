@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { HirmosMark } from '@/components/HirmosMark'
+import { InternalLink } from '@/components/ui/InternalLink'
 import { choreographLanding } from './choreography'
 import type { HirmosGraph } from './HirmosGraph'
 
@@ -85,21 +86,26 @@ function EvidenceFigure() {
 
 export function Landing() {
   const root = useRef<HTMLElement>(null)
-  useEffect(() => (root.current === null ? undefined : choreographLanding(root.current)), [])
+  useEffect(() => {
+    document.title = 'Hirmos · browser causal inference workbench'
+    return root.current === null ? undefined : choreographLanding(root.current)
+  }, [])
   return (
     <main ref={root} className="landing-root">
       <Scene />
       <div className="landing-scrim" aria-hidden="true" />
 
-      <div className="landing-width landing-hero-shell">
-        <header className="landing-header">
-          <a className="landing-wordmark" href="/" aria-label="Hirmos home">
+      <header className="landing-header">
+        <div className="landing-width landing-header__row">
+          <InternalLink className="landing-wordmark" href="/" aria-label="Hirmos home">
             <HirmosMark className="landing-mark" />
             <span>hirmos</span>
-          </a>
-          <a className="landing-open" href="/app">Open the workbench</a>
-        </header>
+          </InternalLink>
+          <InternalLink className="landing-open" href="/app">Open the workbench</InternalLink>
+        </div>
+      </header>
 
+      <div className="landing-width landing-hero-shell">
         <section className="landing-hero-copy" aria-labelledby="landing-title">
           <p className="landing-eyebrow">Browser causal inference workbench</p>
           <h1 id="landing-title">
@@ -111,7 +117,7 @@ export function Landing() {
             Hirmos provides the framework for asking and answering questions about your data.
           </p>
           <div className="landing-actions">
-            <a className="landing-primary" href="/app">Start an analysis</a>
+            <InternalLink className="landing-primary" href="/app">Start an analysis</InternalLink>
             <a className="landing-secondary" href="#workflow">See the workflow</a>
           </div>
         </section>
@@ -134,7 +140,7 @@ export function Landing() {
           </ol>
         </section>
 
-        <section className="landing-width feature-section feature-section--evidence" aria-labelledby="evidence-title">
+        <section id="graph" className="landing-width feature-section feature-section--evidence" aria-labelledby="evidence-title">
           <div className="feature-copy">
             <p className="landing-eyebrow">Discovery and specification</p>
             <h2 id="evidence-title">Compare discovery results with the causal model</h2>
@@ -148,7 +154,7 @@ export function Landing() {
           <EvidenceFigure />
         </section>
 
-        <section className="landing-width feature-section feature-section--identify" aria-labelledby="identify-title">
+        <section id="identification" className="landing-width feature-section feature-section--identify" aria-labelledby="identify-title">
           <BackdoorFigure />
           <div className="feature-copy">
             <p className="landing-eyebrow">Identification before estimation</p>
@@ -162,7 +168,7 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="landing-width structures-section" aria-labelledby="structures-title">
+        <section id="structures" className="landing-width structures-section" aria-labelledby="structures-title">
           <div className="section-intro">
             <p className="landing-eyebrow">Observation structures</p>
             <h2 id="structures-title">Choose the correct observation structure</h2>
@@ -175,26 +181,14 @@ export function Landing() {
           </div>
         </section>
 
-        <section className="landing-width audit-section" aria-labelledby="audit-title">
-          <div>
-            <p className="landing-eyebrow">Analysis record</p>
-            <h2 id="audit-title">See the data, model, and settings for each result</h2>
-          </div>
-          <dl>
-            <div><dt>Data</dt><dd>Source fingerprint, schema, missingness policy, preprocessing recipe, retained samples</dd></div>
-            <div><dt>Design</dt><dd>DAG revision, treatment, outcome, intervention, estimand, identification result</dd></div>
-            <div><dt>Computation</dt><dd>Estimator configuration, diagnostics, random seeds, implementation reference, build version</dd></div>
-          </dl>
-        </section>
-
         <section className="landing-width final-cta" aria-labelledby="final-title">
           <HirmosMark className="landing-mark" size={28} />
           <h2 id="final-title">Start a new causal analysis</h2>
-          <a className="landing-primary" href="/app">Open Hirmos</a>
+          <InternalLink className="landing-primary" href="/app">Open Hirmos</InternalLink>
         </section>
 
         <footer className="landing-width landing-footer">
-          <a className="landing-wordmark" href="/"><HirmosMark className="landing-mark" /><span>hirmos</span></a>
+          <InternalLink className="landing-wordmark" href="/"><HirmosMark className="landing-mark" /><span>hirmos</span></InternalLink>
         </footer>
       </div>
     </main>

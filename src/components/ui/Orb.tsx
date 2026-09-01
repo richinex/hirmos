@@ -8,14 +8,11 @@ const subscribeTheme = (notify: () => void): (() => void) => {
   return () => observer.disconnect()
 }
 
-const isDarkTheme = (): boolean => document.documentElement.dataset.theme === 'dark'
+const isDarkTheme = (): boolean => {
+  const theme = document.documentElement.dataset.theme
+  return theme === 'dark' || theme === 'operational'
+}
 
-/**
- * The one way to mount an orb: inline size, theme pinned from `<html data-theme>`. The package's
- * `auto` only recognises `data-theme="dark|light"`, so the sketchbook themes would fall through to
- * the OS preference; every theme except dark paints a light ground, so all of them take dark ink.
- * An orb marks work running right now — callers unmount it when the run settles rather than pausing.
- */
 export function Orb({ state, className, 'aria-label': ariaLabel }: {
   readonly state: OrbState
   readonly className?: string
