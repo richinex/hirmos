@@ -5,6 +5,7 @@ import type { DagCheckArtifact } from './dagValidation'
 import { parseDatasetProfile, type DatasetProfile } from './dataset'
 import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
+import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import { err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
@@ -37,6 +38,7 @@ export interface PersistedProject {
   readonly prepared: PreparedDatasetArtifact | null
   readonly stationarity: StationarityEvidenceArtifact | null
   readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
+  readonly countSeriesModels: readonly CountSeriesModelArtifact[]
   readonly discoveryRuns: readonly DiscoveryRunArtifact[]
   readonly dagDocuments: readonly DagDocument[]
   readonly dagChecks: readonly DagCheckArtifact[]
@@ -85,7 +87,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       if (workflow.restore !== null) return null
       return {
         kind: 'hirmos-project', version: 1, savedAt, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
-        grangerEvidence: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [],
+        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [],
       }
     case 'source-selected':
     case 'profiling':
@@ -102,6 +104,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         prepared: workflow.prepared,
         stationarity: workflow.stationarity,
         grangerEvidence: workflow.grangerEvidence,
+        countSeriesModels: workflow.countSeriesModels,
         discoveryRuns: workflow.discoveryRuns,
         dagDocuments: workflow.dagDocuments,
         dagChecks: workflow.dagChecks,
@@ -153,6 +156,7 @@ const envelopeSchema = z.object({
   prepared: artifact.nullable(),
   stationarity: artifact.nullable(),
   grangerEvidence: z.array(artifact).default([]),
+  countSeriesModels: z.array(artifact).default([]),
   discoveryRuns: z.array(artifact),
   dagDocuments: z.array(artifact),
   dagChecks: z.array(artifact).default([]),
@@ -200,6 +204,72 @@ const upgradeStationarityTransformRecord = (value: ParsedEnvelope['stationarity'
   return ok({ ...rest, diagnosticTransform: legacy.data })
 }
 
+/**
+ * Upgrade estimation records written before applied adjustment and synthetic inference became
+ * tagged evidence. The numerical result is retained; inference that was never computed is recorded
+ * explicitly rather than fabricated during project loading.
+ */
+const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<string, unknown> => {
+  const estimate = Reflect.get(value, 'estimate')
+  let upgradedEstimate = estimate
+  if (typeof estimate === 'object' && estimate !== null && Reflect.get(estimate, 'adjustment') === undefined) {
+    const legacy = Reflect.get(estimate, 'adjustmentSet')
+    if (Array.isArray(legacy)) {
+      const { adjustmentSet: _legacyAdjustment, ...rest } = estimate as Record<string, unknown>
+      upgradedEstimate = {
+        ...rest,
+        adjustment: legacy.length === 0
+          ? { kind: 'none' }
+          : { kind: 'contemporaneous', variables: legacy },
+      }
+    }
+  }
+
+  const configuration = Reflect.get(value, 'configuration')
+  const evidence = Reflect.get(value, 'evidence')
+  if (Reflect.get(value, 'kind') === 'synthetic-control-run'
+    && typeof configuration === 'object' && configuration !== null
+    && typeof evidence === 'object' && evidence !== null) {
+    return {
+      ...value,
+      estimate: upgradedEstimate,
+      configuration: {
+        crossFitFolds: 3,
+        alpha: 0.05,
+        ...configuration,
+      },
+      evidence: {
+        crossFit: { kind: 'unavailable', reason: 'This saved run predates cross-fitted inference; run the estimator again to compute it.' },
+        donorPlacebo: { kind: 'unavailable', reason: 'This saved run predates donor-placebo inference; run the estimator again to compute it.' },
+        conformalBand: { kind: 'unavailable', reason: 'This saved run predates prediction bands; run the estimator again to compute them.' },
+        gaussianBand: { kind: 'unavailable', reason: 'This saved run predates prediction bands; run the estimator again to compute them.' },
+        ...evidence,
+      },
+    }
+  }
+  if (Reflect.get(value, 'kind') === 'panel-intervention-run'
+    && typeof configuration === 'object' && configuration !== null
+    && typeof evidence === 'object' && evidence !== null) {
+    return {
+      ...value,
+      estimate: upgradedEstimate,
+      configuration: {
+        placeboReplications: 100,
+        seed: 0,
+        ...configuration,
+      },
+      evidence: {
+        syntheticControlPlacebo: { kind: 'unavailable', reason: 'This saved run predates panel placebo inference; run the estimator again to compute it.' },
+        syntheticDidPlacebo: { kind: 'unavailable', reason: 'This saved run predates panel placebo inference; run the estimator again to compute it.' },
+        syntheticControlInTime: { kind: 'unavailable', reason: 'This saved run predates the in-time placebo; run the estimator again to compute it.' },
+        syntheticDidInTime: { kind: 'unavailable', reason: 'This saved run predates the in-time placebo; run the estimator again to compute it.' },
+        ...evidence,
+      },
+    }
+  }
+  return upgradedEstimate === estimate ? value : { ...value, estimate: upgradedEstimate }
+}
+
 export function parseSnapshotValue(value: unknown): Result<PersistedProject, SnapshotProblem> {
   const parsed = envelopeSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-snapshot', detail: z.prettifyError(parsed.error) })
@@ -218,6 +288,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const discoveryRuns = parsed.data.discoveryRuns.filter((run) => Reflect.get(run, 'kind') !== 'granger-ssr-f-run')
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
+  const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
   return ok({
     ...(parsed.data as unknown as PersistedProject),
     version: 1,
@@ -226,6 +297,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     stationarity: stationarity.value as StationarityEvidenceArtifact | null,
     studyDraft,
     discoveryRuns: discoveryRuns as unknown as PersistedProject['discoveryRuns'],
+    estimationRuns: estimationRuns as unknown as PersistedProject['estimationRuns'],
   })
 }
 

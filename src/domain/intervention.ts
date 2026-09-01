@@ -1,4 +1,5 @@
-import { brand, err, ok, type Brand, type Result } from './dop'
+import { z } from 'zod'
+import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
 import type { DagDocument, DagDocumentId, DagNode, DagNodeId, DagRevisionId } from './dag'
 import type { DiscreteBnEvidence } from './estimation'
 import type { PreparedDatasetVersionId } from './preprocessing'
@@ -19,6 +20,62 @@ export interface InterventionTarget {
   readonly name: string
 }
 
+const distributionSchema = z.array(z.tuple([z.string(), z.number().finite()]))
+
+const identifiedDiscreteResultSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('identified'),
+    algorithm: z.enum(['ID', 'IDC']),
+    expression: z.string().min(1),
+    latex: z.string().min(1),
+    expectations: z.tuple([z.number().finite(), z.number().finite()]),
+    effect: z.number().finite(),
+    distributionLow: distributionSchema,
+    distributionHigh: distributionSchema,
+    normalizationLow: z.number().finite(),
+    normalizationHigh: z.number().finite(),
+  }).strict(),
+  z.object({
+    kind: z.literal('unidentifiable'),
+    hedgeGraph: z.array(z.number().int().nonnegative()),
+    hedgeSubgraph: z.array(z.number().int().nonnegative()),
+  }).strict(),
+])
+
+const identifiedDiscreteQueryKindSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('unconditional') }).strict(),
+  z.object({
+    kind: z.literal('conditional'),
+    variable: z.number().int().nonnegative(),
+    state: z.string(),
+    representativeValue: z.number().finite(),
+  }).strict(),
+])
+
+export const identifiedDiscreteQueryEvidenceSchema = z.object({
+  kind: z.literal('identifiedDiscreteQuery'),
+  observations: z.number().int().positive(),
+  bins: z.number().int().min(2).max(10),
+  stateCounts: z.array(z.number().int().positive()).min(2),
+  treatmentStates: z.tuple([z.string(), z.string()]),
+  query: identifiedDiscreteQueryKindSchema,
+  result: identifiedDiscreteResultSchema,
+}).strict()
+
+export type IdentifiedDiscreteQueryEvidence = z.infer<typeof identifiedDiscreteQueryEvidenceSchema>
+
+export type InterventionQueryRoute =
+  | {
+      readonly kind: 'bayesian-network'
+      readonly bins: number
+      readonly equivalentSampleSize: number
+      readonly result: DiscreteBnEvidence
+    }
+  | {
+      readonly kind: 'identified-expression'
+      readonly result: IdentifiedDiscreteQueryEvidence
+    }
+
 export interface InterventionQueryArtifact {
   readonly kind: 'intervention-query'
   readonly id: InterventionQueryId
@@ -28,9 +85,7 @@ export interface InterventionQueryArtifact {
   readonly createdAt: string
   readonly set: InterventionTarget
   readonly read: InterventionTarget
-  readonly bins: number
-  readonly equivalentSampleSize: number
-  readonly result: DiscreteBnEvidence
+  readonly route: InterventionQueryRoute
 }
 
 export type InterventionReadinessProblem =
@@ -38,7 +93,6 @@ export type InterventionReadinessProblem =
   | { readonly kind: 'read-required' }
   | { readonly kind: 'distinct-required' }
   | { readonly kind: 'latent-node'; readonly name: string }
-  | { readonly kind: 'unmeasured-node'; readonly name: string }
   | { readonly kind: 'graph-invalid' }
 
 export interface InterventionSpecification {
@@ -46,7 +100,7 @@ export interface InterventionSpecification {
   readonly read: DagNode & { readonly kind: 'observed' }
 }
 
-/** Both nodes chosen, distinct and observed; the whole graph measured, since the network is fitted to every node; the revision structurally valid. */
+/** Both nodes chosen, distinct and observed, and the revision structurally valid. */
 export function readyInterventionQuery(document: DagDocument, set: DagNodeId | null, read: DagNodeId | null): Result<InterventionSpecification, InterventionReadinessProblem> {
   if (document.current.validation.kind === 'invalid') return err({ kind: 'graph-invalid' })
   const nodes = document.current.graph.nodes
@@ -59,8 +113,6 @@ export function readyInterventionQuery(document: DagDocument, set: DagNodeId | n
   if (readNode === undefined) return err({ kind: 'read-required' })
   if (setNode.kind === 'latent') return err({ kind: 'latent-node', name: setNode.name })
   if (readNode.kind === 'latent') return err({ kind: 'latent-node', name: readNode.name })
-  const unmeasured = nodes.find((node) => node.kind === 'latent')
-  if (unmeasured !== undefined) return err({ kind: 'unmeasured-node', name: unmeasured.name })
   return ok({ set: setNode, read: readNode })
 }
 
@@ -70,7 +122,6 @@ export function describeInterventionReadiness(problem: InterventionReadinessProb
     case 'read-required': return 'Choose the variable to read.'
     case 'distinct-required': return 'Set one variable and read a different one.'
     case 'latent-node': return `${problem.name} is unmeasured; only measured variables can be set or read.`
-    case 'unmeasured-node': return `${problem.name} is unmeasured. The network is fitted to every node, so every node needs a column.`
     case 'graph-invalid': return 'The graph has structural issues; resolve them before asking an intervention question.'
     default: { const exhaustive: never = problem; return exhaustive }
   }
@@ -81,11 +132,21 @@ const figure = (value: number): string => (Math.abs(value) >= 100 ? value.toFixe
 
 /** The answer in one sentence: both expectations, their difference, and what the surgery adjusted for. */
 export function describeInterventionVerdict(artifact: InterventionQueryArtifact): string {
-  const { result } = artifact
-  const adjusted = result.parentsAdjusted.length === 0
-    ? `${artifact.set.name} has no parents in the graph, so no adjustment was needed`
-    : `adjusted for ${result.parentsAdjusted.join(', ')}, the parents of ${artifact.set.name}`
-  return `Setting ${artifact.set.name} to its lowest bin gives an expected ${artifact.read.name} of ${figure(result.expectations[0])}; setting it to its highest gives ${figure(result.expectations[1])}, a difference of ${figure(result.effect)} (${adjusted}).`
+  switch (artifact.route.kind) {
+    case 'bayesian-network': {
+      const { result } = artifact.route
+      const adjusted = result.parentsAdjusted.length === 0
+        ? `${artifact.set.name} has no parents in the graph, so no adjustment was needed`
+        : `adjusted for ${result.parentsAdjusted.join(', ')}, the parents of ${artifact.set.name}`
+      return `Setting ${artifact.set.name} to its lowest bin gives an expected ${artifact.read.name} of ${figure(result.expectations[0])}; setting it to its highest gives ${figure(result.expectations[1])}, a difference of ${figure(result.effect)} (${adjusted}).`
+    }
+    case 'identified-expression': {
+      const { result } = artifact.route.result
+      if (result.kind === 'unidentifiable') return `The recorded graph does not identify this intervention query from the observed distribution.`
+      return `Setting ${artifact.set.name} to its lowest bin gives an expected ${artifact.read.name} of ${figure(result.expectations[0])}; setting it to its highest gives ${figure(result.expectations[1])}, a difference of ${figure(result.effect)} under the ${result.algorithm} expression.`
+    }
+    default: return assertNever(artifact.route)
+  }
 }
 
 /** What the canvas overlays while a question is being framed: the set node, and the read node once chosen. */

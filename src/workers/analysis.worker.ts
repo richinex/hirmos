@@ -12,16 +12,18 @@ import {
   parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
-import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence } from '@/domain/estimation'
+import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
+import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
-import { linearScmEvidenceSchema } from '@/domain/counterfactual'
+import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
+import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
 import {
   analysisProgressSchema,
   parseAnalysisWorkerCommand,
@@ -154,8 +156,12 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       }
     case 'count-glm':
       return { kind: 'countGlm', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, family: command.family }
+    case 'negative-binomial-ingarch':
+      return { kind: 'negativeBinomialIngarch', rows: command.rows, columns: command.columns, outcome: command.outcome, link: command.link, regressors: command.regressors, pastObservationLags: command.pastObservationLags, pastMeanLags: command.pastMeanLags, externalRegressors: command.externalRegressors, horizon: command.horizon, baselineRegressors: command.baselineRegressors, interventionRegressor: command.interventionRegressor, controlValue: command.controlValue, treatmentValue: command.treatmentValue, schedule: command.schedule }
+    case 'count-series-intervention-scan':
+      return { kind: 'countSeriesInterventionScan', rows: command.rows, columns: command.columns, outcome: command.outcome, link: command.link, pastObservationLags: command.pastObservationLags, pastMeanLags: command.pastMeanLags, candidateReferencePoints: command.candidateReferencePoints, delta: command.delta }
     case 'causal-effects-total':
-      return { kind: 'causalEffectsTotal', rows: command.rows, columns: command.columns, statLag: command.statLag, graph: command.graph, x: command.x, y: command.y, hidden: command.hidden, estimator: command.estimator, interventions: command.interventions }
+      return { kind: 'causalEffectsTotal', rows: command.rows, columns: command.columns, statLag: command.statLag, graph: command.graph, x: command.x, y: command.y, hidden: command.hidden, estimator: command.estimator, interventions: command.interventions, uncertainty: command.uncertainty }
     case 'causal-impact':
       return { kind: 'causalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, maxIter: command.maxIter }
     case 'linear-refutation':
@@ -173,19 +179,23 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'vecm':
       return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex }
     case 'synthetic-control':
-      return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre }
+      return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
     case 'panel-intervention':
-      return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times }
+      return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed }
     case 'negbin-nuts':
       return { kind: 'negbinNuts', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, confounder: command.confounder, warmup: command.warmup, samples: command.samples, seed: command.seed }
     case 'bayesian-gaussian':
       return { kind: 'bayesianGaussian', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, warmup: command.warmup, samples: command.samples, seed: command.seed }
     case 'discrete-bn-query':
       return { kind: 'discreteBnQuery', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, bins: command.bins, equivalentSampleSize: command.equivalentSampleSize }
+    case 'identified-discrete-query':
+      return { kind: 'identifiedDiscreteQuery', rows: command.rows, columns: command.columns, observedNodes: command.observedNodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, unobserved: command.unobserved, bins: command.bins, condition: command.condition }
     case 'binary-ett':
       return { kind: 'binaryEtt', rows: command.rows, columns: command.columns, observedNodes: command.observedNodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, unobserved: command.unobserved }
     case 'linear-scm-counterfactual':
       return { kind: 'linearScmCounterfactual', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, interventions: command.interventions, observationNoise: command.observationNoise }
+    case 'dynamic-linear-scm-counterfactual':
+      return { kind: 'dynamicLinearScmCounterfactual', rows: command.rows, columns: command.columns, nodes: command.nodes, statLag: command.statLag, graph: command.graph, treatment: command.treatment, outcome: command.outcome, timing: command.timing, steps: command.steps, interventions: command.interventions, uncertainty: command.uncertainty }
     case 'dml-refutation-batch':
       return { kind: 'dmlRefutationBatch', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed }
     case 'resolve-missingness':
@@ -344,6 +354,18 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'count-glm-succeeded', request: command.request, result: result.value })
         return
       }
+      case 'negative-binomial-ingarch': {
+        const result = parseNegativeBinomialIngarchEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'negative-binomial-ingarch-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'count-series-intervention-scan': {
+        const result = parseCountSeriesInterventionScanEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'count-series-intervention-scan-succeeded', request: command.request, result: result.value })
+        return
+      }
       case 'causal-effects-total': {
         const result = parseCausalEffectsEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
@@ -422,6 +444,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'discrete-bn-succeeded', request: command.request, result: result.data })
         return
       }
+      case 'identified-discrete-query': {
+        const result = identifiedDiscreteQueryEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'identified-discrete-query-succeeded', request: command.request, result: result.data })
+        return
+      }
       case 'binary-ett': {
         const result = binaryEttEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
@@ -432,6 +460,13 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = linearScmEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'linear-scm-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'dynamic-linear-scm-counterfactual': {
+        const result = dynamicLinearScmEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        if (!dynamicCounterfactualUncertaintyMatches(command.uncertainty, result.data.uncertainty)) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'Dynamic counterfactual uncertainty evidence does not match the requested configuration.' }); return }
+        emit({ kind: 'dynamic-linear-scm-succeeded', request: command.request, result: result.data })
         return
       }
       case 'dml-refutation-batch': {

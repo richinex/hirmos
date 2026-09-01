@@ -2,7 +2,7 @@
 //! projection into a time series ADMG, the optimal adjustment set of Runge (NeurIPS 2021),
 //! and the total effect estimator.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 /// A variable index paired with a lag, which is zero or negative.
 pub type Node = (usize, i32);
@@ -44,6 +44,7 @@ pub fn reverse_link(link: Edge) -> Edge {
 }
 
 /// The stationary input graph, indexed `[i][j][tau]`.
+#[derive(Clone)]
 pub struct StationaryGraph {
     pub n: usize,
     pub stat_lag: usize,
@@ -71,6 +72,7 @@ impl StationaryGraph {
 }
 
 /// The projected time series graph, indexed `[i][j][taui][tauj]`.
+#[derive(Clone)]
 pub struct TsgGraph {
     pub n: usize,
     pub tau_max: usize,
@@ -824,6 +826,7 @@ impl CausalEffects {
 // Total effect estimation: `fit_total_effect` and `predict_total_effect`.
 // ---------------------------------------------------------------------------
 
+use crate::nprandom::NpRng;
 use crate::parcorr::{construct_array_general, CutOff, TimeSeries};
 use nalgebra::{DMatrix, DVector};
 
@@ -837,6 +840,7 @@ pub enum Estimator {
     KNeighbors { k: usize },
 }
 
+#[derive(Clone)]
 enum Fitted {
     Linear {
         intercept: f64,
@@ -849,6 +853,7 @@ enum Fitted {
     },
 }
 
+#[derive(Clone)]
 pub struct TotalEffectModel {
     fitted: Fitted,
     /// The adjustment set columns of the observation array, rows by variables.
@@ -860,6 +865,143 @@ pub struct TotalEffectModel {
     conditional_estimator: Estimator,
     pub adjustment_set: Vec<Node>,
     pub n_obs: usize,
+}
+
+/// Tigramite's `boot_blocklength` options that are implemented by `construct_array`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BootstrapBlockLength {
+    Fixed(usize),
+    CubeRoot,
+}
+
+/// Settings for `CausalEffects.fit_bootstrap_of("fit_total_effect", ...)`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TotalEffectBootstrapOptions {
+    pub samples: usize,
+    pub block_length: BootstrapBlockLength,
+    /// Hirmos requires the optional Tigramite seed to be supplied so the run is replayable.
+    pub seed: u64,
+}
+
+impl Default for TotalEffectBootstrapOptions {
+    fn default() -> Self {
+        Self {
+            samples: 100,
+            block_length: BootstrapBlockLength::Fixed(1),
+            seed: 0,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TotalEffectBootstrapError {
+    NotIdentifiable,
+    ZeroSamples,
+    ZeroBlockLength,
+    TooFewBlocks { blocks: usize },
+    SeedOverflow,
+}
+
+/// Fitted original and bootstrap models. `block_starts` is retained for exact-run provenance
+/// and makes Tigramite's resampling path directly testable.
+pub struct TotalEffectBootstrap {
+    pub original_model: TotalEffectModel,
+    bootstrap_models: Vec<TotalEffectModel>,
+    pub block_starts: Vec<Vec<usize>>,
+    pub resolved_block_length: usize,
+    pub options: TotalEffectBootstrapOptions,
+}
+
+/// Output of `predict_bootstrap_of("predict_total_effect", ...)`.
+pub struct TotalEffectBootstrapPrediction {
+    /// One prediction vector per fitted bootstrap model.
+    pub individual_predictions: Vec<Vec<f64>>,
+    /// Equal-tail percentile bounds, ordered `[lower, upper][intervention]`.
+    pub confidence_interval: Vec<Vec<f64>>,
+}
+
+/// Which proper directed paths contribute to a Wright effect.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WrightMediation {
+    /// Every proper directed path from X to Y.
+    Total,
+    /// Only the direct X -> Y path.
+    Direct,
+    /// Paths passing through at least one of the supplied time-indexed mediators.
+    Through(Vec<Node>),
+}
+
+/// The two working coefficient sources in Tigramite's `fit_wright_effect`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum WrightCoefficientMethod {
+    /// Fit every mediator/outcome on all of its parents. Valid only when those nodes have no
+    /// bidirected spouse in the projected graph.
+    Parents,
+    /// Use the stationary link coefficients supplied by the caller, keyed by child variable.
+    Links(BTreeMap<usize, Vec<(Node, f64)>>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct WrightCoefficient {
+    pub parent: Node,
+    pub child: Node,
+    pub value: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct WrightPathContribution {
+    pub source: Node,
+    pub target: Node,
+    pub path: Vec<Node>,
+    pub value: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WrightEffectError {
+    ParentMethodHasBidirectedLink { node: Node },
+    MissingLinkCoefficients { variable: usize },
+    MissingPathCoefficient { parent: Node, child: Node },
+    ZeroSamples,
+    ZeroBlockLength,
+    TooFewBlocks { blocks: usize },
+    SeedOverflow,
+}
+
+/// A fitted Wright model. The effect for each `(X, Y)` pair is the sum of the retained path
+/// contributions; prediction is the dot product of intervention values and those effects.
+#[derive(Clone, Debug)]
+pub struct WrightEffectModel {
+    pub effects: BTreeMap<(Node, Node), f64>,
+    pub coefficients: Vec<WrightCoefficient>,
+    pub paths: Vec<WrightPathContribution>,
+    pub mediation: WrightMediation,
+    pub n_obs: usize,
+    listx: Vec<Node>,
+    listy: Vec<Node>,
+}
+
+pub struct WrightEffectBootstrap {
+    pub original_model: WrightEffectModel,
+    bootstrap_models: Vec<WrightEffectModel>,
+    pub block_starts: Vec<Vec<usize>>,
+    pub resolved_block_length: usize,
+    pub options: TotalEffectBootstrapOptions,
+}
+
+pub struct WrightEffectBootstrapPrediction {
+    pub individual_predictions: Vec<Vec<Vec<f64>>>,
+    /// Equal-tail percentile bounds, ordered `[lower, upper][intervention][outcome]`.
+    pub confidence_interval: Vec<Vec<Vec<f64>>>,
+}
+
+struct TotalEffectDesign {
+    predictors: Vec<Vec<f64>>,
+    targets: Vec<f64>,
+    z_rows: Vec<Vec<f64>>,
+    s_predictors: Vec<Vec<f64>>,
+    len_x: usize,
+    len_s: usize,
+    adjustment_set: Vec<Node>,
 }
 
 /// `LinearRegression().fit()`: centre, solve by least squares, recover the intercept.
@@ -946,6 +1088,16 @@ impl CausalEffects {
         estimator: Estimator,
         conditional_estimator: Option<Estimator>,
     ) -> Option<TotalEffectModel> {
+        let design = self.total_effect_design(data)?;
+        Some(fit_total_effect_design(
+            &design,
+            estimator,
+            conditional_estimator.unwrap_or(estimator),
+            None,
+        ))
+    }
+
+    fn total_effect_design(&self, data: &TimeSeries) -> Option<TotalEffectDesign> {
         if self.no_causal_path {
             return None;
         }
@@ -989,19 +1141,484 @@ impl CausalEffects {
             .collect();
         let targets: Vec<f64> = (0..n_obs).map(|t| array[len_x][t]).collect();
 
-        let fitted = fit_estimator(estimator, &predictors, &targets);
-        Some(TotalEffectModel {
-            fitted,
-            z_array: z_rows,
+        Some(TotalEffectDesign {
+            predictors,
+            targets,
+            z_rows,
             s_predictors,
             len_x,
             len_s,
-            conditional_estimator: conditional_estimator.unwrap_or(estimator),
             // Tigramite exposes the O-set before Models removes its overlap with S.
             adjustment_set,
-            n_obs,
         })
     }
+
+    /// Seeded block bootstrap for `fit_total_effect`, matching Tigramite's
+    /// `fit_bootstrap_of` seed schedule and `DataFrame.construct_array` resampling order.
+    pub fn fit_bootstrap_total_effect(
+        &self,
+        data: &TimeSeries,
+        estimator: Estimator,
+        conditional_estimator: Option<Estimator>,
+        options: TotalEffectBootstrapOptions,
+    ) -> Result<TotalEffectBootstrap, TotalEffectBootstrapError> {
+        self.fit_bootstrap_total_effect_with_progress(
+            data,
+            estimator,
+            conditional_estimator,
+            options,
+            |_, _| {},
+        )
+    }
+
+    /// Progress-aware form of [`Self::fit_bootstrap_total_effect`]. The callback receives
+    /// `(completed_bootstrap_models, total_bootstrap_models)` after each successful refit.
+    pub fn fit_bootstrap_total_effect_with_progress<F>(
+        &self,
+        data: &TimeSeries,
+        estimator: Estimator,
+        conditional_estimator: Option<Estimator>,
+        options: TotalEffectBootstrapOptions,
+        mut progress: F,
+    ) -> Result<TotalEffectBootstrap, TotalEffectBootstrapError>
+    where
+        F: FnMut(usize, usize),
+    {
+        if options.samples == 0 {
+            return Err(TotalEffectBootstrapError::ZeroSamples);
+        }
+        let design = self
+            .total_effect_design(data)
+            .ok_or(TotalEffectBootstrapError::NotIdentifiable)?;
+        let n_obs = design.predictors.len();
+        let resolved_block_length = match options.block_length {
+            BootstrapBlockLength::Fixed(0) => {
+                return Err(TotalEffectBootstrapError::ZeroBlockLength)
+            }
+            BootstrapBlockLength::Fixed(value) => value,
+            BootstrapBlockLength::CubeRoot => ((n_obs as f64).powf(1.0 / 3.0) as usize).max(1),
+        };
+        let blocks = n_obs.div_ceil(resolved_block_length);
+        if blocks < 2 {
+            return Err(TotalEffectBootstrapError::TooFewBlocks { blocks });
+        }
+
+        let conditional_estimator = conditional_estimator.unwrap_or(estimator);
+        let original_model =
+            fit_total_effect_design(&design, estimator, conditional_estimator, None);
+        let mut bootstrap_models = Vec::with_capacity(options.samples);
+        let mut all_starts = Vec::with_capacity(options.samples);
+        for bootstrap_index in 0..options.samples {
+            let seed = options
+                .seed
+                .checked_mul(options.samples as u64)
+                .and_then(|value| value.checked_add(bootstrap_index as u64))
+                .ok_or(TotalEffectBootstrapError::SeedOverflow)?;
+            let starts = bootstrap_block_starts(n_obs, resolved_block_length, seed)?;
+            let sample_indices = bootstrap_sample_indices(n_obs, resolved_block_length, &starts);
+            bootstrap_models.push(fit_total_effect_design(
+                &design,
+                estimator,
+                conditional_estimator,
+                Some(&sample_indices),
+            ));
+            all_starts.push(starts);
+            progress(bootstrap_index + 1, options.samples);
+        }
+
+        Ok(TotalEffectBootstrap {
+            original_model,
+            bootstrap_models,
+            block_starts: all_starts,
+            resolved_block_length,
+            options,
+        })
+    }
+
+    /// Tigramite's working `fit_wright_effect` branches: `method="parents"` and
+    /// `method="links_coeffs"`. The upstream `method="optimal"` branch stores a coefficient
+    /// vector where a scalar edge coefficient is required and is deliberately not represented by
+    /// this parity API.
+    pub fn fit_wright_effect(
+        &self,
+        data: &TimeSeries,
+        method: WrightCoefficientMethod,
+        mediation: WrightMediation,
+    ) -> Result<WrightEffectModel, WrightEffectError> {
+        self.fit_wright_effect_indexed(data, &method, &mediation, None)
+    }
+
+    fn fit_wright_effect_indexed(
+        &self,
+        data: &TimeSeries,
+        method: &WrightCoefficientMethod,
+        mediation: &WrightMediation,
+        sample_indices: Option<&[usize]>,
+    ) -> Result<WrightEffectModel, WrightEffectError> {
+        let paths = self.wright_paths(mediation);
+        let mut coefficient_map: BTreeMap<Node, BTreeMap<Node, f64>> = BTreeMap::new();
+        let mut fitted_observations = data.t.saturating_sub(self.tau_max);
+        let fitted_nodes: BTreeSet<Node> = self
+            .mediators
+            .iter()
+            .copied()
+            .chain(self.listy.iter().copied())
+            .collect();
+
+        match method {
+            WrightCoefficientMethod::Parents => {
+                for child in fitted_nodes {
+                    if !self.get_spouses(child).is_empty() {
+                        return Err(WrightEffectError::ParentMethodHasBidirectedLink {
+                            node: child,
+                        });
+                    }
+                    let parents: Vec<Node> = self.get_parents(child);
+                    if parents.is_empty() {
+                        coefficient_map.insert(child, BTreeMap::new());
+                        continue;
+                    }
+                    let (coefficients, n_obs) = fit_wright_edge_regression(
+                        data,
+                        &parents,
+                        child,
+                        &[],
+                        self.tau_max,
+                        sample_indices,
+                    );
+                    fitted_observations = n_obs;
+                    coefficient_map.insert(child, coefficients);
+                }
+            }
+            WrightCoefficientMethod::Links(links) => {
+                for child in fitted_nodes {
+                    let supplied = links
+                        .get(&child.0)
+                        .ok_or(WrightEffectError::MissingLinkCoefficients { variable: child.0 })?;
+                    let shifted = supplied
+                        .iter()
+                        .map(|&((parent, lag), coefficient)| ((parent, lag + child.1), coefficient))
+                        .collect();
+                    coefficient_map.insert(child, shifted);
+                }
+            }
+        }
+
+        let mut effects = BTreeMap::new();
+        let mut contributions = Vec::new();
+        for &source in &self.listx {
+            for &target in &self.listy {
+                let mut total = 0.0;
+                for path in paths.get(&(source, target)).into_iter().flatten() {
+                    let mut value = 1.0;
+                    for edge in path.windows(2) {
+                        let parent = edge[0];
+                        let child = edge[1];
+                        let coefficient = coefficient_map
+                            .get(&child)
+                            .and_then(|parents| parents.get(&parent))
+                            .copied()
+                            .ok_or(WrightEffectError::MissingPathCoefficient { parent, child })?;
+                        value *= coefficient;
+                    }
+                    total += value;
+                    contributions.push(WrightPathContribution {
+                        source,
+                        target,
+                        path: path.clone(),
+                        value,
+                    });
+                }
+                effects.insert((source, target), total);
+            }
+        }
+
+        let coefficients = coefficient_map
+            .iter()
+            .flat_map(|(&child, parents)| {
+                parents
+                    .iter()
+                    .map(move |(&parent, &value)| WrightCoefficient {
+                        parent,
+                        child,
+                        value,
+                    })
+            })
+            .collect();
+        Ok(WrightEffectModel {
+            effects,
+            coefficients,
+            paths: contributions,
+            mediation: mediation.clone(),
+            n_obs: fitted_observations,
+            listx: self.listx.clone(),
+            listy: self.listy.clone(),
+        })
+    }
+
+    fn wright_paths(&self, mediation: &WrightMediation) -> BTreeMap<(Node, Node), Vec<Vec<Node>>> {
+        let mut result = BTreeMap::new();
+        if *mediation == WrightMediation::Direct {
+            for &source in &self.listx {
+                for &target in &self.listy {
+                    let paths = if self.get_parents(target).contains(&source) {
+                        vec![vec![source, target]]
+                    } else {
+                        Vec::new()
+                    };
+                    result.insert((source, target), paths);
+                }
+            }
+            return result;
+        }
+
+        let inside: BTreeSet<Node> = self
+            .mediators
+            .union(&self.y)
+            .copied()
+            .filter(|node| !self.x.contains(node))
+            .collect();
+        let through: BTreeSet<Node> = match mediation {
+            WrightMediation::Through(nodes) => nodes.iter().copied().collect(),
+            WrightMediation::Total => BTreeSet::new(),
+            WrightMediation::Direct => unreachable!("handled above"),
+        };
+
+        for &source in &self.listx {
+            for &target in &self.listy {
+                let mut found = Vec::new();
+                let mut queue = vec![(source, Vec::<Node>::new())];
+                while let Some((node, prefix)) = queue.pop() {
+                    let mut path = prefix;
+                    path.push(node);
+                    let children: BTreeSet<Node> = self
+                        .get_children(node)
+                        .into_iter()
+                        .filter(|child| inside.contains(child))
+                        .collect();
+                    for child in children {
+                        if child.1 < -(self.tau_max as i32) || child.1 > 0 || path.contains(&child)
+                        {
+                            continue;
+                        }
+                        queue.push((child, path.clone()));
+                        if child == target
+                            && (through.is_empty() || path.iter().any(|n| through.contains(n)))
+                        {
+                            let mut completed = path.clone();
+                            completed.push(child);
+                            found.push(completed);
+                        }
+                    }
+                }
+                found.sort();
+                result.insert((source, target), found);
+            }
+        }
+        result
+    }
+
+    pub fn fit_bootstrap_wright_effect(
+        &self,
+        data: &TimeSeries,
+        method: WrightCoefficientMethod,
+        mediation: WrightMediation,
+        options: TotalEffectBootstrapOptions,
+    ) -> Result<WrightEffectBootstrap, WrightEffectError> {
+        self.fit_bootstrap_wright_effect_with_progress(data, method, mediation, options, |_, _| {})
+    }
+
+    pub fn fit_bootstrap_wright_effect_with_progress<F>(
+        &self,
+        data: &TimeSeries,
+        method: WrightCoefficientMethod,
+        mediation: WrightMediation,
+        options: TotalEffectBootstrapOptions,
+        mut progress: F,
+    ) -> Result<WrightEffectBootstrap, WrightEffectError>
+    where
+        F: FnMut(usize, usize),
+    {
+        if options.samples == 0 {
+            return Err(WrightEffectError::ZeroSamples);
+        }
+        let n_obs = data.t.saturating_sub(self.tau_max);
+        let resolved_block_length = match options.block_length {
+            BootstrapBlockLength::Fixed(0) => return Err(WrightEffectError::ZeroBlockLength),
+            BootstrapBlockLength::Fixed(value) => value,
+            BootstrapBlockLength::CubeRoot => ((n_obs as f64).powf(1.0 / 3.0) as usize).max(1),
+        };
+        let blocks = n_obs.div_ceil(resolved_block_length);
+        if blocks < 2 {
+            return Err(WrightEffectError::TooFewBlocks { blocks });
+        }
+
+        let original_model = self.fit_wright_effect_indexed(data, &method, &mediation, None)?;
+        let mut bootstrap_models = Vec::with_capacity(options.samples);
+        let mut all_starts = Vec::with_capacity(options.samples);
+        for bootstrap_index in 0..options.samples {
+            let seed = options
+                .seed
+                .checked_mul(options.samples as u64)
+                .and_then(|value| value.checked_add(bootstrap_index as u64))
+                .ok_or(WrightEffectError::SeedOverflow)?;
+            let starts =
+                bootstrap_block_starts(n_obs, resolved_block_length, seed).map_err(|error| {
+                    match error {
+                        TotalEffectBootstrapError::ZeroBlockLength => {
+                            WrightEffectError::ZeroBlockLength
+                        }
+                        TotalEffectBootstrapError::TooFewBlocks { blocks } => {
+                            WrightEffectError::TooFewBlocks { blocks }
+                        }
+                        TotalEffectBootstrapError::SeedOverflow => WrightEffectError::SeedOverflow,
+                        TotalEffectBootstrapError::ZeroSamples
+                        | TotalEffectBootstrapError::NotIdentifiable => {
+                            unreachable!("block-start validation cannot return this error")
+                        }
+                    }
+                })?;
+            let sample_indices = bootstrap_sample_indices(n_obs, resolved_block_length, &starts);
+            bootstrap_models.push(self.fit_wright_effect_indexed(
+                data,
+                &method,
+                &mediation,
+                Some(&sample_indices),
+            )?);
+            all_starts.push(starts);
+            progress(bootstrap_index + 1, options.samples);
+        }
+        Ok(WrightEffectBootstrap {
+            original_model,
+            bootstrap_models,
+            block_starts: all_starts,
+            resolved_block_length,
+            options,
+        })
+    }
+}
+
+fn fit_wright_edge_regression(
+    data: &TimeSeries,
+    parents: &[Node],
+    child: Node,
+    adjustment: &[Node],
+    tau_max: usize,
+    sample_indices: Option<&[usize]>,
+) -> (BTreeMap<Node, f64>, usize) {
+    let ((array, cleaned), extra_z) = construct_array_general(
+        data,
+        parents,
+        &[child],
+        &[],
+        adjustment,
+        tau_max,
+        CutOff::TauMax,
+        None,
+        None,
+    );
+    let base_n_obs = array[0].len();
+    let indices: Vec<usize> = sample_indices
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| (0..base_n_obs).collect());
+    let predictor_rows: Vec<&Vec<f64>> = (0..cleaned.x.len())
+        .map(|index| &array[index])
+        .chain(
+            extra_z
+                .iter()
+                .enumerate()
+                .map(|(index, _)| &array[cleaned.x.len() + cleaned.y.len() + index]),
+        )
+        .collect();
+    let predictors: Vec<Vec<f64>> = indices
+        .iter()
+        .map(|&sample| predictor_rows.iter().map(|row| row[sample]).collect())
+        .collect();
+    let targets: Vec<f64> = indices
+        .iter()
+        .map(|&sample| array[cleaned.x.len()][sample])
+        .collect();
+    let Fitted::Linear { coef, .. } = linear_fit(&predictors, &targets) else {
+        unreachable!("Wright always uses linear regression")
+    };
+    let names: Vec<Node> = cleaned.x.iter().copied().chain(extra_z).collect();
+    (
+        names
+            .into_iter()
+            .enumerate()
+            .map(|(index, node)| (node, coef[index]))
+            .collect(),
+        indices.len(),
+    )
+}
+
+fn fit_total_effect_design(
+    design: &TotalEffectDesign,
+    estimator: Estimator,
+    conditional_estimator: Estimator,
+    sample_indices: Option<&[usize]>,
+) -> TotalEffectModel {
+    let indices: Vec<usize> = sample_indices
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(|| (0..design.predictors.len()).collect());
+    let predictors: Vec<Vec<f64>> = indices
+        .iter()
+        .map(|&index| design.predictors[index].clone())
+        .collect();
+    let targets: Vec<f64> = indices.iter().map(|&index| design.targets[index]).collect();
+    let z_array: Vec<Vec<f64>> = design
+        .z_rows
+        .iter()
+        .map(|row| indices.iter().map(|&index| row[index]).collect())
+        .collect();
+    let s_predictors: Vec<Vec<f64>> = indices
+        .iter()
+        .map(|&index| design.s_predictors[index].clone())
+        .collect();
+    let fitted = fit_estimator(estimator, &predictors, &targets);
+    TotalEffectModel {
+        fitted,
+        z_array,
+        s_predictors,
+        len_x: design.len_x,
+        len_s: design.len_s,
+        conditional_estimator,
+        adjustment_set: design.adjustment_set.clone(),
+        n_obs: indices.len(),
+    }
+}
+
+/// Starting positions from Tigramite's
+/// `Generator.choice(arange(n_obs - block_length), size=ceil(n_obs/block_length))`.
+pub fn bootstrap_block_starts(
+    n_obs: usize,
+    block_length: usize,
+    seed: u64,
+) -> Result<Vec<usize>, TotalEffectBootstrapError> {
+    if block_length == 0 {
+        return Err(TotalEffectBootstrapError::ZeroBlockLength);
+    }
+    let blocks = n_obs.div_ceil(block_length);
+    if blocks < 2 {
+        return Err(TotalEffectBootstrapError::TooFewBlocks { blocks });
+    }
+    let high = n_obs - block_length;
+    let mut rng = NpRng::seeded(seed);
+    Ok((0..blocks)
+        .map(|_| rng.bounded_uint64(high as u64) as usize)
+        .collect())
+}
+
+/// Expand circular block starts into the reference-point order used by Tigramite's bootstrap.
+pub fn bootstrap_sample_indices(n_obs: usize, block_length: usize, starts: &[usize]) -> Vec<usize> {
+    let mut indices = Vec::with_capacity(starts.len() * block_length);
+    for &start in starts {
+        for offset in 0..block_length {
+            indices.push(start + offset);
+        }
+    }
+    indices.truncate(n_obs);
+    indices
 }
 
 impl TotalEffectModel {
@@ -1068,4 +1685,154 @@ impl TotalEffectModel {
             })
             .collect()
     }
+}
+
+impl TotalEffectBootstrap {
+    /// Tigramite's `predict_bootstrap_of("predict_total_effect", ...)`, including NumPy's
+    /// default linear percentile interpolation.
+    pub fn predict_total_effect(
+        &self,
+        intervention_data: &[Vec<f64>],
+        confidence_level: f64,
+    ) -> TotalEffectBootstrapPrediction {
+        assert!(
+            confidence_level > 0.0 && confidence_level < 1.0,
+            "confidence_level must be between zero and one"
+        );
+        let individual_predictions: Vec<Vec<f64>> = self
+            .bootstrap_models
+            .iter()
+            .map(|model| model.predict_total_effect(intervention_data))
+            .collect();
+        bootstrap_prediction_interval(&individual_predictions, confidence_level)
+    }
+
+    /// Conditional counterpart for a non-empty S set.
+    pub fn predict_total_effect_with_conditions(
+        &self,
+        intervention_data: &[Vec<f64>],
+        conditions_data: &[Vec<f64>],
+        confidence_level: f64,
+    ) -> TotalEffectBootstrapPrediction {
+        assert!(
+            confidence_level > 0.0 && confidence_level < 1.0,
+            "confidence_level must be between zero and one"
+        );
+        let individual_predictions: Vec<Vec<f64>> = self
+            .bootstrap_models
+            .iter()
+            .map(|model| {
+                model.predict_total_effect_with_conditions(intervention_data, conditions_data)
+            })
+            .collect();
+        bootstrap_prediction_interval(&individual_predictions, confidence_level)
+    }
+}
+
+impl WrightEffectModel {
+    /// `predict_wright_effect`: linear intervention values multiplied by the path-summed effects.
+    /// Like Tigramite, this reports a change model with no intercept.
+    pub fn predict_wright_effect(&self, intervention_data: &[Vec<f64>]) -> Vec<Vec<f64>> {
+        intervention_data
+            .iter()
+            .map(|row| {
+                assert_eq!(
+                    row.len(),
+                    self.listx.len(),
+                    "intervention width must match X"
+                );
+                self.listy
+                    .iter()
+                    .map(|&target| {
+                        self.listx
+                            .iter()
+                            .enumerate()
+                            .map(|(index, &source)| {
+                                row[index]
+                                    * self.effects.get(&(source, target)).copied().unwrap_or(0.0)
+                            })
+                            .sum()
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+}
+
+impl WrightEffectBootstrap {
+    pub fn predict_wright_effect(
+        &self,
+        intervention_data: &[Vec<f64>],
+        confidence_level: f64,
+    ) -> WrightEffectBootstrapPrediction {
+        assert!(
+            confidence_level > 0.0 && confidence_level < 1.0,
+            "confidence_level must be between zero and one"
+        );
+        let individual_predictions: Vec<Vec<Vec<f64>>> = self
+            .bootstrap_models
+            .iter()
+            .map(|model| model.predict_wright_effect(intervention_data))
+            .collect();
+        let interventions = intervention_data.len();
+        let outcomes = self.original_model.listy.len();
+        let tail = (1.0 - confidence_level) / 2.0;
+        let mut confidence_interval = vec![vec![vec![0.0; outcomes]; interventions]; 2];
+        for intervention in 0..interventions {
+            for outcome in 0..outcomes {
+                let values: Vec<f64> = individual_predictions
+                    .iter()
+                    .map(|draw| draw[intervention][outcome])
+                    .collect();
+                confidence_interval[0][intervention][outcome] = numpy_percentile(&values, tail);
+                confidence_interval[1][intervention][outcome] =
+                    numpy_percentile(&values, 1.0 - tail);
+            }
+        }
+        WrightEffectBootstrapPrediction {
+            individual_predictions,
+            confidence_interval,
+        }
+    }
+}
+
+fn bootstrap_prediction_interval(
+    individual_predictions: &[Vec<f64>],
+    confidence_level: f64,
+) -> TotalEffectBootstrapPrediction {
+    let width = individual_predictions[0].len();
+    assert!(
+        individual_predictions.iter().all(|row| row.len() == width),
+        "bootstrap prediction widths differ"
+    );
+    let tail = (1.0 - confidence_level) / 2.0;
+    let mut confidence_interval = vec![vec![0.0; width]; 2];
+    for column in 0..width {
+        let values: Vec<f64> = individual_predictions
+            .iter()
+            .map(|row| row[column])
+            .collect();
+        confidence_interval[0][column] = numpy_percentile(&values, tail);
+        confidence_interval[1][column] = numpy_percentile(&values, 1.0 - tail);
+    }
+    TotalEffectBootstrapPrediction {
+        individual_predictions: individual_predictions.to_vec(),
+        confidence_interval,
+    }
+}
+
+/// NumPy percentile's default `method="linear"`, with probability in `[0, 1]`.
+pub fn numpy_percentile(values: &[f64], probability: f64) -> f64 {
+    assert!(!values.is_empty(), "percentile requires values");
+    assert!(
+        (0.0..=1.0).contains(&probability),
+        "percentile probability must be in [0, 1]"
+    );
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|a, b| a.total_cmp(b));
+    let position = probability * (sorted.len() - 1) as f64;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    let weight = position - lower as f64;
+    sorted[lower] + weight * (sorted[upper] - sorted[lower])
 }

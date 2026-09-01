@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import type { EstimationRunArtifact, EstimationRunId } from './estimation'
+import { contemporaneousAdjustmentVariables, type EstimationRunArtifact, type EstimationRunId } from './estimation'
 import type { MethodId } from './methods'
 import type { PreparedDatasetVersionId } from './preprocessing'
 import type { StudyVariable } from './study'
@@ -223,7 +223,7 @@ export function probeEligibility(probe: SensitivityProbe, run: EstimationRunArti
         : { kind: 'refused', reason: 'The DoWhy refuters refit the linear back-door estimate; choose an adjusted linear regression run.' }
     case 'unobserved-confounding':
       if (run.kind !== 'backdoor-linear-run') return { kind: 'refused', reason: 'The simulated confounder refits the linear back-door estimate; choose an adjusted linear regression run.' }
-      if (run.estimate.adjustmentSet.length === 0) return { kind: 'refused', reason: 'The simulated confounder is sized from the observed common causes, and this study adjusts for none.' }
+      if ((contemporaneousAdjustmentVariables(run.estimate.adjustment)?.length ?? 0) === 0) return { kind: 'refused', reason: 'The simulated confounder is sized from the observed common causes, and this study adjusts for none.' }
       if (treatmentIsBinary === false) return { kind: 'refused', reason: 'The simulation flips a binary treatment; this treatment is not 0 or 1.' }
       return { kind: 'eligible' }
     case 'dml-refutation':

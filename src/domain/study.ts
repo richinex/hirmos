@@ -129,6 +129,7 @@ export function studyGraphOf(graph: EditableDag): StudyGraph {
     const to = index.get(edge.effect)
     if (from === undefined || to === undefined) continue
     if (edge.timing.kind === 'lagged') laggedArrows += 1
+    if (from === to) continue
     const key = `${from}>${to}`
     if (seen.has(key)) continue
     seen.add(key)

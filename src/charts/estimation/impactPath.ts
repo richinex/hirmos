@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import type { TimeEffectPoint } from '@/domain/estimation'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { baseOption, gridAuto, legend, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface ImpactPathView {
@@ -43,7 +43,7 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
       nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
+      axisLabel: axisLabelStyle(theme),
     },
     yAxis: { ...valueAxis(theme), scale: true },
     series: [

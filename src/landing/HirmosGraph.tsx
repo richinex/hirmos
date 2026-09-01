@@ -3,6 +3,10 @@ import * as THREE from 'three'
 import { Line2 } from 'three/examples/jsm/lines/Line2.js'
 import { LineGeometry } from 'three/examples/jsm/lines/LineGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 
 /**
  * The hero scene tells the headline: raw data becomes a causal estimate. A cloud of observations
@@ -151,6 +155,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const compact = window.matchMedia('(max-width: 900px)').matches
 
     const scene = new THREE.Scene()
+    scene.fog = new THREE.FogExp2(stage.getHex(), dark ? 0.055 : 0.042)
     const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 40)
     camera.position.set(0, 0, 9)
 
@@ -163,7 +168,18 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     renderer.setClearColor(stage, 0)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, compact ? 1.5 : 2))
     renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.12
     element.prepend(renderer.domElement)
+
+    // Bloom lifts the signal arrows and live rings off the ground. It costs a second render target, so
+    // it is spent only on a dark ground with room to draw, and never when motion is refused.
+    const composer = !compact && !still && dark ? new EffectComposer(renderer) : null
+    if (composer !== null) {
+      composer.addPass(new RenderPass(scene, camera))
+      composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.42, 0.5, 0.72))
+      composer.addPass(new OutputPass())
+    }
 
     const graph = new THREE.Group()
     scene.add(graph)
@@ -235,6 +251,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       caption.position.set(0, -(NODE_RADIUS + 0.22), 0.03)
       group.add(disc, ring, glyph, caption)
       group.scale.setScalar(0)
+      group.userData = { ring, live, pulseSpeed: 0.42 + Math.random() * 0.34, pulseOffset: Math.random() * Math.PI * 2 }
       graph.add(group)
       nodeGroups.push(group)
     }
@@ -334,6 +351,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       height = element.clientHeight
       if (width === 0 || height === 0) return
       renderer.setSize(width, height)
+      composer?.setSize(width, height)
       lineResolution.set(width, height)
       camera.aspect = width / height
       camera.updateProjectionMatrix()
@@ -367,17 +385,33 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     let startTime = performance.now()
     let pausedAt: number | null = null
 
+    let lastFrame = performance.now()
+
     const render = (now: number) => {
       if (!running) return
+      // A stalled tab must not deliver one enormous step to the smoothers.
+      const delta = Math.min((now - lastFrame) / 1000, 0.05)
+      lastFrame = now
       const time = (now - startTime) / 1000
       layoutCloud(time)
       layoutGraph(time)
+      for (const group of nodeGroups) {
+        const { ring, live, pulseSpeed, pulseOffset } = group.userData as { ring: THREE.Mesh; live: boolean; pulseSpeed: number; pulseOffset: number }
+        const material = ring.material as THREE.MeshBasicMaterial
+        const pulse = (Math.sin(time * pulseSpeed + pulseOffset) + 1) / 2
+        material.opacity = (live ? 0.78 : 0.62) + pulse * (live ? 0.22 : 0.2)
+      }
+      // Ambient drift rides on top of the pointer, so the field keeps breathing when the cursor rests.
       const sway = Math.sin(time * 0.25) * 0.02
-      const targetY = compact ? sway : sway + pointerX * 0.07
-      const targetX = compact ? 0 : pointerY * 0.05
-      graph.rotation.y += (targetY - graph.rotation.y) * 0.04
-      graph.rotation.x += (targetX - graph.rotation.x) * 0.04
-      renderer.render(scene, camera)
+      const driftY = Math.sin(time * 0.11) * 0.018
+      const driftX = Math.cos(time * 0.085) * 0.012
+      const targetY = compact ? sway + driftY : sway + driftY + pointerX * 0.07
+      const targetX = compact ? driftX : driftX + pointerY * 0.05
+      const ease = 1 - Math.pow(0.02, delta)
+      graph.rotation.y += (targetY - graph.rotation.y) * ease
+      graph.rotation.x += (targetX - graph.rotation.x) * ease
+      if (composer !== null) composer.render()
+      else renderer.render(scene, camera)
       if (!still) frame = requestAnimationFrame(render)
       else running = false
     }
@@ -386,6 +420,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const start = () => {
       if (!booted || running || !heroVisible || !pageVisible) return
       running = true
+      lastFrame = performance.now()
       if (pausedAt === null) startTime = performance.now()
       else startTime += performance.now() - pausedAt
       pausedAt = null
@@ -449,6 +484,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
         }
       })
       lineMaterials.forEach((material) => material.dispose())
+      composer?.dispose()
       renderer.dispose()
       renderer.forceContextLoss()
       if (canvas.parentElement === element) element.removeChild(canvas)

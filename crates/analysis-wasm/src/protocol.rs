@@ -81,6 +81,52 @@ pub(crate) enum CounterfactualIdentificationEvidence {
     },
 }
 
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct IdentifiedDiscreteCondition {
+    pub(crate) variable: usize,
+    pub(crate) state: usize,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum IdentifiedDiscreteQueryKind {
+    Unconditional,
+    Conditional {
+        variable: usize,
+        state: String,
+        representative_value: f64,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum IdentifiedDiscreteResult {
+    Identified {
+        algorithm: &'static str,
+        expression: String,
+        latex: String,
+        expectations: (f64, f64),
+        effect: f64,
+        distribution_low: Vec<(String, f64)>,
+        distribution_high: Vec<(String, f64)>,
+        normalization_low: f64,
+        normalization_high: f64,
+    },
+    Unidentifiable {
+        hedge_graph: Vec<usize>,
+        hedge_subgraph: Vec<usize>,
+    },
+}
+
 #[derive(serde::Deserialize)]
 #[serde(
     tag = "kind",
@@ -184,6 +230,35 @@ pub(crate) enum AnalysisCommand {
         adjustment: Vec<usize>,
         family: CountFamily,
     },
+    NegativeBinomialIngarch {
+        rows: usize,
+        columns: usize,
+        outcome: usize,
+        link: IngarchLink,
+        /// Contemporaneous regressor columns, including the treatment column.
+        regressors: Vec<usize>,
+        past_observation_lags: Vec<usize>,
+        past_mean_lags: Vec<usize>,
+        external_regressors: Vec<bool>,
+        horizon: usize,
+        /// One future baseline value per regressor; repeated over the forecast horizon.
+        baseline_regressors: Vec<f64>,
+        /// Matrix column whose future path is changed by the intervention schedule.
+        intervention_regressor: usize,
+        control_value: f64,
+        treatment_value: f64,
+        schedule: IngarchInterventionSchedule,
+    },
+    CountSeriesInterventionScan {
+        rows: usize,
+        columns: usize,
+        outcome: usize,
+        link: IngarchLink,
+        past_observation_lags: Vec<usize>,
+        past_mean_lags: Vec<usize>,
+        candidate_reference_points: Vec<usize>,
+        delta: f64,
+    },
     CausalEffectsTotal {
         rows: usize,
         columns: usize,
@@ -196,6 +271,7 @@ pub(crate) enum AnalysisCommand {
         estimator: TotalEffectEstimator,
         /// Two intervention values for X; the effect is the prediction difference.
         interventions: [f64; 2],
+        uncertainty: CausalEffectsUncertainty,
     },
     CausalImpact {
         rows: usize,
@@ -282,12 +358,16 @@ pub(crate) enum AnalysisCommand {
         treated: usize,
         donors: Vec<usize>,
         n_pre: usize,
+        cross_fit_folds: usize,
+        alpha: f64,
     },
     PanelIntervention {
         rows: usize,
         /// One unit label and ordered time code per long-form observation.
         units: Vec<String>,
         times: Vec<i64>,
+        placebo_replications: usize,
+        seed: u64,
     },
     NegbinNuts {
         rows: usize,
@@ -322,6 +402,20 @@ pub(crate) enum AnalysisCommand {
         bins: usize,
         equivalent_sample_size: f64,
     },
+    IdentifiedDiscreteQuery {
+        rows: usize,
+        columns: usize,
+        /// One matrix column per observed graph node, in full graph-node order.
+        observed_nodes: Vec<usize>,
+        /// Names and directed edges cover the full graph, including unobserved nodes.
+        names: Vec<String>,
+        edges: Vec<(usize, usize)>,
+        treatment: usize,
+        outcome: usize,
+        unobserved: Vec<usize>,
+        bins: usize,
+        condition: Option<IdentifiedDiscreteCondition>,
+    },
     BinaryEtt {
         rows: usize,
         columns: usize,
@@ -348,6 +442,22 @@ pub(crate) enum AnalysisCommand {
         interventions: (f64, f64),
         /// Observation noise scale for abduction; null abducts exactly.
         observation_noise: Option<f64>,
+    },
+    DynamicLinearScmCounterfactual {
+        rows: usize,
+        columns: usize,
+        /// One prepared-matrix column per observed graph node, in graph-node order.
+        nodes: Vec<usize>,
+        stat_lag: usize,
+        /// Stationary directed marks indexed source, target, lag.
+        graph: Vec<Vec<Vec<String>>>,
+        treatment: usize,
+        outcome: usize,
+        timing: DynamicInterventionTiming,
+        /// Number of returned time points, including the intervention time.
+        steps: usize,
+        interventions: (f64, f64),
+        uncertainty: DynamicCounterfactualUncertainty,
     },
     Vecm {
         rows: usize,
@@ -391,9 +501,168 @@ pub(crate) enum CountFamily {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
+pub(crate) enum IngarchInterventionSchedule {
+    Point,
+    Persistent,
+    Decaying { delta: f64 },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum IngarchLink {
+    Identity,
+    Log,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
 pub(crate) enum TotalEffectEstimator {
     Linear,
     Knn { k: usize },
+    WrightParents,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DynamicInterventionTiming {
+    Point { time: usize },
+    Persistent { start: usize },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CausalEffectsFitEvidence {
+    Unfitted {
+        requested: TotalEffectEstimator,
+    },
+    AdjustedLinear {
+        adjustment_set: Vec<(usize, i32)>,
+    },
+    AdjustedKnn {
+        k: usize,
+        adjustment_set: Vec<(usize, i32)>,
+    },
+    WrightParents {
+        coefficients: Vec<WrightCoefficientEvidence>,
+        paths: Vec<WrightPathEvidence>,
+        direct_effect: f64,
+        indirect_effect: f64,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WrightCoefficientEvidence {
+    pub(crate) parent: (usize, i32),
+    pub(crate) child: (usize, i32),
+    pub(crate) coefficient: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct WrightPathEvidence {
+    pub(crate) nodes: Vec<(usize, i32)>,
+    pub(crate) coefficient: f64,
+    pub(crate) contrast: f64,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CausalEffectsBlockLength {
+    Fixed { length: usize },
+    CubeRoot,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CausalEffectsUncertainty {
+    None,
+    Bootstrap {
+        samples: usize,
+        block_length: CausalEffectsBlockLength,
+        confidence_level: f64,
+        seed: u64,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CausalEffectsUncertaintyEvidence {
+    None,
+    Bootstrap {
+        samples: usize,
+        block_length: CausalEffectsBlockLength,
+        resolved_block_length: usize,
+        confidence_level: f64,
+        seed: u64,
+        prediction_intervals: [[f64; 2]; 2],
+        effect_interval: [f64; 2],
+        effect_draws: Vec<f64>,
+    },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DynamicCounterfactualUncertainty {
+    None,
+    BlockBootstrap {
+        samples: usize,
+        block_length: CausalEffectsBlockLength,
+        confidence_level: f64,
+        seed: u64,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DynamicCounterfactualUncertaintyEvidence {
+    None,
+    BlockBootstrap {
+        samples: usize,
+        block_length: CausalEffectsBlockLength,
+        resolved_block_length: usize,
+        confidence_level: f64,
+        seed: u64,
+        effect_draws: Vec<Vec<f64>>,
+        /// Equal-tail pointwise bounds, ordered lower then upper.
+        pointwise_effect_interval: [Vec<f64>; 2],
+        average_draws: Vec<f64>,
+        average_interval: [f64; 2],
+        cumulative_draws: Vec<f64>,
+        cumulative_interval: [f64; 2],
+    },
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -525,6 +794,13 @@ pub(crate) struct GrangerLagEvidence {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct IngarchScanCandidateEvidence {
+    pub(crate) reference_point: usize,
+    pub(crate) score_statistic: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct OcseEdgeEvidence {
     pub(crate) source: usize,
     pub(crate) target: usize,
@@ -545,6 +821,120 @@ pub(crate) struct PanelMethodEvidence {
     pub(crate) lambda_objective: Vec<f64>,
     pub(crate) omega_objective: Vec<f64>,
     pub(crate) noise_level: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SyntheticCrossFitFoldEvidence {
+    pub(crate) held_out: Vec<usize>,
+    pub(crate) weights: Vec<f64>,
+    pub(crate) bias: f64,
+    pub(crate) att: f64,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum SyntheticCrossFitEvidence {
+    Available {
+        att: f64,
+        standard_error: f64,
+        t_statistic: f64,
+        degrees_of_freedom: usize,
+        p_value: f64,
+        confidence_interval: (f64, f64),
+        block_size: usize,
+        folds: Vec<SyntheticCrossFitFoldEvidence>,
+    },
+    Unavailable {
+        reason: String,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DonorPlaceboEvidence {
+    pub(crate) donor: usize,
+    pub(crate) pre_mspe: f64,
+    pub(crate) post_mspe: f64,
+    pub(crate) mspe_ratio: Option<f64>,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DonorPlaceboInferenceEvidence {
+    Available {
+        treated_pre_mspe: f64,
+        treated_post_mspe: f64,
+        treated_mspe_ratio: Option<f64>,
+        placebos: Vec<DonorPlaceboEvidence>,
+        p_value: f64,
+        n_valid_placebos: usize,
+    },
+    Unavailable {
+        reason: String,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum SyntheticPredictionBandEvidence {
+    Available {
+        alpha: f64,
+        intervals: Vec<(f64, f64)>,
+        half_width: f64,
+        pre_mspe: f64,
+        post_mspe: f64,
+        mspe_ratio: Option<f64>,
+    },
+    Unavailable {
+        reason: String,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum PanelPlaceboEvidence {
+    Available {
+        replications: usize,
+        seed: u64,
+        standard_error: f64,
+        estimates: Vec<f64>,
+    },
+    Unavailable {
+        reason: String,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum PanelInTimeEvidence {
+    Available {
+        estimate: f64,
+        effect_curve: Vec<f64>,
+    },
+    Unavailable {
+        reason: String,
+    },
 }
 
 /// Posterior expected-outcome curve over one adjustment covariate under both interventions.
@@ -763,20 +1153,65 @@ pub(crate) enum AnalysisResult {
         converged: bool,
         iterations: usize,
     },
+    NegativeBinomialIngarch {
+        observations: usize,
+        outcome: usize,
+        link: IngarchLink,
+        regressors: Vec<usize>,
+        past_observation_lags: Vec<usize>,
+        past_mean_lags: Vec<usize>,
+        external_regressors: Vec<bool>,
+        horizon: usize,
+        intervention_regressor: usize,
+        control_value: f64,
+        treatment_value: f64,
+        schedule: IngarchInterventionSchedule,
+        parameters: Vec<f64>,
+        fitted_means: Vec<f64>,
+        residuals: Vec<f64>,
+        log_likelihood: f64,
+        size: f64,
+        dispersion: f64,
+        score: Vec<f64>,
+        iterations: usize,
+        function_evaluations: usize,
+        gradient_evaluations: usize,
+        baseline_mean: Vec<f64>,
+        intervention_mean: Vec<f64>,
+        effect_path: Vec<f64>,
+        average_effect: f64,
+        cumulative_effect: f64,
+    },
+    CountSeriesInterventionScan {
+        observations: usize,
+        outcome: usize,
+        link: IngarchLink,
+        past_observation_lags: Vec<usize>,
+        past_mean_lags: Vec<usize>,
+        parameters: Vec<f64>,
+        fitted_means: Vec<f64>,
+        residuals: Vec<f64>,
+        log_likelihood: f64,
+        size: f64,
+        dispersion: f64,
+        candidates: Vec<IngarchScanCandidateEvidence>,
+        strongest_reference_point: usize,
+        delta: f64,
+    },
     CausalEffectsTotal {
         observations: usize,
         tau_max: usize,
         no_causal_path: bool,
         identifiable: bool,
-        adjustment_set: Vec<(usize, i32)>,
         mediators: Vec<(usize, i32)>,
-        estimator: TotalEffectEstimator,
+        fit: CausalEffectsFitEvidence,
         interventions: [f64; 2],
         /// Predicted Y at each intervention value; empty when not identifiable.
         predictions: Vec<f64>,
         /// predictions[1] - predictions[0]; NaN when not identifiable.
         total_effect: f64,
         fitted_observations: usize,
+        uncertainty: CausalEffectsUncertaintyEvidence,
     },
     CausalImpact {
         observations: usize,
@@ -864,6 +1299,10 @@ pub(crate) enum AnalysisResult {
         /// The treated series and its synthetic counterpart over every row.
         treated: Vec<f64>,
         synthetic: Vec<f64>,
+        cross_fit: SyntheticCrossFitEvidence,
+        donor_placebo: DonorPlaceboInferenceEvidence,
+        conformal_band: SyntheticPredictionBandEvidence,
+        gaussian_band: SyntheticPredictionBandEvidence,
     },
     PanelIntervention {
         observations: usize,
@@ -876,6 +1315,10 @@ pub(crate) enum AnalysisResult {
         did: PanelMethodEvidence,
         synthetic_control: PanelMethodEvidence,
         synthetic_did: PanelMethodEvidence,
+        synthetic_control_placebo: PanelPlaceboEvidence,
+        synthetic_did_placebo: PanelPlaceboEvidence,
+        synthetic_control_in_time: PanelInTimeEvidence,
+        synthetic_did_in_time: PanelInTimeEvidence,
     },
     NegbinNuts {
         observations: usize,
@@ -933,6 +1376,15 @@ pub(crate) enum AnalysisResult {
         /// The parents the do-query itself adjusted for.
         parents_adjusted: Vec<String>,
     },
+    IdentifiedDiscreteQuery {
+        observations: usize,
+        bins: usize,
+        /// State count per observed node, in full graph-node order with latent nodes omitted.
+        state_counts: Vec<usize>,
+        treatment_states: (String, String),
+        query: IdentifiedDiscreteQueryKind,
+        result: IdentifiedDiscreteResult,
+    },
     BinaryEtt {
         observations: usize,
         treatment: usize,
@@ -958,6 +1410,23 @@ pub(crate) enum AnalysisResult {
         effects: Vec<f64>,
         average_effect: f64,
         share_positive: f64,
+    },
+    DynamicLinearScmCounterfactual {
+        observations: usize,
+        fitted_observations: usize,
+        max_lag: usize,
+        order: Vec<usize>,
+        equations: Vec<DynamicScmEquationEvidence>,
+        timing: DynamicInterventionTiming,
+        interventions: (f64, f64),
+        start: usize,
+        factual_outcome: Vec<f64>,
+        counterfactual_low: Vec<f64>,
+        counterfactual_high: Vec<f64>,
+        effects: Vec<f64>,
+        average_effect: f64,
+        cumulative_effect: f64,
+        uncertainty: DynamicCounterfactualUncertaintyEvidence,
     },
     Vecm {
         observations: usize,
@@ -1056,6 +1525,23 @@ pub(crate) struct ScmEquation {
     pub(crate) parents: Vec<(usize, f64)>,
     pub(crate) residual_sd: f64,
     pub(crate) r_squared: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DynamicScmParentEvidence {
+    pub(crate) variable: usize,
+    pub(crate) lag: usize,
+    pub(crate) coefficient: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DynamicScmEquationEvidence {
+    pub(crate) variable: usize,
+    pub(crate) intercept: f64,
+    pub(crate) parents: Vec<DynamicScmParentEvidence>,
+    pub(crate) residual_scale: f64,
 }
 
 #[derive(Serialize)]

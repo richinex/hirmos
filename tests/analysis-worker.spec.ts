@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { stationarityBatterySchema } from '../src/domain/stationarity'
 import { dagCheckEvidenceSchema } from '../src/domain/dagValidation'
 import { directLingamEvidenceSchema } from '../src/domain/discovery'
-import { binaryEttEvidenceSchema, frontdoorTwoStageEvidenceSchema } from '../src/domain/estimation'
+import { identifiedDiscreteQueryEvidenceSchema } from '../src/domain/intervention'
+import { binaryEttEvidenceSchema, causalEffectsEvidenceSchema, frontdoorTwoStageEvidenceSchema } from '../src/domain/estimation'
 
 const browserOutcomeSchema = z.object({
   result: z.discriminatedUnion('ok', [
@@ -25,6 +26,15 @@ test('rejects impossible Holm evidence at the TypeScript boundary', () => {
     implications: [{ x: 0, y: 1, given: [], pValue: 0.2, adjustedPValue: 0.1, observations: 100, decision: 'notRefuted' }],
     uniformity: { statistic: 0.2, pValue: 0.7, tests: 1 },
     falsification: { kind: 'skipped', reason: 'latent variables' },
+  })
+  expect(parsed.success).toBe(false)
+})
+
+test('rejects an effect attached to an unidentifiable intervention result', () => {
+  const parsed = identifiedDiscreteQueryEvidenceSchema.safeParse({
+    kind: 'identifiedDiscreteQuery', observations: 80, bins: 2, stateCounts: [2, 2], treatmentStates: ['0', '1'],
+    query: { kind: 'unconditional' },
+    result: { kind: 'unidentifiable', hedgeGraph: [0, 1], hedgeSubgraph: [1], effect: 0.4 },
   })
   expect(parsed.success).toBe(false)
 })
@@ -284,6 +294,116 @@ test('runs the front-door estimator through the Rust worker', async ({ page }, t
   expect(parsed.data.result.value.uncertainty.kind).toBe('bootstrap')
   expect(parsed.data.progress[0]).toEqual({ stage: 'frontdoor-bootstrap', completed: 0, total: 20 })
   expect(parsed.data.progress.at(-1)).toEqual({ stage: 'frontdoor-bootstrap', completed: 20, total: 20 })
+})
+
+test('runs ID, IDC and hedge outcomes through the discrete intervention boundary', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Numerical boundary contract runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const completeBinary = (variables: number): { rows: number; values: Float64Array } => {
+      const repeats = 8
+      const rows = (2 ** variables) * repeats
+      const values = new Float64Array(rows * variables)
+      for (let variable = 0; variable < variables; variable += 1) {
+        for (let pattern = 0; pattern < 2 ** variables; pattern += 1) {
+          for (let repeat = 0; repeat < repeats; repeat += 1) values[variable * rows + pattern * repeats + repeat] = (pattern >> variable) & 1
+        }
+      }
+      return { rows, values }
+    }
+    const frontdoorData = completeBinary(3)
+    const frontdoor = await analysis.runIdentifiedDiscreteQuery(frontdoorData.values, frontdoorData.rows, 3, {
+      observedNodes: [0, 1, 2], names: ['U', 'X', 'M', 'Y'], edges: [[0, 1], [0, 3], [1, 2], [2, 3]],
+      treatment: 1, outcome: 3, unobserved: [0], bins: 2, condition: null,
+    })
+    const conditionalData = completeBinary(3)
+    const conditional = await analysis.runIdentifiedDiscreteQuery(conditionalData.values, conditionalData.rows, 3, {
+      observedNodes: [0, 1, 2], names: ['Z', 'X', 'Y'], edges: [[0, 1], [0, 2], [1, 2]],
+      treatment: 1, outcome: 2, unobserved: [], bins: 2, condition: { variable: 0, state: 1 },
+    })
+    const hedgeData = completeBinary(2)
+    const hedge = await analysis.runIdentifiedDiscreteQuery(hedgeData.values, hedgeData.rows, 2, {
+      observedNodes: [0, 1], names: ['U', 'X', 'Y'], edges: [[0, 1], [0, 2], [1, 2]],
+      treatment: 1, outcome: 2, unobserved: [0], bins: 2, condition: null,
+    })
+    return { frontdoor, conditional, hedge }
+  })
+  const outcome = z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value: identifiedDiscreteQueryEvidenceSchema }).strict(),
+    z.object({ ok: z.literal(false), error: z.unknown() }).strict(),
+  ])
+  const parsed = z.object({ frontdoor: outcome, conditional: outcome, hedge: outcome }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success || !parsed.data.frontdoor.ok || !parsed.data.conditional.ok || !parsed.data.hedge.ok) return
+  expect(parsed.data.frontdoor.value.result.kind).toBe('identified')
+  if (parsed.data.frontdoor.value.result.kind === 'identified') {
+    expect(parsed.data.frontdoor.value.result.algorithm).toBe('ID')
+    expect(parsed.data.frontdoor.value.result.normalizationLow).toBeCloseTo(1, 12)
+    expect(parsed.data.frontdoor.value.result.normalizationHigh).toBeCloseTo(1, 12)
+  }
+  expect(parsed.data.conditional.value.query.kind).toBe('conditional')
+  expect(parsed.data.conditional.value.result.kind).toBe('identified')
+  if (parsed.data.conditional.value.result.kind === 'identified') expect(parsed.data.conditional.value.result.algorithm).toBe('IDC')
+  expect(parsed.data.hedge.value.result.kind).toBe('unidentifiable')
+  if (parsed.data.hedge.value.result.kind === 'unidentifiable') expect(parsed.data.hedge.value.result.hedgeGraph.length).toBeGreaterThan(0)
+})
+
+test('runs the seeded CausalEffects block bootstrap through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Numerical boundary contract runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 120
+    const columns = 3
+    const values = new Float64Array(rows * columns)
+    for (let row = 1; row < rows; row += 1) {
+      const z = 0.4 * values[2 * rows + row - 1] + 0.3 * Math.sin(row * 1.17)
+      const x = 0.5 * z + 0.2 * Math.cos(row * 0.73)
+      const y = 0.7 * values[row - 1] + 0.35 * z + 0.2 * Math.sin(row * 0.41)
+      values[row] = x
+      values[rows + row] = y
+      values[2 * rows + row] = z
+    }
+    const graph = Array.from({ length: columns }, () => Array.from({ length: columns }, () => ['', '']))
+    graph[0][1][1] = '-->'
+    graph[2][0][1] = '-->'
+    graph[2][1][1] = '-->'
+    graph[0][0][1] = '-->'
+    graph[1][1][1] = '-->'
+    graph[2][2][1] = '-->'
+    const progress: unknown[] = []
+    const result = await analysis.runCausalEffectsTotal(values, rows, columns, {
+      statLag: 1,
+      graph,
+      x: [[0, -1]],
+      y: [[1, 0]],
+      hidden: [],
+      estimator: { kind: 'linear' },
+      interventions: [0, 1],
+      uncertainty: { kind: 'bootstrap', samples: 20, blockLength: { kind: 'fixed', length: 4 }, confidenceLevel: 0.9, seed: 4 },
+    }, (event: unknown) => progress.push(event))
+    return { result, progress, detachedBytes: values.byteLength }
+  })
+  const parsed = z.object({
+    result: z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), value: causalEffectsEvidenceSchema }).strict(),
+      z.object({ ok: z.literal(false), error: z.unknown() }).strict(),
+    ]),
+    progress: z.array(z.object({ stage: z.string(), completed: z.number(), total: z.number() }).strict()),
+    detachedBytes: z.number().int().nonnegative(),
+  }).strict().safeParse(raw)
+
+  expect(parsed.success).toBe(true)
+  if (!parsed.success || !parsed.data.result.ok) return
+  expect(parsed.data.detachedBytes).toBe(0)
+  expect(parsed.data.result.value.identifiable).toBe(true)
+  expect(parsed.data.result.value.uncertainty.kind).toBe('bootstrap')
+  if (parsed.data.result.value.uncertainty.kind !== 'bootstrap') return
+  expect(parsed.data.result.value.uncertainty.effectDraws).toHaveLength(20)
+  expect(parsed.data.result.value.uncertainty.resolvedBlockLength).toBe(4)
+  expect(parsed.data.progress[0]).toEqual({ stage: 'causal-effects-bootstrap', completed: 0, total: 20 })
+  expect(parsed.data.progress.at(-1)).toEqual({ stage: 'causal-effects-bootstrap', completed: 20, total: 20 })
 })
 
 test('runs KCI, Holm, KS and permutation graph checks in the Rust worker', async ({ page }, testInfo) => {

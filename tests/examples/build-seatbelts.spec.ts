@@ -79,7 +79,7 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await page.getByRole('button', { name: 'Intervene' }).click()
   await choose(page.getByLabel('Variable to set'), 'kms')
   await choose(page.getByLabel('Variable to read'), 'DriversKilled')
-  await page.getByRole('button', { name: /Ask the network/ }).click()
+  await page.getByRole('button', { name: /Evaluate intervention/ }).click()
   await expect(page.getByText(/Graph revision/)).toBeVisible({ timeout: 60_000 })
   await page.getByRole('button', { name: 'Selection' }).click()
   await page.getByRole('button', { name: /Use for study/ }).click()

@@ -9,7 +9,7 @@ import {
   pcmciPlusEvidenceSchema,
 } from '../src/domain/discovery'
 import { stationarityBatterySchema } from '../src/domain/stationarity'
-import { panelInterventionEvidenceSchema } from '../src/domain/estimation'
+import { panelInterventionEvidenceSchema, syntheticControlEvidenceSchema } from '../src/domain/estimation'
 
 const analysisOutcomeSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: stationarityBatterySchema }).strict(),
@@ -193,7 +193,7 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
       studyDraft: {},
       studies: [],
       identifications: [],
-      estimationRuns: [],
+      estimationRuns: [{ id: 'run', kind: 'backdoor-linear-run', estimate: { adjustmentSet: [{ node: 'node-z', column: 'z', name: 'Z' }] } }],
       sensitivityRuns: [],
       counterfactualRuns: [],
     })
@@ -203,6 +203,7 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
       transforms: parsed.value.prepared?.kind === 'prepared-time-series' ? parsed.value.prepared.seriesTransforms : null,
       diagnosticTransform: parsed.value.stationarity?.diagnosticTransform ?? null,
       legacyTransformRetained: parsed.value.stationarity !== null && 'transform' in parsed.value.stationarity,
+      appliedAdjustment: parsed.value.estimationRuns[0]?.estimate.adjustment ?? null,
     }
   })
 
@@ -214,7 +215,58 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
     ],
     diagnosticTransform: { kind: 'difference', order: 1 },
     legacyTransformRetained: false,
+    appliedAdjustment: { kind: 'contemporaneous', variables: [{ node: 'node-z', column: 'z', name: 'Z' }] },
   })
+})
+
+test('the shipped example uses the current applied-adjustment record', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Example compatibility runs once')
+  await page.goto('/app')
+  const adjustments = await page.evaluate(async () => {
+    const bundle = await import(new URL('/src/domain/bundle.ts', window.location.href).href)
+    const response = await fetch('/examples/seatbelts.hirmos.json')
+    const parsed = bundle.parseBundle(await response.text())
+    if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
+    return parsed.value.project.estimationRuns.map((run: { readonly estimate: { readonly adjustment: unknown } }) => run.estimate.adjustment)
+  })
+  expect(adjustments).toEqual([
+    { kind: 'contemporaneous', variables: [{ node: '855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice', column: '6:PetrolPrice', name: 'PetrolPrice' }] },
+    { kind: 'contemporaneous', variables: [{ node: '855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice', column: '6:PetrolPrice', name: 'PetrolPrice' }] },
+    { kind: 'contemporaneous', variables: [{ node: '855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice', column: '6:PetrolPrice', name: 'PetrolPrice' }] },
+  ])
+})
+
+test('opens the shipped example Estimation chapter without the compatibility boundary', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Example rendering runs once')
+  await page.goto('/app')
+  const example = page.getByRole('listitem').filter({ hasText: 'Seat-belt law and road deaths' })
+  await example.getByRole('button', { name: 'Open' }).click()
+  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await expect(page.getByText('The Estimation chapter could not be displayed.')).toHaveCount(0)
+  await expect(page.getByText('Runs · 3')).toBeVisible()
+})
+
+test('returns synthetic-control cross-fit, donor-placebo, and prediction-band evidence through Wasm', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Synthetic-control boundary runs once')
+  await page.goto('/app')
+  const raw = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 40
+    const nPre = 25
+    const donorA = Array.from({ length: rows }, (_, index) => 10 + 0.5 * index + 0.2 * Math.sin(index))
+    const donorB = Array.from({ length: rows }, (_, index) => 30 - 0.2 * index + 0.15 * Math.cos(index / 2))
+    const treated = donorA.map((value, index) => 0.6 * value + 0.4 * (donorB[index] ?? 0) + (index >= nPre ? 5 : 0))
+    const values = Float64Array.from([...treated, ...donorA, ...donorB])
+    return analysis.runSyntheticControl(values, rows, 3, { treated: 0, donors: [1, 2], nPre, crossFitFolds: 3, alpha: 0.1 })
+  })
+  const parsed = z.object({ ok: z.literal(true), value: syntheticControlEvidenceSchema }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(parsed.data.value.crossFit.kind).toBe('available')
+  expect(parsed.data.value.donorPlacebo.kind).toBe('available')
+  expect(parsed.data.value.conformalBand.kind).toBe('available')
+  expect(parsed.data.value.gaussianBand.kind).toBe('available')
+  expect(Math.abs(parsed.data.value.att - 5)).toBeLessThan(1e-6)
 })
 
 test('validates, materializes, and estimates a balanced long panel through both workers', async ({ page }, testInfo) => {
@@ -270,6 +322,7 @@ test('validates, materializes, and estimates a balanced long panel through both 
       matrix.value.rowCount,
       matrix.value.units,
       matrix.value.times,
+      { placeboReplications: 24, seed: 0 },
       (next: { stage: string; completed: number; total: number }) => progress.push(next),
     )
     return {
@@ -302,11 +355,20 @@ test('validates, materializes, and estimates a balanced long panel through both 
   if (!parsed.success) return
   expect(Math.abs(parsed.data.estimated.value.syntheticDid.estimate - 4)).toBeLessThan(0.1)
   expect(Math.abs(parsed.data.estimated.value.syntheticControl.estimate - 4)).toBeLessThan(0.1)
+  expect(parsed.data.estimated.value.syntheticControlPlacebo.kind).toBe('available')
+  expect(parsed.data.estimated.value.syntheticDidPlacebo.kind).toBe('available')
+  expect(parsed.data.estimated.value.syntheticControlInTime.kind).toBe('available')
+  expect(parsed.data.estimated.value.syntheticDidInTime.kind).toBe('available')
   expect(parsed.data.progress).toEqual([
-    { stage: 'validated-panel', completed: 1, total: 4 },
-    { stage: 'difference-in-differences', completed: 2, total: 4 },
-    { stage: 'synthetic-control', completed: 3, total: 4 },
-    { stage: 'synthetic-did', completed: 4, total: 4 },
+    { stage: 'validated-panel', completed: 1, total: 9 },
+    { stage: 'difference-in-differences', completed: 2, total: 9 },
+    { stage: 'synthetic-control', completed: 3, total: 9 },
+    { stage: 'synthetic-did', completed: 4, total: 9 },
+    { stage: 'placebo-permutations', completed: 5, total: 9 },
+    { stage: 'synthetic-control-placebos', completed: 6, total: 9 },
+    { stage: 'synthetic-did-placebos', completed: 7, total: 9 },
+    { stage: 'synthetic-control-in-time', completed: 8, total: 9 },
+    { stage: 'synthetic-did-in-time', completed: 9, total: 9 },
   ])
 })
 

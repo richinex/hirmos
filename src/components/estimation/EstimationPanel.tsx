@@ -2,6 +2,7 @@ import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
+import { LagListField } from '@/components/ui/LagListField'
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
@@ -27,8 +28,10 @@ import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import {
   additive,
+  adjustmentLabels,
   boundsReading,
   causalEstimateFrom,
+  contemporaneousAdjustmentVariables,
   defaultConfiguration,
   describeCovariance,
   describeEstimator,
@@ -43,6 +46,7 @@ import {
   type EstimationRunArtifact,
   type EstimatorConfiguration,
   type EstimatorId,
+  type TotalEffectEstimator,
 } from '@/domain/estimation'
 import { ESTIMATION_METHODS, methodDefinition, type MethodEligibility } from '@/domain/methods'
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
@@ -66,6 +70,15 @@ import type { AnalysisProgress } from '@/workers/analysisProtocol'
 const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
 const TRACE_LEVELS: readonly (90 | 95 | 99)[] = [90, 95, 99]
 const VECM_TERMS = [['n', 'None'], ['co', 'Constant outside'], ['ci', 'Constant inside'], ['coli', 'Constant and trend']] as const
+
+const totalEffectEstimatorFromKind = (kind: TotalEffectEstimator['kind']): TotalEffectEstimator => {
+  switch (kind) {
+    case 'linear': return { kind: 'linear' }
+    case 'knn': return { kind: 'knn', k: 15 }
+    case 'wrightParents': return { kind: 'wrightParents' }
+    default: return assertNever(kind)
+  }
+}
 
 type Job =
   | { readonly kind: 'idle' }
@@ -192,6 +205,41 @@ const eligibilityHint = (eligibility: MethodEligibility): string => {
 
 const panelWeight = (values: readonly number[], index: number): string => formatStatistic('score', values[index] ?? Number.NaN).text
 
+function SyntheticControlEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArtifact, { readonly kind: 'synthetic-control-run' }> }) {
+  const { evidence } = run
+  const donorNames = run.columns.slice(2).map((column) => column.name)
+  return (
+    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+      <summary className="cursor-pointer text-ink">Synthetic-control inference</summary>
+      <div className="mt-3 grid gap-4">
+        {evidence.crossFit.kind === 'available' ? (
+          <div className="figure-strip overflow-x-auto">
+            <table className="w-full border-collapse text-body" aria-label="Cross-fitted synthetic-control folds">
+              <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Fold</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Held-out rows</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Bias</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Effect</th></tr></thead>
+              <tbody>{evidence.crossFit.folds.map((fold, index) => <tr key={index}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{index + 1}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{fold.heldOut[0] + 1}–{(fold.heldOut.at(-1) ?? fold.heldOut[0]) + 1}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', fold.bias).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', fold.att).text}</td></tr>)}</tbody>
+            </table>
+          </div>
+        ) : <p className="m-0 text-body text-muted">Cross-fitted inference unavailable: {evidence.crossFit.reason}</p>}
+        {evidence.donorPlacebo.kind === 'available' ? (
+          <div className="figure-strip overflow-x-auto">
+            <table className="w-full border-collapse text-body" aria-label="Donor-placebo MSPE ratios">
+              <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Series</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Pre MSPE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Post MSPE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Post/pre ratio</th></tr></thead>
+              <tbody>
+                <tr><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-medium">Treated</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.donorPlacebo.treatedPreMspe).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.donorPlacebo.treatedPostMspe).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{evidence.donorPlacebo.treatedMspeRatio === null ? '∞' : formatStatistic('raw', evidence.donorPlacebo.treatedMspeRatio).text}</td></tr>
+                {evidence.donorPlacebo.placebos.map((placebo) => <tr key={placebo.donor}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{donorNames[placebo.donor] ?? `Donor ${placebo.donor + 1}`}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', placebo.preMspe).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', placebo.postMspe).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{placebo.mspeRatio === null ? '∞' : formatStatistic('raw', placebo.mspeRatio).text}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="m-0 text-body text-muted">Donor-placebo inference unavailable: {evidence.donorPlacebo.reason}</p>}
+        <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body">
+          <dt>Conformal band</dt><dd className="m-0">{evidence.conformalBand.kind === 'available' ? `half-width ${formatStatistic('raw', evidence.conformalBand.halfWidth).text}` : evidence.conformalBand.reason}</dd>
+          <dt>Gaussian band</dt><dd className="m-0">{evidence.gaussianBand.kind === 'available' ? `half-width ${formatStatistic('raw', evidence.gaussianBand.halfWidth).text}` : evidence.gaussianBand.reason}</dd>
+        </dl>
+      </div>
+    </details>
+  )
+}
+
 function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArtifact, { readonly kind: 'panel-intervention-run' }> }) {
   const { evidence } = run
   const controls = evidence.units.slice(0, evidence.controlUnits)
@@ -200,9 +248,9 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
   const preLabels = timeLabels.slice(0, evidence.nPre)
   const postLabels = timeLabels.slice(evidence.nPre)
   const estimates = [
-    ['Difference-in-differences', evidence.did],
-    ['Synthetic control', evidence.syntheticControl],
-    ['Synthetic difference-in-differences', evidence.syntheticDid],
+    ['Difference-in-differences', evidence.did, null, null],
+    ['Synthetic control', evidence.syntheticControl, evidence.syntheticControlPlacebo, evidence.syntheticControlInTime],
+    ['Synthetic difference-in-differences', evidence.syntheticDid, evidence.syntheticDidPlacebo, evidence.syntheticDidInTime],
   ] as const
   return (
     <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
@@ -210,10 +258,18 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
       <div className="mt-3 grid gap-4">
         <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel estimator comparison">
-            <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Estimator</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Estimate</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Noise level</th></tr></thead>
-            <tbody>{estimates.map(([name, estimate]) => <tr key={name}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{name}{name.startsWith('Synthetic difference') ? ' · primary' : ''}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.estimate).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.noiseLevel).text}</td></tr>)}</tbody>
+            <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Estimator</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Estimate</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Placebo SE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">In-time placebo</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Noise level</th></tr></thead>
+            <tbody>{estimates.map(([name, estimate, placebo, inTime]) => <tr key={name}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{name}{name.startsWith('Synthetic difference') ? ' · primary' : ''}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.estimate).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{placebo === null ? '—' : placebo.kind === 'available' ? formatStatistic('raw', placebo.standardError).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{inTime === null ? '—' : inTime.kind === 'available' ? formatStatistic('raw', inTime.estimate).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.noiseLevel).text}</td></tr>)}</tbody>
           </table>
         </div>
+        {[evidence.syntheticControlPlacebo, evidence.syntheticDidPlacebo, evidence.syntheticControlInTime, evidence.syntheticDidInTime].some((item) => item.kind === 'unavailable') ? (
+          <ul className="m-0 grid gap-1 pl-5 text-body text-muted">
+            {evidence.syntheticControlPlacebo.kind === 'unavailable' ? <li>SC placebo SE: {evidence.syntheticControlPlacebo.reason}</li> : null}
+            {evidence.syntheticDidPlacebo.kind === 'unavailable' ? <li>SDID placebo SE: {evidence.syntheticDidPlacebo.reason}</li> : null}
+            {evidence.syntheticControlInTime.kind === 'unavailable' ? <li>SC in-time placebo: {evidence.syntheticControlInTime.reason}</li> : null}
+            {evidence.syntheticDidInTime.kind === 'unavailable' ? <li>SDID in-time placebo: {evidence.syntheticDidInTime.reason}</li> : null}
+          </ul>
+        ) : null}
         <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel unit weights">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Control unit</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
@@ -285,6 +341,14 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Convergence', value: formatWords(evidence.converged ? 'converged' : 'not converged'), context: `${formatCount(evidence.iterations).text} iterations` },
         ]
       }
+      case 'negative-binomial-ingarch-run': {
+        const { evidence } = run
+        return [
+          { label: 'Average path difference', value: formatStatistic('raw', evidence.averageEffect), context: `${formatCount(evidence.horizon).text} forecast periods · cumulative ${formatStatistic('raw', evidence.cumulativeEffect).text}` },
+          { label: 'Overdispersion', value: formatStatistic('raw', evidence.dispersion), context: `negative-binomial size ${formatStatistic('raw', evidence.size).text}` },
+          { label: 'Recursion', value: formatWords(`${evidence.link === 'identity' ? 'additive' : 'multiplicative'} · count lag ${evidence.pastObservationLags.join(', ')} · mean lag ${evidence.pastMeanLags.join(', ')}`), context: `${formatCount(evidence.iterations).text} optimizer iterations · ${evidence.functionEvaluations}/${evidence.gradientEvaluations} function/gradient evaluations` },
+        ]
+      }
       case 'ardl-run': {
         const { evidence } = run
         const reading = boundsReading(evidence)
@@ -309,9 +373,27 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const { evidence } = run
         const donorNames = run.columns.slice(2).map((variable) => variable.name)
         return [
-          { label: 'Donor weights', value: formatWords(evidence.weights.map((weight, index) => `${donorNames[index] ?? index} ${formatStatistic('score', weight).text}`).join(' · ')), context: `${formatCount(evidence.weights.length).text} donors · sum to one` },
+          {
+            label: 'Donor weights',
+            value: formatWords(evidence.weights
+              .map((weight, index) => ({ name: donorNames[index] ?? String(index), weight }))
+              .filter((donor) => donor.weight >= 0.0005)
+              .sort((first, second) => second.weight - first.weight)
+              .map((donor) => `${donor.name} ${formatStatistic('score', donor.weight).text}`)
+              .join(' · ')),
+            context: `${formatCount(evidence.weights.filter((weight) => weight >= 0.0005).length).text} of ${evidence.weights.length} donors carry weight · sum to one`,
+          },
           { label: 'Pre-period loss', value: formatStatistic('raw', evidence.loss), context: `${formatCount(evidence.nPre).text} pre rows · ${formatCount(evidence.iterations).text} active-set steps` },
           { label: 'Average post gap', value: formatStatistic('raw', evidence.att), context: `over ${formatCount(evidence.nPost).text} post rows` },
+          evidence.crossFit.kind === 'available'
+            ? { label: 'Cross-fitted effect', value: formatStatistic('raw', evidence.crossFit.att), context: `SE ${formatStatistic('raw', evidence.crossFit.standardError).text} · ${formatInterval(evidence.crossFit.att, evidence.crossFit.confidenceInterval[0], evidence.crossFit.confidenceInterval[1], { kind: 'confidence', level: 0.95 }, additive).text} · p ${formatP(evidence.crossFit.pValue, { withLabel: false }).text}` }
+            : { label: 'Cross-fitted effect', value: formatWords('unavailable'), context: evidence.crossFit.reason },
+          evidence.donorPlacebo.kind === 'available'
+            ? { label: 'Donor placebo rank', value: formatP(evidence.donorPlacebo.pValue, { withLabel: false }), context: `treated post/pre MSPE ${evidence.donorPlacebo.treatedMspeRatio === null ? '∞' : formatStatistic('raw', evidence.donorPlacebo.treatedMspeRatio).text} · ${formatCount(evidence.donorPlacebo.nValidPlacebos).text} donor placebos` }
+            : { label: 'Donor placebo rank', value: formatWords('unavailable'), context: evidence.donorPlacebo.reason },
+          evidence.conformalBand.kind === 'available'
+            ? { label: 'Conformal band', value: formatStatistic('raw', evidence.conformalBand.halfWidth), context: `${Math.round((1 - evidence.conformalBand.alpha) * 100)}% fixed-weight prediction half-width` }
+            : { label: 'Conformal band', value: formatWords('unavailable'), context: evidence.conformalBand.reason },
         ]
       }
       case 'panel-intervention-run': {
@@ -349,7 +431,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         return [
           { label: 'Treatment bins', value: formatWords(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: `${evidence.bins} quantile bins · states ${evidence.stateCounts.join('/')}` },
           { label: 'Expected outcome', value: formatWords(`${formatStatistic('raw', evidence.expectations[0]).text} → ${formatStatistic('raw', evidence.expectations[1]).text}`), context: 'under do(low) and do(high)' },
-          ...(evidence.parentsAdjusted.join(', ') === run.estimate.adjustmentSet.map((variable) => variable.name).join(', ') ? [] : [
+          ...(evidence.parentsAdjusted.join(', ') === adjustmentLabels(run.estimate.adjustment).join(', ') ? [] : [
   { label: 'Adjustment set', value: formatWords(evidence.parentsAdjusted.length === 0 ? 'none' : evidence.parentsAdjusted.join(', ')), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : evidence.minimalAdjustmentSet.join(', ')}` },
           ]),
         ]
@@ -373,10 +455,23 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       case 'causal-effects-run': {
         const { evidence } = run
         const nodeName = (node: readonly [number, number]) => `${run.columns[node[0]]?.name ?? node[0]}${node[1] === 0 ? '' : ` (t${node[1]})`}`
+        const fitTiles = (() => {
+          switch (evidence.fit.kind) {
+            case 'unfitted': return []
+            case 'adjustedLinear': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `linear · τ max ${evidence.tauMax}` }]
+            case 'adjustedKnn': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `${evidence.fit.k}-neighbour · τ max ${evidence.tauMax}` }]
+            case 'wrightParents': return [
+              { label: 'Direct effect', value: formatStatistic('raw', evidence.fit.directEffect), context: 'sum of direct path contrasts' },
+              { label: 'Indirect effect', value: formatStatistic('raw', evidence.fit.indirectEffect), context: `${evidence.fit.paths.length} directed paths · ${evidence.fit.coefficients.length} parent coefficients` },
+            ]
+            default: return assertNever(evidence.fit)
+          }
+        })()
         return [
-          { label: 'Adjustment set', value: formatWords(evidence.adjustmentSet.length === 0 ? 'None' : evidence.adjustmentSet.map(nodeName).join(', ')), context: `τ max ${evidence.tauMax}` },
+          ...fitTiles,
           { label: 'Predictions', value: formatWords(evidence.predictions.map((value) => formatStatistic('raw', value).text).join(' → ')), context: `at ${evidence.interventions[0]} and ${evidence.interventions[1]}` },
           { label: 'Fitted rows', value: formatCount(evidence.fittedObservations), context: evidence.mediators.length === 0 ? 'no mediators' : `${evidence.mediators.length} mediator nodes` },
+          ...(evidence.uncertainty.kind === 'bootstrap' ? [{ label: 'Bootstrap', value: formatCount(evidence.uncertainty.samples), context: `${Math.round(evidence.uncertainty.confidenceLevel * 100)}% percentile interval · block ${evidence.uncertainty.resolvedBlockLength} · seed ${evidence.uncertainty.seed}` }] : []),
         ]
       }
       case 'causal-impact-run': {
@@ -393,12 +488,14 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   return (
     <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
       <MetricTile
-        label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : 'Adjustment set'}
+        label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
         size="compact"
         frame="cell"
         value={formatWords(run.kind === 'frontdoor-two-stage-run'
           ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
-          : run.estimate.adjustmentSet.length === 0 ? 'None' : run.estimate.adjustmentSet.map((variable) => variable.name).join(', '))}
+          : run.estimate.adjustment.kind === 'structural-parent-model'
+            ? `${run.estimate.adjustment.coefficients} parent coefficients · ${run.estimate.adjustment.paths} directed paths`
+            : adjustmentLabels(run.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(run.estimate.adjustment).join(', '))}
       />
       {tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </div>
@@ -408,6 +505,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
 function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: () => void }) {
   const theme = useChartTheme()
   const estimate = run.estimate
+  const adjustmentVariables = useMemo(() => contemporaneousAdjustmentVariables(estimate.adjustment) ?? [], [estimate.adjustment])
   const sentence = estimandSentence(study)
   const scaleLine = resultScaleLine(run, study, stepLabel)
   const chart = useMemo(() => (estimate.effect.kind === 'path'
@@ -436,10 +534,10 @@ function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run
       : counterfactualCurvesOption({
         outcome: study.outcome.name,
         treatment: study.treatment.name,
-        covariate: estimate.adjustmentSet[curveIndex]?.name ?? `covariate ${curveIndex + 1}`,
+        covariate: adjustmentVariables[curveIndex]?.name ?? `covariate ${curveIndex + 1}`,
         curve,
       }, theme)
-  }, [curves, curveIndex, estimate.adjustmentSet, study.outcome.name, study.treatment.name, theme])
+  }, [curves, curveIndex, adjustmentVariables, study.outcome.name, study.treatment.name, theme])
   const stamp = `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''} · ${formatTime(run.createdAt)}`
   const body = (
     <>
@@ -486,7 +584,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className={label('m-0 text-muted')}>Expected outcome across a covariate</p>
             <Select aria-label="Curve covariate" className={field('text', 'w-40')} value={curveIndex} onChange={(event) => setChosenCurve(Number(event.target.value))}>
-              {curves.map((_, index) => <option key={index} value={index}>{estimate.adjustmentSet[index]?.name ?? `covariate ${index + 1}`}</option>)}
+              {curves.map((_, index) => <option key={index} value={index}>{adjustmentVariables[index]?.name ?? `covariate ${index + 1}`}</option>)}
             </Select>
           </div>
           <EChart option={curveChart} label={`Expected ${study.outcome.name} across the chosen covariate under both interventions`} className="mt-2 h-[240px]" testId="counterfactual-curves" />
@@ -503,7 +601,8 @@ function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run
       )}
       <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />
       <Diagnostics run={run} />
-      {run.kind === 'panel-intervention-run' && <PanelEvidenceDetails run={run} />}
+      {run.kind === 'synthetic-control-run' ? <SyntheticControlEvidenceDetails run={run} /> : null}
+      {run.kind === 'panel-intervention-run' ? <PanelEvidenceDetails run={run} /> : null}
       <RunRecord run={run} />
     </>
   )
@@ -825,7 +924,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             if (!start.ok) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} does not switch on once: ${start.error.detail} Give the intervention row instead.` }); return }
             nPre = start.value
           }
-          const evidence = await analysis.runSyntheticControl(matrix.values, matrix.rowCount, columns.length, { treated: 1, donors: donorVariables.map((_, index) => index + 2), nPre })
+          const evidence = await analysis.runSyntheticControl(matrix.values, matrix.rowCount, columns.length, { treated: 1, donors: donorVariables.map((_, index) => index + 2), nPre, crossFitFolds: configuration.crossFitFolds, alpha: configuration.alpha })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
           const run = { kind: 'synthetic-control-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -844,6 +943,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             matrix.rowCount,
             matrix.units,
             matrix.times,
+            { placeboReplications: configuration.placeboReplications, seed: configuration.seed },
             (progress) => dispatch({ type: 'run-progressed', progress }),
           )
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
@@ -912,9 +1012,37 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
           return
         }
+        case 'negative-binomial-ingarch': {
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
+          const matrix = await materialise(columns)
+          const outcome = columnAt(matrix.values, matrix.rowCount, 1)
+          if (outcome.some((value) => value < 0 || !Number.isInteger(value))) { dispatch({ type: 'run-failed', detail: `${study.outcome.name} is not a count: it holds negative or fractional values.` }); return }
+          const regressors = [0, ...identification.result.adjustment.variables.map((_, index) => index + 2)]
+          const baselineRegressors = regressors.map((column) => matrix.values[column * matrix.rowCount + matrix.rowCount - 1] ?? 0)
+          const evidence = await analysis.runNegativeBinomialIngarch(matrix.values, matrix.rowCount, columns.length, {
+            outcome: 1,
+            link: configuration.link,
+            regressors,
+            pastObservationLags: configuration.pastObservationLags,
+            pastMeanLags: configuration.pastMeanLags,
+            externalRegressors: regressors.map(() => false),
+            horizon: configuration.horizon,
+            baselineRegressors,
+            interventionRegressor: 0,
+            controlValue: configuration.controlValue,
+            treatmentValue: configuration.treatmentValue,
+            schedule: configuration.schedule,
+          }, (progress) => dispatch({ type: 'run-progressed', progress }))
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          const run = { kind: 'negative-binomial-ingarch-run', configuration, evidence: evidence.value } as const
+          const estimate = causalEstimateFrom(study, identification, run)
+          finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The INGARCH run produced no forecast path.')
+          return
+        }
         case 'causal-effects-total': {
           if (document === null) { dispatch({ type: 'run-failed', detail: 'The study’s DAG document is missing.' }); return }
           const nodes = document.current.graph.nodes
+          const graphVariables = nodes.map((node): StudyVariable | null => node.kind === 'observed' ? { node: node.id, column: node.column, name: node.name } : null)
           const observed = nodes.flatMap((node) => (node.kind === 'observed' ? [{ node: node.id, column: node.column, name: node.name }] : []))
           if (observed.length === 0) { dispatch({ type: 'run-failed', detail: 'The DAG has no observed variables.' }); return }
           const matrix = await materialise(observed as unknown as NonEmptyArray<StudyVariable>)
@@ -937,10 +1065,11 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             hidden: marks.hidden.flatMap((variable) => Array.from({ length: lags + 1 }, (_, lag) => [variable, -lag] as const)),
             estimator: configuration.estimator,
             interventions: configuration.interventions,
-          })
+            uncertainty: configuration.uncertainty,
+          }, (progress) => dispatch({ type: 'run-progressed', progress }))
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
           const run = { kind: 'causal-effects-run', configuration, evidence: evidence.value } as const
-          const estimate = causalEstimateFrom(study, identification, run)
+          const estimate = causalEstimateFrom(study, identification, { ...run, graphVariables })
           const columns = nodes.map((node) => (node.kind === 'observed' ? { node: node.id, column: node.column, name: node.name } : { node: node.id, column: study.treatment.column, name: `${node.name} (unmeasured)` })) as unknown as NonEmptyArray<StudyVariable>
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact,
             evidence.value.noCausalPath ? 'The time-series graph has no causal path from the treatment to the outcome.' : 'The effect is not identifiable by adjustment in the projected time-series graph.')
@@ -1056,7 +1185,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </div>
             </div>
             <div>
-              <span className={fieldLabel}>Donor series</span>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className={fieldLabel}>Donor series</span>
+                {controlCandidates.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button type="button" className={button('quiet')} onClick={() => configure({ ...configuration, donors: controlCandidates.map((column) => column.id) })}>Select all</button>
+                    <button type="button" className={button('quiet')} onClick={() => configure({ ...configuration, donors: [] })}>Clear</button>
+                  </div>
+                )}
+              </div>
               <div className="mt-1 flex flex-wrap gap-2" role="group" aria-label="Donor series">
                 {controlCandidates.length === 0 && <span className="text-body text-faint">No other prepared columns to use as donors.</span>}
                 {controlCandidates.map((column) => (
@@ -1067,6 +1204,10 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 ))}
               </div>
             </div>
+            <div className="grid gap-3 @md/panel:grid-cols-2">
+              <label className="block"><span className={fieldLabel}>Cross-fit folds</span><input type="number" min={2} max={20} aria-label="Cross-fit folds" className={field('text', 'mt-1')} value={configuration.crossFitFolds} onChange={(event) => configure({ ...configuration, crossFitFolds: Math.max(2, Math.min(20, Math.floor(Number(event.target.value) || 2))) })} /></label>
+              <label className="block"><span className={fieldLabel}>Inference alpha</span><input type="number" min={0.001} max={0.5} step={0.01} aria-label="Synthetic-control inference alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => configure({ ...configuration, alpha: Math.max(0.001, Math.min(0.5, Number(event.target.value) || 0.05)) })} /></label>
+            </div>
           </div>
         )
       case 'panel-intervention':
@@ -1075,6 +1216,10 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <p className="m-0 max-w-[72ch] text-body text-faint">
               The primary estimator is predeclared as synthetic difference-in-differences. Conventional DID and synthetic control are reported as required comparisons; the primary result cannot be changed after viewing the estimates.
             </p>
+            <div className="grid gap-3 @md/panel:grid-cols-2">
+              <label className="block"><span className={fieldLabel}>Placebo replications</span><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
+              <label className="block"><span className={fieldLabel}>Placebo seed</span><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
+            </div>
             {panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
             {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted">Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units · {panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods · adoption at {panelPreflight.layout.adoptionLabel}.</p>}
           </div>
@@ -1110,23 +1255,59 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'poisson-glm':
       case 'negative-binomial-p':
         return <p className="m-0 text-body text-faint">Log link on the expected count of {study?.outcome.name ?? 'the outcome'}; the treatment coefficient exponentiates to an incidence rate ratio with a 95% normal interval.</p>
-      case 'causal-effects-total':
+      case 'negative-binomial-ingarch':
+        return (
+          <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            <div><span className={fieldLabel}>Mean link</span><SegmentedControl className="mt-1" ariaLabel="INGARCH mean link" value={configuration.link} onChange={(link) => configure({ ...configuration, link })} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>
+            <LagListField label="Past count lags" lags={configuration.pastObservationLags} onChange={(pastObservationLags) => configure({ ...configuration, pastObservationLags })} />
+            <LagListField label="Past mean lags" lags={configuration.pastMeanLags} onChange={(pastMeanLags) => configure({ ...configuration, pastMeanLags })} />
+            <label className="block"><span className={fieldLabel}>Forecast periods</span><input type="number" min={1} max={240} className={field('text', 'mt-1')} value={configuration.horizon} onChange={(event) => configure({ ...configuration, horizon: Math.max(1, Math.min(240, Math.floor(Number(event.target.value) || 1))) })} /></label>
+            <div><span className={fieldLabel}>Treatment schedule</span><SegmentedControl className="mt-1" ariaLabel="INGARCH treatment schedule" value={configuration.schedule.kind} onChange={(kind) => configure({ ...configuration, schedule: kind === 'decaying' ? { kind: 'decaying', delta: 0.6 } : { kind } })} options={[{ value: 'point', label: 'One period' }, { value: 'persistent', label: 'Persistent' }, { value: 'decaying', label: 'Decaying' }]} /></div>
+            <label className="block"><span className={fieldLabel}>Control value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.controlValue} onChange={(event) => configure({ ...configuration, controlValue: Number(event.target.value) || 0 })} /></label>
+            <label className="block"><span className={fieldLabel}>Treatment value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.treatmentValue} onChange={(event) => configure({ ...configuration, treatmentValue: Number(event.target.value) || 0 })} /></label>
+            {configuration.schedule.kind === 'decaying' && <label className="block"><span className={fieldLabel}>Decay δ</span><input type="number" min={0} max={1} step={0.05} className={field('text', 'mt-1')} value={configuration.schedule.delta} onChange={(event) => configure({ ...configuration, schedule: { kind: 'decaying', delta: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} /></label>}
+            <p className="m-0 max-w-[72ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The additive link expresses effects in expected counts and requires non-negative regressors. The multiplicative link expresses effects on the log expected count and permits signed regressors. Both use the treatment and identified same-period adjustment variables with the selected count and mean lags; no sampling interval is reported.</p>
+          </div>
+        )
+      case 'causal-effects-total': {
+        const bootstrap = configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty : null
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <div>
-              <span className={fieldLabel}>First-stage estimator</span>
-              <SegmentedControl className="mt-1" ariaLabel="First-stage estimator" value={configuration.estimator.kind} onChange={(kind) => configure({ ...configuration, estimator: kind === 'linear' ? { kind: 'linear' } : { kind: 'knn', k: 15 } })} options={[{ value: 'linear', label: 'Linear' }, { value: 'knn', label: 'k-NN' }]} />
+              <span className={fieldLabel}>Effect model</span>
+              <SegmentedControl className="mt-1" ariaLabel="CausalEffects model" value={configuration.estimator.kind} onChange={(kind) => configure({ ...configuration, estimator: totalEffectEstimatorFromKind(kind) })} options={[{ value: 'linear', label: 'Adjusted linear' }, { value: 'knn', label: 'Adjusted k-NN' }, { value: 'wrightParents', label: 'Wright paths' }]} />
             </div>
             {configuration.estimator.kind === 'knn' && (
               <label className="block"><span className={fieldLabel}>Neighbours k</span><input type="number" min={1} max={100} className={field('text', 'mt-1')} value={configuration.estimator.k} onChange={(event) => configure({ ...configuration, estimator: { kind: 'knn', k: Math.max(1, Math.min(100, Number(event.target.value) || 1)) } })} /></label>
+            )}
+            {configuration.estimator.kind === 'wrightParents' && (
+              <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Fits each node on its time-indexed parents, then sums products of coefficients along directed treatment-to-outcome paths. The result separates direct and indirect path contributions.</p>
             )}
             <label className="block"><span className={fieldLabel}>Treatment lag</span><input type="number" min={0} max={20} className={field('text', 'mt-1')} value={configuration.treatmentLag} onChange={(event) => configure({ ...configuration, treatmentLag: Math.max(0, Math.min(20, Number(event.target.value) || 0)) })} /></label>
             <div className="grid grid-cols-2 gap-2">
               <label className="block"><span className={fieldLabel}>From value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.interventions[0]} onChange={(event) => configure({ ...configuration, interventions: [Number(event.target.value) || 0, configuration.interventions[1]] })} /></label>
               <label className="block"><span className={fieldLabel}>To value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
             </div>
+            <div>
+              <span className={fieldLabel}>Sampling uncertainty</span>
+              <SegmentedControl className="mt-1" ariaLabel="CausalEffects sampling uncertainty" value={configuration.uncertainty.kind} onChange={(kind) => configure({ ...configuration, uncertainty: kind === 'none' ? { kind: 'none' } : { kind: 'bootstrap', samples: 100, blockLength: { kind: 'fixed', length: 1 }, confidenceLevel: 0.9, seed: 4 } })} options={[{ value: 'bootstrap', label: 'Block bootstrap' }, { value: 'none', label: 'Point estimate' }]} />
+            </div>
+            {bootstrap !== null && (
+              <>
+                <label className="block"><span className={fieldLabel}>Bootstrap samples</span><input type="number" min={20} max={5000} aria-label="CausalEffects bootstrap samples" className={field('text', 'mt-1')} value={bootstrap.samples} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, samples: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) } })} /></label>
+                <div>
+                  <span className={fieldLabel}>Block length</span>
+                  <SegmentedControl className="mt-1" ariaLabel="CausalEffects block length policy" value={bootstrap.blockLength.kind} onChange={(kind) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: kind === 'fixed' ? { kind: 'fixed', length: 1 } : { kind: 'cubeRoot' } } })} options={[{ value: 'fixed', label: 'Fixed' }, { value: 'cubeRoot', label: 'Cube root' }]} />
+                </div>
+                {bootstrap.blockLength.kind === 'fixed' && <label className="block"><span className={fieldLabel}>Observations per block</span><input type="number" min={1} aria-label="CausalEffects observations per block" className={field('text', 'mt-1')} value={bootstrap.blockLength.length} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: { kind: 'fixed', length: Math.max(1, Math.floor(Number(event.target.value) || 1)) } } })} /></label>}
+                <label className="block"><span className={fieldLabel}>Confidence level</span><input type="number" min={50} max={99.9} step={0.1} aria-label="CausalEffects confidence level" className={field('text', 'mt-1')} value={bootstrap.confidenceLevel * 100} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, confidenceLevel: Math.max(0.5, Math.min(0.999, (Number(event.target.value) || 90) / 100)) } })} /></label>
+                <label className="block"><span className={fieldLabel}>Bootstrap seed</span><input type="number" min={0} aria-label="CausalEffects bootstrap seed" className={field('text', 'mt-1')} value={bootstrap.seed} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) } })} /></label>
+                <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">Contiguous blocks preserve the lag alignment used by the fitted graph. Choose a block length that represents the series’ dependence; the cube-root option follows Tigramite’s built-in rule.</p>
+              </>
+            )}
           </div>
         )
+      }
       case 'causal-impact':
         return (
           <div className="grid gap-3">
@@ -1188,7 +1369,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </label>
               <div>
                 <RadioList
-                  legend="Estimation methods"
+                  columns={2}
+              legend="Estimation methods"
                   value={state.estimator}
                   onChange={(estimator) => dispatch({ type: 'estimator-chosen', estimator })}
                   options={ESTIMATOR_IDS.flatMap((id) => {

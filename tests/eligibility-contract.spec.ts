@@ -182,3 +182,62 @@ test('cointegration eligibility reads saved transformations, not the diagnostic 
     }),
   ]))
 })
+
+test('CausalEffects reports nonstationary prepared values for review without blocking the run', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Temporal eligibility contract runs once')
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const estimation = await import(new URL('/src/domain/estimation.ts', window.location.href).href)
+    const methods = await import(new URL('/src/domain/methods.ts', window.location.href).href)
+    const treatment = { node: 'kms', column: 'kms', name: 'kms' }
+    const outcome = { node: 'deaths', column: 'deaths', name: 'DriversKilled' }
+    const prepared = {
+      kind: 'prepared-time-series', observations: 192, columns: ['kms', 'deaths'],
+      sampling: { frequency: 'monthly' }, missingness: { kind: 'not-present' },
+      seriesTransforms: [
+        { column: 'kms', transform: { kind: 'levels' } },
+        { column: 'deaths', transform: { kind: 'levels' } },
+      ],
+    }
+    const study = {
+      estimand: { kind: 'average-treatment-effect', scale: 'additive' }, treatment, outcome,
+      graph: { nodes: [treatment, outcome], laggedArrows: 2 },
+    }
+    const evidence = [{ test: 'adf', specification: 'c', series: 'levels', pValue: 0.4 }]
+    const stationarity = {
+      kind: 'stationarity-evidence', preparedDataset: 'prepared', diagnosticTransform: { kind: 'difference' },
+      variables: [treatment, outcome].map((variable) => ({
+        column: variable.column, result: {}, levels: {}, differenced: {},
+        assessment: { kind: 'differenceStationary', order: 1, evidence },
+      })),
+    }
+    const document = {
+      name: 'Seat-belt temporal DAG',
+      current: {
+        validation: { kind: 'structurally-valid' },
+        graph: { nodes: [
+          { id: 'kms', kind: 'observed', column: 'kms', name: 'kms' },
+          { id: 'deaths', kind: 'observed', column: 'deaths', name: 'DriversKilled' },
+        ] },
+      },
+    }
+    const identification = { kind: 'identified', adjustment: { kind: 'canonical', variables: [] } }
+    const definition = methods.methodDefinition(estimation.methodIdOf('causal-effects-total'))
+    if (!definition.ok) throw new Error('CausalEffects method definition is missing.')
+    return estimation.evaluateEstimatorEligibility(definition.value, {
+      identification, prepared, stationarity, document, study,
+      configuration: estimation.defaultConfiguration('causal-effects-total', prepared, study),
+      outcomeIsCount: false, treatmentIsBinary: false, observedGraphIsBinary: false,
+      panelPreflight: { kind: 'not-applicable' },
+    })
+  })
+
+  expect(result.kind).toBe('caution')
+  expect(result).not.toHaveProperty('violations')
+  expect(result.unresolved).toEqual(expect.arrayContaining([
+    expect.objectContaining({
+      caveat: expect.objectContaining({ id: 'causal-effects-stationarity' }),
+      missingEvidence: expect.stringContaining('I(1)'),
+    }),
+  ]))
+})

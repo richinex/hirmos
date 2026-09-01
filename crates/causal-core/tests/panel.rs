@@ -173,6 +173,165 @@ fn california_did_sc_and_sdid_match_the_official_r_package() {
 }
 
 #[test]
+fn california_placebo_refits_match_synthdid_algorithm_four() {
+    let root = fixture();
+    let panel = panel_matrices(&observations(&root)).unwrap();
+    let inference = &root["inference"];
+    for (name, kind, expected) in [
+        (
+            "SC",
+            PanelEstimatorKind::SyntheticControl,
+            &inference["sc_placebo"],
+        ),
+        (
+            "SDID",
+            PanelEstimatorKind::SyntheticDifferenceInDifferences,
+            &inference["sdid_placebo"],
+        ),
+    ] {
+        let permutations: Vec<Vec<usize>> = expected["indices"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|permutation| {
+                permutation
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|index| index.as_u64().unwrap() as usize - 1)
+                    .collect()
+            })
+            .collect();
+        let actual =
+            panel_placebo_standard_error(&panel.y, panel.n0, panel.t0, kind, &permutations)
+                .unwrap();
+        let expected_estimates = numbers(&expected["estimates"]);
+        let draw_deviation = max_deviation(&actual.estimates, &expected_estimates);
+        let se_deviation =
+            (actual.standard_error - expected["standard_error"].as_f64().unwrap()).abs();
+        println!(
+            "{name} placebo: {} refits, draw maxdev {draw_deviation:.3e}, SE dev {se_deviation:.3e}",
+            actual.estimates.len()
+        );
+        assert!(draw_deviation <= 3e-9, "{name}: {draw_deviation}");
+        assert!(se_deviation <= 3e-9, "{name}: {se_deviation}");
+    }
+}
+
+#[test]
+fn multiple_treated_units_match_synthdid_placebo_refits() {
+    let root = fixture();
+    let mut rows = observations(&root);
+    for row in &mut rows {
+        if row.unit == "Kansas" && row.time >= 1989 {
+            row.treatment = 1.0;
+        }
+    }
+    let panel = panel_matrices(&rows).unwrap();
+    let expected = &root["inference"]["multi_sdid_placebo"];
+    let permutations: Vec<Vec<usize>> = expected["indices"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|permutation| {
+            permutation
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|index| index.as_u64().unwrap() as usize - 1)
+                .collect()
+        })
+        .collect();
+    let actual = panel_placebo_standard_error(
+        &panel.y,
+        panel.n0,
+        panel.t0,
+        PanelEstimatorKind::SyntheticDifferenceInDifferences,
+        &permutations,
+    )
+    .unwrap();
+    let draw_deviation = max_deviation(&actual.estimates, &numbers(&expected["estimates"]));
+    let se_deviation = (actual.standard_error - expected["standard_error"].as_f64().unwrap()).abs();
+    println!(
+        "multi-treated SDID placebo: draw maxdev {draw_deviation:.3e}, SE dev {se_deviation:.3e}"
+    );
+    assert!(draw_deviation <= 3e-9);
+    assert!(se_deviation <= 3e-9);
+}
+
+#[test]
+fn california_in_time_placebos_match_the_reference_refits() {
+    let root = fixture();
+    let panel = panel_matrices(&observations(&root)).unwrap();
+    let inference = &root["inference"];
+    let sc = panel_in_time_placebo(
+        &panel.y,
+        panel.n0,
+        panel.t0,
+        PanelEstimatorKind::SyntheticControl,
+        None,
+    )
+    .unwrap();
+    let sdid = panel_in_time_placebo(
+        &panel.y,
+        panel.n0,
+        panel.t0,
+        PanelEstimatorKind::SyntheticDifferenceInDifferences,
+        None,
+    )
+    .unwrap();
+    check_estimate("SC in-time placebo", &sc, &inference["sc_in_time"], 3e-9);
+    check_estimate(
+        "SDID in-time placebo",
+        &sdid,
+        &inference["sdid_in_time"],
+        3e-9,
+    );
+    assert!(inference["sc_in_time_upstream_error"]
+        .as_str()
+        .unwrap()
+        .contains("omega.intercept"));
+}
+
+#[test]
+fn placebo_inference_rejects_invalid_sampling_boundaries() {
+    let y = DMatrix::from_fn(3, 4, |row, column| row as f64 + column as f64);
+    assert_eq!(
+        panel_placebo_standard_error(
+            &y,
+            2,
+            2,
+            PanelEstimatorKind::DifferenceInDifferences,
+            &[vec![0, 1]],
+        )
+        .unwrap_err(),
+        PanelError::InsufficientPlaceboReplications
+    );
+    assert_eq!(
+        panel_placebo_standard_error(
+            &y,
+            2,
+            2,
+            PanelEstimatorKind::DifferenceInDifferences,
+            &[vec![0, 0], vec![0, 1]],
+        )
+        .unwrap_err(),
+        PanelError::InvalidPlaceboPermutation { replication: 0 }
+    );
+    assert_eq!(
+        panel_in_time_placebo(
+            &y,
+            2,
+            2,
+            PanelEstimatorKind::DifferenceInDifferences,
+            Some(1.0),
+        )
+        .unwrap_err(),
+        PanelError::InvalidTreatedFraction
+    );
+}
+
+#[test]
 fn multiple_treated_units_use_the_same_block_average_as_r() {
     let root = fixture();
     let mut rows = observations(&root);

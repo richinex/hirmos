@@ -107,15 +107,10 @@ export function Landing() {
 
       <div className="landing-width landing-hero-shell">
         <section className="landing-hero-copy" aria-labelledby="landing-title">
-          <p className="landing-eyebrow">Browser causal inference workbench</p>
-          <h1 id="landing-title">
-            From raw data<br />
-            <span>to an auditable</span><br />
-            <strong>causal estimate</strong>
+          <p className="landing-eyebrow">My causal inference workbench</p>
+          <h1 id="landing-title" className="landing-headline">
+            Hirmos offers a framework for causal inference.
           </h1>
-          <p className="landing-lede">
-            Hirmos provides the framework for asking and answering questions about your data.
-          </p>
           <div className="landing-actions">
             <InternalLink className="landing-primary" href="/app">Start an analysis</InternalLink>
             <a className="landing-secondary" href="#workflow">See the workflow</a>
@@ -127,8 +122,8 @@ export function Landing() {
         <section id="workflow" className="landing-width workflow-section" aria-labelledby="workflow-title">
           <div className="section-intro">
             <p className="landing-eyebrow">The workbench</p>
-            <h2 id="workflow-title">From prepared data to an assessed causal estimate</h2>
-            <p>Each stage produces a versioned artifact. Changes to the data, graph, causal question, or assumptions can therefore be compared without overwriting earlier analyses.</p>
+            <h2 id="workflow-title">Go from raw data to causal estimate in six steps</h2>
+            <p>Hirmos provides a versioned artifact at each stage of the analysis.</p>
           </div>
           <ol className="workflow-list">
             {WORKFLOW.map((step) => (

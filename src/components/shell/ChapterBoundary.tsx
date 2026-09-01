@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Alert } from '@/components/ui/Alert'
+import { button, literal } from '@/components/ui/recipes'
 
 /**
  * Keeps one failing chapter from blanking the workbench. A chapter renders recorded artifacts, and an
@@ -20,9 +21,19 @@ export class ChapterBoundary extends Component<{ readonly chapter: string; reado
   override render(): ReactNode {
     if (this.state.error === null) return this.props.children
     return (
-      <Alert tone="warn" live={false}>
-        <p className="m-0">The {this.props.chapter} chapter could not render: {this.state.error.message}.</p>
-        <p className="mb-0 mt-1 text-muted">A recorded run may have been saved by an earlier build. Open another chapter, or delete the run and run it again.</p>
+      <Alert tone="warn" live={false} className="rise my-auto max-w-2xl">
+        <p className="m-0">The {this.props.chapter} chapter could not be displayed.</p>
+        <p className="mb-0 mt-1 text-muted">
+          A run recorded by an earlier build of Hirmos is usually the cause: it does not carry a field this version reads.
+          Delete that run from another chapter that still opens, or reset the example project in Projects, then run it again.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button type="button" className={button('quiet')} onClick={() => this.setState({ error: null })}>Try again</button>
+        </div>
+        <details className="mt-3">
+          <summary className="cursor-pointer text-label text-muted">Technical detail</summary>
+          <p className={literal('mb-0 mt-2 break-words text-body text-faint')}>{this.state.error.message}</p>
+        </details>
       </Alert>
     )
   }

@@ -628,6 +628,8 @@ function App() {
                       preparedVersion={workflow.prepared}
                       grangerEvidence={workflow.grangerEvidence}
                       onGrangerEvidence={(evidence) => dispatch({ type: 'granger-evidence-created', evidence })}
+                      countSeriesModels={workflow.countSeriesModels}
+                      onCountSeriesModel={(artifact) => dispatch({ type: 'count-series-model-created', artifact })}
                     />
                   {workflow.prepared !== null && (
                     <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
@@ -772,6 +774,7 @@ function App() {
                       source={workflow.source}
                       profile={workflow.profile}
                       prepared={workflow.prepared}
+                      documents={workflow.dagDocuments}
                       studies={workflow.studies}
                       identifications={workflow.identifications}
                       runs={workflow.counterfactualRuns}

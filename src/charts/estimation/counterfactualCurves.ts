@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import type { BayesianGaussianCurve } from '@/domain/estimation'
 import { formatStatistic } from '@/lib/format/number'
-import { baseOption, gridAuto, legend, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface CounterfactualCurvesView {
@@ -70,7 +70,7 @@ export function counterfactualCurvesOption(view: CounterfactualCurvesView, theme
       nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
+      axisLabel: axisLabelStyle(theme),
       scale: true,
     },
     yAxis: { ...valueAxis(theme, `expected ${view.outcome}`), scale: true },

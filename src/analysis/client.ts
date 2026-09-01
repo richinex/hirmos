@@ -1,4 +1,5 @@
 import { err, type Result } from '@/domain/dop'
+import type { CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
   DynotearsEvidence,
@@ -8,16 +9,17 @@ import type {
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
-import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence } from '@/domain/estimation'
+import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
 import type { DmlRefutationEvidence } from '@/domain/sensitivity'
-import type { LinearScmEvidence } from '@/domain/counterfactual'
+import type { DynamicCounterfactualUncertainty, DynamicInterventionTiming, DynamicLinearScmEvidence, LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import type { StationarityBattery } from '@/domain/stationarity'
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
+import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import {
   newWorkerRequestId,
   parseAnalysisWorkerEvent,
@@ -40,6 +42,8 @@ type DagCheckOutcome = Result<DagCheckEvidence, AnalysisWorkerProblem>
 type BackdoorLinearOutcome = Result<BackdoorLinearEvidence, AnalysisWorkerProblem>
 type FrontdoorTwoStageOutcome = Result<FrontdoorTwoStageEvidence, AnalysisWorkerProblem>
 type CountGlmOutcome = Result<CountGlmEvidence, AnalysisWorkerProblem>
+type NegativeBinomialIngarchOutcome = Result<NegativeBinomialIngarchEvidence, AnalysisWorkerProblem>
+type CountSeriesInterventionScanOutcome = Result<CountSeriesInterventionScanEvidence, AnalysisWorkerProblem>
 type CausalEffectsOutcome = Result<CausalEffectsEvidence, AnalysisWorkerProblem>
 type CausalImpactOutcome = Result<CausalImpactEvidence, AnalysisWorkerProblem>
 type LinearRefutationOutcome = Result<LinearRefutationEvidence, AnalysisWorkerProblem>
@@ -56,8 +60,10 @@ type PanelInterventionOutcome = Result<PanelInterventionEvidence, AnalysisWorker
 type NegbinNutsOutcome = Result<NegbinNutsEvidence, AnalysisWorkerProblem>
 type BayesianGaussianOutcome = Result<BayesianGaussianEvidence, AnalysisWorkerProblem>
 type DiscreteBnOutcome = Result<DiscreteBnEvidence, AnalysisWorkerProblem>
+type IdentifiedDiscreteQueryOutcome = Result<IdentifiedDiscreteQueryEvidence, AnalysisWorkerProblem>
 type BinaryEttOutcome = Result<BinaryEttEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
+type DynamicLinearScmOutcome = Result<DynamicLinearScmEvidence, AnalysisWorkerProblem>
 type PendingRun =
   | { readonly kind: 'stationarity'; readonly resolve: (outcome: StationarityOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'pcmci-plus'; readonly resolve: (outcome: PcmciPlusOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
@@ -72,6 +78,8 @@ type PendingRun =
   | { readonly kind: 'backdoor-linear'; readonly resolve: (outcome: BackdoorLinearOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'frontdoor-two-stage'; readonly resolve: (outcome: FrontdoorTwoStageOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'count-glm'; readonly resolve: (outcome: CountGlmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'negative-binomial-ingarch'; readonly resolve: (outcome: NegativeBinomialIngarchOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'count-series-intervention-scan'; readonly resolve: (outcome: CountSeriesInterventionScanOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'causal-effects-total'; readonly resolve: (outcome: CausalEffectsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'causal-impact'; readonly resolve: (outcome: CausalImpactOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'linear-refutation'; readonly resolve: (outcome: LinearRefutationOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
@@ -88,8 +96,10 @@ type PendingRun =
   | { readonly kind: 'negbin-nuts'; readonly resolve: (outcome: NegbinNutsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'bayesian-gaussian'; readonly resolve: (outcome: BayesianGaussianOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'discrete-bn-query'; readonly resolve: (outcome: DiscreteBnOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'identified-discrete-query'; readonly resolve: (outcome: IdentifiedDiscreteQueryOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'binary-ett'; readonly resolve: (outcome: BinaryEttOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'linear-scm-counterfactual'; readonly resolve: (outcome: LinearScmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'dynamic-linear-scm-counterfactual'; readonly resolve: (outcome: DynamicLinearScmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
 
 let worker: Worker | null = null
 const pending = new Map<WorkerRequestId, PendingRun>()
@@ -183,6 +193,14 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a count model request.' })
       return
     }
+    if (run.kind === 'negative-binomial-ingarch' && parsed.value.kind !== 'negative-binomial-ingarch-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a negative-binomial INGARCH request.' })
+      return
+    }
+    if (run.kind === 'count-series-intervention-scan' && parsed.value.kind !== 'count-series-intervention-scan-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a count-series intervention scan.' })
+      return
+    }
     if (run.kind === 'causal-effects-total' && parsed.value.kind !== 'causal-effects-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a CausalEffects request.' })
       return
@@ -247,12 +265,20 @@ const analysisWorker = (): Worker => {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a discrete BN query.' })
       return
     }
+    if (run.kind === 'identified-discrete-query' && parsed.value.kind !== 'identified-discrete-query-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an identified discrete query request.' })
+      return
+    }
     if (run.kind === 'binary-ett' && parsed.value.kind !== 'binary-ett-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a binary ETT request.' })
       return
     }
     if (run.kind === 'linear-scm-counterfactual' && parsed.value.kind !== 'linear-scm-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a counterfactual request.' })
+      return
+    }
+    if (run.kind === 'dynamic-linear-scm-counterfactual' && parsed.value.kind !== 'dynamic-linear-scm-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a dynamic counterfactual request.' })
       return
     }
     pending.delete(parsed.value.request)
@@ -305,6 +331,14 @@ const analysisWorker = (): Worker => {
       return
     }
     if (run.kind === 'count-glm' && parsed.value.kind === 'count-glm-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'negative-binomial-ingarch' && parsed.value.kind === 'negative-binomial-ingarch-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'count-series-intervention-scan' && parsed.value.kind === 'count-series-intervention-scan-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -372,11 +406,20 @@ const analysisWorker = (): Worker => {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
+    if (run.kind === 'identified-discrete-query' && parsed.value.kind === 'identified-discrete-query-succeeded') {
+      pending.delete(parsed.value.request)
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
     if (run.kind === 'binary-ett' && parsed.value.kind === 'binary-ett-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
     if (run.kind === 'linear-scm-counterfactual' && parsed.value.kind === 'linear-scm-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'dynamic-linear-scm-counterfactual' && parsed.value.kind === 'dynamic-linear-scm-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
     }
   }
@@ -677,17 +720,48 @@ export function runCountGlm(values: Float64Array, rows: number, columns: number,
   return post<CountGlmOutcome>('count-glm', { kind: 'count-glm', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'count-glm', resolve }))
 }
 
+export function runNegativeBinomialIngarch(values: Float64Array, rows: number, columns: number, design: {
+  readonly outcome: number
+  readonly link: 'identity' | 'log'
+  readonly regressors: readonly number[]
+  readonly pastObservationLags: readonly number[]
+  readonly pastMeanLags: readonly number[]
+  readonly externalRegressors: readonly boolean[]
+  readonly horizon: number
+  readonly baselineRegressors: readonly number[]
+  readonly interventionRegressor: number
+  readonly controlValue: number
+  readonly treatmentValue: number
+  readonly schedule: IngarchInterventionSchedule
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<NegativeBinomialIngarchOutcome> {
+  const request = newWorkerRequestId()
+  return post<NegativeBinomialIngarchOutcome>('negative-binomial-ingarch', { kind: 'negative-binomial-ingarch', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'negative-binomial-ingarch', resolve, onProgress }))
+}
+
+export function runCountSeriesInterventionScan(values: Float64Array, rows: number, columns: number, design: {
+  readonly outcome: number
+  readonly link: 'identity' | 'log'
+  readonly pastObservationLags: readonly number[]
+  readonly pastMeanLags: readonly number[]
+  readonly candidateReferencePoints: readonly number[]
+  readonly delta: number
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<CountSeriesInterventionScanOutcome> {
+  const request = newWorkerRequestId()
+  return post<CountSeriesInterventionScanOutcome>('count-series-intervention-scan', { kind: 'count-series-intervention-scan', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'count-series-intervention-scan', resolve, onProgress }))
+}
+
 export function runCausalEffectsTotal(values: Float64Array, rows: number, columns: number, design: {
   readonly statLag: number
   readonly graph: readonly (readonly (readonly string[])[])[]
   readonly x: readonly (readonly [number, number])[]
   readonly y: readonly (readonly [number, number])[]
   readonly hidden: readonly (readonly [number, number])[]
-  readonly estimator: { readonly kind: 'linear' } | { readonly kind: 'knn'; readonly k: number }
+  readonly estimator: TotalEffectEstimator
   readonly interventions: readonly [number, number]
-}): Promise<CausalEffectsOutcome> {
+  readonly uncertainty: CausalEffectsUncertainty
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<CausalEffectsOutcome> {
   const request = newWorkerRequestId()
-  return post<CausalEffectsOutcome>('causal-effects-total', { kind: 'causal-effects-total', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'causal-effects-total', resolve }))
+  return post<CausalEffectsOutcome>('causal-effects-total', { kind: 'causal-effects-total', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'causal-effects-total', resolve, onProgress }))
 }
 
 export function runCausalImpact(values: Float64Array, rows: number, columns: number, design: { readonly outcome: number; readonly controls: readonly number[]; readonly nPre: number; readonly maxIter: number }): Promise<CausalImpactOutcome> {
@@ -739,7 +813,7 @@ export function runVecm(values: Float64Array, rows: number, columns: number, des
   return post<VecmOutcome>('vecm', { kind: 'vecm', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'vecm', resolve }))
 }
 
-export function runSyntheticControl(values: Float64Array, rows: number, columns: number, design: { readonly treated: number; readonly donors: readonly number[]; readonly nPre: number }): Promise<SyntheticOutcome> {
+export function runSyntheticControl(values: Float64Array, rows: number, columns: number, design: { readonly treated: number; readonly donors: readonly number[]; readonly nPre: number; readonly crossFitFolds: number; readonly alpha: number }): Promise<SyntheticOutcome> {
   const request = newWorkerRequestId()
   return post<SyntheticOutcome>('synthetic-control', { kind: 'synthetic-control', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'synthetic-control', resolve }))
 }
@@ -749,12 +823,13 @@ export function runPanelIntervention(
   rows: number,
   units: readonly string[],
   times: readonly number[],
+  inference: { readonly placeboReplications: number; readonly seed: number },
   onProgress?: (progress: AnalysisProgress) => void,
 ): Promise<PanelInterventionOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
     pending.set(request, { kind: 'panel-intervention', resolve, onProgress })
-    const command: AnalysisWorkerCommand = { kind: 'panel-intervention', request, values, rows, units, times }
+    const command: AnalysisWorkerCommand = { kind: 'panel-intervention', request, values, rows, units, times, ...inference }
     try {
       analysisWorker().postMessage(command, [values.buffer])
     } catch (cause: unknown) {
@@ -777,6 +852,11 @@ export function runBayesianGaussian(values: Float64Array, rows: number, columns:
 export function runDiscreteBnQuery(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly bins: number; readonly equivalentSampleSize: number }): Promise<DiscreteBnOutcome> {
   const request = newWorkerRequestId()
   return post<DiscreteBnOutcome>('discrete-bn-query', { kind: 'discrete-bn-query', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'discrete-bn-query', resolve }))
+}
+
+export function runIdentifiedDiscreteQuery(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[]; readonly bins: number; readonly condition: { readonly variable: number; readonly state: number } | null }): Promise<IdentifiedDiscreteQueryOutcome> {
+  const request = newWorkerRequestId()
+  return post<IdentifiedDiscreteQueryOutcome>('identified-discrete-query', { kind: 'identified-discrete-query', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'identified-discrete-query', resolve }))
 }
 
 export function runBinaryEtt(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[] }): Promise<BinaryEttOutcome> {
@@ -815,6 +895,11 @@ export function runDagCheck(
 export function runLinearScmCounterfactual(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly interventions: readonly [number, number]; readonly observationNoise: number | null }): Promise<LinearScmOutcome> {
   const request = newWorkerRequestId()
   return post<LinearScmOutcome>('linear-scm-counterfactual', { kind: 'linear-scm-counterfactual', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'linear-scm-counterfactual', resolve }))
+}
+
+export function runDynamicLinearScmCounterfactual(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly statLag: number; readonly graph: readonly (readonly (readonly string[])[])[]; readonly treatment: number; readonly outcome: number; readonly timing: DynamicInterventionTiming; readonly steps: number; readonly interventions: readonly [number, number]; readonly uncertainty: DynamicCounterfactualUncertainty }, onProgress?: (progress: AnalysisProgress) => void): Promise<DynamicLinearScmOutcome> {
+  const request = newWorkerRequestId()
+  return post<DynamicLinearScmOutcome>('dynamic-linear-scm-counterfactual', { kind: 'dynamic-linear-scm-counterfactual', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'dynamic-linear-scm-counterfactual', resolve, onProgress }))
 }
 
 export function seasonalAdjustInWorker(values: Float64Array, rows: number, columns: number, design: { readonly period: number; readonly robust: boolean; readonly adjust: readonly number[] }): Promise<SeasonalOutcome> {

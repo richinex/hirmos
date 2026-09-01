@@ -8,8 +8,10 @@ import { Alert } from '@/components/ui/Alert'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { SeriesStructureCard } from './SeriesStructureCard'
 import { GrangerCard } from './GrangerCard'
+import { CountSeriesCard } from './CountSeriesCard'
 import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
+import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { describeMissingnessRefusal, describeResolutionRecord, resolutionCommandFor, type MissingnessResolutionRecord } from '@/domain/missingness'
 import { button, field, fieldLabel, label, num, table, td, th, tr } from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
@@ -54,9 +56,11 @@ interface PreprocessingPanelProps {
   readonly preparedVersion: PreparedDatasetArtifact | null
   readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
   readonly onGrangerEvidence: (evidence: GrangerEvidenceArtifact) => void
+  readonly countSeriesModels: readonly CountSeriesModelArtifact[]
+  readonly onCountSeriesModel: (artifact: CountSeriesModelArtifact) => void
 }
 
-type Diagnostic = 'stationarity' | 'structure' | 'granger'
+type Diagnostic = 'stationarity' | 'structure' | 'granger' | 'count-series'
 
 /** A switch label with a fixed slot for the done glyph, so the knob's measured width does not change when a check appears. */
 function DiagnosticLabel({ text, done }: { readonly text: string; readonly done: boolean }) {
@@ -238,7 +242,7 @@ function preparedArtifact(
   }
 }
 
-export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence }: PreprocessingPanelProps) {
+export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence, countSeriesModels, onCountSeriesModel }: PreprocessingPanelProps) {
   const [diagnostic, setDiagnostic] = useState<Diagnostic>('stationarity')
   const [structureChecked, setStructureChecked] = useState(false)
   const [draft, dispatch] = useReducer(
@@ -788,6 +792,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 { value: 'stationarity', label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
                 { value: 'structure', label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
                 { value: 'granger', label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
+                { value: 'count-series', label: <DiagnosticLabel text="Count model" done={countSeriesModels.length > 0} /> },
               ]}
             />
           </div>
@@ -974,6 +979,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 />
               )
               : null}
+          </div>
+          <div hidden={diagnostic !== 'count-series'} className="mt-4 border-t border-hair pt-4">
+            {preparedTimeSeries !== null && (
+              <CountSeriesCard source={source} profile={profile} prepared={preparedTimeSeries} artifacts={countSeriesModels} onArtifact={onCountSeriesModel} />
+            )}
           </div>
         </section>
       )}

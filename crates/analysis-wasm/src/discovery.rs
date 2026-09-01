@@ -437,6 +437,8 @@ mod tests {
             | AnalysisCommand::BackdoorLinear { .. }
             | AnalysisCommand::FrontdoorTwoStage { .. }
             | AnalysisCommand::CountGlm { .. }
+            | AnalysisCommand::NegativeBinomialIngarch { .. }
+            | AnalysisCommand::CountSeriesInterventionScan { .. }
             | AnalysisCommand::CausalEffectsTotal { .. }
             | AnalysisCommand::CausalImpact { .. }
             | AnalysisCommand::LinearRefutation { .. }
@@ -450,9 +452,11 @@ mod tests {
             | AnalysisCommand::SyntheticControl { .. }
             | AnalysisCommand::PanelIntervention { .. }
             | AnalysisCommand::LinearScmCounterfactual { .. }
+            | AnalysisCommand::DynamicLinearScmCounterfactual { .. }
             | AnalysisCommand::NegbinNuts { .. }
             | AnalysisCommand::BayesianGaussian { .. }
             | AnalysisCommand::DiscreteBnQuery { .. }
+            | AnalysisCommand::IdentifiedDiscreteQuery { .. }
             | AnalysisCommand::BinaryEtt { .. }
             | AnalysisCommand::ResolveMissingness { .. } => {
                 panic!("parsed the wrong command variant")

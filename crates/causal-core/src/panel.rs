@@ -40,6 +40,10 @@ pub enum PanelError {
     NonSimultaneousAdoption,
     InvalidMatrixBoundary,
     DegenerateNoise,
+    TooFewControlsForPlacebo,
+    InsufficientPlaceboReplications,
+    InvalidPlaceboPermutation { replication: usize },
+    InvalidTreatedFraction,
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +203,29 @@ pub struct PanelEstimate {
     /// Penalised-MSE trace from the final (post-sparsification) reference run.
     pub omega_objective: Vec<f64>,
     pub noise_level: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PanelEstimatorKind {
+    DifferenceInDifferences,
+    SyntheticControl,
+    SyntheticDifferenceInDifferences,
+}
+
+#[derive(Debug, Clone)]
+pub struct PanelPlaceboInference {
+    pub estimates: Vec<f64>,
+    pub standard_error: f64,
+}
+
+#[derive(Clone, Copy)]
+struct FitConfiguration {
+    noise_level: f64,
+    zeta_lambda: f64,
+    zeta_omega: f64,
+    min_decrease: f64,
+    lambda_intercept: bool,
+    omega_intercept: bool,
 }
 
 fn validate_boundary(y: &DMatrix<f64>, n0: usize, t0: usize) -> Result<(), PanelError> {
@@ -410,7 +437,17 @@ fn fitted_weights(
     intercept: bool,
     min_decrease: f64,
 ) -> WeightFit {
-    let preliminary = sc_weight_fw(design, zeta, intercept, None, min_decrease, 100);
+    fitted_weights_from_initial(design, zeta, intercept, min_decrease, None)
+}
+
+fn fitted_weights_from_initial(
+    design: &DMatrix<f64>,
+    zeta: f64,
+    intercept: bool,
+    min_decrease: f64,
+    initial: Option<&[f64]>,
+) -> WeightFit {
+    let preliminary = sc_weight_fw(design, zeta, intercept, initial, min_decrease, 100);
     let initial = sparsify(&preliminary.weights);
     sc_weight_fw(
         design,
@@ -419,6 +456,221 @@ fn fitted_weights(
         Some(&initial),
         min_decrease,
         10_000,
+    )
+}
+
+fn fit_configuration(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+    estimator: PanelEstimatorKind,
+) -> Result<FitConfiguration, PanelError> {
+    validate_boundary(y, n0, t0)?;
+    let noise_level = match estimator {
+        PanelEstimatorKind::DifferenceInDifferences => sample_noise_level(y, n0, t0).unwrap_or(0.0),
+        _ => sample_noise_level(y, n0, t0)?,
+    };
+    let post_units = y.nrows() - n0;
+    let post_periods = y.ncols() - t0;
+    Ok(FitConfiguration {
+        noise_level,
+        zeta_lambda: 1e-6 * noise_level,
+        zeta_omega: match estimator {
+            PanelEstimatorKind::DifferenceInDifferences => 0.0,
+            PanelEstimatorKind::SyntheticControl => 1e-6 * noise_level,
+            PanelEstimatorKind::SyntheticDifferenceInDifferences => {
+                ((post_units * post_periods) as f64).powf(0.25) * noise_level
+            }
+        },
+        min_decrease: 1e-5 * noise_level,
+        lambda_intercept: estimator != PanelEstimatorKind::SyntheticControl,
+        omega_intercept: estimator != PanelEstimatorKind::SyntheticControl,
+    })
+}
+
+fn normalize_or_uniform(weights: &[f64]) -> Vec<f64> {
+    let total = weights.iter().sum::<f64>();
+    if total != 0.0 {
+        weights.iter().map(|weight| weight / total).collect()
+    } else {
+        vec![1.0 / weights.len() as f64; weights.len()]
+    }
+}
+
+fn refit_with_configuration(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+    estimator: PanelEstimatorKind,
+    configuration: FitConfiguration,
+    initial_lambda: Option<&[f64]>,
+    initial_omega: Option<&[f64]>,
+) -> Result<PanelEstimate, PanelError> {
+    validate_boundary(y, n0, t0)?;
+    let collapsed = collapsed_form(y, n0, t0);
+
+    let lambda = match estimator {
+        PanelEstimatorKind::DifferenceInDifferences => WeightFit {
+            weights: initial_lambda
+                .map(normalize_or_uniform)
+                .unwrap_or_else(|| vec![1.0 / t0 as f64; t0]),
+            values: Vec::new(),
+        },
+        PanelEstimatorKind::SyntheticControl => WeightFit {
+            weights: vec![0.0; t0],
+            values: Vec::new(),
+        },
+        PanelEstimatorKind::SyntheticDifferenceInDifferences => {
+            let design = collapsed.rows(0, n0).into_owned();
+            fitted_weights_from_initial(
+                &design,
+                configuration.zeta_lambda,
+                configuration.lambda_intercept,
+                configuration.min_decrease,
+                initial_lambda,
+            )
+        }
+    };
+
+    let omega = match estimator {
+        PanelEstimatorKind::DifferenceInDifferences => WeightFit {
+            weights: initial_omega
+                .map(normalize_or_uniform)
+                .unwrap_or_else(|| vec![1.0 / n0 as f64; n0]),
+            values: Vec::new(),
+        },
+        PanelEstimatorKind::SyntheticControl
+        | PanelEstimatorKind::SyntheticDifferenceInDifferences => {
+            let design = collapsed.columns(0, t0).transpose();
+            fitted_weights_from_initial(
+                &design,
+                configuration.zeta_omega,
+                configuration.omega_intercept,
+                configuration.min_decrease,
+                initial_omega,
+            )
+        }
+    };
+
+    Ok(estimate_from_weights(
+        y,
+        n0,
+        t0,
+        lambda.weights,
+        omega.weights,
+        lambda.values.len(),
+        omega.values.len(),
+        lambda.values,
+        omega.values,
+        configuration.noise_level,
+    ))
+}
+
+fn fit_by_kind(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+    estimator: PanelEstimatorKind,
+) -> Result<PanelEstimate, PanelError> {
+    match estimator {
+        PanelEstimatorKind::DifferenceInDifferences => did_estimate(y, n0, t0),
+        PanelEstimatorKind::SyntheticControl => synthdid_sc_estimate(y, n0, t0),
+        PanelEstimatorKind::SyntheticDifferenceInDifferences => synthetic_did_estimate(y, n0, t0),
+    }
+}
+
+/// Algorithm 4 of Arkhangelsky et al., matching `synthdid::placebo_se`.
+///
+/// `control_permutations` holds zero-based permutations of the original control
+/// rows. Keeping the random permutations at the boundary separates parity of the
+/// numerical refits from R's RNG implementation.
+pub fn panel_placebo_standard_error(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+    estimator: PanelEstimatorKind,
+    control_permutations: &[Vec<usize>],
+) -> Result<PanelPlaceboInference, PanelError> {
+    validate_boundary(y, n0, t0)?;
+    if control_permutations.len() < 2 {
+        return Err(PanelError::InsufficientPlaceboReplications);
+    }
+    let treated_units = y.nrows() - n0;
+    if n0 <= treated_units {
+        return Err(PanelError::TooFewControlsForPlacebo);
+    }
+    let placebo_n0 = n0 - treated_units;
+    let base = fit_by_kind(y, n0, t0, estimator)?;
+    let configuration = fit_configuration(y, n0, t0, estimator)?;
+    let mut estimates = Vec::with_capacity(control_permutations.len());
+
+    for (replication, permutation) in control_permutations.iter().enumerate() {
+        let mut sorted = permutation.clone();
+        sorted.sort_unstable();
+        if permutation.len() != n0 || sorted != (0..n0).collect::<Vec<_>>() {
+            return Err(PanelError::InvalidPlaceboPermutation { replication });
+        }
+        let placebo_y =
+            DMatrix::from_fn(n0, y.ncols(), |row, column| y[(permutation[row], column)]);
+        let initial_omega = normalize_or_uniform(
+            &permutation[..placebo_n0]
+                .iter()
+                .map(|&index| base.omega[index])
+                .collect::<Vec<_>>(),
+        );
+        let estimate = refit_with_configuration(
+            &placebo_y,
+            placebo_n0,
+            t0,
+            estimator,
+            configuration,
+            Some(&base.lambda),
+            Some(&initial_omega),
+        )?;
+        estimates.push(estimate.estimate);
+    }
+
+    let mean = estimates.iter().sum::<f64>() / estimates.len() as f64;
+    // sqrt((B-1)/B) * sample_sd is algebraically sqrt(sum((x-mean)^2)/B).
+    let standard_error = (estimates
+        .iter()
+        .map(|estimate| (estimate - mean).powi(2))
+        .sum::<f64>()
+        / estimates.len() as f64)
+        .sqrt();
+    Ok(PanelPlaceboInference {
+        estimates,
+        standard_error,
+    })
+}
+
+/// Pre-treatment-only placebo diagnostic from `synthdid_placebo`.
+pub fn panel_in_time_placebo(
+    y: &DMatrix<f64>,
+    n0: usize,
+    t0: usize,
+    estimator: PanelEstimatorKind,
+    treated_fraction: Option<f64>,
+) -> Result<PanelEstimate, PanelError> {
+    validate_boundary(y, n0, t0)?;
+    let fraction = treated_fraction.unwrap_or(1.0 - t0 as f64 / y.ncols() as f64);
+    if !fraction.is_finite() || !(0.0..1.0).contains(&fraction) {
+        return Err(PanelError::InvalidTreatedFraction);
+    }
+    let placebo_t0 = (t0 as f64 * (1.0 - fraction)).floor() as usize;
+    if placebo_t0 == 0 || placebo_t0 >= t0 {
+        return Err(PanelError::InvalidTreatedFraction);
+    }
+    let placebo_y = y.columns(0, t0).into_owned();
+    let configuration = fit_configuration(y, n0, t0, estimator)?;
+    refit_with_configuration(
+        &placebo_y,
+        n0,
+        placebo_t0,
+        estimator,
+        configuration,
+        None,
+        None,
     )
 }
 

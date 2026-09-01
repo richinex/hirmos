@@ -437,6 +437,193 @@ pub(crate) fn count_glm(
 }
 
 #[allow(clippy::too_many_arguments)]
+pub(crate) fn negative_binomial_ingarch(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    outcome: usize,
+    link: IngarchLink,
+    regressors: &[usize],
+    past_observation_lags: &[usize],
+    past_mean_lags: &[usize],
+    external_regressors: &[bool],
+    horizon: usize,
+    baseline_regressors: &[f64],
+    intervention_regressor: usize,
+    control_value: f64,
+    treatment_value: f64,
+    schedule: IngarchInterventionSchedule,
+    progress: impl Fn(&'static str, usize, usize),
+) -> Result<AnalysisResult, String> {
+    validate_dense_matrix("negative-binomial INGARCH", values, rows, columns)?;
+    if outcome >= columns
+        || regressors.is_empty()
+        || regressors
+            .iter()
+            .any(|&column| column >= columns || column == outcome)
+        || baseline_regressors.len() != regressors.len()
+        || external_regressors.len() != regressors.len()
+        || horizon == 0
+    {
+        return Err("negative-binomial INGARCH received an invalid outcome, regressor, or horizon configuration".to_owned());
+    }
+    let treatment_position = regressors
+        .iter()
+        .position(|&column| column == intervention_regressor)
+        .ok_or_else(|| {
+            "the INGARCH intervention column must be included among its regressors".to_owned()
+        })?;
+    let y: Vec<f64> = (0..rows).map(|row| values[outcome * rows + row]).collect();
+    let x: Vec<Vec<f64>> = (0..rows)
+        .map(|row| {
+            regressors
+                .iter()
+                .map(|&column| values[column * rows + row])
+                .collect()
+        })
+        .collect();
+    let specification = IngarchSpecification {
+        link: match link {
+            IngarchLink::Identity => CoreIngarchLink::Identity,
+            IngarchLink::Log => CoreIngarchLink::Log,
+        },
+        past_observation_lags: past_observation_lags.to_vec(),
+        past_mean_lags: past_mean_lags.to_vec(),
+        external_regressors: external_regressors.to_vec(),
+    };
+    progress("fit", 0, 2);
+    let fit = fit_negative_binomial_ingarch(&y, &x, specification)
+        .map_err(|error| format!("negative-binomial INGARCH could not be fitted: {error:?}"))?;
+    progress("forecast", 1, 2);
+    let baseline = vec![baseline_regressors.to_vec(); horizon];
+    let control = intervention_regressors(
+        &baseline,
+        treatment_position,
+        control_value,
+        InterventionSchedule::Persistent,
+    )
+    .map_err(|error| format!("invalid INGARCH control scenario: {error:?}"))?;
+    let core_schedule = match schedule {
+        IngarchInterventionSchedule::Point => InterventionSchedule::Point,
+        IngarchInterventionSchedule::Persistent => InterventionSchedule::Persistent,
+        IngarchInterventionSchedule::Decaying { delta } => InterventionSchedule::Decaying { delta },
+    };
+    let intervention =
+        intervention_regressors(&control, treatment_position, treatment_value, core_schedule)
+            .map_err(|error| format!("invalid INGARCH intervention scenario: {error:?}"))?;
+    let baseline_mean = fit
+        .forecast_mean(&y, &x, &control)
+        .map_err(|error| format!("INGARCH baseline forecast failed: {error:?}"))?;
+    let intervention_mean = fit
+        .forecast_mean(&y, &x, &intervention)
+        .map_err(|error| format!("INGARCH intervention forecast failed: {error:?}"))?;
+    let effect_path: Vec<f64> = intervention_mean
+        .iter()
+        .zip(&baseline_mean)
+        .map(|(treated, control)| treated - control)
+        .collect();
+    let cumulative_effect = effect_path.iter().sum();
+    let average_effect = cumulative_effect / horizon as f64;
+    progress("complete", 2, 2);
+    Ok(AnalysisResult::NegativeBinomialIngarch {
+        observations: rows,
+        outcome,
+        link,
+        regressors: regressors.to_vec(),
+        past_observation_lags: past_observation_lags.to_vec(),
+        past_mean_lags: past_mean_lags.to_vec(),
+        external_regressors: external_regressors.to_vec(),
+        horizon,
+        intervention_regressor,
+        control_value,
+        treatment_value,
+        schedule,
+        parameters: fit.parameters,
+        fitted_means: fit.fitted_means,
+        residuals: fit.residuals,
+        log_likelihood: fit.log_likelihood,
+        size: fit.size,
+        dispersion: fit.dispersion,
+        score: fit.score,
+        iterations: fit.iterations,
+        function_evaluations: fit.function_evaluations,
+        gradient_evaluations: fit.gradient_evaluations,
+        baseline_mean,
+        intervention_mean,
+        effect_path,
+        average_effect,
+        cumulative_effect,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn count_series_intervention_scan(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    outcome: usize,
+    link: IngarchLink,
+    past_observation_lags: &[usize],
+    past_mean_lags: &[usize],
+    candidate_reference_points: &[usize],
+    delta: f64,
+    progress: impl Fn(&'static str, usize, usize),
+) -> Result<AnalysisResult, String> {
+    validate_dense_matrix("count-series intervention scan", values, rows, columns)?;
+    if outcome >= columns
+        || past_observation_lags.is_empty()
+        || past_mean_lags.is_empty()
+        || candidate_reference_points.is_empty()
+    {
+        return Err("count-series intervention scan received an invalid outcome, lag set, or candidate range".to_owned());
+    }
+    let observations: Vec<f64> = (0..rows).map(|row| values[outcome * rows + row]).collect();
+    let no_regressors = vec![Vec::new(); rows];
+    let specification = IngarchSpecification {
+        link: match link {
+            IngarchLink::Identity => CoreIngarchLink::Identity,
+            IngarchLink::Log => CoreIngarchLink::Log,
+        },
+        past_observation_lags: past_observation_lags.to_vec(),
+        past_mean_lags: past_mean_lags.to_vec(),
+        external_regressors: vec![],
+    };
+    progress("fit-and-scan", 0, 1);
+    let detection = detect_negative_binomial_intervention(
+        &observations,
+        &no_regressors,
+        specification,
+        candidate_reference_points,
+        delta,
+    )
+    .map_err(|error| format!("count-series intervention scan failed: {error:?}"))?;
+    progress("complete", 1, 1);
+    Ok(AnalysisResult::CountSeriesInterventionScan {
+        observations: rows,
+        outcome,
+        link,
+        past_observation_lags: past_observation_lags.to_vec(),
+        past_mean_lags: past_mean_lags.to_vec(),
+        parameters: detection.null_fit.parameters,
+        fitted_means: detection.null_fit.fitted_means,
+        residuals: detection.null_fit.residuals,
+        log_likelihood: detection.null_fit.log_likelihood,
+        size: detection.null_fit.size,
+        dispersion: detection.null_fit.dispersion,
+        candidates: detection
+            .candidates
+            .into_iter()
+            .map(|candidate| IngarchScanCandidateEvidence {
+                reference_point: candidate.reference_point,
+                score_statistic: candidate.score_statistic,
+            })
+            .collect(),
+        strongest_reference_point: detection.strongest_reference_point,
+        delta: detection.delta,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn causal_effects_total(
     values: &[f64],
     rows: usize,
@@ -448,6 +635,8 @@ pub(crate) fn causal_effects_total(
     hidden: &[Node],
     estimator: TotalEffectEstimator,
     interventions: [f64; 2],
+    uncertainty: CausalEffectsUncertainty,
+    progress: impl Fn(&'static str, usize, usize),
 ) -> Result<AnalysisResult, String> {
     validate_dense_matrix("causal effects", values, rows, columns)?;
     if graph.len() != columns
@@ -491,38 +680,333 @@ pub(crate) fn causal_effects_total(
     }
     let effects = CausalEffects::new(stationary, x, y, &[], hidden);
     let mediators: Vec<Node> = effects.mediators.iter().copied().collect();
-    let adjustment_set = effects.get_optimal_set();
     let no_causal_path = effects.no_causal_path;
-    let (identifiable, adjustment, predictions, total_effect, fitted) = match adjustment_set {
-        Some(set) if !no_causal_path => {
-            let data = time_series_from_column_major(values, rows, columns);
-            let chosen = match estimator {
-                TotalEffectEstimator::Linear => Estimator::Linear,
-                TotalEffectEstimator::Knn { k } => Estimator::KNeighbors { k: k.max(1) },
-            };
-            let model = effects
-                .fit_total_effect(&data, chosen)
-                .ok_or_else(|| "causal effects could not fit the total effect model".to_owned())?;
-            let predicted =
-                model.predict_total_effect(&[vec![interventions[0]], vec![interventions[1]]]);
-            let effect = predicted[1] - predicted[0];
-            (true, set, predicted, effect, model.n_obs)
-        }
-        _ => (false, Vec::new(), Vec::new(), f64::NAN, 0),
-    };
+    let data = time_series_from_column_major(values, rows, columns);
+    let intervention_rows = [vec![interventions[0]], vec![interventions[1]]];
+    let (identifiable, fit, predictions, total_effect, fitted, uncertainty_evidence) =
+        if no_causal_path {
+            (
+                false,
+                CausalEffectsFitEvidence::Unfitted {
+                    requested: estimator,
+                },
+                Vec::new(),
+                f64::NAN,
+                0,
+                CausalEffectsUncertaintyEvidence::None,
+            )
+        } else {
+            match estimator {
+                TotalEffectEstimator::Linear | TotalEffectEstimator::Knn { .. } => {
+                    let Some(set) = effects.get_optimal_set() else {
+                        return Ok(AnalysisResult::CausalEffectsTotal {
+                            observations: rows,
+                            tau_max: effects.tau_max,
+                            no_causal_path,
+                            identifiable: false,
+                            mediators,
+                            fit: CausalEffectsFitEvidence::Unfitted {
+                                requested: estimator,
+                            },
+                            interventions,
+                            predictions: Vec::new(),
+                            total_effect: f64::NAN,
+                            fitted_observations: 0,
+                            uncertainty: CausalEffectsUncertaintyEvidence::None,
+                        });
+                    };
+                    let (chosen, fit) = match estimator {
+                        TotalEffectEstimator::Linear => (
+                            Estimator::Linear,
+                            CausalEffectsFitEvidence::AdjustedLinear {
+                                adjustment_set: set.clone(),
+                            },
+                        ),
+                        TotalEffectEstimator::Knn { k } => (
+                            Estimator::KNeighbors { k: k.max(1) },
+                            CausalEffectsFitEvidence::AdjustedKnn {
+                                k: k.max(1),
+                                adjustment_set: set.clone(),
+                            },
+                        ),
+                        TotalEffectEstimator::WrightParents => unreachable!("outer match"),
+                    };
+                    let (model, uncertainty_evidence) = match uncertainty {
+                        CausalEffectsUncertainty::None => {
+                            let model =
+                                effects.fit_total_effect(&data, chosen).ok_or_else(|| {
+                                    "causal effects could not fit the total effect model".to_owned()
+                                })?;
+                            (model, CausalEffectsUncertaintyEvidence::None)
+                        }
+                        CausalEffectsUncertainty::Bootstrap {
+                            samples,
+                            block_length,
+                            confidence_level,
+                            seed,
+                        } => {
+                            validate_causal_effects_bootstrap(samples, confidence_level)?;
+                            let core_block_length = core_block_length(block_length);
+                            progress("causal-effects-bootstrap", 0, samples);
+                            let bootstrap = effects
+                                .fit_bootstrap_total_effect_with_progress(
+                                    &data,
+                                    chosen,
+                                    None,
+                                    TotalEffectBootstrapOptions {
+                                        samples,
+                                        block_length: core_block_length,
+                                        seed,
+                                    },
+                                    |completed, total| {
+                                        progress("causal-effects-bootstrap", completed, total)
+                                    },
+                                )
+                                .map_err(causal_effects_bootstrap_error)?;
+                            let bootstrap_prediction = bootstrap
+                                .predict_total_effect(&intervention_rows, confidence_level);
+                            let evidence = uncertainty_evidence_from_flat_predictions(
+                                samples,
+                                block_length,
+                                bootstrap.resolved_block_length,
+                                confidence_level,
+                                seed,
+                                &bootstrap_prediction.individual_predictions,
+                                &bootstrap_prediction.confidence_interval,
+                            );
+                            (bootstrap.original_model, evidence)
+                        }
+                    };
+                    let predicted = model.predict_total_effect(&intervention_rows);
+                    let effect = predicted[1] - predicted[0];
+                    (
+                        true,
+                        fit,
+                        predicted,
+                        effect,
+                        model.n_obs,
+                        uncertainty_evidence,
+                    )
+                }
+                TotalEffectEstimator::WrightParents => {
+                    let (model, uncertainty_evidence) = match uncertainty {
+                        CausalEffectsUncertainty::None => (
+                            effects
+                                .fit_wright_effect(
+                                    &data,
+                                    WrightCoefficientMethod::Parents,
+                                    WrightMediation::Total,
+                                )
+                                .map_err(causal_effects_wright_error)?,
+                            CausalEffectsUncertaintyEvidence::None,
+                        ),
+                        CausalEffectsUncertainty::Bootstrap {
+                            samples,
+                            block_length,
+                            confidence_level,
+                            seed,
+                        } => {
+                            validate_causal_effects_bootstrap(samples, confidence_level)?;
+                            progress("causal-effects-wright-bootstrap", 0, samples);
+                            let bootstrap = effects
+                                .fit_bootstrap_wright_effect_with_progress(
+                                    &data,
+                                    WrightCoefficientMethod::Parents,
+                                    WrightMediation::Total,
+                                    TotalEffectBootstrapOptions {
+                                        samples,
+                                        block_length: core_block_length(block_length),
+                                        seed,
+                                    },
+                                    |completed, total| {
+                                        progress(
+                                            "causal-effects-wright-bootstrap",
+                                            completed,
+                                            total,
+                                        )
+                                    },
+                                )
+                                .map_err(causal_effects_wright_error)?;
+                            let prediction = bootstrap
+                                .predict_wright_effect(&intervention_rows, confidence_level);
+                            let draws: Vec<Vec<f64>> = prediction
+                                .individual_predictions
+                                .iter()
+                                .map(|draw| vec![draw[0][0], draw[1][0]])
+                                .collect();
+                            let interval = vec![
+                                vec![prediction.confidence_interval[0][0][0]],
+                                vec![prediction.confidence_interval[0][1][0]],
+                                vec![prediction.confidence_interval[1][0][0]],
+                                vec![prediction.confidence_interval[1][1][0]],
+                            ];
+                            let flat_interval = vec![
+                                vec![interval[0][0], interval[1][0]],
+                                vec![interval[2][0], interval[3][0]],
+                            ];
+                            let evidence = uncertainty_evidence_from_flat_predictions(
+                                samples,
+                                block_length,
+                                bootstrap.resolved_block_length,
+                                confidence_level,
+                                seed,
+                                &draws,
+                                &flat_interval,
+                            );
+                            (bootstrap.original_model, evidence)
+                        }
+                    };
+                    let prediction_rows = model.predict_wright_effect(&intervention_rows);
+                    let predicted = vec![prediction_rows[0][0], prediction_rows[1][0]];
+                    let effect = predicted[1] - predicted[0];
+                    let delta = interventions[1] - interventions[0];
+                    let direct_effect = model
+                        .paths
+                        .iter()
+                        .filter(|path| path.path.len() == 2)
+                        .map(|path| path.value * delta)
+                        .sum::<f64>();
+                    let fit = CausalEffectsFitEvidence::WrightParents {
+                        coefficients: model
+                            .coefficients
+                            .iter()
+                            .map(|coefficient| WrightCoefficientEvidence {
+                                parent: coefficient.parent,
+                                child: coefficient.child,
+                                coefficient: coefficient.value,
+                            })
+                            .collect(),
+                        paths: model
+                            .paths
+                            .iter()
+                            .map(|path| WrightPathEvidence {
+                                nodes: path.path.clone(),
+                                coefficient: path.value,
+                                contrast: path.value * delta,
+                            })
+                            .collect(),
+                        direct_effect,
+                        indirect_effect: effect - direct_effect,
+                    };
+                    (
+                        true,
+                        fit,
+                        predicted,
+                        effect,
+                        model.n_obs,
+                        uncertainty_evidence,
+                    )
+                }
+            }
+        };
     Ok(AnalysisResult::CausalEffectsTotal {
         observations: rows,
         tau_max: effects.tau_max,
         no_causal_path,
         identifiable,
-        adjustment_set: adjustment,
         mediators,
-        estimator,
+        fit,
         interventions,
         predictions,
         total_effect,
         fitted_observations: fitted,
+        uncertainty: uncertainty_evidence,
     })
+}
+
+fn validate_causal_effects_bootstrap(samples: usize, confidence_level: f64) -> Result<(), String> {
+    if samples == 0 || !(0.0 < confidence_level && confidence_level < 1.0) {
+        return Err("causal effects bootstrap needs positive samples and a confidence level between zero and one".to_owned());
+    }
+    Ok(())
+}
+
+fn core_block_length(block_length: CausalEffectsBlockLength) -> BootstrapBlockLength {
+    match block_length {
+        CausalEffectsBlockLength::Fixed { length } => BootstrapBlockLength::Fixed(length),
+        CausalEffectsBlockLength::CubeRoot => BootstrapBlockLength::CubeRoot,
+    }
+}
+
+fn uncertainty_evidence_from_flat_predictions(
+    samples: usize,
+    block_length: CausalEffectsBlockLength,
+    resolved_block_length: usize,
+    confidence_level: f64,
+    seed: u64,
+    individual_predictions: &[Vec<f64>],
+    confidence_interval: &[Vec<f64>],
+) -> CausalEffectsUncertaintyEvidence {
+    let effect_draws: Vec<f64> = individual_predictions
+        .iter()
+        .map(|prediction| prediction[1] - prediction[0])
+        .collect();
+    let tail = (1.0 - confidence_level) / 2.0;
+    let effect_interval = [
+        hirmos_causal_core::causal_effects::numpy_percentile(&effect_draws, tail),
+        hirmos_causal_core::causal_effects::numpy_percentile(&effect_draws, 1.0 - tail),
+    ];
+    CausalEffectsUncertaintyEvidence::Bootstrap {
+        samples,
+        block_length,
+        resolved_block_length,
+        confidence_level,
+        seed,
+        prediction_intervals: [
+            [confidence_interval[0][0], confidence_interval[1][0]],
+            [confidence_interval[0][1], confidence_interval[1][1]],
+        ],
+        effect_interval,
+        effect_draws,
+    }
+}
+
+fn causal_effects_bootstrap_error(error: TotalEffectBootstrapError) -> String {
+    match error {
+        TotalEffectBootstrapError::NotIdentifiable => {
+            "causal effects bootstrap is not identifiable by adjustment".to_owned()
+        }
+        TotalEffectBootstrapError::ZeroSamples => {
+            "causal effects bootstrap needs at least one sample".to_owned()
+        }
+        TotalEffectBootstrapError::ZeroBlockLength => {
+            "causal effects bootstrap block length must be positive".to_owned()
+        }
+        TotalEffectBootstrapError::TooFewBlocks { blocks } => format!(
+            "causal effects bootstrap block length leaves only {blocks} block; choose a shorter block"
+        ),
+        TotalEffectBootstrapError::SeedOverflow => {
+            "causal effects bootstrap seed schedule overflowed".to_owned()
+        }
+    }
+}
+
+fn causal_effects_wright_error(error: WrightEffectError) -> String {
+    match error {
+        WrightEffectError::ParentMethodHasBidirectedLink { node } => format!(
+            "Wright parent coefficients require a DAG without a bidirected link adjacent to ({}, {})",
+            node.0, node.1
+        ),
+        WrightEffectError::MissingLinkCoefficients { variable } => {
+            format!("Wright coefficients are missing for variable {variable}")
+        }
+        WrightEffectError::MissingPathCoefficient { parent, child } => format!(
+            "Wright path coefficient is missing for ({}, {}) -> ({}, {})",
+            parent.0, parent.1, child.0, child.1
+        ),
+        WrightEffectError::ZeroSamples => {
+            "Wright bootstrap needs at least one sample".to_owned()
+        }
+        WrightEffectError::ZeroBlockLength => {
+            "Wright bootstrap block length must be positive".to_owned()
+        }
+        WrightEffectError::TooFewBlocks { blocks } => format!(
+            "Wright bootstrap block length leaves only {blocks} block; choose a shorter block"
+        ),
+        WrightEffectError::SeedOverflow => {
+            "Wright bootstrap seed schedule overflowed".to_owned()
+        }
+    }
 }
 
 pub(crate) fn causal_impact_evidence(
@@ -838,6 +1322,8 @@ pub(crate) fn synthetic_control(
     treated: usize,
     donors: &[usize],
     n_pre: usize,
+    cross_fit_folds: usize,
+    alpha: f64,
 ) -> Result<AnalysisResult, String> {
     validate_dense_matrix("synthetic control", values, rows, columns)?;
     let mut used = vec![treated];
@@ -853,6 +1339,12 @@ pub(crate) fn synthetic_control(
     }
     if n_pre < 2 || n_pre >= rows {
         return Err("synthetic control needs at least 2 pre-intervention rows and at least one post-intervention row".to_owned());
+    }
+    if cross_fit_folds < 2 {
+        return Err("synthetic control cross-fitting needs at least 2 folds".to_owned());
+    }
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err("synthetic control inference alpha must be between zero and one".to_owned());
     }
     let data = DMatrix::from_column_slice(rows, columns, values);
     let n_post = rows - n_pre;
@@ -873,6 +1365,107 @@ pub(crate) fn synthetic_control(
                 .sum()
         })
         .collect();
+    let cross_fit = match debiased_synthetic_control(
+        &y_pre_co,
+        &y_pre_tr,
+        &y_post_co,
+        &y_post_tr,
+        cross_fit_folds,
+    ) {
+        Ok(inference) => SyntheticCrossFitEvidence::Available {
+            att: inference.att,
+            standard_error: inference.standard_error,
+            t_statistic: inference.t_statistic,
+            degrees_of_freedom: inference.degrees_of_freedom,
+            p_value: inference.p_value,
+            confidence_interval: inference.confidence_interval,
+            block_size: inference.block_size,
+            folds: inference
+                .folds
+                .into_iter()
+                .map(|fold| SyntheticCrossFitFoldEvidence {
+                    held_out: fold.held_out,
+                    weights: fold.weights,
+                    bias: fold.bias,
+                    att: fold.att,
+                })
+                .collect(),
+        },
+        Err(error) => SyntheticCrossFitEvidence::Unavailable {
+            reason: synthetic_control_problem(error),
+        },
+    };
+    let outcome_controls = DMatrix::from_fn(rows, donors.len(), |row, column| {
+        data[(row, donors[column])]
+    });
+    let outcome_treated = DVector::from_fn(rows, |row, _| data[(row, treated)]);
+    let donor_placebo = match donor_placebo_mspe_inference(
+        &y_pre_co,
+        &y_pre_tr,
+        &outcome_controls,
+        &outcome_treated,
+        n_pre,
+    ) {
+        Ok(inference) => DonorPlaceboInferenceEvidence::Available {
+            treated_pre_mspe: inference.treated.pre_mspe,
+            treated_post_mspe: inference.treated.post_mspe,
+            treated_mspe_ratio: inference
+                .treated
+                .mspe_ratio
+                .is_finite()
+                .then_some(inference.treated.mspe_ratio),
+            placebos: inference
+                .placebos
+                .into_iter()
+                .map(|placebo| DonorPlaceboEvidence {
+                    donor: placebo.donor,
+                    pre_mspe: placebo.summary.pre_mspe,
+                    post_mspe: placebo.summary.post_mspe,
+                    mspe_ratio: placebo
+                        .summary
+                        .mspe_ratio
+                        .is_finite()
+                        .then_some(placebo.summary.mspe_ratio),
+                })
+                .collect(),
+            p_value: inference.p_value,
+            n_valid_placebos: inference.n_valid_placebos,
+        },
+        Err(error) => DonorPlaceboInferenceEvidence::Unavailable {
+            reason: synthetic_control_problem(error),
+        },
+    };
+    let band = |method| match synthetic_control_prediction_band(
+        &outcome_controls,
+        &outcome_treated,
+        &control.weights,
+        n_pre,
+        alpha,
+        method,
+    ) {
+        Ok(inference) if inference.half_width.is_finite() => {
+            SyntheticPredictionBandEvidence::Available {
+                alpha: inference.alpha,
+                intervals: inference.intervals,
+                half_width: inference.half_width,
+                pre_mspe: inference.pre_mspe,
+                post_mspe: inference.post_mspe,
+                mspe_ratio: inference
+                    .mspe_ratio
+                    .is_finite()
+                    .then_some(inference.mspe_ratio),
+            }
+        }
+        Ok(_) => SyntheticPredictionBandEvidence::Unavailable {
+            reason: "the requested conformal level needs more pre-intervention residuals"
+                .to_owned(),
+        },
+        Err(error) => SyntheticPredictionBandEvidence::Unavailable {
+            reason: synthetic_control_problem(error),
+        },
+    };
+    let conformal_band = band(SyntheticControlBandMethod::Conformal);
+    let gaussian_band = band(SyntheticControlBandMethod::ParametricGaussian);
     Ok(AnalysisResult::SyntheticControl {
         observations: rows,
         n_pre,
@@ -885,7 +1478,24 @@ pub(crate) fn synthetic_control(
         att: effect.att,
         treated: treated_series,
         synthetic,
+        cross_fit,
+        donor_placebo,
+        conformal_band,
+        gaussian_band,
     })
+}
+
+fn synthetic_control_problem(error: SyntheticControlError) -> String {
+    match error {
+        SyntheticControlError::EmptyDesign => "the synthetic-control design is empty".to_owned(),
+        SyntheticControlError::DimensionMismatch => "the treated and donor matrices do not have compatible dimensions".to_owned(),
+        SyntheticControlError::NonFiniteInput => "the synthetic-control design contains a non-finite value".to_owned(),
+        SyntheticControlError::InvalidFoldCount => "cross-fitting needs at least two folds".to_owned(),
+        SyntheticControlError::InsufficientFoldData => "the pre- and post-intervention periods are too short for the requested cross-fitting folds".to_owned(),
+        SyntheticControlError::InvalidPrePeriodBoundary => "prediction inference needs at least two pre-intervention rows and one post-intervention row".to_owned(),
+        SyntheticControlError::InsufficientDonors => "donor-placebo inference needs at least two donor series".to_owned(),
+        SyntheticControlError::InvalidAlpha => "prediction-band alpha must be between zero and one".to_owned(),
+    }
 }
 
 fn panel_method_evidence(
@@ -922,6 +1532,45 @@ fn panel_problem(error: hirmos_causal_core::panel::PanelError) -> String {
         PanelError::NonSimultaneousAdoption => "treated units do not adopt simultaneously and remain treated".to_owned(),
         PanelError::InvalidMatrixBoundary => "the panel boundary does not contain controls, treated units, pre-periods, and post-periods".to_owned(),
         PanelError::DegenerateNoise => "the control pre-period has no usable first-difference variation for synthetic weighting".to_owned(),
+        PanelError::TooFewControlsForPlacebo => "placebo variance needs more control units than treated units".to_owned(),
+        PanelError::InsufficientPlaceboReplications => "placebo variance needs at least two replications".to_owned(),
+        PanelError::InvalidPlaceboPermutation { replication } => format!("placebo replication {} is not a permutation of the control units", replication + 1),
+        PanelError::InvalidTreatedFraction => "the pre-treatment period is too short for an in-time placebo".to_owned(),
+    }
+}
+
+fn panel_placebo_evidence(
+    result: Result<
+        hirmos_causal_core::panel::PanelPlaceboInference,
+        hirmos_causal_core::panel::PanelError,
+    >,
+    replications: usize,
+    seed: u64,
+) -> PanelPlaceboEvidence {
+    match result {
+        Ok(inference) => PanelPlaceboEvidence::Available {
+            replications,
+            seed,
+            standard_error: inference.standard_error,
+            estimates: inference.estimates,
+        },
+        Err(error) => PanelPlaceboEvidence::Unavailable {
+            reason: panel_problem(error),
+        },
+    }
+}
+
+fn panel_in_time_evidence(
+    result: Result<hirmos_causal_core::panel::PanelEstimate, hirmos_causal_core::panel::PanelError>,
+) -> PanelInTimeEvidence {
+    match result {
+        Ok(estimate) => PanelInTimeEvidence::Available {
+            estimate: estimate.estimate,
+            effect_curve: estimate.effect_curve,
+        },
+        Err(error) => PanelInTimeEvidence::Unavailable {
+            reason: panel_problem(error),
+        },
     }
 }
 
@@ -930,6 +1579,8 @@ pub(crate) fn panel_intervention(
     rows: usize,
     units: &[String],
     times: &[i64],
+    placebo_replications: usize,
+    seed: u64,
     progress: impl Fn(&'static str, usize, usize),
 ) -> Result<AnalysisResult, String> {
     validate_dense_matrix("panel intervention", values, rows, 2)?;
@@ -945,18 +1596,65 @@ pub(crate) fn panel_intervention(
         })
         .collect::<Vec<_>>();
     let panel = hirmos_causal_core::panel::panel_matrices(&observations).map_err(panel_problem)?;
-    progress("validated-panel", 1, 4);
+    progress("validated-panel", 1, 9);
     let did = hirmos_causal_core::panel::did_estimate(&panel.y, panel.n0, panel.t0)
         .map_err(panel_problem)?;
-    progress("difference-in-differences", 2, 4);
+    progress("difference-in-differences", 2, 9);
     let synthetic_control =
         hirmos_causal_core::panel::synthdid_sc_estimate(&panel.y, panel.n0, panel.t0)
             .map_err(panel_problem)?;
-    progress("synthetic-control", 3, 4);
+    progress("synthetic-control", 3, 9);
     let synthetic_did =
         hirmos_causal_core::panel::synthetic_did_estimate(&panel.y, panel.n0, panel.t0)
             .map_err(panel_problem)?;
-    progress("synthetic-did", 4, 4);
+    progress("synthetic-did", 4, 9);
+    let mut rng = NpRng::seeded(seed);
+    let permutations = (0..placebo_replications)
+        .map(|_| rng.permutation(panel.n0))
+        .collect::<Vec<_>>();
+    progress("placebo-permutations", 5, 9);
+    let synthetic_control_placebo = panel_placebo_evidence(
+        hirmos_causal_core::panel::panel_placebo_standard_error(
+            &panel.y,
+            panel.n0,
+            panel.t0,
+            hirmos_causal_core::panel::PanelEstimatorKind::SyntheticControl,
+            &permutations,
+        ),
+        placebo_replications,
+        seed,
+    );
+    progress("synthetic-control-placebos", 6, 9);
+    let synthetic_did_placebo = panel_placebo_evidence(
+        hirmos_causal_core::panel::panel_placebo_standard_error(
+            &panel.y,
+            panel.n0,
+            panel.t0,
+            hirmos_causal_core::panel::PanelEstimatorKind::SyntheticDifferenceInDifferences,
+            &permutations,
+        ),
+        placebo_replications,
+        seed,
+    );
+    progress("synthetic-did-placebos", 7, 9);
+    let synthetic_control_in_time =
+        panel_in_time_evidence(hirmos_causal_core::panel::panel_in_time_placebo(
+            &panel.y,
+            panel.n0,
+            panel.t0,
+            hirmos_causal_core::panel::PanelEstimatorKind::SyntheticControl,
+            None,
+        ));
+    progress("synthetic-control-in-time", 8, 9);
+    let synthetic_did_in_time =
+        panel_in_time_evidence(hirmos_causal_core::panel::panel_in_time_placebo(
+            &panel.y,
+            panel.n0,
+            panel.t0,
+            hirmos_causal_core::panel::PanelEstimatorKind::SyntheticDifferenceInDifferences,
+            None,
+        ));
+    progress("synthetic-did-in-time", 9, 9);
     Ok(AnalysisResult::PanelIntervention {
         observations: rows,
         treated_units: panel.y.nrows() - panel.n0,
@@ -968,6 +1666,10 @@ pub(crate) fn panel_intervention(
         did: panel_method_evidence(did),
         synthetic_control: panel_method_evidence(synthetic_control),
         synthetic_did: panel_method_evidence(synthetic_did),
+        synthetic_control_placebo,
+        synthetic_did_placebo,
+        synthetic_control_in_time,
+        synthetic_did_in_time,
     })
 }
 
@@ -1370,9 +2072,403 @@ pub(crate) fn discrete_bn_query(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn identified_discrete_query(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    observed_nodes: &[usize],
+    names: &[String],
+    edges: &[(usize, usize)],
+    treatment: usize,
+    outcome: usize,
+    unobserved: &[usize],
+    bins: usize,
+    condition: Option<IdentifiedDiscreteCondition>,
+) -> Result<AnalysisResult, String> {
+    validate_dense_matrix("identified discrete query", values, rows, columns)?;
+    if names.len() < 2 || !(2..=10).contains(&bins) {
+        return Err(
+            "identified discrete query needs at least two graph nodes and between 2 and 10 bins"
+                .to_owned(),
+        );
+    }
+    if treatment >= names.len() || outcome >= names.len() || treatment == outcome {
+        return Err(
+            "identified discrete query treatment and outcome must be distinct graph-node positions"
+                .to_owned(),
+        );
+    }
+    if edges
+        .iter()
+        .any(|&(cause, effect)| cause >= names.len() || effect >= names.len() || cause == effect)
+        || unobserved.iter().any(|&node| node >= names.len())
+    {
+        return Err(
+            "identified discrete query contains an invalid graph edge or unobserved node"
+                .to_owned(),
+        );
+    }
+    let unobserved_set = unobserved
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    if unobserved_set.contains(&treatment) || unobserved_set.contains(&outcome) {
+        return Err(
+            "identified discrete query can only set and read observed variables".to_owned(),
+        );
+    }
+    let observed_positions = (0..names.len())
+        .filter(|position| !unobserved_set.contains(position))
+        .collect::<Vec<_>>();
+    if observed_nodes.len() != observed_positions.len()
+        || observed_nodes.iter().any(|&column| column >= columns)
+    {
+        return Err(
+            "identified discrete query needs one matrix column per observed graph node".to_owned(),
+        );
+    }
+    if let Some(condition) = condition {
+        if condition.variable >= names.len()
+            || condition.variable == treatment
+            || condition.variable == outcome
+            || unobserved_set.contains(&condition.variable)
+        {
+            return Err(
+                "identified discrete query condition must be a distinct observed variable"
+                    .to_owned(),
+            );
+        }
+    }
+
+    let data = DMatrix::from_column_slice(rows, columns, values);
+    let mut columns_by_name = BTreeMap::new();
+    let mut means_by_position = HashMap::new();
+    let mut state_counts = Vec::with_capacity(observed_nodes.len());
+    for (&position, &column) in observed_positions.iter().zip(observed_nodes) {
+        let series = (0..rows).map(|row| data[(row, column)]).collect::<Vec<_>>();
+        let discretised = discretize_805(&series, bins).ok_or_else(|| {
+            format!(
+                "identified discrete query cannot discretise {}: it is constant",
+                names[position]
+            )
+        })?;
+        state_counts.push(discretised.means.len());
+        means_by_position.insert(position, discretised.means);
+        columns_by_name.insert(names[position].clone(), discretised.labels);
+    }
+    let table = DiscreteTable::from_columns(columns_by_name).map_err(|error| {
+        format!("identified discrete query could not form its observational table: {error}")
+    })?;
+    let named_edges = edges
+        .iter()
+        .map(|&(cause, effect)| (names[cause].clone(), names[effect].clone()))
+        .collect::<Vec<_>>();
+    let latent_names = unobserved
+        .iter()
+        .map(|&position| names[position].clone())
+        .collect::<Vec<_>>();
+    let projection = latent_projection(names.iter().cloned(), named_edges, latent_names)
+        .map_err(|error| format!("identified discrete query graph is invalid: {error:?}"))?;
+    let treatment_name = names[treatment].clone();
+    let outcome_name = names[outcome].clone();
+    let treatment_states = table.states(&treatment_name).ok_or_else(|| {
+        "identified discrete query treatment is absent from the observed table".to_owned()
+    })?;
+    let low = treatment_states
+        .first()
+        .cloned()
+        .ok_or_else(|| "identified discrete query treatment has no states".to_owned())?;
+    let high = treatment_states
+        .last()
+        .cloned()
+        .ok_or_else(|| "identified discrete query treatment has no states".to_owned())?;
+    if low == high {
+        return Err(format!("identified discrete query treatment {treatment_name} has a single state after discretisation"));
+    }
+
+    let (query, condition_name, condition_state) = match condition {
+        None => (IdentifiedDiscreteQueryKind::Unconditional, None, None),
+        Some(condition) => {
+            let name = names[condition.variable].clone();
+            let state = condition.state.to_string();
+            let means = &means_by_position[&condition.variable];
+            let representative_value = means.get(&state).copied().ok_or_else(|| {
+                format!("identified discrete query condition state {state} is absent for {name} after discretisation")
+            })?;
+            (
+                IdentifiedDiscreteQueryKind::Conditional {
+                    variable: condition.variable,
+                    state: state.clone(),
+                    representative_value,
+                },
+                Some(name),
+                Some(state),
+            )
+        }
+    };
+    let expression = match &condition_name {
+        None => identify_outcomes(
+            &projection,
+            [treatment_name.clone()],
+            [outcome_name.clone()],
+        ),
+        Some(name) => identify_conditional_outcomes(
+            &projection,
+            [treatment_name.clone()],
+            [outcome_name.clone()],
+            [name.clone()],
+        ),
+    };
+    let expression = match expression {
+        Ok(expression) => expression,
+        Err(IdentificationError::Unidentifiable(hedge)) => {
+            let index_by_name = names
+                .iter()
+                .enumerate()
+                .map(|(index, name)| (name.as_str(), index))
+                .collect::<HashMap<_, _>>();
+            return Ok(AnalysisResult::IdentifiedDiscreteQuery {
+                observations: rows,
+                bins,
+                state_counts,
+                treatment_states: (low, high),
+                query,
+                result: IdentifiedDiscreteResult::Unidentifiable {
+                    hedge_graph: hedge
+                        .graph_district
+                        .iter()
+                        .map(|name| index_by_name[name.as_str()])
+                        .collect(),
+                    hedge_subgraph: hedge
+                        .treatment_removed_district
+                        .iter()
+                        .map(|name| index_by_name[name.as_str()])
+                        .collect(),
+                },
+            });
+        }
+        Err(error) => {
+            return Err(format!(
+                "identified discrete query could not identify its expression: {error}"
+            ))
+        }
+    };
+    let fixed = |treatment_state: String| {
+        let mut assignment = BTreeMap::from([(treatment_name.clone(), treatment_state)]);
+        if let (Some(name), Some(state)) = (&condition_name, &condition_state) {
+            assignment.insert(name.clone(), state.clone());
+        }
+        assignment
+    };
+    let low_distribution = evaluate_distribution(
+        &expression,
+        &table,
+        [outcome_name.clone()],
+        &fixed(low.clone()),
+    )
+    .map_err(|error| {
+        format!("identified discrete query could not evaluate the low intervention: {error}")
+    })?;
+    let high_distribution = evaluate_distribution(
+        &expression,
+        &table,
+        [outcome_name.clone()],
+        &fixed(high.clone()),
+    )
+    .map_err(|error| {
+        format!("identified discrete query could not evaluate the high intervention: {error}")
+    })?;
+    let ordered =
+        |distribution: &hirmos_causal_core::identified_expression::EvaluatedDistribution| {
+            distribution
+                .probabilities
+                .iter()
+                .map(|(states, probability)| (states[0].clone(), *probability))
+                .collect::<Vec<_>>()
+        };
+    let outcome_means = &means_by_position[&outcome];
+    let expectation =
+        |distribution: &hirmos_causal_core::identified_expression::EvaluatedDistribution| {
+            distribution
+                .probabilities
+                .iter()
+                .map(|(states, probability)| outcome_means[&states[0]] * probability)
+                .sum::<f64>()
+        };
+    let expectations = (
+        expectation(&low_distribution),
+        expectation(&high_distribution),
+    );
+    Ok(AnalysisResult::IdentifiedDiscreteQuery {
+        observations: rows,
+        bins,
+        state_counts,
+        treatment_states: (low, high),
+        query,
+        result: IdentifiedDiscreteResult::Identified {
+            algorithm: if condition_name.is_some() {
+                "IDC"
+            } else {
+                "ID"
+            },
+            expression: expression.to_y0(),
+            latex: expression.to_latex(),
+            expectations,
+            effect: expectations.1 - expectations.0,
+            distribution_low: ordered(&low_distribution),
+            distribution_high: ordered(&high_distribution),
+            normalization_low: low_distribution.total,
+            normalization_high: high_distribution.total,
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn negative_binomial_ingarch_facade_matches_the_tscount_forecast() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../causal-core/oracle/fixtures/ingarch.json"
+        ))
+        .unwrap();
+        let observations: Vec<f64> =
+            serde_json::from_value(fixture["observations"].clone()).unwrap();
+        let regressors: Vec<Vec<f64>> =
+            serde_json::from_value(fixture["regressors"].clone()).unwrap();
+        let rows = observations.len();
+        let mut values = observations;
+        values.extend(regressors.iter().map(|row| row[0]));
+        values.extend(regressors.iter().map(|row| row[1]));
+        let progress = std::cell::RefCell::new(Vec::new());
+        let result = negative_binomial_ingarch(
+            &values,
+            rows,
+            3,
+            0,
+            IngarchLink::Log,
+            &[1, 2],
+            &[1],
+            &[1],
+            &[false, false],
+            10,
+            &[2.0, 0.15],
+            1,
+            2.0,
+            5.0,
+            IngarchInterventionSchedule::Persistent,
+            |stage, completed, total| progress.borrow_mut().push((stage, completed, total)),
+        )
+        .unwrap();
+        let encoded = serde_json::to_value(result).unwrap();
+        assert_eq!(encoded["kind"], "negativeBinomialIngarch");
+        assert_eq!(encoded["horizon"], 10);
+        assert_eq!(encoded["schedule"]["kind"], "persistent");
+        let expected = fixture["scenarios"]["persistent"]["mean"]
+            .as_array()
+            .unwrap();
+        for (actual, expected) in encoded["interventionMean"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(expected)
+        {
+            assert!((actual.as_f64().unwrap() - expected.as_f64().unwrap()).abs() < 1e-8);
+        }
+        assert_eq!(progress.borrow().last(), Some(&("complete", 2, 2)));
+    }
+
+    #[test]
+    fn identity_ingarch_facade_matches_tscount_default_forecast() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../causal-core/oracle/fixtures/ingarch_identity.json"
+        ))
+        .unwrap();
+        let observations: Vec<f64> =
+            serde_json::from_value(fixture["observations"].clone()).unwrap();
+        let regressors: Vec<Vec<f64>> =
+            serde_json::from_value(fixture["regressors"].clone()).unwrap();
+        let rows = observations.len();
+        let mut values = observations;
+        values.extend(regressors.iter().map(|row| row[0]));
+        let result = negative_binomial_ingarch(
+            &values,
+            rows,
+            2,
+            0,
+            IngarchLink::Identity,
+            &[1],
+            &[1],
+            &[1],
+            &[false],
+            12,
+            &[0.0],
+            1,
+            0.0,
+            1.0,
+            IngarchInterventionSchedule::Persistent,
+            |_, _, _| {},
+        )
+        .unwrap();
+        let encoded = serde_json::to_value(result).unwrap();
+        assert_eq!(encoded["link"], "identity");
+        for (actual, expected) in encoded["interventionMean"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(fixture["scenarios"]["treated"]["mean"].as_array().unwrap())
+        {
+            assert!((actual.as_f64().unwrap() - expected.as_f64().unwrap()).abs() < 1e-7);
+        }
+    }
+
+    #[test]
+    fn multi_lag_count_series_scan_matches_tscount_and_reports_progress() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../causal-core/oracle/fixtures/ingarch_detection.json"
+        ))
+        .unwrap();
+        let observations: Vec<f64> =
+            serde_json::from_value(fixture["observations"].clone()).unwrap();
+        let candidates: Vec<usize> =
+            serde_json::from_value::<Vec<usize>>(fixture["detection"]["candidates"].clone())
+                .unwrap()
+                .into_iter()
+                .map(|tau| tau - 1)
+                .collect();
+        let rows = observations.len();
+        let progress = std::cell::RefCell::new(Vec::new());
+        let result = count_series_intervention_scan(
+            &observations,
+            rows,
+            1,
+            0,
+            IngarchLink::Identity,
+            &[1],
+            &[7, 13],
+            &candidates,
+            1.0,
+            |stage, completed, total| progress.borrow_mut().push((stage, completed, total)),
+        )
+        .unwrap();
+        let encoded = serde_json::to_value(result).unwrap();
+        assert_eq!(encoded["kind"], "countSeriesInterventionScan");
+        assert_eq!(encoded["strongestReferencePoint"].as_u64(), Some(83));
+        let scores = encoded["candidates"].as_array().unwrap();
+        let oracle = fixture["detection"]["score_statistics"].as_array().unwrap();
+        for (actual, expected) in scores.iter().zip(oracle) {
+            assert!(
+                (actual["scoreStatistic"].as_f64().unwrap() - expected.as_f64().unwrap()).abs()
+                    < 1e-7
+            );
+        }
+        assert_eq!(
+            progress.borrow().as_slice(),
+            &[("fit-and-scan", 0, 1), ("complete", 1, 1)]
+        );
+    }
 
     #[test]
     fn backdoor_linear_serializes_both_intervals() {
@@ -1572,6 +2668,8 @@ mod tests {
             &[],
             TotalEffectEstimator::Linear,
             [0.0, 1.0],
+            CausalEffectsUncertainty::None,
+            |_, _, _| {},
         )
         .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
         .expect("total effect should serialize");
@@ -1580,6 +2678,42 @@ mod tests {
         assert_eq!(value["identifiable"], true);
         let effect = value["totalEffect"].as_f64().unwrap();
         assert!((effect - 0.8).abs() < 0.15, "total effect {effect}");
+        let progress_events = std::cell::RefCell::new(Vec::new());
+        let bootstrap_json = causal_effects_total(
+            &values,
+            rows,
+            3,
+            1,
+            &graph,
+            &[(0, -1)],
+            &[(1, 0)],
+            &[],
+            TotalEffectEstimator::Linear,
+            [0.0, 1.0],
+            CausalEffectsUncertainty::Bootstrap {
+                samples: 20,
+                block_length: CausalEffectsBlockLength::Fixed { length: 4 },
+                confidence_level: 0.9,
+                seed: 4,
+            },
+            |stage, completed, total| progress_events.borrow_mut().push((stage, completed, total)),
+        )
+        .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
+        .expect("bootstrap total effect should serialize");
+        let bootstrap: serde_json::Value = serde_json::from_str(&bootstrap_json).unwrap();
+        assert_eq!(bootstrap["uncertainty"]["kind"], "bootstrap");
+        assert_eq!(bootstrap["uncertainty"]["samples"], 20);
+        assert_eq!(bootstrap["uncertainty"]["resolvedBlockLength"], 4);
+        assert_eq!(
+            bootstrap["uncertainty"]["effectDraws"]
+                .as_array()
+                .unwrap()
+                .len(),
+            20
+        );
+        let events = progress_events.borrow();
+        assert_eq!(events.first(), Some(&("causal-effects-bootstrap", 0, 20)));
+        assert_eq!(events.last(), Some(&("causal-effects-bootstrap", 20, 20)));
         assert!(causal_effects_total(
             &values,
             rows,
@@ -1590,9 +2724,86 @@ mod tests {
             &[(1, 0)],
             &[],
             TotalEffectEstimator::Linear,
-            [0.0, 1.0]
+            [0.0, 1.0],
+            CausalEffectsUncertainty::None,
+            |_, _, _| {},
         )
         .is_err());
+    }
+
+    #[test]
+    fn causal_effects_wright_reports_path_decomposition_and_bootstrap() {
+        let rows = 180;
+        let z: Vec<f64> = (0..rows)
+            .map(|row| (row as f64 * 0.31).sin() + (row % 7) as f64 * 0.03)
+            .collect();
+        let x: Vec<f64> = (0..rows)
+            .map(|row| 0.6 * z[row] + (row as f64 * 0.73).cos() * 0.4)
+            .collect();
+        let mediator: Vec<f64> = (0..rows)
+            .map(|row| 0.5 * x[row] + 0.3 * z[row] + (row as f64 * 0.47).sin() * 0.2)
+            .collect();
+        let y: Vec<f64> = (0..rows)
+            .map(|row| {
+                0.1 * x[row] + 0.4 * mediator[row] + 0.2 * z[row] + (row as f64 * 1.13).cos() * 0.25
+            })
+            .collect();
+        let mut values = Vec::with_capacity(rows * 4);
+        values.extend(&x);
+        values.extend(&mediator);
+        values.extend(&y);
+        values.extend(&z);
+        let mut graph = vec![vec![vec![String::new(); 1]; 4]; 4];
+        for (source, target) in [(3, 0), (3, 1), (3, 2), (0, 1), (1, 2), (0, 2)] {
+            graph[source][target][0] = "-->".to_owned();
+            graph[target][source][0] = "<--".to_owned();
+        }
+        let progress_events = std::cell::RefCell::new(Vec::new());
+        let result = causal_effects_total(
+            &values,
+            rows,
+            4,
+            0,
+            &graph,
+            &[(0, 0)],
+            &[(2, 0)],
+            &[],
+            TotalEffectEstimator::WrightParents,
+            [0.0, 1.0],
+            CausalEffectsUncertainty::Bootstrap {
+                samples: 20,
+                block_length: CausalEffectsBlockLength::Fixed { length: 4 },
+                confidence_level: 0.9,
+                seed: 19,
+            },
+            |stage, completed, total| progress_events.borrow_mut().push((stage, completed, total)),
+        )
+        .unwrap();
+        let value = serde_json::to_value(result).unwrap();
+        assert_eq!(value["fit"]["kind"], "wrightParents");
+        assert_eq!(value["fit"]["coefficients"].as_array().unwrap().len(), 5);
+        assert_eq!(value["fit"]["paths"].as_array().unwrap().len(), 2);
+        let total = value["totalEffect"].as_f64().unwrap();
+        let decomposed = value["fit"]["directEffect"].as_f64().unwrap()
+            + value["fit"]["indirectEffect"].as_f64().unwrap();
+        assert!((total - decomposed).abs() < 1e-12);
+        assert_eq!(value["uncertainty"]["kind"], "bootstrap");
+        assert_eq!(
+            value["uncertainty"]["effectDraws"]
+                .as_array()
+                .unwrap()
+                .len(),
+            20
+        );
+        let events = progress_events.borrow();
+        assert_eq!(
+            events.first(),
+            Some(&("causal-effects-wright-bootstrap", 0, 20))
+        );
+        assert_eq!(
+            events.last(),
+            Some(&("causal-effects-wright-bootstrap", 20, 20))
+        );
     }
 
     #[test]
@@ -1708,9 +2919,10 @@ mod tests {
             .chain(donor_b.iter())
             .copied()
             .collect();
-        let result =
-            serde_json::to_value(synthetic_control(&values, rows, 3, 0, &[1, 2], n_pre).unwrap())
-                .unwrap();
+        let result = serde_json::to_value(
+            synthetic_control(&values, rows, 3, 0, &[1, 2], n_pre, 3, 0.05).unwrap(),
+        )
+        .unwrap();
         assert_eq!(result["kind"], "syntheticControl");
         let weights: Vec<f64> = result["weights"]
             .as_array()
@@ -1724,8 +2936,8 @@ mod tests {
         );
         assert!((result["att"].as_f64().unwrap() - 5.0).abs() < 1e-6);
         assert_eq!(result["synthetic"].as_array().unwrap().len(), rows);
-        assert!(synthetic_control(&values, rows, 3, 0, &[0], n_pre).is_err());
-        assert!(synthetic_control(&values, rows, 3, 0, &[1, 2], rows).is_err());
+        assert!(synthetic_control(&values, rows, 3, 0, &[0], n_pre, 3, 0.05).is_err());
+        assert!(synthetic_control(&values, rows, 3, 0, &[1, 2], rows, 3, 0.05).is_err());
     }
 
     #[test]
@@ -1760,11 +2972,18 @@ mod tests {
         let rows = outcome.len();
         let values = outcome.into_iter().chain(treatment).collect::<Vec<_>>();
         let stages = std::cell::RefCell::new(Vec::new());
-        let result =
-            panel_intervention(&values, rows, &units, &times, |stage, completed, total| {
+        let result = panel_intervention(
+            &values,
+            rows,
+            &units,
+            &times,
+            12,
+            0,
+            |stage, completed, total| {
                 stages.borrow_mut().push((stage, completed, total));
-            })
-            .unwrap();
+            },
+        )
+        .unwrap();
         let encoded = serde_json::to_value(result).unwrap();
         assert_eq!(encoded["kind"], "panelIntervention");
         assert_eq!(encoded["controlUnits"], 38);
@@ -1777,7 +2996,14 @@ mod tests {
             (actual - expected).abs() <= 2e-10,
             "{actual} versus {expected}"
         );
-        assert_eq!(stages.borrow().last(), Some(&("synthetic-did", 4, 4)));
+        assert_eq!(encoded["syntheticControlPlacebo"]["kind"], "available");
+        assert_eq!(encoded["syntheticDidPlacebo"]["kind"], "available");
+        assert_eq!(encoded["syntheticControlInTime"]["kind"], "available");
+        assert_eq!(encoded["syntheticDidInTime"]["kind"], "available");
+        assert_eq!(
+            stages.borrow().last(),
+            Some(&("synthetic-did-in-time", 9, 9))
+        );
     }
 
     #[test]
@@ -1860,6 +3086,122 @@ mod tests {
         assert!(
             discrete_bn_query(&values, rows, 3, &[0, 1, 2], &names, &edges, 0, 1, 1, 5.0).is_err()
         );
+    }
+
+    fn complete_binary_columns(variable_count: usize) -> (usize, Vec<f64>) {
+        let repeats = 8;
+        let rows = (1usize << variable_count) * repeats;
+        let mut values = Vec::with_capacity(rows * variable_count);
+        for variable in 0..variable_count {
+            for pattern in 0..(1usize << variable_count) {
+                let value = ((pattern >> variable) & 1) as f64;
+                values.extend(std::iter::repeat_n(value, repeats));
+            }
+        }
+        (rows, values)
+    }
+
+    #[test]
+    fn identified_discrete_query_evaluates_the_frontdoor_id_expression() {
+        let (rows, values) = complete_binary_columns(3);
+        let names = vec!["U", "X", "M", "Y"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let result = serde_json::to_value(
+            identified_discrete_query(
+                &values,
+                rows,
+                3,
+                &[0, 1, 2],
+                &names,
+                &[(0, 1), (0, 3), (1, 2), (2, 3)],
+                1,
+                3,
+                &[0],
+                2,
+                None,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["kind"], "identifiedDiscreteQuery");
+        assert_eq!(result["query"]["kind"], "unconditional");
+        assert_eq!(result["result"]["kind"], "identified");
+        assert_eq!(result["result"]["algorithm"], "ID");
+        assert!((result["result"]["normalizationLow"].as_f64().unwrap() - 1.0).abs() < 1e-12);
+        assert!((result["result"]["normalizationHigh"].as_f64().unwrap() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn identified_discrete_query_evaluates_an_idc_condition() {
+        let (rows, values) = complete_binary_columns(3);
+        let names = vec!["Z", "X", "Y"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let result = serde_json::to_value(
+            identified_discrete_query(
+                &values,
+                rows,
+                3,
+                &[0, 1, 2],
+                &names,
+                &[(0, 1), (0, 2), (1, 2)],
+                1,
+                2,
+                &[],
+                2,
+                Some(IdentifiedDiscreteCondition {
+                    variable: 0,
+                    state: 1,
+                }),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["query"]["kind"], "conditional");
+        assert_eq!(result["query"]["variable"], 0);
+        assert_eq!(result["query"]["state"], "1");
+        assert_eq!(result["result"]["kind"], "identified");
+        assert_eq!(result["result"]["algorithm"], "IDC");
+        assert!((result["result"]["normalizationLow"].as_f64().unwrap() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn identified_discrete_query_returns_the_source_hedge_witness() {
+        let (rows, values) = complete_binary_columns(2);
+        let names = vec!["U", "X", "Y"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let result = serde_json::to_value(
+            identified_discrete_query(
+                &values,
+                rows,
+                2,
+                &[0, 1],
+                &names,
+                &[(0, 1), (0, 2), (1, 2)],
+                1,
+                2,
+                &[0],
+                2,
+                None,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["result"]["kind"], "unidentifiable");
+        assert!(!result["result"]["hedgeGraph"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(!result["result"]["hedgeSubgraph"]
+            .as_array()
+            .unwrap()
+            .is_empty());
+        assert!(result["result"].get("effect").is_none());
     }
 
     #[test]

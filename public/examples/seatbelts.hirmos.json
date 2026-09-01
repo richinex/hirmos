@@ -3064,9 +3064,11 @@
           "node": "855efccf-0540-48c3-b7f0-4620b6744971:1:DriversKilled",
           "name": "DriversKilled"
         },
-        "bins": 3,
-        "equivalentSampleSize": 5,
-        "result": {
+        "route": {
+          "kind": "bayesian-network",
+          "bins": 3,
+          "equivalentSampleSize": 5,
+          "result": {
           "kind": "discreteBnQuery",
           "observations": 192,
           "bins": 3,
@@ -3117,9 +3119,10 @@
           "minimalAdjustmentSet": [
             "PetrolPrice"
           ],
-          "parentsAdjusted": [
-            "PetrolPrice"
-          ]
+            "parentsAdjusted": [
+              "PetrolPrice"
+            ]
+          }
         }
       }
     ],
@@ -3680,13 +3683,16 @@
             "upper": -0.0000035849960278889082
           },
           "standardError": 0.0008908127761002891,
-          "adjustmentSet": [
-            {
-              "node": "855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice",
-              "column": "6:PetrolPrice",
-              "name": "PetrolPrice"
-            }
-          ],
+          "adjustment": {
+            "kind": "contemporaneous",
+            "variables": [
+              {
+                "node": "855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice",
+                "column": "6:PetrolPrice",
+                "name": "PetrolPrice"
+              }
+            ]
+          },
           "sample": {
             "observations": 192,
             "parameters": 3,
@@ -3893,13 +3899,16 @@
             "upper": 0.9999955674719136
           },
           "standardError": null,
-          "adjustmentSet": [
-            {
-              "node": "855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice",
-              "column": "6:PetrolPrice",
-              "name": "PetrolPrice"
-            }
-          ],
+          "adjustment": {
+            "kind": "contemporaneous",
+            "variables": [
+              {
+                "node": "855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice",
+                "column": "6:PetrolPrice",
+                "name": "PetrolPrice"
+              }
+            ]
+          },
           "sample": {
             "observations": 192,
             "parameters": 4,
@@ -4131,13 +4140,16 @@
             "reason": "The do-query reports expectations from the fitted network; no posterior or sampling interval is available."
           },
           "standardError": null,
-          "adjustmentSet": [
-            {
-              "node": "855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice",
-              "column": "6:PetrolPrice",
-              "name": "PetrolPrice"
-            }
-          ],
+          "adjustment": {
+            "kind": "contemporaneous",
+            "variables": [
+              {
+                "node": "855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice",
+                "column": "6:PetrolPrice",
+                "name": "PetrolPrice"
+              }
+            ]
+          },
           "sample": {
             "observations": 192,
             "parameters": 11,

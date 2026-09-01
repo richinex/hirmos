@@ -5,17 +5,25 @@
 
 use hirmos_causal_core::ardl::{ardl_select_order, bounds_test, uecm, Trend};
 use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
-use hirmos_causal_core::causal_effects::{mark, CausalEffects, Estimator, Node, StationaryGraph};
+use hirmos_causal_core::causal_effects::{
+    mark, BootstrapBlockLength, CausalEffects, Estimator, Node, StationaryGraph,
+    TotalEffectBootstrapError, TotalEffectBootstrapOptions, WrightCoefficientMethod,
+    WrightEffectError, WrightMediation,
+};
 use hirmos_causal_core::causal_impact::causal_impact;
 use hirmos_causal_core::counterfactual::{Equation, LinearScm};
 use hirmos_causal_core::counterfactual_evaluator::{estimate_binary_ett, identify_binary_ett};
 use hirmos_causal_core::discrete_bn::{discretize_805, Dag as DiscreteDag, DiscreteBn};
 use hirmos_causal_core::dynotears::dynotears_with_progress;
 use hirmos_causal_core::glm::{negative_binomial_p, poisson_glm};
-use hirmos_causal_core::identified_expression::DiscreteTable;
+use hirmos_causal_core::identified_expression::{evaluate_distribution, DiscreteTable};
+use hirmos_causal_core::ingarch::{
+    detect_negative_binomial_intervention, fit_negative_binomial_ingarch, intervention_regressors,
+    IngarchLink as CoreIngarchLink, IngarchSpecification, InterventionSchedule,
+};
 use hirmos_causal_core::lpcmci::run_lpcmci_with_progress;
 use hirmos_causal_core::negbin_nuts::{irr_summary, quantile, PbcNegBinModel};
-use hirmos_causal_core::nprandom::Mt19937;
+use hirmos_causal_core::nprandom::{Mt19937, NpRng};
 use hirmos_causal_core::nuts::NutsOptions;
 use hirmos_causal_core::ocse::{discover_network_with_progress, CmiMethod};
 use hirmos_causal_core::ols::Ols;
@@ -27,7 +35,10 @@ use hirmos_causal_core::refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, WorkerStudy,
 };
 use hirmos_causal_core::stl::{stl, strength, StlConfig};
-use hirmos_causal_core::synthetic_control::synthetic_effect;
+use hirmos_causal_core::synthetic_control::{
+    debiased_synthetic_control, donor_placebo_mspe_inference, synthetic_control_prediction_band,
+    synthetic_effect, SyntheticControlBandMethod, SyntheticControlError,
+};
 use hirmos_causal_core::tsdiag::granger_ssr_ftest;
 use hirmos_causal_core::tsdiag::ljung_box;
 use hirmos_causal_core::var_lingam::{direct_lingam_with_progress, run_var_lingam};
@@ -36,9 +47,9 @@ use hirmos_causal_core::{
     adfuller, kpss, zivot_andrews, AdfResult, KpssResult, Regression, ZaModel, ZaResult,
 };
 use hirmos_causal_core::{
-    backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_frontdoor_set,
-    identify_outcomes, infer_kappa_t, infer_kappa_y, latent_projection, ols_hac,
-    refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
+    backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_conditional_outcomes,
+    identify_frontdoor_set, identify_outcomes, infer_kappa_t, infer_kappa_y, latent_projection,
+    ols_hac, refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
     unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag, IdentificationError,
 };
 use nalgebra::DMatrix;
@@ -55,6 +66,7 @@ use missingness::{resolve_missingness, MissingnessExecution, MissingnessResoluti
 mod counterfactual;
 mod dag_check;
 mod discovery;
+mod dynamic_counterfactual;
 mod estimation;
 mod identification;
 mod matrix;
@@ -66,6 +78,7 @@ mod stationarity;
 use counterfactual::*;
 use dag_check::*;
 use discovery::*;
+use dynamic_counterfactual::*;
 use estimation::*;
 use identification::*;
 use matrix::*;
@@ -232,6 +245,60 @@ pub fn run_analysis(
             &adjustment,
             family,
         ),
+        AnalysisCommand::NegativeBinomialIngarch {
+            rows,
+            columns,
+            outcome,
+            link,
+            regressors,
+            past_observation_lags,
+            past_mean_lags,
+            external_regressors,
+            horizon,
+            baseline_regressors,
+            intervention_regressor,
+            control_value,
+            treatment_value,
+            schedule,
+        } => negative_binomial_ingarch(
+            values,
+            rows,
+            columns,
+            outcome,
+            link,
+            &regressors,
+            &past_observation_lags,
+            &past_mean_lags,
+            &external_regressors,
+            horizon,
+            &baseline_regressors,
+            intervention_regressor,
+            control_value,
+            treatment_value,
+            schedule,
+            progress,
+        ),
+        AnalysisCommand::CountSeriesInterventionScan {
+            rows,
+            columns,
+            outcome,
+            link,
+            past_observation_lags,
+            past_mean_lags,
+            candidate_reference_points,
+            delta,
+        } => count_series_intervention_scan(
+            values,
+            rows,
+            columns,
+            outcome,
+            link,
+            &past_observation_lags,
+            &past_mean_lags,
+            &candidate_reference_points,
+            delta,
+            progress,
+        ),
         AnalysisCommand::CausalEffectsTotal {
             rows,
             columns,
@@ -242,6 +309,7 @@ pub fn run_analysis(
             hidden,
             estimator,
             interventions,
+            uncertainty,
         } => causal_effects_total(
             values,
             rows,
@@ -253,6 +321,8 @@ pub fn run_analysis(
             &hidden,
             estimator,
             interventions,
+            uncertainty,
+            progress,
         ),
         AnalysisCommand::CausalImpact {
             rows,
@@ -404,10 +474,33 @@ pub fn run_analysis(
             treated,
             donors,
             n_pre,
-        } => synthetic_control(values, rows, columns, treated, &donors, n_pre),
-        AnalysisCommand::PanelIntervention { rows, units, times } => {
-            panel_intervention(values, rows, &units, &times, progress)
-        }
+            cross_fit_folds,
+            alpha,
+        } => synthetic_control(
+            values,
+            rows,
+            columns,
+            treated,
+            &donors,
+            n_pre,
+            cross_fit_folds,
+            alpha,
+        ),
+        AnalysisCommand::PanelIntervention {
+            rows,
+            units,
+            times,
+            placebo_replications,
+            seed,
+        } => panel_intervention(
+            values,
+            rows,
+            &units,
+            &times,
+            placebo_replications,
+            seed,
+            progress,
+        ),
         AnalysisCommand::LinearScmCounterfactual {
             rows,
             columns,
@@ -429,6 +522,33 @@ pub fn run_analysis(
             outcome,
             interventions,
             observation_noise,
+        ),
+        AnalysisCommand::DynamicLinearScmCounterfactual {
+            rows,
+            columns,
+            nodes,
+            stat_lag,
+            graph,
+            treatment,
+            outcome,
+            timing,
+            steps,
+            interventions,
+            uncertainty,
+        } => dynamic_linear_scm_counterfactual(
+            values,
+            rows,
+            columns,
+            &nodes,
+            stat_lag,
+            &graph,
+            treatment,
+            outcome,
+            timing,
+            steps,
+            interventions,
+            uncertainty,
+            progress,
         ),
         AnalysisCommand::NegbinNuts {
             rows,
@@ -483,6 +603,30 @@ pub fn run_analysis(
             outcome,
             bins,
             equivalent_sample_size,
+        ),
+        AnalysisCommand::IdentifiedDiscreteQuery {
+            rows,
+            columns,
+            observed_nodes,
+            names,
+            edges,
+            treatment,
+            outcome,
+            unobserved,
+            bins,
+            condition,
+        } => identified_discrete_query(
+            values,
+            rows,
+            columns,
+            &observed_nodes,
+            &names,
+            &edges,
+            treatment,
+            outcome,
+            &unobserved,
+            bins,
+            condition,
         ),
         AnalysisCommand::BinaryEtt {
             rows,

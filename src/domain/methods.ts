@@ -129,6 +129,7 @@ export const ADF_METHOD_ID = methodId('adf')
 export const KPSS_METHOD_ID = methodId('kpss')
 export const ZIVOT_ANDREWS_METHOD_ID = methodId('zivot-andrews')
 export const GRANGER_SSR_F_METHOD_ID = methodId('granger-ssr-f')
+export const COUNT_SERIES_INTERVENTION_SCAN_METHOD_ID = methodId('count-series-intervention-scan')
 export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
 export const LPCMCI_PAR_CORR_METHOD_ID = methodId('lpcmci-parcorr')
 export const DYNOTEARS_METHOD_ID = methodId('dynotears')
@@ -142,6 +143,7 @@ export const BACKDOOR_LINEAR_REGRESSION_METHOD_ID = methodId('backdoor-linear-re
 export const FRONTDOOR_TWO_STAGE_METHOD_ID = methodId('frontdoor-two-stage')
 export const POISSON_GLM_METHOD_ID = methodId('poisson-glm')
 export const NEGATIVE_BINOMIAL_METHOD_ID = methodId('negative-binomial-p')
+export const NEGATIVE_BINOMIAL_INGARCH_METHOD_ID = methodId('negative-binomial-ingarch')
 export const CAUSAL_EFFECTS_TOTAL_METHOD_ID = methodId('causal-effects-total')
 export const CAUSAL_IMPACT_METHOD_ID = methodId('causal-impact')
 export const DML_PLR_METHOD_ID = methodId('dml-plr')
@@ -156,6 +158,7 @@ export const BAYESIAN_GAUSSIAN_METHOD_ID = methodId('bayesian-gaussian')
 export const DISCRETE_BN_METHOD_ID = methodId('discrete-bn-query')
 export const BINARY_ETT_METHOD_ID = methodId('binary-ett-idc-star')
 export const LINEAR_SCM_METHOD_ID = methodId('linear-scm-counterfactual')
+export const DYNAMIC_LINEAR_SCM_METHOD_ID = methodId('dynamic-linear-scm-counterfactual')
 export const PLACEBO_REFUTER_METHOD_ID = methodId('placebo-treatment-refuter')
 export const DATA_SUBSET_REFUTER_METHOD_ID = methodId('data-subset-refuter')
 export const RANDOM_COMMON_CAUSE_REFUTER_METHOD_ID = methodId('random-common-cause-refuter')
@@ -174,6 +177,7 @@ const RUIZ_DE_VILLA_CH8 = (locator: string): MethodSource => paper('Causal Infer
 const NESS_CH4 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 4', locator)
 const NESS_CH11 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 11', locator)
 const NESS_CH10 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 10', locator)
+const NESS_CH13 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 13', locator)
 const SHPITSER_PEARL_ID = paper('Identification of joint interventional distributions in recursive semi-Markovian causal models (Shpitser and Pearl, 2006)', 'AAAI 2006, ID algorithm')
 const SHPITSER_PEARL_COUNTERFACTUAL = paper('Complete identification methods for the causal hierarchy (Shpitser and Pearl, 2008)', 'JMLR 9:1941–1979; ID* and IDC*')
 const CINELLI_FORNEY_PEARL = paper('A crash course in good and bad controls (Cinelli, Forney and Pearl, 2022)', 'good, neutral and bad controls')
@@ -206,6 +210,7 @@ const ABADIE_2021 = paper('Using Synthetic Controls: Feasibility, Data Requireme
 const CALLAWAY_SANTANNA_2021 = paper('Difference-in-Differences with multiple time periods (Callaway and Sant\'Anna, 2021)', 'Journal of Econometrics 225(2), 200–230; simultaneous adoption as the one-cohort case')
 const ARKHANGELSKY_2021 = paper('Synthetic Difference-in-Differences (Arkhangelsky, Athey, Hirshberg, Imbens and Wager, 2021)', 'American Economic Review 111(12), 4088–4118')
 const BRODERSEN_2015 = paper('Inferring causal impact using Bayesian structural time-series models (Brodersen and others, 2015)', 'Annals of Applied Statistics 9(1), 247–274')
+const KUNSCH_1989 = paper('The Jackknife and the Bootstrap for General Stationary Observations (Künsch, 1989)', 'Annals of Statistics 17(3), 1217–1241; doi:10.1214/aos/1176347265')
 const CHERNOZHUKOV_OVB = paper('Long Story Short: Omitted Variable Bias in Causal Machine Learning (Chernozhukov, Cinelli, Newey, Sharma and Syrgkanis, 2022)', 'NBER Working Paper 30302; sensitivity bounds')
 const HYVARINEN_2010 = paper('Estimation of a Structural Vector Autoregression Model Using Non-Gaussianity (Hyvärinen, Zhang, Shimizu and Hoyer, 2010)', 'Journal of Machine Learning Research 11, 1709–1731')
 const SHIMIZU_2011 = paper('DirectLiNGAM: A Direct Method for Learning a Linear Non-Gaussian Structural Equation Model (Shimizu and others, 2011)', 'Journal of Machine Learning Research 12, 1225–1248')
@@ -324,6 +329,46 @@ const GRANGER_SSR_F: MethodDefinition = {
       requirement: 'A rejection establishes incremental temporal prediction at the tested lag order, not an identified intervention effect.',
       consequenceIfUnmet: 'Predictive precedence is presented as a causal effect.',
       sources: [GRANGER_1969],
+    },
+  ],
+}
+
+const COUNT_SERIES_INTERVENTION_SCAN: MethodDefinition = {
+  id: COUNT_SERIES_INTERVENTION_SCAN_METHOD_ID,
+  name: 'Negative-binomial INGARCH diagnostic',
+  family: 'diagnostic',
+  summary: 'Fits a negative-binomial count time-series model and scans a user-selected date range for the point, decaying, or persistent intervention shape with the largest score statistic.',
+  caveats: [
+    {
+      id: caveatId('count-scan-regular-count-series'),
+      category: 'sampling-structure',
+      requirement: 'The selected series contains non-negative integer counts observed on a regular time grid.',
+      consequenceIfUnmet: 'The count distribution or the meaning of the selected lags does not match the observations.',
+      sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', 'Journal of Statistical Software 82(5), §2')],
+    },
+    {
+      id: caveatId('count-scan-user-specification'),
+      category: 'functional-form',
+      requirement: 'The mean link, past-count lags, past-mean lags, candidate window, and intervention shape are modelling choices; compare plausible specifications rather than treating the defaults as selected by the data.',
+      consequenceIfUnmet: 'The strongest date can be a feature of the chosen model specification rather than a stable feature of the series.',
+      sources: [
+        paper('Interventions in INGARCH processes (Fokianos and Fried, 2010)', 'Journal of Time Series Analysis 31(3), 210–225'),
+        paper('Interventions in log-linear Poisson autoregression (Fokianos and Fried, 2012)', 'Statistical Modelling 12(4), 299–322'),
+      ],
+    },
+    {
+      id: caveatId('count-scan-stable-recursion'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Inspect whether the fitted conditional-mean recursion is stable and describes the dependence in the analysis window.',
+      consequenceIfUnmet: 'The score profile can reflect omitted dynamics or a changing baseline rather than the selected intervention shape.',
+      sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', 'Journal of Statistical Software 82(5), §§2–3')],
+    },
+    {
+      id: caveatId('count-scan-no-bootstrap-inference'),
+      category: 'interpretation',
+      requirement: 'The displayed maximum is a candidate location under the fitted model. This non-bootstrap scan does not provide a p-value and does not establish that an intervention occurred.',
+      consequenceIfUnmet: 'A ranking statistic is reported as a confirmed event or a causal effect.',
+      sources: [paper('Interventions in log-linear Poisson autoregression (Fokianos and Fried, 2012)', 'Statistical Modelling 12(4), 299–322')],
     },
   ],
 }
@@ -908,6 +953,50 @@ const NEGATIVE_BINOMIAL: MethodDefinition = {
   caveats: countCaveats('negbin', 'statsmodels/discrete/discrete_model.py#NegativeBinomialP'),
 }
 
+const NEGATIVE_BINOMIAL_INGARCH: MethodDefinition = {
+  id: NEGATIVE_BINOMIAL_INGARCH_METHOD_ID,
+  name: 'Negative-binomial INGARCH',
+  family: 'estimation',
+  summary: 'A count time-series model whose conditional mean depends on past counts, past conditional means, and recorded regressors. Identity and log links represent additive and multiplicative effects; the run compares forecast count paths under two future treatment schedules.',
+  caveats: [
+    {
+      id: caveatId('ingarch-regular-count-series'),
+      category: 'sampling-structure',
+      requirement: 'The outcome is a regularly sampled sequence of non-negative integer counts.',
+      consequenceIfUnmet: 'The count recursion and its lag spacing do not describe the observations.',
+      sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', 'Journal of Statistical Software 82(5)')],
+    },
+    {
+      id: caveatId('ingarch-conditional-mean'),
+      category: 'functional-form',
+      requirement: 'The selected identity or log conditional-mean form is adequately represented by the chosen past-count lags, past-mean lags, and regressors. Identity-link regressors must be non-negative.',
+      consequenceIfUnmet: 'The fitted treatment trajectory can reflect omitted dynamics or a misspecified response surface.',
+      sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', '§2 INGARCH and log-linear count time-series models')],
+    },
+    {
+      id: caveatId('ingarch-identified-regressors'),
+      category: 'identification',
+      requirement: 'The treatment and supplied covariates are an identified contemporaneous adjustment set, and the proposed future regressor paths are well-defined interventions.',
+      consequenceIfUnmet: 'The two forecast paths are model-based scenarios rather than an identified causal contrast.',
+      sources: [RUIZ_DE_VILLA_CH7('§7.2 back-door criterion'), PEARL_2009('§3.2 interventions and modified models')],
+    },
+    {
+      id: caveatId('ingarch-stability'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'The fitted recursion is stable over the observed and forecast periods.',
+      consequenceIfUnmet: 'Small changes in recent counts can produce implausible or explosive forecasts.',
+      sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', '§2 stationarity and ergodicity')],
+    },
+    {
+      id: caveatId('ingarch-no-interval'),
+      category: 'finite-sample',
+      requirement: 'Sampling uncertainty requires a dependence-aware bootstrap or another validated interval procedure.',
+      consequenceIfUnmet: 'The fitted baseline and intervention trajectories are point predictions, not uncertainty bounds.',
+      sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', '§3 prediction')],
+    },
+  ],
+}
+
 const CAUSAL_EFFECTS_TOTAL: MethodDefinition = {
   id: CAUSAL_EFFECTS_TOTAL_METHOD_ID,
   name: 'CausalEffects total effect',
@@ -950,11 +1039,11 @@ const CAUSAL_EFFECTS_TOTAL: MethodDefinition = {
       sources: [tigramite('tigramite/causal_effects.py#fit_total_effect')],
     },
     {
-      id: caveatId('causal-effects-no-interval'),
+      id: caveatId('causal-effects-bootstrap'),
       category: 'finite-sample',
-      requirement: 'The result is a point estimate; the bootstrap is not ported.',
-      consequenceIfUnmet: 'A point is read as if it carried an interval.',
-      sources: [hirmos('crates/analysis-wasm/src/lib.rs#causal_effects_total')],
+      requirement: 'The block-bootstrap length represents the serial dependence in the fitted observations.',
+      consequenceIfUnmet: 'The percentile interval can understate or overstate sampling variation.',
+      sources: [KUNSCH_1989],
     },
   ],
 }
@@ -1337,9 +1426,9 @@ const SYNTHETIC_CONTROL: MethodDefinition = {
     {
       id: caveatId('synthetic-no-interval'),
       category: 'finite-sample',
-      requirement: 'No placebo distribution is ported, so no interval.',
-      consequenceIfUnmet: 'A post gap is read as significant.',
-      sources: [hirmos('crates/causal-core/src/synthetic_control.rs')],
+      requirement: 'Cross-fitted confidence inference, donor-placebo ranking, and fixed-weight prediction bands are interpreted separately because each quantifies a different source of uncertainty.',
+      consequenceIfUnmet: 'A prediction band or placebo rank is incorrectly presented as a confidence interval for the average effect.',
+      sources: [ABADIE_2010, ABADIE_2021],
     },
   ],
 }
@@ -1382,9 +1471,9 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-no-interval'), category: 'finite-sample',
-      requirement: 'No placebo, jackknife, or bootstrap variance estimator is included in this port, so the result has no sampling interval.',
-      consequenceIfUnmet: 'A point estimate is interpreted as statistically precise.',
-      sources: [synthdid('R/vcov.R'), hirmos('crates/causal-core/src/panel.rs')],
+      requirement: 'Placebo standard errors require more control units than treated units and a pre-treatment period long enough for the fitted weighting problem.',
+      consequenceIfUnmet: 'The point estimate has no placebo measure of sampling variability.',
+      sources: [ARKHANGELSKY_2021],
     },
   ],
 }
@@ -1631,11 +1720,70 @@ const LINEAR_SCM: MethodDefinition = {
   ],
 }
 
+const DYNAMIC_LINEAR_SCM: MethodDefinition = {
+  id: DYNAMIC_LINEAR_SCM_METHOD_ID,
+  name: 'Dynamic linear SCM counterfactual',
+  family: 'counterfactual',
+  summary: 'Fits each series on its contemporaneous and lagged DAG parents, recovers the observed innovation sequence, and replays a one-time or persistent intervention through the temporal graph.',
+  caveats: [
+    {
+      id: caveatId('dynamic-scm-time-series'),
+      category: 'sampling-structure',
+      requirement: 'The prepared data are one regularly sampled multivariate time series in chronological order.',
+      consequenceIfUnmet: 'A lag no longer denotes a consistent elapsed interval, so the fitted dynamic equations and replay horizon have no stable temporal meaning.',
+      sources: [RUNGE_2020],
+    },
+    {
+      id: caveatId('dynamic-scm-structural-equations'),
+      category: 'functional-form',
+      requirement: 'Each variable is linear in the contemporaneous and lagged parents shown in the DAG, with additive innovations.',
+      consequenceIfUnmet: 'The recovered innovations and propagated intervention path come from a misspecified structural model.',
+      sources: [RUIZ_DE_VILLA_CH7('§7.1.3 structural causal models'), RUIZ_DE_VILLA_CH8('§8.1.1 linear structural equations')],
+    },
+    {
+      id: caveatId('dynamic-scm-graph-complete'),
+      category: 'identification',
+      requirement: 'Every parent needed by the dynamic structural equations is measured and represented at the correct lag.',
+      consequenceIfUnmet: 'An omitted contemporaneous or lagged cause can be absorbed into the innovation sequence and then incorrectly held fixed across worlds.',
+      sources: [RUIZ_DE_VILLA_CH7('§7.1.3 omitting an arrow asserts its absence'), PEARL_2009('§7.1 abduction')],
+    },
+    {
+      id: caveatId('dynamic-scm-history'),
+      category: 'finite-sample',
+      requirement: 'The intervention begins after at least the maximum recorded lag, leaving an observed factual history for the replay.',
+      consequenceIfUnmet: 'The first counterfactual values depend on unobserved pre-sample history.',
+      sources: [PEARL_2009('§7.1 abduction, action, prediction')],
+    },
+    {
+      id: caveatId('dynamic-scm-modularity'),
+      category: 'interpretation',
+      requirement: 'The intervention replaces only the treatment equation; the remaining equations and the abducted innovation at each time point are invariant across the two worlds.',
+      consequenceIfUnmet: 'The replay does not compare the same evolving system under two alternative interventions.',
+      sources: [PEARL_2009('§7.1 abduction, action, prediction'), NESS_CH13('structural mechanisms and counterfactual worlds')],
+    },
+    {
+      id: caveatId('dynamic-scm-intervention-schedule'),
+      category: 'interpretation',
+      requirement: 'A one-time intervention changes one treatment value; a persistent intervention replaces the treatment equation at every replayed time point.',
+      consequenceIfUnmet: 'The reported horizon answers a different intervention from the one intended.',
+      sources: [PEARL_2009('§3.2 interventions and modified models')],
+    },
+    {
+      id: caveatId('dynamic-scm-no-interval'),
+      category: 'finite-sample',
+      requirement: 'A sampling interval requires dependence-aware resampling with a block length appropriate for the series.',
+      consequenceIfUnmet: 'A point estimate does not describe sampling uncertainty; an unsuitable block length can misrepresent serial dependence.',
+      sources: [KUNSCH_1989],
+    },
+  ],
+}
+
 export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   ADF,
   KPSS,
   ZIVOT_ANDREWS,
   GRANGER_SSR_F,
+  COUNT_SERIES_INTERVENTION_SCAN,
   PCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
   DYNOTEARS,
@@ -1649,6 +1797,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   FRONTDOOR_TWO_STAGE,
   POISSON_GLM,
   NEGATIVE_BINOMIAL,
+  NEGATIVE_BINOMIAL_INGARCH,
   CAUSAL_EFFECTS_TOTAL,
   CAUSAL_IMPACT,
   DML_PLR,
@@ -1663,6 +1812,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   DISCRETE_BN,
   BINARY_ETT,
   LINEAR_SCM,
+  DYNAMIC_LINEAR_SCM,
   PLACEBO_REFUTER,
   DATA_SUBSET_REFUTER,
   RANDOM_COMMON_CAUSE_REFUTER,
@@ -1678,13 +1828,14 @@ export const SENSITIVITY_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [
 export const SERIES_STRUCTURE_METHODS: NonEmptyArray<MethodDefinition> = [PELT, STL]
 
 export const IDENTIFICATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_IDENTIFICATION, GRAPHICAL_IDENTIFICATION, COUNTERFACTUAL_IDENTIFICATION]
-export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_SCM]
+export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_SCM, DYNAMIC_LINEAR_SCM]
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
+export const COUNT_SERIES_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [COUNT_SERIES_INTERVENTION_SCAN]
 export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [DIRECT_LINGAM]
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   GRANGER_SSR_F,

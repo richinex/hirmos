@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
-import { baseOption, gridAuto, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, tooltip, valueAxis } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface PosteriorDensityView {
@@ -41,7 +41,7 @@ export function posteriorDensityOption(view: PosteriorDensityView, theme: ChartT
       nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
-      axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
+      axisLabel: axisLabelStyle(theme),
     },
     yAxis: { ...valueAxis(theme, 'density'), scale: false },
     series: [

@@ -17,7 +17,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
+import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import { DATA_SUBSET_REFUTER_METHOD_ID, LJUNG_BOX_METHOD_ID, PLACEBO_REFUTER_METHOD_ID, RANDOM_COMMON_CAUSE_REFUTER_METHOD_ID,
   DML_REFUTATION_METHOD_ID,
   DML_SENSITIVITY_METHODS, REFUTER_METHODS, SENSITIVITY_DIAGNOSTIC_METHODS, SHAPIRO_WILK_METHOD_ID, UNOBSERVED_COMMON_CAUSE_METHOD_ID } from '@/domain/methods'
@@ -312,10 +312,12 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     dispatch({ type: 'job-started' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
-      const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...estimation.estimate.adjustmentSet]
+      const adjustmentVariables = contemporaneousAdjustmentVariables(estimation.estimate.adjustment)
+      if (adjustmentVariables === null) { dispatch({ type: 'job-failed', detail: 'This probe requires contemporaneous adjustment columns; the selected run used time-indexed adjustment rows.' }); return }
+      const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...adjustmentVariables]
       const matrix = await materialisePrepared(source, profile, prepared, columns.map((column) => column.column) as unknown as NonEmptyArray<ColumnId>)
       if (!matrix.ok) { dispatch({ type: 'job-failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
-      const adjustment = estimation.estimate.adjustmentSet.map((_, index) => index + 2)
+      const adjustment = adjustmentVariables.map((_, index) => index + 2)
       const identity = { id: newSensitivityRunId(), estimationRun: estimation.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), columns } as const
       switch (configuration.kind) {
         case 'linear-refutation': {
@@ -481,7 +483,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
         {estimation !== null && (
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Estimate under test">
             <dt className="text-faint">Estimator</dt><dd className="m-0 text-ink">{describeEstimator(estimation.configuration.kind)}</dd>
-            <dt className="text-faint">Adjustment set</dt><dd className="m-0 text-ink">{estimation.estimate.adjustmentSet.length === 0 ? 'None' : estimation.estimate.adjustmentSet.map((variable) => variable.name).join(', ')}</dd>
+            <dt className="text-faint">Adjustment set</dt><dd className="m-0 text-ink">{adjustmentLabels(estimation.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(estimation.estimate.adjustment).join(', ')}</dd>
             <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{formatCount(estimation.estimate.sample.observations).text}</dd>
           </dl>
         )}

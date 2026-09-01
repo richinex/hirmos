@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
 import { describeDagBasis, describeDagValidation, type DagDocument } from '@/domain/dag'
 import type { DatasetProfile } from '@/domain/dataset'
-import { describeEstimator, intervalTypeOf, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
+import { adjustmentLabels, describeEstimator, intervalTypeOf, type AppliedAdjustment, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
@@ -28,6 +28,16 @@ const Row = RecordRow
 /** A set of variables the reader counts; empty sets read as a word. */
 const names = (variables: readonly StudyVariable[]): React.ReactNode =>
   variables.length === 0 ? 'none' : variables.map((variable) => <span key={variable.node} className={chip('mr-1')}>{variable.name}</span>)
+
+const appliedAdjustment = (adjustment: AppliedAdjustment): React.ReactNode => {
+  switch (adjustment.kind) {
+    case 'none': return 'none'
+    case 'contemporaneous':
+    case 'time-indexed': return adjustmentLabels(adjustment).map((text) => <span key={text} className={chip('mr-1')}>{text}</span>)
+    case 'structural-parent-model': return `${adjustment.coefficients} parent coefficients across ${adjustment.paths} directed paths`
+    default: return assertNever(adjustment)
+  }
+}
 
 const identificationMethod = (identification: IdentificationArtifact): string => {
   switch (identification.result.kind) {
@@ -130,7 +140,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <Row term="Treatment">{study.treatment.name}</Row>
           <Row term="Outcome">{study.outcome.name}</Row>
           <Row term="Design category">{describeAssignmentKind(study.assignment.kind)} · {describeStudyDesignCategory(studyDesignCategory(study))}</Row>
-          <Row term="Selected adjustment set">{names(estimate.adjustmentSet)}</Row>
+          <Row term="Adjustment used by estimator">{appliedAdjustment(estimate.adjustment)}</Row>
           <Row term="Identification">{manifest.identification === null ? 'not recorded' : identificationMethod(manifest.identification)}</Row>
           {manifest.identification?.result.kind === 'identified' && (
             <>

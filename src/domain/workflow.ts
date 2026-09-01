@@ -4,6 +4,7 @@ import type { DagDocument } from './dag'
 import type { DagCheckArtifact } from './dagValidation'
 import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
+import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import type { EstimationRunArtifact, EstimationRunId } from './estimation'
 import type { SensitivityRunArtifact, SensitivityRunId } from './sensitivity'
@@ -76,6 +77,7 @@ export type Workflow =
       readonly prepared: PreparedDatasetArtifact | null
       readonly stationarity: StationarityEvidenceArtifact | null
       readonly grangerEvidence: readonly GrangerEvidenceArtifact[]
+      readonly countSeriesModels: readonly CountSeriesModelArtifact[]
       readonly discoveryRuns: readonly DiscoveryRunArtifact[]
       readonly dagDocuments: readonly DagDocument[]
       readonly dagChecks: readonly DagCheckArtifact[]
@@ -100,6 +102,7 @@ export type WorkflowEvent =
   | { readonly type: 'prepared-dataset-created'; readonly artifact: PreparedDatasetArtifact }
   | { readonly type: 'stationarity-evidence-created'; readonly evidence: StationarityEvidenceArtifact }
   | { readonly type: 'granger-evidence-created'; readonly evidence: GrangerEvidenceArtifact }
+  | { readonly type: 'count-series-model-created'; readonly artifact: CountSeriesModelArtifact }
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
   | { readonly type: 'dag-document-created'; readonly document: DagDocument }
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
@@ -205,6 +208,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           prepared: snapshot.prepared,
           stationarity: snapshot.stationarity,
           grangerEvidence: snapshot.grangerEvidence,
+          countSeriesModels: snapshot.countSeriesModels,
           discoveryRuns: snapshot.discoveryRuns,
           dagDocuments: snapshot.dagDocuments,
           dagChecks: snapshot.dagChecks,
@@ -239,6 +243,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           prepared: null,
           stationarity: null,
           grangerEvidence: [],
+          countSeriesModels: [],
           discoveryRuns: [],
           dagDocuments: [],
           dagChecks: [],
@@ -267,7 +272,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
@@ -278,6 +283,11 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         && state.prepared !== null
         && event.evidence.preparedDataset === state.prepared.id) {
         return { ...state, grangerEvidence: [...state.grangerEvidence, event.evidence] }
+      }
+      if (event.type === 'count-series-model-created'
+        && state.prepared !== null
+        && event.artifact.preparedDataset === state.prepared.id) {
+        return { ...state, countSeriesModels: [...state.countSeriesModels, event.artifact] }
       }
       if (event.type === 'discovery-run-created'
         && state.prepared !== null

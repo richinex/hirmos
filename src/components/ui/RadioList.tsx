@@ -17,7 +17,7 @@ export interface RadioOption<V extends string> {
   readonly title?: string
 }
 
-export function RadioList<V extends string>({ legend, legendHidden = false, value, onChange, options, className }: {
+export function RadioList<V extends string>({ legend, legendHidden = false, value, onChange, options, className, columns = 1 }: {
   readonly legend: ReactNode
   /** Keep the legend for assistive technology only, when a heading directly above already names the choice. */
   readonly legendHidden?: boolean
@@ -25,12 +25,14 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
   readonly onChange: (next: V) => void
   readonly options: readonly RadioOption<V>[]
   readonly className?: string
+  /** Two columns keep a long list of short options from stretching across a wide panel. */
+  readonly columns?: 1 | 2
 }) {
   const name = useId()
   return (
     <fieldset className={cn('m-0 min-w-0 border-0 p-0', className)}>
       <legend className={legendHidden ? 'sr-only' : fieldLabel}>{legend}</legend>
-      <div className={cn('grid gap-1 rounded-lg border border-hair bg-well p-1', !legendHidden && 'mt-1')}>
+      <div className={cn('grid gap-1 rounded-lg border border-hair bg-well p-1', columns === 2 && '@3xl/panel:grid-cols-2', !legendHidden && 'mt-1')}>
         {options.map((option) => {
           const chosen = option.value === value
           return (

@@ -69,8 +69,8 @@
   /* The display tier: tutorial and landing-scale headlines. cqi, so a headline sizes to its
      column, not the window; without an ancestor container it falls back to viewport units. */
   --text-display: clamp(2rem, 5cqi, 4.75rem);
-  --text-display--line-height: 1.05;
-  --text-display--letter-spacing: -0.03em;
+  --text-display--line-height: 0.98;
+  --text-display--letter-spacing: -0.055em;
   --text-display--font-weight: 600;
   --text-display-sub: calc(var(--text-display) * 0.6); /* holds a fixed ratio to the display tier */
   --text-display-sub--line-height: 1.1;

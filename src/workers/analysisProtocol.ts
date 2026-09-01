@@ -1,11 +1,13 @@
 import { z } from 'zod'
+import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
+import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type DiscreteBnEvidence, type DoubleMlEvidence, type NegbinNutsEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type VecmEvidence } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
-import { linearScmEvidenceSchema, type LinearScmEvidence } from '@/domain/counterfactual'
+import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
 import { brand, err, ok, type Brand, type Result } from '@/domain/dop'
 import {
   dynotearsEvidenceSchema,
@@ -38,6 +40,7 @@ import {
   parseCausalEffectsEvidence,
   parseCausalImpactEvidence,
   parseCountGlmEvidence,
+  parseNegativeBinomialIngarchEvidence,
   type BackdoorLinearEvidence,
   type FrontdoorTwoStageEvidence,
   type CausalEffectsEvidence,
@@ -223,6 +226,38 @@ export type AnalysisWorkerCommand =
       readonly family: 'poisson' | 'negativeBinomial'
     }
   | {
+      readonly kind: 'negative-binomial-ingarch'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly outcome: number
+      readonly link: 'identity' | 'log'
+      readonly regressors: readonly number[]
+      readonly pastObservationLags: readonly number[]
+      readonly pastMeanLags: readonly number[]
+      readonly externalRegressors: readonly boolean[]
+      readonly horizon: number
+      readonly baselineRegressors: readonly number[]
+      readonly interventionRegressor: number
+      readonly controlValue: number
+      readonly treatmentValue: number
+      readonly schedule: IngarchInterventionSchedule
+    }
+  | {
+      readonly kind: 'count-series-intervention-scan'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly outcome: number
+      readonly link: 'identity' | 'log'
+      readonly pastObservationLags: readonly number[]
+      readonly pastMeanLags: readonly number[]
+      readonly candidateReferencePoints: readonly number[]
+      readonly delta: number
+    }
+  | {
       readonly kind: 'causal-effects-total'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -233,8 +268,9 @@ export type AnalysisWorkerCommand =
       readonly x: readonly (readonly [number, number])[]
       readonly y: readonly (readonly [number, number])[]
       readonly hidden: readonly (readonly [number, number])[]
-      readonly estimator: { readonly kind: 'linear' } | { readonly kind: 'knn'; readonly k: number }
+      readonly estimator: TotalEffectEstimator
       readonly interventions: readonly [number, number]
+      readonly uncertainty: CausalEffectsUncertainty
     }
   | {
       readonly kind: 'causal-impact'
@@ -345,6 +381,8 @@ export type AnalysisWorkerCommand =
       readonly treated: number
       readonly donors: readonly number[]
       readonly nPre: number
+      readonly crossFitFolds: number
+      readonly alpha: number
     }
   | {
       readonly kind: 'panel-intervention'
@@ -353,6 +391,8 @@ export type AnalysisWorkerCommand =
       readonly rows: number
       readonly units: readonly string[]
       readonly times: readonly number[]
+      readonly placeboReplications: number
+      readonly seed: number
     }
   | {
       readonly kind: 'negbin-nuts'
@@ -395,6 +435,21 @@ export type AnalysisWorkerCommand =
       readonly equivalentSampleSize: number
     }
   | {
+      readonly kind: 'identified-discrete-query'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly observedNodes: readonly number[]
+      readonly names: readonly string[]
+      readonly edges: readonly (readonly [number, number])[]
+      readonly treatment: number
+      readonly outcome: number
+      readonly unobserved: readonly number[]
+      readonly bins: number
+      readonly condition: { readonly variable: number; readonly state: number } | null
+    }
+  | {
       readonly kind: 'binary-ett'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -420,6 +475,22 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly interventions: readonly [number, number]
       readonly observationNoise: number | null
+    }
+  | {
+      readonly kind: 'dynamic-linear-scm-counterfactual'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly nodes: readonly number[]
+      readonly statLag: number
+      readonly graph: readonly (readonly (readonly string[])[])[]
+      readonly treatment: number
+      readonly outcome: number
+      readonly timing: DynamicInterventionTiming
+      readonly steps: number
+      readonly interventions: readonly [number, number]
+      readonly uncertainty: DynamicCounterfactualUncertainty
     }
   | {
       readonly kind: 'seasonal-adjust'
@@ -509,6 +580,8 @@ export type AnalysisWorkerEvent =
     }
   | { readonly kind: 'frontdoor-two-stage-succeeded'; readonly request: WorkerRequestId; readonly result: FrontdoorTwoStageEvidence }
   | { readonly kind: 'count-glm-succeeded'; readonly request: WorkerRequestId; readonly result: CountGlmEvidence }
+  | { readonly kind: 'negative-binomial-ingarch-succeeded'; readonly request: WorkerRequestId; readonly result: NegativeBinomialIngarchEvidence }
+  | { readonly kind: 'count-series-intervention-scan-succeeded'; readonly request: WorkerRequestId; readonly result: CountSeriesInterventionScanEvidence }
   | { readonly kind: 'causal-effects-succeeded'; readonly request: WorkerRequestId; readonly result: CausalEffectsEvidence }
   | { readonly kind: 'causal-impact-succeeded'; readonly request: WorkerRequestId; readonly result: CausalImpactEvidence }
   | { readonly kind: 'linear-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: LinearRefutationEvidence }
@@ -523,8 +596,10 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
   | { readonly kind: 'bayesian-gaussian-succeeded'; readonly request: WorkerRequestId; readonly result: BayesianGaussianEvidence }
   | { readonly kind: 'discrete-bn-succeeded'; readonly request: WorkerRequestId; readonly result: DiscreteBnEvidence }
+  | { readonly kind: 'identified-discrete-query-succeeded'; readonly request: WorkerRequestId; readonly result: IdentifiedDiscreteQueryEvidence }
   | { readonly kind: 'binary-ett-succeeded'; readonly request: WorkerRequestId; readonly result: BinaryEttEvidence }
   | { readonly kind: 'linear-scm-succeeded'; readonly request: WorkerRequestId; readonly result: LinearScmEvidence }
+  | { readonly kind: 'dynamic-linear-scm-succeeded'; readonly request: WorkerRequestId; readonly result: DynamicLinearScmEvidence }
   | { readonly kind: 'dml-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: DmlRefutationEvidence }
   | { readonly kind: 'missingness-resolved'; readonly request: WorkerRequestId; readonly result: MissingnessResolvedEvidence }
   | {
@@ -692,6 +767,51 @@ const commandSchema = z.discriminatedUnion('kind', [
     family: z.enum(['poisson', 'negativeBinomial']),
   }).strict(),
   z.object({
+    kind: z.literal('negative-binomial-ingarch'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(64),
+    outcome: z.number().int().nonnegative(),
+    link: z.enum(['identity', 'log']),
+    regressors: z.array(z.number().int().nonnegative()).min(1),
+    pastObservationLags: z.array(z.number().int().min(1).max(24)).min(1),
+    pastMeanLags: z.array(z.number().int().min(1).max(24)).min(1),
+    externalRegressors: z.array(z.boolean()),
+    horizon: z.number().int().min(1).max(240),
+    baselineRegressors: z.array(z.number().finite()).min(1),
+    interventionRegressor: z.number().int().nonnegative(),
+    controlValue: z.number().finite(),
+    treatmentValue: z.number().finite(),
+    schedule: ingarchInterventionScheduleSchema,
+  }).strict().superRefine((value, context) => {
+    if (value.link !== 'identity') return
+    if (value.controlValue < 0 || value.treatmentValue < 0 || value.baselineRegressors.some((entry) => entry < 0)) {
+      context.addIssue({ code: 'custom', message: 'Identity-link INGARCH requires non-negative control, treatment, and future regressor values.' })
+    }
+    for (const column of value.regressors) {
+      for (let row = 0; row < value.rows; row += 1) {
+        if ((value.values[column * value.rows + row] ?? Number.NaN) < 0) {
+          context.addIssue({ code: 'custom', message: 'Identity-link INGARCH requires non-negative historical regressors.' })
+          return
+        }
+      }
+    }
+  }),
+  z.object({
+    kind: z.literal('count-series-intervention-scan'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().positive().max(64),
+    outcome: z.number().int().nonnegative(),
+    link: z.enum(['identity', 'log']),
+    pastObservationLags: z.array(z.number().int().min(1).max(24)).min(1),
+    pastMeanLags: z.array(z.number().int().min(1).max(24)).min(1),
+    candidateReferencePoints: z.array(z.number().int().nonnegative()).min(1),
+    delta: z.number().finite().min(0).max(1),
+  }).strict(),
+  z.object({
     kind: z.literal('causal-effects-total'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -702,8 +822,9 @@ const commandSchema = z.discriminatedUnion('kind', [
     x: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])).min(1),
     y: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])).length(1),
     hidden: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])),
-    estimator: z.discriminatedUnion('kind', [z.object({ kind: z.literal('linear') }).strict(), z.object({ kind: z.literal('knn'), k: z.number().int().min(1).max(100) }).strict()]),
+    estimator: totalEffectEstimatorSchema,
     interventions: z.tuple([z.number().finite(), z.number().finite()]),
+    uncertainty: causalEffectsUncertaintySchema,
   }).strict(),
   z.object({
     kind: z.literal('causal-impact'),
@@ -814,6 +935,8 @@ const commandSchema = z.discriminatedUnion('kind', [
     treated: z.number().int().nonnegative(),
     donors: z.array(z.number().int().nonnegative()).min(1),
     nPre: z.number().int().min(2),
+    crossFitFolds: z.number().int().min(2).max(20),
+    alpha: z.number().gt(0).lt(1),
   }).strict(),
   z.object({
     kind: z.literal('panel-intervention'),
@@ -822,6 +945,8 @@ const commandSchema = z.discriminatedUnion('kind', [
     rows: z.number().int().positive(),
     units: z.array(z.string().min(1)).min(1),
     times: z.array(z.number().int().nonnegative()).min(1),
+    placeboReplications: z.number().int().min(2).max(2000),
+    seed: z.number().int().min(0).max(0xffff_ffff),
   }).strict(),
   z.object({
     kind: z.literal('negbin-nuts'),
@@ -864,6 +989,21 @@ const commandSchema = z.discriminatedUnion('kind', [
     equivalentSampleSize: z.number().positive(),
   }).strict(),
   z.object({
+    kind: z.literal('identified-discrete-query'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(64),
+    observedNodes: z.array(z.number().int().nonnegative()).min(2),
+    names: z.array(z.string().trim().min(1)).min(2),
+    edges: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    unobserved: z.array(z.number().int().nonnegative()),
+    bins: z.number().int().min(2).max(10),
+    condition: z.object({ variable: z.number().int().nonnegative(), state: z.number().int().nonnegative() }).strict().nullable(),
+  }).strict(),
+  z.object({
     kind: z.literal('binary-ett'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -889,6 +1029,25 @@ const commandSchema = z.discriminatedUnion('kind', [
     outcome: z.number().int().nonnegative(),
     interventions: z.tuple([z.number().finite(), z.number().finite()]),
     observationNoise: z.number().positive().nullable(),
+  }).strict(),
+  z.object({
+    kind: z.literal('dynamic-linear-scm-counterfactual'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(64),
+    nodes: z.array(z.number().int().nonnegative()).min(2),
+    statLag: z.number().int().min(0).max(20),
+    graph: z.array(z.array(z.array(z.string().max(3)))),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    timing: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('point'), time: z.number().int().nonnegative() }).strict(),
+      z.object({ kind: z.literal('persistent'), start: z.number().int().nonnegative() }).strict(),
+    ]),
+    steps: z.number().int().positive(),
+    interventions: z.tuple([z.number().finite(), z.number().finite()]),
+    uncertainty: dynamicCounterfactualUncertaintySchema,
   }).strict(),
   z.object({
     kind: z.literal('seasonal-adjust'),
@@ -988,6 +1147,8 @@ const eventSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('frontdoor-two-stage-succeeded'), request: requestSchema, result: frontdoorTwoStageEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count-glm-succeeded'), request: requestSchema, result: countGlmEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('negative-binomial-ingarch-succeeded'), request: requestSchema, result: negativeBinomialIngarchEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('count-series-intervention-scan-succeeded'), request: requestSchema, result: countSeriesInterventionScanEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-effects-succeeded'), request: requestSchema, result: causalEffectsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-impact-succeeded'), request: requestSchema, result: causalImpactEvidenceSchema }).strict(),
   z.object({ kind: z.literal('linear-refutation-succeeded'), request: requestSchema, result: linearRefutationEvidenceSchema }).strict(),
@@ -1002,8 +1163,10 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('bayesian-gaussian-succeeded'), request: requestSchema, result: bayesianGaussianEvidenceSchema }).strict(),
   z.object({ kind: z.literal('discrete-bn-succeeded'), request: requestSchema, result: discreteBnEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('identified-discrete-query-succeeded'), request: requestSchema, result: identifiedDiscreteQueryEvidenceSchema }).strict(),
   z.object({ kind: z.literal('binary-ett-succeeded'), request: requestSchema, result: binaryEttEvidenceSchema }).strict(),
   z.object({ kind: z.literal('linear-scm-succeeded'), request: requestSchema, result: linearScmEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('dynamic-linear-scm-succeeded'), request: requestSchema, result: dynamicLinearScmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('dml-refutation-succeeded'), request: requestSchema, result: dmlRefutationEvidenceSchema }).strict(),
   z.object({ kind: z.literal('missingness-resolved'), request: requestSchema, result: missingnessResolvedEvidenceSchema }).strict(),
   z.object({
@@ -1125,6 +1288,14 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseCountGlmEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'count-glm-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
   }
+  if (parsed.data.kind === 'negative-binomial-ingarch-succeeded') {
+    const result = parseNegativeBinomialIngarchEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'negative-binomial-ingarch-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'count-series-intervention-scan-succeeded') {
+    const result = parseCountSeriesInterventionScanEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'count-series-intervention-scan-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
   if (parsed.data.kind === 'causal-effects-succeeded') {
     const result = parseCausalEffectsEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'causal-effects-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
@@ -1177,6 +1348,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = discreteBnEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'discrete-bn-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
+  if (parsed.data.kind === 'identified-discrete-query-succeeded') {
+    const result = identifiedDiscreteQueryEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'identified-discrete-query-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
   if (parsed.data.kind === 'binary-ett-succeeded') {
     const result = binaryEttEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'binary-ett-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
@@ -1184,6 +1359,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'linear-scm-succeeded') {
     const result = linearScmEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'linear-scm-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'dynamic-linear-scm-succeeded') {
+    const result = dynamicLinearScmEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'dynamic-linear-scm-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'dml-refutation-succeeded') {
     const result = parseDmlRefutationEvidence(parsed.data.result)

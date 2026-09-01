@@ -157,6 +157,45 @@ impl NpRng {
         }
     }
 
+    /// `Generator.integers(0, high, dtype=int64)`: NumPy's Lemire bounded-integer path.
+    /// This intentionally differs from the masked-rejection routine used by permutation.
+    pub fn bounded_uint64(&mut self, high: u64) -> u64 {
+        assert!(high > 0);
+        let inclusive_range = high - 1;
+        if inclusive_range == 0 {
+            return 0;
+        }
+        if inclusive_range <= u32::MAX as u64 {
+            if inclusive_range == u32::MAX as u64 {
+                return self.next_u32() as u64;
+            }
+            let range_exclusive = inclusive_range as u32 + 1;
+            loop {
+                let product = self.next_u32() as u64 * range_exclusive as u64;
+                let leftover = product as u32;
+                if leftover < range_exclusive {
+                    let threshold = (u32::MAX - inclusive_range as u32) % range_exclusive;
+                    if leftover < threshold {
+                        continue;
+                    }
+                }
+                return product >> 32;
+            }
+        }
+        let range_exclusive = inclusive_range + 1;
+        loop {
+            let product = self.next_u64() as u128 * range_exclusive as u128;
+            let leftover = product as u64;
+            if leftover < range_exclusive {
+                let threshold = (u64::MAX - inclusive_range) % range_exclusive;
+                if leftover < threshold {
+                    continue;
+                }
+            }
+            return (product >> 64) as u64;
+        }
+    }
+
     pub fn shuffle<T>(&mut self, x: &mut [T]) {
         for i in (1..x.len()).rev() {
             let j = self.random_interval(i as u64) as usize;

@@ -1,7 +1,7 @@
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
 import type { DatasetProfile } from './dataset'
-import type { EstimationRunArtifact } from './estimation'
+import { adjustmentLabels, type EstimationRunArtifact } from './estimation'
 import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import type { IdentificationArtifact, StudySpecification } from './study'
@@ -140,7 +140,10 @@ export function compareResults(left: ResultManifest, right: ResultManifest): rea
   add('Outcome', left.study?.outcome.name ?? 'none', right.study?.outcome.name ?? 'none')
   add('Target', left.study?.estimand.kind ?? 'none', right.study?.estimand.kind ?? 'none')
   add('Assignment', left.study?.assignment.kind ?? 'none', right.study?.assignment.kind ?? 'none')
-  add('Adjustment set', left.estimation.estimate.adjustmentSet.map((variable) => variable.name).join(', ') || 'none', right.estimation.estimate.adjustmentSet.map((variable) => variable.name).join(', ') || 'none')
+  const adjustment = (run: EstimationRunArtifact): string => run.estimate.adjustment.kind === 'structural-parent-model'
+    ? `Wright parent model: ${run.estimate.adjustment.coefficients} coefficients, ${run.estimate.adjustment.paths} paths`
+    : adjustmentLabels(run.estimate.adjustment).join(', ') || 'none'
+  add('Adjustment strategy', adjustment(left.estimation), adjustment(right.estimation))
   add('Estimator', left.estimation.configuration.kind, right.estimation.configuration.kind)
   add('Configuration', describeConfiguration(left.estimation), describeConfiguration(right.estimation))
   add('Eligibility', left.estimation.eligibility.kind, right.estimation.eligibility.kind)
