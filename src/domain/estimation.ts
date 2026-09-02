@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { ColumnId } from './dataset'
 import type { DagDocument, EditableDag } from './dag'
-import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import { assertNever, brand, err, flattenNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { CaveatEvaluation, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
 import {
   BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
@@ -74,9 +74,20 @@ export interface NegativeBinomialIngarchConfiguration {
   readonly schedule: IngarchInterventionSchedule
 }
 
+export const causalEffectsNodeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])
+export type CausalEffectsNode = z.infer<typeof causalEffectsNodeSchema>
+
+export const causalEffectsAdjustmentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('optimal') }).strict(),
+  z.object({ kind: z.literal('minimizedOptimal') }).strict(),
+  z.object({ kind: z.literal('collidersMinimizedOptimal') }).strict(),
+  z.object({ kind: z.literal('explicit'), nodes: z.array(causalEffectsNodeSchema) }).strict(),
+])
+export type CausalEffectsAdjustment = z.infer<typeof causalEffectsAdjustmentSchema>
+
 export const totalEffectEstimatorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('linear') }).strict(),
-  z.object({ kind: z.literal('knn'), k: z.number().int().min(1).max(100) }).strict(),
+  z.object({ kind: z.literal('linear'), adjustment: causalEffectsAdjustmentSchema }).strict(),
+  z.object({ kind: z.literal('knn'), k: z.number().int().min(1).max(100), adjustment: causalEffectsAdjustmentSchema }).strict(),
   z.object({ kind: z.literal('wrightParents') }).strict(),
 ])
 export type TotalEffectEstimator = z.infer<typeof totalEffectEstimatorSchema>
@@ -205,7 +216,49 @@ export type EstimatorConfiguration =
 
 export type EstimatorId = EstimatorConfiguration['kind']
 
-export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = ['backdoor-linear-regression', 'frontdoor-two-stage', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negative-binomial-ingarch', 'negbin-nuts', 'dml-plr', 'dml-irm', 'causal-effects-total', 'causal-impact', 'synthetic-control', 'panel-intervention', 'ardl-pss', 'vecm', 'discrete-bn-query', 'binary-ett-idc-star']
+export type EstimatorGroupId = 'adjusted-outcome' | 'identified-functional' | 'graph-adjusted-temporal' | 'dynamic-time-series' | 'intervention-comparison'
+
+export interface EstimatorGroup {
+  readonly id: EstimatorGroupId
+  readonly name: string
+  readonly description: string
+  readonly estimators: NonEmptyArray<EstimatorId>
+}
+
+export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
+  {
+    id: 'adjusted-outcome',
+    name: 'Covariate-adjusted outcome models',
+    description: 'Regression, count-model and orthogonal-score estimators using an identified adjustment set.',
+    estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm'],
+  },
+  {
+    id: 'identified-functional',
+    name: 'Identified-function estimators',
+    description: 'Methods tied to a front-door, interventional-distribution, or counterfactual identification result.',
+    estimators: ['frontdoor-two-stage', 'discrete-bn-query', 'binary-ett-idc-star'],
+  },
+  {
+    id: 'graph-adjusted-temporal',
+    name: 'Graph-adjusted temporal effects',
+    description: 'Total-effect estimation using a time-indexed causal graph and lag-resolved adjustment set.',
+    estimators: ['causal-effects-total'],
+  },
+  {
+    id: 'dynamic-time-series',
+    name: 'Dynamic time-series models',
+    description: 'Models for count dynamics, distributed lags, long-run relations and error correction.',
+    estimators: ['negative-binomial-ingarch', 'ardl-pss', 'vecm'],
+  },
+  {
+    id: 'intervention-comparison',
+    name: 'Intervention and comparative designs',
+    description: 'Post-intervention comparisons using a forecast counterfactual or untreated comparison units.',
+    estimators: ['causal-impact', 'synthetic-control', 'panel-intervention'],
+  },
+]
+
+export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = flattenNonEmpty(mapNonEmpty(ESTIMATOR_GROUPS, (group) => group.estimators))
 
 export const methodIdOf = (estimator: EstimatorId): MethodId => {
   switch (estimator) {
@@ -256,7 +309,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'bayesian-gaussian': return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
     case 'discrete-bn-query': return { kind: estimator, bins: 3, equivalentSampleSize: 5 }
     case 'binary-ett-idc-star': return { kind: estimator }
-    case 'causal-effects-total': return { kind: estimator, estimator: { kind: 'linear' }, treatmentLag: 0, interventions: [0, 1], uncertainty: { kind: 'bootstrap', samples: 100, blockLength: { kind: 'fixed', length: 1 }, confidenceLevel: 0.9, seed: 4 } }
+    case 'causal-effects-total': return { kind: estimator, estimator: { kind: 'linear', adjustment: { kind: 'optimal' } }, treatmentLag: 0, interventions: [0, 1], uncertainty: { kind: 'bootstrap', samples: 100, blockLength: { kind: 'fixed', length: 1 }, confidenceLevel: 0.9, seed: 4 } }
     case 'causal-impact': {
       // A control the treatment itself moves would absorb the effect, so DAG descendants of the
       // treatment start unticked; columns outside the DAG stay in, as a judgement for the user.
@@ -679,7 +732,7 @@ export const binaryEttEvidenceSchema = z.object({
 export type BinaryEttEvidence = z.infer<typeof binaryEttEvidenceSchema>
 export const parseBinaryEttEvidence = (value: unknown): Result<BinaryEttEvidence, EstimationEvidenceProblem> => parseWith(binaryEttEvidenceSchema, value)
 
-const nodeSchema = z.tuple([z.number().int().nonnegative(), z.number().int().max(0)])
+const nodeSchema = causalEffectsNodeSchema
 
 const wrightCoefficientEvidenceSchema = z.object({
   parent: nodeSchema,
@@ -693,10 +746,24 @@ const wrightPathEvidenceSchema = z.object({
   contrast: z.number().finite(),
 }).strict()
 
+export const causalEffectsAdjustmentProblemSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('queryTreatment'), node: nodeSchema }).strict(),
+  z.object({ kind: z.literal('queryOutcome'), node: nodeSchema }).strict(),
+  z.object({ kind: z.literal('laterTreatmentOccurrence'), node: nodeSchema }).strict(),
+  z.object({ kind: z.literal('forbiddenNode'), node: nodeSchema }).strict(),
+  z.object({ kind: z.literal('openNonCausalPath') }).strict(),
+])
+export type CausalEffectsAdjustmentProblem = z.infer<typeof causalEffectsAdjustmentProblemSchema>
+
 const causalEffectsFitEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unfitted'), requested: totalEffectEstimatorSchema }).strict(),
-  z.object({ kind: z.literal('adjustedLinear'), adjustmentSet: z.array(nodeSchema) }).strict(),
-  z.object({ kind: z.literal('adjustedKnn'), k: z.number().int().positive(), adjustmentSet: z.array(nodeSchema) }).strict(),
+  z.object({
+    kind: z.literal('invalidAdjustment'),
+    requested: totalEffectEstimatorSchema,
+    problems: z.array(causalEffectsAdjustmentProblemSchema).min(1),
+  }).strict(),
+  z.object({ kind: z.literal('adjustedLinear'), selection: causalEffectsAdjustmentSchema, adjustmentSet: z.array(nodeSchema) }).strict(),
+  z.object({ kind: z.literal('adjustedKnn'), k: z.number().int().positive(), selection: causalEffectsAdjustmentSchema, adjustmentSet: z.array(nodeSchema) }).strict(),
   z.object({
     kind: z.literal('wrightParents'),
     coefficients: z.array(wrightCoefficientEvidenceSchema).min(1),
@@ -763,12 +830,20 @@ function causalEffectsUncertaintyMatches(
   }
 }
 
+function adjustmentSelectionMatches(left: CausalEffectsAdjustment, right: CausalEffectsAdjustment): boolean {
+  if (left.kind !== right.kind) return false
+  if (left.kind !== 'explicit' || right.kind !== 'explicit') return true
+  return left.nodes.length === right.nodes.length
+    && left.nodes.every((node, index) => node[0] === right.nodes[index]?.[0] && node[1] === right.nodes[index]?.[1])
+}
+
 function causalEffectsFitMatches(requested: TotalEffectEstimator, returned: CausalEffectsFitEvidence): boolean {
   switch (requested.kind) {
-    case 'linear': return returned.kind === 'adjustedLinear' || (returned.kind === 'unfitted' && returned.requested.kind === 'linear')
-    case 'knn': return (returned.kind === 'adjustedKnn' && returned.k === requested.k)
-      || (returned.kind === 'unfitted' && returned.requested.kind === 'knn' && returned.requested.k === requested.k)
-    case 'wrightParents': return returned.kind === 'wrightParents' || (returned.kind === 'unfitted' && returned.requested.kind === 'wrightParents')
+    case 'linear': return (returned.kind === 'adjustedLinear' && adjustmentSelectionMatches(requested.adjustment, returned.selection))
+      || ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') && returned.requested.kind === 'linear' && adjustmentSelectionMatches(requested.adjustment, returned.requested.adjustment))
+    case 'knn': return (returned.kind === 'adjustedKnn' && returned.k === requested.k && adjustmentSelectionMatches(requested.adjustment, returned.selection))
+      || ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') && returned.requested.kind === 'knn' && returned.requested.k === requested.k && adjustmentSelectionMatches(requested.adjustment, returned.requested.adjustment))
+    case 'wrightParents': return returned.kind === 'wrightParents' || ((returned.kind === 'unfitted' || returned.kind === 'invalidAdjustment') && returned.requested.kind === 'wrightParents')
     default: return assertNever(requested)
   }
 }
@@ -825,7 +900,10 @@ export function parseCausalEffectsEvidence(value: unknown): Result<CausalEffects
   if (parsed.value.identifiable && (parsed.value.predictions.length !== 2 || parsed.value.totalEffect === null)) {
     return err({ kind: 'invalid-estimation-evidence', detail: 'An identifiable effect must carry two predictions and a total effect.' })
   }
-  if (parsed.value.identifiable === (parsed.value.fit.kind === 'unfitted')) {
+  const fitted = parsed.value.fit.kind === 'adjustedLinear'
+    || parsed.value.fit.kind === 'adjustedKnn'
+    || parsed.value.fit.kind === 'wrightParents'
+  if (parsed.value.identifiable !== fitted) {
     return err({ kind: 'invalid-estimation-evidence', detail: 'The CausalEffects fit state does not agree with its identification state.' })
   }
   if (!parsed.value.identifiable && parsed.value.uncertainty.kind === 'bootstrap') {
@@ -1380,10 +1458,16 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         if (review.length > 0) leave('causal-effects-stationarity', `${review.map((verdict) => verdict.reason).join(' ')} CausalEffects assumes a stationary temporal graph; continuing keeps the prepared values unchanged and records this conflict with the run.`)
         else satisfy('causal-effects-stationarity', `All ${verdicts.length} prepared series are stationary in levels.`)
       }
-      leave('causal-effects-identifiable', 'Whether the optimal adjustment set exists is decided by the run; a refusal is reported as not identifiable.')
+      if (configuration.estimator.kind === 'wrightParents') {
+        leave('causal-effects-identifiable', 'The run checks whether the graph contains directed treatment–outcome paths that Wright path tracing can evaluate.')
+      } else if (configuration.estimator.adjustment.kind === 'explicit') {
+        leave('causal-effects-identifiable', 'The run checks the supplied time-indexed set against every open non-causal treatment–outcome path and refuses an invalid set.')
+      } else {
+        leave('causal-effects-identifiable', `Whether the ${configuration.estimator.adjustment.kind === 'optimal' ? 'complete O-set' : configuration.estimator.adjustment.kind === 'minimizedOptimal' ? 'minimized O-set' : 'collider-minimized O-set'} exists is decided by the run; a refusal is reported as not identifiable.`)
+      }
       switch (configuration.estimator.kind) {
         case 'linear':
-          satisfy('causal-effects-functional-form', 'Linear outcome regression with the graph-derived time-indexed adjustment set.')
+          satisfy('causal-effects-functional-form', 'Linear outcome regression with the selected time-indexed adjustment set.')
           break
         case 'knn':
           leave('causal-effects-functional-form', `k-nearest neighbours with k = ${configuration.estimator.k}; confirm that this local model is suitable for the response surface.`)
@@ -1656,6 +1740,7 @@ export function causalEstimateFrom(
       let parameters: number
       switch (evidence.fit.kind) {
         case 'unfitted': return null
+        case 'invalidAdjustment': return null
         case 'adjustedLinear':
         case 'adjustedKnn': {
           const temporal = appliedTimeIndexedAdjustment(run.graphVariables, evidence.fit.adjustmentSet)

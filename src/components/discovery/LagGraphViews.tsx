@@ -25,7 +25,8 @@ const markMeanings = (semantics: LagGraphSemantics): readonly MarkMeaning[] => {
       { mark: 'o->', meaning: 'the target is not an ancestor of the source; the circle end is undetermined' },
       { mark: 'o-o', meaning: 'contemporaneous; neither end is oriented' },
     ]
-    case 'stationary-lag-graph': return [
+    case 'stationary-lag-graph':
+    case 'regime-specific-lag-graph': return [
       { mark: '-->', meaning: 'directed; lagged links always point forward in time' },
       { mark: 'o-o', meaning: 'contemporaneous; neither end is oriented' },
     ]

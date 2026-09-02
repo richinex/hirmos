@@ -35,6 +35,15 @@ export type DiscoveryCandidate =
       readonly statistic: number
     }
   | CandidateBase & {
+      readonly kind: 'regime-endpoint-marked'
+      readonly method: 'RPCMCI'
+      readonly regime: number
+      readonly lag: number
+      readonly mark: string
+      readonly pValue: number
+      readonly statistic: number
+    }
+  | CandidateBase & {
       readonly kind: 'weighted-directed'
       readonly method: 'DirectLiNGAM' | 'DYNOTEARS' | 'VAR-LiNGAM'
       readonly lag: number
@@ -50,8 +59,8 @@ export type DiscoveryCandidate =
 
 export interface DiscoveryEvidenceView {
   readonly run: DiscoveryRunArtifact
-  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
-  readonly semantics: 'stationary-lag-graph' | 'pag' | 'weighted-directed-evidence' | 'lagged-information'
+  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
+  readonly semantics: 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information'
   readonly candidates: readonly DiscoveryCandidate[]
 }
 
@@ -115,6 +124,37 @@ const matrixCandidates = (
   return candidates
 }
 
+const regimeMatrixCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }>,
+): readonly DiscoveryCandidate[] => run.result.graphs.flatMap((graph, regime) => {
+  const candidates: DiscoveryCandidate[] = []
+  for (let sourceIndex = 0; sourceIndex < run.result.variables; sourceIndex += 1) {
+    for (let targetIndex = 0; targetIndex < run.result.variables; targetIndex += 1) {
+      for (let lag = 0; lag <= run.result.tauMax; lag += 1) {
+        const mark = graph[sourceIndex][targetIndex][lag]
+        if (mark.length === 0 || (lag === 0 && sourceIndex > targetIndex)) continue
+        const source = variable(run.variables[sourceIndex])
+        const target = variable(run.variables[targetIndex])
+        candidates.push({
+          kind: 'regime-endpoint-marked',
+          id: candidateId(run.id, `regime:${regime}:${sourceIndex}:${targetIndex}:${lag}:${mark}`),
+          run: run.id,
+          method: 'RPCMCI',
+          regime,
+          source,
+          target,
+          lag,
+          mark,
+          pValue: run.result.pMatrices[regime][sourceIndex][targetIndex][lag],
+          statistic: run.result.valMatrices[regime][sourceIndex][targetIndex][lag],
+          relationMatch: markedRelationMatch(source, target, lag, mark),
+        })
+      }
+    }
+  }
+  return candidates
+})
+
 /** Every nonzero fitted weight, strongest first; weights[lag][source][target] with lag 0 contemporaneous. */
 const weightedCandidates = (
   run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>,
@@ -174,6 +214,12 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
       semantics: 'pag',
       candidates: matrixCandidates(run),
     }
+    case 'rpcmci-run': return {
+      run,
+      method: 'RPCMCI',
+      semantics: 'regime-specific-lag-graphs',
+      candidates: regimeMatrixCandidates(run),
+    }
     case 'dynotears-run': return {
       run,
       method: 'DYNOTEARS',
@@ -220,6 +266,7 @@ export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
   switch (view.semantics) {
     case 'stationary-lag-graph': return 'Conditional-dependence marks over lagged variables'
     case 'pag': return 'Partial ancestral graph marks; circles and bidirected endpoints remain unresolved'
+    case 'regime-specific-lag-graphs': return 'A separately estimated lag graph for each inferred regime'
     case 'weighted-directed-evidence': return 'Fitted directed structural weights'
     case 'lagged-information': return 'Selected lagged conditional-information relations'
     default: return assertNever(view.semantics)
@@ -229,6 +276,7 @@ export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
 export function discoveryEvidenceReference(candidate: DiscoveryCandidate) {
   switch (candidate.kind) {
     case 'endpoint-marked': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'endpoint-marked' as const }
+    case 'regime-endpoint-marked': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'endpoint-marked' as const }
     case 'weighted-directed': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'weighted-directed' as const }
     case 'lagged-information': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'lagged-information' as const }
     default: return assertNever(candidate)

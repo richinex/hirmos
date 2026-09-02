@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { field, fieldHint, fieldLabel } from '@/components/ui/recipes'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 
 export type LagListProblem =
@@ -34,13 +35,14 @@ interface LagListFieldProps {
   readonly lags: NonEmptyArray<number>
   readonly onChange: (lags: NonEmptyArray<number>) => void
   readonly maximum?: number
+  readonly help?: string
 }
 
 /**
  * Edits a non-empty, sorted set of positive lags. Invalid text remains local to the field, so the
  * scientific configuration can never contain an empty, duplicate, fractional, or out-of-range lag.
  */
-export function LagListField({ label, lags, onChange, maximum = 24 }: LagListFieldProps) {
+export function LagListField({ label, lags, onChange, maximum = 24, help }: LagListFieldProps) {
   const canonical = lags.join(', ')
   const [draft, setDraft] = useState(canonical)
   const [problem, setProblem] = useState<LagListProblem | null>(null)
@@ -49,7 +51,9 @@ export function LagListField({ label, lags, onChange, maximum = 24 }: LagListFie
 
   return (
     <label className="block">
-      <span className={fieldLabel}>{label}</span>
+      {help === undefined
+        ? <span className={fieldLabel}>{label}</span>
+        : <ParameterLabel className={fieldLabel} label={label} help={help} />}
       <input
         type="text"
         inputMode="numeric"

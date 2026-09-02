@@ -9,6 +9,7 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { EligibilityView } from '@/components/EligibilityView'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { ParameterHelp, ParameterLabel } from '@/components/ui/ParameterLabel'
 import {
   EVIDENCE_SCOPES,
   explainEvidenceScope,
@@ -20,7 +21,7 @@ import {
   type EvidenceSelection,
 } from '@/domain/evidenceScope'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
-import { OcsePlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
+import { OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
 import { button, field, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
@@ -49,6 +50,7 @@ import {
   DYNOTEARS_METHOD_ID,
   DIRECT_LINGAM_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
+  RPCMCI_PAR_CORR_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
@@ -63,9 +65,10 @@ import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
+import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
 
 const CROSS_SECTIONAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['direct-lingam', 'DirectLiNGAM']]
-const TEMPORAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
+const TEMPORAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['rpcmci', 'RPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
 const DISCOVERY_METHODS = [...CROSS_SECTIONAL_DISCOVERY_METHODS, ...TEMPORAL_DISCOVERY_METHODS] as const
 
 interface DiscoveryPanelProps {
@@ -95,6 +98,7 @@ const methodIdForChoice = (method: DiscoveryMethodChoice) => {
     case 'direct-lingam': return DIRECT_LINGAM_METHOD_ID
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
     case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
+    case 'rpcmci': return RPCMCI_PAR_CORR_METHOD_ID
     case 'dynotears': return DYNOTEARS_METHOD_ID
     case 'var-lingam': return VAR_LINGAM_METHOD_ID
     case 'ocse': return OCSE_METHOD_ID
@@ -128,6 +132,76 @@ const linkColumns = <Row extends LinkRow>(): readonly EvidenceColumn<Row>[] => [
 
 const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => number, print: (value: number) => string = statistic): EvidenceColumn<Row> =>
   ({ id, header, align: 'right', value, format: (value) => print(asNumber(value)) })
+
+type RpcmciConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }>
+
+function RpcmciControls({ configuration, onChange }: {
+  readonly configuration: RpcmciConfiguration
+  readonly onChange: (configuration: RpcmciConfiguration) => void
+}) {
+  const changeNumber = (fieldName: Exclude<keyof RpcmciConfiguration, 'kind'>, value: number) => {
+    if (Number.isFinite(value)) onChange({ ...configuration, [fieldName]: value })
+  }
+  return (
+    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+      <div className="text-body text-ink">
+        <ParameterLabel label="Regimes" help={DISCOVERY_PARAMETER_HELP.rpcmci.regimes} htmlFor="rpcmci-regimes" />
+        <Select id="rpcmci-regimes" className={field('text', 'mt-1')} value={configuration.numRegimes} onChange={(event) => changeNumber('numRegimes', Number(event.target.value))}>
+          {[2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Maximum transitions" help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumTransitions} htmlFor="rpcmci-maximum-transitions" />
+        <input id="rpcmci-maximum-transitions" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.maxTransitions} onChange={(event) => changeNumber('maxTransitions', event.currentTarget.valueAsNumber)} />
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumLag} htmlFor="rpcmci-maximum-lag" />
+        <Select id="rpcmci-maximum-lag" className={field('text', 'mt-1')} value={configuration.tauMax} onChange={(event) => changeNumber('tauMax', Number(event.target.value))}>
+          {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Graph alpha" help={DISCOVERY_PARAMETER_HELP.rpcmci.graphAlpha} htmlFor="rpcmci-graph-alpha" />
+        <Select id="rpcmci-graph-alpha" className={field('text', 'mt-1')} value={configuration.alphaLevel} onChange={(event) => changeNumber('alphaLevel', Number(event.target.value))}>
+          {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <details className="@md/panel:col-span-2 @2xl/panel:col-span-3 rounded-lg border border-hair bg-well px-3 py-2">
+        <summary className="cursor-pointer text-body text-ink">Annealing and conditional-independence settings</summary>
+        <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+          <div className="text-body text-ink">
+            <ParameterLabel label="Minimum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.minimumLag} htmlFor="rpcmci-minimum-lag" />
+            <Select id="rpcmci-minimum-lag" className={field('text', 'mt-1')} value={configuration.tauMin} onChange={(event) => changeNumber('tauMin', Number(event.target.value))}>
+              {Array.from({ length: configuration.tauMax + 1 }, (_, value) => value).map((value) => <option key={value} value={value}>{value}</option>)}
+            </Select>
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="PC alpha" help={DISCOVERY_PARAMETER_HELP.rpcmci.pcAlpha} htmlFor="rpcmci-pc-alpha" />
+            <Select id="rpcmci-pc-alpha" className={field('text', 'mt-1')} value={configuration.pcAlpha} onChange={(event) => changeNumber('pcAlpha', Number(event.target.value))}>
+              {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </Select>
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Switching threshold" help={DISCOVERY_PARAMETER_HELP.rpcmci.switchingThreshold} htmlFor="rpcmci-switching-threshold" />
+            <input id="rpcmci-switching-threshold" className={field('text', 'mt-1')} type="number" min={0} max={1} step={0.01} value={configuration.switchThres} onChange={(event) => changeNumber('switchThres', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Iterations per annealing" help={DISCOVERY_PARAMETER_HELP.rpcmci.iterationsPerAnnealing} htmlFor="rpcmci-iterations" />
+            <input id="rpcmci-iterations" className={field('text', 'mt-1')} type="number" min={1} max={100} step={1} value={configuration.numIterations} onChange={(event) => changeNumber('numIterations', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Annealing runs" help={DISCOVERY_PARAMETER_HELP.rpcmci.annealingRuns} htmlFor="rpcmci-annealing-runs" />
+            <input id="rpcmci-annealing-runs" className={field('text', 'mt-1')} type="number" min={1} max={50} step={1} value={configuration.maxAnneal} onChange={(event) => changeNumber('maxAnneal', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.rpcmci.seed} htmlFor="rpcmci-seed" />
+            <input id="rpcmci-seed" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
+          </div>
+        </div>
+      </details>
+    </div>
+  )
+}
 
 
 function ResultEligibility({ eligibility }: { readonly eligibility: MethodEligibility }) {
@@ -279,6 +353,73 @@ function TimeGraphResult({ run, open, current }: { readonly open: boolean; reado
   )
 }
 
+function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }> }) {
+  const [regime, setRegime] = useState(0)
+  const [selection, setSelection] = useState<EvidenceSelection>(NO_EVIDENCE_SELECTION)
+  const graph = run.result.graphs[regime]
+  const pMatrix = run.result.pMatrices[regime]
+  const valMatrix = run.result.valMatrices[regime]
+  const rows = useMemo(
+    () => graph.flatMap((targets, sourceIndex) => targets.flatMap((lags, targetIndex) => lags.map((mark, lag) => ({
+      key: `${regime}:${sourceIndex}:${targetIndex}:${lag}`,
+      source: run.variables[sourceIndex].name,
+      target: run.variables[targetIndex].name,
+      lag,
+      mark,
+      p: pMatrix[sourceIndex][targetIndex][lag],
+      value: valMatrix[sourceIndex][targetIndex][lag],
+    })))),
+    [graph, pMatrix, regime, run.variables, valMatrix],
+  )
+  const selected = useMemo(
+    () => (selectsEverything(selection) ? rows : rows.filter((row) => matchesEvidenceSelection(row, selection, run.result.alphaLevel))),
+    [rows, run.result.alphaLevel, selection],
+  )
+  const variableNames = useMemo(() => run.variables.map((variable) => variable.name), [run.variables])
+  return (
+    <ResultCard
+      run={run}
+      open={open}
+      current={current}
+      method="RPCMCI · ParCorr"
+      title={<>Regime-dependent lag-graph evidence</>}
+      meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.numRegimes} regimes · lags {run.result.tauMin}–{run.result.tauMax} · graph alpha {run.result.alphaLevel}</>}
+    >
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <RpcmciMembershipPlot run={run} />
+      <div className="mt-3 flex items-center gap-2">
+        <label className="text-body text-ink">
+          Regime shown
+          <Select className={field('text', 'ml-2 w-auto')} value={regime} onChange={(event) => setRegime(Number(event.target.value))}>
+            {run.result.graphs.map((_, index) => <option key={index} value={index}>Regime {index + 1}</option>)}
+          </Select>
+        </label>
+      </div>
+      <StructurePlot run={run} regime={regime} label={`RPCMCI regime ${regime + 1} structure`} />
+      <RpcmciTimeGraphPlot run={run} regime={regime} />
+      <p className="mb-3 mt-3 text-body text-muted">The selected regime changes both the graph and its partial-correlation matrix. Regime numbers are labels and may be exchanged without changing the fitted model.</p>
+      <EvidenceTable<typeof rows[number]>
+        title={`RPCMCI regime ${regime + 1} raw evidence`}
+        rows={selected}
+        total={rows.length}
+        rowKey={(row) => row.key}
+        noun="cell"
+        empty="The run reported no cell."
+        exportName={`rpcmci-regime-${regime + 1}-evidence`}
+        filters={<EvidenceScopeControls selection={selection} onChange={setSelection} variables={variableNames} tauMax={run.result.tauMax} alpha={run.result.alphaLevel} />}
+        columns={[
+          ...linkColumns<typeof rows[number]>(),
+          { id: 'mark', header: 'Mark', mono: true, value: (row) => row.mark, format: (value) => (value === '' ? '—' : value) },
+          figureColumn<typeof rows[number]>('p', 'p', (row) => row.p, pValue),
+          figureColumn<typeof rows[number]>('value', 'ParCorr', (row) => row.value),
+        ]}
+      />
+      <p className="mb-0 mt-3 text-micro text-faint">{run.result.errorFreeAnnealings} of {run.result.maxAnneal} annealing runs completed without an optimisation error · switch threshold {run.result.switchThres} · transition budget {run.result.maxTransitions} · seed {run.result.seed}</p>
+    </ResultCard>
+  )
+}
+
 function DynotearsResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' }> }) {
   const weights = [run.result.contemporaneousWeights, ...run.result.laggedWeights].flatMap((matrix, lag) =>
     matrix.flatMap((targets, source) => targets.map((weight, target) => ({ lag, source, target, weight }))),
@@ -389,6 +530,7 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
     case 'direct-lingam-run': return <DirectLingamResult run={run} open={open} current={current} />
     case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
+    case 'rpcmci-run': return <RpcmciResult run={run} open={open} current={current} />
     case 'dynotears-run': return <DynotearsResult run={run} open={open} current={current} />
     case 'var-lingam-run': return <VarLingamResult run={run} open={open} current={current} />
     case 'ocse-run': return <OcseResult run={run} open={open} current={current} />
@@ -491,6 +633,32 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         onRun(artifact)
         return
       }
+      case 'rpcmci': {
+        const result = await analysis.runRpcmci(
+          matrix.value.values,
+          matrix.value.rowCount,
+          matrix.value.columns.length,
+          specification.value,
+          (progress) => dispatch({ type: 'run-progressed', progress }),
+        )
+        if (!result.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          return
+        }
+        const artifact: DiscoveryRunArtifact = {
+          kind: 'rpcmci-run',
+          id: newDiscoveryRunId(),
+          preparedDataset: prepared.id,
+          createdAt: new Date().toISOString(),
+          method: RPCMCI_PAR_CORR_METHOD_ID,
+          variables: matrix.value.columns,
+          eligibility,
+          result: result.value,
+        }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
       case 'dynotears': {
         const result = await analysis.runDynotears(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.lambdaW, specification.value.lambdaA, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
@@ -578,9 +746,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
-              <label className="text-body text-ink">
-                Maximum lag
+              <div className="text-body text-ink">
+                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.pcmci.maximumLag} htmlFor="pcmci-maximum-lag" />
                 <Select
+                  id="pcmci-maximum-lag"
                   className={field('text', 'mt-1')}
                   value={configuration.tauMax}
                   onChange={(event) => {
@@ -590,10 +759,11 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 >
                   {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
-              <label className="text-body text-ink">
-                PC alpha
+              </div>
+              <div className="text-body text-ink">
+                <ParameterLabel label="PC alpha" help={DISCOVERY_PARAMETER_HELP.pcmci.pcAlpha} htmlFor="pcmci-pc-alpha" />
                 <Select
+                  id="pcmci-pc-alpha"
                   className={field('text', 'mt-1')}
                   value={configuration.pcAlpha}
                   onChange={(event) => {
@@ -603,98 +773,111 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 >
                   {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
+              </div>
             </div>
+          )}
+
+          {configuration.kind === 'rpcmci' && (
+            <RpcmciControls
+              configuration={configuration}
+              onChange={(next) => dispatch({ type: 'rpcmci-configured', configuration: next })}
+            />
           )}
 
           {configuration.kind === 'dynotears' && (
             <div className="mt-4 grid gap-3 @2xl/panel:grid-cols-3">
-              <label className="text-body text-ink">
-                Maximum lag
-                <Select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+              <div className="text-body text-ink">
+                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.dynotears.maximumLag} htmlFor="dynotears-maximum-lag" />
+                <Select id="dynotears-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
                 }}>
                   {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
-              <label className="text-body text-ink">
-                Contemporaneous λ
-                <Select className={field('text', 'mt-1')} value={configuration.lambdaW} onChange={(event) => {
+              </div>
+              <div className="text-body text-ink">
+                <ParameterLabel label="Contemporaneous λ" help={DISCOVERY_PARAMETER_HELP.dynotears.contemporaneousPenalty} htmlFor="dynotears-contemporaneous-penalty" />
+                <Select id="dynotears-contemporaneous-penalty" className={field('text', 'mt-1')} value={configuration.lambdaW} onChange={(event) => {
                   const value = penaltyFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'dynotears-lambda-w-selected', value })
                 }}>
                   {DYNOTEARS_PENALTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
-              <label className="text-body text-ink">
-                Lagged λ
-                <Select className={field('text', 'mt-1')} value={configuration.lambdaA} onChange={(event) => {
+              </div>
+              <div className="text-body text-ink">
+                <ParameterLabel label="Lagged λ" help={DISCOVERY_PARAMETER_HELP.dynotears.laggedPenalty} htmlFor="dynotears-lagged-penalty" />
+                <Select id="dynotears-lagged-penalty" className={field('text', 'mt-1')} value={configuration.lambdaA} onChange={(event) => {
                   const value = penaltyFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'dynotears-lambda-a-selected', value })
                 }}>
                   {DYNOTEARS_PENALTY_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
+              </div>
             </div>
           )}
 
           {configuration.kind === 'var-lingam' && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
-              <label className="text-body text-ink">
-                Maximum lag
-                <Select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+              <div className="text-body text-ink">
+                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.varLingam.maximumLag} htmlFor="var-lingam-maximum-lag" />
+                <Select id="var-lingam-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
                 }}>
                   {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
-              <label className="flex items-start gap-2 self-end pb-2 text-body text-ink">
-                <input type="checkbox" className="mt-1" checked={configuration.prune} onChange={(event) => dispatch({ type: 'var-lingam-prune-selected', value: event.target.checked })} />
-                <span>Adaptive-lasso pruning<span className="block text-faint">BIC selects the lag order up to the maximum.</span></span>
-              </label>
+              </div>
+              <div className="self-end pb-2 text-body text-ink">
+                <div className="flex items-center gap-1">
+                  <label htmlFor="var-lingam-prune" className="flex items-center gap-2">
+                    <input id="var-lingam-prune" type="checkbox" checked={configuration.prune} onChange={(event) => dispatch({ type: 'var-lingam-prune-selected', value: event.target.checked })} />
+                    Adaptive-lasso pruning
+                  </label>
+                  <ParameterHelp label="Adaptive-lasso pruning" help={DISCOVERY_PARAMETER_HELP.varLingam.prune} />
+                </div>
+                <span className="block pl-6 text-faint">BIC selects the lag order up to the maximum.</span>
+              </div>
             </div>
           )}
 
           {configuration.kind === 'ocse' && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
-              <label className="text-body text-ink">
-                Maximum lag
-                <Select className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+              <div className="text-body text-ink">
+                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.ocse.maximumLag} htmlFor="ocse-maximum-lag" />
+                <Select id="ocse-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
                 }}>
                   {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 8).map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
-              <label className="text-body text-ink">
-                Information estimator
-                <Select className={field('text', 'mt-1')} value={configuration.method} onChange={(event) => {
+              </div>
+              <div className="text-body text-ink">
+                <ParameterLabel label="Information estimator" help={DISCOVERY_PARAMETER_HELP.ocse.informationEstimator} htmlFor="ocse-information-estimator" />
+                <Select id="ocse-information-estimator" className={field('text', 'mt-1')} value={configuration.method} onChange={(event) => {
                   if (event.target.value === 'gaussian' || event.target.value === 'knn') dispatch({ type: 'ocse-method-selected', value: event.target.value })
                 }}>
                   <option value="gaussian">Gaussian conditional mutual information</option>
                   <option value="knn">k-nearest neighbours (k = 5)</option>
                 </Select>
-              </label>
-              <label className="text-body text-ink">
-                Test alpha
-                <Select className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
+              </div>
+              <div className="text-body text-ink">
+                <ParameterLabel label="Test alpha" help={DISCOVERY_PARAMETER_HELP.ocse.testAlpha} htmlFor="ocse-test-alpha" />
+                <Select id="ocse-test-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
                   const value = alphaFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'ocse-alpha-selected', value })
                 }}>
                   {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
-              <label className="text-body text-ink">
-                Permutation shuffles
-                <Select className={field('text', 'mt-1')} value={configuration.nShuffles} onChange={(event) => {
+              </div>
+              <div className="text-body text-ink">
+                <ParameterLabel label="Permutation shuffles" help={DISCOVERY_PARAMETER_HELP.ocse.permutationShuffles} htmlFor="ocse-permutation-shuffles" />
+                <Select id="ocse-permutation-shuffles" className={field('text', 'mt-1')} value={configuration.nShuffles} onChange={(event) => {
                   const value = shufflesFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'ocse-shuffles-selected', value })
                 }}>
                   {OCSE_SHUFFLE_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
                 </Select>
-              </label>
+              </div>
             </div>
           )}
 

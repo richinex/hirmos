@@ -35,7 +35,7 @@ export interface LagLink {
   readonly mark: string | null
 }
 
-export type LagGraphSemantics = 'stationary-lag-graph' | 'pag' | 'weighted-directed-evidence' | 'lagged-information' | 'temporal-dag'
+export type LagGraphSemantics = 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'temporal-dag'
 
 export interface LagGraph {
   readonly variables: NonEmptyArray<LagVariable>
@@ -81,16 +81,19 @@ export const describeStrength = (strength: LagLinkStrength): string => {
 const variablesOf = (run: Extract<DiscoveryRunArtifact, { readonly variables: unknown }>): NonEmptyArray<LagVariable> =>
   run.variables.map((column) => ({ id: column.id, name: column.name, latent: false })) as unknown as NonEmptyArray<LagVariable>
 
-/** Tigramite lag-graph marks into links. A contemporaneous pair is reported twice, mirrored; the lower index keeps it. */
-export function lagGraphFromTimeGraphRun(
-  run: Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>,
-): Result<LagGraph, LagGraphProblem> {
+const lagGraphFromMarkedMatrices = (
+  variables: NonEmptyArray<LagVariable>,
+  graph: readonly (readonly (readonly string[])[])[],
+  values: readonly (readonly (readonly number[])[])[],
+  tauMax: number,
+  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph'>,
+): Result<LagGraph, LagGraphProblem> => {
   const links: LagLink[] = []
-  const n = run.result.variables
+  const n = variables.length
   for (let source = 0; source < n; source += 1) {
     for (let target = 0; target < n; target += 1) {
-      for (let lag = 0; lag <= run.result.tauMax; lag += 1) {
-        const mark = run.result.graph[source][target][lag]
+      for (let lag = 0; lag <= tauMax; lag += 1) {
+        const mark = graph[source][target][lag]
         if (mark.length === 0) continue
         if (lag === 0 && source > target) continue
         const fromEndpoint = mark.length === 3 ? endpoint(mark[0]) : null
@@ -102,18 +105,44 @@ export function lagGraphFromTimeGraphRun(
           lag,
           fromEndpoint,
           toEndpoint,
-          strength: { kind: 'signed-unit', value: run.result.valMatrix[source][target][lag] },
+          strength: { kind: 'signed-unit', value: values[source][target][lag] },
           mark,
         })
       }
     }
   }
   return ok({
-    variables: variablesOf(run),
-    tauMax: run.result.tauMax,
+    variables,
+    tauMax,
     links,
-    semantics: run.kind === 'lpcmci-run' ? 'pag' : 'stationary-lag-graph',
+    semantics,
   })
+}
+
+/** Tigramite lag-graph marks into links. A contemporaneous pair is reported twice, mirrored; the lower index keeps it. */
+export function lagGraphFromTimeGraphRun(
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>,
+): Result<LagGraph, LagGraphProblem> {
+  return lagGraphFromMarkedMatrices(
+    variablesOf(run),
+    run.result.graph,
+    run.result.valMatrix,
+    run.result.tauMax,
+    run.kind === 'lpcmci-run' ? 'pag' : 'stationary-lag-graph',
+  )
+}
+
+export function lagGraphFromRpcmciRun(
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }>,
+  regime: number,
+): Result<LagGraph, LagGraphProblem> {
+  return lagGraphFromMarkedMatrices(
+    variablesOf(run),
+    run.result.graphs[regime],
+    run.result.valMatrices[regime],
+    run.result.tauMax,
+    'regime-specific-lag-graph',
+  )
 }
 
 /** Fitted weight matrices into links: every nonzero coefficient is a tail → arrow link at its lag. */
@@ -149,11 +178,12 @@ export function lagGraphFromOcseRun(run: Extract<DiscoveryRunArtifact, { readonl
   }
 }
 
-export function lagGraphFromRun(run: DiscoveryRunArtifact): Result<LagGraph, LagGraphProblem> {
+export function lagGraphFromRun(run: DiscoveryRunArtifact, regime = 0): Result<LagGraph, LagGraphProblem> {
   switch (run.kind) {
     case 'direct-lingam-run': return ok(lagGraphFromWeightRun(run))
     case 'pcmci-plus-run':
     case 'lpcmci-run': return lagGraphFromTimeGraphRun(run)
+    case 'rpcmci-run': return lagGraphFromRpcmciRun(run, regime)
     case 'dynotears-run':
     case 'var-lingam-run': return ok(lagGraphFromWeightRun(run))
     case 'ocse-run': return ok(lagGraphFromOcseRun(run))

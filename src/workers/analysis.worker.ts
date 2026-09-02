@@ -7,6 +7,7 @@ import {
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
   parseLpcmciEvidence,
+  parseRpcmciEvidence,
   parseOcseEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
@@ -79,6 +80,22 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         columns: command.columns,
         tauMax: command.tauMax,
         pcAlpha: command.pcAlpha,
+      }
+    case 'rpcmci':
+      return {
+        kind: 'rpcmci',
+        rows: command.rows,
+        columns: command.columns,
+        numRegimes: command.numRegimes,
+        maxTransitions: command.maxTransitions,
+        switchThres: command.switchThres,
+        numIterations: command.numIterations,
+        maxAnneal: command.maxAnneal,
+        tauMin: command.tauMin,
+        tauMax: command.tauMax,
+        pcAlpha: command.pcAlpha,
+        alphaLevel: command.alphaLevel,
+        seed: command.seed,
       }
     case 'dynotears':
       return {
@@ -288,6 +305,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'lpcmci-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'rpcmci': {
+        const result = parseRpcmciEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'rpcmci-succeeded', request: command.request, result: result.value })
         return
       }
       case 'dynotears': {

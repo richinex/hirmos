@@ -21,6 +21,7 @@ import { FigureParts, IntervalFigure, MetricTile } from '@/components/ui/figures
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
@@ -35,6 +36,7 @@ import {
   defaultConfiguration,
   describeCovariance,
   describeEstimator,
+  ESTIMATOR_GROUPS,
   ESTIMATOR_IDS,
   evaluateEstimatorEligibility,
   intervalTypeOf,
@@ -42,9 +44,12 @@ import {
   methodIdOf,
   newEstimationRunId,
   stationaryMarksOf,
+  type CausalEffectsAdjustment,
+  type CausalEffectsAdjustmentProblem,
   type CausalEstimate,
   type EstimationRunArtifact,
   type EstimatorConfiguration,
+  type EstimatorGroupId,
   type EstimatorId,
   type TotalEffectEstimator,
 } from '@/domain/estimation'
@@ -66,17 +71,44 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import type { AnalysisProgress } from '@/workers/analysisProtocol'
+import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 
 const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
 const TRACE_LEVELS: readonly (90 | 95 | 99)[] = [90, 95, 99]
 const VECM_TERMS = [['n', 'None'], ['co', 'Constant outside'], ['ci', 'Constant inside'], ['coli', 'Constant and trend']] as const
 
-const totalEffectEstimatorFromKind = (kind: TotalEffectEstimator['kind']): TotalEffectEstimator => {
+const ESTIMATOR_GROUP_LABELS: Readonly<Record<EstimatorGroupId, string>> = {
+  'adjusted-outcome': 'Adjustment',
+  'identified-functional': 'Identified',
+  'graph-adjusted-temporal': 'Temporal graph',
+  'dynamic-time-series': 'Dynamics',
+  'intervention-comparison': 'Interventions',
+}
+
+const estimatorGroupFor = (estimator: EstimatorId) =>
+  ESTIMATOR_GROUPS.find((group) => group.estimators.includes(estimator)) ?? ESTIMATOR_GROUPS[0]
+
+const adjustmentFromEstimator = (estimator: TotalEffectEstimator): CausalEffectsAdjustment => estimator.kind === 'wrightParents'
+  ? { kind: 'optimal' }
+  : estimator.adjustment
+
+const totalEffectEstimatorFromKind = (kind: TotalEffectEstimator['kind'], current: TotalEffectEstimator): TotalEffectEstimator => {
+  const adjustment = adjustmentFromEstimator(current)
   switch (kind) {
-    case 'linear': return { kind: 'linear' }
-    case 'knn': return { kind: 'knn', k: 15 }
+    case 'linear': return { kind: 'linear', adjustment }
+    case 'knn': return { kind: 'knn', k: 15, adjustment }
     case 'wrightParents': return { kind: 'wrightParents' }
     default: return assertNever(kind)
+  }
+}
+
+const adjustmentStrategyLabel = (adjustment: CausalEffectsAdjustment): string => {
+  switch (adjustment.kind) {
+    case 'optimal': return 'Complete O-set'
+    case 'minimizedOptimal': return 'Minimized O-set'
+    case 'collidersMinimizedOptimal': return 'Collider-minimized O-set'
+    case 'explicit': return 'User-supplied set'
+    default: return assertNever(adjustment)
   }
 }
 
@@ -84,6 +116,34 @@ type Job =
   | { readonly kind: 'idle' }
   | { readonly kind: 'running'; readonly progress: AnalysisProgress | null }
   | { readonly kind: 'failed'; readonly detail: string }
+
+type ExplicitAdjustmentMemberDraft =
+  | { readonly kind: 'closed' }
+  | { readonly kind: 'editing'; readonly variable: number | null; readonly lag: number }
+
+const CLOSED_ADJUSTMENT_DRAFT: ExplicitAdjustmentMemberDraft = { kind: 'closed' }
+
+const timeIndexedNodeLabel = (
+  node: readonly [number, number],
+  names: readonly string[],
+): string => {
+  const variable = names[node[0]] ?? `Variable ${node[0] + 1}`
+  return node[1] === 0 ? `${variable} (t)` : `${variable} (t−${Math.abs(node[1])})`
+}
+
+const describeAdjustmentProblems = (
+  problems: readonly CausalEffectsAdjustmentProblem[],
+  names: readonly string[],
+): string => problems.map((problem) => {
+  switch (problem.kind) {
+    case 'queryTreatment': return `${timeIndexedNodeLabel(problem.node, names)} is the treatment node in this query.`
+    case 'queryOutcome': return `${timeIndexedNodeLabel(problem.node, names)} is the outcome node in this query.`
+    case 'laterTreatmentOccurrence': return `${timeIndexedNodeLabel(problem.node, names)} is a later occurrence of the treatment variable than the intervention node.`
+    case 'forbiddenNode': return `${timeIndexedNodeLabel(problem.node, names)} is excluded by the time-indexed adjustment criterion.`
+    case 'openNonCausalPath': return 'The complete set leaves at least one non-causal treatment–outcome path open.'
+    default: return assertNever(problem)
+  }
+}).join(' ')
 
 interface PanelBinding {
   readonly prepared: PreparedDatasetArtifact['id']
@@ -454,12 +514,13 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       }
       case 'causal-effects-run': {
         const { evidence } = run
-        const nodeName = (node: readonly [number, number]) => `${run.columns[node[0]]?.name ?? node[0]}${node[1] === 0 ? '' : ` (t${node[1]})`}`
+        const nodeName = (node: readonly [number, number]) => `${run.columns[node[0]]?.name ?? node[0]}${node[1] === 0 ? '' : ` (t−${Math.abs(node[1])})`}`
         const fitTiles = (() => {
           switch (evidence.fit.kind) {
             case 'unfitted': return []
-            case 'adjustedLinear': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `linear · τ max ${evidence.tauMax}` }]
-            case 'adjustedKnn': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `${evidence.fit.k}-neighbour · τ max ${evidence.tauMax}` }]
+            case 'invalidAdjustment': return []
+            case 'adjustedLinear': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `${adjustmentStrategyLabel(evidence.fit.selection)} · linear · τ max ${evidence.tauMax}` }]
+            case 'adjustedKnn': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `${adjustmentStrategyLabel(evidence.fit.selection)} · ${evidence.fit.k}-neighbour · τ max ${evidence.tauMax}` }]
             case 'wrightParents': return [
               { label: 'Direct effect', value: formatStatistic('raw', evidence.fit.directEffect), context: 'sum of direct path contrasts' },
               { label: 'Indirect effect', value: formatStatistic('raw', evidence.fit.indirectEffect), context: `${evidence.fit.paths.length} directed paths · ${evidence.fit.coefficients.length} parent coefficients` },
@@ -485,19 +546,27 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       default: return assertNever(run)
     }
   })()
+  const adjustmentValue = formatWords(run.kind === 'frontdoor-two-stage-run'
+    ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
+    : run.estimate.adjustment.kind === 'structural-parent-model'
+      ? `${run.estimate.adjustment.coefficients} parent coefficients · ${run.estimate.adjustment.paths} directed paths`
+      : adjustmentLabels(run.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(run.estimate.adjustment).join(', '))
+
+  // A method that reports the set it actually fitted names the same members as the recorded estimate
+  // whenever it accepted them, so the two tiles would print one value twice and leave the grid's last
+  // row part-filled. Keep the one tile and let it carry how the set was chosen.
+  const restated = tiles.find((tile) => tile.label === 'Adjustment set' && tile.value.text === adjustmentValue.text)
+
   return (
     <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
       <MetricTile
         label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
         size="compact"
         frame="cell"
-        value={formatWords(run.kind === 'frontdoor-two-stage-run'
-          ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
-          : run.estimate.adjustment.kind === 'structural-parent-model'
-            ? `${run.estimate.adjustment.coefficients} parent coefficients · ${run.estimate.adjustment.paths} directed paths`
-            : adjustmentLabels(run.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(run.estimate.adjustment).join(', '))}
+        value={adjustmentValue}
+        context={restated?.context}
       />
-      {tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
+      {tiles.filter((tile) => tile !== restated).map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </div>
   )
 }
@@ -646,20 +715,26 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     || (identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified'))
   const chartTheme = useChartTheme()
   const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
+  const [adjustmentDraft, setAdjustmentDraft] = useState<ExplicitAdjustmentMemberDraft>(CLOSED_ADJUSTMENT_DRAFT)
   const latestIdentification = identified.at(-1) ?? null
   const latestStudy = studies.find((candidate) => candidate.id === latestIdentification?.study) ?? null
+  const initialEstimator: EstimatorId = latestIdentification?.result.kind === 'graphically-identified'
+    ? 'frontdoor-two-stage'
+    : latestIdentification?.result.kind === 'counterfactually-identified'
+      ? 'binary-ett-idc-star'
+      : prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
   const [state, dispatch] = useReducer(step, null, (): State => ({
     identification: latestIdentification?.id ?? null,
-    estimator: latestIdentification?.result.kind === 'graphically-identified'
-      ? 'frontdoor-two-stage'
-      : latestIdentification?.result.kind === 'counterfactually-identified'
-        ? 'binary-ett-idc-star'
-        : prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression',
+    estimator: initialEstimator,
     configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, latestStudy)])) as Record<EstimatorId, EstimatorConfiguration>,
     job: { kind: 'idle' },
     panelPreflight: { kind: 'not-required' },
     studyDataPreflight: { kind: 'not-required' },
   }))
+  const [visibleEstimatorGroup, setVisibleEstimatorGroup] = useState<EstimatorGroupId>(() => estimatorGroupFor(initialEstimator).id)
+  useEffect(() => setVisibleEstimatorGroup(estimatorGroupFor(state.estimator).id), [state.estimator])
+  const visibleGroup = ESTIMATOR_GROUPS.find((group) => group.id === visibleEstimatorGroup) ?? ESTIMATOR_GROUPS[0]
+  const selectedEstimatorIsVisible = visibleGroup.estimators.includes(state.estimator)
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
   const study = identification === null ? null : studies.find((candidate) => candidate.id === identification.study) ?? null
   const studyScale = prepared.kind === 'prepared-time-series' && study !== null
@@ -787,10 +862,23 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   }, [document, identification, panelPreflight, prepared, state.configurations, stationarity, study, studyDataFacts])
   const eligibility = eligibilityByEstimator.get(state.estimator) ?? null
   const configure = (next: EstimatorConfiguration) => dispatch({ type: 'configured', configuration: next })
+  const adjustmentDraftOpen = configuration.kind === 'causal-effects-total'
+    && configuration.estimator.kind !== 'wrightParents'
+    && configuration.estimator.adjustment.kind === 'explicit'
+    && adjustmentDraft.kind === 'editing'
+
+  useEffect(() => {
+    const explicitAdjustmentActive = configuration.kind === 'causal-effects-total'
+      && configuration.estimator.kind !== 'wrightParents'
+      && configuration.estimator.adjustment.kind === 'explicit'
+    if (!explicitAdjustmentActive && adjustmentDraft.kind === 'editing') {
+      setAdjustmentDraft(CLOSED_ADJUSTMENT_DRAFT)
+    }
+  }, [adjustmentDraft.kind, configuration])
 
   useRunActivity(onActivity, state.job.kind === 'running' ? { label: describeEstimator(state.estimator), progress: state.job.progress === null ? null : state.job.progress.completed / Math.max(1, state.job.progress.total) } : null)
   const execute = async () => {
-    if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running' || !method.ok) return
+    if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running' || adjustmentDraftOpen || !method.ok) return
     if (identification.result.kind !== 'identified'
       && identification.result.kind !== 'counterfactually-identified'
       && !(identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified')) return
@@ -1068,6 +1156,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             uncertainty: configuration.uncertainty,
           }, (progress) => dispatch({ type: 'run-progressed', progress }))
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (evidence.value.fit.kind === 'invalidAdjustment') {
+            dispatch({
+              type: 'run-failed',
+              detail: describeAdjustmentProblems(evidence.value.fit.problems, nodes.map((node) => node.name)),
+            })
+            return
+          }
           const run = { kind: 'causal-effects-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, { ...run, graphVariables })
           const columns = nodes.map((node) => (node.kind === 'observed' ? { node: node.id, column: node.column, name: node.name } : { node: node.id, column: study.treatment.column, name: `${node.name} (unmeasured)` })) as unknown as NonEmptyArray<StudyVariable>
@@ -1104,23 +1199,31 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
 
   const latestRun = runs.at(-1) ?? null
   const controlCandidates = study === null ? [] : profile.columns.filter((column) => prepared.columns.includes(column.id) && column.id !== study.outcome.column && column.id !== study.treatment.column)
+  const temporalAdjustmentCandidates = document === null || study === null
+    ? []
+    : document.current.graph.nodes.flatMap((node, index) => node.kind === 'observed'
+      ? [{ index, name: node.name }]
+      : [])
+  const temporalAdjustmentMaxLag = document === null || configuration.kind !== 'causal-effects-total'
+    ? 0
+    : stationaryMarksOf(document).statLag + configuration.treatmentLag
 
   const controls = ((): React.ReactNode => {
     switch (configuration.kind) {
       case 'frontdoor-two-stage':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><span className={fieldLabel}>Control value</span><input type="number" step="any" aria-label="Front-door control value" className={field('text', 'mt-1')} value={configuration.interventions[0]} onChange={(event) => configure({ ...configuration, interventions: [Number(event.target.value) || 0, configuration.interventions[1]] })} /></label>
-            <label className="block"><span className={fieldLabel}>Treatment value</span><input type="number" step="any" aria-label="Front-door treatment value" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
-            <label className="block"><span className={fieldLabel}>Bootstrap resamples</span><input type="number" min={20} max={5000} aria-label="Front-door bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
-            <label className="block"><span className={fieldLabel}>Bootstrap seed</span><input type="number" min={0} aria-label="Front-door bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Control value" help={ESTIMATION_PARAMETER_HELP.frontdoor.controlValue} /><input type="number" step="any" aria-label="Front-door control value" className={field('text', 'mt-1')} value={configuration.interventions[0]} onChange={(event) => configure({ ...configuration, interventions: [Number(event.target.value) || 0, configuration.interventions[1]] })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Treatment value" help={ESTIMATION_PARAMETER_HELP.frontdoor.treatmentValue} /><input type="number" step="any" aria-label="Front-door treatment value" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap resamples" help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapResamples} /><input type="number" min={20} max={5000} aria-label="Front-door bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapSeed} /><input type="number" min={0} aria-label="Front-door bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
             <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The first regression estimates treatment → mediator. The second estimates mediator → outcome while adjusting for treatment. Their product gives the linear front-door contrast; the interval uses a seeded row bootstrap.</p>
           </div>
         )
       case 'backdoor-linear-regression':
         return (
           <div>
-            <span className={fieldLabel}>Interval</span>
+            <ParameterLabel className={fieldLabel} label="Interval" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.interval} />
             <SegmentedControl className="mt-1" ariaLabel="Interval covariance" value={configuration.covariance} onChange={(covariance) => configure({ ...configuration, covariance })} options={[{ value: 'hac', label: 'Newey–West HAC' }, { value: 'classical', label: 'Classical' }]} />
             <p className={cn(fieldHint, 'max-w-[65ch]')}>95% confidence level. Heteroskedasticity and autocorrelation consistent (HAC) covariance uses a Bartlett kernel and the statsmodels default bandwidth. The classical interval assumes independent errors.</p>
           </div>
@@ -1136,20 +1239,20 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 <p className={cn(fieldHint, 'mt-1')}>Change the target in Study design, not in the estimator.</p>
               </div>
             )}
-            <label className="block"><span className={fieldLabel}>Fold seed</span><input type="number" min={0} aria-label="Fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={ESTIMATION_PARAMETER_HELP.dml.foldSeed} /><input type="number" min={0} aria-label="Fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
             <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity chapter repeats this fit at the same seed before its refuters.</p>
           </div>
         )
       case 'ardl-pss':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><span className={fieldLabel}>Maximum lag</span><input type="number" min={1} max={24} aria-label="Maximum lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => configure({ ...configuration, maxLag: Math.max(1, Math.min(24, Number(event.target.value) || 1)) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Maximum lag" help={ESTIMATION_PARAMETER_HELP.ardl.maximumLag} /><input type="number" min={1} max={24} aria-label="Maximum lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => configure({ ...configuration, maxLag: Math.max(1, Math.min(24, Number(event.target.value) || 1)) })} /></label>
             <div>
-              <span className={fieldLabel}>Deterministic terms</span>
+              <ParameterLabel className={fieldLabel} label="Deterministic terms" help={ESTIMATION_PARAMETER_HELP.ardl.deterministicTerms} />
               <SegmentedControl className="mt-1" fill ariaLabel="Deterministic terms" value={configuration.trend} onChange={(trend) => configure({ ...configuration, trend, case: trend === 'c' ? 3 : 4 })} options={[{ value: 'c', label: 'Constant' }, { value: 'ct', label: 'Constant and trend' }]} />
             </div>
             <div>
-              <span className={fieldLabel}>PSS case</span>
+              <ParameterLabel className={fieldLabel} label="PSS case" help={ESTIMATION_PARAMETER_HELP.ardl.pssCase} />
               <SegmentedControl className="mt-1" fill ariaLabel="PSS case" value={String(configuration.case)} onChange={(chosen) => { const candidate = PSS_CASES[configuration.trend].find((item) => String(item) === chosen); if (candidate !== undefined) configure({ ...configuration, case: candidate }) }} options={PSS_CASES[configuration.trend].map((candidate) => ({ value: String(candidate), label: `Case ${candidate}` }))} />
             </div>
             <p className="m-0 max-w-[65ch] self-end text-body text-faint">AIC lag search, error-correction fit, delta-method interval on the long-run effect, bounds test at the recorded case.</p>
@@ -1158,25 +1261,25 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'vecm':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><span className={fieldLabel}>Maximum lags</span><input type="number" min={1} max={24} aria-label="Maximum lags" className={field('text', 'mt-1')} value={configuration.maxLags} onChange={(event) => configure({ ...configuration, maxLags: Math.max(1, Math.min(24, Number(event.target.value) || 1)) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Maximum lags" help={ESTIMATION_PARAMETER_HELP.vecm.maximumLags} /><input type="number" min={1} max={24} aria-label="Maximum lags" className={field('text', 'mt-1')} value={configuration.maxLags} onChange={(event) => configure({ ...configuration, maxLags: Math.max(1, Math.min(24, Number(event.target.value) || 1)) })} /></label>
             <div>
-              <span className={fieldLabel}>Deterministic terms</span>
+              <ParameterLabel className={fieldLabel} label="Deterministic terms" help={ESTIMATION_PARAMETER_HELP.vecm.deterministicTerms} />
               <Select className={field('text', 'mt-1')} aria-label="VECM deterministic terms" value={configuration.deterministic} onChange={(event) => { const term = VECM_TERMS.find(([value]) => value === event.target.value); if (term !== undefined) configure({ ...configuration, deterministic: term[0] }) }}>
                 {VECM_TERMS.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
               </Select>
             </div>
             <div>
-              <span className={fieldLabel}>Trace significance</span>
+              <ParameterLabel className={fieldLabel} label="Trace significance" help={ESTIMATION_PARAMETER_HELP.vecm.traceSignificance} />
               <SegmentedControl className="mt-1" fill ariaLabel="Trace significance" value={String(configuration.significance)} onChange={(chosen) => { const level = TRACE_LEVELS.find((item) => String(item) === chosen); if (level !== undefined) configure({ ...configuration, significance: level }) }} options={TRACE_LEVELS.map((level) => ({ value: String(level), label: `${level}%` }))} />
             </div>
-            <label className="block"><span className={fieldLabel}>Chow break row</span><input type="number" min={4} max={prepared.observations - 4} aria-label="Chow break row" placeholder="none" className={field('text', 'mt-1')} value={configuration.breakIndex ?? ''} onChange={(event) => configure({ ...configuration, breakIndex: event.target.value === '' ? null : Math.max(4, Math.min(prepared.observations - 4, Math.floor(Number(event.target.value) || 4))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Chow break row" help={ESTIMATION_PARAMETER_HELP.vecm.chowBreakRow} /><input type="number" min={4} max={prepared.observations - 4} aria-label="Chow break row" placeholder="none" className={field('text', 'mt-1')} value={configuration.breakIndex ?? ''} onChange={(event) => configure({ ...configuration, breakIndex: event.target.value === '' ? null : Math.max(4, Math.min(prepared.observations - 4, Math.floor(Number(event.target.value) || 4))) })} /></label>
           </div>
         )
       case 'synthetic-control':
         return (
           <div className="grid gap-3">
             <div>
-              <span className={fieldLabel}>Intervention start</span>
+              <ParameterLabel className={fieldLabel} label="Intervention start" help={ESTIMATION_PARAMETER_HELP.syntheticControl.interventionStart} />
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <RadioList legend="Synthetic intervention start" legendHidden value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(3, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
                 {configuration.start.kind === 'row' && (
@@ -1186,7 +1289,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             </div>
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className={fieldLabel}>Donor series</span>
+                <ParameterLabel className={fieldLabel} label="Donor series" help={ESTIMATION_PARAMETER_HELP.syntheticControl.donorSeries} />
                 {controlCandidates.length > 0 && (
                   <div className="flex items-center gap-2">
                     <button type="button" className={button('quiet')} onClick={() => configure({ ...configuration, donors: controlCandidates.map((column) => column.id) })}>Select all</button>
@@ -1205,8 +1308,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </div>
             </div>
             <div className="grid gap-3 @md/panel:grid-cols-2">
-              <label className="block"><span className={fieldLabel}>Cross-fit folds</span><input type="number" min={2} max={20} aria-label="Cross-fit folds" className={field('text', 'mt-1')} value={configuration.crossFitFolds} onChange={(event) => configure({ ...configuration, crossFitFolds: Math.max(2, Math.min(20, Math.floor(Number(event.target.value) || 2))) })} /></label>
-              <label className="block"><span className={fieldLabel}>Inference alpha</span><input type="number" min={0.001} max={0.5} step={0.01} aria-label="Synthetic-control inference alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => configure({ ...configuration, alpha: Math.max(0.001, Math.min(0.5, Number(event.target.value) || 0.05)) })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Cross-fit folds" help={ESTIMATION_PARAMETER_HELP.syntheticControl.crossFitFolds} /><input type="number" min={2} max={20} aria-label="Cross-fit folds" className={field('text', 'mt-1')} value={configuration.crossFitFolds} onChange={(event) => configure({ ...configuration, crossFitFolds: Math.max(2, Math.min(20, Math.floor(Number(event.target.value) || 2))) })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Inference alpha" help={ESTIMATION_PARAMETER_HELP.syntheticControl.inferenceAlpha} /><input type="number" min={0.001} max={0.5} step={0.01} aria-label="Synthetic-control inference alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => configure({ ...configuration, alpha: Math.max(0.001, Math.min(0.5, Number(event.target.value) || 0.05)) })} /></label>
             </div>
           </div>
         )
@@ -1217,8 +1320,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               The primary estimator is predeclared as synthetic difference-in-differences. Conventional DID and synthetic control are reported as required comparisons; the primary result cannot be changed after viewing the estimates.
             </p>
             <div className="grid gap-3 @md/panel:grid-cols-2">
-              <label className="block"><span className={fieldLabel}>Placebo replications</span><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
-              <label className="block"><span className={fieldLabel}>Placebo seed</span><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Placebo replications" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboReplications} /><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
             </div>
             {panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
             {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted">Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units · {panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods · adoption at {panelPreflight.layout.adoptionLabel}.</p>}
@@ -1227,26 +1330,26 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'negbin-nuts':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><span className={fieldLabel}>Warmup</span><input type="number" min={10} max={5000} aria-label="Warmup" className={field('text', 'mt-1')} value={configuration.warmup} onChange={(event) => configure({ ...configuration, warmup: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
-            <label className="block"><span className={fieldLabel}>Draws</span><input type="number" min={10} max={5000} aria-label="Draws" className={field('text', 'mt-1')} value={configuration.samples} onChange={(event) => configure({ ...configuration, samples: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
-            <label className="block"><span className={fieldLabel}>Seed</span><input type="number" min={0} aria-label="Sampler seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Warmup" help={ESTIMATION_PARAMETER_HELP.nuts.warmup} /><input type="number" min={10} max={5000} aria-label="Warmup" className={field('text', 'mt-1')} value={configuration.warmup} onChange={(event) => configure({ ...configuration, warmup: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Draws" help={ESTIMATION_PARAMETER_HELP.nuts.draws} /><input type="number" min={10} max={5000} aria-label="Draws" className={field('text', 'mt-1')} value={configuration.samples} onChange={(event) => configure({ ...configuration, samples: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={ESTIMATION_PARAMETER_HELP.nuts.seed} /><input type="number" min={0} aria-label="Sampler seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
             <p className="m-0 self-end text-body text-faint">Gamma-Poisson likelihood, standardised treatment and confounder, NUTS with step-size and diagonal mass adaptation at target acceptance 0.8.</p>
           </div>
         )
       case 'bayesian-gaussian':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><span className={fieldLabel}>Warmup</span><input type="number" min={10} max={5000} aria-label="Warmup" className={field('text', 'mt-1')} value={configuration.warmup} onChange={(event) => configure({ ...configuration, warmup: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
-            <label className="block"><span className={fieldLabel}>Draws per chain</span><input type="number" min={10} max={5000} aria-label="Draws per chain" className={field('text', 'mt-1')} value={configuration.samples} onChange={(event) => configure({ ...configuration, samples: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
-            <label className="block"><span className={fieldLabel}>Seed</span><input type="number" min={0} aria-label="Sampler seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Warmup" help={ESTIMATION_PARAMETER_HELP.nuts.warmup} /><input type="number" min={10} max={5000} aria-label="Warmup" className={field('text', 'mt-1')} value={configuration.warmup} onChange={(event) => configure({ ...configuration, warmup: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Draws per chain" help={ESTIMATION_PARAMETER_HELP.nuts.draws} /><input type="number" min={10} max={5000} aria-label="Draws per chain" className={field('text', 'mt-1')} value={configuration.samples} onChange={(event) => configure({ ...configuration, samples: Math.max(10, Math.min(5000, Math.floor(Number(event.target.value) || 10))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={ESTIMATION_PARAMETER_HELP.nuts.seed} /><input type="number" min={0} aria-label="Sampler seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
             <p className="m-0 self-end text-body text-faint">Normal(0, 10) intercepts, Normal(0, 1) slopes, half-normal(10) residual scale; non-binary adjustment columns are standardised; three NUTS chains with step-size and diagonal mass adaptation at target acceptance 0.8.</p>
           </div>
         )
       case 'discrete-bn-query':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><span className={fieldLabel}>Quantile bins</span><input type="number" min={2} max={10} aria-label="Quantile bins" className={field('text', 'mt-1')} value={configuration.bins} onChange={(event) => configure({ ...configuration, bins: Math.max(2, Math.min(10, Math.floor(Number(event.target.value) || 2))) })} /></label>
-            <label className="block"><span className={fieldLabel}>Equivalent sample size</span><input type="number" min={0.1} step="any" aria-label="Equivalent sample size" className={field('text', 'mt-1')} value={configuration.equivalentSampleSize} onChange={(event) => configure({ ...configuration, equivalentSampleSize: Math.max(0.1, Number(event.target.value) || 0.1) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Quantile bins" help={ESTIMATION_PARAMETER_HELP.discreteBn.quantileBins} /><input type="number" min={2} max={10} aria-label="Quantile bins" className={field('text', 'mt-1')} value={configuration.bins} onChange={(event) => configure({ ...configuration, bins: Math.max(2, Math.min(10, Math.floor(Number(event.target.value) || 2))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Equivalent sample size" help={ESTIMATION_PARAMETER_HELP.discreteBn.equivalentSampleSize} /><input type="number" min={0.1} step="any" aria-label="Equivalent sample size" className={field('text', 'mt-1')} value={configuration.equivalentSampleSize} onChange={(event) => configure({ ...configuration, equivalentSampleSize: Math.max(0.1, Number(event.target.value) || 0.1) })} /></label>
             <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Every DAG node is cut into quantile bins; the BDeu prior smooths the conditional tables; the effect contrasts the highest and lowest treatment bins.</p>
           </div>
         )
@@ -1258,50 +1361,121 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'negative-binomial-ingarch':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <div><span className={fieldLabel}>Mean link</span><SegmentedControl className="mt-1" ariaLabel="INGARCH mean link" value={configuration.link} onChange={(link) => configure({ ...configuration, link })} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>
-            <LagListField label="Past count lags" lags={configuration.pastObservationLags} onChange={(pastObservationLags) => configure({ ...configuration, pastObservationLags })} />
-            <LagListField label="Past mean lags" lags={configuration.pastMeanLags} onChange={(pastMeanLags) => configure({ ...configuration, pastMeanLags })} />
-            <label className="block"><span className={fieldLabel}>Forecast periods</span><input type="number" min={1} max={240} className={field('text', 'mt-1')} value={configuration.horizon} onChange={(event) => configure({ ...configuration, horizon: Math.max(1, Math.min(240, Math.floor(Number(event.target.value) || 1))) })} /></label>
-            <div><span className={fieldLabel}>Treatment schedule</span><SegmentedControl className="mt-1" ariaLabel="INGARCH treatment schedule" value={configuration.schedule.kind} onChange={(kind) => configure({ ...configuration, schedule: kind === 'decaying' ? { kind: 'decaying', delta: 0.6 } : { kind } })} options={[{ value: 'point', label: 'One period' }, { value: 'persistent', label: 'Persistent' }, { value: 'decaying', label: 'Decaying' }]} /></div>
-            <label className="block"><span className={fieldLabel}>Control value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.controlValue} onChange={(event) => configure({ ...configuration, controlValue: Number(event.target.value) || 0 })} /></label>
-            <label className="block"><span className={fieldLabel}>Treatment value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.treatmentValue} onChange={(event) => configure({ ...configuration, treatmentValue: Number(event.target.value) || 0 })} /></label>
-            {configuration.schedule.kind === 'decaying' && <label className="block"><span className={fieldLabel}>Decay δ</span><input type="number" min={0} max={1} step={0.05} className={field('text', 'mt-1')} value={configuration.schedule.delta} onChange={(event) => configure({ ...configuration, schedule: { kind: 'decaying', delta: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} /></label>}
+            <div><ParameterLabel className={fieldLabel} label="Mean link" help={ESTIMATION_PARAMETER_HELP.ingarch.meanLink} /><SegmentedControl className="mt-1" ariaLabel="INGARCH mean link" value={configuration.link} onChange={(link) => configure({ ...configuration, link })} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>
+            <LagListField label="Past count lags" help={ESTIMATION_PARAMETER_HELP.ingarch.pastCountLags} lags={configuration.pastObservationLags} onChange={(pastObservationLags) => configure({ ...configuration, pastObservationLags })} />
+            <LagListField label="Past mean lags" help={ESTIMATION_PARAMETER_HELP.ingarch.pastMeanLags} lags={configuration.pastMeanLags} onChange={(pastMeanLags) => configure({ ...configuration, pastMeanLags })} />
+            <label className="block"><ParameterLabel className={fieldLabel} label="Forecast periods" help={ESTIMATION_PARAMETER_HELP.ingarch.forecastPeriods} /><input type="number" min={1} max={240} className={field('text', 'mt-1')} value={configuration.horizon} onChange={(event) => configure({ ...configuration, horizon: Math.max(1, Math.min(240, Math.floor(Number(event.target.value) || 1))) })} /></label>
+            <div><ParameterLabel className={fieldLabel} label="Treatment schedule" help={ESTIMATION_PARAMETER_HELP.ingarch.treatmentSchedule} /><SegmentedControl className="mt-1" ariaLabel="INGARCH treatment schedule" value={configuration.schedule.kind} onChange={(kind) => configure({ ...configuration, schedule: kind === 'decaying' ? { kind: 'decaying', delta: 0.6 } : { kind } })} options={[{ value: 'point', label: 'One period' }, { value: 'persistent', label: 'Persistent' }, { value: 'decaying', label: 'Decaying' }]} /></div>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Control value" help={ESTIMATION_PARAMETER_HELP.ingarch.controlValue} /><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.controlValue} onChange={(event) => configure({ ...configuration, controlValue: Number(event.target.value) || 0 })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Treatment value" help={ESTIMATION_PARAMETER_HELP.ingarch.treatmentValue} /><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.treatmentValue} onChange={(event) => configure({ ...configuration, treatmentValue: Number(event.target.value) || 0 })} /></label>
+            {configuration.schedule.kind === 'decaying' && <label className="block"><ParameterLabel className={fieldLabel} label="Decay δ" help={ESTIMATION_PARAMETER_HELP.ingarch.decay} /><input type="number" min={0} max={1} step={0.05} className={field('text', 'mt-1')} value={configuration.schedule.delta} onChange={(event) => configure({ ...configuration, schedule: { kind: 'decaying', delta: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} /></label>}
             <p className="m-0 max-w-[72ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The additive link expresses effects in expected counts and requires non-negative regressors. The multiplicative link expresses effects on the log expected count and permits signed regressors. Both use the treatment and identified same-period adjustment variables with the selected count and mean lags; no sampling interval is reported.</p>
           </div>
         )
       case 'causal-effects-total': {
         const bootstrap = configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty : null
+        const adjustedEstimator = configuration.estimator.kind === 'wrightParents' ? null : configuration.estimator
+        const explicitAdjustment = adjustedEstimator?.adjustment.kind === 'explicit' ? adjustedEstimator.adjustment : null
+        const setAdjustment = (adjustment: CausalEffectsAdjustment) => {
+          if (adjustedEstimator === null) return
+          configure({ ...configuration, estimator: { ...adjustedEstimator, adjustment } })
+        }
+        const setNeighbours = (k: number) => {
+          if (adjustedEstimator?.kind !== 'knn') return
+          configure({ ...configuration, estimator: { ...adjustedEstimator, k } })
+        }
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <div>
-              <span className={fieldLabel}>Effect model</span>
-              <SegmentedControl className="mt-1" ariaLabel="CausalEffects model" value={configuration.estimator.kind} onChange={(kind) => configure({ ...configuration, estimator: totalEffectEstimatorFromKind(kind) })} options={[{ value: 'linear', label: 'Adjusted linear' }, { value: 'knn', label: 'Adjusted k-NN' }, { value: 'wrightParents', label: 'Wright paths' }]} />
+              <ParameterLabel className={fieldLabel} label="Effect model" help={ESTIMATION_PARAMETER_HELP.causalEffects.effectModel} />
+              <SegmentedControl className="mt-1" ariaLabel="CausalEffects model" value={configuration.estimator.kind} onChange={(kind) => configure({ ...configuration, estimator: totalEffectEstimatorFromKind(kind, configuration.estimator) })} options={[{ value: 'linear', label: 'Adjusted linear' }, { value: 'knn', label: 'Adjusted k-NN' }, { value: 'wrightParents', label: 'Wright paths' }]} />
             </div>
             {configuration.estimator.kind === 'knn' && (
-              <label className="block"><span className={fieldLabel}>Neighbours k</span><input type="number" min={1} max={100} className={field('text', 'mt-1')} value={configuration.estimator.k} onChange={(event) => configure({ ...configuration, estimator: { kind: 'knn', k: Math.max(1, Math.min(100, Number(event.target.value) || 1)) } })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Neighbours k" help={ESTIMATION_PARAMETER_HELP.causalEffects.neighbours} /><input type="number" min={1} max={100} className={field('text', 'mt-1')} value={configuration.estimator.k} onChange={(event) => setNeighbours(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></label>
             )}
             {configuration.estimator.kind === 'wrightParents' && (
               <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Fits each node on its time-indexed parents, then sums products of coefficients along directed treatment-to-outcome paths. The result separates direct and indirect path contributions.</p>
             )}
-            <label className="block"><span className={fieldLabel}>Treatment lag</span><input type="number" min={0} max={20} className={field('text', 'mt-1')} value={configuration.treatmentLag} onChange={(event) => configure({ ...configuration, treatmentLag: Math.max(0, Math.min(20, Number(event.target.value) || 0)) })} /></label>
+            {adjustedEstimator !== null && (
+              <div className="@md/panel:col-span-2">
+                <label className="block">
+                  <ParameterLabel className={fieldLabel} label="Time-indexed adjustment set" help={ESTIMATION_PARAMETER_HELP.causalEffects.adjustmentSet} />
+                  <Select className={field('text', 'mt-1')} value={adjustedEstimator.adjustment.kind} onChange={(event) => {
+                    setAdjustmentDraft(CLOSED_ADJUSTMENT_DRAFT)
+                    switch (event.target.value) {
+                      case 'optimal': setAdjustment({ kind: 'optimal' }); break
+                      case 'minimizedOptimal': setAdjustment({ kind: 'minimizedOptimal' }); break
+                      case 'collidersMinimizedOptimal': setAdjustment({ kind: 'collidersMinimizedOptimal' }); break
+                      case 'explicit': setAdjustment({ kind: 'explicit', nodes: [] }); break
+                    }
+                  }}>
+                    <option value="optimal">Complete O-set</option>
+                    <option value="collidersMinimizedOptimal">Collider-minimized O-set</option>
+                    <option value="minimizedOptimal">Minimized O-set</option>
+                    <option value="explicit">User-supplied set</option>
+                  </Select>
+                </label>
+                <p className={cn(fieldHint, 'mt-1 max-w-[72ch]')}>The generated choices are computed from the stationary graph. A user-supplied set is checked against every open non-causal treatment–outcome path before fitting.</p>
+              </div>
+            )}
+            {explicitAdjustment !== null && (
+              <div className="grid gap-2 @md/panel:col-span-2 @4xl/panel:col-span-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <ParameterLabel className={fieldLabel} label="Adjustment members" help={ESTIMATION_PARAMETER_HELP.causalEffects.adjustmentMembers} />
+                  <button type="button" className={button('quiet')} disabled={temporalAdjustmentCandidates.length === 0 || adjustmentDraft.kind === 'editing'} onClick={() => setAdjustmentDraft({ kind: 'editing', variable: null, lag: 0 })}>Add member</button>
+                </div>
+                {explicitAdjustment.nodes.length === 0 && <p className="m-0 text-body text-faint">The empty set will be tested. It is valid only when the graph has no open non-causal treatment–outcome path.</p>}
+                {adjustmentDraft.kind === 'editing' && (
+                  <div className="grid grid-cols-[minmax(0,1fr)_8rem_auto_auto] items-end gap-2 rounded-lg border border-hair bg-well p-2">
+                    <label className="block">
+                      <ParameterLabel className={fieldLabel} label="Variable" help={ESTIMATION_PARAMETER_HELP.causalEffects.variable} />
+                      <Select className={field('text', 'mt-1')} value={adjustmentDraft.variable ?? ''} onChange={(event) => setAdjustmentDraft({ ...adjustmentDraft, variable: event.target.value === '' ? null : Number(event.target.value) })}>
+                        <option value="">Choose a variable</option>
+                        {temporalAdjustmentCandidates.map((candidate) => <option key={candidate.index} value={candidate.index}>{candidate.name}</option>)}
+                      </Select>
+                    </label>
+                    <label className="block"><ParameterLabel className={fieldLabel} label="Lag" help={ESTIMATION_PARAMETER_HELP.causalEffects.lag} /><input type="number" min={0} max={temporalAdjustmentMaxLag} className={field('text', 'mt-1')} value={adjustmentDraft.lag} onChange={(event) => setAdjustmentDraft({ ...adjustmentDraft, lag: Math.max(0, Math.min(temporalAdjustmentMaxLag, Math.floor(Number(event.target.value) || 0))) })} /></label>
+                    <button type="button" className={button('quiet')} disabled={adjustmentDraft.variable === null || explicitAdjustment.nodes.some((node) => node[0] === adjustmentDraft.variable && node[1] === -adjustmentDraft.lag)} onClick={() => {
+                      if (adjustmentDraft.variable === null) return
+                      setAdjustment({ kind: 'explicit', nodes: [...explicitAdjustment.nodes, [adjustmentDraft.variable, -adjustmentDraft.lag]] })
+                      setAdjustmentDraft(CLOSED_ADJUSTMENT_DRAFT)
+                    }}>Add</button>
+                    <button type="button" className={button('quiet')} onClick={() => setAdjustmentDraft(CLOSED_ADJUSTMENT_DRAFT)}>Cancel</button>
+                  </div>
+                )}
+                {explicitAdjustment.nodes.map((node, index) => (
+                  <div key={`${index}-${node[0]}-${node[1]}`} className="grid grid-cols-[minmax(0,1fr)_8rem_auto] items-end gap-2">
+                    <label className="block">
+                      <ParameterLabel className={fieldLabel} label="Variable" help={ESTIMATION_PARAMETER_HELP.causalEffects.variable} />
+                      <Select className={field('text', 'mt-1')} value={node[0]} onChange={(event) => setAdjustment({ kind: 'explicit', nodes: explicitAdjustment.nodes.map((item, position) => position === index ? [Number(event.target.value), item[1]] : item) })}>
+                        {temporalAdjustmentCandidates.map((candidate) => <option key={candidate.index} value={candidate.index}>{candidate.name}</option>)}
+                      </Select>
+                    </label>
+                    <label className="block"><ParameterLabel className={fieldLabel} label="Lag" help={ESTIMATION_PARAMETER_HELP.causalEffects.lag} /><input type="number" min={0} max={temporalAdjustmentMaxLag} className={field('text', 'mt-1')} value={-node[1]} onChange={(event) => setAdjustment({ kind: 'explicit', nodes: explicitAdjustment.nodes.map((item, position) => position === index ? [item[0], -Math.max(0, Math.min(temporalAdjustmentMaxLag, Math.floor(Number(event.target.value) || 0)))] : item) })} /></label>
+                    <button type="button" className={button('quiet')} onClick={() => setAdjustment({ kind: 'explicit', nodes: explicitAdjustment.nodes.filter((_, position) => position !== index) })}>Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className="block"><ParameterLabel className={fieldLabel} label="Treatment lag" help={ESTIMATION_PARAMETER_HELP.causalEffects.treatmentLag} /><input type="number" min={0} max={20} className={field('text', 'mt-1')} value={configuration.treatmentLag} onChange={(event) => configure({ ...configuration, treatmentLag: Math.max(0, Math.min(20, Number(event.target.value) || 0)) })} /></label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="block"><span className={fieldLabel}>From value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.interventions[0]} onChange={(event) => configure({ ...configuration, interventions: [Number(event.target.value) || 0, configuration.interventions[1]] })} /></label>
-              <label className="block"><span className={fieldLabel}>To value</span><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="From value" help={ESTIMATION_PARAMETER_HELP.causalEffects.fromValue} /><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.interventions[0]} onChange={(event) => configure({ ...configuration, interventions: [Number(event.target.value) || 0, configuration.interventions[1]] })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="To value" help={ESTIMATION_PARAMETER_HELP.causalEffects.toValue} /><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
             </div>
             <div>
-              <span className={fieldLabel}>Sampling uncertainty</span>
+              <ParameterLabel className={fieldLabel} label="Sampling uncertainty" help={ESTIMATION_PARAMETER_HELP.causalEffects.uncertainty} />
               <SegmentedControl className="mt-1" ariaLabel="CausalEffects sampling uncertainty" value={configuration.uncertainty.kind} onChange={(kind) => configure({ ...configuration, uncertainty: kind === 'none' ? { kind: 'none' } : { kind: 'bootstrap', samples: 100, blockLength: { kind: 'fixed', length: 1 }, confidenceLevel: 0.9, seed: 4 } })} options={[{ value: 'bootstrap', label: 'Block bootstrap' }, { value: 'none', label: 'Point estimate' }]} />
             </div>
             {bootstrap !== null && (
               <>
-                <label className="block"><span className={fieldLabel}>Bootstrap samples</span><input type="number" min={20} max={5000} aria-label="CausalEffects bootstrap samples" className={field('text', 'mt-1')} value={bootstrap.samples} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, samples: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) } })} /></label>
+                <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap samples" help={ESTIMATION_PARAMETER_HELP.causalEffects.bootstrapSamples} /><input type="number" min={20} max={5000} aria-label="CausalEffects bootstrap samples" className={field('text', 'mt-1')} value={bootstrap.samples} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, samples: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) } })} /></label>
                 <div>
-                  <span className={fieldLabel}>Block length</span>
+                  <ParameterLabel className={fieldLabel} label="Block length" help={ESTIMATION_PARAMETER_HELP.causalEffects.blockLength} />
                   <SegmentedControl className="mt-1" ariaLabel="CausalEffects block length policy" value={bootstrap.blockLength.kind} onChange={(kind) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: kind === 'fixed' ? { kind: 'fixed', length: 1 } : { kind: 'cubeRoot' } } })} options={[{ value: 'fixed', label: 'Fixed' }, { value: 'cubeRoot', label: 'Cube root' }]} />
                 </div>
-                {bootstrap.blockLength.kind === 'fixed' && <label className="block"><span className={fieldLabel}>Observations per block</span><input type="number" min={1} aria-label="CausalEffects observations per block" className={field('text', 'mt-1')} value={bootstrap.blockLength.length} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: { kind: 'fixed', length: Math.max(1, Math.floor(Number(event.target.value) || 1)) } } })} /></label>}
-                <label className="block"><span className={fieldLabel}>Confidence level</span><input type="number" min={50} max={99.9} step={0.1} aria-label="CausalEffects confidence level" className={field('text', 'mt-1')} value={bootstrap.confidenceLevel * 100} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, confidenceLevel: Math.max(0.5, Math.min(0.999, (Number(event.target.value) || 90) / 100)) } })} /></label>
-                <label className="block"><span className={fieldLabel}>Bootstrap seed</span><input type="number" min={0} aria-label="CausalEffects bootstrap seed" className={field('text', 'mt-1')} value={bootstrap.seed} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) } })} /></label>
+                {bootstrap.blockLength.kind === 'fixed' && <label className="block"><ParameterLabel className={fieldLabel} label="Observations per block" help={ESTIMATION_PARAMETER_HELP.causalEffects.observationsPerBlock} /><input type="number" min={1} aria-label="CausalEffects observations per block" className={field('text', 'mt-1')} value={bootstrap.blockLength.length} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: { kind: 'fixed', length: Math.max(1, Math.floor(Number(event.target.value) || 1)) } } })} /></label>}
+                <label className="block"><ParameterLabel className={fieldLabel} label="Confidence level" help={ESTIMATION_PARAMETER_HELP.causalEffects.confidenceLevel} /><input type="number" min={50} max={99.9} step={0.1} aria-label="CausalEffects confidence level" className={field('text', 'mt-1')} value={bootstrap.confidenceLevel * 100} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, confidenceLevel: Math.max(0.5, Math.min(0.999, (Number(event.target.value) || 90) / 100)) } })} /></label>
+                <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.causalEffects.bootstrapSeed} /><input type="number" min={0} aria-label="CausalEffects bootstrap seed" className={field('text', 'mt-1')} value={bootstrap.seed} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) } })} /></label>
                 <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">Contiguous blocks preserve the lag alignment used by the fitted graph. Choose a block length that represents the series’ dependence; the cube-root option follows Tigramite’s built-in rule.</p>
               </>
             )}
@@ -1312,7 +1486,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return (
           <div className="grid gap-3">
             <div>
-              <span className={fieldLabel}>Intervention start</span>
+              <ParameterLabel className={fieldLabel} label="Intervention start" help={ESTIMATION_PARAMETER_HELP.causalImpact.interventionStart} />
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <RadioList legend="Intervention start" legendHidden value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(9, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
                 {configuration.start.kind === 'row' && (
@@ -1321,7 +1495,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </div>
             </div>
             <div>
-              <span className={fieldLabel}>Control series</span>
+              <ParameterLabel className={fieldLabel} label="Control series" help={ESTIMATION_PARAMETER_HELP.causalImpact.controlSeries} />
               <div className="mt-1 flex flex-wrap gap-2" role="group" aria-label="Control series">
                 {controlCandidates.length === 0 && <span className="text-body text-faint">No other prepared columns to use as controls.</span>}
                 {controlCandidates.map((column) => (
@@ -1368,12 +1542,25 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
               </label>
               <div>
+                <SegmentedControl
+                  wrap
+                  size="sm"
+                  ariaLabel="Estimator family"
+                  value={visibleEstimatorGroup}
+                  onChange={setVisibleEstimatorGroup}
+                  options={ESTIMATOR_GROUPS.map((group) => ({ value: group.id, label: ESTIMATOR_GROUP_LABELS[group.id], title: group.name }))}
+                />
+                <div className="mb-2 mt-3">
+                  <h3 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h3>
+                  <p className="mb-0 mt-0.5 max-w-[65ch] text-label text-faint">{visibleGroup.description}</p>
+                </div>
                 <RadioList
                   columns={2}
-              legend="Estimation methods"
+                  legend={visibleGroup.name}
+                  legendHidden
                   value={state.estimator}
                   onChange={(estimator) => dispatch({ type: 'estimator-chosen', estimator })}
-                  options={ESTIMATOR_IDS.flatMap((id) => {
+                  options={visibleGroup.estimators.flatMap((id) => {
                     const definition = methodDefinition(methodIdOf(id))
                     const candidateEligibility = eligibilityByEstimator.get(id)
                     return definition.ok && candidateEligibility !== undefined
@@ -1381,17 +1568,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                       : []
                   })}
                 />
-                {method.ok && <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{method.value.summary}</p>}
-                {method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
+                {!selectedEstimatorIsVisible && <p className={cn(fieldHint, 'mt-3')}>Choose a method from this family to configure it.</p>}
+                {selectedEstimatorIsVisible && method.ok && <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{method.value.summary}</p>}
+                {selectedEstimatorIsVisible && method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>
-              <div>{controls}</div>
+              {selectedEstimatorIsVisible && <div>{controls}</div>}
             </div>
-            {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
+            {selectedEstimatorIsVisible && eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {studyDataError !== null && <Alert tone="danger" className="mt-3"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The estimate could not run: {state.job.detail}</p></Alert>}
             <div className="mt-4 flex items-center gap-3">
-              <button type="button" className={button('signal')} disabled={identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
-                {studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
+              <button type="button" className={button('signal')} disabled={!selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
               </button>
               {state.job.kind === 'running' && <Orb state="solving" aria-label="Estimator running" />}
             </div>

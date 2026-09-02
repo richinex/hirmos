@@ -424,7 +424,7 @@ test('runs the seeded CausalEffects block bootstrap through the Rust worker', as
       x: [[0, -1]],
       y: [[1, 0]],
       hidden: [],
-      estimator: { kind: 'linear' },
+      estimator: { kind: 'linear', adjustment: { kind: 'optimal' } },
       interventions: [0, 1],
       uncertainty: { kind: 'bootstrap', samples: 20, blockLength: { kind: 'fixed', length: 4 }, confidenceLevel: 0.9, seed: 4 },
     }, (event: unknown) => progress.push(event))
@@ -443,6 +443,10 @@ test('runs the seeded CausalEffects block bootstrap through the Rust worker', as
   if (!parsed.success || !parsed.data.result.ok) return
   expect(parsed.data.detachedBytes).toBe(0)
   expect(parsed.data.result.value.identifiable).toBe(true)
+  expect(parsed.data.result.value.fit.kind).toBe('adjustedLinear')
+  if (parsed.data.result.value.fit.kind === 'adjustedLinear') {
+    expect(parsed.data.result.value.fit.selection).toEqual({ kind: 'optimal' })
+  }
   expect(parsed.data.result.value.uncertainty.kind).toBe('bootstrap')
   if (parsed.data.result.value.uncertainty.kind !== 'bootstrap') return
   expect(parsed.data.result.value.uncertainty.effectDraws).toHaveLength(20)

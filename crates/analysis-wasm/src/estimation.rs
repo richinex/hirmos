@@ -651,10 +651,32 @@ pub(crate) fn causal_effects_total(
     if x.is_empty() || y.len() != 1 {
         return Err("causal effects needs at least one X node and exactly one Y node".to_owned());
     }
-    for &(variable, lag) in x.iter().chain(y).chain(hidden) {
-        if variable >= columns || lag > 0 || lag.unsigned_abs() as usize > stat_lag + 1 {
+    let explicit_adjustment = match &estimator {
+        TotalEffectEstimator::Linear { adjustment }
+        | TotalEffectEstimator::Knn { adjustment, .. } => match adjustment {
+            CausalEffectsAdjustmentSelection::Explicit { nodes } => nodes.as_slice(),
+            _ => &[],
+        },
+        TotalEffectEstimator::WrightParents => &[],
+    };
+    for &(variable, lag) in x.iter().chain(y) {
+        if variable >= columns || lag > 0 {
             return Err(
-                "causal effects nodes must name a variable at a non-positive lag within the window"
+                "causal effects query nodes must name a variable at a non-positive lag".to_owned(),
+            );
+        }
+    }
+    let query_lag = x
+        .iter()
+        .chain(y)
+        .map(|node| node.1.unsigned_abs() as usize)
+        .max()
+        .unwrap_or(0);
+    let tau_max = stat_lag + query_lag;
+    for &(variable, lag) in hidden.iter().chain(explicit_adjustment) {
+        if variable >= columns || lag > 0 || lag.unsigned_abs() as usize > tau_max {
+            return Err(
+                "causal effects hidden and adjustment nodes must lie within the projected time window"
                     .to_owned(),
             );
         }
@@ -688,7 +710,7 @@ pub(crate) fn causal_effects_total(
             (
                 false,
                 CausalEffectsFitEvidence::Unfitted {
-                    requested: estimator,
+                    requested: estimator.clone(),
                 },
                 Vec::new(),
                 f64::NAN,
@@ -696,36 +718,96 @@ pub(crate) fn causal_effects_total(
                 CausalEffectsUncertaintyEvidence::None,
             )
         } else {
-            match estimator {
-                TotalEffectEstimator::Linear | TotalEffectEstimator::Knn { .. } => {
-                    let Some(set) = effects.get_optimal_set() else {
-                        return Ok(AnalysisResult::CausalEffectsTotal {
-                            observations: rows,
-                            tau_max: effects.tau_max,
-                            no_causal_path,
-                            identifiable: false,
-                            mediators,
-                            fit: CausalEffectsFitEvidence::Unfitted {
-                                requested: estimator,
-                            },
-                            interventions,
-                            predictions: Vec::new(),
-                            total_effect: f64::NAN,
-                            fitted_observations: 0,
-                            uncertainty: CausalEffectsUncertaintyEvidence::None,
-                        });
+            match estimator.clone() {
+                TotalEffectEstimator::Linear { adjustment }
+                | TotalEffectEstimator::Knn { adjustment, .. } => {
+                    let selection = match &adjustment {
+                        CausalEffectsAdjustmentSelection::Optimal => {
+                            AdjustmentSetSelection::Optimal
+                        }
+                        CausalEffectsAdjustmentSelection::MinimizedOptimal => {
+                            AdjustmentSetSelection::MinimizedOptimal
+                        }
+                        CausalEffectsAdjustmentSelection::CollidersMinimizedOptimal => {
+                            AdjustmentSetSelection::CollidersMinimizedOptimal
+                        }
+                        CausalEffectsAdjustmentSelection::Explicit { nodes } => {
+                            AdjustmentSetSelection::Explicit(nodes.clone())
+                        }
                     };
-                    let (chosen, fit) = match estimator {
-                        TotalEffectEstimator::Linear => (
+                    let set = match effects.resolve_adjustment_set(&selection) {
+                        Ok(set) => set,
+                        Err(AdjustmentSetError::InvalidExplicitSet { problems }) => {
+                            let problems = problems
+                                .into_iter()
+                                .map(|problem| match problem {
+                                    ExplicitAdjustmentProblem::QueryTreatment(node) => {
+                                        CausalEffectsAdjustmentProblem::QueryTreatment { node }
+                                    }
+                                    ExplicitAdjustmentProblem::QueryOutcome(node) => {
+                                        CausalEffectsAdjustmentProblem::QueryOutcome { node }
+                                    }
+                                    ExplicitAdjustmentProblem::LaterTreatmentOccurrence(node) => {
+                                        CausalEffectsAdjustmentProblem::LaterTreatmentOccurrence {
+                                            node,
+                                        }
+                                    }
+                                    ExplicitAdjustmentProblem::ForbiddenNode(node) => {
+                                        CausalEffectsAdjustmentProblem::ForbiddenNode { node }
+                                    }
+                                    ExplicitAdjustmentProblem::OpenNonCausalPath => {
+                                        CausalEffectsAdjustmentProblem::OpenNonCausalPath
+                                    }
+                                })
+                                .collect();
+                            return Ok(AnalysisResult::CausalEffectsTotal {
+                                observations: rows,
+                                tau_max: effects.tau_max,
+                                no_causal_path,
+                                identifiable: false,
+                                mediators,
+                                fit: CausalEffectsFitEvidence::InvalidAdjustment {
+                                    requested: estimator.clone(),
+                                    problems,
+                                },
+                                interventions,
+                                predictions: Vec::new(),
+                                total_effect: f64::NAN,
+                                fitted_observations: 0,
+                                uncertainty: CausalEffectsUncertaintyEvidence::None,
+                            });
+                        }
+                        Err(AdjustmentSetError::NotIdentifiable) => {
+                            return Ok(AnalysisResult::CausalEffectsTotal {
+                                observations: rows,
+                                tau_max: effects.tau_max,
+                                no_causal_path,
+                                identifiable: false,
+                                mediators,
+                                fit: CausalEffectsFitEvidence::Unfitted {
+                                    requested: estimator.clone(),
+                                },
+                                interventions,
+                                predictions: Vec::new(),
+                                total_effect: f64::NAN,
+                                fitted_observations: 0,
+                                uncertainty: CausalEffectsUncertaintyEvidence::None,
+                            });
+                        }
+                    };
+                    let (chosen, fit) = match estimator.clone() {
+                        TotalEffectEstimator::Linear { .. } => (
                             Estimator::Linear,
                             CausalEffectsFitEvidence::AdjustedLinear {
+                                selection: adjustment.clone(),
                                 adjustment_set: set.clone(),
                             },
                         ),
-                        TotalEffectEstimator::Knn { k } => (
+                        TotalEffectEstimator::Knn { k, .. } => (
                             Estimator::KNeighbors { k: k.max(1) },
                             CausalEffectsFitEvidence::AdjustedKnn {
                                 k: k.max(1),
+                                selection: adjustment.clone(),
                                 adjustment_set: set.clone(),
                             },
                         ),
@@ -733,9 +815,15 @@ pub(crate) fn causal_effects_total(
                     };
                     let (model, uncertainty_evidence) = match uncertainty {
                         CausalEffectsUncertainty::None => {
-                            let model =
-                                effects.fit_total_effect(&data, chosen).ok_or_else(|| {
-                                    "causal effects could not fit the total effect model".to_owned()
+                            let model = effects
+                                .fit_total_effect_with_adjustment_set(
+                                    &data,
+                                    chosen,
+                                    None,
+                                    &selection,
+                                )
+                                .map_err(|error| {
+                                    format!("causal effects could not fit the total effect model: {error:?}")
                                 })?;
                             (model, CausalEffectsUncertaintyEvidence::None)
                         }
@@ -749,10 +837,11 @@ pub(crate) fn causal_effects_total(
                             let core_block_length = core_block_length(block_length);
                             progress("causal-effects-bootstrap", 0, samples);
                             let bootstrap = effects
-                                .fit_bootstrap_total_effect_with_progress(
+                                .fit_bootstrap_total_effect_with_adjustment_set_and_progress(
                                     &data,
                                     chosen,
                                     None,
+                                    &selection,
                                     TotalEffectBootstrapOptions {
                                         samples,
                                         block_length: core_block_length,
@@ -2666,7 +2755,9 @@ mod tests {
             &[(0, -1)],
             &[(1, 0)],
             &[],
-            TotalEffectEstimator::Linear,
+            TotalEffectEstimator::Linear {
+                adjustment: CausalEffectsAdjustmentSelection::Optimal,
+            },
             [0.0, 1.0],
             CausalEffectsUncertainty::None,
             |_, _, _| {},
@@ -2676,8 +2767,81 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["kind"], "causalEffectsTotal");
         assert_eq!(value["identifiable"], true);
+        assert_eq!(value["fit"]["selection"]["kind"], "optimal");
         let effect = value["totalEffect"].as_f64().unwrap();
         assert!((effect - 0.8).abs() < 0.15, "total effect {effect}");
+
+        let explicit: Vec<(usize, i32)> = value["fit"]["adjustmentSet"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|node| {
+                (
+                    node[0].as_u64().unwrap() as usize,
+                    node[1].as_i64().unwrap() as i32,
+                )
+            })
+            .collect();
+        for adjustment in [
+            CausalEffectsAdjustmentSelection::MinimizedOptimal,
+            CausalEffectsAdjustmentSelection::CollidersMinimizedOptimal,
+            CausalEffectsAdjustmentSelection::Explicit { nodes: explicit },
+        ] {
+            let result = causal_effects_total(
+                &values,
+                rows,
+                3,
+                1,
+                &graph,
+                &[(0, -1)],
+                &[(1, 0)],
+                &[],
+                TotalEffectEstimator::Linear {
+                    adjustment: adjustment.clone(),
+                },
+                [0.0, 1.0],
+                CausalEffectsUncertainty::None,
+                |_, _, _| {},
+            )
+            .expect("valid adjustment selection");
+            let result = serde_json::to_value(result).unwrap();
+            assert_eq!(result["identifiable"], true);
+            assert_eq!(
+                result["fit"]["selection"]["kind"],
+                serde_json::to_value(adjustment).unwrap()["kind"]
+            );
+        }
+        let invalid = causal_effects_total(
+            &values,
+            rows,
+            3,
+            1,
+            &graph,
+            &[(0, -1)],
+            &[(1, 0)],
+            &[],
+            TotalEffectEstimator::Linear {
+                adjustment: CausalEffectsAdjustmentSelection::Explicit {
+                    nodes: vec![(0, 0)],
+                },
+            },
+            [0.0, 1.0],
+            CausalEffectsUncertainty::None,
+            |_, _, _| {},
+        )
+        .expect("an invalid explicit set is returned as structured evidence");
+        let invalid = serde_json::to_value(invalid).unwrap();
+        assert_eq!(invalid["identifiable"], false);
+        assert_eq!(invalid["fit"]["kind"], "invalidAdjustment");
+        assert_eq!(
+            invalid["fit"]["requested"]["adjustment"]["nodes"][0],
+            serde_json::json!([0, 0])
+        );
+        assert!(invalid["fit"]["problems"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|problem| problem["kind"] == "laterTreatmentOccurrence"));
         let progress_events = std::cell::RefCell::new(Vec::new());
         let bootstrap_json = causal_effects_total(
             &values,
@@ -2688,7 +2852,9 @@ mod tests {
             &[(0, -1)],
             &[(1, 0)],
             &[],
-            TotalEffectEstimator::Linear,
+            TotalEffectEstimator::Linear {
+                adjustment: CausalEffectsAdjustmentSelection::Optimal,
+            },
             [0.0, 1.0],
             CausalEffectsUncertainty::Bootstrap {
                 samples: 20,
@@ -2723,7 +2889,9 @@ mod tests {
             &[],
             &[(1, 0)],
             &[],
-            TotalEffectEstimator::Linear,
+            TotalEffectEstimator::Linear {
+                adjustment: CausalEffectsAdjustmentSelection::Optimal,
+            },
             [0.0, 1.0],
             CausalEffectsUncertainty::None,
             |_, _, _| {},

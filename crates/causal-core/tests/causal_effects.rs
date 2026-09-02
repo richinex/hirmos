@@ -9,6 +9,73 @@ fn nodes(v: &Value) -> Vec<Node> {
     raw.iter().map(|p| (p[0] as usize, p[1] as i32)).collect()
 }
 
+fn graph(n: usize, stat_lag: usize, edges: &[(usize, usize, usize)]) -> StationaryGraph {
+    let mut graph = StationaryGraph::new(n, stat_lag);
+    for &(cause, effect, lag) in edges {
+        graph.set(cause, effect, lag, mark("-->"));
+        if lag == 0 && graph.get(effect, cause, 0) == EMPTY {
+            graph.set(effect, cause, 0, mark("<--"));
+        }
+    }
+    graph
+}
+
+#[test]
+fn adjustment_choices_match_tigramite_tutorial_admg() {
+    let stationary = graph(
+        8,
+        0,
+        &[
+            (0, 1, 0),
+            (1, 2, 0),
+            (1, 3, 0),
+            (2, 3, 0),
+            (5, 1, 0),
+            (5, 2, 0),
+            (5, 4, 0),
+            (6, 3, 0),
+            (7, 3, 0),
+            (7, 4, 0),
+        ],
+    );
+    let effects = CausalEffects::new(stationary, &[(0, 0), (1, 0)], &[(3, 0)], &[], &[(7, 0)]);
+
+    assert_eq!(
+        effects.get_optimal_set(),
+        Some(vec![(4, 0), (5, 0), (6, 0)])
+    );
+    assert_eq!(
+        effects.get_optimal_set_with_minimization(OptimalSetMinimization::CollidersOnly),
+        Some(vec![(5, 0), (6, 0)])
+    );
+    assert_eq!(
+        effects.get_optimal_set_with_minimization(OptimalSetMinimization::All),
+        Some(vec![(5, 0)])
+    );
+    assert!(effects.is_valid_adjustment_set(&[(5, 0)]));
+    assert!(!effects.is_valid_adjustment_set(&[]));
+    assert_eq!(
+        effects.resolve_adjustment_set(&AdjustmentSetSelection::Explicit(vec![])),
+        Err(AdjustmentSetError::InvalidExplicitSet {
+            problems: vec![ExplicitAdjustmentProblem::OpenNonCausalPath],
+        })
+    );
+}
+
+#[test]
+fn invalid_explicit_set_names_time_indexed_query_members() {
+    let stationary = graph(3, 1, &[(2, 0, 0), (0, 1, 1), (2, 1, 1)]);
+    let effects = CausalEffects::new(stationary, &[(0, -1)], &[(1, 0)], &[], &[]);
+
+    assert_eq!(
+        effects.explicit_adjustment_problems(&[(0, 0)]),
+        vec![
+            ExplicitAdjustmentProblem::LaterTreatmentOccurrence((0, 0)),
+            ExplicitAdjustmentProblem::OpenNonCausalPath,
+        ]
+    );
+}
+
 #[test]
 fn causal_effects_matches() {
     let root: Value =
@@ -148,6 +215,67 @@ fn causal_effects_matches() {
                 );
                 assert!(dev <= 1e-9, "{name}/{label}: prediction deviation {dev}");
                 assert!((ate - want_ate).abs() <= 1e-9, "{name}/{label}: ATE");
+
+                let collider_model = ce
+                    .fit_total_effect_with_adjustment_set(
+                        &data,
+                        est,
+                        None,
+                        &AdjustmentSetSelection::CollidersMinimizedOptimal,
+                    )
+                    .expect("Tigramite-valid collider-minimized adjustment set");
+                let collider_prediction = collider_model.predict_total_effect(&iv);
+                let collider_deviation = collider_prediction
+                    .iter()
+                    .zip(&want)
+                    .map(|(actual, expected)| (actual - expected).abs())
+                    .fold(0.0f64, f64::max);
+                assert!(
+                    collider_deviation <= 1e-9,
+                    "{name}/{label}/collider-minimized: prediction deviation {collider_deviation}"
+                );
+            }
+
+            let minimized_oracle = match name {
+                "mediated chain, 4 vars" => Some((
+                    vec![(1, -1)],
+                    [0.04530944771152285, 0.21821659481224817],
+                    [0.13158401774622405, 0.12209228578989693],
+                )),
+                "dense, 5 vars, lag 3" => Some((
+                    vec![(1, -1), (2, -3)],
+                    [0.10641788854102334, 0.5331903819988829],
+                    [0.16759843058980706, 0.45964687983785285],
+                )),
+                _ => None,
+            };
+            if let Some((adjustment_set, linear_oracle, knn_oracle)) = minimized_oracle {
+                for (label, estimator, oracle) in [
+                    ("linear", Estimator::Linear, linear_oracle),
+                    ("knn15", Estimator::KNeighbors { k: 15 }, knn_oracle),
+                ] {
+                    for selection in [
+                        AdjustmentSetSelection::MinimizedOptimal,
+                        AdjustmentSetSelection::Explicit(adjustment_set.clone()),
+                    ] {
+                        let model = ce
+                            .fit_total_effect_with_adjustment_set(
+                                &data, estimator, None, &selection,
+                            )
+                            .expect("Tigramite-valid minimized adjustment set");
+                        assert_eq!(model.adjustment_set, adjustment_set, "{name}/{label}");
+                        let prediction = model.predict_total_effect(&iv);
+                        let deviation = prediction
+                            .iter()
+                            .zip(oracle)
+                            .map(|(actual, expected)| (actual - expected).abs())
+                            .fold(0.0f64, f64::max);
+                        assert!(
+                            deviation <= 1e-9,
+                            "{name}/{label}/{selection:?}: prediction deviation {deviation}"
+                        );
+                    }
+                }
             }
         }
 

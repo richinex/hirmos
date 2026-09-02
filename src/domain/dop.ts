@@ -25,6 +25,11 @@ export function mapNonEmpty<Input, Output>(
   return [transform(first, 0), ...rest.map((value, index) => transform(value, index + 1))]
 }
 
+export function flattenNonEmpty<Value>(groups: NonEmptyArray<NonEmptyArray<Value>>): NonEmptyArray<Value> {
+  const [[first, ...initial], ...remaining] = groups
+  return [first, ...initial, ...remaining.flat()]
+}
+
 export function brand<Value, Name extends string>(value: Value): Brand<Value, Name> {
   return value as Brand<Value, Name>
 }

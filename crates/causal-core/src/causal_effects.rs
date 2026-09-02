@@ -11,6 +11,40 @@ pub type Edge = [u8; 3];
 
 pub const EMPTY: Edge = [0, 0, 0];
 
+/// Tigramite's `get_optimal_set(minimize=...)` choices.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OptimalSetMinimization {
+    None,
+    All,
+    CollidersOnly,
+}
+
+/// Tigramite's `fit_total_effect(adjustment_set=...)` choices.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AdjustmentSetSelection {
+    Optimal,
+    MinimizedOptimal,
+    CollidersMinimizedOptimal,
+    Explicit(Vec<Node>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExplicitAdjustmentProblem {
+    QueryTreatment(Node),
+    QueryOutcome(Node),
+    LaterTreatmentOccurrence(Node),
+    ForbiddenNode(Node),
+    OpenNonCausalPath,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AdjustmentSetError {
+    NotIdentifiable,
+    InvalidExplicitSet {
+        problems: Vec<ExplicitAdjustmentProblem>,
+    },
+}
+
 pub const fn mark(s: &str) -> Edge {
     let b = s.as_bytes();
     [b[0], b[1], b[2]]
@@ -721,17 +755,157 @@ impl CausalEffects {
         ce
     }
 
-    /// `get_optimal_set()`. Returns `None` where tigramite returns `False`, meaning the
-    /// effect is not identifiable from this graph.
+    /// `get_optimal_set()`. Returns `None` where Tigramite returns `False`.
     pub fn get_optimal_set(&self) -> Option<Vec<Node>> {
-        self.optimal_set_parts()
-            .map(|(parents, colliders, collider_parents, s)| {
-                let mut oset: BTreeSet<Node> = parents;
-                oset.extend(colliders);
-                oset.extend(collider_parents);
-                oset.extend(s);
-                oset.into_iter().collect()
-            })
+        self.get_optimal_set_with_minimization(OptimalSetMinimization::None)
+    }
+
+    /// `get_optimal_set(minimize=...)`, including the two minimization variants accepted
+    /// by `fit_total_effect`.
+    pub fn get_optimal_set_with_minimization(
+        &self,
+        minimization: OptimalSetMinimization,
+    ) -> Option<Vec<Node>> {
+        let (parents, colliders, collider_parents, s) = self.optimal_set_parts()?;
+        let mut oset = parents.clone();
+        oset.extend(colliders);
+        oset.extend(collider_parents);
+
+        if minimization != OptimalSetMinimization::None {
+            let candidates = |set: &BTreeSet<Node>| match minimization {
+                OptimalSetMinimization::CollidersOnly => {
+                    set.difference(&parents).copied().collect::<Vec<_>>()
+                }
+                OptimalSetMinimization::All => set.iter().copied().collect(),
+                OptimalSetMinimization::None => Vec::new(),
+            };
+
+            let removable: Vec<Node> = candidates(&oset)
+                .into_iter()
+                .filter(|node| {
+                    let mut conditions = oset.clone();
+                    conditions.remove(node);
+                    conditions.extend(s.iter().copied());
+                    let target = [*node].into_iter().collect();
+                    !self.check_path(
+                        &self.x,
+                        &target,
+                        &conditions,
+                        &[mark("***")],
+                        &[mark("***")],
+                        PathType::Any,
+                        false,
+                        false,
+                        None,
+                    )
+                })
+                .collect();
+            for node in removable {
+                oset.remove(&node);
+            }
+
+            let removable: Vec<Node> = candidates(&oset)
+                .into_iter()
+                .filter(|node| {
+                    let mut conditions = oset.clone();
+                    conditions.remove(node);
+                    conditions.extend(s.iter().copied());
+                    conditions.extend(self.x.iter().copied());
+                    let start = [*node].into_iter().collect();
+                    !self.check_path(
+                        &start,
+                        &self.y,
+                        &conditions,
+                        &[mark("***")],
+                        &[mark("**>"), mark("**+")],
+                        PathType::Any,
+                        false,
+                        false,
+                        None,
+                    )
+                })
+                .collect();
+            for node in removable {
+                oset.remove(&node);
+            }
+        }
+
+        oset.extend(s);
+        Some(oset.into_iter().collect())
+    }
+
+    /// Tigramite's `_check_validity(Z)`: a set is valid when it blocks every non-causal
+    /// path from X to Y in the projected time-indexed graph.
+    pub fn is_valid_adjustment_set(&self, adjustment_set: &[Node]) -> bool {
+        let conditions = adjustment_set.iter().copied().collect();
+        !self.check_path(
+            &self.x,
+            &self.y,
+            &conditions,
+            &[mark("***")],
+            &[mark("***")],
+            PathType::NonCausal,
+            false,
+            false,
+            None,
+        )
+    }
+
+    /// Explain a failed explicit-set validity check without changing Tigramite's criterion.
+    /// The open-path item is the decisive reason. Member-specific items are added only when
+    /// their relationship to the time-indexed query or forbidden-node set is observable.
+    pub fn explicit_adjustment_problems(
+        &self,
+        adjustment_set: &[Node],
+    ) -> Vec<ExplicitAdjustmentProblem> {
+        if self.is_valid_adjustment_set(adjustment_set) {
+            return Vec::new();
+        }
+
+        let mut problems = Vec::new();
+        for &node in adjustment_set {
+            if self.x.contains(&node) {
+                problems.push(ExplicitAdjustmentProblem::QueryTreatment(node));
+            } else if self.y.contains(&node) {
+                problems.push(ExplicitAdjustmentProblem::QueryOutcome(node));
+            } else if self
+                .x
+                .iter()
+                .any(|&(variable, lag)| variable == node.0 && node.1 > lag)
+            {
+                problems.push(ExplicitAdjustmentProblem::LaterTreatmentOccurrence(node));
+            } else if self.forbidden_nodes.contains(&node) {
+                problems.push(ExplicitAdjustmentProblem::ForbiddenNode(node));
+            }
+        }
+        problems.push(ExplicitAdjustmentProblem::OpenNonCausalPath);
+        problems
+    }
+
+    pub fn resolve_adjustment_set(
+        &self,
+        selection: &AdjustmentSetSelection,
+    ) -> Result<Vec<Node>, AdjustmentSetError> {
+        match selection {
+            AdjustmentSetSelection::Optimal => self
+                .get_optimal_set()
+                .ok_or(AdjustmentSetError::NotIdentifiable),
+            AdjustmentSetSelection::MinimizedOptimal => self
+                .get_optimal_set_with_minimization(OptimalSetMinimization::All)
+                .ok_or(AdjustmentSetError::NotIdentifiable),
+            AdjustmentSetSelection::CollidersMinimizedOptimal => self
+                .get_optimal_set_with_minimization(OptimalSetMinimization::CollidersOnly)
+                .ok_or(AdjustmentSetError::NotIdentifiable),
+            AdjustmentSetSelection::Explicit(adjustment_set) => {
+                if self.is_valid_adjustment_set(adjustment_set) {
+                    Ok(adjustment_set.clone())
+                } else {
+                    Err(AdjustmentSetError::InvalidExplicitSet {
+                        problems: self.explicit_adjustment_problems(adjustment_set),
+                    })
+                }
+            }
+        }
     }
 
     /// The same computation, returning the parents, the collider path nodes, their parents
@@ -1097,11 +1271,38 @@ impl CausalEffects {
         ))
     }
 
+    /// `fit_total_effect(..., adjustment_set=...)` with Tigramite's complete adjustment-set
+    /// selection surface. Explicit sets are rejected when `_check_validity` rejects them.
+    pub fn fit_total_effect_with_adjustment_set(
+        &self,
+        data: &TimeSeries,
+        estimator: Estimator,
+        conditional_estimator: Option<Estimator>,
+        selection: &AdjustmentSetSelection,
+    ) -> Result<TotalEffectModel, AdjustmentSetError> {
+        let design = self.total_effect_design_with_adjustment_set(data, selection)?;
+        Ok(fit_total_effect_design(
+            &design,
+            estimator,
+            conditional_estimator.unwrap_or(estimator),
+            None,
+        ))
+    }
+
     fn total_effect_design(&self, data: &TimeSeries) -> Option<TotalEffectDesign> {
+        self.total_effect_design_with_adjustment_set(data, &AdjustmentSetSelection::Optimal)
+            .ok()
+    }
+
+    fn total_effect_design_with_adjustment_set(
+        &self,
+        data: &TimeSeries,
+        selection: &AdjustmentSetSelection,
+    ) -> Result<TotalEffectDesign, AdjustmentSetError> {
         if self.no_causal_path {
-            return None;
+            return Err(AdjustmentSetError::NotIdentifiable);
         }
-        let adjustment_set = self.get_optimal_set()?;
+        let adjustment_set = self.resolve_adjustment_set(selection)?;
         // construct_array takes S as Z and the adjustment set as extraZ, so the rows come
         // back ordered X, Y, S, adjustment set.
         let s_list: Vec<Node> = self.s.iter().copied().collect();
@@ -1141,7 +1342,7 @@ impl CausalEffects {
             .collect();
         let targets: Vec<f64> = (0..n_obs).map(|t| array[len_x][t]).collect();
 
-        Some(TotalEffectDesign {
+        Ok(TotalEffectDesign {
             predictors,
             targets,
             z_rows,
@@ -1171,6 +1372,26 @@ impl CausalEffects {
         )
     }
 
+    /// Bootstrap `fit_total_effect` while preserving the selected generated or explicit
+    /// adjustment set in every refit.
+    pub fn fit_bootstrap_total_effect_with_adjustment_set(
+        &self,
+        data: &TimeSeries,
+        estimator: Estimator,
+        conditional_estimator: Option<Estimator>,
+        selection: &AdjustmentSetSelection,
+        options: TotalEffectBootstrapOptions,
+    ) -> Result<TotalEffectBootstrap, TotalEffectBootstrapError> {
+        self.fit_bootstrap_total_effect_with_adjustment_set_and_progress(
+            data,
+            estimator,
+            conditional_estimator,
+            selection,
+            options,
+            |_, _| {},
+        )
+    }
+
     /// Progress-aware form of [`Self::fit_bootstrap_total_effect`]. The callback receives
     /// `(completed_bootstrap_models, total_bootstrap_models)` after each successful refit.
     pub fn fit_bootstrap_total_effect_with_progress<F>(
@@ -1178,6 +1399,29 @@ impl CausalEffects {
         data: &TimeSeries,
         estimator: Estimator,
         conditional_estimator: Option<Estimator>,
+        options: TotalEffectBootstrapOptions,
+        progress: F,
+    ) -> Result<TotalEffectBootstrap, TotalEffectBootstrapError>
+    where
+        F: FnMut(usize, usize),
+    {
+        self.fit_bootstrap_total_effect_with_adjustment_set_and_progress(
+            data,
+            estimator,
+            conditional_estimator,
+            &AdjustmentSetSelection::Optimal,
+            options,
+            progress,
+        )
+    }
+
+    /// Progress-aware form of [`Self::fit_bootstrap_total_effect_with_adjustment_set`].
+    pub fn fit_bootstrap_total_effect_with_adjustment_set_and_progress<F>(
+        &self,
+        data: &TimeSeries,
+        estimator: Estimator,
+        conditional_estimator: Option<Estimator>,
+        selection: &AdjustmentSetSelection,
         options: TotalEffectBootstrapOptions,
         mut progress: F,
     ) -> Result<TotalEffectBootstrap, TotalEffectBootstrapError>
@@ -1188,8 +1432,13 @@ impl CausalEffects {
             return Err(TotalEffectBootstrapError::ZeroSamples);
         }
         let design = self
-            .total_effect_design(data)
-            .ok_or(TotalEffectBootstrapError::NotIdentifiable)?;
+            .total_effect_design_with_adjustment_set(data, selection)
+            .map_err(|error| match error {
+                AdjustmentSetError::NotIdentifiable => TotalEffectBootstrapError::NotIdentifiable,
+                AdjustmentSetError::InvalidExplicitSet { .. } => {
+                    TotalEffectBootstrapError::NotIdentifiable
+                }
+            })?;
         let n_obs = design.predictors.len();
         let resolved_block_length = match options.block_length {
             BootstrapBlockLength::Fixed(0) => {

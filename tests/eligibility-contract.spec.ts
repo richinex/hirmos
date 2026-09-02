@@ -68,6 +68,8 @@ test('estimator chips use the prepared treatment and outcome before a run', asyn
   await expect(page.getByRole('button', { name: 'Checking treatment and outcome…' })).toBeHidden({ timeout: 30_000 })
   await expect(page.getByRole('radio', { name: /Bayesian negative binomial.*review/i })).toBeVisible()
   await expect(page.getByRole('radio', { name: /Bayesian Gaussian regression.*unavailable/i })).toBeVisible()
+  // The do-query belongs to the identified-function family, and a family shows only its own methods.
+  await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio').nth(1).click()
   await expect(page.getByRole('radio', { name: /Discrete Bayesian network do-query.*unavailable/i })).toBeVisible()
 })
 

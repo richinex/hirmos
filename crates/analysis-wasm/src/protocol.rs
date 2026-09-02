@@ -156,6 +156,20 @@ pub(crate) enum AnalysisCommand {
         tau_max: usize,
         pc_alpha: f64,
     },
+    Rpcmci {
+        rows: usize,
+        columns: usize,
+        num_regimes: usize,
+        max_transitions: usize,
+        switch_thres: f64,
+        num_iterations: usize,
+        max_anneal: usize,
+        tau_min: usize,
+        tau_max: usize,
+        pc_alpha: f64,
+        alpha_level: f64,
+        seed: u64,
+    },
     Dynotears {
         rows: usize,
         columns: usize,
@@ -523,16 +537,34 @@ pub(crate) enum IngarchLink {
     Log,
 }
 
-#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[derive(Clone, serde::Deserialize, Serialize)]
 #[serde(
     tag = "kind",
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum TotalEffectEstimator {
-    Linear,
-    Knn { k: usize },
+    Linear {
+        adjustment: CausalEffectsAdjustmentSelection,
+    },
+    Knn {
+        k: usize,
+        adjustment: CausalEffectsAdjustmentSelection,
+    },
     WrightParents,
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CausalEffectsAdjustmentSelection {
+    Optimal,
+    MinimizedOptimal,
+    CollidersMinimizedOptimal,
+    Explicit { nodes: Vec<(usize, i32)> },
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -556,11 +588,17 @@ pub(crate) enum CausalEffectsFitEvidence {
     Unfitted {
         requested: TotalEffectEstimator,
     },
+    InvalidAdjustment {
+        requested: TotalEffectEstimator,
+        problems: Vec<CausalEffectsAdjustmentProblem>,
+    },
     AdjustedLinear {
+        selection: CausalEffectsAdjustmentSelection,
         adjustment_set: Vec<(usize, i32)>,
     },
     AdjustedKnn {
         k: usize,
+        selection: CausalEffectsAdjustmentSelection,
         adjustment_set: Vec<(usize, i32)>,
     },
     WrightParents {
@@ -569,6 +607,20 @@ pub(crate) enum CausalEffectsFitEvidence {
         direct_effect: f64,
         indirect_effect: f64,
     },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CausalEffectsAdjustmentProblem {
+    QueryTreatment { node: (usize, i32) },
+    QueryOutcome { node: (usize, i32) },
+    LaterTreatmentOccurrence { node: (usize, i32) },
+    ForbiddenNode { node: (usize, i32) },
+    OpenNonCausalPath,
 }
 
 #[derive(Serialize)]
@@ -1053,6 +1105,27 @@ pub(crate) enum AnalysisResult {
         graph: Vec<Vec<Vec<String>>>,
         p_matrix: Vec<Vec<Vec<f64>>>,
         val_matrix: Vec<Vec<Vec<f64>>>,
+    },
+    Rpcmci {
+        observations: usize,
+        variables: usize,
+        num_regimes: usize,
+        max_transitions: usize,
+        switch_thres: f64,
+        num_iterations: usize,
+        max_anneal: usize,
+        tau_min: usize,
+        tau_max: usize,
+        pc_alpha: f64,
+        alpha_level: f64,
+        seed: u64,
+        regimes: Vec<Vec<f64>>,
+        graphs: Vec<Vec<Vec<Vec<String>>>>,
+        val_matrices: Vec<Vec<Vec<Vec<f64>>>>,
+        p_matrices: Vec<Vec<Vec<Vec<f64>>>>,
+        diff_g_all: Vec<Option<Vec<f64>>>,
+        diff_g_best: Vec<f64>,
+        error_free_annealings: usize,
     },
     Dynotears {
         observations: usize,

@@ -1,8 +1,10 @@
 import { Select } from '@/components/ui/Select'
 import { useMemo, useState } from 'react'
+import { ExpandableChart } from '@/charts/ExpandableChart'
 import { EChart } from '@/charts/EChart'
 import { edgeStrengthBarsOption } from '@/charts/discovery/edgeStrengthBars'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
+import { annealingObjectiveOption, regimeMembershipOption } from '@/charts/discovery/regimeMembership'
 import { useChartTheme } from '@/charts/theme'
 import { caption, field } from '@/components/ui/recipes'
 import type { DiscoveryRunArtifact } from '@/domain/discovery'
@@ -10,6 +12,7 @@ import { lagGraphFromRun } from '@/domain/lagGraph'
 import { LagGraphViews } from './LagGraphViews'
 
 type TimeGraphRun = Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>
+type RpcmciRun = Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }>
 type WeightRun = Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>
 type OcseRun = Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }>
 
@@ -25,28 +28,74 @@ function LagSelect({ lags, value, onChange, contemporaneous }: { readonly lags: 
   )
 }
 
-/** ParCorr values as a source-by-target heatmap at one lag, with the graph mark drawn in each reported cell. */
-export function TimeGraphPlot({ run }: { readonly run: TimeGraphRun }) {
+function MarkedMatrixPlot({ graph, values, names, tauMax, title, caption: text }: {
+  readonly graph: readonly (readonly (readonly string[])[])[]
+  readonly values: readonly (readonly (readonly number[])[])[]
+  readonly names: readonly string[]
+  readonly tauMax: number
+  readonly title: string
+  readonly caption: string
+}) {
   const theme = useChartTheme()
-  const reportedLags = run.result.graph.flatMap((targets) => targets.flatMap((lags) => lags.map((mark, index) => (mark.length > 0 ? index : -1)))).filter((index) => index >= 0)
+  const reportedLags = graph.flatMap((targets) => targets.flatMap((lags) => lags.map((mark, index) => (mark.length > 0 ? index : -1)))).filter((index) => index >= 0)
   const [lag, setLag] = useState(reportedLags.length > 0 ? Math.min(...reportedLags) : 0)
-  const names = run.variables.map((variable) => variable.name)
   const option = useMemo(() => matrixHeatmapOption({
-    title: `${run.kind === 'lpcmci-run' ? 'LPCMCI' : 'PCMCI+'} partial correlations at lag ${lag}`,
+    title: `${title} at lag ${lag}`,
     sources: names,
     targets: names,
-    values: run.result.valMatrix.map((targets, source) => targets.map((lags, target) => (run.result.graph[source][target][lag].length > 0 ? lags[lag] : null))),
+    values: values.map((targets, source) => targets.map((lags, target) => (graph[source][target][lag].length > 0 ? lags[lag] : null))),
     scale: 'signed',
     quantity: 'ParCorr',
-    cellText: (source, target) => run.result.graph[source][target][lag] || null,
-  }, theme), [lag, names, run, theme])
+    cellText: (source, target) => graph[source][target][lag] || null,
+  }, theme), [graph, lag, names, theme, title, values])
   return (
     <div className="mt-3 rounded-lg border border-hair bg-well p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={caption('m-0')}>Reported links · {run.kind === 'lpcmci-run' ? 'PAG marks' : 'lag-graph marks'}</p>
-        <LagSelect lags={run.result.tauMax} value={lag} onChange={setLag} contemporaneous />
+        <p className={caption('m-0')}>{text}</p>
+        <LagSelect lags={tauMax} value={lag} onChange={setLag} contemporaneous />
       </div>
       <EChart option={option} label={`Partial correlation heatmap at lag ${lag}`} className="h-[clamp(220px,34cqb,320px)]" />
+    </div>
+  )
+}
+
+/** ParCorr values as a source-by-target heatmap at one lag, with the graph mark drawn in each reported cell. */
+export function TimeGraphPlot({ run }: { readonly run: TimeGraphRun }) {
+  return <MarkedMatrixPlot
+    graph={run.result.graph}
+    values={run.result.valMatrix}
+    names={run.variables.map((variable) => variable.name)}
+    tauMax={run.result.tauMax}
+    title={`${run.kind === 'lpcmci-run' ? 'LPCMCI' : 'PCMCI+'} partial correlations`}
+    caption={`Reported links · ${run.kind === 'lpcmci-run' ? 'PAG marks' : 'lag-graph marks'}`}
+  />
+}
+
+export function RpcmciTimeGraphPlot({ run, regime }: { readonly run: RpcmciRun; readonly regime: number }) {
+  return <MarkedMatrixPlot
+    graph={run.result.graphs[regime]}
+    values={run.result.valMatrices[regime]}
+    names={run.variables.map((variable) => variable.name)}
+    tauMax={run.result.tauMax}
+    title={`RPCMCI regime ${regime + 1} partial correlations`}
+    caption={`Regime ${regime + 1} · reported lag-graph marks`}
+  />
+}
+
+export function RpcmciMembershipPlot({ run }: { readonly run: RpcmciRun }) {
+  const theme = useChartTheme()
+  const membership = useMemo(() => regimeMembershipOption({ memberships: run.result.regimes }, theme), [run.result.regimes, theme])
+  const objective = useMemo(() => annealingObjectiveOption({ best: run.result.diffGBest }, theme), [run.result.diffGBest, theme])
+  return (
+    <div className="mt-3 grid gap-3">
+      <div className="rounded-lg border border-hair bg-well p-3">
+        <p className={caption('m-0')}>Regime membership by observation</p>
+        <ExpandableChart option={membership} label="RPCMCI regime membership by observation" className="h-[clamp(200px,30cqb,300px)]" testId="rpcmci-membership" />
+      </div>
+      <div className="rounded-lg border border-hair bg-well p-3">
+        <p className={caption('m-0')}>Best annealing objective</p>
+        <ExpandableChart option={objective} label="RPCMCI best annealing objective by iteration" className="h-[clamp(200px,30cqb,300px)]" testId="rpcmci-objective" />
+      </div>
     </div>
   )
 }
@@ -105,8 +154,8 @@ export function OcsePlot({ run }: { readonly run: OcseRun }) {
 }
 
 /** The run's structure as tigramite's two views: the summary graph and the lag grid. */
-export function StructurePlot({ run, label: name }: { readonly run: DiscoveryRunArtifact; readonly label: string }) {
-  const graph = useMemo(() => lagGraphFromRun(run), [run])
+export function StructurePlot({ run, label: name, regime = 0 }: { readonly run: DiscoveryRunArtifact; readonly label: string; readonly regime?: number }) {
+  const graph = useMemo(() => lagGraphFromRun(run, regime), [regime, run])
   if (!graph.ok) return <p className="mt-3 text-body text-warn">The run reported a link mark Hirmos cannot draw ({graph.error.mark}); the table below is complete.</p>
   if (graph.value.links.length === 0) return <p className="mt-3 text-body text-faint">No link to draw: the run reported no relation.</p>
   return (

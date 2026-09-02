@@ -6,9 +6,9 @@
 use hirmos_causal_core::ardl::{ardl_select_order, bounds_test, uecm, Trend};
 use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
 use hirmos_causal_core::causal_effects::{
-    mark, BootstrapBlockLength, CausalEffects, Estimator, Node, StationaryGraph,
-    TotalEffectBootstrapError, TotalEffectBootstrapOptions, WrightCoefficientMethod,
-    WrightEffectError, WrightMediation,
+    mark, AdjustmentSetError, AdjustmentSetSelection, BootstrapBlockLength, CausalEffects,
+    Estimator, ExplicitAdjustmentProblem, Node, StationaryGraph, TotalEffectBootstrapError,
+    TotalEffectBootstrapOptions, WrightCoefficientMethod, WrightEffectError, WrightMediation,
 };
 use hirmos_causal_core::causal_impact::causal_impact;
 use hirmos_causal_core::counterfactual::{Equation, LinearScm};
@@ -38,6 +38,7 @@ use hirmos_causal_core::resampling::{
     pandas_resample_daily, Aggregation as CoreResamplingAggregation,
     IncompleteBins as CoreIncompleteBins, ResampleFrequency as CoreResampleFrequency,
 };
+use hirmos_causal_core::rpcmci::run_rpcmci_with_progress;
 use hirmos_causal_core::stl::{stl, strength, StlConfig};
 use hirmos_causal_core::synthetic_control::{
     debiased_synthetic_control, donor_placebo_mspe_inference, synthetic_control_prediction_band,
@@ -197,6 +198,35 @@ pub fn run_analysis(
             tau_max,
             pc_alpha,
         } => lpcmci_evidence(values, rows, columns, tau_max, pc_alpha, progress),
+        AnalysisCommand::Rpcmci {
+            rows,
+            columns,
+            num_regimes,
+            max_transitions,
+            switch_thres,
+            num_iterations,
+            max_anneal,
+            tau_min,
+            tau_max,
+            pc_alpha,
+            alpha_level,
+            seed,
+        } => rpcmci_evidence(
+            values,
+            rows,
+            columns,
+            num_regimes,
+            max_transitions,
+            switch_thres,
+            num_iterations,
+            max_anneal,
+            tau_min,
+            tau_max,
+            pc_alpha,
+            alpha_level,
+            seed,
+            progress,
+        ),
         AnalysisCommand::Dynotears {
             rows,
             columns,

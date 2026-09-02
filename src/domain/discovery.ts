@@ -5,6 +5,7 @@ import {
   DYNOTEARS_METHOD_ID,
   DIRECT_LINGAM_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
+  RPCMCI_PAR_CORR_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
@@ -37,6 +38,31 @@ export const lpcmciEvidenceSchema = pcmciPlusEvidenceSchema.extend({
 }).strict()
 
 export type LpcmciEvidence = z.infer<typeof lpcmciEvidenceSchema>
+
+export const rpcmciEvidenceSchema = z.object({
+  kind: z.literal('rpcmci'),
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(12),
+  numRegimes: z.number().int().min(2).max(6),
+  maxTransitions: z.number().int().nonnegative(),
+  switchThres: z.number().finite().min(0).max(1),
+  numIterations: z.number().int().min(1).max(100),
+  maxAnneal: z.number().int().min(1).max(50),
+  tauMin: z.number().int().nonnegative().max(6),
+  tauMax: z.number().int().nonnegative().max(6),
+  pcAlpha: z.number().finite().positive().max(1),
+  alphaLevel: z.number().finite().positive().max(1),
+  seed: z.number().int().nonnegative(),
+  regimes: z.array(z.array(z.number().finite().min(-1e-9).max(1 + 1e-9))),
+  graphs: z.array(z.array(z.array(z.array(z.string().max(3))))),
+  pMatrices: z.array(z.array(z.array(z.array(z.number().finite().min(0).max(1))))),
+  valMatrices: z.array(z.array(z.array(z.array(z.number().finite().min(-1).max(1))))),
+  diffGAll: z.array(z.array(z.number().finite().nonnegative()).nullable()),
+  diffGBest: z.array(z.number().finite().nonnegative()),
+  errorFreeAnnealings: z.number().int().positive(),
+}).strict()
+
+export type RpcmciEvidence = z.infer<typeof rpcmciEvidenceSchema>
 
 export const dynotearsEvidenceSchema = z.object({
   kind: z.literal('dynotears'),
@@ -104,7 +130,7 @@ export type PcmciPlusBoundaryProblem = {
 
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE'
+  readonly method: 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE'
   readonly detail: string
 }
 
@@ -143,6 +169,39 @@ export function parseLpcmciEvidence(value: unknown): Result<LpcmciEvidence, Disc
     return err({ kind: 'invalid-discovery-matrix-result', method: 'LPCMCI', detail: 'LPCMCI evidence matrices have inconsistent dimensions.' })
   }
   return ok(parsed.data)
+}
+
+export function parseRpcmciEvidence(value: unknown): Result<RpcmciEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = rpcmciEvidenceSchema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'RPCMCI', detail: z.prettifyError(parsed.error) })
+  }
+  const evidence = parsed.data
+  const matrixShapeIsValid = (matrix: readonly (readonly (readonly unknown[])[])[]) =>
+    hasMatrixShape(matrix, evidence.variables, evidence.tauMax + 1)
+  if (evidence.tauMin > evidence.tauMax
+    || evidence.maxTransitions >= evidence.observations
+    || evidence.regimes.length !== evidence.numRegimes
+    || evidence.regimes.some((regime) => regime.length !== evidence.observations)
+    || evidence.graphs.length !== evidence.numRegimes
+    || evidence.pMatrices.length !== evidence.numRegimes
+    || evidence.valMatrices.length !== evidence.numRegimes
+    || !evidence.graphs.every(matrixShapeIsValid)
+    || !evidence.pMatrices.every(matrixShapeIsValid)
+    || !evidence.valMatrices.every(matrixShapeIsValid)
+    || evidence.diffGAll.length !== evidence.maxAnneal
+    || evidence.diffGAll.some((history) => history !== null && history.length > evidence.numIterations)
+    || evidence.diffGBest.length > evidence.numIterations
+    || evidence.errorFreeAnnealings > evidence.maxAnneal) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'RPCMCI', detail: 'RPCMCI evidence dimensions do not match its declared configuration.' })
+  }
+  for (let time = 0; time < evidence.observations; time += 1) {
+    const membership = evidence.regimes.reduce((sum, regime) => sum + (regime[time] ?? 0), 0)
+    if (Math.abs(membership - 1) > 1e-7) {
+      return err({ kind: 'invalid-discovery-matrix-result', method: 'RPCMCI', detail: `RPCMCI memberships at observation ${time + 1} do not sum to one.` })
+    }
+  }
+  return ok(evidence)
 }
 
 export function parseDynotearsEvidence(value: unknown): Result<DynotearsEvidence, DiscoveryMatrixBoundaryProblem> {
@@ -215,7 +274,7 @@ export type DiscoveryRunId = Brand<string, 'DiscoveryRunId'>
 export const DISCOVERY_LAG_OPTIONS = [1, 2, 3, 4, 6, 8, 12, 20] as const
 export type DiscoveryLag = (typeof DISCOVERY_LAG_OPTIONS)[number]
 
-export const PCMCI_ALPHA_OPTIONS = [0.01, 0.025, 0.05, 0.1] as const
+export const PCMCI_ALPHA_OPTIONS = [0.01, 0.025, 0.05, 0.1, 0.2] as const
 export type PcmciAlpha = (typeof PCMCI_ALPHA_OPTIONS)[number]
 
 export const DYNOTEARS_PENALTY_OPTIONS = [0.01, 0.05, 0.1, 0.2] as const
@@ -225,7 +284,7 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
+export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
 export type DiscoveryConfiguration =
@@ -239,6 +298,19 @@ export type DiscoveryConfiguration =
       readonly kind: 'lpcmci'
       readonly tauMax: DiscoveryLag
       readonly pcAlpha: PcmciAlpha
+    }
+  | {
+      readonly kind: 'rpcmci'
+      readonly numRegimes: number
+      readonly maxTransitions: number
+      readonly switchThres: number
+      readonly numIterations: number
+      readonly maxAnneal: number
+      readonly tauMin: number
+      readonly tauMax: DiscoveryLag
+      readonly pcAlpha: PcmciAlpha
+      readonly alphaLevel: PcmciAlpha
+      readonly seed: number
     }
   | {
       readonly kind: 'dynotears'
@@ -290,6 +362,16 @@ export type DiscoveryRunArtifact =
       readonly variables: NonEmptyArray<NumericColumnSelection>
       readonly eligibility: AcceptedDiscoveryEligibility
       readonly result: LpcmciEvidence
+    }
+  | {
+      readonly kind: 'rpcmci-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof RPCMCI_PAR_CORR_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: RpcmciEvidence
     }
   | {
       readonly kind: 'dynotears-run'
@@ -349,6 +431,7 @@ export type DiscoveryEvent =
   | { readonly type: 'method-selected'; readonly method: DiscoveryMethodChoice }
   | { readonly type: 'tau-max-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'pc-alpha-selected'; readonly value: PcmciAlpha }
+  | { readonly type: 'rpcmci-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }> }
   | { readonly type: 'dynotears-lambda-w-selected'; readonly value: DynotearsPenalty }
   | { readonly type: 'dynotears-lambda-a-selected'; readonly value: DynotearsPenalty }
   | { readonly type: 'var-lingam-prune-selected'; readonly value: boolean }
@@ -387,6 +470,10 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
     case 'pc-alpha-selected':
       return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'lpcmci'
         ? { configuration: { ...state.configuration, pcAlpha: event.value }, job: { kind: 'idle' } }
+        : state
+    case 'rpcmci-configured':
+      return state.configuration.kind === 'rpcmci'
+        ? { configuration: event.configuration, job: { kind: 'idle' } }
         : state
     case 'dynotears-lambda-w-selected':
       return state.configuration.kind === 'dynotears'
@@ -431,6 +518,7 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
     case 'direct-lingam': return { kind: 'direct-lingam' }
     case 'pcmci-plus': return { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }
     case 'lpcmci': return { kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }
+    case 'rpcmci': return { kind: 'rpcmci', numRegimes: 2, maxTransitions: 4, switchThres: 0.05, numIterations: 20, maxAnneal: 10, tauMin: 1, tauMax: 1, pcAlpha: 0.2, alphaLevel: 0.01, seed: 327 }
     case 'dynotears': return { kind: 'dynotears', maxLag: 2, lambdaW: 0.1, lambdaA: 0.1 }
     case 'var-lingam': return { kind: 'var-lingam', maxLag: 2, prune: true }
     case 'ocse': return { kind: 'ocse', maxLag: 2, alpha: 0.05, nShuffles: 50, method: 'gaussian', k: 5 }
@@ -450,6 +538,7 @@ export type ReadyDiscoverySpecification =
       readonly tauMax: DiscoveryLag
       readonly pcAlpha: PcmciAlpha
     }
+  | Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }>
   | {
       readonly kind: 'dynotears'
       readonly maxLag: DiscoveryLag
@@ -476,8 +565,9 @@ export type DiscoveryReadinessProblem =
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number; readonly available: number }
-  | { readonly kind: 'browser-lag-limit'; readonly method: 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number }
+  | { readonly kind: 'transition-budget-too-large'; readonly available: number }
 
 export function readyDiscoverySpecification(
   configuration: DiscoveryConfiguration,
@@ -507,6 +597,16 @@ export function readyDiscoverySpecification(
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
       if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'LPCMCI', maximum: 32, available: prepared.columns.length })
       const required = Math.max(2 * configuration.tauMax + 16, 24)
+      return prepared.observations < required
+        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+        : ok(configuration)
+    }
+    case 'rpcmci': {
+      if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'RPCMCI', maximum: 12, available: prepared.columns.length })
+      if (configuration.tauMax > 6) return err({ kind: 'browser-lag-limit', method: 'RPCMCI', maximum: 6 })
+      if (configuration.maxTransitions >= prepared.observations) return err({ kind: 'transition-budget-too-large', available: prepared.observations })
+      const required = Math.max(2 * configuration.tauMax + 24, 40)
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
         : ok(configuration)
@@ -648,6 +748,7 @@ export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): 
     case 'dense-browser-boundary-required': return 'Choose a complete interval or imputation. This method needs complete numeric columns in the browser.'
     case 'browser-variable-limit': return `${problem.method} accepts up to ${problem.maximum} variables in the browser; ${problem.available} are selected. Deselect ${problem.available - problem.maximum}.`
     case 'browser-lag-limit': return `${problem.method} accepts a maximum lag of ${problem.maximum} in the browser. Lower the maximum lag.`
+    case 'transition-budget-too-large': return `The maximum transition count must be smaller than the ${problem.available} available observations.`
     default: return assertNever(problem)
   }
 }

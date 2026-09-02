@@ -17,6 +17,7 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
     case 'direct-lingam-run': return 'DirectLiNGAM'
     case 'pcmci-plus-run': return 'PCMCI+'
     case 'lpcmci-run': return 'LPCMCI'
+    case 'rpcmci-run': return 'RPCMCI'
     case 'dynotears-run': return 'DYNOTEARS'
     case 'var-lingam-run': return 'VAR-LiNGAM'
     case 'ocse-run': return 'oCSE'
@@ -29,6 +30,7 @@ const variablesOf = (view: DiscoveryEvidenceView) => {
     case 'direct-lingam-run':
     case 'pcmci-plus-run':
     case 'lpcmci-run':
+    case 'rpcmci-run':
     case 'dynotears-run':
     case 'var-lingam-run':
     case 'ocse-run': return view.run.variables
@@ -45,6 +47,7 @@ const pValue = (value: number): string => value < 0.001 ? value.toExponential(2)
 const candidateLabel = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
     case 'endpoint-marked': return `${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
+    case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1} · ${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · t−${candidate.lag}`
     default: return assertNever(candidate)
@@ -54,6 +57,7 @@ const candidateLabel = (candidate: DiscoveryCandidate): string => {
 const candidateDetail = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
     case 'endpoint-marked': return `mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
+    case 'regime-endpoint-marked': return `regime ${candidate.regime + 1} · mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
     case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ' · contemporaneous' : ` · lag ${candidate.lag}`}`
     case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · p ${pValue(candidate.pValue)} · lag ${candidate.lag}`
     default: return assertNever(candidate)
@@ -64,7 +68,8 @@ function EvidenceGraph({ view, selected }: {
   readonly view: DiscoveryEvidenceView
   readonly selected: DiscoveryCandidate | null
 }) {
-  const graph = useMemo(() => lagGraphFromRun(view.run), [view.run])
+  const regime = selected?.kind === 'regime-endpoint-marked' ? selected.regime : 0
+  const graph = useMemo(() => lagGraphFromRun(view.run, regime), [regime, view.run])
   if (!graph.ok) return <p className="text-body text-warn">The run reported a link mark Hirmos cannot draw ({graph.error.mark}).</p>
   const highlighted = selected === null ? [] : [selected.source.column, selected.target.column]
   return <LagGraphViews graph={graph.value} label={`${view.method} evidence graph`} highlighted={highlighted} compact />
@@ -124,7 +129,7 @@ export function EvidenceInspector({
             onClick={() => onCandidateSelected(candidate)}
             className="block w-full rounded-lg border border-hair bg-well px-2.5 py-2 text-left transition-colors hover:border-edge aria-pressed:border-signal aria-pressed:bg-raised"
           >
-            <span className="block text-body font-medium text-ink">{candidate.source.name} {candidate.kind === 'endpoint-marked' ? candidate.mark : '→'} {candidate.target.name}</span>
+            <span className="block text-body font-medium text-ink">{candidate.source.name} {candidate.kind === 'endpoint-marked' || candidate.kind === 'regime-endpoint-marked' ? candidate.mark : '→'} {candidate.target.name}</span>
             <span className={num('mt-0.5 block text-label text-faint')}>{candidateDetail(candidate)}</span>
           </button>
         ))}

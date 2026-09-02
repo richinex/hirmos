@@ -132,6 +132,7 @@ export const GRANGER_SSR_F_METHOD_ID = methodId('granger-ssr-f')
 export const COUNT_SERIES_INTERVENTION_SCAN_METHOD_ID = methodId('count-series-intervention-scan')
 export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
 export const LPCMCI_PAR_CORR_METHOD_ID = methodId('lpcmci-parcorr')
+export const RPCMCI_PAR_CORR_METHOD_ID = methodId('rpcmci-parcorr')
 export const DYNOTEARS_METHOD_ID = methodId('dynotears')
 export const DIRECT_LINGAM_METHOD_ID = methodId('direct-lingam')
 export const VAR_LINGAM_METHOD_ID = methodId('var-lingam')
@@ -218,6 +219,7 @@ const PAMFIL_2020 = paper('DYNOTEARS: Structure Learning from Time-Series Data (
 const SUN_2015 = paper('Causal Network Inference by Optimal Causation Entropy (Sun, Taylor and Bollt, 2015)', 'SIAM Journal on Applied Dynamical Systems 14(1), 65–83')
 const RUNGE_2020 = paper('Discovering contemporaneous and lagged causal relations in autocorrelated nonlinear time series datasets (Runge, 2020)', 'Proceedings of UAI, PMLR 124; PCMCI+')
 const GERHARDUS_RUNGE_2020 = paper('High-recall causal discovery for autocorrelated time series with latent confounders (Gerhardus and Runge, 2020)', 'Advances in Neural Information Processing Systems 33; LPCMCI')
+const SAGGIORO_2020 = paper('Reconstructing regime-dependent causal relationships from observational time series (Saggioro, de Wiljes, Kretschmer and Runge, 2020)', 'Chaos 30(11), 113115; doi:10.1063/5.0020538')
 const LJUNG_BOX_1978 = paper('On a Measure of Lack of Fit in Time Series Models (Ljung and Box, 1978)', 'Biometrika 65(2), 297–303')
 const SHAPIRO_WILK_1965 = paper('An Analysis of Variance Test for Normality (Complete Samples) (Shapiro and Wilk, 1965)', 'Biometrika 52(3/4), 591–611')
 const KILLICK_2012 = paper('Optimal Detection of Changepoints with a Linear Computational Cost (Killick, Fearnhead and Eckley, 2012)', 'Journal of the American Statistical Association 107(500), 1590–1598; PELT')
@@ -457,6 +459,57 @@ const LPCMCI_PAR_CORR: MethodDefinition = {
       requirement: 'The output is a time-series partial ancestral graph (PAG): circles remain undetermined and bidirected endpoints permit latent confounding.',
       consequenceIfUnmet: 'Endpoint uncertainty is converted into a fully directed DAG.',
       sources: [GERHARDUS_RUNGE_2020],
+    },
+  ],
+}
+
+const RPCMCI_PAR_CORR: MethodDefinition = {
+  id: RPCMCI_PAR_CORR_METHOD_ID,
+  name: 'RPCMCI with ParCorr',
+  family: 'discovery',
+  summary: 'Alternates regime assignment with PCMCI to estimate a separate lagged graph for each persistent regime.',
+  caveats: [
+    {
+      id: caveatId('rpcmci-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Observations form one scalar, regularly ordered time series; the analysis mask is not used by RPCMCI.',
+      consequenceIfUnmet: 'Lagged tests and the regime transition constraint refer to the wrong observation sequence.',
+      sources: [SAGGIORO_2020],
+    },
+    {
+      id: caveatId('rpcmci-persistent-discrete-regimes'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'A finite, persistent background regime exists, and the causal relations are stationary within each regime.',
+      consequenceIfUnmet: 'The fitted partition can combine distinct processes or split gradual change into artificial regimes.',
+      sources: [SAGGIORO_2020],
+    },
+    {
+      id: caveatId('rpcmci-regime-specification'),
+      category: 'identification',
+      requirement: 'The assumed number of regimes and maximum transitions are substantively plausible and assessed across alternative settings.',
+      consequenceIfUnmet: 'The transition budget predetermines a partition that can change the regime-specific graphs.',
+      sources: [SAGGIORO_2020],
+    },
+    {
+      id: caveatId('rpcmci-parcorr-form'),
+      category: 'functional-form',
+      requirement: 'Within each regime, ParCorr and the linear prediction model adequately describe the conditional relations.',
+      consequenceIfUnmet: 'Regime assignments and PCMCI p-values can both be misspecified.',
+      sources: [SAGGIORO_2020],
+    },
+    {
+      id: caveatId('rpcmci-local-optima'),
+      category: 'finite-sample',
+      requirement: 'Multiple seeded annealings are compared because the alternating optimization can reach different solutions.',
+      consequenceIfUnmet: 'A single initialization can be reported as if it were the stable regime solution.',
+      sources: [SAGGIORO_2020],
+    },
+    {
+      id: caveatId('rpcmci-result-reading'),
+      category: 'interpretation',
+      requirement: 'Regime labels are exchangeable; interpret the membership paths and the corresponding graph together.',
+      consequenceIfUnmet: 'A label permutation is mistaken for a substantive difference between runs.',
+      sources: [SAGGIORO_2020],
     },
   ],
 }
@@ -1001,7 +1054,7 @@ const CAUSAL_EFFECTS_TOTAL: MethodDefinition = {
   id: CAUSAL_EFFECTS_TOTAL_METHOD_ID,
   name: 'CausalEffects total effect',
   family: 'estimation',
-  summary: 'Tigramite’s CausalEffects on a stationary time-series DAG: latent projection, Runge’s optimal adjustment set, and a total effect predicted at two intervention values.',
+  summary: 'Tigramite’s CausalEffects on a stationary time-series DAG: latent projection, time-indexed adjustment, and a total effect predicted at two intervention values.',
   caveats: [
     {
       id: caveatId('causal-effects-time-series'),
@@ -1027,9 +1080,9 @@ const CAUSAL_EFFECTS_TOTAL: MethodDefinition = {
     {
       id: caveatId('causal-effects-identifiable'),
       category: 'identification',
-      requirement: 'An optimal adjustment set exists in the projected graph; it may be larger than a minimal set because it minimises variance.',
-      consequenceIfUnmet: 'The run reports not identifiable and no estimate.',
-      sources: [RUNGE_2021],
+      requirement: 'The selected generated set, or a set supplied by the user, blocks every non-causal treatment–outcome path in the projected graph.',
+      consequenceIfUnmet: 'The run refuses the adjustment set and does not fit an effect model.',
+      sources: [RUNGE_2021, VAN_DER_ZANDER_2014],
     },
     {
       id: caveatId('causal-effects-functional-form'),
@@ -1786,6 +1839,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   COUNT_SERIES_INTERVENTION_SCAN,
   PCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
+  RPCMCI_PAR_CORR,
   DYNOTEARS,
   DIRECT_LINGAM,
   VAR_LINGAM,
@@ -1841,6 +1895,7 @@ export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   GRANGER_SSR_F,
   PCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
+  RPCMCI_PAR_CORR,
   DYNOTEARS,
   VAR_LINGAM,
   OCSE,

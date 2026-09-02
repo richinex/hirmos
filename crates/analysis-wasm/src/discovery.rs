@@ -76,6 +76,109 @@ where
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn rpcmci_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    num_regimes: usize,
+    max_transitions: usize,
+    switch_thres: f64,
+    num_iterations: usize,
+    max_anneal: usize,
+    tau_min: usize,
+    tau_max: usize,
+    pc_alpha: f64,
+    alpha_level: f64,
+    seed: u64,
+    progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    if !(2..=12).contains(&columns) {
+        return Err(
+            "RPCMCI requires between 2 and 12 selected variables in the browser".to_owned(),
+        );
+    }
+    if !(2..=6).contains(&num_regimes) {
+        return Err("RPCMCI numRegimes must be between 2 and 6".to_owned());
+    }
+    if max_transitions >= rows {
+        return Err(
+            "RPCMCI maxTransitions must be smaller than the number of observations".to_owned(),
+        );
+    }
+    if !switch_thres.is_finite() || !(0.0..=1.0).contains(&switch_thres) {
+        return Err("RPCMCI switchThres must be finite and in [0, 1]".to_owned());
+    }
+    if !(1..=100).contains(&num_iterations) || !(1..=50).contains(&max_anneal) {
+        return Err("RPCMCI iterations must be in 1..=100 and annealings in 1..=50".to_owned());
+    }
+    if tau_min > tau_max || tau_max > 6 {
+        return Err("RPCMCI requires 0 <= tauMin <= tauMax <= 6 in the browser".to_owned());
+    }
+    if !pc_alpha.is_finite()
+        || !(0.0..=1.0).contains(&pc_alpha)
+        || pc_alpha == 0.0
+        || !alpha_level.is_finite()
+        || !(0.0..=1.0).contains(&alpha_level)
+        || alpha_level == 0.0
+    {
+        return Err("RPCMCI pcAlpha and alphaLevel must be finite and in (0, 1]".to_owned());
+    }
+    validate_dense_matrix("RPCMCI", values, rows, columns)?;
+    if rows < (2 * tau_max + 24).max(40) {
+        return Err("RPCMCI has too few observations for the selected maximum lag".to_owned());
+    }
+
+    let data: Vec<Vec<f64>> = (0..rows)
+        .map(|row| {
+            (0..columns)
+                .map(|column| values[column * rows + row])
+                .collect()
+        })
+        .collect();
+    let result = run_rpcmci_with_progress(
+        &data,
+        num_regimes,
+        max_transitions,
+        switch_thres,
+        num_iterations,
+        max_anneal,
+        tau_min,
+        tau_max,
+        pc_alpha,
+        alpha_level,
+        seed,
+        CiKind::ParCorr,
+        progress,
+    )
+    .ok_or_else(|| "RPCMCI produced no error-free annealing for this configuration".to_owned())?;
+
+    Ok(AnalysisResult::Rpcmci {
+        observations: rows,
+        variables: columns,
+        num_regimes,
+        max_transitions,
+        switch_thres,
+        num_iterations,
+        max_anneal,
+        tau_min,
+        tau_max,
+        pc_alpha,
+        alpha_level,
+        seed,
+        regimes: result.regimes,
+        graphs: result.graphs,
+        val_matrices: result.val_matrices,
+        p_matrices: result.p_matrices,
+        diff_g_all: result.diff_g_f.0,
+        diff_g_best: result.diff_g_f.1,
+        error_free_annealings: result.error_free_annealings,
+    })
+}
+
 pub(crate) fn dynotears_evidence<F>(
     values: &[f64],
     rows: usize,
@@ -428,6 +531,7 @@ mod tests {
             AnalysisCommand::StationarityBattery
             | AnalysisCommand::PandasResampleDaily { .. }
             | AnalysisCommand::Lpcmci { .. }
+            | AnalysisCommand::Rpcmci { .. }
             | AnalysisCommand::Dynotears { .. }
             | AnalysisCommand::DirectLingam { .. }
             | AnalysisCommand::VarLingam { .. }
@@ -642,5 +746,56 @@ mod tests {
         assert_eq!(ocse_json["kind"], "ocse");
         assert_eq!(ocse_json["seed"], 42);
         assert_eq!(ocse_progress.last(), Some(&("complete", columns, columns)));
+    }
+
+    #[test]
+    fn rpcmci_serializes_the_parity_fixture_and_reports_annealing_progress() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../causal-core/oracle/fixtures/rpcmci.json"
+        ))
+        .expect("RPCMCI fixture parses");
+        let data: Vec<Vec<f64>> =
+            serde_json::from_value(fixture["data"].clone()).expect("RPCMCI data parses");
+        let rows = data.len();
+        let columns = data[0].len();
+        let mut values = vec![0.0; rows * columns];
+        for row in 0..rows {
+            for column in 0..columns {
+                values[column * rows + row] = data[row][column];
+            }
+        }
+
+        let num_iterations = fixture["num_iterations"].as_u64().unwrap() as usize;
+        let max_anneal = fixture["max_anneal"].as_u64().unwrap() as usize;
+        let mut progress = Vec::new();
+        let result = rpcmci_evidence(
+            &values,
+            rows,
+            columns,
+            fixture["num_regimes"].as_u64().unwrap() as usize,
+            fixture["max_transitions"].as_u64().unwrap() as usize,
+            fixture["switch_thres"].as_f64().unwrap(),
+            num_iterations,
+            max_anneal,
+            fixture["tau_min"].as_u64().unwrap() as usize,
+            fixture["tau_max"].as_u64().unwrap() as usize,
+            fixture["pc_alpha"].as_f64().unwrap(),
+            fixture["alpha_level"].as_f64().unwrap(),
+            fixture["seed"].as_u64().unwrap(),
+            |stage, done, total| progress.push((stage, done, total)),
+        )
+        .expect("RPCMCI parity fixture should run");
+        let json = serde_json::to_value(result).expect("RPCMCI result serializes");
+        assert_eq!(json["kind"], "rpcmci");
+        assert_eq!(json["regimes"].as_array().unwrap().len(), 2);
+        assert_eq!(json["graphs"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            progress.last(),
+            Some(&(
+                "complete",
+                num_iterations * max_anneal,
+                num_iterations * max_anneal
+            ))
+        );
     }
 }

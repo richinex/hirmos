@@ -221,7 +221,7 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await navigation.getByRole('button', { name: /Discovery lab/ }).click()
   await expect(page.getByRole('heading', { name: 'Examine candidate relationships' })).toBeVisible()
   const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method' })
-  await expect(discoveryMethods.getByRole('radio')).toHaveCount(6)
+  await expect(discoveryMethods.getByRole('radio')).toHaveCount(7)
   await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
   await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toBeDisabled()
   await expect(discoveryMethods.getByRole('radio', { name: /VAR-LiNGAM/ })).toBeDisabled()

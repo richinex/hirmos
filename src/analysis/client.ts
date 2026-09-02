@@ -1,10 +1,11 @@
-import { err, type Result } from '@/domain/dop'
+import { err, ok, type Result } from '@/domain/dop'
 import type { CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
   DynotearsEvidence,
   DirectLingamEvidence,
   LpcmciEvidence,
+  RpcmciEvidence,
   OcseEvidence,
   PcmciPlusEvidence,
   VarLingamEvidence,
@@ -26,6 +27,7 @@ import {
   parseAnalysisWorkerEvent,
   type AnalysisWorkerCommand,
   type AnalysisProgress,
+  type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
   type WorkerRequestId,
 } from '@/workers/analysisProtocol'
@@ -35,6 +37,7 @@ type PandasResamplingOutcome = Result<PandasResamplingEvidence, AnalysisWorkerPr
 type PcmciPlusOutcome = Result<PcmciPlusEvidence, AnalysisWorkerProblem>
 type GrangerOutcome = Result<GrangerSsrEvidence, AnalysisWorkerProblem>
 type LpcmciOutcome = Result<LpcmciEvidence, AnalysisWorkerProblem>
+type RpcmciOutcome = Result<RpcmciEvidence, AnalysisWorkerProblem>
 type DynotearsOutcome = Result<DynotearsEvidence, AnalysisWorkerProblem>
 type DirectLingamOutcome = Result<DirectLingamEvidence, AnalysisWorkerProblem>
 type VarLingamOutcome = Result<VarLingamEvidence, AnalysisWorkerProblem>
@@ -66,52 +69,62 @@ type IdentifiedDiscreteQueryOutcome = Result<IdentifiedDiscreteQueryEvidence, An
 type BinaryEttOutcome = Result<BinaryEttEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type DynamicLinearScmOutcome = Result<DynamicLinearScmEvidence, AnalysisWorkerProblem>
-type PendingRun =
-  | { readonly kind: 'stationarity'; readonly resolve: (outcome: StationarityOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'pandas-resampling'; readonly resolve: (outcome: PandasResamplingOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'pcmci-plus'; readonly resolve: (outcome: PcmciPlusOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'lpcmci'; readonly resolve: (outcome: LpcmciOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'dynotears'; readonly resolve: (outcome: DynotearsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'direct-lingam'; readonly resolve: (outcome: DirectLingamOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'var-lingam'; readonly resolve: (outcome: VarLingamOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'ocse'; readonly resolve: (outcome: OcseOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'granger'; readonly resolve: (outcome: GrangerOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'backdoor-identify'; readonly resolve: (outcome: BackdoorIdentificationOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'dag-check'; readonly resolve: (outcome: DagCheckOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'backdoor-linear'; readonly resolve: (outcome: BackdoorLinearOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'frontdoor-two-stage'; readonly resolve: (outcome: FrontdoorTwoStageOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'count-glm'; readonly resolve: (outcome: CountGlmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'negative-binomial-ingarch'; readonly resolve: (outcome: NegativeBinomialIngarchOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'count-series-intervention-scan'; readonly resolve: (outcome: CountSeriesInterventionScanOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'causal-effects-total'; readonly resolve: (outcome: CausalEffectsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'causal-impact'; readonly resolve: (outcome: CausalImpactOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'linear-refutation'; readonly resolve: (outcome: LinearRefutationOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'unobserved-confounding'; readonly resolve: (outcome: UnobservedConfoundingOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'series-structure'; readonly resolve: (outcome: SeriesStructureOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'resolve-missingness'; readonly resolve: (outcome: MissingnessOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'seasonal-adjust'; readonly resolve: (outcome: SeasonalOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'double-ml'; readonly resolve: (outcome: DoubleMlOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'dml-refutation-batch'; readonly resolve: (outcome: DmlRefutationOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'ardl-pss'; readonly resolve: (outcome: ArdlOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'vecm'; readonly resolve: (outcome: VecmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'synthetic-control'; readonly resolve: (outcome: SyntheticOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'panel-intervention'; readonly resolve: (outcome: PanelInterventionOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'negbin-nuts'; readonly resolve: (outcome: NegbinNutsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'bayesian-gaussian'; readonly resolve: (outcome: BayesianGaussianOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'discrete-bn-query'; readonly resolve: (outcome: DiscreteBnOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'identified-discrete-query'; readonly resolve: (outcome: IdentifiedDiscreteQueryOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'binary-ett'; readonly resolve: (outcome: BinaryEttOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'linear-scm-counterfactual'; readonly resolve: (outcome: LinearScmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
-  | { readonly kind: 'dynamic-linear-scm-counterfactual'; readonly resolve: (outcome: DynamicLinearScmOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+type SuccessfulAnalysisEvent = Extract<AnalysisWorkerEvent, { readonly result: unknown }>
+type SuccessfulAnalysisEventKind = SuccessfulAnalysisEvent['kind']
+type SuccessfulAnalysisResults = {
+  readonly [Event in SuccessfulAnalysisEvent as Event['kind']]: Event['result']
+}
+type SuccessfulAnalysisResult<Kind extends SuccessfulAnalysisEventKind> = SuccessfulAnalysisResults[Kind]
+
+type PendingCompletion =
+  | { readonly kind: 'completed' }
+  | {
+      readonly kind: 'unexpected-event'
+      readonly expected: SuccessfulAnalysisEventKind
+      readonly received: SuccessfulAnalysisEventKind
+    }
+
+interface PendingRun {
+  readonly expected: SuccessfulAnalysisEventKind
+  readonly complete: (event: SuccessfulAnalysisEvent) => PendingCompletion
+  readonly reject: (problem: AnalysisWorkerProblem) => void
+  readonly onProgress?: (progress: AnalysisProgress) => void
+}
+
+function hasEventKind<Kind extends SuccessfulAnalysisEventKind>(
+  event: SuccessfulAnalysisEvent,
+  kind: Kind,
+): event is Extract<SuccessfulAnalysisEvent, { readonly kind: Kind }> {
+  return event.kind === kind
+}
+
+function pendingRun<Kind extends SuccessfulAnalysisEventKind>(
+  expected: Kind,
+  resolve: (outcome: Result<SuccessfulAnalysisResult<Kind>, AnalysisWorkerProblem>) => void,
+  onProgress?: (progress: AnalysisProgress) => void,
+): PendingRun {
+  return {
+    expected,
+    onProgress,
+    reject: (problem) => resolve(err(problem)),
+    complete: (event) => {
+      if (!hasEventKind(event, expected)) {
+        return { kind: 'unexpected-event', expected, received: event.kind }
+      }
+
+      // The discriminant check above establishes the generic event/result correlation that
+      // TypeScript cannot retain after indexing a union by a generic literal.
+      resolve(ok(event.result as SuccessfulAnalysisResult<Kind>))
+      return { kind: 'completed' }
+    },
+  }
+}
 
 let worker: Worker | null = null
 const pending = new Map<WorkerRequestId, PendingRun>()
 
-/** Reject one run; the union of resolvers is too wide for the checker to fold, and a failure fits every outcome. */
-const reject = (run: PendingRun, problem: AnalysisWorkerProblem): void => (run.resolve as (outcome: Result<never, AnalysisWorkerProblem>) => void)(err(problem))
-
 const failAll = (problem: AnalysisWorkerProblem) => {
-  for (const run of pending.values()) reject(run, problem)
+  for (const run of pending.values()) run.reject(problem)
   pending.clear()
   worker?.terminate()
   worker = null
@@ -141,297 +154,17 @@ const analysisWorker = (): Worker => {
     }
     if (parsed.value.kind === 'analysis-failed') {
       pending.delete(parsed.value.request)
-      reject(run, parsed.value.problem)
+      run.reject(parsed.value.problem)
       return
     }
-    if (run.kind === 'stationarity' && parsed.value.kind !== 'stationarity-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned PCMCI+ evidence for a stationarity request.' })
-      return
-    }
-    if (run.kind === 'pandas-resampling' && parsed.value.kind !== 'pandas-resampling-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a pandas resampling request.' })
-      return
-    }
-    if (run.kind === 'pcmci-plus' && parsed.value.kind !== 'pcmci-plus-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a PCMCI+ request.' })
-      return
-    }
-    if (run.kind === 'lpcmci' && parsed.value.kind !== 'lpcmci-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an LPCMCI request.' })
-      return
-    }
-    if (run.kind === 'dynotears' && parsed.value.kind !== 'dynotears-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a DYNOTEARS request.' })
-      return
-    }
-    if (run.kind === 'direct-lingam' && parsed.value.kind !== 'direct-lingam-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a DirectLiNGAM request.' })
-      return
-    }
-    if (run.kind === 'var-lingam' && parsed.value.kind !== 'var-lingam-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a VAR-LiNGAM request.' })
-      return
-    }
-    if (run.kind === 'ocse' && parsed.value.kind !== 'ocse-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an oCSE request.' })
-      return
-    }
-    if (run.kind === 'granger' && parsed.value.kind !== 'granger-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a Granger request.' })
-      return
-    }
-    if (run.kind === 'backdoor-identify' && parsed.value.kind !== 'backdoor-identification-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an identification request.' })
-      return
-    }
-    if (run.kind === 'dag-check' && parsed.value.kind !== 'dag-check-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a DAG check request.' })
-      return
-    }
-    if (run.kind === 'backdoor-linear' && parsed.value.kind !== 'backdoor-linear-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an adjusted regression request.' })
-      return
-    }
-    if (run.kind === 'frontdoor-two-stage' && parsed.value.kind !== 'frontdoor-two-stage-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a front-door estimate.' })
-      return
-    }
-    if (run.kind === 'count-glm' && parsed.value.kind !== 'count-glm-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a count model request.' })
-      return
-    }
-    if (run.kind === 'negative-binomial-ingarch' && parsed.value.kind !== 'negative-binomial-ingarch-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a negative-binomial INGARCH request.' })
-      return
-    }
-    if (run.kind === 'count-series-intervention-scan' && parsed.value.kind !== 'count-series-intervention-scan-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a count-series intervention scan.' })
-      return
-    }
-    if (run.kind === 'causal-effects-total' && parsed.value.kind !== 'causal-effects-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a CausalEffects request.' })
-      return
-    }
-    if (run.kind === 'causal-impact' && parsed.value.kind !== 'causal-impact-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a causal impact request.' })
-      return
-    }
-    if (run.kind === 'linear-refutation' && parsed.value.kind !== 'linear-refutation-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a refutation request.' })
-      return
-    }
-    if (run.kind === 'unobserved-confounding' && parsed.value.kind !== 'unobserved-confounding-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an unobserved confounding request.' })
-      return
-    }
-    if (run.kind === 'series-structure' && parsed.value.kind !== 'series-structure-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for a series structure request.' })
-      return
-    }
-    if (run.kind === 'resolve-missingness' && parsed.value.kind !== 'missingness-resolved') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a missingness request.' })
-      return
-    }
-    if (run.kind === 'seasonal-adjust' && parsed.value.kind !== 'seasonal-adjusted') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a seasonal adjustment request.' })
-      return
-    }
-    if (run.kind === 'double-ml' && parsed.value.kind !== 'double-ml-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a double machine learning request.' })
-      return
-    }
-    if (run.kind === 'dml-refutation-batch' && parsed.value.kind !== 'dml-refutation-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a DML refutation batch.' })
-      return
-    }
-    if (run.kind === 'ardl-pss' && parsed.value.kind !== 'ardl-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for an ARDL request.' })
-      return
-    }
-    if (run.kind === 'vecm' && parsed.value.kind !== 'vecm-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a VECM request.' })
-      return
-    }
-    if (run.kind === 'synthetic-control' && parsed.value.kind !== 'synthetic-control-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a synthetic control request.' })
-      return
-    }
-    if (run.kind === 'panel-intervention' && parsed.value.kind !== 'panel-intervention-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a panel intervention request.' })
-      return
-    }
-    if (run.kind === 'negbin-nuts' && parsed.value.kind !== 'negbin-nuts-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a NUTS request.' })
-      return
-    }
-    if (run.kind === 'bayesian-gaussian' && parsed.value.kind !== 'bayesian-gaussian-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a Bayesian Gaussian request.' })
-      return
-    }
-    if (run.kind === 'discrete-bn-query' && parsed.value.kind !== 'discrete-bn-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a discrete BN query.' })
-      return
-    }
-    if (run.kind === 'identified-discrete-query' && parsed.value.kind !== 'identified-discrete-query-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another method result for an identified discrete query request.' })
-      return
-    }
-    if (run.kind === 'binary-ett' && parsed.value.kind !== 'binary-ett-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a binary ETT request.' })
-      return
-    }
-    if (run.kind === 'linear-scm-counterfactual' && parsed.value.kind !== 'linear-scm-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a counterfactual request.' })
-      return
-    }
-    if (run.kind === 'dynamic-linear-scm-counterfactual' && parsed.value.kind !== 'dynamic-linear-scm-succeeded') {
-      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a dynamic counterfactual request.' })
-      return
-    }
+
     pending.delete(parsed.value.request)
-    if (run.kind === 'stationarity' && parsed.value.kind === 'stationarity-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'pandas-resampling' && parsed.value.kind === 'pandas-resampling-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'pcmci-plus' && parsed.value.kind === 'pcmci-plus-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'lpcmci' && parsed.value.kind === 'lpcmci-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'dynotears' && parsed.value.kind === 'dynotears-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'direct-lingam' && parsed.value.kind === 'direct-lingam-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'var-lingam' && parsed.value.kind === 'var-lingam-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'ocse' && parsed.value.kind === 'ocse-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'granger' && parsed.value.kind === 'granger-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'backdoor-identify' && parsed.value.kind === 'backdoor-identification-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'dag-check' && parsed.value.kind === 'dag-check-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'backdoor-linear' && parsed.value.kind === 'backdoor-linear-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'frontdoor-two-stage' && parsed.value.kind === 'frontdoor-two-stage-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'count-glm' && parsed.value.kind === 'count-glm-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'negative-binomial-ingarch' && parsed.value.kind === 'negative-binomial-ingarch-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'count-series-intervention-scan' && parsed.value.kind === 'count-series-intervention-scan-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'causal-effects-total' && parsed.value.kind === 'causal-effects-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'causal-impact' && parsed.value.kind === 'causal-impact-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'linear-refutation' && parsed.value.kind === 'linear-refutation-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'unobserved-confounding' && parsed.value.kind === 'unobserved-confounding-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'series-structure' && parsed.value.kind === 'series-structure-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'resolve-missingness' && parsed.value.kind === 'missingness-resolved') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'seasonal-adjust' && parsed.value.kind === 'seasonal-adjusted') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'double-ml' && parsed.value.kind === 'double-ml-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'dml-refutation-batch' && parsed.value.kind === 'dml-refutation-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'ardl-pss' && parsed.value.kind === 'ardl-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'vecm' && parsed.value.kind === 'vecm-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'synthetic-control' && parsed.value.kind === 'synthetic-control-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'panel-intervention' && parsed.value.kind === 'panel-intervention-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'negbin-nuts' && parsed.value.kind === 'negbin-nuts-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'bayesian-gaussian' && parsed.value.kind === 'bayesian-gaussian-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'discrete-bn-query' && parsed.value.kind === 'discrete-bn-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'identified-discrete-query' && parsed.value.kind === 'identified-discrete-query-succeeded') {
-      pending.delete(parsed.value.request)
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'binary-ett' && parsed.value.kind === 'binary-ett-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'linear-scm-counterfactual' && parsed.value.kind === 'linear-scm-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
-      return
-    }
-    if (run.kind === 'dynamic-linear-scm-counterfactual' && parsed.value.kind === 'dynamic-linear-scm-succeeded') {
-      run.resolve({ ok: true, value: parsed.value.result })
+    const completion = run.complete(parsed.value)
+    if (completion.kind === 'unexpected-event') {
+      failAll({
+        kind: 'worker-protocol-failed',
+        detail: `The analysis worker returned ${completion.received} for a request expecting ${completion.expected}.`,
+      })
     }
   }
   created.onerror = (event) => {
@@ -455,9 +188,42 @@ export function runLpcmci(
 ): Promise<LpcmciOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'lpcmci', resolve, onProgress })
+    pending.set(request, pendingRun('lpcmci-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
       kind: 'lpcmci', request, values, rows, columns, tauMax, pcAlpha,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runRpcmci(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  configuration: {
+    readonly numRegimes: number
+    readonly maxTransitions: number
+    readonly switchThres: number
+    readonly numIterations: number
+    readonly maxAnneal: number
+    readonly tauMin: number
+    readonly tauMax: number
+    readonly pcAlpha: number
+    readonly alphaLevel: number
+    readonly seed: number
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<RpcmciOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('rpcmci-succeeded', resolve, onProgress))
+    const command: AnalysisWorkerCommand = {
+      kind: 'rpcmci', request, values, rows, columns, ...configuration,
     }
     try {
       analysisWorker().postMessage(command, [values.buffer])
@@ -479,7 +245,7 @@ export function runDynotears(
 ): Promise<DynotearsOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'dynotears', resolve, onProgress })
+    pending.set(request, pendingRun('dynotears-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
       kind: 'dynotears', request, values, rows, columns, maxLag, lambdaW, lambdaA,
     }
@@ -505,7 +271,7 @@ export function runOcse(
 ): Promise<OcseOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'ocse', resolve, onProgress })
+    pending.set(request, pendingRun('ocse-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
       kind: 'ocse', request, values, rows, columns, maxLag, alpha, nShuffles, method, k,
     }
@@ -521,7 +287,7 @@ export function runOcse(
 export function runStationarityBattery(values: Float64Array): Promise<StationarityOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'stationarity', resolve })
+    pending.set(request, pendingRun('stationarity-succeeded', resolve))
     const command: AnalysisWorkerCommand = { kind: 'stationarity-battery', request, values }
     try {
       analysisWorker().postMessage(command, [values.buffer])
@@ -549,11 +315,10 @@ export function runPandasResampling(
   const payload = new Float64Array(timestamps.length + values.length)
   payload.set(timestamps)
   payload.set(values, timestamps.length)
-  return post<PandasResamplingOutcome>(
-    'pandas-resampling',
+  return post(
+    'pandas-resampling-succeeded',
     { kind: 'pandas-resample-daily', request, values: payload, rows, columns, target, incompleteBins, aggregations, imputedCells },
     payload,
-    (resolve) => ({ kind: 'pandas-resampling', resolve }),
   )
 }
 
@@ -566,7 +331,7 @@ export function runPcmciPlus(
 ): Promise<PcmciPlusOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'pcmci-plus', resolve })
+    pending.set(request, pendingRun('pcmci-plus-succeeded', resolve))
     const command: AnalysisWorkerCommand = {
       kind: 'pcmci-plus',
       request,
@@ -595,7 +360,7 @@ export function runGrangerSsrF(
 ): Promise<GrangerOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'granger', resolve })
+    pending.set(request, pendingRun('granger-succeeded', resolve))
     const command: AnalysisWorkerCommand = {
       kind: 'granger-ssr-f',
       request,
@@ -623,7 +388,7 @@ export function runDirectLingam(
 ): Promise<DirectLingamOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'direct-lingam', resolve, onProgress })
+    pending.set(request, pendingRun('direct-lingam-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
       kind: 'direct-lingam', request, values, rows, columns,
     }
@@ -646,7 +411,7 @@ export function runVarLingam(
 ): Promise<VarLingamOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'var-lingam', resolve, onProgress })
+    pending.set(request, pendingRun('var-lingam-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
       kind: 'var-lingam', request, values, rows, columns, lags, prune,
     }
@@ -670,7 +435,7 @@ export function identifyBackdoor(graph: {
 }): Promise<BackdoorIdentificationOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'backdoor-identify', resolve })
+    pending.set(request, pendingRun('backdoor-identification-succeeded', resolve))
     const command: AnalysisWorkerCommand = { kind: 'backdoor-identify', request, values: new Float64Array(0), ...graph }
     try {
       analysisWorker().postMessage(command)
@@ -695,7 +460,7 @@ export function runBackdoorLinear(
 ): Promise<BackdoorLinearOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'backdoor-linear', resolve })
+    pending.set(request, pendingRun('backdoor-linear-succeeded', resolve))
     const command: AnalysisWorkerCommand = { kind: 'backdoor-linear', request, values, rows, columns, ...design }
     try {
       analysisWorker().postMessage(command, [values.buffer])
@@ -729,28 +494,36 @@ export function runFrontdoorTwoStage(
   onProgress?: (progress: AnalysisProgress) => void,
 ): Promise<FrontdoorTwoStageOutcome> {
   const request = newWorkerRequestId()
-  return post<FrontdoorTwoStageOutcome>(
-    'frontdoor-two-stage',
+  return post(
+    'frontdoor-two-stage-succeeded',
     { kind: 'frontdoor-two-stage', request, values, rows, columns, ...design },
     values,
-    (resolve) => ({ kind: 'frontdoor-two-stage', resolve, onProgress }),
+    onProgress,
   )
 }
 
-const post = <Outcome>(kind: PendingRun['kind'], command: AnalysisWorkerCommand, values: Float64Array, register: (resolve: (outcome: Outcome) => void) => PendingRun): Promise<Outcome> =>
+const post = <Kind extends SuccessfulAnalysisEventKind>(
+  expected: Kind,
+  command: AnalysisWorkerCommand,
+  values: Float64Array,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<Result<SuccessfulAnalysisResult<Kind>, AnalysisWorkerProblem>> =>
   new Promise((resolve) => {
-    pending.set(command.request, register(resolve))
+    pending.set(command.request, pendingRun(expected, resolve, onProgress))
     try {
       analysisWorker().postMessage(command, [values.buffer])
     } catch (cause: unknown) {
       pending.delete(command.request)
-      resolve({ ok: false, error: { kind: 'worker-unavailable', detail: `${kind}: ${cause instanceof Error ? cause.message : String(cause)}` } } as Outcome)
+      resolve(err({
+        kind: 'worker-unavailable',
+        detail: `${command.kind}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      }))
     }
   })
 
 export function runCountGlm(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly family: 'poisson' | 'negativeBinomial' }): Promise<CountGlmOutcome> {
   const request = newWorkerRequestId()
-  return post<CountGlmOutcome>('count-glm', { kind: 'count-glm', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'count-glm', resolve }))
+  return post('count-glm-succeeded', { kind: 'count-glm', request, values, rows, columns, ...design }, values)
 }
 
 export function runNegativeBinomialIngarch(values: Float64Array, rows: number, columns: number, design: {
@@ -768,7 +541,7 @@ export function runNegativeBinomialIngarch(values: Float64Array, rows: number, c
   readonly schedule: IngarchInterventionSchedule
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<NegativeBinomialIngarchOutcome> {
   const request = newWorkerRequestId()
-  return post<NegativeBinomialIngarchOutcome>('negative-binomial-ingarch', { kind: 'negative-binomial-ingarch', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'negative-binomial-ingarch', resolve, onProgress }))
+  return post('negative-binomial-ingarch-succeeded', { kind: 'negative-binomial-ingarch', request, values, rows, columns, ...design }, values, onProgress)
 }
 
 export function runCountSeriesInterventionScan(values: Float64Array, rows: number, columns: number, design: {
@@ -780,7 +553,7 @@ export function runCountSeriesInterventionScan(values: Float64Array, rows: numbe
   readonly delta: number
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<CountSeriesInterventionScanOutcome> {
   const request = newWorkerRequestId()
-  return post<CountSeriesInterventionScanOutcome>('count-series-intervention-scan', { kind: 'count-series-intervention-scan', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'count-series-intervention-scan', resolve, onProgress }))
+  return post('count-series-intervention-scan-succeeded', { kind: 'count-series-intervention-scan', request, values, rows, columns, ...design }, values, onProgress)
 }
 
 export function runCausalEffectsTotal(values: Float64Array, rows: number, columns: number, design: {
@@ -794,27 +567,27 @@ export function runCausalEffectsTotal(values: Float64Array, rows: number, column
   readonly uncertainty: CausalEffectsUncertainty
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<CausalEffectsOutcome> {
   const request = newWorkerRequestId()
-  return post<CausalEffectsOutcome>('causal-effects-total', { kind: 'causal-effects-total', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'causal-effects-total', resolve, onProgress }))
+  return post('causal-effects-succeeded', { kind: 'causal-effects-total', request, values, rows, columns, ...design }, values, onProgress)
 }
 
 export function runCausalImpact(values: Float64Array, rows: number, columns: number, design: { readonly outcome: number; readonly controls: readonly number[]; readonly nPre: number; readonly maxIter: number }): Promise<CausalImpactOutcome> {
   const request = newWorkerRequestId()
-  return post<CausalImpactOutcome>('causal-impact', { kind: 'causal-impact', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'causal-impact', resolve }))
+  return post('causal-impact-succeeded', { kind: 'causal-impact', request, values, rows, columns, ...design }, values)
 }
 
 export function runLinearRefutation(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly simulations: number; readonly subsetFraction: number; readonly seed: number; readonly ljungBoxLags: number }): Promise<LinearRefutationOutcome> {
   const request = newWorkerRequestId()
-  return post<LinearRefutationOutcome>('linear-refutation', { kind: 'linear-refutation', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'linear-refutation', resolve }))
+  return post('linear-refutation-succeeded', { kind: 'linear-refutation', request, values, rows, columns, ...design }, values)
 }
 
 export function runUnobservedConfounding(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly seed: number; readonly kappaT: readonly number[] | null; readonly kappaY: readonly number[] | null }): Promise<UnobservedConfoundingOutcome> {
   const request = newWorkerRequestId()
-  return post<UnobservedConfoundingOutcome>('unobserved-confounding', { kind: 'unobserved-confounding', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'unobserved-confounding', resolve }))
+  return post('unobserved-confounding-succeeded', { kind: 'unobserved-confounding', request, values, rows, columns, ...design }, values)
 }
 
 export function runSeriesStructure(values: Float64Array, rows: number, columns: number, design: { readonly period: number | null; readonly robust: boolean; readonly correlationMaxLag: number; readonly peltMinSize: number; readonly peltJump: number; readonly peltPenalty: number }): Promise<SeriesStructureOutcome> {
   const request = newWorkerRequestId()
-  return post<SeriesStructureOutcome>('series-structure', { kind: 'series-structure', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'series-structure', resolve }))
+  return post('series-structure-succeeded', { kind: 'series-structure', request, values, rows, columns, ...design }, values)
 }
 
 export interface DmlDesign {
@@ -828,27 +601,27 @@ export interface DmlDesign {
 
 export function runDoubleMl(values: Float64Array, rows: number, columns: number, design: DmlDesign): Promise<DoubleMlOutcome> {
   const request = newWorkerRequestId()
-  return post<DoubleMlOutcome>('double-ml', { kind: 'double-ml', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'double-ml', resolve }))
+  return post('double-ml-succeeded', { kind: 'double-ml', request, values, rows, columns, ...design }, values)
 }
 
 export function runDmlRefutationBatch(values: Float64Array, rows: number, columns: number, design: DmlDesign): Promise<DmlRefutationOutcome> {
   const request = newWorkerRequestId()
-  return post<DmlRefutationOutcome>('dml-refutation-batch', { kind: 'dml-refutation-batch', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'dml-refutation-batch', resolve }))
+  return post('dml-refutation-succeeded', { kind: 'dml-refutation-batch', request, values, rows, columns, ...design }, values)
 }
 
 export function runArdlPss(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly maxLag: number; readonly trend: 'c' | 'ct'; readonly case: number }): Promise<ArdlOutcome> {
   const request = newWorkerRequestId()
-  return post<ArdlOutcome>('ardl-pss', { kind: 'ardl-pss', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'ardl-pss', resolve }))
+  return post('ardl-succeeded', { kind: 'ardl-pss', request, values, rows, columns, ...design }, values)
 }
 
 export function runVecm(values: Float64Array, rows: number, columns: number, design: { readonly endogenous: readonly number[]; readonly maxLags: number; readonly deterministic: 'n' | 'co' | 'ci' | 'coli'; readonly significance: number; readonly breakIndex: number | null }): Promise<VecmOutcome> {
   const request = newWorkerRequestId()
-  return post<VecmOutcome>('vecm', { kind: 'vecm', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'vecm', resolve }))
+  return post('vecm-succeeded', { kind: 'vecm', request, values, rows, columns, ...design }, values)
 }
 
 export function runSyntheticControl(values: Float64Array, rows: number, columns: number, design: { readonly treated: number; readonly donors: readonly number[]; readonly nPre: number; readonly crossFitFolds: number; readonly alpha: number }): Promise<SyntheticOutcome> {
   const request = newWorkerRequestId()
-  return post<SyntheticOutcome>('synthetic-control', { kind: 'synthetic-control', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'synthetic-control', resolve }))
+  return post('synthetic-control-succeeded', { kind: 'synthetic-control', request, values, rows, columns, ...design }, values)
 }
 
 export function runPanelIntervention(
@@ -861,7 +634,7 @@ export function runPanelIntervention(
 ): Promise<PanelInterventionOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'panel-intervention', resolve, onProgress })
+    pending.set(request, pendingRun('panel-intervention-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = { kind: 'panel-intervention', request, values, rows, units, times, ...inference }
     try {
       analysisWorker().postMessage(command, [values.buffer])
@@ -874,27 +647,27 @@ export function runPanelIntervention(
 
 export function runNegbinNuts(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly confounder: number; readonly warmup: number; readonly samples: number; readonly seed: number }): Promise<NegbinNutsOutcome> {
   const request = newWorkerRequestId()
-  return post<NegbinNutsOutcome>('negbin-nuts', { kind: 'negbin-nuts', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'negbin-nuts', resolve }))
+  return post('negbin-nuts-succeeded', { kind: 'negbin-nuts', request, values, rows, columns, ...design }, values)
 }
 
 export function runBayesianGaussian(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly warmup: number; readonly samples: number; readonly seed: number }): Promise<BayesianGaussianOutcome> {
   const request = newWorkerRequestId()
-  return post<BayesianGaussianOutcome>('bayesian-gaussian', { kind: 'bayesian-gaussian', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'bayesian-gaussian', resolve }))
+  return post('bayesian-gaussian-succeeded', { kind: 'bayesian-gaussian', request, values, rows, columns, ...design }, values)
 }
 
 export function runDiscreteBnQuery(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly bins: number; readonly equivalentSampleSize: number }): Promise<DiscreteBnOutcome> {
   const request = newWorkerRequestId()
-  return post<DiscreteBnOutcome>('discrete-bn-query', { kind: 'discrete-bn-query', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'discrete-bn-query', resolve }))
+  return post('discrete-bn-succeeded', { kind: 'discrete-bn-query', request, values, rows, columns, ...design }, values)
 }
 
 export function runIdentifiedDiscreteQuery(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[]; readonly bins: number; readonly condition: { readonly variable: number; readonly state: number } | null }): Promise<IdentifiedDiscreteQueryOutcome> {
   const request = newWorkerRequestId()
-  return post<IdentifiedDiscreteQueryOutcome>('identified-discrete-query', { kind: 'identified-discrete-query', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'identified-discrete-query', resolve }))
+  return post('identified-discrete-query-succeeded', { kind: 'identified-discrete-query', request, values, rows, columns, ...design }, values)
 }
 
 export function runBinaryEtt(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[] }): Promise<BinaryEttOutcome> {
   const request = newWorkerRequestId()
-  return post<BinaryEttOutcome>('binary-ett', { kind: 'binary-ett', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'binary-ett', resolve }))
+  return post('binary-ett-succeeded', { kind: 'binary-ett', request, values, rows, columns, ...design }, values)
 }
 
 export function runDagCheck(
@@ -914,7 +687,7 @@ export function runDagCheck(
 ): Promise<DagCheckOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
-    pending.set(request, { kind: 'dag-check', resolve, onProgress })
+    pending.set(request, pendingRun('dag-check-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = { kind: 'dag-check', request, values, rows, columns, ...design }
     try {
       analysisWorker().postMessage(command, [values.buffer])
@@ -927,24 +700,24 @@ export function runDagCheck(
 
 export function runLinearScmCounterfactual(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly interventions: readonly [number, number]; readonly observationNoise: number | null }): Promise<LinearScmOutcome> {
   const request = newWorkerRequestId()
-  return post<LinearScmOutcome>('linear-scm-counterfactual', { kind: 'linear-scm-counterfactual', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'linear-scm-counterfactual', resolve }))
+  return post('linear-scm-succeeded', { kind: 'linear-scm-counterfactual', request, values, rows, columns, ...design }, values)
 }
 
 export function runDynamicLinearScmCounterfactual(values: Float64Array, rows: number, columns: number, design: { readonly nodes: readonly number[]; readonly statLag: number; readonly graph: readonly (readonly (readonly string[])[])[]; readonly treatment: number; readonly outcome: number; readonly timing: DynamicInterventionTiming; readonly steps: number; readonly interventions: readonly [number, number]; readonly uncertainty: DynamicCounterfactualUncertainty }, onProgress?: (progress: AnalysisProgress) => void): Promise<DynamicLinearScmOutcome> {
   const request = newWorkerRequestId()
-  return post<DynamicLinearScmOutcome>('dynamic-linear-scm-counterfactual', { kind: 'dynamic-linear-scm-counterfactual', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'dynamic-linear-scm-counterfactual', resolve, onProgress }))
+  return post('dynamic-linear-scm-succeeded', { kind: 'dynamic-linear-scm-counterfactual', request, values, rows, columns, ...design }, values, onProgress)
 }
 
 export function seasonalAdjustInWorker(values: Float64Array, rows: number, columns: number, design: { readonly period: number; readonly robust: boolean; readonly adjust: readonly number[] }): Promise<SeasonalOutcome> {
   const request = newWorkerRequestId()
   // The values buffer is copied rather than transferred: the caller keeps its matrix.
   const copy = Float64Array.from(values)
-  return post<SeasonalOutcome>('seasonal-adjust', { kind: 'seasonal-adjust', request, values: copy, rows, columns, ...design }, copy, (resolve) => ({ kind: 'seasonal-adjust', resolve }))
+  return post('seasonal-adjusted', { kind: 'seasonal-adjust', request, values: copy, rows, columns, ...design }, copy)
 }
 
 export function resolveMissingnessInWorker(values: Float64Array, rows: number, columns: number, validity: Uint8Array, resolution: MissingnessResolutionCommand): Promise<MissingnessOutcome> {
   const request = newWorkerRequestId()
   // The values buffer is copied rather than transferred: the caller keeps its nullable matrix.
   const copy = Float64Array.from(values)
-  return post<MissingnessOutcome>('resolve-missingness', { kind: 'resolve-missingness', request, values: copy, rows, columns, validity, resolution }, copy, (resolve) => ({ kind: 'resolve-missingness', resolve }))
+  return post('missingness-resolved', { kind: 'resolve-missingness', request, values: copy, rows, columns, validity, resolution }, copy)
 }

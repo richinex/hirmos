@@ -270,6 +270,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       const model = (() => {
         switch (run.evidence.fit.kind) {
           case 'unfitted': return 'No model was fitted.'
+          case 'invalidAdjustment': return 'No model was fitted because the supplied adjustment set did not pass the graph criterion.'
           case 'adjustedLinear': return 'A linear outcome regression uses the graph-derived time-indexed adjustment set.'
           case 'adjustedKnn': return `A ${run.evidence.fit.k}-neighbour outcome regression uses the graph-derived time-indexed adjustment set.`
           case 'wrightParents': return `Wright path tracing gives a direct contribution of ${number(run.evidence.fit.directEffect)} and an indirect contribution of ${number(run.evidence.fit.indirectEffect)} from linear regressions on each node’s time-indexed parents.`
@@ -310,6 +311,10 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
     case 'lpcmci-run': return { kind: 'result-interpretation', statements: [
       { kind: 'magnitude', text: `A marked cell records lagged or same-period graphical evidence selected at alpha ${run.result.pcAlpha}. Endpoint marks carry the orientation information; ParCorr gives the signed conditional association used by the test.` },
       { kind: 'qualification', text: 'Circles preserve unresolved endpoints and bidirected marks permit latent confounding. The PAG is evidence to review, not a fully oriented causal DAG or an intervention-effect estimate.' },
+    ] }
+    case 'rpcmci-run': return { kind: 'result-interpretation', statements: [
+      { kind: 'magnitude', text: `RPCMCI assigned each of the ${run.result.observations} time points to one of ${run.result.numRegimes} regimes and estimated a separate lag graph for each regime. ${run.result.errorFreeAnnealings} of ${run.result.maxAnneal} annealing runs completed without an optimisation error.` },
+      { kind: 'qualification', text: 'The regime memberships and conditional-dependence graphs depend on the selected number of regimes, transition budget, linear partial-correlation test and assumption that each regime has a stationary causal structure. Regime labels have no ordering or substantive meaning by themselves.' },
     ] }
     case 'dynotears-run': return { kind: 'result-interpretation', statements: [
       { kind: 'magnitude', text: 'Each nonzero weight is a fitted linear structural coefficient from source(t−lag) to target(t). Its sign gives the fitted direction of association; its magnitude depends on the variables’ scales and the selected penalties.' },

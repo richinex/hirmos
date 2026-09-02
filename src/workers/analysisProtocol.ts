@@ -14,10 +14,12 @@ import {
   dynotearsEvidenceSchema,
   directLingamEvidenceSchema,
   lpcmciEvidenceSchema,
+  rpcmciEvidenceSchema,
   ocseEvidenceSchema,
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
   parseLpcmciEvidence,
+  parseRpcmciEvidence,
   parseOcseEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
@@ -26,6 +28,7 @@ import {
   type DynotearsEvidence,
   type DirectLingamEvidence,
   type LpcmciEvidence,
+  type RpcmciEvidence,
   type OcseEvidence,
   type PcmciPlusEvidence,
   type VarLingamEvidence,
@@ -118,6 +121,23 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly tauMax: number
       readonly pcAlpha: number
+    }
+  | {
+      readonly kind: 'rpcmci'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly numRegimes: number
+      readonly maxTransitions: number
+      readonly switchThres: number
+      readonly numIterations: number
+      readonly maxAnneal: number
+      readonly tauMin: number
+      readonly tauMax: number
+      readonly pcAlpha: number
+      readonly alphaLevel: number
+      readonly seed: number
     }
   | {
       readonly kind: 'dynotears'
@@ -558,6 +578,11 @@ export type AnalysisWorkerEvent =
       readonly result: LpcmciEvidence
     }
   | {
+      readonly kind: 'rpcmci-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: RpcmciEvidence
+    }
+  | {
       readonly kind: 'dynotears-succeeded'
       readonly request: WorkerRequestId
       readonly result: DynotearsEvidence
@@ -672,6 +697,23 @@ const commandSchema = z.discriminatedUnion('kind', [
     columns: z.number().int().min(2).max(32),
     tauMax: z.number().int().min(1).max(20),
     pcAlpha: z.number().finite().positive().max(1),
+  }).strict(),
+  z.object({
+    kind: z.literal('rpcmci'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(12),
+    numRegimes: z.number().int().min(2).max(6),
+    maxTransitions: z.number().int().nonnegative(),
+    switchThres: z.number().finite().min(0).max(1),
+    numIterations: z.number().int().min(1).max(100),
+    maxAnneal: z.number().int().min(1).max(50),
+    tauMin: z.number().int().nonnegative().max(6),
+    tauMax: z.number().int().nonnegative().max(6),
+    pcAlpha: z.number().finite().positive().max(1),
+    alphaLevel: z.number().finite().positive().max(1),
+    seed: z.number().int().nonnegative(),
   }).strict(),
   z.object({
     kind: z.literal('dynotears'),
@@ -1142,6 +1184,11 @@ const eventSchema = z.discriminatedUnion('kind', [
     result: lpcmciEvidenceSchema,
   }).strict(),
   z.object({
+    kind: z.literal('rpcmci-succeeded'),
+    request: requestSchema,
+    result: rpcmciEvidenceSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('dynotears-succeeded'),
     request: requestSchema,
     result: dynotearsEvidenceSchema,
@@ -1268,6 +1315,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseLpcmciEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'lpcmci-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'rpcmci-succeeded') {
+    const result = parseRpcmciEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'rpcmci-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'dynotears-succeeded') {

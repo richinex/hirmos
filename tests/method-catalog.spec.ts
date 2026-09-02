@@ -50,6 +50,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'count-series-intervention-scan',
     'pcmci-plus-parcorr',
     'lpcmci-parcorr',
+    'rpcmci-parcorr',
     'dynotears',
     'direct-lingam',
     'var-lingam',

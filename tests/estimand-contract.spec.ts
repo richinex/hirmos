@@ -76,18 +76,21 @@ test('records the time-indexed adjustment rows actually fitted by CausalEffects'
       },
     }
     const identification = { result: { kind: 'identified', adjustment: { kind: 'canonical', variables: [] } } }
-    const configuration = { kind: 'causal-effects-total', estimator: { kind: 'linear' }, treatmentLag: 2, interventions: [0, 1], uncertainty: { kind: 'none' } }
+    const configuration = { kind: 'causal-effects-total', estimator: { kind: 'linear', adjustment: { kind: 'optimal' } }, treatmentLag: 2, interventions: [0, 1], uncertainty: { kind: 'none' } }
     const evidence = {
       kind: 'causalEffectsTotal', observations: 192, tauMax: 4, noCausalPath: false, identifiable: true,
-      mediators: [], fit: { kind: 'adjustedLinear', adjustmentSet: [[1, -1], [2, -1]] },
+      mediators: [], fit: { kind: 'adjustedLinear', selection: { kind: 'optimal' }, adjustmentSet: [[1, -1], [2, -1]] },
       interventions: [0, 1], predictions: [100, 95], totalEffect: -5, fittedObservations: 188, uncertainty: { kind: 'none' },
     }
     const graphVariables = study.graph.nodes
     const estimate = estimation.causalEstimateFrom(study, identification, { kind: 'causal-effects-run', configuration, evidence, graphVariables })
     const invalid = estimation.causalEstimateFrom(study, identification, {
-      kind: 'causal-effects-run', configuration, evidence: { ...evidence, fit: { kind: 'adjustedLinear', adjustmentSet: [[9, -1]] } }, graphVariables,
+      kind: 'causal-effects-run', configuration, evidence: { ...evidence, fit: { kind: 'adjustedLinear', selection: { kind: 'optimal' }, adjustmentSet: [[9, -1]] } }, graphVariables,
     })
-    return { estimate, labels: estimate === null ? [] : estimation.adjustmentLabels(estimate.adjustment), invalid }
+    const mismatchedSelection = estimation.causalEstimateFrom(study, identification, {
+      kind: 'causal-effects-run', configuration, evidence: { ...evidence, fit: { kind: 'adjustedLinear', selection: { kind: 'minimizedOptimal' }, adjustmentSet: [[1, -1]] } }, graphVariables,
+    })
+    return { estimate, labels: estimate === null ? [] : estimation.adjustmentLabels(estimate.adjustment), invalid, mismatchedSelection }
   })
   expect(result.estimate?.adjustment).toEqual({
     kind: 'time-indexed',
@@ -98,6 +101,7 @@ test('records the time-indexed adjustment rows actually fitted by CausalEffects'
   })
   expect(result.labels).toEqual(['DriversKilled (t−1)', 'PetrolPrice (t−1)'])
   expect(result.invalid).toBeNull()
+  expect(result.mismatchedSelection).toBeNull()
 })
 
 test('unlocks estimation for every identified result and not for an identification failure', async ({ page }, testInfo) => {

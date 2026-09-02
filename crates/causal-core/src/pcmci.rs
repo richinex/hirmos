@@ -28,17 +28,25 @@ pub(crate) fn pc_stable_single(
     data: &TimeSeries,
     j: usize,
     n: usize,
+    tau_min: usize,
     tau_max: usize,
     pc_alpha: f64,
 ) -> Pc1Single {
-    // Candidate order matches the default link assumptions: variable ascending, lag 1..=tau_max.
+    // PC1 only considers lagged parents. Tigramite first maps tau_min=0 to 1, then creates
+    // candidates in variable-major, lag-minor order.
+    let tau_min = tau_min.max(1);
     let mut parents: Vec<Node> = (0..n)
-        .flat_map(|i| (1..=tau_max as i32).map(move |tau| (i, -tau)))
+        .flat_map(|i| (tau_min..=tau_max).map(move |tau| (i, -(tau as i32))))
         .collect();
     // Minimum |val| per surviving link, in insertion (test) order.
     let mut val_min: Vec<(Node, f64)> = Vec::new();
     let mut pval_max: Vec<(Node, f64, f64)> = Vec::new();
-    let max_conds_dim = n * tau_max;
+    let lag_count = if tau_min <= tau_max {
+        tau_max - tau_min + 1
+    } else {
+        0
+    };
+    let max_conds_dim = n * lag_count;
 
     for conds_dim in 0..=max_conds_dim {
         if parents.len() < conds_dim + 1 {
@@ -150,7 +158,7 @@ pub fn run_pcmci_selected(
     for j in 0..n {
         let mut best: Option<(f64, usize, Vec<Node>)> = None;
         for (idx, &alpha) in alphas.iter().enumerate() {
-            let cand = pc_stable_single(&mut ci, data, j, n, tau_max, alpha).parents;
+            let cand = pc_stable_single(&mut ci, data, j, n, 1, tau_max, alpha).parents;
             let score = crate::parcorr::model_selection_aic(data, j, &cand, tau_max);
             // np.argmin keeps the first minimum.
             if best.as_ref().map(|(s, _, _)| score < *s).unwrap_or(true) {
@@ -234,7 +242,7 @@ pub fn run_pcmci_filtered(
     let mut ci = ParCorrCi::with_kind(kind);
     ci.sample_filter = filter;
     let parents: Vec<Vec<Node>> = (0..n)
-        .map(|j| pc_stable_single(&mut ci, data, j, n, tau_max, pc_alpha).parents)
+        .map(|j| pc_stable_single(&mut ci, data, j, n, tau_min, tau_max, pc_alpha).parents)
         .collect();
     let (val_matrix, p_matrix) = mci_stage(&mut ci, data, &parents, tau_min, tau_max);
     PcmciResult {

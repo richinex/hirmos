@@ -14,6 +14,7 @@ import { MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
@@ -40,6 +41,7 @@ import { estimandSentence, type StudySpecification, type StudyVariable } from '@
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
 import { lowerFirst } from '@/lib/text'
+import { SENSITIVITY_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
@@ -401,27 +403,27 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               {configuration.kind === 'linear-refutation' && (
                 <>
-                  <label className="block"><span className={fieldLabel}>Simulations</span><input type="number" min={1} max={2000} className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(1, Math.min(2000, Number(event.target.value) || 1)) })} /></label>
-                  <label className="block"><span className={fieldLabel}>Subset fraction</span><input type="number" step="0.05" min={0.15} max={0.95} className={field('text', 'mt-1')} value={configuration.subsetFraction} onChange={(event) => configure({ ...configuration, subsetFraction: Math.max(0.15, Math.min(0.95, Number(event.target.value) || 0.8)) })} /></label>
-                  <label className="block"><span className={fieldLabel}>Seed</span><input type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-                  <label className="block"><span className={fieldLabel}>Ljung–Box lags</span><input type="number" min={1} max={200} className={field('text', 'mt-1')} value={configuration.ljungBoxLags} onChange={(event) => configure({ ...configuration, ljungBoxLags: Math.max(1, Math.min(200, Number(event.target.value) || 1)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Simulations" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.simulations} /><input type="number" min={1} max={2000} className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(1, Math.min(2000, Number(event.target.value) || 1)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Subset fraction" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.subsetFraction} /><input type="number" step="0.05" min={0.15} max={0.95} className={field('text', 'mt-1')} value={configuration.subsetFraction} onChange={(event) => configure({ ...configuration, subsetFraction: Math.max(0.15, Math.min(0.95, Number(event.target.value) || 0.8)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.seed} /><input type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Ljung–Box lags" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.ljungBoxLags} /><input type="number" min={1} max={200} className={field('text', 'mt-1')} value={configuration.ljungBoxLags} onChange={(event) => configure({ ...configuration, ljungBoxLags: Math.max(1, Math.min(200, Number(event.target.value) || 1)) })} /></label>
                 </>
               )}
               {configuration.kind === 'dml-refutation' && (
                 <>
-                  <label className="block"><span className={fieldLabel}>Fold seed</span><input type="number" min={0} aria-label="Batch fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={SENSITIVITY_PARAMETER_HELP.dmlRefutation.foldSeed} /><input type="number" min={0} aria-label="Batch fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
                   <p className="m-0 self-end text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-3">Main fit, placebo, random common cause, then confounding bounds, all from this seed. Use the estimation run’s seed{estimation?.kind === 'double-ml-run' ? ` (${estimation.configuration.seed})` : ''} so the main fit repeats it.</p>
                 </>
               )}
               {configuration.kind === 'unobserved-confounding' && (
                 <>
-                  <label className="block"><span className={fieldLabel}>Seed</span><input type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.unobservedConfounding.seed} /><input type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
                   {(['kappaT', 'kappaY'] as const).map((axis) => {
                     const range = configuration[axis]
                     const title = axis === 'kappaT' ? 'Treatment flip strength' : 'Outcome shift strength'
                     return (
                       <div key={axis} className="@md/panel:col-span-2 @4xl/panel:col-span-1">
-                        <span className={fieldLabel}>{title}</span>
+                        <ParameterLabel className={fieldLabel} label={title} help={axis === 'kappaT' ? SENSITIVITY_PARAMETER_HELP.unobservedConfounding.treatmentFlipStrength : SENSITIVITY_PARAMETER_HELP.unobservedConfounding.outcomeShiftStrength} />
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <SegmentedControl ariaLabel={title} value={range.kind} onChange={(kind) => configure({ ...configuration, [axis]: kind === 'inferred' ? { kind: 'inferred' } : axis === 'kappaT' ? { kind: 'range', from: 0.05, to: 0.5, steps: 10 } : { kind: 'range', from: 0, to: Math.abs(estimation?.estimate.effect.kind === 'additive' ? estimation.estimate.effect.value : 1), steps: 10 } })} options={[{ value: 'inferred', label: 'Inferred' }, { value: 'range', label: 'Range' }]} />
                           {range.kind === 'range' && (

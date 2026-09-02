@@ -11,8 +11,9 @@ export function countSeriesFitOption(view: {
 }, theme: ChartTheme): EChartsCoreOption {
   return {
     ...baseOption(theme, `${view.name}: observed counts and fitted INGARCH conditional means across ${view.observed.length} reference points.`),
-    grid: gridAuto({ bottom: 44 }),
-    legend: legend(theme, ['observed', 'fitted mean']),
+    // The legend goes above the plot so it does not print over the axis name at the foot.
+    grid: gridAuto({ top: 30, bottom: 44 }),
+    legend: { ...legend(theme, ['observed', 'fitted mean']), bottom: 'auto', top: 0 },
     tooltip: { ...tooltip(theme, 'axis'), axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } } },
     xAxis: { type: 'value', min: 1, max: Math.max(2, view.observed.length), minInterval: 1, name: 'reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
     yAxis: { ...valueAxis(theme, 'count'), scale: true },

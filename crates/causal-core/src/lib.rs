@@ -90,6 +90,8 @@ pub mod preprocess;
 pub mod pss_tables;
 pub mod refute_dml;
 pub mod resampling;
+pub mod rpcmci;
+pub mod simplex;
 pub mod sklearn_linear;
 pub mod sktree;
 pub mod stl;
@@ -119,6 +121,7 @@ pub use resampling::{
     pandas_resample_daily, Aggregation as ResamplingAggregation, IncompleteBins, ResampleError,
     ResampleFrequency, ResampleResult,
 };
+pub use rpcmci::{run_rpcmci, run_rpcmci_frame, run_rpcmci_with_progress, RpcmciResult};
 pub use unobserved::{infer_kappa_t, infer_kappa_y, unobserved_common_cause_grid};
 pub use vecm::{chow_break, select_coint_rank, vecm_fit, vecm_select_order, VecmResult};
 mod adjustment_sets;

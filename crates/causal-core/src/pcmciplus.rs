@@ -188,7 +188,7 @@ pub fn run_pcmciplus_windowed(
     let mut p_full = vec![vec![vec![1.0; tau_max + 1]; n]; n];
     let mut val_full = vec![vec![vec![0.0; tau_max + 1]; n]; n];
     for j in 0..n {
-        let single = pc_stable_single(&mut ci, data, j, n, tau_max, pc_alpha);
+        let single = pc_stable_single(&mut ci, data, j, n, 1, tau_max, pc_alpha);
         for &((i, tau), pval, val) in &single.pval_max {
             p_full[i][j][(-tau) as usize] = pval;
             val_full[i][j][(-tau) as usize] = val;
