@@ -7,6 +7,8 @@ import type {
   LpcmciEvidence,
   RpcmciEvidence,
   OcseEvidence,
+  CmlpEvidence,
+  ClstmEvidence,
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
@@ -42,6 +44,8 @@ type DynotearsOutcome = Result<DynotearsEvidence, AnalysisWorkerProblem>
 type DirectLingamOutcome = Result<DirectLingamEvidence, AnalysisWorkerProblem>
 type VarLingamOutcome = Result<VarLingamEvidence, AnalysisWorkerProblem>
 type OcseOutcome = Result<OcseEvidence, AnalysisWorkerProblem>
+type CmlpOutcome = Result<CmlpEvidence, AnalysisWorkerProblem>
+type ClstmOutcome = Result<ClstmEvidence, AnalysisWorkerProblem>
 type BackdoorIdentificationOutcome = Result<BackdoorIdentificationEvidence, AnalysisWorkerProblem>
 type DagCheckOutcome = Result<DagCheckEvidence, AnalysisWorkerProblem>
 type BackdoorLinearOutcome = Result<BackdoorLinearEvidence, AnalysisWorkerProblem>
@@ -128,6 +132,10 @@ const failAll = (problem: AnalysisWorkerProblem) => {
   pending.clear()
   worker?.terminate()
   worker = null
+}
+
+export const cancelAnalysisRuns = (): void => {
+  failAll({ kind: 'analysis-cancelled', detail: 'The analysis run was cancelled.' })
 }
 
 const analysisWorker = (): Worker => {
@@ -282,6 +290,50 @@ export function runOcse(
       resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }
   })
+}
+
+export function runCmlp(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  configuration: {
+    readonly lag: number
+    readonly hidden: readonly number[]
+    readonly activation: 'sigmoid' | 'tanh' | 'relu' | 'leakyRelu' | 'identity'
+    readonly penalty: 'groupLasso' | 'groupSparseGroupLasso' | 'hierarchical'
+    readonly lambda: number
+    readonly ridgeLambda: number
+    readonly learningRate: number
+    readonly maxIter: number
+    readonly checkEvery: number
+    readonly lookback: number
+    readonly seed: number
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<CmlpOutcome> {
+  const request = newWorkerRequestId()
+  return post('cmlp-succeeded', { kind: 'cmlp', request, values, rows, columns, ...configuration }, values, onProgress)
+}
+
+export function runClstm(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  configuration: {
+    readonly context: number
+    readonly hidden: number
+    readonly lambda: number
+    readonly ridgeLambda: number
+    readonly learningRate: number
+    readonly maxIter: number
+    readonly checkEvery: number
+    readonly lookback: number
+    readonly seed: number
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<ClstmOutcome> {
+  const request = newWorkerRequestId()
+  return post('clstm-succeeded', { kind: 'clstm', request, values, rows, columns, ...configuration }, values, onProgress)
 }
 
 export function runStationarityBattery(values: Float64Array): Promise<StationarityOutcome> {

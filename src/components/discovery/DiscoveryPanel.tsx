@@ -1,7 +1,7 @@
 import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
@@ -21,7 +21,7 @@ import {
   type EvidenceSelection,
 } from '@/domain/evidenceScope'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
-import { OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
+import { CmlpLagPlot, NeuralSummaryPlot, OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
 import { button, field, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
@@ -56,6 +56,8 @@ import {
   LPCMCI_PAR_CORR_METHOD_ID,
   RPCMCI_PAR_CORR_METHOD_ID,
   OCSE_METHOD_ID,
+  CMLP_METHOD_ID,
+  CLSTM_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
   methodDefinition,
@@ -70,12 +72,14 @@ import type { RunActivity } from '@/domain/activity'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
+import type { AnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 const DISCOVERY_GROUP_LABELS: Readonly<Record<DiscoveryMethodGroupId, string>> = {
   'pcmci-family': 'PCMCI',
   'lingam-family': 'LiNGAM',
   'continuous-optimization': 'DYNOTEARS',
   'causation-entropy': 'oCSE',
+  'neural-granger': 'Neural',
 }
 
 interface DiscoveryPanelProps {
@@ -109,6 +113,8 @@ const methodIdForChoice = (method: DiscoveryMethodChoice) => {
     case 'dynotears': return DYNOTEARS_METHOD_ID
     case 'var-lingam': return VAR_LINGAM_METHOD_ID
     case 'ocse': return OCSE_METHOD_ID
+    case 'cmlp': return CMLP_METHOD_ID
+    case 'clstm': return CLSTM_METHOD_ID
     default: return assertNever(method)
   }
 }
@@ -121,6 +127,18 @@ const eligibilityHint = (eligibility: MethodEligibility): string => {
     case 'caution': return 'Review: runnable, with conditions to assess.'
     case 'refused': return `Unavailable: ${eligibility.violations[0]?.evidence ?? 'a requirement is not met.'}`
     default: return assertNever(eligibility)
+  }
+}
+
+const analysisFailureEvent = (problem: AnalysisWorkerProblem) => {
+  switch (problem.kind) {
+    case 'analysis-cancelled': return { type: 'run-cancelled' } as const
+    case 'kernel-refused':
+    case 'wasm-unavailable':
+    case 'worker-unavailable':
+    case 'worker-protocol-failed':
+      return { type: 'run-failed', problem: { kind: 'analysis-refused', detail: problem.detail } } as const
+    default: return assertNever(problem)
   }
 }
 
@@ -203,6 +221,113 @@ function RpcmciControls({ configuration, onChange }: {
           <div className="text-body text-ink">
             <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.rpcmci.seed} htmlFor="rpcmci-seed" />
             <input id="rpcmci-seed" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
+          </div>
+        </div>
+      </details>
+    </div>
+  )
+}
+
+type NeuralConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'cmlp' | 'clstm' }>
+type NeuralNumericField = 'lambda' | 'ridgeLambda' | 'learningRate' | 'maxIter' | 'checkEvery' | 'lookback' | 'seed'
+
+function NeuralControls({ configuration, onChange }: {
+  readonly configuration: NeuralConfiguration
+  readonly onChange: (configuration: NeuralConfiguration) => void
+}) {
+  const changeNumber = (fieldName: NeuralNumericField, value: number) => {
+    if (!Number.isFinite(value)) return
+    if (configuration.kind === 'cmlp') onChange({ ...configuration, [fieldName]: value })
+    else onChange({ ...configuration, [fieldName]: value })
+  }
+  const prefix = configuration.kind
+  return (
+    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+      {configuration.kind === 'cmlp' ? (
+        <div className="text-body text-ink">
+          <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.neural.maximumLag} htmlFor="cmlp-lag" />
+          <Select id="cmlp-lag" className={field('text', 'mt-1')} value={configuration.lag} onChange={(event) => {
+            const value = lagFromValue(event.target.value)
+            if (value !== null) onChange({ ...configuration, lag: value })
+          }}>
+            {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </div>
+      ) : (
+        <div className="text-body text-ink">
+          <ParameterLabel label="Context length" help={DISCOVERY_PARAMETER_HELP.neural.context} htmlFor="clstm-context" />
+          <input id="clstm-context" className={field('text', 'mt-1')} type="number" min={1} max={100} step={1} value={configuration.context} onChange={(event) => {
+            const context = event.currentTarget.valueAsNumber
+            if (Number.isFinite(context)) onChange({ ...configuration, context })
+          }} />
+        </div>
+      )}
+      <div className="text-body text-ink">
+        <ParameterLabel label="Hidden width" help={DISCOVERY_PARAMETER_HELP.neural.hiddenWidth} htmlFor={`${prefix}-hidden`} />
+        <input id={`${prefix}-hidden`} className={field('text', 'mt-1')} type="number" min={1} max={256} step={1} value={configuration.kind === 'cmlp' ? configuration.hidden[0] : configuration.hidden} onChange={(event) => {
+          const value = event.currentTarget.valueAsNumber
+          if (!Number.isFinite(value)) return
+          onChange(configuration.kind === 'cmlp' ? { ...configuration, hidden: [value] } : { ...configuration, hidden: value })
+        }} />
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Sparsity λ" help={DISCOVERY_PARAMETER_HELP.neural.sparsity} htmlFor={`${prefix}-lambda`} />
+        <input id={`${prefix}-lambda`} className={field('text', 'mt-1')} type="number" min={0} step={0.001} value={configuration.lambda} onChange={(event) => changeNumber('lambda', event.currentTarget.valueAsNumber)} />
+      </div>
+      {configuration.kind === 'cmlp' && (
+        <>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Activation" help={DISCOVERY_PARAMETER_HELP.neural.activation} htmlFor="cmlp-activation" />
+            <Select id="cmlp-activation" className={field('text', 'mt-1')} value={configuration.activation} onChange={(event) => {
+              const activation = event.target.value
+              if (activation === 'sigmoid' || activation === 'tanh' || activation === 'relu' || activation === 'leakyRelu' || activation === 'identity') onChange({ ...configuration, activation })
+            }}>
+              <option value="relu">ReLU</option>
+              <option value="leakyRelu">Leaky ReLU</option>
+              <option value="tanh">Tanh</option>
+              <option value="sigmoid">Sigmoid</option>
+              <option value="identity">Identity</option>
+            </Select>
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Structured penalty" help={DISCOVERY_PARAMETER_HELP.neural.penalty} htmlFor="cmlp-penalty" />
+            <Select id="cmlp-penalty" className={field('text', 'mt-1')} value={configuration.penalty} onChange={(event) => {
+              const penalty = event.target.value
+              if (penalty === 'groupLasso' || penalty === 'groupSparseGroupLasso' || penalty === 'hierarchical') onChange({ ...configuration, penalty })
+            }}>
+              <option value="hierarchical">Hierarchical</option>
+              <option value="groupLasso">Group lasso</option>
+              <option value="groupSparseGroupLasso">Group sparse group lasso</option>
+            </Select>
+          </div>
+        </>
+      )}
+      <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
+        <summary className="cursor-pointer text-body text-ink">Training settings</summary>
+        <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+          <div className="text-body text-ink">
+            <ParameterLabel label="Ridge λ" help={DISCOVERY_PARAMETER_HELP.neural.ridge} htmlFor={`${prefix}-ridge`} />
+            <input id={`${prefix}-ridge`} className={field('text', 'mt-1')} type="number" min={0} step={0.001} value={configuration.ridgeLambda} onChange={(event) => changeNumber('ridgeLambda', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Learning rate" help={DISCOVERY_PARAMETER_HELP.neural.learningRate} htmlFor={`${prefix}-learning-rate`} />
+            <input id={`${prefix}-learning-rate`} className={field('text', 'mt-1')} type="number" min={0.000001} step={0.001} value={configuration.learningRate} onChange={(event) => changeNumber('learningRate', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Maximum iterations" help={DISCOVERY_PARAMETER_HELP.neural.iterations} htmlFor={`${prefix}-iterations`} />
+            <input id={`${prefix}-iterations`} className={field('text', 'mt-1')} type="number" min={1} max={configuration.kind === 'cmlp' ? 50_000 : 20_000} step={1} value={configuration.maxIter} onChange={(event) => changeNumber('maxIter', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Check every" help={DISCOVERY_PARAMETER_HELP.neural.checkEvery} htmlFor={`${prefix}-check-every`} />
+            <input id={`${prefix}-check-every`} className={field('text', 'mt-1')} type="number" min={1} max={configuration.maxIter} step={1} value={configuration.checkEvery} onChange={(event) => changeNumber('checkEvery', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Early-stop lookback" help={DISCOVERY_PARAMETER_HELP.neural.lookback} htmlFor={`${prefix}-lookback`} />
+            <input id={`${prefix}-lookback`} className={field('text', 'mt-1')} type="number" min={1} step={1} value={configuration.lookback} onChange={(event) => changeNumber('lookback', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.neural.seed} htmlFor={`${prefix}-seed`} />
+            <input id={`${prefix}-seed`} className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
           </div>
         </div>
       </details>
@@ -538,6 +663,76 @@ function OcseResult({ run, open, current }: { readonly open: boolean; readonly c
   )
 }
 
+function CmlpResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'cmlp-run' }> }) {
+  const rows = run.result.lagOrder.flatMap((lag, position) => run.result.lagScores.flatMap((targets, source) =>
+    targets.map((scores, target) => ({
+      key: `${source}:${target}:${lag}`,
+      source: run.variables[source].name,
+      target: run.variables[target].name,
+      lag,
+      score: scores[position],
+      active: run.result.lagActive[source][target][position],
+    })),
+  ))
+  return (
+    <ResultCard run={run} open={open} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.lag} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
+      <StructurePlot run={run} label="cMLP lag-resolved relations" />
+      <NeuralSummaryPlot run={run} />
+      <CmlpLagPlot run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">A selected row means the source’s past at that lag contributes to predicting the target under the fitted component-wise network and sparsity penalty.</p>
+      <EvidenceTable<typeof rows[number]>
+        frame="none"
+        title="cMLP lag-group scores"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="score"
+        empty="The run reported no lag score."
+        columns={[
+          ...linkColumns<typeof rows[number]>(),
+          figureColumn<typeof rows[number]>('score', 'Input norm', (row) => row.score),
+          { id: 'active', header: 'Selected', value: (row) => row.active ? 'Yes' : 'No' },
+        ]}
+      />
+    </ResultCard>
+  )
+}
+
+function ClstmResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }> }) {
+  const rows = run.result.summaryScores.flatMap((targets, source) => targets.map((score, target) => ({
+    key: `${source}:${target}`,
+    source: run.variables[source].name,
+    target: run.variables[target].name,
+    score,
+    active: run.result.summaryActive[source][target],
+  })))
+  return (
+    <ResultCard run={run} open={open} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · context {run.result.context} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
+      <NeuralSummaryPlot run={run} />
+      <p className="mb-3 mt-3 text-body text-muted">cLSTM selects whether a source history helps predict a target. It does not select an individual lag, so Hirmos does not render this result as a lag graph.</p>
+      <EvidenceTable<typeof rows[number]>
+        frame="none"
+        title="cLSTM input-group scores"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="score"
+        empty="The run reported no score."
+        columns={[
+          { id: 'source', header: 'Source', value: (row) => row.source },
+          { id: 'target', header: 'Target', value: (row) => row.target },
+          figureColumn<typeof rows[number]>('score', 'Input norm', (row) => row.score),
+          { id: 'active', header: 'Selected', value: (row) => row.active ? 'Yes' : 'No' },
+        ]}
+      />
+    </ResultCard>
+  )
+}
+
 function DiscoveryResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: DiscoveryRunArtifact }) {
   switch (run.kind) {
     case 'direct-lingam-run': return <DirectLingamResult run={run} open={open} current={current} />
@@ -547,6 +742,8 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
     case 'dynotears-run': return <DynotearsResult run={run} open={open} current={current} />
     case 'var-lingam-run': return <VarLingamResult run={run} open={open} current={current} />
     case 'ocse-run': return <OcseResult run={run} open={open} current={current} />
+    case 'cmlp-run': return <CmlpResult run={run} open={open} current={current} />
+    case 'clstm-run': return <ClstmResult run={run} open={open} current={current} />
     default: return assertNever(run)
   }
 }
@@ -554,6 +751,7 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
 export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, onRun, onActivity }: DiscoveryPanelProps) {
   const [draft, dispatch] = useReducer(stepDiscovery, prepared, initialDiscoveryDraftFor)
   const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
+  const cancelRequested = useRef(false)
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
   const selectedMethod = methodDefinition(methodId)
@@ -577,7 +775,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       value,
       label: definition.value.name.replace(' with ParCorr', ''),
       hint: eligibilityHint(candidateEligibility),
-      disabled: candidateEligibility.kind === 'refused',
+      disabled: draft.job.kind === 'running' || candidateEligibility.kind === 'refused',
       title: candidateEligibility.kind === 'refused'
         ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
         : undefined,
@@ -587,6 +785,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
     if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused') return
+    cancelRequested.current = false
     dispatch({ type: 'run-started' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
@@ -594,6 +793,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         import('@/analysis/client'),
       ])
       const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
+      if (cancelRequested.current) {
+        dispatch({ type: 'run-cancelled' })
+        return
+      }
       if (!matrix.ok) {
         dispatch(matrix.error.kind === 'missing-values-remain'
           ? { type: 'run-failed', problem: { kind: 'missing-values-remain', cells: matrix.error.cells } }
@@ -605,7 +808,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       case 'direct-lingam': {
         const result = await analysis.runDirectLingam(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
@@ -622,7 +825,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           specification.value.pcAlpha,
         )
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = {
@@ -642,7 +845,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       case 'lpcmci': {
         const result = await analysis.runLpcmci(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.tauMax, specification.value.pcAlpha, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
@@ -659,7 +862,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           (progress) => dispatch({ type: 'run-progressed', progress }),
         )
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = {
@@ -679,7 +882,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       case 'dynotears': {
         const result = await analysis.runDynotears(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.lambdaW, specification.value.lambdaA, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
@@ -690,7 +893,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       case 'var-lingam': {
         const result = await analysis.runVarLingam(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.prune, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
@@ -701,10 +904,44 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       case 'ocse': {
         const result = await analysis.runOcse(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.alpha, specification.value.nShuffles, specification.value.method, specification.value.k, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
-          dispatch({ type: 'run-failed', problem: { kind: 'analysis-refused', detail: result.error.detail } })
+          dispatch(analysisFailureEvent(result.error))
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'cmlp': {
+        const result = await analysis.runCmlp(
+          matrix.value.values,
+          matrix.value.rowCount,
+          matrix.value.columns.length,
+          specification.value,
+          (progress) => dispatch({ type: 'run-progressed', progress }),
+        )
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'cmlp-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CMLP_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'clstm': {
+        const result = await analysis.runClstm(
+          matrix.value.values,
+          matrix.value.rowCount,
+          matrix.value.columns.length,
+          specification.value,
+          (progress) => dispatch({ type: 'run-progressed', progress }),
+        )
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'clstm-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CLSTM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -720,6 +957,11 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         },
       })
     }
+  }
+
+  const cancelRun = () => {
+    cancelRequested.current = true
+    void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns())
   }
 
   const inspector = (
@@ -760,6 +1002,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             ariaLabel="Discovery method family"
             value={visibleMethodGroup}
             onChange={setVisibleMethodGroup}
+            disabled={draft.job.kind === 'running'}
             options={DISCOVERY_METHOD_GROUPS.map((group) => ({ value: group.id, label: DISCOVERY_GROUP_LABELS[group.id], title: group.name }))}
           />
           <div className="mb-2 mt-3">
@@ -915,6 +1158,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             </div>
           )}
 
+          {(configuration.kind === 'cmlp' || configuration.kind === 'clstm') && (
+            <NeuralControls
+              configuration={configuration}
+              onChange={(next) => dispatch({ type: 'neural-configured', configuration: next })}
+            />
+          )}
+
 
           <EligibilityView eligibility={eligibility} />
           {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeDiscoveryReadiness(readiness.error)}</p>}
@@ -932,12 +1182,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             <button
               type="button"
               className={button('signal')}
-              disabled={!readiness.ok || eligibility.kind === 'refused'}
+              disabled={!readiness.ok || eligibility.kind === 'refused' || draft.job.kind === 'running'}
               aria-busy={draft.job.kind === 'running'}
-              onClick={draft.job.kind === 'running' ? undefined : () => void execute()}
+              onClick={() => void execute()}
             >
               Run {method.name}
             </button>
+            {draft.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={cancelRun}>Cancel run</button>}
             {draft.job.kind === 'running' && <Orb state="searching" aria-label="Discovery method running" />}
           </div>
             </>

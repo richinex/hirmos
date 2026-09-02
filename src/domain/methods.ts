@@ -137,6 +137,8 @@ export const DYNOTEARS_METHOD_ID = methodId('dynotears')
 export const DIRECT_LINGAM_METHOD_ID = methodId('direct-lingam')
 export const VAR_LINGAM_METHOD_ID = methodId('var-lingam')
 export const OCSE_METHOD_ID = methodId('ocse')
+export const CMLP_METHOD_ID = methodId('neural-granger-cmlp')
+export const CLSTM_METHOD_ID = methodId('neural-granger-clstm')
 export const BACKDOOR_IDENTIFICATION_METHOD_ID = methodId('backdoor-identification')
 export const GRAPHICAL_IDENTIFICATION_METHOD_ID = methodId('graphical-identification-id')
 export const COUNTERFACTUAL_IDENTIFICATION_METHOD_ID = methodId('counterfactual-identification-id-star')
@@ -220,6 +222,7 @@ const SUN_2015 = paper('Causal Network Inference by Optimal Causation Entropy (S
 const RUNGE_2020 = paper('Discovering contemporaneous and lagged causal relations in autocorrelated nonlinear time series datasets (Runge, 2020)', 'Proceedings of UAI, PMLR 124; PCMCI+')
 const GERHARDUS_RUNGE_2020 = paper('High-recall causal discovery for autocorrelated time series with latent confounders (Gerhardus and Runge, 2020)', 'Advances in Neural Information Processing Systems 33; LPCMCI')
 const SAGGIORO_2020 = paper('Reconstructing regime-dependent causal relationships from observational time series (Saggioro, de Wiljes, Kretschmer and Runge, 2020)', 'Chaos 30(11), 113115; doi:10.1063/5.0020538')
+const TANK_2021 = paper('Neural Granger Causality (Tank, Covert, Foti, Shojaie and Fox, 2021)', 'IEEE Transactions on Pattern Analysis and Machine Intelligence 44(8), 4267–4279; arXiv:1802.05842')
 const LJUNG_BOX_1978 = paper('On a Measure of Lack of Fit in Time Series Models (Ljung and Box, 1978)', 'Biometrika 65(2), 297–303')
 const SHAPIRO_WILK_1965 = paper('An Analysis of Variance Test for Normality (Complete Samples) (Shapiro and Wilk, 1965)', 'Biometrika 52(3/4), 591–611')
 const KILLICK_2012 = paper('Optimal Detection of Changepoints with a Linear Computational Cost (Killick, Fearnhead and Eckley, 2012)', 'Journal of the American Statistical Association 107(500), 1590–1598; PELT')
@@ -728,6 +731,108 @@ const OCSE: MethodDefinition = {
       requirement: 'Selected edges are conditional-information evidence about the observed process, not identified intervention effects.',
       consequenceIfUnmet: 'Predictive pathways are read as identified effects.',
       sources: [SUN_2015],
+    },
+  ],
+}
+
+const CMLP: MethodDefinition = {
+  id: CMLP_METHOD_ID,
+  name: 'cMLP',
+  family: 'discovery',
+  summary: 'Fits one nonlinear autoregressive multilayer perceptron per series and selects Granger relations with structured sparsity.',
+  caveats: [
+    {
+      id: caveatId('cmlp-ordered-stationary-series'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'The selected variables form a stationary multivariate time series over the fitted window.',
+      consequenceIfUnmet: 'Changing levels or dynamics can be selected as predictive relations.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('cmlp-lag-window'),
+      category: 'sampling-structure',
+      requirement: 'Rows are regularly ordered, and the maximum lag covers the predictive history under study.',
+      consequenceIfUnmet: 'The network joins the wrong time points or cannot represent relations beyond the selected lag.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('cmlp-model-capacity'),
+      category: 'functional-form',
+      requirement: 'The component-wise MLP has adequate capacity for the nonlinear autoregressive relationships.',
+      consequenceIfUnmet: 'Model misspecification can omit or distort predictive relations.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('cmlp-regularization'),
+      category: 'computation',
+      requirement: 'The sparsity penalty, architecture and optimization settings are assessed because the objective is non-convex.',
+      consequenceIfUnmet: 'Different tuning choices or initializations can select different relations.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('cmlp-sample-size'),
+      category: 'finite-sample',
+      requirement: 'The number of observations is adequate for the selected variables, lag window and network size.',
+      consequenceIfUnmet: 'The fitted sparsity pattern can be unstable or overfit.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('cmlp-granger-reading'),
+      category: 'interpretation',
+      requirement: 'An active input means its past helps predict the target within the fitted system; it is not an intervention-effect estimate.',
+      consequenceIfUnmet: 'Predictive Granger relations are read as effects of manipulating a variable.',
+      sources: [TANK_2021],
+    },
+  ],
+}
+
+const CLSTM: MethodDefinition = {
+  id: CLSTM_METHOD_ID,
+  name: 'cLSTM',
+  family: 'discovery',
+  summary: 'Fits one recurrent forecasting model per series and selects window-level Granger relations with a group-lasso penalty.',
+  caveats: [
+    {
+      id: caveatId('clstm-ordered-stationary-series'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'The selected variables form a stationary multivariate time series over the fitted window.',
+      consequenceIfUnmet: 'Changing levels or dynamics can be selected as predictive relations.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('clstm-context-window'),
+      category: 'sampling-structure',
+      requirement: 'Rows are regularly ordered, and the context length is sufficient to train the recurrent history model.',
+      consequenceIfUnmet: 'The network joins the wrong time points or trains on an inadequate history window.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('clstm-model-capacity'),
+      category: 'functional-form',
+      requirement: 'The component-wise LSTM has adequate capacity for the nonlinear recurrent relationships.',
+      consequenceIfUnmet: 'Model misspecification can omit or distort predictive relations.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('clstm-regularization'),
+      category: 'computation',
+      requirement: 'The group-lasso strength, hidden width and optimization settings are assessed because the objective is non-convex.',
+      consequenceIfUnmet: 'Different tuning choices or initializations can select different relations.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('clstm-sample-size'),
+      category: 'finite-sample',
+      requirement: 'The number of observations is adequate for the selected variables, context and recurrent network size.',
+      consequenceIfUnmet: 'The fitted sparsity pattern can be unstable or overfit.',
+      sources: [TANK_2021],
+    },
+    {
+      id: caveatId('clstm-window-reading'),
+      category: 'interpretation',
+      requirement: 'cLSTM identifies whether a source history helps predict a target, but does not assign that relation to an individual lag.',
+      consequenceIfUnmet: 'A window-level relation is displayed as if the model had selected a specific lag or an intervention effect.',
+      sources: [TANK_2021],
     },
   ],
 }
@@ -1844,6 +1949,8 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   DIRECT_LINGAM,
   VAR_LINGAM,
   OCSE,
+  CMLP,
+  CLSTM,
   BACKDOOR_IDENTIFICATION,
   GRAPHICAL_IDENTIFICATION,
   COUNTERFACTUAL_IDENTIFICATION,
@@ -1899,6 +2006,8 @@ export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   DYNOTEARS,
   VAR_LINGAM,
   OCSE,
+  CMLP,
+  CLSTM,
 ]
 
 export function methodDefinition(id: MethodId): Result<MethodDefinition, MethodLookupProblem> {

@@ -328,6 +328,20 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
       { kind: 'magnitude', text: `${run.result.edges.length} lagged relations survived forward and backward conditional-information selection. CMI measures remaining conditional information; the permutation p-value compares it with shuffled data.` },
       { kind: 'qualification', text: 'A selected relation is conditional-information evidence at the stated lag. It is not an estimate of the effect of intervening on the source.' },
     ] }
+    case 'cmlp-run': {
+      const selected = run.result.lagActive.flatMap((targets) => targets.flatMap((lags) => lags)).filter(Boolean).length
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `${selected} source–target–lag groups remain active after cMLP training. Each displayed score is the norm of the fitted input weights for that source, target and lag.` },
+        { kind: 'qualification', text: 'An active group means the source history helps predict the target within the fitted component-wise MLP. Selection depends on the lag window, network, structured penalty, initialization and optimization; it is not an intervention-effect estimate.' },
+      ] }
+    }
+    case 'clstm-run': {
+      const selected = run.result.summaryActive.flatMap((targets) => targets).filter(Boolean).length
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `${selected} source–target input groups remain active after cLSTM training. Each displayed score is the norm of the source input weights in the target’s component LSTM.` },
+        { kind: 'qualification', text: 'An active group means the source history helps predict the target within the fitted recurrent model. cLSTM does not identify an individual lag, and the relation is not an intervention-effect estimate.' },
+      ] }
+    }
     default: return assertNever(run)
   }
 }

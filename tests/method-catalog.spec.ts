@@ -55,6 +55,8 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'direct-lingam',
     'var-lingam',
     'ocse',
+    'neural-granger-cmlp',
+    'neural-granger-clstm',
     'backdoor-identification',
     'graphical-identification-id',
     'counterfactual-identification-id-star',

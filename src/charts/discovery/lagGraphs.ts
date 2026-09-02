@@ -55,6 +55,8 @@ const symbolFor = (endpoint: LagEndpoint): string => {
     case 'tail': return 'none'
     case 'arrow': return 'arrow'
     case 'circle': return 'emptyCircle'
+    case 'conflict': return 'path://M-5,-3 L-3,-5 L0,-2 L3,-5 L5,-3 L2,0 L5,3 L3,5 L0,2 L-3,5 L-5,3 L-2,0 Z'
+    case 'unresolved': return 'diamond'
     default: return assertNever(endpoint)
   }
 }
@@ -145,6 +147,7 @@ export function lagGridOption(graph: LagGraph, theme: ChartTheme, metrics: LagGr
         width: widthFor(link.strength, scale),
         curveness: link.from === link.to ? (link.lag <= 1 ? 0 : 0.45) : 0.18,
         opacity: 1,
+        type: link.fromEndpoint === 'unresolved' || link.toEndpoint === 'unresolved' ? 'dashed' : 'solid',
       },
       value: strengthMagnitude(link.strength),
       hirmos: { from: graph.variables[link.from].name, to: graph.variables[link.to].name, lag: link.lag, strength: describeStrength(link.strength), mark: link.mark },
@@ -234,7 +237,12 @@ export function summaryGraphOption(graph: SummaryGraph, theme: ChartTheme, metri
     target: `p-${link.to}`,
     symbol: [symbolFor(link.fromEndpoint), symbolFor(link.toEndpoint)],
     symbolSize: [8, 11],
-    lineStyle: { color: strengthColour(link.strength, scale, theme), width: widthFor(link.strength, scale), curveness: 0.22 },
+    lineStyle: {
+      color: strengthColour(link.strength, scale, theme),
+      width: widthFor(link.strength, scale),
+      curveness: 0.22,
+      type: link.fromEndpoint === 'unresolved' || link.toEndpoint === 'unresolved' ? 'dashed' : 'solid',
+    },
     label: {
       show: link.lags.length > 0,
       formatter: link.lags.join(','),

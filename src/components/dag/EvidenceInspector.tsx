@@ -1,6 +1,7 @@
 import { Select } from '@/components/ui/Select'
 import { useMemo } from 'react'
 import { LagGraphViews } from '@/components/discovery/LagGraphViews'
+import { NeuralSummaryPlot } from '@/components/discovery/DiscoveryPlots'
 import { label, literal, num, well } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
 import {
@@ -21,6 +22,8 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
     case 'dynotears-run': return 'DYNOTEARS'
     case 'var-lingam-run': return 'VAR-LiNGAM'
     case 'ocse-run': return 'oCSE'
+    case 'cmlp-run': return 'cMLP'
+    case 'clstm-run': return 'cLSTM'
     default: return assertNever(run)
   }
 }
@@ -34,6 +37,8 @@ const variablesOf = (view: DiscoveryEvidenceView) => {
     case 'dynotears-run':
     case 'var-lingam-run':
     case 'ocse-run': return view.run.variables
+    case 'cmlp-run':
+    case 'clstm-run': return view.run.variables
     default: return assertNever(view.run)
   }
 }
@@ -50,6 +55,8 @@ const candidateLabel = (candidate: DiscoveryCandidate): string => {
     case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1} · ${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · t−${candidate.lag}`
+    case 'neural-lagged': return `score ${statistic(candidate.score)} · t−${candidate.lag}`
+    case 'neural-window': return `score ${statistic(candidate.score)} · ${candidate.context}-step window`
     default: return assertNever(candidate)
   }
 }
@@ -60,6 +67,8 @@ const candidateDetail = (candidate: DiscoveryCandidate): string => {
     case 'regime-endpoint-marked': return `regime ${candidate.regime + 1} · mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
     case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ' · contemporaneous' : ` · lag ${candidate.lag}`}`
     case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · p ${pValue(candidate.pValue)} · lag ${candidate.lag}`
+    case 'neural-lagged': return `input-group norm ${statistic(candidate.score)} · lag ${candidate.lag}`
+    case 'neural-window': return `input-group norm ${statistic(candidate.score)} · ${candidate.context}-step history; no individual lag selected`
     default: return assertNever(candidate)
   }
 }
@@ -69,10 +78,11 @@ function EvidenceGraph({ view, selected }: {
   readonly selected: DiscoveryCandidate | null
 }) {
   const regime = selected?.kind === 'regime-endpoint-marked' ? selected.regime : 0
-  const graph = useMemo(() => lagGraphFromRun(view.run, regime), [regime, view.run])
-  if (!graph.ok) return <p className="text-body text-warn">The run reported a link mark Hirmos cannot draw ({graph.error.mark}).</p>
+  const projection = useMemo(() => view.run.kind === 'clstm-run' ? null : lagGraphFromRun(view.run, regime), [regime, view.run])
   const highlighted = selected === null ? [] : [selected.source.column, selected.target.column]
-  return <LagGraphViews graph={graph.value} label={`${view.method} evidence graph`} highlighted={highlighted} compact />
+  if (view.run.kind === 'clstm-run') return <NeuralSummaryPlot run={view.run} compact />
+  if (projection === null) return null
+  return <LagGraphViews graph={projection.graph} warnings={projection.warnings} label={`${view.method} evidence graph`} highlighted={highlighted} compact />
 }
 
 export function EvidenceInspector({

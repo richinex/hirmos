@@ -34,6 +34,20 @@ export const DISCOVERY_PARAMETER_HELP = {
     testAlpha: 'Significance threshold used during forward and backward selection.',
     permutationShuffles: 'Number of permutations used to form each null distribution.',
   },
+  neural: {
+    maximumLag: 'Number of previous time points supplied to each cMLP forecast.',
+    context: 'Length of each overlapping history sequence used to train cLSTM.',
+    hiddenWidth: 'Number of units in the hidden layer of each component network.',
+    activation: 'Nonlinear activation between cMLP layers.',
+    penalty: 'Structured sparsity penalty applied to cMLP input weights.',
+    sparsity: 'Strength of the penalty that sets input groups to zero.',
+    ridge: 'Ridge penalty applied to weights outside the sparse input groups.',
+    learningRate: 'Step size used by the source ISTA training procedure.',
+    iterations: 'Maximum number of ISTA updates.',
+    checkEvery: 'Number of updates between convergence checks and recorded loss values.',
+    lookback: 'Number of recorded loss values used by the early-stopping check.',
+    seed: 'Seed used for reproducible network initialization.',
+  },
 } as const
 
 export const ESTIMATION_PARAMETER_HELP = {

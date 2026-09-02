@@ -16,11 +16,15 @@ import {
   lpcmciEvidenceSchema,
   rpcmciEvidenceSchema,
   ocseEvidenceSchema,
+  cmlpEvidenceSchema,
+  clstmEvidenceSchema,
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
   parseLpcmciEvidence,
   parseRpcmciEvidence,
   parseOcseEvidence,
+  parseCmlpEvidence,
+  parseClstmEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
   pcmciPlusEvidenceSchema,
@@ -30,6 +34,8 @@ import {
   type LpcmciEvidence,
   type RpcmciEvidence,
   type OcseEvidence,
+  type CmlpEvidence,
+  type ClstmEvidence,
   type PcmciPlusEvidence,
   type VarLingamEvidence,
 } from '@/domain/discovery'
@@ -176,6 +182,40 @@ export type AnalysisWorkerCommand =
       readonly nShuffles: number
       readonly method: 'gaussian' | 'knn'
       readonly k: number
+    }
+  | {
+      readonly kind: 'cmlp'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly lag: number
+      readonly hidden: readonly number[]
+      readonly activation: 'sigmoid' | 'tanh' | 'relu' | 'leakyRelu' | 'identity'
+      readonly penalty: 'groupLasso' | 'groupSparseGroupLasso' | 'hierarchical'
+      readonly lambda: number
+      readonly ridgeLambda: number
+      readonly learningRate: number
+      readonly maxIter: number
+      readonly checkEvery: number
+      readonly lookback: number
+      readonly seed: number
+    }
+  | {
+      readonly kind: 'clstm'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly context: number
+      readonly hidden: number
+      readonly lambda: number
+      readonly ridgeLambda: number
+      readonly learningRate: number
+      readonly maxIter: number
+      readonly checkEvery: number
+      readonly lookback: number
+      readonly seed: number
     }
   | {
       readonly kind: 'granger-ssr-f'
@@ -554,6 +594,7 @@ export type AnalysisWorkerProblem =
   | { readonly kind: 'wasm-unavailable'; readonly detail: string }
   | { readonly kind: 'worker-unavailable'; readonly detail: string }
   | { readonly kind: 'worker-protocol-failed'; readonly detail: string }
+  | { readonly kind: 'analysis-cancelled'; readonly detail: string }
 
 export type AnalysisWorkerEvent =
   | {
@@ -602,6 +643,8 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: OcseEvidence
     }
+  | { readonly kind: 'cmlp-succeeded'; readonly request: WorkerRequestId; readonly result: CmlpEvidence }
+  | { readonly kind: 'clstm-succeeded'; readonly request: WorkerRequestId; readonly result: ClstmEvidence }
   | {
       readonly kind: 'granger-succeeded'
       readonly request: WorkerRequestId
@@ -753,6 +796,40 @@ const commandSchema = z.discriminatedUnion('kind', [
     method: z.enum(['gaussian', 'knn']),
     k: z.number().int().min(1).max(20),
   }).strict(),
+  z.object({
+    kind: z.literal('cmlp'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(12),
+    lag: z.number().int().min(1).max(20),
+    hidden: z.array(z.number().int().min(1).max(256)).min(1).max(4),
+    activation: z.enum(['sigmoid', 'tanh', 'relu', 'leakyRelu', 'identity']),
+    penalty: z.enum(['groupLasso', 'groupSparseGroupLasso', 'hierarchical']),
+    lambda: z.number().finite().nonnegative(),
+    ridgeLambda: z.number().finite().nonnegative(),
+    learningRate: z.number().finite().positive(),
+    maxIter: z.number().int().min(1).max(50_000),
+    checkEvery: z.number().int().positive(),
+    lookback: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+  }).strict().refine((value) => value.checkEvery <= value.maxIter, { message: 'cMLP checkEvery cannot exceed maxIter.' }),
+  z.object({
+    kind: z.literal('clstm'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(12),
+    context: z.number().int().min(1).max(100),
+    hidden: z.number().int().min(1).max(256),
+    lambda: z.number().finite().nonnegative(),
+    ridgeLambda: z.number().finite().nonnegative(),
+    learningRate: z.number().finite().positive(),
+    maxIter: z.number().int().min(1).max(20_000),
+    checkEvery: z.number().int().positive(),
+    lookback: z.number().int().positive(),
+    seed: z.number().int().nonnegative(),
+  }).strict().refine((value) => value.checkEvery <= value.maxIter, { message: 'cLSTM checkEvery cannot exceed maxIter.' }),
   z.object({
     kind: z.literal('granger-ssr-f'),
     request: requestSchema,
@@ -1147,6 +1224,7 @@ const workerProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('wasm-unavailable'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('worker-unavailable'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('worker-protocol-failed'), detail: z.string() }).strict(),
+  z.object({ kind: z.literal('analysis-cancelled'), detail: z.string() }).strict(),
 ])
 
 export const analysisProgressSchema = z.object({
@@ -1208,6 +1286,8 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: ocseEvidenceSchema,
   }).strict(),
+  z.object({ kind: z.literal('cmlp-succeeded'), request: requestSchema, result: cmlpEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('clstm-succeeded'), request: requestSchema, result: clstmEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('granger-succeeded'),
     request: requestSchema,
@@ -1345,6 +1425,18 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseOcseEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'ocse-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'cmlp-succeeded') {
+    const result = parseCmlpEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'cmlp-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'clstm-succeeded') {
+    const result = parseClstmEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'clstm-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'granger-succeeded') {

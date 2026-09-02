@@ -196,6 +196,34 @@ pub(crate) enum AnalysisCommand {
         method: OcseMethod,
         k: usize,
     },
+    Cmlp {
+        rows: usize,
+        columns: usize,
+        lag: usize,
+        hidden: Vec<usize>,
+        activation: NeuralActivation,
+        penalty: NeuralCmlpPenalty,
+        lambda: f64,
+        ridge_lambda: f64,
+        learning_rate: f64,
+        max_iter: usize,
+        check_every: usize,
+        lookback: usize,
+        seed: u64,
+    },
+    Clstm {
+        rows: usize,
+        columns: usize,
+        context: usize,
+        hidden: usize,
+        lambda: f64,
+        ridge_lambda: f64,
+        learning_rate: f64,
+        max_iter: usize,
+        check_every: usize,
+        lookback: usize,
+        seed: u64,
+    },
     GrangerSsrF {
         rows: usize,
         max_lag: usize,
@@ -516,6 +544,31 @@ pub(crate) struct DagImplicationCommand {
 pub(crate) enum CountFamily {
     Poisson,
     NegativeBinomial,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum NeuralActivation {
+    Sigmoid,
+    Tanh,
+    Relu,
+    LeakyRelu,
+    Identity,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum NeuralCmlpPenalty {
+    GroupLasso,
+    GroupSparseGroupLasso,
+    Hierarchical,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NeuralStandardizationEvidence {
+    pub(crate) means: Vec<f64>,
+    pub(crate) scales: Vec<f64>,
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -1162,6 +1215,47 @@ pub(crate) enum AnalysisResult {
         k: usize,
         seed: u64,
         edges: Vec<OcseEdgeEvidence>,
+    },
+    Cmlp {
+        observations: usize,
+        variables: usize,
+        lag: usize,
+        hidden: Vec<usize>,
+        activation: NeuralActivation,
+        penalty: NeuralCmlpPenalty,
+        lambda: f64,
+        ridge_lambda: f64,
+        learning_rate: f64,
+        max_iter: usize,
+        check_every: usize,
+        lookback: usize,
+        seed: u64,
+        standardization: NeuralStandardizationEvidence,
+        summary_scores: Vec<Vec<f64>>,
+        summary_active: Vec<Vec<bool>>,
+        lag_scores: Vec<Vec<Vec<f64>>>,
+        lag_active: Vec<Vec<Vec<bool>>>,
+        lag_order: Vec<usize>,
+        loss: Vec<f64>,
+        iterations: usize,
+    },
+    Clstm {
+        observations: usize,
+        variables: usize,
+        context: usize,
+        hidden: usize,
+        lambda: f64,
+        ridge_lambda: f64,
+        learning_rate: f64,
+        max_iter: usize,
+        check_every: usize,
+        lookback: usize,
+        seed: u64,
+        standardization: NeuralStandardizationEvidence,
+        summary_scores: Vec<Vec<f64>>,
+        summary_active: Vec<Vec<bool>>,
+        loss: Vec<f64>,
+        iterations: usize,
     },
     GrangerSsrF {
         observations: usize,

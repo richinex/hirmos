@@ -5,7 +5,7 @@ import { EChart } from '@/charts/EChart'
 import { lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discovery/lagGraphs'
 import { useChartTheme } from '@/charts/theme'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { summarizeLagGraph, type LagGraph, type LagGraphSemantics } from '@/domain/lagGraph'
+import { summarizeLagGraph, type LagGraph, type LagGraphSemantics, type LagGraphWarning } from '@/domain/lagGraph'
 import { literal, well } from '@/components/ui/recipes'
 
 interface MarkMeaning { readonly mark: string; readonly meaning: string }
@@ -24,21 +24,25 @@ const markMeanings = (semantics: LagGraphSemantics): readonly MarkMeaning[] => {
       { mark: '<->', meaning: 'neither is an ancestor of the other' },
       { mark: 'o->', meaning: 'the target is not an ancestor of the source; the circle end is undetermined' },
       { mark: 'o-o', meaning: 'contemporaneous; neither end is oriented' },
+      { mark: 'x', meaning: 'ambiguous endpoint information' },
     ]
     case 'stationary-lag-graph':
     case 'regime-specific-lag-graph': return [
       { mark: '-->', meaning: 'directed; lagged links always point forward in time' },
       { mark: 'o-o', meaning: 'contemporaneous; neither end is oriented' },
+      { mark: 'x-x', meaning: 'contemporaneous; orientation rules conflict' },
     ]
     case 'weighted-directed-evidence':
     case 'lagged-information':
+    case 'neural-lagged-granger':
     case 'temporal-dag': return []
     default: return assertNever(semantics)
   }
 }
 
-export function LagGraphViews({ graph, label, highlighted = [], initial = 'summary', compact = false }: {
+export function LagGraphViews({ graph, warnings = [], label, highlighted = [], initial = 'summary', compact = false }: {
   readonly graph: LagGraph
+  readonly warnings?: readonly LagGraphWarning[]
   /** Accessible name for the rendered chart, for example "PCMCI+ evidence graph". */
   readonly label: string
   /** Variable ids to outline in the summary graph, for example the selected candidate's endpoints. */
@@ -89,6 +93,11 @@ export function LagGraphViews({ graph, label, highlighted = [], initial = 'summa
           <dt className={literal('text-muted')}>{'<--'}</dt>
           <dd className="m-0">mirrored: the same with the ends swapped</dd>
         </dl>
+      )}
+      {warnings.length > 0 && (
+        <p className="mb-0 mt-2 px-1 text-label text-warn" role="status">
+          Unsupported mark{warnings.length === 1 ? '' : 's'} · {warnings.map((warning) => warning.mark || '(empty)').join(', ')} · drawn unresolved
+        </p>
       )}
     </div>
   )

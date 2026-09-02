@@ -1,6 +1,6 @@
 import type { DagDocument } from './dag'
 import type { DiscoveryRunArtifact } from './discovery'
-import { assertNever, err, isNonEmpty, ok, type NonEmptyArray, type Result } from './dop'
+import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
 
 /**
  * One method-agnostic projection of lag-resolved structure. Discovery evidence of every kind and an
@@ -8,7 +8,7 @@ import { assertNever, err, isNonEmpty, ok, type NonEmptyArray, type Result } fro
  * Discovery Lab and the DAG Workspace's lag expansion.
  */
 
-export type LagEndpoint = 'tail' | 'arrow' | 'circle'
+export type LagEndpoint = 'tail' | 'arrow' | 'circle' | 'conflict' | 'unresolved'
 
 /** What the link statistic means; the renderer picks a ramp per kind instead of assuming [-1, 1]. */
 export type LagLinkStrength =
@@ -35,7 +35,7 @@ export interface LagLink {
   readonly mark: string | null
 }
 
-export type LagGraphSemantics = 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'temporal-dag'
+export type LagGraphSemantics = 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
 
 export interface LagGraph {
   readonly variables: NonEmptyArray<LagVariable>
@@ -44,16 +44,22 @@ export interface LagGraph {
   readonly semantics: LagGraphSemantics
 }
 
-export type LagGraphProblem =
-  | { readonly kind: 'unknown-mark'; readonly source: number; readonly target: number; readonly lag: number; readonly mark: string }
+export type LagGraphWarning =
+  | { readonly kind: 'unsupported-mark'; readonly source: number; readonly target: number; readonly lag: number; readonly mark: string }
 
-const endpoint = (character: string): LagEndpoint | null => {
+export interface LagGraphProjection {
+  readonly graph: LagGraph
+  readonly warnings: readonly LagGraphWarning[]
+}
+
+const endpoint = (character: string): LagEndpoint => {
   switch (character) {
     case '-': return 'tail'
     case 'o': return 'circle'
+    case 'x': return 'conflict'
     case '<':
     case '>': return 'arrow'
-    default: return null
+    default: return 'unresolved'
   }
 }
 
@@ -81,14 +87,15 @@ export const describeStrength = (strength: LagLinkStrength): string => {
 const variablesOf = (run: Extract<DiscoveryRunArtifact, { readonly variables: unknown }>): NonEmptyArray<LagVariable> =>
   run.variables.map((column) => ({ id: column.id, name: column.name, latent: false })) as unknown as NonEmptyArray<LagVariable>
 
-const lagGraphFromMarkedMatrices = (
+export const lagGraphFromMarkedMatrices = (
   variables: NonEmptyArray<LagVariable>,
   graph: readonly (readonly (readonly string[])[])[],
   values: readonly (readonly (readonly number[])[])[],
   tauMax: number,
   semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph'>,
-): Result<LagGraph, LagGraphProblem> => {
+): LagGraphProjection => {
   const links: LagLink[] = []
+  const warnings: LagGraphWarning[] = []
   const n = variables.length
   for (let source = 0; source < n; source += 1) {
     for (let target = 0; target < n; target += 1) {
@@ -96,9 +103,11 @@ const lagGraphFromMarkedMatrices = (
         const mark = graph[source][target][lag]
         if (mark.length === 0) continue
         if (lag === 0 && source > target) continue
-        const fromEndpoint = mark.length === 3 ? endpoint(mark[0]) : null
-        const toEndpoint = mark.length === 3 ? endpoint(mark[2]) : null
-        if (fromEndpoint === null || toEndpoint === null) return err({ kind: 'unknown-mark', source, target, lag, mark })
+        const fromEndpoint = mark.length === 3 ? endpoint(mark[0]) : 'unresolved'
+        const toEndpoint = mark.length === 3 ? endpoint(mark[2]) : 'unresolved'
+        if (fromEndpoint === 'unresolved' || toEndpoint === 'unresolved') {
+          warnings.push({ kind: 'unsupported-mark', source, target, lag, mark })
+        }
         links.push({
           from: source,
           to: target,
@@ -111,18 +120,16 @@ const lagGraphFromMarkedMatrices = (
       }
     }
   }
-  return ok({
-    variables,
-    tauMax,
-    links,
-    semantics,
-  })
+  return {
+    graph: { variables, tauMax, links, semantics },
+    warnings,
+  }
 }
 
 /** Tigramite lag-graph marks into links. A contemporaneous pair is reported twice, mirrored; the lower index keeps it. */
 export function lagGraphFromTimeGraphRun(
   run: Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>,
-): Result<LagGraph, LagGraphProblem> {
+): LagGraphProjection {
   return lagGraphFromMarkedMatrices(
     variablesOf(run),
     run.result.graph,
@@ -135,7 +142,7 @@ export function lagGraphFromTimeGraphRun(
 export function lagGraphFromRpcmciRun(
   run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }>,
   regime: number,
-): Result<LagGraph, LagGraphProblem> {
+): LagGraphProjection {
   return lagGraphFromMarkedMatrices(
     variablesOf(run),
     run.result.graphs[regime],
@@ -178,15 +185,40 @@ export function lagGraphFromOcseRun(run: Extract<DiscoveryRunArtifact, { readonl
   }
 }
 
-export function lagGraphFromRun(run: DiscoveryRunArtifact, regime = 0): Result<LagGraph, LagGraphProblem> {
+/** cMLP's active lag groups as directed predictive links; source lag is preserved exactly. */
+export function lagGraphFromCmlpRun(run: Extract<DiscoveryRunArtifact, { readonly kind: 'cmlp-run' }>): LagGraph {
+  const links: LagLink[] = []
+  for (let source = 0; source < run.result.variables; source += 1) {
+    for (let target = 0; target < run.result.variables; target += 1) {
+      run.result.lagOrder.forEach((lag, position) => {
+        if (!run.result.lagActive[source][target][position]) return
+        links.push({
+          from: source,
+          to: target,
+          lag,
+          fromEndpoint: 'tail',
+          toEndpoint: 'arrow',
+          strength: { kind: 'nonnegative', value: run.result.lagScores[source][target][position] },
+          mark: null,
+        })
+      })
+    }
+  }
+  return { variables: variablesOf(run), tauMax: run.result.lag, links, semantics: 'neural-lagged-granger' }
+}
+
+export type LagResolvedDiscoveryRun = Exclude<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }>
+
+export function lagGraphFromRun(run: LagResolvedDiscoveryRun, regime = 0): LagGraphProjection {
   switch (run.kind) {
-    case 'direct-lingam-run': return ok(lagGraphFromWeightRun(run))
+    case 'direct-lingam-run': return { graph: lagGraphFromWeightRun(run), warnings: [] }
     case 'pcmci-plus-run':
     case 'lpcmci-run': return lagGraphFromTimeGraphRun(run)
     case 'rpcmci-run': return lagGraphFromRpcmciRun(run, regime)
     case 'dynotears-run':
-    case 'var-lingam-run': return ok(lagGraphFromWeightRun(run))
-    case 'ocse-run': return ok(lagGraphFromOcseRun(run))
+    case 'var-lingam-run': return { graph: lagGraphFromWeightRun(run), warnings: [] }
+    case 'ocse-run': return { graph: lagGraphFromOcseRun(run), warnings: [] }
+    case 'cmlp-run': return { graph: lagGraphFromCmlpRun(run), warnings: [] }
     default: return assertNever(run)
   }
 }

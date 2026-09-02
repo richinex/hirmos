@@ -15,6 +15,12 @@ export type EvidenceRelationMatch =
       readonly effect: EvidenceVariable
       readonly timing: { readonly kind: 'contemporaneous' } | { readonly kind: 'lagged'; readonly lag: number }
     }
+  | {
+      readonly kind: 'directed-window-candidate'
+      readonly cause: EvidenceVariable
+      readonly effect: EvidenceVariable
+      readonly context: number
+    }
   | { readonly kind: 'orientation-unresolved' }
 
 interface CandidateBase {
@@ -56,11 +62,23 @@ export type DiscoveryCandidate =
       readonly cmi: number
       readonly pValue: number
     }
+  | CandidateBase & {
+      readonly kind: 'neural-lagged'
+      readonly method: 'cMLP'
+      readonly lag: number
+      readonly score: number
+    }
+  | CandidateBase & {
+      readonly kind: 'neural-window'
+      readonly method: 'cLSTM'
+      readonly context: number
+      readonly score: number
+    }
 
 export interface DiscoveryEvidenceView {
   readonly run: DiscoveryRunArtifact
-  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'
-  readonly semantics: 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information'
+  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly semantics: 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
   readonly candidates: readonly DiscoveryCandidate[]
 }
 
@@ -194,6 +212,65 @@ const weightedCandidates = (
   return candidates
 }
 
+const cmlpCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'cmlp-run' }>,
+): readonly DiscoveryCandidate[] => {
+  const candidates: Extract<DiscoveryCandidate, { readonly kind: 'neural-lagged' }>[] = []
+  for (let sourceIndex = 0; sourceIndex < run.result.variables; sourceIndex += 1) {
+    for (let targetIndex = 0; targetIndex < run.result.variables; targetIndex += 1) {
+      run.result.lagOrder.forEach((lag, position) => {
+        if (!run.result.lagActive[sourceIndex][targetIndex][position]) return
+        const source = variable(run.variables[sourceIndex])
+        const target = variable(run.variables[targetIndex])
+        candidates.push({
+          kind: 'neural-lagged',
+          id: candidateId(run.id, `${sourceIndex}:${targetIndex}:${lag}`),
+          run: run.id,
+          method: 'cMLP',
+          source,
+          target,
+          lag,
+          score: run.result.lagScores[sourceIndex][targetIndex][position],
+          relationMatch: {
+            kind: 'directed-candidate',
+            cause: source,
+            effect: target,
+            timing: { kind: 'lagged', lag },
+          },
+        })
+      })
+    }
+  }
+  candidates.sort((left, right) => right.score - left.score)
+  return candidates
+}
+
+const clstmCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }>,
+): readonly DiscoveryCandidate[] => {
+  const candidates: Extract<DiscoveryCandidate, { readonly kind: 'neural-window' }>[] = []
+  for (let sourceIndex = 0; sourceIndex < run.result.variables; sourceIndex += 1) {
+    for (let targetIndex = 0; targetIndex < run.result.variables; targetIndex += 1) {
+      if (!run.result.summaryActive[sourceIndex][targetIndex]) continue
+      const source = variable(run.variables[sourceIndex])
+      const target = variable(run.variables[targetIndex])
+      candidates.push({
+        kind: 'neural-window',
+        id: candidateId(run.id, `${sourceIndex}:${targetIndex}:window`),
+        run: run.id,
+        method: 'cLSTM',
+        source,
+        target,
+        context: run.result.context,
+        score: run.result.summaryScores[sourceIndex][targetIndex],
+        relationMatch: { kind: 'directed-window-candidate', cause: source, effect: target, context: run.result.context },
+      })
+    }
+  }
+  candidates.sort((left, right) => right.score - left.score)
+  return candidates
+}
+
 export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvidenceView {
   switch (run.kind) {
     case 'direct-lingam-run': return {
@@ -258,6 +335,18 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
         }
       }),
     }
+    case 'cmlp-run': return {
+      run,
+      method: 'cMLP',
+      semantics: 'neural-lagged-granger',
+      candidates: cmlpCandidates(run),
+    }
+    case 'clstm-run': return {
+      run,
+      method: 'cLSTM',
+      semantics: 'neural-window-granger',
+      candidates: clstmCandidates(run),
+    }
     default: return assertNever(run)
   }
 }
@@ -269,6 +358,8 @@ export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
     case 'regime-specific-lag-graphs': return 'A separately estimated lag graph for each inferred regime'
     case 'weighted-directed-evidence': return 'Fitted directed structural weights'
     case 'lagged-information': return 'Selected lagged conditional-information relations'
+    case 'neural-lagged-granger': return 'Lag-resolved predictive relations selected by structured neural sparsity'
+    case 'neural-window-granger': return 'Directed predictive relations over the fitted history window; individual lags are not identified'
     default: return assertNever(view.semantics)
   }
 }
@@ -279,6 +370,8 @@ export function discoveryEvidenceReference(candidate: DiscoveryCandidate) {
     case 'regime-endpoint-marked': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'endpoint-marked' as const }
     case 'weighted-directed': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'weighted-directed' as const }
     case 'lagged-information': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'lagged-information' as const }
+    case 'neural-lagged': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'weighted-directed' as const }
+    case 'neural-window': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'weighted-directed' as const }
     default: return assertNever(candidate)
   }
 }

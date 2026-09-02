@@ -435,6 +435,292 @@ where
     })
 }
 
+fn neural_row_major(values: &[f64], rows: usize, columns: usize) -> Vec<f64> {
+    (0..rows)
+        .flat_map(|row| (0..columns).map(move |column| values[column * rows + row]))
+        .collect()
+}
+
+fn standardize_neural_columns(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+) -> Result<(Vec<f64>, NeuralStandardizationEvidence), String> {
+    let mut standardized = vec![0.0; values.len()];
+    let mut means = Vec::with_capacity(columns);
+    let mut scales = Vec::with_capacity(columns);
+
+    for column in 0..columns {
+        let offset = column * rows;
+        let source = &values[offset..offset + rows];
+        let mean = source.iter().sum::<f64>() / rows as f64;
+        let variance = source
+            .iter()
+            .map(|value| {
+                let centered = value - mean;
+                centered * centered
+            })
+            .sum::<f64>()
+            / rows as f64;
+        let scale = variance.sqrt();
+        if !mean.is_finite() || !scale.is_finite() || scale == 0.0 {
+            return Err(format!(
+                "neural Granger variable {} is constant or cannot be standardized",
+                column + 1
+            ));
+        }
+
+        for row in 0..rows {
+            standardized[offset + row] = (source[row] - mean) / scale;
+        }
+        means.push(mean);
+        scales.push(scale);
+    }
+
+    Ok((
+        standardized,
+        NeuralStandardizationEvidence { means, scales },
+    ))
+}
+
+fn neural_scores(values: &[f64], variables: usize) -> Vec<Vec<f64>> {
+    (0..variables)
+        .map(|source| {
+            (0..variables)
+                .map(|target| values[target * variables + source])
+                .collect()
+        })
+        .collect()
+}
+
+fn neural_active(values: &[bool], variables: usize) -> Vec<Vec<bool>> {
+    (0..variables)
+        .map(|source| {
+            (0..variables)
+                .map(|target| values[target * variables + source])
+                .collect()
+        })
+        .collect()
+}
+
+fn neural_lag_scores(values: &[f64], variables: usize, lags: usize) -> Vec<Vec<Vec<f64>>> {
+    (0..variables)
+        .map(|source| {
+            (0..variables)
+                .map(|target| {
+                    (0..lags)
+                        .map(|lag| values[(target * variables + source) * lags + lag])
+                        .collect()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn neural_lag_active(values: &[bool], variables: usize, lags: usize) -> Vec<Vec<Vec<bool>>> {
+    (0..variables)
+        .map(|source| {
+            (0..variables)
+                .map(|target| {
+                    (0..lags)
+                        .map(|lag| values[(target * variables + source) * lags + lag])
+                        .collect()
+                })
+                .collect()
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn cmlp_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    lag: usize,
+    hidden: Vec<usize>,
+    activation: NeuralActivation,
+    penalty: NeuralCmlpPenalty,
+    lambda: f64,
+    ridge_lambda: f64,
+    learning_rate: f64,
+    max_iter: usize,
+    check_every: usize,
+    lookback: usize,
+    seed: u64,
+    mut progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    if !(2..=12).contains(&columns) {
+        return Err("cMLP requires between 2 and 12 selected variables in the browser".to_owned());
+    }
+    if !(1..=20).contains(&lag) {
+        return Err("cMLP lag must be between 1 and 20 in the browser".to_owned());
+    }
+    if hidden.is_empty()
+        || hidden.len() > 4
+        || hidden.iter().any(|width| !(1..=256).contains(width))
+    {
+        return Err("cMLP requires one to four hidden layers with widths from 1 to 256".to_owned());
+    }
+    if !(1..=50_000).contains(&max_iter)
+        || check_every == 0
+        || check_every > max_iter
+        || lookback == 0
+    {
+        return Err("cMLP training counts are outside the supported range".to_owned());
+    }
+    validate_dense_matrix("cMLP", values, rows, columns)?;
+    if rows < lag + 16 {
+        return Err("cMLP has too few observations for the selected lag window".to_owned());
+    }
+
+    let core_activation = match activation {
+        NeuralActivation::Sigmoid => CoreNeuralActivation::Sigmoid,
+        NeuralActivation::Tanh => CoreNeuralActivation::Tanh,
+        NeuralActivation::Relu => CoreNeuralActivation::Relu,
+        NeuralActivation::LeakyRelu => CoreNeuralActivation::LeakyRelu,
+        NeuralActivation::Identity => CoreNeuralActivation::Identity,
+    };
+    let core_penalty = match penalty {
+        NeuralCmlpPenalty::GroupLasso => CoreCmlpPenalty::GroupLasso,
+        NeuralCmlpPenalty::GroupSparseGroupLasso => CoreCmlpPenalty::GroupSparseGroupLasso,
+        NeuralCmlpPenalty::Hierarchical => CoreCmlpPenalty::Hierarchical,
+    };
+    let configuration = CmlpConfig {
+        lag,
+        hidden: hidden.clone(),
+        activation: core_activation,
+        penalty: core_penalty,
+        lambda,
+        ridge_lambda,
+        learning_rate,
+        max_iter,
+        check_every,
+        lookback,
+        seed,
+    };
+    let (standardized, standardization) = standardize_neural_columns(values, rows, columns)?;
+    let result = fit_cmlp_with(
+        &neural_row_major(&standardized, rows, columns),
+        rows,
+        columns,
+        &configuration,
+        None,
+        |state| progress("neural-training", state.iteration, state.max_iterations),
+    )
+    .map_err(|problem| format!("cMLP refused: {problem}"))?;
+    progress("complete", result.iterations, result.iterations);
+
+    Ok(AnalysisResult::Cmlp {
+        observations: rows,
+        variables: columns,
+        lag,
+        hidden,
+        activation,
+        penalty,
+        lambda,
+        ridge_lambda,
+        learning_rate,
+        max_iter,
+        check_every,
+        lookback,
+        seed,
+        standardization,
+        summary_scores: neural_scores(&result.summary_scores, columns),
+        summary_active: neural_active(&result.summary_active, columns),
+        lag_scores: neural_lag_scores(&result.lag_scores, columns, lag),
+        lag_active: neural_lag_active(&result.lag_active, columns, lag),
+        lag_order: result.lag_order,
+        loss: result.loss,
+        iterations: result.iterations,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn clstm_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    context: usize,
+    hidden: usize,
+    lambda: f64,
+    ridge_lambda: f64,
+    learning_rate: f64,
+    max_iter: usize,
+    check_every: usize,
+    lookback: usize,
+    seed: u64,
+    mut progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    if !(2..=12).contains(&columns) {
+        return Err("cLSTM requires between 2 and 12 selected variables in the browser".to_owned());
+    }
+    if !(1..=100).contains(&context) {
+        return Err("cLSTM context must be between 1 and 100 in the browser".to_owned());
+    }
+    if !(1..=256).contains(&hidden) {
+        return Err("cLSTM hidden width must be between 1 and 256".to_owned());
+    }
+    if !(1..=20_000).contains(&max_iter)
+        || check_every == 0
+        || check_every > max_iter
+        || lookback == 0
+    {
+        return Err("cLSTM training counts are outside the supported range".to_owned());
+    }
+    validate_dense_matrix("cLSTM", values, rows, columns)?;
+    if rows < context + 16 {
+        return Err("cLSTM has too few observations for the selected context window".to_owned());
+    }
+
+    let configuration = ClstmConfig {
+        context,
+        hidden,
+        lambda,
+        ridge_lambda,
+        learning_rate,
+        max_iter,
+        check_every,
+        lookback,
+        seed,
+    };
+    let (standardized, standardization) = standardize_neural_columns(values, rows, columns)?;
+    let result = fit_clstm_with(
+        &neural_row_major(&standardized, rows, columns),
+        rows,
+        columns,
+        &configuration,
+        None,
+        |state| progress("neural-training", state.iteration, state.max_iterations),
+    )
+    .map_err(|problem| format!("cLSTM refused: {problem}"))?;
+    progress("complete", result.iterations, result.iterations);
+
+    Ok(AnalysisResult::Clstm {
+        observations: rows,
+        variables: columns,
+        context,
+        hidden,
+        lambda,
+        ridge_lambda,
+        learning_rate,
+        max_iter,
+        check_every,
+        lookback,
+        seed,
+        standardization,
+        summary_scores: neural_scores(&result.summary_scores, columns),
+        summary_active: neural_active(&result.summary_active, columns),
+        loss: result.loss,
+        iterations: result.iterations,
+    })
+}
+
 pub(crate) fn granger_evidence(
     values: &[f64],
     rows: usize,
@@ -533,6 +819,8 @@ mod tests {
             | AnalysisCommand::Lpcmci { .. }
             | AnalysisCommand::Rpcmci { .. }
             | AnalysisCommand::Dynotears { .. }
+            | AnalysisCommand::Cmlp { .. }
+            | AnalysisCommand::Clstm { .. }
             | AnalysisCommand::DirectLingam { .. }
             | AnalysisCommand::VarLingam { .. }
             | AnalysisCommand::Ocse { .. }
@@ -746,6 +1034,109 @@ mod tests {
         assert_eq!(ocse_json["kind"], "ocse");
         assert_eq!(ocse_json["seed"], 42);
         assert_eq!(ocse_progress.last(), Some(&("complete", columns, columns)));
+    }
+
+    #[test]
+    fn neural_adapters_record_standardization_and_return_finite_losses_across_units() {
+        let rows = 48;
+        let columns = 2;
+        let mut values = vec![0.0; rows * columns];
+        for row in 0..rows {
+            let time = row as f64;
+            values[row] = 15_000.0 + 2_500.0 * (time / 4.0).sin();
+            values[rows + row] = 0.1
+                + if row == 0 {
+                    0.0
+                } else {
+                    0.02 * (values[row - 1] - 15_000.0) / 2_500.0
+                };
+        }
+
+        let cmlp = cmlp_evidence(
+            &values,
+            rows,
+            columns,
+            2,
+            vec![3],
+            NeuralActivation::Relu,
+            NeuralCmlpPenalty::Hierarchical,
+            0.005,
+            0.01,
+            0.01,
+            5,
+            1,
+            5,
+            0,
+            |_, _, _| {},
+        )
+        .expect("cMLP should run after recorded per-column standardization");
+        match cmlp {
+            AnalysisResult::Cmlp {
+                standardization,
+                loss,
+                ..
+            } => {
+                assert_eq!(standardization.means.len(), columns);
+                assert_eq!(standardization.scales.len(), columns);
+                assert!(standardization.scales[0] > 1_000.0);
+                assert!(standardization.scales[1] < 0.1);
+                assert!(loss.iter().all(|value| value.is_finite()));
+            }
+            _ => panic!("cMLP adapter returned another result variant"),
+        }
+
+        let clstm = clstm_evidence(
+            &values,
+            rows,
+            columns,
+            3,
+            3,
+            0.005,
+            0.01,
+            0.01,
+            5,
+            1,
+            5,
+            0,
+            |_, _, _| {},
+        )
+        .expect("cLSTM should run after recorded per-column standardization");
+        match clstm {
+            AnalysisResult::Clstm {
+                standardization,
+                loss,
+                ..
+            } => {
+                assert_eq!(standardization.means.len(), columns);
+                assert_eq!(standardization.scales.len(), columns);
+                assert!(loss.iter().all(|value| value.is_finite()));
+            }
+            _ => panic!("cLSTM adapter returned another result variant"),
+        }
+
+        let mut constant = values;
+        constant[..rows].fill(1.0);
+        let refusal = match cmlp_evidence(
+            &constant,
+            rows,
+            columns,
+            2,
+            vec![3],
+            NeuralActivation::Relu,
+            NeuralCmlpPenalty::Hierarchical,
+            0.005,
+            0.01,
+            0.01,
+            1,
+            1,
+            1,
+            0,
+            |_, _, _| {},
+        ) {
+            Ok(_) => panic!("a constant selected variable should be refused before training"),
+            Err(problem) => problem,
+        };
+        assert!(refusal.contains("variable 1 is constant"));
     }
 
     #[test]

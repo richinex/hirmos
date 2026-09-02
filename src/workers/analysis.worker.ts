@@ -9,6 +9,8 @@ import {
   parseLpcmciEvidence,
   parseRpcmciEvidence,
   parseOcseEvidence,
+  parseCmlpEvidence,
+  parseClstmEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
 } from '@/domain/discovery'
@@ -130,6 +132,38 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         nShuffles: command.nShuffles,
         method: command.method,
         k: command.k,
+      }
+    case 'cmlp':
+      return {
+        kind: 'cmlp',
+        rows: command.rows,
+        columns: command.columns,
+        lag: command.lag,
+        hidden: command.hidden,
+        activation: command.activation,
+        penalty: command.penalty,
+        lambda: command.lambda,
+        ridgeLambda: command.ridgeLambda,
+        learningRate: command.learningRate,
+        maxIter: command.maxIter,
+        checkEvery: command.checkEvery,
+        lookback: command.lookback,
+        seed: command.seed,
+      }
+    case 'clstm':
+      return {
+        kind: 'clstm',
+        rows: command.rows,
+        columns: command.columns,
+        context: command.context,
+        hidden: command.hidden,
+        lambda: command.lambda,
+        ridgeLambda: command.ridgeLambda,
+        learningRate: command.learningRate,
+        maxIter: command.maxIter,
+        checkEvery: command.checkEvery,
+        lookback: command.lookback,
+        seed: command.seed,
       }
     case 'granger-ssr-f':
       return { kind: 'grangerSsrF', rows: command.rows, maxLag: command.maxLag }
@@ -350,6 +384,24 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'ocse-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'cmlp': {
+        const result = parseCmlpEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'cmlp-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'clstm': {
+        const result = parseClstmEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'clstm-succeeded', request: command.request, result: result.value })
         return
       }
       case 'granger-ssr-f': {

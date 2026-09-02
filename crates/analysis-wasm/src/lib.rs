@@ -23,6 +23,10 @@ use hirmos_causal_core::ingarch::{
 };
 use hirmos_causal_core::lpcmci::run_lpcmci_with_progress;
 use hirmos_causal_core::negbin_nuts::{irr_summary, quantile, PbcNegBinModel};
+use hirmos_causal_core::neural_granger::{
+    fit_clstm_with, fit_cmlp_with, Activation as CoreNeuralActivation, ClstmConfig, CmlpConfig,
+    CmlpPenalty as CoreCmlpPenalty,
+};
 use hirmos_causal_core::nprandom::{Mt19937, NpRng};
 use hirmos_causal_core::nuts::NutsOptions;
 use hirmos_causal_core::ocse::{discover_network_with_progress, CmiMethod};
@@ -253,6 +257,64 @@ pub fn run_analysis(
             k,
         } => ocse_evidence(
             values, rows, columns, max_lag, alpha, n_shuffles, method, k, progress,
+        ),
+        AnalysisCommand::Cmlp {
+            rows,
+            columns,
+            lag,
+            hidden,
+            activation,
+            penalty,
+            lambda,
+            ridge_lambda,
+            learning_rate,
+            max_iter,
+            check_every,
+            lookback,
+            seed,
+        } => cmlp_evidence(
+            values,
+            rows,
+            columns,
+            lag,
+            hidden,
+            activation,
+            penalty,
+            lambda,
+            ridge_lambda,
+            learning_rate,
+            max_iter,
+            check_every,
+            lookback,
+            seed,
+            progress,
+        ),
+        AnalysisCommand::Clstm {
+            rows,
+            columns,
+            context,
+            hidden,
+            lambda,
+            ridge_lambda,
+            learning_rate,
+            max_iter,
+            check_every,
+            lookback,
+            seed,
+        } => clstm_evidence(
+            values,
+            rows,
+            columns,
+            context,
+            hidden,
+            lambda,
+            ridge_lambda,
+            learning_rate,
+            max_iter,
+            check_every,
+            lookback,
+            seed,
+            progress,
         ),
         AnalysisCommand::GrangerSsrF { rows, max_lag } => granger_evidence(values, rows, max_lag),
         AnalysisCommand::BackdoorIdentify {

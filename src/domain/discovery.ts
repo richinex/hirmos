@@ -6,6 +6,8 @@ import {
   DIRECT_LINGAM_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   RPCMCI_PAR_CORR_METHOD_ID,
+  CMLP_METHOD_ID,
+  CLSTM_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
@@ -122,6 +124,62 @@ export const ocseEvidenceSchema = z.object({
 
 export type OcseEvidence = z.infer<typeof ocseEvidenceSchema>
 
+const neuralScoreMatrixSchema = z.array(z.array(z.number().finite().nonnegative()))
+const neuralActiveMatrixSchema = z.array(z.array(z.boolean()))
+const neuralStandardizationSchema = z.object({
+  means: z.array(z.number().finite()),
+  scales: z.array(z.number().finite().positive()),
+}).strict()
+
+export const cmlpEvidenceSchema = z.object({
+  kind: z.literal('cmlp'),
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(12),
+  lag: z.number().int().min(1).max(20),
+  hidden: z.array(z.number().int().min(1).max(256)).min(1).max(4),
+  activation: z.enum(['sigmoid', 'tanh', 'relu', 'leakyRelu', 'identity']),
+  penalty: z.enum(['groupLasso', 'groupSparseGroupLasso', 'hierarchical']),
+  lambda: z.number().finite().nonnegative(),
+  ridgeLambda: z.number().finite().nonnegative(),
+  learningRate: z.number().finite().positive(),
+  maxIter: z.number().int().min(1).max(50_000),
+  checkEvery: z.number().int().positive(),
+  lookback: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  standardization: neuralStandardizationSchema,
+  summaryScores: neuralScoreMatrixSchema,
+  summaryActive: neuralActiveMatrixSchema,
+  lagScores: z.array(z.array(z.array(z.number().finite().nonnegative()))),
+  lagActive: z.array(z.array(z.array(z.boolean()))),
+  lagOrder: z.array(z.number().int().positive()),
+  loss: z.array(z.number().finite().nonnegative()),
+  iterations: z.number().int().positive(),
+}).strict()
+
+export type CmlpEvidence = z.infer<typeof cmlpEvidenceSchema>
+
+export const clstmEvidenceSchema = z.object({
+  kind: z.literal('clstm'),
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(12),
+  context: z.number().int().min(1).max(100),
+  hidden: z.number().int().min(1).max(256),
+  lambda: z.number().finite().nonnegative(),
+  ridgeLambda: z.number().finite().nonnegative(),
+  learningRate: z.number().finite().positive(),
+  maxIter: z.number().int().min(1).max(20_000),
+  checkEvery: z.number().int().positive(),
+  lookback: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  standardization: neuralStandardizationSchema,
+  summaryScores: neuralScoreMatrixSchema,
+  summaryActive: neuralActiveMatrixSchema,
+  loss: z.array(z.number().finite().nonnegative()),
+  iterations: z.number().int().positive(),
+}).strict()
+
+export type ClstmEvidence = z.infer<typeof clstmEvidenceSchema>
+
 
 export type PcmciPlusBoundaryProblem = {
   readonly kind: 'invalid-pcmci-plus-result'
@@ -130,7 +188,7 @@ export type PcmciPlusBoundaryProblem = {
 
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE'
+  readonly method: 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
   readonly detail: string
 }
 
@@ -269,6 +327,45 @@ export function parseOcseEvidence(value: unknown): Result<OcseEvidence, Discover
   return ok(parsed.data)
 }
 
+const isSquare = <Value>(matrix: readonly (readonly Value[])[], variables: number): boolean =>
+  matrix.length === variables && matrix.every((row) => row.length === variables)
+
+export function parseCmlpEvidence(value: unknown): Result<CmlpEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = cmlpEvidenceSchema.safeParse(value)
+  if (!parsed.success) return err({ kind: 'invalid-discovery-matrix-result', method: 'cMLP', detail: z.prettifyError(parsed.error) })
+  const result = parsed.data
+  const lagShape = (matrix: readonly (readonly (readonly unknown[])[])[]) =>
+    isSquare(matrix, result.variables) && matrix.every((row) => row.every((lags) => lags.length === result.lag))
+  if (!isSquare(result.summaryScores, result.variables)
+    || !isSquare(result.summaryActive, result.variables)
+    || !lagShape(result.lagScores)
+    || !lagShape(result.lagActive)
+    || result.lagOrder.length !== result.lag
+    || result.standardization.means.length !== result.variables
+    || result.standardization.scales.length !== result.variables
+    || [...result.lagOrder].sort((left, right) => left - right).some((lag, index) => lag !== index + 1)
+    || result.checkEvery > result.maxIter
+    || result.iterations > result.maxIter) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'cMLP', detail: 'cMLP evidence dimensions do not match its declared configuration.' })
+  }
+  return ok(result)
+}
+
+export function parseClstmEvidence(value: unknown): Result<ClstmEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = clstmEvidenceSchema.safeParse(value)
+  if (!parsed.success) return err({ kind: 'invalid-discovery-matrix-result', method: 'cLSTM', detail: z.prettifyError(parsed.error) })
+  const result = parsed.data
+  if (!isSquare(result.summaryScores, result.variables)
+    || !isSquare(result.summaryActive, result.variables)
+    || result.standardization.means.length !== result.variables
+    || result.standardization.scales.length !== result.variables
+    || result.checkEvery > result.maxIter
+    || result.iterations > result.maxIter) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'cLSTM', detail: 'cLSTM evidence dimensions do not match its declared configuration.' })
+  }
+  return ok(result)
+}
+
 export type DiscoveryRunId = Brand<string, 'DiscoveryRunId'>
 
 export const DISCOVERY_LAG_OPTIONS = [1, 2, 3, 4, 6, 8, 12, 20] as const
@@ -284,10 +381,10 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
+export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
-export type DiscoveryMethodGroupId = 'pcmci-family' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy'
+export type DiscoveryMethodGroupId = 'pcmci-family' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy' | 'neural-granger'
 
 export interface DiscoveryMethodGroup {
   readonly id: DiscoveryMethodGroupId
@@ -324,11 +421,19 @@ const CAUSATION_ENTROPY: DiscoveryMethodGroup = {
   methods: ['ocse'],
 }
 
+const NEURAL_GRANGER: DiscoveryMethodGroup = {
+  id: 'neural-granger',
+  name: 'Neural Granger',
+  description: 'Component-wise neural forecasting models with structured sparsity for nonlinear Granger-causality selection.',
+  methods: ['cmlp', 'clstm'],
+}
+
 export const DISCOVERY_METHOD_GROUPS: NonEmptyArray<DiscoveryMethodGroup> = [
   PCMCI_FAMILY,
   LINGAM_FAMILY,
   CONTINUOUS_OPTIMIZATION,
   CAUSATION_ENTROPY,
+  NEURAL_GRANGER,
 ]
 
 export function discoveryMethodGroupById(id: DiscoveryMethodGroupId): DiscoveryMethodGroup {
@@ -337,6 +442,7 @@ export function discoveryMethodGroupById(id: DiscoveryMethodGroupId): DiscoveryM
     case 'lingam-family': return LINGAM_FAMILY
     case 'continuous-optimization': return CONTINUOUS_OPTIMIZATION
     case 'causation-entropy': return CAUSATION_ENTROPY
+    case 'neural-granger': return NEURAL_GRANGER
     default: return assertNever(id)
   }
 }
@@ -354,6 +460,9 @@ export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): Discover
       return CONTINUOUS_OPTIMIZATION
     case 'ocse':
       return CAUSATION_ENTROPY
+    case 'cmlp':
+    case 'clstm':
+      return NEURAL_GRANGER
     default:
       return assertNever(method)
   }
@@ -402,6 +511,32 @@ export type DiscoveryConfiguration =
       readonly nShuffles: OcseShuffles
       readonly method: OcseInformationMethod
       readonly k: 5
+    }
+  | {
+      readonly kind: 'cmlp'
+      readonly lag: DiscoveryLag
+      readonly hidden: NonEmptyArray<number>
+      readonly activation: 'sigmoid' | 'tanh' | 'relu' | 'leakyRelu' | 'identity'
+      readonly penalty: 'groupLasso' | 'groupSparseGroupLasso' | 'hierarchical'
+      readonly lambda: number
+      readonly ridgeLambda: number
+      readonly learningRate: number
+      readonly maxIter: number
+      readonly checkEvery: number
+      readonly lookback: number
+      readonly seed: number
+    }
+  | {
+      readonly kind: 'clstm'
+      readonly context: number
+      readonly hidden: number
+      readonly lambda: number
+      readonly ridgeLambda: number
+      readonly learningRate: number
+      readonly maxIter: number
+      readonly checkEvery: number
+      readonly lookback: number
+      readonly seed: number
     }
 
 export type DiscoveryRunArtifact =
@@ -475,6 +610,26 @@ export type DiscoveryRunArtifact =
       readonly eligibility: AcceptedDiscoveryEligibility
       readonly result: OcseEvidence
     }
+  | {
+      readonly kind: 'cmlp-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof CMLP_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: CmlpEvidence
+    }
+  | {
+      readonly kind: 'clstm-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof CLSTM_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: ClstmEvidence
+    }
 
 export type DiscoveryRunProblem =
   | { readonly kind: 'materialization-refused'; readonly detail: string }
@@ -510,8 +665,10 @@ export type DiscoveryEvent =
   | { readonly type: 'ocse-alpha-selected'; readonly value: PcmciAlpha }
   | { readonly type: 'ocse-shuffles-selected'; readonly value: OcseShuffles }
   | { readonly type: 'ocse-method-selected'; readonly value: OcseInformationMethod }
+  | { readonly type: 'neural-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'cmlp' | 'clstm' }> }
   | { readonly type: 'max-lag-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'run-started' }
+  | { readonly type: 'run-cancelled' }
   | { readonly type: 'run-progressed'; readonly progress: DiscoveryProgress }
   | { readonly type: 'run-failed'; readonly problem: DiscoveryRunProblem }
   | { readonly type: 'run-succeeded'; readonly artifact: DiscoveryRunArtifact }
@@ -571,11 +728,16 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
       return state.configuration.kind === 'ocse'
         ? { configuration: { ...state.configuration, method: event.value }, job: { kind: 'idle' } }
         : state
+    case 'neural-configured':
+      return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration, job: { kind: 'idle' } }
+        : state
     case 'max-lag-selected':
       return state.configuration.kind === 'dynotears' || state.configuration.kind === 'var-lingam' || state.configuration.kind === 'ocse'
         ? { configuration: { ...state.configuration, maxLag: event.value }, job: { kind: 'idle' } }
         : state
     case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
+    case 'run-cancelled': return { ...state, job: { kind: 'idle' } }
     case 'run-progressed': return state.job.kind === 'running'
       ? { ...state, job: { kind: 'running', progress: event.progress } }
       : state
@@ -594,6 +756,8 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
     case 'dynotears': return { kind: 'dynotears', maxLag: 2, lambdaW: 0.1, lambdaA: 0.1 }
     case 'var-lingam': return { kind: 'var-lingam', maxLag: 2, prune: true }
     case 'ocse': return { kind: 'ocse', maxLag: 2, alpha: 0.05, nShuffles: 50, method: 'gaussian', k: 5 }
+    case 'cmlp': return { kind: 'cmlp', lag: 3, hidden: [100], activation: 'relu', penalty: 'hierarchical', lambda: 0.005, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 50_000, checkEvery: 100, lookback: 5, seed: 0 }
+    case 'clstm': return { kind: 'clstm', context: 10, hidden: 100, lambda: 0.005, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 20_000, checkEvery: 50, lookback: 5, seed: 0 }
     default: return assertNever(method)
   }
 }
@@ -630,6 +794,7 @@ export type ReadyDiscoverySpecification =
       readonly method: OcseInformationMethod
       readonly k: 5
     }
+  | Extract<DiscoveryConfiguration, { readonly kind: 'cmlp' | 'clstm' }>
 
 export type DiscoveryReadinessProblem =
   | { readonly kind: 'time-series-required' }
@@ -637,8 +802,8 @@ export type DiscoveryReadinessProblem =
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number; readonly available: number }
-  | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE'; readonly maximum: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP'; readonly maximum: number }
   | { readonly kind: 'transition-budget-too-large'; readonly available: number }
 
 export function readyDiscoverySpecification(
@@ -706,6 +871,23 @@ export function readyDiscoverySpecification(
       if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'oCSE', maximum: 12, available: prepared.columns.length })
       if (configuration.maxLag > 8) return err({ kind: 'browser-lag-limit', method: 'oCSE', maximum: 8 })
       const required = configuration.maxLag + 24
+      return prepared.observations < required
+        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+        : ok(configuration)
+    }
+    case 'cmlp': {
+      if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'cMLP', maximum: 12, available: prepared.columns.length })
+      if (configuration.lag > 20) return err({ kind: 'browser-lag-limit', method: 'cMLP', maximum: 20 })
+      const required = configuration.lag + 16
+      return prepared.observations < required
+        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+        : ok(configuration)
+    }
+    case 'clstm': {
+      if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'cLSTM', maximum: 12, available: prepared.columns.length })
+      const required = configuration.context + 16
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
         : ok(configuration)

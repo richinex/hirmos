@@ -10,6 +10,7 @@ pub mod discrete_bn;
 pub mod estimation;
 pub mod frontdoor;
 pub mod mackinnon;
+pub mod neural_granger;
 pub mod ols;
 pub mod panel;
 pub mod parcorr;

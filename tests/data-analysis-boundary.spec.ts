@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test'
 import { grangerSsrEvidenceSchema } from '../src/domain/granger'
 import { z } from 'zod'
 import {
+  cmlpEvidenceSchema,
+  clstmEvidenceSchema,
   dynotearsEvidenceSchema,
   lpcmciEvidenceSchema,
   ocseEvidenceSchema,
@@ -652,4 +654,139 @@ test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress call
   expect(finalDynotearsProgress?.stage).toBe('complete')
   expect(finalDynotearsProgress?.completed).toBe(finalDynotearsProgress?.total)
   expect(parsed.data.ocseProgress.at(-1)).toMatchObject({ stage: 'complete', completed: expectedColumns, total: expectedColumns })
+})
+
+test('runs cMLP and cLSTM through the Neural worker boundary without inventing cLSTM lags', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 32
+    const columns = 2
+    const makeValues = () => {
+      const values = new Float64Array(rows * columns)
+      for (let row = 0; row < rows; row += 1) {
+        const time = row
+        values[row] = 15_000 + 2_500 * Math.sin(time / 3.7)
+        values[rows + row] = 0.1 + (row === 0 ? 0 : 0.02 * (values[row - 1] - 15_000) / 2_500) + 0.003 * Math.sin(time / 2.1)
+      }
+      return values
+    }
+    const cmlpProgress: unknown[] = []
+    const clstmProgress: unknown[] = []
+    const cmlp = await analysis.runCmlp(makeValues(), rows, columns, {
+      lag: 2,
+      hidden: [3],
+      activation: 'relu',
+      penalty: 'hierarchical',
+      lambda: 0.005,
+      ridgeLambda: 0.01,
+      learningRate: 0.01,
+      maxIter: 1,
+      checkEvery: 1,
+      lookback: 1,
+      seed: 0,
+    }, (progress: unknown) => cmlpProgress.push(progress))
+    const clstm = await analysis.runClstm(makeValues(), rows, columns, {
+      context: 3,
+      hidden: 3,
+      lambda: 0.005,
+      ridgeLambda: 0.01,
+      learningRate: 0.01,
+      maxIter: 1,
+      checkEvery: 1,
+      lookback: 1,
+      seed: 0,
+    }, (progress: unknown) => clstmProgress.push(progress))
+    return { cmlp, clstm, cmlpProgress, clstmProgress }
+  })
+
+  const progressSchema = z.array(z.object({
+    stage: z.string().min(1),
+    completed: z.number().int().nonnegative(),
+    total: z.number().int().positive(),
+  }).strict()).min(2)
+  const outcome = <Value extends z.ZodType>(value: Value) => z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value }).strict(),
+    z.object({ ok: z.literal(false), error: z.object({ kind: z.string(), detail: z.string() }).strict() }).strict(),
+  ])
+  const parsed = z.object({
+    cmlp: outcome(cmlpEvidenceSchema),
+    clstm: outcome(clstmEvidenceSchema),
+    cmlpProgress: progressSchema,
+    clstmProgress: progressSchema,
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  if (!parsed.data.cmlp.ok || !parsed.data.clstm.ok) {
+    throw new Error('One of the Neural Granger methods was refused at the browser boundary.')
+  }
+  expect(parsed.data.cmlp.value.summaryScores).toHaveLength(2)
+  expect(parsed.data.cmlp.value.standardization.scales[0]).toBeGreaterThan(1_000)
+  expect(parsed.data.cmlp.value.standardization.scales[1]).toBeLessThan(0.1)
+  expect(parsed.data.cmlp.value.lagScores[0]?.[0]).toHaveLength(2)
+  expect(parsed.data.cmlp.value.lagOrder).toEqual([2, 1])
+  expect(parsed.data.clstm.value.summaryScores).toHaveLength(2)
+  expect(parsed.data.clstm.value.standardization.scales).toHaveLength(2)
+  expect('lagScores' in parsed.data.clstm.value).toBe(false)
+  expect('lagOrder' in parsed.data.clstm.value).toBe(false)
+  expect(parsed.data.cmlpProgress.at(-1)).toMatchObject({ stage: 'complete', completed: 1, total: 1 })
+  expect(parsed.data.clstmProgress.at(-1)).toMatchObject({ stage: 'complete', completed: 1, total: 1 })
+})
+
+test('cancels a Neural run by replacing the blocked worker and starts a fresh run afterwards', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 96
+    const columns = 2
+    const makeValues = () => {
+      const values = new Float64Array(rows * columns)
+      for (let row = 0; row < rows; row += 1) {
+        values[row] = 10_000 + 2_000 * Math.sin(row / 4)
+        values[rows + row] = 0.1 + 0.02 * Math.cos(row / 5)
+      }
+      return values
+    }
+    const longRun = analysis.runCmlp(makeValues(), rows, columns, {
+      lag: 3,
+      hidden: [100],
+      activation: 'relu',
+      penalty: 'hierarchical',
+      lambda: 0.005,
+      ridgeLambda: 0.01,
+      learningRate: 0.01,
+      maxIter: 50_000,
+      checkEvery: 100,
+      lookback: 5,
+      seed: 0,
+    })
+    await new Promise((resolve) => window.setTimeout(resolve, 25))
+    analysis.cancelAnalysisRuns()
+    const cancelled = await longRun
+    const retry = await analysis.runCmlp(makeValues(), rows, columns, {
+      lag: 2,
+      hidden: [3],
+      activation: 'relu',
+      penalty: 'hierarchical',
+      lambda: 0.005,
+      ridgeLambda: 0.01,
+      learningRate: 0.01,
+      maxIter: 1,
+      checkEvery: 1,
+      lookback: 1,
+      seed: 0,
+    })
+    return { cancelled, retry }
+  })
+
+  const parsed = z.object({
+    cancelled: z.object({
+      ok: z.literal(false),
+      error: z.object({ kind: z.literal('analysis-cancelled'), detail: z.string().min(1) }).strict(),
+    }).strict(),
+    retry: z.object({ ok: z.literal(true), value: cmlpEvidenceSchema }).strict(),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
 })
