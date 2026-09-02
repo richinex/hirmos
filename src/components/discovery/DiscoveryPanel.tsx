@@ -1,7 +1,7 @@
 import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
-import { useMemo, useReducer, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useReducer, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
@@ -27,11 +27,14 @@ import { button, field, figureGrid, label, literal, num } from '@/components/ui/
 import type { DatasetProfile } from '@/domain/dataset'
 import {
   DISCOVERY_LAG_OPTIONS,
+  DISCOVERY_METHOD_GROUPS,
   DYNOTEARS_PENALTY_OPTIONS,
   OCSE_SHUFFLE_OPTIONS,
   PCMCI_ALPHA_OPTIONS,
   describeDiscoveryReadiness,
   describeDiscoveryRunProblem,
+  discoveryMethodGroupById,
+  discoveryMethodGroupFor,
   evaluateDiscoveryEligibility,
   initialDiscoveryDraftFor,
   newDiscoveryRunId,
@@ -44,6 +47,7 @@ import {
   type OcseShuffles,
   type PcmciAlpha,
   type DiscoveryMethodChoice,
+  type DiscoveryMethodGroupId,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
 import {
@@ -67,9 +71,12 @@ import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
 
-const CROSS_SECTIONAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['direct-lingam', 'DirectLiNGAM']]
-const TEMPORAL_DISCOVERY_METHODS: readonly (readonly [DiscoveryMethodChoice, string])[] = [['pcmci-plus', 'PCMCI+'], ['lpcmci', 'LPCMCI'], ['rpcmci', 'RPCMCI'], ['dynotears', 'DYNOTEARS'], ['var-lingam', 'VAR-LiNGAM'], ['ocse', 'oCSE']]
-const DISCOVERY_METHODS = [...CROSS_SECTIONAL_DISCOVERY_METHODS, ...TEMPORAL_DISCOVERY_METHODS] as const
+const DISCOVERY_GROUP_LABELS: Readonly<Record<DiscoveryMethodGroupId, string>> = {
+  'pcmci-family': 'PCMCI',
+  'lingam-family': 'LiNGAM',
+  'continuous-optimization': 'DYNOTEARS',
+  'causation-entropy': 'oCSE',
+}
 
 interface DiscoveryPanelProps {
   readonly source: SelectedSource
@@ -541,35 +548,39 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
 export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, onRun, onActivity }: DiscoveryPanelProps) {
   const [draft, dispatch] = useReducer(stepDiscovery, prepared, initialDiscoveryDraftFor)
   const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
-  useRunActivity(onActivity, draft.job.kind === 'running' ? { label: DISCOVERY_METHODS.find(([value]) => value === draft.configuration.kind)?.[1] ?? 'Discovery', progress: draft.job.progress === null ? null : draft.job.progress.completed / Math.max(1, draft.job.progress.total) } : null)
-  const preparedColumns = profile.columns.filter((column) => prepared.columns.includes(column.id))
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
   const selectedMethod = methodDefinition(methodId)
+  const [visibleMethodGroup, setVisibleMethodGroup] = useState<DiscoveryMethodGroupId>(() => discoveryMethodGroupFor(configuration.kind).id)
+  useEffect(() => setVisibleMethodGroup(discoveryMethodGroupFor(configuration.kind).id), [configuration.kind])
+  const visibleGroup = discoveryMethodGroupById(visibleMethodGroup)
+  const selectedMethodIsVisible = visibleGroup.methods.includes(configuration.kind)
+  useRunActivity(onActivity, draft.job.kind === 'running' ? { label: selectedMethod.ok ? selectedMethod.value.name : 'Discovery', progress: draft.job.progress === null ? null : draft.job.progress.completed / Math.max(1, draft.job.progress.total) } : null)
+  const preparedColumns = profile.columns.filter((column) => prepared.columns.includes(column.id))
   if (!selectedMethod.ok) {
     return <p role="alert" className="text-body text-danger">The selected discovery method is not registered.</p>
   }
   const method: MethodDefinition = selectedMethod.value
   const eligibility = evaluateDiscoveryEligibility(method, prepared, stationarity)
   const readiness = readyDiscoverySpecification(configuration, prepared)
-  const methodOptions = DISCOVERY_METHODS.flatMap(([value, name]) => {
+  const methodOptions = visibleGroup.methods.flatMap((value) => {
     const definition = methodDefinition(methodIdForChoice(value))
     if (!definition.ok) return []
     const candidateEligibility = evaluateDiscoveryEligibility(definition.value, prepared, stationarity)
     return [{
       value,
-      label: name,
+      label: definition.value.name.replace(' with ParCorr', ''),
       hint: eligibilityHint(candidateEligibility),
       disabled: candidateEligibility.kind === 'refused',
       title: candidateEligibility.kind === 'refused'
-        ? `${name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
+        ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
         : undefined,
     }]
   })
 
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
-    if (!specification.ok || eligibility.kind === 'refused') return
+    if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused') return
     dispatch({ type: 'run-started' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
@@ -720,7 +731,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         )}
         <p className={literal('mb-0 mt-3 break-all text-micro text-faint')}>Dataset version {prepared.id.slice(0, 8)}</p>
       </section>
-      <MethodCaveats methods={[method]} eligibility={eligibility} />
+      {selectedMethodIsVisible
+        ? <MethodCaveats methods={[method]} eligibility={eligibility} />
+        : <p className="m-0 text-body text-faint">Choose a method from this family to review its requirements.</p>}
     </div>
   )
 
@@ -734,7 +747,19 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
       <div className="grid gap-4">
         <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="discovery-method-title">
-            <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
+          <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
+          <SegmentedControl
+            wrap
+            size="sm"
+            ariaLabel="Discovery method family"
+            value={visibleMethodGroup}
+            onChange={setVisibleMethodGroup}
+            options={DISCOVERY_METHOD_GROUPS.map((group) => ({ value: group.id, label: DISCOVERY_GROUP_LABELS[group.id], title: group.name }))}
+          />
+          <div className="mb-2 mt-3">
+            <h4 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h4>
+            <p className="mb-0 mt-0.5 max-w-[65ch] text-label text-faint">{visibleGroup.description}</p>
+          </div>
           <RadioList
             className="mt-1"
             legend="Discovery method"
@@ -743,7 +768,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             onChange={(method) => dispatch({ type: 'method-selected', method })}
             options={methodOptions}
           />
+          {!selectedMethodIsVisible && <p className="mb-0 mt-3 text-body text-faint">Choose a method from this family to configure it.</p>}
 
+          {selectedMethodIsVisible && (
+            <>
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
               <div className="text-body text-ink">
@@ -906,6 +934,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             </button>
             {draft.job.kind === 'running' && <Orb state="searching" aria-label="Discovery method running" />}
           </div>
+            </>
+          )}
         </section>
       </div>
 

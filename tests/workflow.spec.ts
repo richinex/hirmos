@@ -168,17 +168,19 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('button', { name: 'Expand chapter list' }).click()
   await mobileNav.getByRole('button', { name: /Discovery lab/ }).click()
 
-  const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method' })
+  // Exact, so the family segmented control above it is not matched as well. The keys move within one
+  // family, whose last method is RPCMCI.
+  const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method', exact: true })
   const pcmci = discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })
   const lpcmci = discoveryMethods.getByRole('radio', { name: /LPCMCI/ })
-  const ocse = discoveryMethods.getByRole('radio', { name: /oCSE/ })
+  const rpcmci = discoveryMethods.getByRole('radio', { name: /RPCMCI/ })
   expect(await pcmci.evaluate((element) => element instanceof HTMLInputElement && element.type === 'radio')).toBe(true)
   await pcmci.focus()
   await pcmci.press('ArrowRight')
   await expect(lpcmci).toBeChecked()
   await lpcmci.press('End')
-  await expect(ocse).toBeChecked()
-  await ocse.press('Home')
+  await expect(rpcmci).toBeChecked()
+  await rpcmci.press('Home')
   await expect(pcmci).toBeChecked()
 
   const pageWidth = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
@@ -220,11 +222,17 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
   await navigation.getByRole('button', { name: /Discovery lab/ }).click()
   await expect(page.getByRole('heading', { name: 'Examine candidate relationships' })).toBeVisible()
-  const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method' })
-  await expect(discoveryMethods.getByRole('radio')).toHaveCount(7)
+  // Methods are grouped into families, so only the selected family's methods are on the page. The
+  // eligible method decides the family, and the time-series methods are checked in their own.
+  const discoveryFamilies = page.getByRole('radiogroup', { name: 'Discovery method family' })
+  const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method', exact: true })
+  await expect(discoveryFamilies.getByRole('radio')).toHaveCount(4)
   await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
-  await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toBeDisabled()
   await expect(discoveryMethods.getByRole('radio', { name: /VAR-LiNGAM/ })).toBeDisabled()
+  await discoveryFamilies.getByRole('radio').first().click()
+  await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toBeDisabled()
+  await discoveryFamilies.getByRole('radio').nth(1).click()
+  await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
   await page.getByRole('button', { name: 'Run DirectLiNGAM' }).click()
 
   await expect(page.getByLabel('DirectLiNGAM causal order')).toContainText('→', { timeout: 30_000 })

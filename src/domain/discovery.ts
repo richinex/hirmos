@@ -287,6 +287,78 @@ export type OcseInformationMethod = 'gaussian' | 'knn'
 export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'dynotears' | 'var-lingam' | 'ocse'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
+export type DiscoveryMethodGroupId = 'pcmci-family' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy'
+
+export interface DiscoveryMethodGroup {
+  readonly id: DiscoveryMethodGroupId
+  readonly name: string
+  readonly description: string
+  readonly methods: NonEmptyArray<DiscoveryMethodChoice>
+}
+
+const PCMCI_FAMILY: DiscoveryMethodGroup = {
+  id: 'pcmci-family',
+  name: 'PCMCI family',
+  description: 'Conditional-independence methods for time-indexed graphs; RPCMCI also estimates persistent regimes.',
+  methods: ['pcmci-plus', 'lpcmci', 'rpcmci'],
+}
+
+const LINGAM_FAMILY: DiscoveryMethodGroup = {
+  id: 'lingam-family',
+  name: 'LiNGAM family',
+  description: 'Linear structural models identified through non-Gaussian disturbances.',
+  methods: ['direct-lingam', 'var-lingam'],
+}
+
+const CONTINUOUS_OPTIMIZATION: DiscoveryMethodGroup = {
+  id: 'continuous-optimization',
+  name: 'DYNOTEARS',
+  description: 'Sparse dynamic structural equations fitted under an acyclicity constraint.',
+  methods: ['dynotears'],
+}
+
+const CAUSATION_ENTROPY: DiscoveryMethodGroup = {
+  id: 'causation-entropy',
+  name: 'Optimal causation entropy',
+  description: 'Lagged-parent selection by conditional mutual information.',
+  methods: ['ocse'],
+}
+
+export const DISCOVERY_METHOD_GROUPS: NonEmptyArray<DiscoveryMethodGroup> = [
+  PCMCI_FAMILY,
+  LINGAM_FAMILY,
+  CONTINUOUS_OPTIMIZATION,
+  CAUSATION_ENTROPY,
+]
+
+export function discoveryMethodGroupById(id: DiscoveryMethodGroupId): DiscoveryMethodGroup {
+  switch (id) {
+    case 'pcmci-family': return PCMCI_FAMILY
+    case 'lingam-family': return LINGAM_FAMILY
+    case 'continuous-optimization': return CONTINUOUS_OPTIMIZATION
+    case 'causation-entropy': return CAUSATION_ENTROPY
+    default: return assertNever(id)
+  }
+}
+
+export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): DiscoveryMethodGroup {
+  switch (method) {
+    case 'pcmci-plus':
+    case 'lpcmci':
+    case 'rpcmci':
+      return PCMCI_FAMILY
+    case 'direct-lingam':
+    case 'var-lingam':
+      return LINGAM_FAMILY
+    case 'dynotears':
+      return CONTINUOUS_OPTIMIZATION
+    case 'ocse':
+      return CAUSATION_ENTROPY
+    default:
+      return assertNever(method)
+  }
+}
+
 export type DiscoveryConfiguration =
   | { readonly kind: 'direct-lingam' }
   | {

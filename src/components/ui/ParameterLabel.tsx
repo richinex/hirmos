@@ -1,23 +1,25 @@
 import { Icon } from '@/components/Icon'
-import { Tooltip } from '@/components/ui/Tooltip'
+import { TapNote, Tooltip } from '@/components/ui/Tooltip'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
 export function ParameterHelp({ label, help }: { readonly label: string; readonly help: string }) {
+  // A finger cannot hover, and the hover note closes itself on the touch that opened it. Where the
+  // pointer is coarse the same text is opened by a tap instead, and stays until it is dismissed.
+  const coarse = useMediaQuery('(pointer: coarse)')
+  const Note = coarse ? TapNote : Tooltip
   return (
-    <Tooltip text={help}>
-      {/* A focusable span carrying an explicit role, not a <button>: assistive technology needs a role
-          to announce beside the label, but Radix's trigger stops opening on pointer hover when the
-          element is a button, and hover is how most readers reach this note. Focus opens it too, so a
-          keyboard reader gets the text by tabbing here; there is nothing to activate. */}
-      <span
-        role="button"
-        tabIndex={0}
-        className="grid size-5 shrink-0 cursor-help place-items-center rounded text-faint transition-colors hover:text-ink"
+    <Note text={help}>
+      {/* A button, so the control carries a role: a focusable span with only an aria-label is announced
+          without any sign that it does something. The cursor is left to the app's rule for buttons. */}
+      <button
+        type="button"
+        className="grid size-5 shrink-0 place-items-center rounded text-faint transition-colors hover:text-ink pointer-coarse:size-9"
         aria-label={`About ${label}`}
       >
         <Icon name="info" size={14} />
-      </span>
-    </Tooltip>
+      </button>
+    </Note>
   )
 }
 
