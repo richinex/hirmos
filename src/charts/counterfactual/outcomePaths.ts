@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis, zoomPair } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface OutcomePathsView {
@@ -24,6 +24,7 @@ export function outcomePathsOption(view: OutcomePathsView, theme: ChartTheme): E
     ...baseOption(theme, description),
     grid: gridAuto({ top: 30, bottom: 40 }),
     legend: { ...legend(theme), bottom: 'auto', top: 0 },
+    dataZoom: zoomPair(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
       axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } },
@@ -51,11 +52,12 @@ export function outcomePathsOption(view: OutcomePathsView, theme: ChartTheme): E
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
       axisLabel: axisLabelStyle(theme),
+      splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
     series: [
-      { type: 'line', name: `${view.treatment} = ${view.interventions[0]}`, data: view.low.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.muted, width: 1.2, type: 'dashed' }, symbol: 'none' },
-      { type: 'line', name: `${view.treatment} = ${view.interventions[1]}`, data: view.high.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.bone, width: 1.2, type: 'dashed' }, symbol: 'none' },
+      { type: 'line', name: `${view.treatment} = ${view.interventions[0]}`, data: view.low.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.muted, width: 1.2, type: 'dashed' }, itemStyle: { color: theme.muted }, symbol: 'none' },
+      { type: 'line', name: `${view.treatment} = ${view.interventions[1]}`, data: view.high.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.bone, width: 1.2, type: 'dashed' }, itemStyle: { color: theme.bone }, symbol: 'none' },
       { type: 'line', name: 'observed', data: view.factual.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.ink, width: 1.4 }, symbol: 'circle', symbolSize: 3, itemStyle: { color: theme.ink } },
     ],
   }

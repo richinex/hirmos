@@ -44,6 +44,7 @@ pub(crate) fn seasonal_adjust(
         .map(|&column| {
             let slice = &values[column * rows..(column + 1) * rows];
             let fit = stl(slice, &config, None, None);
+            let trend_strength = strength(&fit.trend, &fit.resid);
             let before = strength(&fit.seasonal, &fit.resid);
             let deseasonalised: Vec<f64> = slice
                 .iter()
@@ -55,6 +56,12 @@ pub(crate) fn seasonal_adjust(
             output[column * rows..(column + 1) * rows].copy_from_slice(&deseasonalised);
             SeasonalAdjustedColumn {
                 column,
+                observed: slice.to_vec(),
+                trend: fit.trend,
+                seasonal: fit.seasonal,
+                remainder: fit.resid,
+                robust_weights: fit.weights,
+                trend_strength,
                 seasonal_strength_before: before,
                 seasonal_strength_after: after,
             }
@@ -90,6 +97,12 @@ mod tests {
         let value: serde_json::Value = serde_json::to_value(result).unwrap();
         assert_eq!(value["kind"], "seasonalAdjusted");
         let adjusted = &value["adjusted"][0];
+        assert_eq!(adjusted["observed"].as_array().unwrap().len(), rows);
+        assert_eq!(adjusted["trend"].as_array().unwrap().len(), rows);
+        assert_eq!(adjusted["seasonal"].as_array().unwrap().len(), rows);
+        assert_eq!(adjusted["remainder"].as_array().unwrap().len(), rows);
+        assert_eq!(adjusted["robustWeights"].as_array().unwrap().len(), rows);
+        assert!(adjusted["trendStrength"].as_f64().unwrap() > 0.0);
         assert!(adjusted["seasonalStrengthBefore"].as_f64().unwrap() > 0.9);
         assert!(
             adjusted["seasonalStrengthAfter"].as_f64().unwrap() < 0.5,
@@ -103,6 +116,22 @@ mod tests {
             .map(|v| v.as_f64().unwrap())
             .collect();
         assert_eq!(&output[rows..], &flat[..]);
+        let reconstructed = adjusted["observed"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(adjusted["trend"].as_array().unwrap())
+            .zip(adjusted["seasonal"].as_array().unwrap())
+            .zip(adjusted["remainder"].as_array().unwrap())
+            .map(|(((observed, trend), seasonal), remainder)| {
+                (observed.as_f64().unwrap()
+                    - trend.as_f64().unwrap()
+                    - seasonal.as_f64().unwrap()
+                    - remainder.as_f64().unwrap())
+                .abs()
+            })
+            .fold(0.0_f64, f64::max);
+        assert!(reconstructed <= 1e-12, "reconstruction {reconstructed}");
         let amplitude = output[..rows].iter().cloned().fold(f64::MIN, f64::max)
             - output[..rows].iter().cloned().fold(f64::MAX, f64::min);
         assert!(amplitude < 4.5, "amplitude {amplitude}");

@@ -34,6 +34,10 @@ use hirmos_causal_core::pss_tables::stat_star;
 use hirmos_causal_core::refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, WorkerStudy,
 };
+use hirmos_causal_core::resampling::{
+    pandas_resample_daily, Aggregation as CoreResamplingAggregation,
+    IncompleteBins as CoreIncompleteBins, ResampleFrequency as CoreResampleFrequency,
+};
 use hirmos_causal_core::stl::{stl, strength, StlConfig};
 use hirmos_causal_core::synthetic_control::{
     debiased_synthetic_control, donor_placebo_mspe_inference, synthetic_control_prediction_band,
@@ -106,6 +110,81 @@ pub fn run_analysis(
     };
     let result = match command {
         AnalysisCommand::StationarityBattery => stationarity_battery(values),
+        AnalysisCommand::PandasResampleDaily {
+            rows,
+            columns,
+            target,
+            incomplete_bins,
+            aggregations,
+            imputed_cells,
+        } => {
+            if values.len() != rows.saturating_mul(columns + 1) {
+                return Err(JsError::new(
+                    "resampling payload shape does not match rows and columns",
+                ));
+            }
+            let timestamps: Result<Vec<i64>, JsError> = values[..rows]
+                .iter()
+                .map(|&value| {
+                    if !value.is_finite()
+                        || value.fract() != 0.0
+                        || value < i64::MIN as f64
+                        || value > i64::MAX as f64
+                    {
+                        Err(JsError::new(
+                            "resampling timestamps must be finite integer milliseconds",
+                        ))
+                    } else {
+                        Ok(value as i64)
+                    }
+                })
+                .collect();
+            let target = match target {
+                ResamplingTarget::Weekly => CoreResampleFrequency::WeeklyMonday,
+                ResamplingTarget::Monthly => CoreResampleFrequency::MonthStart,
+            };
+            let incomplete = match incomplete_bins {
+                ResamplingIncompleteBins::Keep => CoreIncompleteBins::Keep,
+                ResamplingIncompleteBins::Drop => CoreIncompleteBins::Drop,
+            };
+            let methods: Vec<_> = aggregations
+                .into_iter()
+                .map(|method| match method {
+                    ResamplingAggregation::Mean => CoreResamplingAggregation::Mean,
+                    ResamplingAggregation::Sum => CoreResamplingAggregation::Sum,
+                    ResamplingAggregation::Median => CoreResamplingAggregation::Median,
+                    ResamplingAggregation::Minimum => CoreResamplingAggregation::Minimum,
+                    ResamplingAggregation::Maximum => CoreResamplingAggregation::Maximum,
+                    ResamplingAggregation::First => CoreResamplingAggregation::First,
+                    ResamplingAggregation::Last => CoreResamplingAggregation::Last,
+                })
+                .collect();
+            let imputed: Vec<_> = imputed_cells
+                .into_iter()
+                .map(|cell| (cell[0], cell[1]))
+                .collect();
+            let result = pandas_resample_daily(
+                &values[rows..],
+                rows,
+                columns,
+                &timestamps?,
+                &methods,
+                &imputed,
+                target,
+                incomplete,
+            )
+            .map_err(|problem| JsError::new(&format!("pandas resampling refused: {problem:?}")))?;
+            Ok(AnalysisResult::PandasResampled {
+                values: result.values,
+                timestamps_ms: result.timestamps_ms,
+                imputed_cells: result.imputed_cells,
+                source_rows: result.source_rows,
+                output_rows: result.output_rows,
+                incomplete_bins: result.incomplete_bins,
+                bins_dropped: result.bins_dropped,
+                source_rows_dropped: result.source_rows_dropped,
+            })
+        }
         AnalysisCommand::PcmciPlus {
             rows,
             columns,
@@ -379,6 +458,7 @@ pub fn run_analysis(
             columns,
             period,
             robust,
+            correlation_max_lag,
             pelt_min_size,
             pelt_jump,
             pelt_penalty,
@@ -388,6 +468,7 @@ pub fn run_analysis(
             columns,
             period,
             robust,
+            correlation_max_lag,
             pelt_min_size,
             pelt_jump,
             pelt_penalty,

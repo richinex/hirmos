@@ -25,6 +25,25 @@ fn diagnostics_match_statsmodels() {
     println!("pacf maxdev {d:.3e}");
     assert!(d <= 1e-10, "pacf deviation {d}");
 
+    let want: Vec<f64> = serde_json::from_value(root["pacf_ywmle"].clone()).unwrap();
+    let pacf = pacf_yw_mle(&a, 8);
+    let d = maxdev(&pacf, &want);
+    println!("pacf ywmle maxdev {d:.3e}");
+    assert!(d <= 1e-10, "pacf ywmle deviation {d}");
+
+    let acf_values = acf(&a, 8);
+    let (acf_limits, pacf_limits) = correlation_plot_limits(&acf_values, a.len());
+    let want_acf: Vec<f64> = serde_json::from_value(root["plot_limits"]["acf"].clone()).unwrap();
+    let want_pacf: Vec<f64> = serde_json::from_value(root["plot_limits"]["pacf"].clone()).unwrap();
+    assert!(
+        maxdev(&acf_limits, &want_acf) <= 1e-12,
+        "ACF plotting limits"
+    );
+    assert!(
+        maxdev(&pacf_limits, &want_pacf) <= 1e-15,
+        "PACF plotting limits"
+    );
+
     let (stat, pval) = ljung_box(&a, 8);
     let want_s: Vec<f64> = serde_json::from_value(root["ljungbox"]["stat"].clone()).unwrap();
     let want_p: Vec<f64> = serde_json::from_value(root["ljungbox"]["pvalue"].clone()).unwrap();

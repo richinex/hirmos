@@ -5,6 +5,7 @@ import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvid
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
+import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type PandasResamplingEvidence, type ResamplingAggregation } from '@/domain/resampling'
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
@@ -87,6 +88,18 @@ export type AnalysisWorkerCommand =
       readonly kind: 'stationarity-battery'
       readonly request: WorkerRequestId
       readonly values: Float64Array
+    }
+  | {
+      readonly kind: 'pandas-resample-daily'
+      readonly request: WorkerRequestId
+      /** UTC millisecond timestamps followed by the column-major matrix. */
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly target: 'weekly' | 'monthly'
+      readonly incompleteBins: 'keep' | 'drop'
+      readonly aggregations: readonly ResamplingAggregation[]
+      readonly imputedCells: readonly (readonly [number, number])[]
     }
   | {
       readonly kind: 'pcmci-plus'
@@ -318,6 +331,7 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly period: number | null
       readonly robust: boolean
+      readonly correlationMaxLag: number
       readonly peltMinSize: number
       readonly peltJump: number
       readonly peltPenalty: number
@@ -532,6 +546,7 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: StationarityBattery
     }
+  | { readonly kind: 'pandas-resampling-succeeded'; readonly request: WorkerRequestId; readonly result: PandasResamplingEvidence }
   | {
       readonly kind: 'pcmci-plus-succeeded'
       readonly request: WorkerRequestId
@@ -628,6 +643,17 @@ const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('stationarity-battery'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
+  }).strict(),
+  z.object({
+    kind: z.literal('pandas-resample-daily'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(1).max(256),
+    target: z.enum(['weekly', 'monthly']),
+    incompleteBins: z.enum(['keep', 'drop']),
+    aggregations: z.array(z.enum(['mean', 'sum', 'median', 'minimum', 'maximum', 'first', 'last'])).min(1).max(256),
+    imputedCells: z.array(z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])),
   }).strict(),
   z.object({
     kind: z.literal('pcmci-plus'),
@@ -872,6 +898,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     columns: z.number().int().min(1).max(64),
     period: z.number().int().min(2).max(400).nullable(),
     robust: z.boolean(),
+    correlationMaxLag: z.number().int().min(1).max(400),
     peltMinSize: z.number().int().min(1).max(1000),
     peltJump: z.number().int().min(1).max(100),
     peltPenalty: z.number().finite().nonnegative(),
@@ -1100,6 +1127,11 @@ const eventSchema = z.discriminatedUnion('kind', [
     result: stationarityBatterySchema,
   }).strict(),
   z.object({
+    kind: z.literal('pandas-resampling-succeeded'),
+    request: requestSchema,
+    result: pandasResamplingEvidenceSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('pcmci-plus-succeeded'),
     request: requestSchema,
     result: pcmciPlusEvidenceSchema,
@@ -1182,7 +1214,15 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   if (!parsed.success) return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
   const request = workerRequestId(parsed.data.request)
   if (!request.ok) return err({ kind: 'invalid-command', detail: 'The worker request identity is invalid.' })
-  if ('columns' in parsed.data && parsed.data.values.length !== parsed.data.rows * parsed.data.columns) {
+  if (parsed.data.kind === 'pandas-resample-daily') {
+    const { rows, columns } = parsed.data
+    if (parsed.data.values.length !== rows * (columns + 1)
+      || parsed.data.aggregations.length !== columns
+      || parsed.data.imputedCells.some(([row, column]) => row >= rows || column >= columns)) {
+      return err({ kind: 'invalid-command', detail: 'The resampling timestamps, matrix, aggregation rules, or imputation evidence do not share one shape.' })
+    }
+  }
+  if (parsed.data.kind !== 'pandas-resample-daily' && 'columns' in parsed.data && parsed.data.values.length !== parsed.data.rows * parsed.data.columns) {
     return err({ kind: 'invalid-command', detail: 'The multivariate matrix dimensions do not match its numeric buffer.' })
   }
   if (parsed.data.kind === 'granger-ssr-f' && parsed.data.values.length !== parsed.data.rows * 2) {
@@ -1375,6 +1415,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'missingness-resolved') {
     const result = parseMissingnessResolvedEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'missingness-resolved', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'pandas-resampling-succeeded') {
+    const result = parsePandasResamplingEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'pandas-resampling-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   const result = parseStationarityBattery(parsed.data.result)
   return result.ok

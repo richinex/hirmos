@@ -35,9 +35,8 @@ const BUTTON_TONE: Record<ButtonTone, string> = {
   danger: cn('bg-danger', FILLED),
   outline: 'border border-hair text-ink hover:border-edge',
   quiet: 'border border-hair text-muted hover:text-ink',
-  // Named for its register, not its typeface. It carried font-mono until the typography pass, which only
-  // made the words wider.
-  mono: 'border border-hair text-label uppercase tracking-[0.1em] text-muted hover:border-edge hover:text-ink',
+  // Named for its register, not its typeface: the label voice, at button size.
+  mono: 'border border-hair text-label font-medium text-muted hover:border-edge hover:text-ink',
 }
 
 /** `md` is the 30px field height that matches `field()` and `SegmentedControl`; `sm` the 24px chrome step. */
@@ -135,10 +134,16 @@ export const num = (extra?: string): string => cn('tabular-nums', extra)
  *  This is the only mono outside actual code. Filenames, model names and timestamps read as words. */
 export const literal = (extra?: string): string => cn('font-mono', extra)
 
-/** A small-caps chrome label. The 11px label tier remains readable in dense panels; the 10px micro tier
- * is reserved for timings and keycaps. Ships the app's one label tracking (0.1em); call sites had
- * invented twelve values for that one job. */
-export const label = (extra?: string): string => cn('text-label uppercase tracking-[0.1em]', extra)
+/** A chrome label: the name of a slot, above or beside the value that fills it. The 11px label tier
+ * remains readable in dense panels; the 10px micro tier is reserved for timings and keycaps. The size,
+ * the weight and the muted colour do the "this is a label" work, so the words are set as words. */
+export const label = (extra?: string): string => cn('text-label font-medium', extra)
+
+/** What a figure plots, under or above it.
+ *
+ * A caption is a phrase, not a slot name, so it is sentence case: `label()` stays for the short fixed
+ * nouns that name a field. Same tier and colour, so the two still read as one register. */
+export const caption = (extra?: string): string => cn('text-label text-faint', extra)
 
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
@@ -149,9 +154,11 @@ export const figureGrid = (extra?: string): string => cn('grid gap-px overflow-h
 /** Text colour for a machine-state verdict, from the status ramp; muted for a state that is neither good nor bad. */
 export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 
-/** The title of a floating surface: panel, drawer or sheet. A step above `label()` in size, same voice.
- *  The app once had four registers for this, from 9.5px to 13px across three trackings. */
-export const panelTitle = 'text-label uppercase tracking-[0.1em] text-muted'
+/** The title of a floating surface: panel, drawer or sheet.
+ *
+ * A heading, so it is set in sentence case on the title tier, the ramp step named for a surface's
+ * subject. Capitals are for a label naming a slot, not for a heading naming a surface. */
+export const panelTitle = 'text-title font-medium text-ink'
 
 /** Row padding per density: 24px compact and 32px comfortable rows with 12px body text, including the 1px hairline under the row. */
 export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px] pb-[6px]' } as const
@@ -159,9 +166,10 @@ export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px]
 /** A data table: the caps tier for headers, hairline rows, comfortable 32px body rows unless a density is applied; figure cells add `text-right`. */
 export const table = 'w-full border-collapse text-left text-body'
 
-/** A header cell. Sticky, on the well, in the caps tier at regular weight. `p-0` when a sort button fills it. */
+/** A header cell. Sticky, on the well, set in sentence case and carried by weight rather than capitals,
+ *  because a header may be a phrase ("Zivot-Andrews p, constant and trend"). `p-0` when a sort button fills it. */
 export const th = (extra?: string): string =>
-  cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-well px-3.5 py-2 text-left font-normal text-faint', label(), extra)
+  cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-well px-3.5 py-2 text-left text-label font-medium text-muted', extra)
 
 /** A body row. `action` rows fill on hover and focus; `selected` is a surface, never a colour or a weight. */
 export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: string): string =>
@@ -175,5 +183,6 @@ export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: s
 /** A body cell. Text cells truncate with the full value in `title`; figure cells add `text-right`. */
 export const td = (extra?: string): string => cn('max-w-[300px] truncate px-3.5 align-top', rowPadding.comfortable, extra)
 
-/** The row-count line under a table; `aria-live="polite"` so a sort or filter is announced. */
-export const tableFoot = label('border-t border-hair px-3.5 py-1.5 text-faint')
+/** The row-count line under a table; `aria-live="polite"` so a sort or filter is announced.
+ *  It reports a count, so it is sentence case: capitals are for a label naming a slot. */
+export const tableFoot = 'border-t border-hair px-3.5 py-1.5 text-label text-faint'

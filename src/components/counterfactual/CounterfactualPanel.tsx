@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
 import { Select } from '@/components/ui/Select'
 import { useEffect, useMemo, useReducer, useState } from 'react'
-import { EChart } from '@/charts/EChart'
+import { ExpandableChart } from '@/charts/ExpandableChart'
 import { outcomePathsOption } from '@/charts/counterfactual/outcomePaths'
 import { counterfactualEffectPathOption } from '@/charts/counterfactual/effectPath'
 import { useChartTheme } from '@/charts/theme'
@@ -192,8 +192,8 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
         <MetricTile label="Equations" size="compact" frame="cell" value={formatCount(run.evidence.equations.length)} context={`order ${run.evidence.order.map((node) => run.nodes[node]?.name ?? node).join(' → ')}`} />
       </div>
       <ResultInterpretation interpretation={interpretCounterfactualResult(run, study, stepLabel)} className="mt-3" />
-      <EChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" />
-      {effectOption !== null && <EChart option={effectOption} label={`${study.outcome.name} counterfactual contrast with pointwise block-bootstrap interval`} className="mt-3 h-[240px]" testId="counterfactual-effect-interval" />}
+      <ExpandableChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" />
+      {effectOption !== null && <ExpandableChart option={effectOption} label={`${study.outcome.name} counterfactual contrast with pointwise block-bootstrap interval`} className="mt-3 h-[240px]" testId="counterfactual-effect-interval" />}
       <div className="mt-3 grid items-start gap-3 rounded-lg border border-hair bg-well p-3 @md/panel:grid-cols-[auto_1fr]">
         <label className="block text-body text-ink"><span className={fieldLabel}>Inspect plotted point</span><input type="number" min={1} max={view.plottedObservations} aria-label="Inspect plotted point" className={field('text', 'mt-1 w-28')} value={row} onChange={(event) => setRow(Math.max(1, Math.min(view.plottedObservations, Math.floor(Number(event.target.value) || 1))))} /></label>
         <dl className="m-0 grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-body" aria-label={`${stepLabel} ${view.firstStep + index} counterfactual`}>

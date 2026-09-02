@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, responsive, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, responsive, tooltip, valueAxis, zoomPair } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface SeriesOverviewView {
@@ -54,32 +54,14 @@ export function seriesOverviewOption(view: SeriesOverviewView, theme: ChartTheme
       splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
-    dataZoom: [
-      { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-      {
-        type: 'slider',
-        xAxisIndex: 0,
-        height: 18,
-        bottom: 6,
-        showDetail: false,
-        handleSize: '150%',
-        borderColor: theme.hair,
-        backgroundColor: theme.well,
-        fillerColor: `${theme.muted}33`,
-        dataBackground: { lineStyle: { color: theme.muted }, areaStyle: { color: theme.hair } },
-        selectedDataBackground: { lineStyle: { color: theme.bone }, areaStyle: { color: theme.hair } },
-        handleStyle: { color: theme.panel, borderColor: theme.muted },
-        moveHandleStyle: { color: theme.hair },
-        textStyle: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
-      },
-    ],
+    dataZoom: zoomPair(theme),
     series: [{
       type: 'line',
       name: view.name,
       data,
       showSymbol: false,
       connectNulls: false,
-      sampling: 'lttb',
+      sampling: 'minmax',
       lineStyle: { color: theme.bone, width: 1.2 },
       itemStyle: { color: theme.bone },
       emphasis: { lineStyle: { width: 1.2 } },

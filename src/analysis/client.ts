@@ -17,6 +17,7 @@ import type { DmlRefutationEvidence } from '@/domain/sensitivity'
 import type { DynamicCounterfactualUncertainty, DynamicInterventionTiming, DynamicLinearScmEvidence, LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
 import type { StationarityBattery } from '@/domain/stationarity'
+import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/resampling'
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
@@ -30,6 +31,7 @@ import {
 } from '@/workers/analysisProtocol'
 
 type StationarityOutcome = Result<StationarityBattery, AnalysisWorkerProblem>
+type PandasResamplingOutcome = Result<PandasResamplingEvidence, AnalysisWorkerProblem>
 type PcmciPlusOutcome = Result<PcmciPlusEvidence, AnalysisWorkerProblem>
 type GrangerOutcome = Result<GrangerSsrEvidence, AnalysisWorkerProblem>
 type LpcmciOutcome = Result<LpcmciEvidence, AnalysisWorkerProblem>
@@ -66,6 +68,7 @@ type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type DynamicLinearScmOutcome = Result<DynamicLinearScmEvidence, AnalysisWorkerProblem>
 type PendingRun =
   | { readonly kind: 'stationarity'; readonly resolve: (outcome: StationarityOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
+  | { readonly kind: 'pandas-resampling'; readonly resolve: (outcome: PandasResamplingOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'pcmci-plus'; readonly resolve: (outcome: PcmciPlusOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'lpcmci'; readonly resolve: (outcome: LpcmciOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
   | { readonly kind: 'dynotears'; readonly resolve: (outcome: DynotearsOutcome) => void; readonly onProgress?: (progress: AnalysisProgress) => void }
@@ -143,6 +146,10 @@ const analysisWorker = (): Worker => {
     }
     if (run.kind === 'stationarity' && parsed.value.kind !== 'stationarity-succeeded') {
       failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned PCMCI+ evidence for a stationarity request.' })
+      return
+    }
+    if (run.kind === 'pandas-resampling' && parsed.value.kind !== 'pandas-resampling-succeeded') {
+      failAll({ kind: 'worker-protocol-failed', detail: 'The analysis worker returned another result for a pandas resampling request.' })
       return
     }
     if (run.kind === 'pcmci-plus' && parsed.value.kind !== 'pcmci-plus-succeeded') {
@@ -283,6 +290,10 @@ const analysisWorker = (): Worker => {
     }
     pending.delete(parsed.value.request)
     if (run.kind === 'stationarity' && parsed.value.kind === 'stationarity-succeeded') {
+      run.resolve({ ok: true, value: parsed.value.result })
+      return
+    }
+    if (run.kind === 'pandas-resampling' && parsed.value.kind === 'pandas-resampling-succeeded') {
       run.resolve({ ok: true, value: parsed.value.result })
       return
     }
@@ -522,6 +533,28 @@ export function runStationarityBattery(values: Float64Array): Promise<Stationari
       }))
     }
   })
+}
+
+export function runPandasResampling(
+  timestamps: Float64Array,
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  target: 'weekly' | 'monthly',
+  incompleteBins: 'keep' | 'drop',
+  aggregations: readonly ResamplingAggregation[],
+  imputedCells: readonly (readonly [number, number])[],
+): Promise<PandasResamplingOutcome> {
+  const request = newWorkerRequestId()
+  const payload = new Float64Array(timestamps.length + values.length)
+  payload.set(timestamps)
+  payload.set(values, timestamps.length)
+  return post<PandasResamplingOutcome>(
+    'pandas-resampling',
+    { kind: 'pandas-resample-daily', request, values: payload, rows, columns, target, incompleteBins, aggregations, imputedCells },
+    payload,
+    (resolve) => ({ kind: 'pandas-resampling', resolve }),
+  )
 }
 
 export function runPcmciPlus(
@@ -779,7 +812,7 @@ export function runUnobservedConfounding(values: Float64Array, rows: number, col
   return post<UnobservedConfoundingOutcome>('unobserved-confounding', { kind: 'unobserved-confounding', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'unobserved-confounding', resolve }))
 }
 
-export function runSeriesStructure(values: Float64Array, rows: number, columns: number, design: { readonly period: number | null; readonly robust: boolean; readonly peltMinSize: number; readonly peltJump: number; readonly peltPenalty: number }): Promise<SeriesStructureOutcome> {
+export function runSeriesStructure(values: Float64Array, rows: number, columns: number, design: { readonly period: number | null; readonly robust: boolean; readonly correlationMaxLag: number; readonly peltMinSize: number; readonly peltJump: number; readonly peltPenalty: number }): Promise<SeriesStructureOutcome> {
   const request = newWorkerRequestId()
   return post<SeriesStructureOutcome>('series-structure', { kind: 'series-structure', request, values, rows, columns, ...design }, values, (resolve) => ({ kind: 'series-structure', resolve }))
 }

@@ -643,7 +643,7 @@ function App() {
                     </section>
                   )}
                   <details className="group rounded-md border border-line bg-panel">
-                    <summary className={label('flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-muted transition-colors marker:content-none hover:text-ink')}>
+                    <summary className="flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-label text-muted transition-colors marker:content-none hover:text-ink">
                       <span>Source file · storage and export</span>
                       <Icon name="expand_more" size={14} className="shrink-0 transition-transform group-open:rotate-180" />
                     </summary>

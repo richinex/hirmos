@@ -168,6 +168,7 @@ pub(crate) fn series_structure(
     columns: usize,
     period: Option<usize>,
     robust: bool,
+    correlation_max_lag: usize,
     pelt_min_size: usize,
     pelt_jump: usize,
     pelt_penalty: f64,
@@ -177,6 +178,11 @@ pub(crate) fn series_structure(
         if period < 2 {
             return Err("series structure period must be at least 2".to_owned());
         }
+    }
+    if correlation_max_lag == 0 || correlation_max_lag >= rows / 2 {
+        return Err(
+            "series structure correlation lag must be positive and below half the rows".to_owned(),
+        );
     }
     if pelt_min_size == 0 || pelt_jump == 0 || !pelt_penalty.is_finite() || pelt_penalty < 0.0 {
         return Err(
@@ -202,10 +208,19 @@ pub(crate) fn series_structure(
             let signal: Vec<Vec<f64>> = y.iter().map(|value| vec![*value]).collect();
             let mut change_points = pelt_l2(&signal, pelt_min_size, pelt_jump, pelt_penalty);
             change_points.retain(|&end| end < rows);
+            let acf = hirmos_causal_core::tsdiag::acf(&y, correlation_max_lag);
+            let pacf = hirmos_causal_core::tsdiag::pacf_yw_mle(&y, correlation_max_lag);
+            let (acf_limits, pacf_limits) =
+                hirmos_causal_core::tsdiag::correlation_plot_limits(&acf, rows);
             SeriesStructureEvidence {
                 column,
                 trend_strength,
                 seasonal_strength,
+                correlation_max_lag,
+                acf,
+                acf_limits,
+                pacf,
+                pacf_limits,
                 change_points,
                 pelt_penalty,
             }
@@ -373,13 +388,17 @@ mod tests {
                     + ((i * 7919) % 13) as f64 * 0.05
             })
             .collect();
-        let json = series_structure(&y, rows, 1, Some(12), false, 4, 1, 10.0)
+        let json = series_structure(&y, rows, 1, Some(12), false, 12, 4, 1, 10.0)
             .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
             .expect("structure should serialize");
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["kind"], "seriesStructure");
         let series = &value["series"][0];
         assert!(series["seasonalStrength"].as_f64().unwrap() > 0.9);
+        assert_eq!(series["correlationMaxLag"], 12);
+        for name in ["acf", "acfLimits", "pacf", "pacfLimits"] {
+            assert_eq!(series[name].as_array().unwrap().len(), 13);
+        }
         let points: Vec<u64> = series["changePoints"]
             .as_array()
             .unwrap()
@@ -390,7 +409,8 @@ mod tests {
             points.iter().any(|&p| (88..=92).contains(&p)),
             "change points {points:?}"
         );
-        assert!(series_structure(&y, rows, 1, Some(1), false, 4, 1, 10.0).is_err());
+        assert!(series_structure(&y, rows, 1, Some(1), false, 12, 4, 1, 10.0).is_err());
+        assert!(series_structure(&y, rows, 1, Some(12), false, rows / 2, 4, 1, 10.0).is_err());
     }
 
     #[test]

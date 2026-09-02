@@ -118,7 +118,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
 
       {manifest.warnings.length > 0 && (
         <section className="rounded-xl border border-hair bg-panel p-4" aria-label="Unresolved requirements">
-          <h3 className={label('mb-2 mt-0 text-warn')}>Requirements to review</h3>
+          <h3 className="mb-2 mt-0 text-warn text-label font-medium">Requirements to review</h3>
           <ul className="m-0 space-y-1 pl-4 text-body text-muted">
             {manifest.warnings.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
@@ -240,7 +240,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
       </div>
       {otherManifest !== null && manifest !== null && (
         <section className="rounded-xl border border-hair bg-panel p-4" aria-label="Differences">
-          <h3 className={label('mb-2 mt-0 text-faint')}>Differences · {differences.length}</h3>
+          <h3 className="mb-2 mt-0 text-faint text-label font-medium">Differences · {differences.length}</h3>
           {differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : (
             <div className="figure-strip overflow-x-auto">
               <table className={table}>

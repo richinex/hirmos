@@ -108,6 +108,40 @@ test('keeps null and zero distinct in a materialized numeric buffer', async ({ p
   expect(raw).toEqual({ firstIsNaN: true, second: 2, validityByte: 2, missing: 1 })
 })
 
+test('keeps calendar dates temporal in the bounded and paged previews', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Data preview boundary runs once')
+  await page.goto('/app')
+
+  const raw: unknown = await page.evaluate(async () => {
+    const [dataModule, workflowModule] = await Promise.all([
+      import(new URL('/src/data/client.ts', window.location.href).href),
+      import(new URL('/src/domain/workflow.ts', window.location.href).href),
+    ])
+    const file = new File(['date,x\n1958-03-29,1\n1958-04-05,2\n'], 'dated.csv', { type: 'text/csv' })
+    const profiled = await dataModule.profileSourceInWorker(workflowModule.newImportRequestId(), file)
+    if (!profiled.ok) throw new Error(`Profile failed: ${profiled.error.kind}`)
+    const preview = await dataModule.previewWindowInWorker(file, profiled.value, {
+      offset: 0,
+      limit: 2,
+      sort: null,
+      filters: [],
+      search: '',
+    })
+    if (!preview.ok) throw new Error(`Preview failed: ${preview.error.kind}`)
+    return {
+      physicalType: profiled.value.columns[0].duckdbType,
+      bounded: profiled.value.preview[0][0],
+      paged: preview.value.rows[0]?.cells[0],
+    }
+  })
+
+  expect(raw).toEqual({
+    physicalType: 'DATE',
+    bounded: { kind: 'temporal', value: '1958-03-29T00:00:00.000Z' },
+    paged: { kind: 'temporal', value: '1958-03-29T00:00:00.000Z' },
+  })
+})
+
 test('materializes saved per-column time-series transformations on one aligned grid', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Prepared transformation boundary runs once')
   await page.goto('/app')
@@ -140,6 +174,7 @@ test('materializes saved per-column time-series transformations on one aligned g
       sampling: { kind: 'regular-series' as const, timeColumn: time, frequency: 'daily' as const },
       missingness: { kind: 'not-present' as const },
       resolution: { kind: 'none' as const },
+      resampling: { kind: 'none' as const },
       seasonalAdjustment: { kind: 'none' as const },
       seriesTransforms: [
         { column: x, transform: { kind: 'difference' as const, order: 1 as const } },
@@ -201,6 +236,7 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
     return {
       ok: true,
       transforms: parsed.value.prepared?.kind === 'prepared-time-series' ? parsed.value.prepared.seriesTransforms : null,
+      resampling: parsed.value.prepared?.kind === 'prepared-time-series' ? parsed.value.prepared.resampling : null,
       diagnosticTransform: parsed.value.stationarity?.diagnosticTransform ?? null,
       legacyTransformRetained: parsed.value.stationarity !== null && 'transform' in parsed.value.stationarity,
       appliedAdjustment: parsed.value.estimationRuns[0]?.estimate.adjustment ?? null,
@@ -213,6 +249,7 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
       { column: 'x', transform: { kind: 'levels' } },
       { column: 'y', transform: { kind: 'levels' } },
     ],
+    resampling: { kind: 'none' },
     diagnosticTransform: { kind: 'difference', order: 1 },
     legacyTransformRetained: false,
     appliedAdjustment: { kind: 'contemporaneous', variables: [{ node: 'node-z', column: 'z', name: 'Z' }] },

@@ -1,3 +1,5 @@
+import { createPortal } from 'react-dom'
+import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
@@ -526,6 +528,9 @@ const describeConnectionNotice = (notice: ConnectionNotice): string => {
   }
 }
 
+/** One canvas at a time, so the layer stack needs no per-instance id. */
+const EXPANDED_CANVAS_LAYER = 'dag-canvas-expanded'
+
 const IDLE_HINT = 'Drag from a card onto another card to draw an arrow; drag a card by its name to move it. Select an arrow to reverse or remove it, or drag either of its ends to another card.'
 
 const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation): {
@@ -695,9 +700,10 @@ export function DagCanvas({
   // A finger is imprecise: connections snap from further away and a tap on one dot then another also connects.
   const coarse = useMediaQuery('(pointer: coarse)')
   const [expanded, setExpanded] = useState(false)
+  useEffect(() => (expanded ? pushLayer(EXPANDED_CANVAS_LAYER) : undefined), [expanded])
   useEffect(() => {
-    if (!expanded) return
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') setExpanded(false) }
+    if (!expanded) return undefined
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && escapeFor(EXPANDED_CANVAS_LAYER, event)) setExpanded(false) }
     window.addEventListener('keydown', escape)
     return () => window.removeEventListener('keydown', escape)
   }, [expanded])
@@ -818,7 +824,7 @@ export function DagCanvas({
     }
   }
   const refusedNotice = connectionNotice?.kind === 'edge-refused'
-  return (
+  const canvas = (
     <div
       ref={hostRef}
       className={expanded
@@ -945,4 +951,9 @@ export function DagCanvas({
       </div>
     </div>
   )
+  // Expanded, the canvas is portalled to the body: the workbench pane declares `container-type: size`,
+  // which makes it the containing block for fixed positioning, so in place the layer would be inset
+  // from the pane and clipped by its neighbours instead of filling the window.
+  // `document` here is the DAG document prop, so the global is named explicitly.
+  return expanded ? createPortal(canvas, globalThis.document.body) : canvas
 }

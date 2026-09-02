@@ -3,6 +3,7 @@ import {
   parseColumnProfileShape,
   parseDatasetProfile,
   parseNullableNumericMatrix,
+  parseTimeOrderedNumericMatrix,
   previewQuerySchema,
   type ColumnProfile,
   type ColumnProfileProblem,
@@ -10,7 +11,9 @@ import {
   type DatasetProfileProblem,
   type DatasetSummaryProblem,
   type NullableNumericMatrix,
+  type TimeOrderedNumericMatrix,
   type NumericMaterializationProblem,
+  type TimeSeriesMaterializationProblem,
   type ColumnId,
   type PreviewFilter,
   type PreviewQuery,
@@ -32,6 +35,14 @@ export type DataWorkerCommand =
       readonly request: ImportRequestId
       readonly file: File
       readonly profile: DatasetProfile
+      readonly columnIds: readonly [ColumnId, ...ColumnId[]]
+    }
+  | {
+      readonly kind: 'materialize-time-series'
+      readonly request: ImportRequestId
+      readonly file: File
+      readonly profile: DatasetProfile
+      readonly timeColumn: ColumnId
       readonly columnIds: readonly [ColumnId, ...ColumnId[]]
     }
   | {
@@ -61,7 +72,8 @@ export type DataWorkerEvent =
   | { readonly kind: 'profile-succeeded'; readonly request: ImportRequestId; readonly profile: DatasetProfile }
   | { readonly kind: 'profile-failed'; readonly request: ImportRequestId; readonly problem: DatasetProfileProblem }
   | { readonly kind: 'materialization-succeeded'; readonly request: ImportRequestId; readonly matrix: NullableNumericMatrix }
-  | { readonly kind: 'materialization-failed'; readonly request: ImportRequestId; readonly problem: NumericMaterializationProblem }
+  | { readonly kind: 'time-series-materialization-succeeded'; readonly request: ImportRequestId; readonly matrix: TimeOrderedNumericMatrix }
+  | { readonly kind: 'materialization-failed'; readonly request: ImportRequestId; readonly problem: NumericMaterializationProblem | TimeSeriesMaterializationProblem }
   | { readonly kind: 'column-profile-succeeded'; readonly request: ImportRequestId; readonly profile: ColumnProfile }
   | { readonly kind: 'column-profile-failed'; readonly request: ImportRequestId; readonly problem: ColumnProfileProblem }
   | { readonly kind: 'summary-succeeded'; readonly request: ImportRequestId; readonly summary: unknown }
@@ -90,6 +102,14 @@ const commandSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     file: z.instanceof(File),
     profile: z.unknown(),
+    columnIds: z.array(z.string()).min(1),
+  }).strict(),
+  z.object({
+    kind: z.literal('materialize-time-series'),
+    request: requestSchema,
+    file: z.instanceof(File),
+    profile: z.unknown(),
+    timeColumn: z.string(),
     columnIds: z.array(z.string()).min(1),
   }).strict(),
   z.object({
@@ -144,6 +164,8 @@ const materializationProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('non-numeric-column'), name: z.string(), duckdbType: z.string() }).strict(),
   z.object({ kind: z.literal('non-finite-value'), name: z.string(), row: z.number().int().nonnegative() }).strict(),
   z.object({ kind: z.literal('materialization-failed'), detail: z.string() }).strict(),
+  z.object({ kind: z.literal('time-value-unparseable'), name: z.string(), row: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('duplicate-time-value'), name: z.string(), row: z.number().int().nonnegative() }).strict(),
   z.object({ kind: z.literal('worker-unavailable'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('worker-protocol-failed'), detail: z.string() }).strict(),
 ])
@@ -178,6 +200,7 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     matrix: z.unknown(),
   }).strict(),
+  z.object({ kind: z.literal('time-series-materialization-succeeded'), request: requestSchema, matrix: z.unknown() }).strict(),
   z.object({
     kind: z.literal('materialization-failed'),
     request: requestSchema,
@@ -207,6 +230,19 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
 
   const profile = parseDatasetProfile(data.profile)
   if (!profile.ok) return err({ kind: 'invalid-command', detail: profile.error.detail })
+  if (data.kind === 'materialize-time-series') {
+    const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
+    const timeColumn = known.get(data.timeColumn)
+    if (timeColumn === undefined) return err({ kind: 'invalid-command', detail: 'The time column is outside the supplied profile.' })
+    const columnIds: ColumnId[] = []
+    for (const rawId of data.columnIds) {
+      const id = known.get(rawId)
+      if (id === undefined) return err({ kind: 'invalid-command', detail: `Column identity ${rawId} is not in the supplied profile.` })
+      columnIds.push(id)
+    }
+    if (!isNonEmpty(columnIds)) return err({ kind: 'invalid-command', detail: 'At least one numeric column is required.' })
+    return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, timeColumn, columnIds })
+  }
   if (data.kind === 'inspect-panel' || data.kind === 'materialize-panel') {
     const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
     const unitColumn = known.get(data.unitColumn)
@@ -298,6 +334,12 @@ export function parseDataWorkerEvent(value: unknown): Result<DataWorkerEvent, Da
     const matrix = parseNullableNumericMatrix(parsed.data.matrix)
     return matrix.ok
       ? ok({ kind: 'materialization-succeeded', request: request.value, matrix: matrix.value })
+      : err({ kind: 'invalid-event', detail: matrix.error.detail })
+  }
+  if (parsed.data.kind === 'time-series-materialization-succeeded') {
+    const matrix = parseTimeOrderedNumericMatrix(parsed.data.matrix)
+    return matrix.ok
+      ? ok({ kind: parsed.data.kind, request: request.value, matrix: matrix.value })
       : err({ kind: 'invalid-event', detail: matrix.error.detail })
   }
 

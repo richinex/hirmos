@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, tooltip, valueAxis, zoomPair } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface CounterfactualEffectPathView {
@@ -20,6 +20,7 @@ export function counterfactualEffectPathOption(view: CounterfactualEffectPathVie
   return {
     ...baseOption(theme, `${view.outcome} high-minus-low counterfactual contrast and its ${level}% pointwise block-bootstrap interval over ${formatCount(view.effects.length).text} ${view.stepLabel}s.`),
     grid: gridAuto({ bottom: 42 }),
+    dataZoom: zoomPair(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
       axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } },
@@ -47,6 +48,7 @@ export function counterfactualEffectPathOption(view: CounterfactualEffectPathVie
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
       axisLabel: axisLabelStyle(theme),
+      splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
     series: [

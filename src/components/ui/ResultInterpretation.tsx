@@ -1,6 +1,5 @@
 import type { ResultInterpretation as ResultInterpretationModel } from '@/domain/resultInterpretation'
 import { assertNever } from '@/domain/dop'
-import { label } from './recipes'
 
 const statementClass = (kind: ResultInterpretationModel['statements'][number]['kind']): string => {
   switch (kind) {
@@ -19,7 +18,7 @@ export function ResultInterpretation({ interpretation, className = '' }: {
 }) {
   return (
     <section className={`rounded-lg border border-hair bg-well px-3 py-3 ${className}`.trim()} aria-label="Interpretation">
-      <h4 className={label('m-0 text-faint')}>What this result means</h4>
+      <h4 className="m-0 text-faint text-label font-medium">What this result means</h4>
       <div className="mt-2 space-y-1.5">
         {interpretation.statements.map((statement, index) => (
           <p key={`${statement.kind}-${index}`} className={`m-0 max-w-[75ch] text-body ${statementClass(statement.kind)}`}>{statement.text}</p>

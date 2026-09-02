@@ -1,4 +1,4 @@
-import { err, type Result } from '@/domain/dop'
+import { assertNever, err, type Result } from '@/domain/dop'
 import type { NonEmptyArray } from '@/domain/dop'
 import {
   type ColumnId,
@@ -10,6 +10,8 @@ import {
   type DatasetSummaryProblem,
   type NullableNumericMatrix,
   type NumericMaterializationProblem,
+  type TimeOrderedNumericMatrix,
+  type TimeSeriesMaterializationProblem,
   type PreviewQuery,
   type PreviewWindow,
   type PreviewWindowProblem,
@@ -17,6 +19,7 @@ import {
   parseDatasetSummary,
   parsePreviewWindow,
   validateNumericMatrixAgainstProfile,
+  validateTimeOrderedMatrixAgainstProfile,
 } from '@/domain/dataset'
 import type { ImportRequestId } from '@/domain/workflow'
 import { newImportRequestId } from '@/domain/workflow'
@@ -25,6 +28,7 @@ import { parsePanelLongMatrix, parsePanelStructure, type PanelDataProblem, type 
 
 type ProfileOutcome = Result<DatasetProfile, DatasetProfileProblem>
 type MaterializationOutcome = Result<NullableNumericMatrix, NumericMaterializationProblem>
+type TimeSeriesMaterializationOutcome = Result<TimeOrderedNumericMatrix, TimeSeriesMaterializationProblem>
 type ColumnProfileOutcome = Result<ColumnProfile, ColumnProfileProblem>
 type SummaryOutcome = Result<DatasetSummary, DatasetSummaryProblem>
 type PreviewWindowOutcome = Result<PreviewWindow, PreviewWindowProblem>
@@ -44,20 +48,37 @@ type PendingRequest =
       readonly profile: DatasetProfile
       readonly resolve: (outcome: MaterializationOutcome) => void
     }
+  | { readonly kind: 'time-series-materialization'; readonly profile: DatasetProfile; readonly resolve: (outcome: TimeSeriesMaterializationOutcome) => void }
   | { readonly kind: 'panel-inspection'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelStructureOutcome) => void }
   | { readonly kind: 'panel-materialization'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelMaterializationOutcome) => void }
 
 let worker: Worker | null = null
 const pending = new Map<ImportRequestId, PendingRequest>()
 
-const failAll = (detail: string) => {
+type SharedWorkerProblem =
+  | { readonly kind: 'worker-protocol-failed'; readonly detail: string }
+  | { readonly kind: 'worker-unavailable'; readonly detail: string }
+
+const stopAll = (problem: SharedWorkerProblem) => {
   for (const request of pending.values()) {
-    request.resolve(err({ kind: 'worker-protocol-failed', detail }))
+    switch (request.kind) {
+      case 'profile': request.resolve(err(problem)); break
+      case 'summary': request.resolve(err(problem)); break
+      case 'preview-window': request.resolve(err(problem)); break
+      case 'column-profile': request.resolve(err(problem)); break
+      case 'materialization': request.resolve(err(problem)); break
+      case 'time-series-materialization': request.resolve(err(problem)); break
+      case 'panel-inspection': request.resolve(err(problem)); break
+      case 'panel-materialization': request.resolve(err(problem)); break
+      default: assertNever(request)
+    }
   }
   pending.clear()
   worker?.terminate()
   worker = null
 }
+
+const failAll = (detail: string) => stopAll({ kind: 'worker-protocol-failed', detail })
 
 const dataWorker = (): Worker => {
   if (worker) return worker
@@ -148,13 +169,26 @@ const dataWorker = (): Worker => {
       waiting.resolve(checked.ok ? checked : { ok: false, error: { kind: 'worker-protocol-failed', detail: checked.error.detail } })
       return
     }
+    if (waiting.kind === 'time-series-materialization') {
+      if (parsed.value.kind !== 'time-series-materialization-succeeded' && parsed.value.kind !== 'materialization-failed') {
+        failAll('The data worker returned another response for a time-series materialization request.')
+        return
+      }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'materialization-failed') { waiting.resolve({ ok: false, error: parsed.value.problem }); return }
+      const checked = validateTimeOrderedMatrixAgainstProfile(parsed.value.matrix, waiting.profile)
+      waiting.resolve(checked.ok ? checked : { ok: false, error: { kind: 'worker-protocol-failed', detail: checked.error.detail } })
+      return
+    }
     if (parsed.value.kind !== 'materialization-succeeded' && parsed.value.kind !== 'materialization-failed') {
       failAll('The data worker returned a profile response for a materialization request.')
       return
     }
     pending.delete(parsed.value.request)
     if (parsed.value.kind === 'materialization-failed') {
-      waiting.resolve({ ok: false, error: parsed.value.problem })
+      waiting.resolve(parsed.value.problem.kind === 'time-value-unparseable' || parsed.value.problem.kind === 'duplicate-time-value'
+        ? { ok: false, error: { kind: 'worker-protocol-failed', detail: 'The data worker returned a time-axis failure for a numeric materialization.' } }
+        : { ok: false, error: parsed.value.problem })
       return
     }
     const checked = validateNumericMatrixAgainstProfile(parsed.value.matrix, waiting.profile)
@@ -165,10 +199,7 @@ const dataWorker = (): Worker => {
   created.onerror = (event) => {
     event.preventDefault()
     const detail = event.message || 'The data worker stopped unexpectedly.'
-    for (const request of pending.values()) request.resolve(err({ kind: 'worker-unavailable', detail }))
-    pending.clear()
-    worker?.terminate()
-    worker = null
+    stopAll({ kind: 'worker-unavailable', detail })
   }
   worker = created
   return created
@@ -223,6 +254,25 @@ export function materializeNumericColumnsInWorker(
         kind: 'worker-unavailable',
         detail: cause instanceof Error ? cause.message : String(cause),
       }))
+    }
+  })
+}
+
+export function materializeTimeSeriesColumnsInWorker(
+  file: File,
+  profile: DatasetProfile,
+  timeColumn: ColumnId,
+  columnIds: NonEmptyArray<ColumnId>,
+): Promise<TimeSeriesMaterializationOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'time-series-materialization', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'materialize-time-series', request, file, profile, timeColumn, columnIds }
+    try {
+      dataWorker().postMessage(command)
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }
   })
 }

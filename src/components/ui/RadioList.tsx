@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { fieldLabel } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 
@@ -29,8 +29,22 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
   readonly columns?: 1 | 2
 }) {
   const name = useId()
+  const group = useRef<HTMLFieldSetElement | null>(null)
+
+  // Browsers move a radio group with the arrow keys but not with Home and End, which a list of six
+  // methods is long enough to want. Disabled options are skipped, as the arrow keys already skip them.
+  const jumpToEnd = useCallback((event: KeyboardEvent<HTMLFieldSetElement>) => {
+    if (event.key !== 'Home' && event.key !== 'End') return
+    const radios = [...(group.current?.querySelectorAll<HTMLInputElement>('input[type="radio"]:not(:disabled)') ?? [])]
+    const target = event.key === 'Home' ? radios[0] : radios.at(-1)
+    if (target === undefined) return
+    event.preventDefault()
+    target.focus()
+    if (!target.checked) onChange(target.value as V)
+  }, [onChange])
+
   return (
-    <fieldset className={cn('m-0 min-w-0 border-0 p-0', className)}>
+    <fieldset ref={group} role="radiogroup" onKeyDown={jumpToEnd} className={cn('m-0 min-w-0 border-0 p-0', className)}>
       <legend className={legendHidden ? 'sr-only' : fieldLabel}>{legend}</legend>
       <div className={cn('grid gap-1 rounded-lg border border-hair bg-well p-1', columns === 2 && '@3xl/panel:grid-cols-2', !legendHidden && 'mt-1')}>
         {options.map((option) => {

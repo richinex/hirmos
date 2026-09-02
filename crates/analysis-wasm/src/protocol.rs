@@ -136,6 +136,14 @@ pub(crate) enum IdentifiedDiscreteResult {
 )]
 pub(crate) enum AnalysisCommand {
     StationarityBattery,
+    PandasResampleDaily {
+        rows: usize,
+        columns: usize,
+        target: ResamplingTarget,
+        incomplete_bins: ResamplingIncompleteBins,
+        aggregations: Vec<ResamplingAggregation>,
+        imputed_cells: Vec<[usize; 2]>,
+    },
     PcmciPlus {
         rows: usize,
         columns: usize,
@@ -308,6 +316,7 @@ pub(crate) enum AnalysisCommand {
         columns: usize,
         period: Option<usize>,
         robust: bool,
+        correlation_max_lag: usize,
         pelt_min_size: usize,
         pelt_jump: usize,
         pelt_penalty: f64,
@@ -1017,6 +1026,16 @@ pub(crate) enum AnalysisResult {
         kpss: DeterministicEvidence<KpssEvidence>,
         zivot_andrews: BreakEvidence,
     },
+    PandasResampled {
+        values: Vec<f64>,
+        timestamps_ms: Vec<i64>,
+        imputed_cells: Vec<(usize, usize)>,
+        source_rows: usize,
+        output_rows: usize,
+        incomplete_bins: usize,
+        bins_dropped: usize,
+        source_rows_dropped: usize,
+    },
     PcmciPlus {
         observations: usize,
         variables: usize,
@@ -1478,6 +1497,32 @@ pub(crate) enum DmlModel {
 
 #[derive(Clone, Copy, Serialize, serde::Deserialize, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
+pub(crate) enum ResamplingTarget {
+    Weekly,
+    Monthly,
+}
+
+#[derive(Clone, Copy, Serialize, serde::Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ResamplingIncompleteBins {
+    Keep,
+    Drop,
+}
+
+#[derive(Clone, Copy, Serialize, serde::Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ResamplingAggregation {
+    Mean,
+    Sum,
+    Median,
+    Minimum,
+    Maximum,
+    First,
+    Last,
+}
+
+#[derive(Clone, Copy, Serialize, serde::Deserialize, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
 pub(crate) enum ArdlTrend {
     C,
     Ct,
@@ -1574,6 +1619,12 @@ pub(crate) struct DmlSensitivity {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SeasonalAdjustedColumn {
     pub(crate) column: usize,
+    pub(crate) observed: Vec<f64>,
+    pub(crate) trend: Vec<f64>,
+    pub(crate) seasonal: Vec<f64>,
+    pub(crate) remainder: Vec<f64>,
+    pub(crate) robust_weights: Vec<f64>,
+    pub(crate) trend_strength: f64,
     pub(crate) seasonal_strength_before: f64,
     pub(crate) seasonal_strength_after: f64,
 }
@@ -1584,6 +1635,11 @@ pub(crate) struct SeriesStructureEvidence {
     pub(crate) column: usize,
     pub(crate) trend_strength: Option<f64>,
     pub(crate) seasonal_strength: Option<f64>,
+    pub(crate) correlation_max_lag: usize,
+    pub(crate) acf: Vec<f64>,
+    pub(crate) acf_limits: Vec<f64>,
+    pub(crate) pacf: Vec<f64>,
+    pub(crate) pacf_limits: Vec<f64>,
     /// Segment ends as one-based row numbers, without the final row.
     pub(crate) change_points: Vec<usize>,
     pub(crate) pelt_penalty: f64,

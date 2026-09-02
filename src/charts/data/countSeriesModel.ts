@@ -14,7 +14,7 @@ export function countSeriesFitOption(view: {
     grid: gridAuto({ bottom: 44 }),
     legend: legend(theme, ['observed', 'fitted mean']),
     tooltip: { ...tooltip(theme, 'axis'), axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } } },
-    xAxis: { type: 'value', min: 1, max: Math.max(2, view.observed.length), minInterval: 1, name: 'reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme) },
+    xAxis: { type: 'value', min: 1, max: Math.max(2, view.observed.length), minInterval: 1, name: 'reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
     yAxis: { ...valueAxis(theme, 'count'), scale: true },
     series: [
       { type: 'line', name: 'observed', data: view.observed.map((value, index) => [index + 1, value]), symbol: 'none', lineStyle: { color: theme.ink, width: 1.1 }, markLine: { silent: true, symbol: 'none', label: { color: theme.muted, formatter: 'strongest scan date' }, lineStyle: { color: theme.signal, type: 'dashed', width: 1 }, data: [{ xAxis: view.strongestReferencePoint + 1 }] } },
@@ -40,7 +40,7 @@ export function interventionScoreOption(view: {
         return `reference point ${Number(data[0])}<br/>score statistic <strong>${formatStatistic('raw', Number(data[1])).text}</strong>`
       },
     },
-    xAxis: { type: 'value', minInterval: 1, name: 'candidate reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme) },
+    xAxis: { type: 'value', minInterval: 1, name: 'candidate reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
     yAxis: { ...valueAxis(theme, 'score statistic'), scale: true },
     series: [{ type: 'line', name: 'score statistic', data: view.candidates.map((candidate) => [candidate.referencePoint + 1, candidate.scoreStatistic]), symbol: 'circle', symbolSize: 3, lineStyle: { color: theme.ink, width: 1.2 }, itemStyle: { color: theme.ink }, markPoint: { symbolSize: 28, label: { color: theme.panel, fontFamily: theme.mono, fontSize: theme.labelSize, formatter: String(strongest.referencePoint + 1) }, itemStyle: { color: theme.signal }, data: [{ coord: [strongest.referencePoint + 1, strongest.scoreStatistic] }] } }],
   }

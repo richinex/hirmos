@@ -118,17 +118,24 @@ export const dmlRefutationEvidenceSchema = z.object({
 
 export type DmlRefutationEvidence = z.infer<typeof dmlRefutationEvidenceSchema>
 
+const seriesStructureColumnSchema = z.object({
+  column: z.number().int().nonnegative(),
+  trendStrength: z.number().min(0).max(1).nullable(),
+  seasonalStrength: z.number().min(0).max(1).nullable(),
+  correlationMaxLag: z.number().int().positive(),
+  acf: z.array(z.number().finite()).min(2),
+  acfLimits: z.array(z.number().finite().nonnegative()).min(2),
+  pacf: z.array(z.number().finite()).min(2),
+  pacfLimits: z.array(z.number().finite().nonnegative()).min(2),
+  changePoints: z.array(z.number().int().positive()),
+  peltPenalty: z.number().finite().nonnegative(),
+}).strict()
+
 export const seriesStructureEvidenceSchema = z.object({
   kind: z.literal('seriesStructure'),
   observations: z.number().int().positive(),
   period: z.number().int().min(2).nullable(),
-  series: z.array(z.object({
-    column: z.number().int().nonnegative(),
-    trendStrength: z.number().finite().nullable(),
-    seasonalStrength: z.number().finite().nullable(),
-    changePoints: z.array(z.number().int().positive()),
-    peltPenalty: z.number().finite().nonnegative(),
-  }).strict()),
+  series: z.tuple([seriesStructureColumnSchema]).rest(seriesStructureColumnSchema),
 }).strict()
 
 export type SeriesStructureEvidence = z.infer<typeof seriesStructureEvidenceSchema>
@@ -162,7 +169,24 @@ export function parseUnobservedConfoundingEvidence(value: unknown): Result<Unobs
   return parsed
 }
 
-export const parseSeriesStructureEvidence = (value: unknown): Result<SeriesStructureEvidence, SensitivityEvidenceProblem> => parseWith(seriesStructureEvidenceSchema, value)
+export function parseSeriesStructureEvidence(value: unknown): Result<SeriesStructureEvidence, SensitivityEvidenceProblem> {
+  const parsed = parseWith(seriesStructureEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (new Set(parsed.value.series.map(({ column }) => column)).size !== parsed.value.series.length) return err({ kind: 'invalid-sensitivity-evidence', detail: 'A time-series column appears more than once in the structure evidence.' })
+  for (const series of parsed.value.series) {
+    const expected = series.correlationMaxLag + 1
+    if ([series.acf, series.acfLimits, series.pacf, series.pacfLimits].some((values) => values.length !== expected)) {
+      return err({ kind: 'invalid-sensitivity-evidence', detail: 'The ACF, PACF, and confidence bands must contain lag zero through the requested maximum lag.' })
+    }
+    if (series.correlationMaxLag >= parsed.value.observations / 2) {
+      return err({ kind: 'invalid-sensitivity-evidence', detail: 'The maximum correlation lag must be below half the observation count.' })
+    }
+    if (series.changePoints.some((point, index, points) => point >= parsed.value.observations || (index > 0 && point <= points[index - 1]))) {
+      return err({ kind: 'invalid-sensitivity-evidence', detail: 'PELT change points must be strictly increasing and precede the final observation.' })
+    }
+  }
+  return parsed
+}
 
 /** A refuter's reading: what it should show if the estimate is real, and what it did show. */
 interface RefuterFactBase {

@@ -56,6 +56,21 @@ test('keeps null distinct from a real zero at the Arrow boundary', async ({ page
   await expect(preview.getByRole('cell', { name: '0', exact: true })).toBeVisible()
 })
 
+test('renders calendar dates as dates in the source preview', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Canonical preview runs once')
+  await createProject(page)
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'dated.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('date,x\n1958-03-29,1\n1958-04-05,2\n'),
+  })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+
+  const first = page.getByLabel('Preview').getByRole('row').nth(1)
+  await expect(first.getByRole('cell').nth(0)).toHaveText('1958-03-29 00:00:00', { timeout: 30_000 })
+  await expect(first).not.toContainText('-371174400000')
+})
+
 test('profiles the pinned Seatbelts Parquet through the same canonical worker', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Canonical Parquet boundary runs once')
   const externalRequests = new Set<string>()
@@ -208,8 +223,8 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method' })
   await expect(discoveryMethods.getByRole('radio')).toHaveCount(6)
   await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
-  await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toHaveAttribute('aria-disabled', 'true')
-  await expect(discoveryMethods.getByRole('radio', { name: /VAR-LiNGAM/ })).toHaveAttribute('aria-disabled', 'true')
+  await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toBeDisabled()
+  await expect(discoveryMethods.getByRole('radio', { name: /VAR-LiNGAM/ })).toBeDisabled()
   await page.getByRole('button', { name: 'Run DirectLiNGAM' }).click()
 
   await expect(page.getByLabel('DirectLiNGAM causal order')).toContainText('→', { timeout: 30_000 })
@@ -247,7 +262,6 @@ test('saves per-column time-series transformations and previews the materialized
   await expect(page.getByText('Prepared time series · 5 rows')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/x: first difference, y: linear detrend/)).toBeVisible()
 
-  await page.getByRole('button', { name: 'Preview prepared values' }).click()
   const plots = page.getByRole('list', { name: 'Prepared series plots' })
   await expect(plots.getByTestId('prepared-series')).toHaveCount(2, { timeout: 30_000 })
   await expect(plots).toContainText('x')
@@ -255,6 +269,75 @@ test('saves per-column time-series transformations and previews the materialized
   await expect(plots).toContainText('linear detrend')
   await expect(page.getByText('5 aligned rows')).toBeVisible()
   await expect(page.getByText('first source row removed for alignment')).toBeVisible()
+})
+
+test('shows the saved STL decomposition and ACF/PACF diagnostics', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Time-series visualization workflow runs once')
+  const errors: string[] = []
+  page.on('pageerror', (error) => errors.push(error.message))
+  await createProject(page)
+  const rows = Array.from({ length: 72 }, (_, index) => `${index + 1},${0.03 * index + 2 * Math.sin(index * Math.PI / 6) + 0.1 * Math.cos(index * 0.7)}`)
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'seasonal-series.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`time,x\n${rows.join('\n')}\n`),
+  })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await page.getByRole('radio', { name: 'Regular time series' }).click()
+  await choose(page.getByLabel('Time column'), { label: 'time' })
+  await page.getByRole('checkbox', { name: 'x', exact: true }).check()
+  await page.getByRole('checkbox', { name: /Remove the seasonal component/ }).check()
+  await page.getByRole('group', { name: 'Columns to adjust seasonally' }).getByRole('checkbox', { name: 'x', exact: true }).check()
+  await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
+
+  await expect(page.getByText('Prepared time series · 72 rows')).toBeVisible({ timeout: 30_000 })
+  const decomposition = page.getByTestId('stl-decomposition')
+  await expect(decomposition).toBeVisible({ timeout: 30_000 })
+  await expect(decomposition).toHaveAttribute('aria-description', /observed equals trend plus seasonal plus remainder/i)
+
+  await page.getByRole('radio', { name: /Breaks/ }).click()
+  await page.getByRole('button', { name: 'Analyse temporal structure' }).click()
+  const correlation = page.getByTestId('acf-pacf')
+  await expect(correlation).toBeVisible({ timeout: 30_000 })
+  await expect(correlation).toHaveAttribute('aria-description', /autocorrelation and partial autocorrelation from lag 0 through lag 35/i)
+  expect(errors).toEqual([])
+})
+
+test('explains the opposing stationarity null hypotheses and labels every critical value', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Stationarity presentation runs once')
+  await createProject(page)
+  const rows = Array.from({ length: 96 }, (_, index) => `${index + 1},${index + Math.sin(index / 4)}`)
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'stationarity-copy.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(`time,x\n${rows.join('\n')}\n`),
+  })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await page.getByRole('radio', { name: 'Regular time series' }).click()
+  await choose(page.getByLabel('Time column'), { label: 'time' })
+  await page.getByRole('checkbox', { name: 'x', exact: true }).check()
+  await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
+  await expect(page.getByText('Prepared time series · 96 rows')).toBeVisible({ timeout: 30_000 })
+
+  await expect(page.getByText(/ADF tests a unit root as its null; KPSS tests stationarity as its null/)).toBeVisible()
+  await expect(page.getByText(/prepared data are not changed unless first differencing is saved as a transformation/)).toBeVisible()
+  await page.getByRole('button', { name: 'Run stationarity tests' }).click()
+  await expect(page.getByText(/Stationarity tests · 1 variables · 96 rows/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('columnheader', { name: 'ADF p · constant' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'KPSS p · constant' })).toBeVisible()
+  await expect(page.getByText(/ADF · constant · prepared values: p/)).toBeVisible()
+  await page.getByText('x · test statistics', { exact: true }).click()
+
+  const rawEvidence = page.getByRole('region', { name: 'Stationarity raw evidence' })
+  const adf = rawEvidence.getByRole('row').filter({ hasText: 'ADF · constant' }).first()
+  const kpss = rawEvidence.getByRole('row').filter({ hasText: 'KPSS · constant' }).first()
+  await expect(adf).toContainText('1%:')
+  await expect(adf).toContainText('5%:')
+  await expect(adf).toContainText('10%:')
+  await expect(kpss).toContainText('10%:')
+  await expect(kpss).toContainText('5%:')
+  await expect(kpss).toContainText('2.5%:')
+  await expect(kpss).toContainText('1%:')
 })
 
 test('keeps the current chapter visible until a cold lazy chapter is ready', async ({ page }, testInfo) => {

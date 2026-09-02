@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { EChart } from '@/charts/EChart'
 import { seriesOverviewOption } from '@/charts/data/seriesOverview'
 import { useChartTheme } from '@/charts/theme'
-import { label, num } from '@/components/ui/recipes'
+import { caption, num } from '@/components/ui/recipes'
 import type { PhysicalColumnProfile } from '@/domain/dataset'
 import { formatCount } from '@/lib/format/number'
 import type { ColumnDescription } from './useColumnProfile'
@@ -29,7 +29,7 @@ export function ColumnSeriesPane({ column, description, stepLabel }: {
   return (
     <div className="flex h-full flex-col px-3 py-2">
       <div className="flex items-baseline justify-between gap-3">
-        <p className={label('m-0 text-faint')}>{column.name} by {stepLabel}</p>
+        <p className={caption('m-0')}>{column.name} by {stepLabel}</p>
         <p className={num('m-0 text-label text-faint')}>{formatCount(series.values.length, { noun: `${stepLabel}s` }).text}{series.missingCells > 0 ? ` · ${formatCount(series.missingCells).text} missing` : ''}</p>
       </div>
       <EChart option={option} label={`${column.name} in ${stepLabel} order`} className="min-h-[160px] flex-1" testId="column-series" />

@@ -1,14 +1,18 @@
-import type { ColumnId, DatasetProfile, NumericColumnSelection } from '@/domain/dataset'
-import { assertNever, err, ok, type NonEmptyArray, type Result } from '@/domain/dop'
+import type { ColumnId, DatasetProfile, NullableNumericMatrix, NumericColumnSelection, TimeAxis, TimeOrderedNumericMatrix } from '@/domain/dataset'
+import { assertNever, err, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { resolutionCommandFor } from '@/domain/missingness'
 import {
   seriesTransformFor,
   transformSeries,
   transformWarmup,
   type ColumnSeriesTransform,
+  type DenseReadyMissingness,
   type PreparedDatasetArtifact,
 } from '@/domain/preprocessing'
+import { aggregationsForColumns, describeResamplingProblem, resampledMatrixFromEvidence, sameResamplingRecord } from '@/domain/resampling'
+import type { MissingnessResolutionRecord } from '@/domain/missingness'
 import type { SelectedSource } from '@/domain/workflow'
+import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
 
 /** A dense column-major matrix over the prepared version's retained rows. */
 export interface PreparedMatrix {
@@ -19,6 +23,8 @@ export interface PreparedMatrix {
   readonly imputedCells: readonly (readonly [number, number])[]
   /** Leading resolved rows excluded to align columns after their recorded transformations. */
   readonly leadingRowsRemoved: number
+  /** Parsed temporal order for a regular series; absent for cross-sections and panels. */
+  readonly timeAxis: TimeAxis | null
 }
 
 export type PreparedMaterialisationProblem =
@@ -26,6 +32,8 @@ export type PreparedMaterialisationProblem =
   | { readonly kind: 'seasonal-adjustment-refused'; readonly detail: string }
   | { readonly kind: 'missing-values-remain'; readonly cells: number }
   | { readonly kind: 'resolution-refused'; readonly detail: string }
+  | { readonly kind: 'resampling-refused'; readonly detail: string }
+  | { readonly kind: 'resolution-record-mismatch' }
   | { readonly kind: 'column-outside-prepared'; readonly column: ColumnId }
 
 /** Unpack the bit-packed validity into one byte per cell, column-major like the values. */
@@ -53,8 +61,12 @@ export async function materialisePrepared(
 /** The pipeline's intermediate matrices, for before-and-after inspection of the recipe. */
 export interface PreparedStageMatrices {
   readonly resolved: PreparedMatrix
+  /** After the recorded calendar aggregation; null when the version keeps its source frequency. */
+  readonly resampled: PreparedMatrix | null
   /** After the recorded STL adjustment; null when no requested column is adjusted. */
   readonly adjusted: PreparedMatrix | null
+  /** STL components for the adjusted columns; null when this materialisation did not run STL. */
+  readonly stl: SeasonalAdjustedEvidence | null
   readonly final: PreparedMatrix
 }
 
@@ -66,21 +78,36 @@ export async function materialisePreparedStages(
 ): Promise<Result<PreparedStageMatrices, PreparedMaterialisationProblem>> {
   const resolved = await materialiseResolved(source, profile, prepared, columnIds)
   if (!resolved.ok) return resolved
+  let resampled: PreparedMatrix | null = null
+  if (prepared.kind === 'prepared-time-series' && prepared.resampling.kind === 'daily-downsample') {
+    if (resolved.value.timeAxis?.kind !== 'calendar') return err({ kind: 'resampling-refused', detail: 'Calendar resampling requires a date or timestamp column; an ordinal time key only defines row order.' })
+    const input = { ...resolved.value, timestamps: resolved.value.timeAxis.timestamps }
+    const aggregations = aggregationsForColumns(resolved.value.columns, prepared.resampling)
+    if (!aggregations.ok) return err({ kind: 'resampling-refused', detail: describeResamplingProblem(aggregations.error) })
+    const { runPandasResampling } = await import('@/analysis/client')
+    const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, prepared.resampling.targetFrequency, prepared.resampling.incompleteBins, aggregations.value, input.imputedCells)
+    if (!evidence.ok) return err({ kind: 'resampling-refused', detail: evidence.error.detail })
+    const result = resampledMatrixFromEvidence(input, prepared.resampling, evidence.value)
+    if (!result.ok) return err({ kind: 'resampling-refused', detail: describeResamplingProblem(result.error) })
+    if (!sameResamplingRecord(result.value.record, prepared.resampling)) return err({ kind: 'resolution-record-mismatch' })
+    resampled = { ...result.value, leadingRowsRemoved: resolved.value.leadingRowsRemoved, timeAxis: { kind: 'calendar', timestamps: result.value.timestamps } }
+  }
   let adjusted: PreparedMatrix | null = null
+  let stl: SeasonalAdjustedEvidence | null = null
   if (prepared.seasonalAdjustment.kind === 'stl') {
-    const matrix = resolved.value
+    const matrix = resampled ?? resolved.value
     const adjust = matrix.columns.flatMap((column, index) => (prepared.seasonalAdjustment.kind === 'stl' && prepared.seasonalAdjustment.columns.includes(column.id) ? [index] : []))
     if (adjust.length > 0) {
       const { seasonalAdjustInWorker } = await import('@/analysis/client')
       const result = await seasonalAdjustInWorker(matrix.values, matrix.rowCount, matrix.columns.length, { period: prepared.seasonalAdjustment.period, robust: prepared.seasonalAdjustment.robust, adjust })
       if (!result.ok) return err({ kind: 'seasonal-adjustment-refused', detail: result.error.detail })
+      stl = result.value
       adjusted = { ...matrix, values: Float64Array.from(result.value.values) }
     }
   }
-  const final = prepared.kind === 'prepared-time-series'
-    ? applySeriesTransforms(adjusted ?? resolved.value, prepared.seriesTransforms)
-    : adjusted ?? resolved.value
-  return ok({ resolved: resolved.value, adjusted, final })
+  const base = adjusted ?? resampled ?? resolved.value
+  const final = prepared.kind === 'prepared-time-series' ? applySeriesTransforms(base, prepared.seriesTransforms) : base
+  return ok({ resolved: resolved.value, resampled, adjusted, stl, final })
 }
 
 /**
@@ -114,7 +141,18 @@ export function applySeriesTransforms(
     }
   }
 
-  return { ...matrix, values, rowCount: outputRows, imputedCells, leadingRowsRemoved: matrix.leadingRowsRemoved + leadingRowsRemoved }
+  return {
+    ...matrix,
+    values,
+    rowCount: outputRows,
+    imputedCells,
+    leadingRowsRemoved: matrix.leadingRowsRemoved + leadingRowsRemoved,
+    timeAxis: matrix.timeAxis === null
+      ? null
+      : matrix.timeAxis.kind === 'calendar'
+        ? { kind: 'calendar', timestamps: matrix.timeAxis.timestamps.slice(leadingRowsRemoved) }
+        : { kind: 'ordinal', values: matrix.timeAxis.values.slice(leadingRowsRemoved) },
+  }
 }
 
 /** The retained rows with the missingness resolution applied and nothing else. */
@@ -127,44 +165,109 @@ async function materialiseResolved(
   for (const column of columnIds) {
     if (!prepared.columns.includes(column)) return err({ kind: 'column-outside-prepared', column })
   }
-  const { materializeNumericColumnsInWorker } = await import('./client')
-  const matrix = await materializeNumericColumnsInWorker(source.file, profile, columnIds)
+  const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('./client')
+  const matrix = prepared.kind === 'prepared-time-series'
+    ? await materializeTimeSeriesColumnsInWorker(source.file, profile, prepared.sampling.timeColumn, prepared.columns)
+    : await materializeNumericColumnsInWorker(source.file, profile, prepared.columns)
   if (!matrix.ok) return err({ kind: 'materialization-refused', detail: matrix.error.kind })
-  const { values, validity, rowCount, columns, missingCells } = matrix.value
-  const record = prepared.resolution
-  switch (record.kind) {
-    case 'none':
-      return missingCells > 0 ? err({ kind: 'missing-values-remain', cells: missingCells }) : ok({ values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0 })
-    case 'window': {
-      const rows = record.endExclusive - record.start
-      const sliced = new Float64Array(rows * columns.length)
-      let missing = 0
-      columns.forEach((_, columnIndex) => {
-        for (let row = 0; row < rows; row += 1) {
-          const sourceIndex = columnIndex * rowCount + record.start + row
-          const valid = (validity[sourceIndex >> 3] >> (sourceIndex & 7)) & 1
-          if (valid === 0) missing += 1
-          sliced[columnIndex * rows + row] = values[sourceIndex]
-        }
-      })
-      return missing > 0 ? err({ kind: 'missing-values-remain', cells: missing }) : ok({ values: sliced, rowCount: rows, columns, imputedCells: [], leadingRowsRemoved: 0 })
-    }
-    case 'imputed': {
-      if (missingCells === 0) return ok({ values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0 })
-      const command = resolutionCommandFor(prepared.missingness)
-      if (command === null || command.kind !== 'imputation') return err({ kind: 'resolution-refused', detail: 'The prepared version records an imputation its policy does not describe.' })
-      const { resolveMissingnessInWorker } = await import('@/analysis/client')
-      const resolved = await resolveMissingnessInWorker(values, rowCount, columns.length, unpackValidity(validity, rowCount * columns.length), command)
-      if (!resolved.ok) return err({ kind: 'resolution-refused', detail: resolved.error.detail })
-      if (resolved.value.outcome.kind === 'refused') {
-        const { describeMissingnessRefusal } = await import('@/domain/missingness')
-        return err({ kind: 'resolution-refused', detail: resolved.value.outcome.reasons.map(describeMissingnessRefusal).join(' ') })
-      }
-      return ok({ values: Float64Array.from(resolved.value.outcome.values), rowCount, columns, imputedCells: resolved.value.outcome.imputedCells, leadingRowsRemoved: 0 })
-    }
-    default:
-      return assertNever(record)
+  const resolved = await resolveNullableInput(matrix.value, prepared.missingness)
+  if (!resolved.ok) return resolved
+  if (!sameResolution(resolved.value.resolution, prepared.resolution)) return err({ kind: 'resolution-record-mismatch' })
+  return ok(selectColumns(resolved.value.matrix, columnIds))
+}
+
+const sameResolution = (left: MissingnessResolutionRecord, right: MissingnessResolutionRecord): boolean => {
+  if (left.kind !== right.kind) return false
+  switch (left.kind) {
+    case 'none': return true
+    case 'window': return right.kind === 'window' && left.start === right.start && left.endExclusive === right.endExclusive && left.sourceRows === right.sourceRows
+    case 'imputed': return right.kind === 'imputed' && left.method === right.method && left.maxGap === right.maxGap && left.cells === right.cells
+    default: return assertNever(left)
   }
+}
+
+const selectColumns = (matrix: PreparedMatrix, ids: NonEmptyArray<ColumnId>): PreparedMatrix => {
+  const rows = matrix.rowCount
+  const columns = mapNonEmpty(ids, (id) => {
+    const column = matrix.columns.find((candidate) => candidate.id === id)
+    if (column === undefined) throw new Error(`Prepared column ${id} is absent after resolution.`)
+    return column
+  })
+  const values = new Float64Array(rows * columns.length)
+  const imputedCells: (readonly [number, number])[] = []
+
+  columns.forEach((column, target) => {
+    const source = matrix.columns.findIndex((candidate) => candidate.id === column.id)
+    values.set(matrix.values.subarray(source * rows, (source + 1) * rows), target * rows)
+    for (const [row, index] of matrix.imputedCells) if (index === source) imputedCells.push([row, target])
+  })
+
+  return { ...matrix, values, columns, imputedCells }
+}
+
+export interface ResolvedPreparedInput {
+  readonly matrix: PreparedMatrix
+  readonly resolution: MissingnessResolutionRecord
+}
+
+/** Apply one missingness policy to either ordinary numeric rows or a chronologically sorted series. */
+export async function resolveNullableInput(
+  input: NullableNumericMatrix | TimeOrderedNumericMatrix,
+  missingness: DenseReadyMissingness,
+): Promise<Result<ResolvedPreparedInput, PreparedMaterialisationProblem>> {
+  const { values, validity, rowCount, columns, missingCells } = input
+  const timeAxis = input.kind === 'time-ordered-numeric-matrix' ? input.timeAxis : null
+  const command = resolutionCommandFor(missingness)
+  if (missingCells > 0 && command === null) return err({ kind: 'missing-values-remain', cells: missingCells })
+  if (command === null) return ok({
+    matrix: { values, rowCount, columns, imputedCells: [], leadingRowsRemoved: 0, timeAxis },
+    resolution: { kind: 'none' },
+  })
+
+  const { resolveMissingnessInWorker } = await import('@/analysis/client')
+  const resolved = await resolveMissingnessInWorker(values, rowCount, columns.length, unpackValidity(validity, rowCount * columns.length), command)
+  if (!resolved.ok) return err({ kind: 'resolution-refused', detail: resolved.error.detail })
+  const outcome = resolved.value.outcome
+  if (outcome.kind === 'refused') {
+    const { describeMissingnessRefusal } = await import('@/domain/missingness')
+    return err({ kind: 'resolution-refused', detail: outcome.reasons.map(describeMissingnessRefusal).join(' ') })
+  }
+
+  if (command.kind === 'completeInterval') {
+    const rows = outcome.windowEnd - outcome.windowStart
+    const sliced = new Float64Array(rows * columns.length)
+    columns.forEach((_, column) => {
+      const start = column * rowCount + outcome.windowStart
+      sliced.set(values.subarray(start, start + rows), column * rows)
+    })
+    return ok({
+      matrix: {
+        values: sliced,
+        rowCount: rows,
+        columns,
+        imputedCells: [],
+        leadingRowsRemoved: 0,
+        timeAxis: timeAxis === null
+          ? null
+          : timeAxis.kind === 'calendar'
+            ? { kind: 'calendar', timestamps: timeAxis.timestamps.slice(outcome.windowStart, outcome.windowEnd) }
+            : { kind: 'ordinal', values: timeAxis.values.slice(outcome.windowStart, outcome.windowEnd) },
+      },
+      resolution: { kind: 'window', start: outcome.windowStart, endExclusive: outcome.windowEnd, sourceRows: rowCount },
+    })
+  }
+
+  return ok({
+    matrix: {
+      values: Float64Array.from(outcome.values),
+      rowCount,
+      columns,
+      imputedCells: outcome.imputedCells,
+      leadingRowsRemoved: 0,
+      timeAxis,
+    },
+    resolution: { kind: 'imputed', method: command.method, maxGap: command.maxGap, cells: outcome.imputedCells.length },
+  })
 }
 
 export function describePreparedMaterialisationProblem(problem: PreparedMaterialisationProblem): string {
@@ -173,6 +276,8 @@ export function describePreparedMaterialisationProblem(problem: PreparedMaterial
     case 'seasonal-adjustment-refused': return `The recorded seasonal adjustment could not be applied: ${problem.detail}`
     case 'missing-values-remain': return `${problem.cells} values are missing. Choose a missing-value policy in Data studio.`
     case 'resolution-refused': return `The recorded missingness resolution could not be applied: ${problem.detail}`
+    case 'resampling-refused': return `The recorded resampling could not be applied: ${problem.detail}`
+    case 'resolution-record-mismatch': return 'The source no longer reproduces the saved preparation record. Recreate the prepared dataset version.'
     case 'column-outside-prepared': return 'A requested column is not part of the prepared dataset version. Select another column.'
     default: return assertNever(problem)
   }

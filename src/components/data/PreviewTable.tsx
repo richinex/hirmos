@@ -132,7 +132,7 @@ function FilterEditor({ draft, onChange, onApply, onCancel }: {
       onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onCancel() } }}
     >
       <div className="flex flex-wrap items-end gap-3">
-        <span className={label('text-muted')}>Filter {draft.column.name}</span>
+        <span className={label('text-muted')}>Filter <span className="normal-case tracking-normal">{draft.column.name}</span></span>
         {numeric && (
           <>
             <label className="text-body text-ink">Min<input type="number" step="any" className={field('text', 'mt-1 w-32')} value={draft.min} placeholder={draft.summary?.min ?? ''} onChange={(event) => onChange({ ...draft, min: event.target.value })} /></label>
@@ -238,6 +238,7 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
 
   return (
     <TableShell
+      collapsible
       title="Preview"
       titleId={titleId}
       scrollRef={scrollRef}
@@ -321,7 +322,7 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
                       aria-pressed={selected}
                       onClick={() => onSelectColumn(column.id)}
                       title={`Profile ${column.name}`}
-                      className={cn(label('min-w-0 flex-1 truncate font-normal'), numeric ? 'text-right' : 'text-left', selected ? 'text-ink' : 'hover:text-ink')}
+                      className={cn('min-w-0 flex-1 truncate text-label font-medium', numeric ? 'text-right' : 'text-left', selected ? 'text-ink' : 'hover:text-ink')}
                     >
                       {column.name}
                     </button>

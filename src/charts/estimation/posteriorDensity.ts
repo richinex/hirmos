@@ -42,6 +42,7 @@ export function posteriorDensityOption(view: PosteriorDensityView, theme: ChartT
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
       axisLabel: axisLabelStyle(theme),
+      splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme, 'density'), scale: false },
     series: [

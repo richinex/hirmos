@@ -24,17 +24,25 @@ export const seasonalPeriodOf = (frequency: Frequency): number | null => {
   }
 }
 
+const stlComponentSchema = z.object({
+  column: z.number().int().nonnegative(),
+  observed: z.array(z.number().finite()),
+  trend: z.array(z.number().finite()),
+  seasonal: z.array(z.number().finite()),
+  remainder: z.array(z.number().finite()),
+  robustWeights: z.array(z.number().min(0).max(1)),
+  trendStrength: z.number().min(0).max(1),
+  seasonalStrengthBefore: z.number().min(0).max(1),
+  seasonalStrengthAfter: z.number().min(0).max(1),
+}).strict()
+
 export const seasonalAdjustedEvidenceSchema = z.object({
   kind: z.literal('seasonalAdjusted'),
   rows: z.number().int().positive(),
   columns: z.number().int().positive(),
   period: z.number().int().min(2),
   values: z.array(z.number().finite()),
-  adjusted: z.array(z.object({
-    column: z.number().int().nonnegative(),
-    seasonalStrengthBefore: z.number().finite(),
-    seasonalStrengthAfter: z.number().finite(),
-  }).strict()),
+  adjusted: z.tuple([stlComponentSchema]).rest(stlComponentSchema),
 }).strict()
 
 export type SeasonalAdjustedEvidence = z.infer<typeof seasonalAdjustedEvidenceSchema>
@@ -44,7 +52,21 @@ export type SeasonalAdjustedEvidenceProblem = { readonly kind: 'invalid-seasonal
 export function parseSeasonalAdjustedEvidence(value: unknown): Result<SeasonalAdjustedEvidence, SeasonalAdjustedEvidenceProblem> {
   const parsed = seasonalAdjustedEvidenceSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: z.prettifyError(parsed.error) })
-  if (parsed.data.values.length !== parsed.data.rows * parsed.data.columns) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'The adjusted matrix does not match rows by columns.' })
+  const { adjusted, columns, rows, values } = parsed.data
+  if (values.length !== rows * columns) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'The adjusted matrix does not match rows by columns.' })
+  if (adjusted.some(({ column }) => column >= columns)) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'An STL component names a column outside the adjusted matrix.' })
+  if (new Set(adjusted.map(({ column }) => column)).size !== adjusted.length) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'An adjusted column appears more than once.' })
+  if (adjusted.some(({ observed, trend, seasonal, remainder, robustWeights }) => [observed, trend, seasonal, remainder, robustWeights].some((component) => component.length !== rows))) {
+    return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'Each STL component must contain one value per adjusted row.' })
+  }
+  for (const component of adjusted) {
+    for (let row = 0; row < rows; row += 1) {
+      const scale = 1 + Math.abs(component.observed[row])
+      const reconstruction = component.trend[row] + component.seasonal[row] + component.remainder[row]
+      if (Math.abs(component.observed[row] - reconstruction) > 1e-10 * scale) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'The STL components do not reconstruct the observed series.' })
+      if (Math.abs(values[component.column * rows + row] - (component.observed[row] - component.seasonal[row])) > 1e-10 * scale) return err({ kind: 'invalid-seasonal-adjusted-evidence', detail: 'The adjusted matrix does not equal the observed series minus its seasonal component.' })
+    }
+  }
   return ok(parsed.data)
 }
 

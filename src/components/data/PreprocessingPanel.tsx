@@ -12,7 +12,7 @@ import { CountSeriesCard } from './CountSeriesCard'
 import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
-import { describeMissingnessRefusal, describeResolutionRecord, resolutionCommandFor, type MissingnessResolutionRecord } from '@/domain/missingness'
+import { describeResolutionRecord, type MissingnessResolutionRecord } from '@/domain/missingness'
 import { button, field, fieldLabel, label, num, table, td, th, tr } from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
@@ -22,6 +22,7 @@ import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
 import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
   describeSeriesTransform,
+  describeReadinessProblem,
   initialPreprocessingDraft,
   newPreparedDatasetVersionId,
   newStationarityEvidenceId,
@@ -39,11 +40,21 @@ import {
   type StationarityEvidenceArtifact,
   type VariableStationarityEvidence,
 } from '@/domain/preprocessing'
-import { assessStationarity, decisiveEvidence, describeStationarityAssessment, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
+import { assessStationarity, decisiveEvidence, describeStationarityAssessment, describeStationarityConflict, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
 import { describeSeasonalAdjustment, seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatP, formatStatistic } from '@/lib/format/number'
 import type { PanelStructureEvidence } from '@/domain/panel'
+import {
+  aggregationFor,
+  aggregationsForColumns,
+  describeResampling,
+  describeResamplingProblem,
+  effectiveFrequency,
+  resampledMatrixFromEvidence,
+  type ResamplingAggregation,
+  type ResamplingRecord,
+} from '@/domain/resampling'
 
 interface PreprocessingPanelProps {
   readonly source: SelectedSource
@@ -87,6 +98,16 @@ const TRANSFORMS: readonly { readonly value: SeriesTransform; readonly label: st
   { value: { kind: 'linear-detrend' }, label: 'Linear detrend', detail: 'Subtract a fitted intercept and linear time trend; use deviations from that trend.' },
 ]
 
+const RESAMPLING_AGGREGATIONS: readonly { readonly value: ResamplingAggregation; readonly label: string }[] = [
+  { value: 'mean', label: 'Mean' },
+  { value: 'sum', label: 'Sum' },
+  { value: 'median', label: 'Median' },
+  { value: 'minimum', label: 'Minimum' },
+  { value: 'maximum', label: 'Maximum' },
+  { value: 'first', label: 'First value' },
+  { value: 'last', label: 'Last value' },
+]
+
 type MissingnessChoiceKind = 'unresolved' | 'lag-aware-exclusion' | 'complete-interval' | 'imputation'
 type LagAwareExclusionDraft = Extract<MissingnessDraft, { readonly kind: 'lag-aware-exclusion' }>
 
@@ -99,15 +120,34 @@ const MISSINGNESS_CHOICES: readonly MissingnessChoiceKind[] = [
 
 const TONE_CLASS = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' } as const
 
-const ruleLabel = (ref: StationarityTestRef): string => `${ref.test === 'zivot-andrews' ? 'ZA' : ref.test.toUpperCase()} ${ref.specification}${ref.series === 'first-difference' ? ' Δ' : ''} ${pValue(ref.pValue)}`
+const specificationName = (specification: StationarityTestRef['specification']): string => {
+  switch (specification) {
+    case 'c': return 'constant'
+    case 'ct': return 'constant and trend'
+    case 'level': return 'level break'
+    case 'trend': return 'trend break'
+    case 'levelAndTrend': return 'level and trend break'
+    default: return assertNever(specification)
+  }
+}
+
+const ruleLabel = (ref: StationarityTestRef): string => {
+  const test = ref.test === 'zivot-andrews' ? 'Zivot–Andrews' : ref.test.toUpperCase()
+  const scale = ref.series === 'first-difference' ? 'first difference' : 'prepared values'
+  return `${test} · ${specificationName(ref.specification)} · ${scale}: p ${pValue(ref.pValue)}`
+}
 
 /** The interpreted route for one series with the tests that decided it. */
 function StationarityVerdict({ assessment }: { readonly assessment: StationarityAssessment }) {
   const described = describeStationarityAssessment(assessment)
   const decisive = decisiveEvidence(assessment)
+  // An inconclusive verdict is only actionable with the disagreement that produced it: which
+  // specification the two tests fell out over, and which way each of them went.
+  const conflicts = assessment.kind === 'inconclusive' ? assessment.conflicts.map(describeStationarityConflict) : []
   return (
     <div className="min-w-[14rem]" aria-label={`Verdict for ${described.verdict}`}>
       <span className={`text-body font-medium ${TONE_CLASS[described.tone]}`}>{described.verdict}</span>
+      {conflicts.map((conflict) => <span key={conflict} className="block text-label text-warn">{conflict}</span>)}
       <span className="block text-label text-faint">{described.route}</span>
       <span className={num('block text-micro text-faint')}>{decisive.map(ruleLabel).join(' · ')}</span>
     </div>
@@ -147,7 +187,7 @@ interface TestStatisticRow {
   readonly statistic: number
   readonly p: number
   readonly fit: string
-  readonly critical: readonly number[]
+  readonly critical: readonly { readonly level: string; readonly value: number }[]
 }
 
 const statisticHelper = createColumnHelper<TestStatisticRow>()
@@ -157,7 +197,7 @@ const statisticColumns = [
   statisticHelper.accessor('statistic', { header: 'Statistic', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span> }),
   statisticHelper.accessor('p', { header: 'p-value', meta: { align: 'right' }, cell: (context) => <span className="text-muted">{rawNumber(context.getValue())}</span> }),
   statisticHelper.accessor('fit', { header: 'Fit', cell: (context) => <span className="text-muted">{context.getValue()}</span> }),
-  statisticHelper.accessor('critical', { header: 'Critical values · reference order', enableSorting: false, cell: (context) => <span className="text-muted">{criticalValues(context.getValue())}</span> }),
+  statisticHelper.accessor('critical', { header: 'Critical values', enableSorting: false, cell: (context) => <span className="text-muted">{criticalValues(context.getValue())}</span> }),
 ]
 
 function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestStatisticRow[]; readonly density: Parameters<typeof cellPadding>[0] }) {
@@ -207,13 +247,23 @@ function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestSt
 }
 
 const rawNumber = (value: number): string => formatStatistic('raw', value).text
-const criticalValues = (values: readonly number[]): string => values.map(rawNumber).join(' · ')
+const criticalValues = (values: readonly { readonly level: string; readonly value: number }[]): string =>
+  values.map(({ level, value }) => `${level}: ${rawNumber(value)}`).join(' · ')
+
+const labelledCriticalValues = (
+  test: 'adf' | 'kpss' | 'zivot-andrews',
+  values: readonly number[],
+): readonly { readonly level: string; readonly value: number }[] => {
+  const levels = test === 'kpss' ? ['10%', '5%', '2.5%', '1%'] : ['1%', '5%', '10%']
+  return values.map((value, index) => ({ level: levels[index] ?? '?', value }))
+}
 
 function preparedArtifact(
   recipe: ReadyPreprocessingRecipe,
   profile: DatasetProfile,
   observations: number,
   resolution: MissingnessResolutionRecord,
+  resampling: ResamplingRecord,
   panel: PanelStructureEvidence | null,
 ): Result<PreparedDatasetArtifact, { readonly kind: 'panel-evidence-missing' }> {
   const identity = {
@@ -229,7 +279,8 @@ function preparedArtifact(
     case 'regular-series': return ok({
       ...identity,
       kind: 'prepared-time-series',
-      sampling: recipe.sampling,
+      sampling: { ...recipe.sampling, frequency: effectiveFrequency(recipe.sampling.frequency, recipe.resampling) },
+      resampling,
       seasonalAdjustment: recipe.seasonalAdjustment,
       seriesTransforms: recipe.seriesTransforms,
     })
@@ -269,7 +320,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const currentFrequency = timeSeriesSelected || panelSelected ? draft.sampling.frequency : 'monthly'
   const currentTime = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.timeColumn ?? '' : ''
   const currentUnit = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.unitColumn ?? '' : ''
-  const seasonalPeriod = timeSeriesSelected ? seasonalPeriodOf(draft.sampling.frequency) : null
+  const outputFrequency = timeSeriesSelected ? effectiveFrequency(draft.sampling.frequency, draft.resampling) : null
+  const seasonalPeriod = outputFrequency === null ? null : seasonalPeriodOf(outputFrequency)
   const lagExclusion = draft.missingness.kind === 'lag-aware-exclusion' ? draft.missingness : null
   const columnName = (column: ColumnId): string => profile.columns.find((candidate) => candidate.id === column)?.name ?? column
   const missingnessChoices = crossSectionSelected
@@ -293,49 +345,45 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         if (panelStructure.duplicateKeys > 0) { dispatch({ type: 'preparation-failed', detail: `${panelStructure.duplicateKeys} unit–time keys repeat. Remove the duplicate rows.` }); return }
         if (!panelStructure.balanced) { dispatch({ type: 'preparation-failed', detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. Complete every unit–period cell.` }); return }
       }
-      const { materializeNumericColumnsInWorker } = await import('@/data/client')
-      const matrix = await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
+      const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('@/data/client')
+      const matrix = recipe.value.kind === 'regular-series'
+        ? await materializeTimeSeriesColumnsInWorker(source.file, profile, recipe.value.sampling.timeColumn, recipe.value.columns)
+        : await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
       if (!matrix.ok) {
-        dispatch({ type: 'preparation-failed', detail: 'The selected numeric columns could not be read. Check their types and missing-value settings.' })
-        return
-      }
-      const command = resolutionCommandFor(recipe.value.missingness)
-      let resolution: MissingnessResolutionRecord = { kind: 'none' }
-      let observations = matrix.value.rowCount
-      if (matrix.value.missingCells > 0 && command === null) {
-        dispatch({ type: 'preparation-failed', detail: 'Missing values remain in the selected columns. Choose a missing-value policy.' })
+        const detail = matrix.error.kind === 'time-value-unparseable'
+          ? `${matrix.error.name} contains an unparseable time at sorted row ${matrix.error.row + 1}.`
+          : matrix.error.kind === 'duplicate-time-value'
+            ? `${matrix.error.name} repeats at sorted row ${matrix.error.row + 1}. A regular time series needs one row per time point.`
+            : 'The selected columns could not be read. Check their types and missing-value settings.'
+        dispatch({ type: 'preparation-failed', detail })
         return
       }
       if (recipe.value.kind === 'regular-panel' && matrix.value.missingCells > 0) {
         dispatch({ type: 'preparation-failed', detail: 'Complete the missing values separately within each unit, then import the balanced panel again.' })
         return
       }
-      if (command !== null) {
-        const { resolveMissingnessInWorker } = await import('@/analysis/client')
-        const cells = matrix.value.rowCount * matrix.value.columns.length
-        const validity = new Uint8Array(cells)
-        for (let index = 0; index < cells; index += 1) validity[index] = (matrix.value.validity[index >> 3] >> (index & 7)) & 1
-        const resolved = await resolveMissingnessInWorker(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, validity, command)
-        if (!resolved.ok) {
-          dispatch({ type: 'preparation-failed', detail: resolved.error.detail })
-          return
-        }
-        const outcome = resolved.value.outcome
-        if (outcome.kind === 'refused') {
-          const reasons = outcome.reasons.map(describeMissingnessRefusal).join(' ')
-          const runs = outcome.unresolvedRuns.slice(0, 4).map((run) => `${matrix.value.columns[run.column]?.name ?? run.column} rows ${run.start + 1} to ${run.end}`).join('; ')
-          dispatch({ type: 'preparation-failed', detail: `${reasons}${runs.length > 0 ? ` (${runs}${outcome.unresolvedRuns.length > 4 ? '; …' : ''})` : ''} Raise the gap limit, choose another policy, or keep the complete interval.` })
-          return
-        }
-        if (command.kind === 'completeInterval') {
-          resolution = { kind: 'window', start: outcome.windowStart, endExclusive: outcome.windowEnd, sourceRows: matrix.value.rowCount }
-          observations = outcome.windowEnd - outcome.windowStart
-        } else {
-          resolution = { kind: 'imputed', method: command.method, maxGap: command.maxGap, cells: outcome.imputedCells.length }
-        }
-      }
+
+      const { describePreparedMaterialisationProblem, resolveNullableInput } = await import('@/data/prepared')
+      const resolved = await resolveNullableInput(matrix.value, recipe.value.missingness)
+      if (!resolved.ok) { dispatch({ type: 'preparation-failed', detail: describePreparedMaterialisationProblem(resolved.error) }); return }
+      let observations = resolved.value.matrix.rowCount
+      let resampling: ResamplingRecord = { kind: 'none' }
 
       if (recipe.value.kind === 'regular-series') {
+        if (recipe.value.resampling.kind === 'daily-downsample') {
+          const timeAxis = resolved.value.matrix.timeAxis
+          if (timeAxis?.kind !== 'calendar') { dispatch({ type: 'preparation-failed', detail: 'Weekly and monthly resampling require a date or timestamp column. An ordinal time key can order rows but cannot define calendar bins.' }); return }
+          const input = { ...resolved.value.matrix, timestamps: timeAxis.timestamps }
+          const aggregations = aggregationsForColumns(input.columns, recipe.value.resampling)
+          if (!aggregations.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(aggregations.error) }); return }
+          const { runPandasResampling } = await import('@/analysis/client')
+          const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, recipe.value.resampling.targetFrequency, recipe.value.resampling.incompleteBins, aggregations.value, input.imputedCells)
+          if (!evidence.ok) { dispatch({ type: 'preparation-failed', detail: evidence.error.detail }); return }
+          const grouped = resampledMatrixFromEvidence(input, recipe.value.resampling, evidence.value)
+          if (!grouped.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(grouped.error) }); return }
+          observations = grouped.value.rowCount
+          resampling = grouped.value.record
+        }
         const leadingRows = transformWarmup(recipe.value.seriesTransforms)
         if (observations <= leadingRows) {
           dispatch({ type: 'preparation-failed', detail: 'First differencing needs at least two retained observations. Choose a longer interval or keep the series in levels.' })
@@ -344,7 +392,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         observations -= leadingRows
       }
 
-      const artifact = preparedArtifact(recipe.value, profile, observations, resolution, panelStructure)
+      const artifact = preparedArtifact(recipe.value, profile, observations, resolved.value.resolution, resampling, panelStructure)
       if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
       dispatch({ type: 'preparation-succeeded', artifact: artifact.value })
       onPrepared(artifact.value)
@@ -473,7 +521,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 </Select>
               </label>
               <label className="block text-body text-ink">
-                Frequency
+                Source frequency
                 <Select
                   className={field('text', 'mt-1')}
                   value={currentFrequency}
@@ -673,7 +721,74 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <h3 id="transform-title" className="mb-1 mt-1 text-title font-medium text-ink">Prepare the analysis scale</h3>
           {timeSeriesSelected ? (
             <>
-              <p className="mb-0 mt-1 text-body text-faint">The saved version resolves missing values, removes any selected seasonal component, then applies each column’s transformation.</p>
+              <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">A transformation changes the values used by later analyses. Save a separate prepared version so results on levels and transformed values remain comparable. Missingness is resolved before calendar resampling, seasonal adjustment, and per-column transformations.</p>
+              <div className="mt-4 rounded-md border border-line bg-panel p-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <span className={fieldLabel}>Calendar resampling</span>
+                    <span className="block text-label text-faint">Create UTC calendar weeks or months from a daily source before diagnostics and analysis.</span>
+                  </div>
+                  <SegmentedControl
+                    size="sm"
+                    ariaLabel="Calendar resampling"
+                    value={draft.resampling.kind === 'none' ? 'none' : draft.resampling.targetFrequency}
+                    onChange={(next) => {
+                      if (next === 'none') { dispatch({ type: 'resampling-selected', resampling: { kind: 'none' } }); return }
+                      if (next === 'weekly' || next === 'monthly') dispatch({ type: 'resampling-selected', resampling: { kind: 'daily-downsample', targetFrequency: next, incompleteBins: 'keep', aggregations: draft.resampling.kind === 'daily-downsample' ? draft.resampling.aggregations : [] } })
+                    }}
+                    options={[
+                      { value: 'none', label: 'Keep source' },
+                      { value: 'weekly', label: 'Weekly', disabled: draft.sampling.frequency !== 'daily' },
+                      { value: 'monthly', label: 'Monthly', disabled: draft.sampling.frequency !== 'daily' },
+                    ]}
+                  />
+                </div>
+                {draft.sampling.frequency !== 'daily' && <p className="mb-0 mt-2 text-body text-faint">This increment resamples daily sources. Other source frequencies remain unchanged.</p>}
+                {draft.resampling.kind === 'daily-downsample' && (
+                  <div className="mt-3 border-t border-hair pt-3">
+                    <label className="block text-body text-ink">
+                      <span className={fieldLabel}>Incomplete calendar bins</span>
+                      <Select
+                        className={field('text', 'mt-1 max-w-64')}
+                        value={draft.resampling.incompleteBins}
+                        onChange={(event) => {
+                          if (draft.resampling.kind === 'daily-downsample') dispatch({ type: 'resampling-selected', resampling: { ...draft.resampling, incompleteBins: event.target.value === 'drop' ? 'drop' : 'keep' } })
+                        }}
+                      >
+                        <option value="keep">Keep and record</option>
+                        <option value="drop">Drop</option>
+                      </Select>
+                    </label>
+                    <div className="mt-3 rounded-md border border-hair" role="group" aria-label="Aggregation by column">
+                      <div className="border-b border-hair px-3 py-1.5 text-label text-faint">Choose sum for interval totals; use mean for rates or measurements.</div>
+                      <div className="divide-y divide-hair">
+                        {selectedIds.map((column) => (
+                          <label key={column} className="flex items-center justify-between gap-3 px-3 py-2 text-body text-ink">
+                            <span>{columnName(column)}</span>
+                            <Select
+                              className={field('text', 'w-36')}
+                              aria-label={`Aggregation for ${columnName(column)}`}
+                              value={aggregationFor(draft.resampling.kind === 'daily-downsample' ? draft.resampling.aggregations : [], column) ?? ''}
+                              onChange={(event) => {
+                                const chosen = RESAMPLING_AGGREGATIONS.find((candidate) => candidate.value === event.target.value)
+                                if (chosen) dispatch({ type: 'resampling-aggregation-selected', column, aggregation: chosen.value })
+                              }}
+                            >
+                              <option value="">Choose aggregation</option>
+                              {RESAMPLING_AGGREGATIONS.map((aggregation) => <option key={aggregation.value} value={aggregation.value}>{aggregation.label}</option>)}
+                            </Select>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {!readiness.ok && readiness.error.kind === 'resampling-aggregations-required' && (
+                      <p className="mb-0 mt-2 text-body text-danger" role="status">
+                        {describeReadinessProblem(readiness.error)}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
               <div className="mt-4">
                 <label className="flex items-start gap-2 text-body text-ink">
                   <input
@@ -684,7 +799,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   />
                   <span>
                     Remove the seasonal component with seasonal-trend decomposition using loess (STL){seasonalPeriod === null ? ' (no period for yearly rows)' : ` at period ${seasonalPeriod}`}
-                    <span className="block text-faint">Choose columns with a recurring seasonal pattern. The saved recipe records the period and whether the robust fit was used.</span>
+                    <span className="block text-faint">STL separates a fitted trend, a repeating seasonal component, and a remainder. Adjustment subtracts the seasonal component while retaining the trend; the decomposition does not assign causal meaning.</span>
                   </span>
                 </label>
                 {draft.seasonal.kind === 'stl' && (
@@ -753,7 +868,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   </div>
                 </div>
                 {draft.seriesTransforms.some((record) => record.transform.kind === 'difference') && (
-                  <p className="mb-0 mt-3 text-body text-faint">First difference replaces xₜ with xₜ − xₜ₋₁. The first retained row is removed from every column so timestamps remain aligned.</p>
+                  <p className="mb-0 mt-3 text-body text-faint">First difference replaces xₜ with xₜ − xₜ₋₁. The first retained row is removed from every column so timestamps remain aligned. An effect on a differenced outcome is an effect on its period-to-period change, not directly on its level.</p>
                 )}
               </div>
             </>
@@ -769,6 +884,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <Icon name="check_circle" size={14} className="text-ok" />
           {preparedCurrent.kind === 'prepared-time-series' ? 'Prepared time series' : preparedCurrent.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'} · <span className={num()}>{preparedCurrent.observations.toLocaleString()} rows</span>
           {describeResolutionRecord(preparedCurrent.resolution) !== null && <> · {describeResolutionRecord(preparedCurrent.resolution)}</>}
+          {preparedCurrent.kind === 'prepared-time-series' && describeResampling(preparedCurrent.resampling, columnName) !== null && <> · {describeResampling(preparedCurrent.resampling, columnName)}</>}
           {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName) !== null && <> · {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName)}</>}
           {preparedCurrent.kind === 'prepared-time-series' && preparedCurrent.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <> · {preparedCurrent.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</>}
           {preparedCurrent.kind === 'prepared-panel' && <> · {preparedCurrent.panel.units.toLocaleString()} units × {preparedCurrent.panel.periods.toLocaleString()} periods</>}
@@ -802,11 +918,13 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-            <p className="mb-0 mt-1 text-body text-faint">ADF and KPSS assess the prepared values and their first difference; Zivot–Andrews allows one structural break.</p>
+            <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">A stationary process has stable probabilistic behavior over time after accounting for the deterministic terms in the test. ADF tests a unit root as its null; KPSS tests stationarity as its null. Hirmos reads them together because either test alone can be inconclusive. Zivot–Andrews allows one structural break.</p>
+            <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">Hirmos reports I(1) only when the values in levels support unit-root behavior and their first difference supports stationarity. The prepared data are not changed unless first differencing is saved as a transformation.</p>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />
           <div className="mt-3">
             <span className={fieldLabel}>Run the tests on</span>
+            <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">This moves the reported statistics only. The verdict is read from the values in levels and their first difference either way, because integration order is a property of the series rather than of the scale it is inspected on.</p>
             <RadioList
               className="mt-2"
               legend="Run the stationarity tests on"
@@ -845,8 +963,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               type="button"
               onClick={() => setStationarityOpen((value) => !value)}
               aria-expanded={stationarityOpen}
-              className={label('flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-muted transition-colors hover:text-ink')}
+              className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
             >
+              <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-150 ${stationarityOpen ? 'rotate-180' : ''}`} />
               <span className="flex flex-wrap items-center gap-2">
                 <Icon name="check_circle" size={14} className="text-ok" />
                 Stationarity tests · {stationarityEvidence.variables.length} variables · {stationarityEvidence.observations.toLocaleString()} rows · {
@@ -857,7 +976,6 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       : 'linear detrend of prepared values'
                 }
               </span>
-              <Icon name={stationarityOpen ? 'expand_less' : 'expand_more'} size={14} className="shrink-0" />
             </button>
             <div className="grid transition-[grid-template-rows] duration-200" style={{ gridTemplateRows: stationarityOpen ? '1fr' : '0fr' }}>
             <div className="overflow-hidden">
@@ -867,10 +985,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               <thead>
                 <tr>
                   <th className={th()}>Variable</th>
-                  <th className={th('text-right')}>ADF p · c</th>
-                  <th className={th('text-right')}>KPSS p · c</th>
+                  <th className={th('text-right')}>ADF p · constant</th>
+                  <th className={th('text-right')}>KPSS p · constant</th>
                   <th className={th('text-right')}>Zivot–Andrews p · constant and trend</th>
-                  <th className={th()}>Verdict</th>
+                  <th className={th()} title="Integration order is a property of the series, so it is read from the values in levels and their first difference whichever scale the columns show.">Verdict · from levels and first difference</th>
                 </tr>
               </thead>
               <tbody>
@@ -889,7 +1007,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               </tbody>
             </table>
             </div>
-            <div className="mt-4 space-y-2" aria-label="Stationarity raw evidence">
+            <div className="mt-4 space-y-2" role="region" aria-label="Stationarity raw evidence">
               {stationarityEvidence.variables.map((evidence) => {
                 const column = profile.columns.find((candidate) => candidate.id === evidence.column)
                 const result = evidence.result
@@ -899,49 +1017,49 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     statistic: result.adf.constant.statistic,
                     p: result.adf.constant.pValue,
                     fit: `lag ${result.adf.constant.usedLag} · n ${result.adf.constant.observations}`,
-                    critical: result.adf.constant.criticalValues,
+                    critical: labelledCriticalValues('adf', result.adf.constant.criticalValues),
                   },
                   {
                     name: 'ADF · constant + trend',
                     statistic: result.adf.constantAndTrend.statistic,
                     p: result.adf.constantAndTrend.pValue,
                     fit: `lag ${result.adf.constantAndTrend.usedLag} · n ${result.adf.constantAndTrend.observations}`,
-                    critical: result.adf.constantAndTrend.criticalValues,
+                    critical: labelledCriticalValues('adf', result.adf.constantAndTrend.criticalValues),
                   },
                   {
                     name: 'KPSS · constant',
                     statistic: result.kpss.constant.statistic,
                     p: result.kpss.constant.pValue,
                     fit: `lag ${result.kpss.constant.usedLag}`,
-                    critical: result.kpss.constant.criticalValues,
+                    critical: labelledCriticalValues('kpss', result.kpss.constant.criticalValues),
                   },
                   {
                     name: 'KPSS · constant + trend',
                     statistic: result.kpss.constantAndTrend.statistic,
                     p: result.kpss.constantAndTrend.pValue,
                     fit: `lag ${result.kpss.constantAndTrend.usedLag}`,
-                    critical: result.kpss.constantAndTrend.criticalValues,
+                    critical: labelledCriticalValues('kpss', result.kpss.constantAndTrend.criticalValues),
                   },
                   {
                     name: 'Zivot–Andrews · level',
                     statistic: result.zivotAndrews.level.statistic,
                     p: result.zivotAndrews.level.pValue,
                     fit: `base lag ${result.zivotAndrews.level.baseLags} · break ${result.zivotAndrews.level.breakIndex}`,
-                    critical: result.zivotAndrews.level.criticalValues,
+                    critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.level.criticalValues),
                   },
                   {
                     name: 'Zivot–Andrews · trend',
                     statistic: result.zivotAndrews.trend.statistic,
                     p: result.zivotAndrews.trend.pValue,
                     fit: `base lag ${result.zivotAndrews.trend.baseLags} · break ${result.zivotAndrews.trend.breakIndex}`,
-                    critical: result.zivotAndrews.trend.criticalValues,
+                    critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.trend.criticalValues),
                   },
                   {
                     name: 'Zivot–Andrews · level + trend',
                     statistic: result.zivotAndrews.levelAndTrend.statistic,
                     p: result.zivotAndrews.levelAndTrend.pValue,
                     fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags} · break ${result.zivotAndrews.levelAndTrend.breakIndex}`,
-                    critical: result.zivotAndrews.levelAndTrend.criticalValues,
+                    critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.levelAndTrend.criticalValues),
                   },
                 ] as const
                 return (

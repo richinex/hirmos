@@ -13,6 +13,8 @@ import {
   type DatasetProfileProblem,
   type NullableNumericMatrix,
   type NumericMaterializationProblem,
+  type TimeOrderedNumericMatrix,
+  type TimeSeriesMaterializationProblem,
   type PhysicalColumnProfile,
   type PreviewCell,
   type SourceFingerprint,
@@ -71,6 +73,7 @@ async function configureOfflineEngine(db: duckdb.AsyncDuckDB, version: string): 
     await connection.query('SET autoload_known_extensions = false')
     await connection.query('LOAD parquet')
     await connection.query('LOAD icu')
+    await connection.query("SET TimeZone = 'UTC'")
 
     // This parses named-zone timestamps on both sides of Amsterdam's 2024 spring DST transition.
     // If ICU is missing, mismatched, unsigned, or not actually loaded, engine startup is refused.
@@ -121,9 +124,15 @@ const engine = (): Promise<Engine> => {
 const sqlString = (value: string): string => `'${value.replaceAll("'", "''")}'`
 const sqlIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
-const previewCell = (value: unknown): PreviewCell => {
+const temporalPreview = (value: number, duckdbType: string): PreviewCell | null => {
+  if (!/^(DATE|TIMESTAMP)/i.test(duckdbType)) return null
+  const date = new Date(value)
+  return Number.isNaN(date.valueOf()) ? null : { kind: 'temporal', value: date.toISOString() }
+}
+
+const previewCell = (value: unknown, duckdbType: string): PreviewCell => {
   if (value === null || value === undefined) return { kind: 'null' }
-  if (typeof value === 'number') return { kind: 'number', value }
+  if (typeof value === 'number') return temporalPreview(value, duckdbType) ?? { kind: 'number', value }
   if (typeof value === 'bigint') return { kind: 'integer', value: value.toString() }
   if (typeof value === 'boolean') return { kind: 'boolean', value }
   if (value instanceof Date) return { kind: 'temporal', value: value.toISOString() }
@@ -202,7 +211,7 @@ async function readProfile(
   const builtPreview: NonEmptyArray<PreviewCell>[] = []
   for (let rowIndex = 0; rowIndex < previewTable.numRows; rowIndex += 1) {
     const row = builtColumns.map((_, columnIndex) =>
-      previewCell(previewTable.getChildAt(columnIndex)?.get(rowIndex)),
+      previewCell(previewTable.getChildAt(columnIndex)?.get(rowIndex), builtColumns[columnIndex].duckdbType),
     )
     if (!isNonEmpty(row)) return err({ kind: 'no-columns' })
     builtPreview.push(row)
@@ -290,21 +299,10 @@ const setValid = (validity: Uint8Array, index: number): void => {
   validity[index >> 3] |= 1 << (index & 7)
 }
 
-export async function materializeNumericColumns(
-  source: SelectedSource,
+const selectedNumericColumns = (
   profile: DatasetProfile,
   requestedColumnIds: NonEmptyArray<string>,
-): Promise<Result<NullableNumericMatrix, NumericMaterializationProblem>> {
-  const fingerprint = await fingerprintFile(source.file)
-  if (!fingerprint.ok) return err({ kind: 'materialization-failed', detail: fingerprint.error.detail })
-  if (fingerprint.value !== profile.source.fingerprint) {
-    return err({
-      kind: 'source-changed',
-      expected: profile.source.fingerprint,
-      actual: fingerprint.value,
-    })
-  }
-
+): Result<NonEmptyArray<PhysicalColumnProfile>, NumericMaterializationProblem> => {
   const selected: PhysicalColumnProfile[] = []
   const seen = new Set<string>()
   for (const id of requestedColumnIds) {
@@ -312,110 +310,127 @@ export async function materializeNumericColumns(
     seen.add(id)
     const column = profile.columns.find((candidate) => candidate.id === id)
     if (!column) return err({ kind: 'column-not-found', id })
-    if (!isNumericDuckDbType(column.duckdbType)) {
-      return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
-    }
+    if (!isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
     selected.push(column)
   }
-  if (!isNonEmpty(selected)) return err({ kind: 'materialization-failed', detail: 'No numeric columns were selected.' })
+  return isNonEmpty(selected) ? ok(selected) : err({ kind: 'materialization-failed', detail: 'No numeric columns were selected.' })
+}
 
-  let running: Engine
-  try {
-    running = await engine()
-  } catch (cause) {
-    return err({ kind: 'materialization-failed', detail: detailOf(cause) })
-  }
+interface NumericQueryTable {
+  readonly numRows: number
+  getChild(name: string): { get(row: number): unknown } | null
+}
 
-  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
-  try {
-    await running.db.registerFileHandle(
-      registeredPath,
-      source.file,
-      duckdb.DuckDBDataProtocol.BROWSER_FILEREADER,
-      true,
-    )
-  } catch (cause) {
-    return err({ kind: 'materialization-failed', detail: detailOf(cause) })
-  }
-
-  const relation = source.format === 'parquet'
-    ? `read_parquet(${sqlString(registeredPath)})`
-    : `read_csv_auto(${sqlString(registeredPath)}, header = true, sample_size = 20480)`
-  const projections = selected.map((column, index) =>
-    `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
-  )
-  let connection: duckdb.AsyncDuckDBConnection | null = null
-  let outcome: Result<NullableNumericMatrix, NumericMaterializationProblem>
-  try {
-    connection = await running.db.connect()
-    const table = await connection.query(`SELECT ${projections.join(', ')} FROM ${relation}`)
-    if (table.numRows !== profile.rowCount) {
-      outcome = err({ kind: 'materialization-failed', detail: 'The materialized row count changed since profiling.' })
-    } else {
-      const cellCount = profile.rowCount * selected.length
-      if (!Number.isSafeInteger(cellCount)) {
-        outcome = err({ kind: 'materialization-failed', detail: 'The selected matrix is too large for browser-safe indexing.' })
+const numericMatrixFromTable = (
+  table: NumericQueryTable,
+  profile: DatasetProfile,
+  selected: NonEmptyArray<PhysicalColumnProfile>,
+): Result<NullableNumericMatrix, NumericMaterializationProblem> => {
+  if (table.numRows !== profile.rowCount) return err({ kind: 'materialization-failed', detail: 'The materialized row count changed since profiling.' })
+  const cellCount = profile.rowCount * selected.length
+  if (!Number.isSafeInteger(cellCount)) return err({ kind: 'materialization-failed', detail: 'The selected matrix is too large for browser-safe indexing.' })
+  const values = new Float64Array(cellCount)
+  values.fill(Number.NaN)
+  const validity = new Uint8Array(Math.ceil(cellCount / 8))
+  let missingCells = 0
+  for (const [columnIndex, column] of selected.entries()) {
+    const vector = table.getChild(`hirmos_numeric_${columnIndex}`)
+    if (!vector) return err({ kind: 'materialization-failed', detail: `DuckDB omitted numeric column ${column.name}.` })
+    for (let row = 0; row < profile.rowCount; row += 1) {
+      const value = vector.get(row)
+      const target = columnIndex * profile.rowCount + row
+      if (value === null || value === undefined) {
+        missingCells += 1
+      } else if (typeof value !== 'number' || !Number.isFinite(value)) {
+        return err({ kind: 'non-finite-value', name: column.name, row })
       } else {
-        const values = new Float64Array(cellCount)
-        values.fill(Number.NaN)
-        const validity = new Uint8Array(Math.ceil(cellCount / 8))
-        let missingCells = 0
-        let problem: NumericMaterializationProblem | null = null
-        for (const [columnIndex, column] of selected.entries()) {
-          const vector = table.getChild(`hirmos_numeric_${columnIndex}`)
-          if (!vector) {
-            problem = { kind: 'materialization-failed', detail: `DuckDB omitted numeric column ${column.name}.` }
-            break
-          }
-          for (let row = 0; row < profile.rowCount; row += 1) {
-            const value = vector.get(row)
-            const target = columnIndex * profile.rowCount + row
-            if (value === null || value === undefined) {
-              missingCells += 1
-            } else if (typeof value !== 'number' || !Number.isFinite(value)) {
-              problem = { kind: 'non-finite-value', name: column.name, row }
-              break
-            } else {
-              values[target] = value
-              setValid(validity, target)
-            }
-          }
-          if (problem) break
-        }
-        outcome = problem
-          ? err(problem)
-          : ok({
-              kind: 'nullable-numeric-matrix',
-              sourceFingerprint: profile.source.fingerprint,
-              layout: 'column-major',
-              rowCount: profile.rowCount,
-              columns: mapNonEmpty(selected, ({ id, name }) => ({ id, name })),
-              values,
-              validity,
-              missingCells,
-            })
+        values[target] = value
+        setValid(validity, target)
       }
     }
-  } catch (cause) {
-    outcome = err({ kind: 'materialization-failed', detail: detailOf(cause) })
   }
+  return ok({
+    kind: 'nullable-numeric-matrix',
+    sourceFingerprint: profile.source.fingerprint,
+    layout: 'column-major',
+    rowCount: profile.rowCount,
+    columns: mapNonEmpty(selected, ({ id, name }) => ({ id, name })),
+    values,
+    validity,
+    missingCells,
+  })
+}
 
-  const cleanupFailures: string[] = []
-  if (connection) {
-    try {
-      await connection.close()
-    } catch (cause) {
-      cleanupFailures.push(`connection: ${detailOf(cause)}`)
-    }
-  }
-  try {
-    await running.db.dropFile(registeredPath)
-  } catch (cause) {
-    cleanupFailures.push(`source handle: ${detailOf(cause)}`)
-  }
-  return cleanupFailures.length > 0
-    ? err({ kind: 'materialization-failed', detail: cleanupFailures.join('; ') })
-    : outcome
+export async function materializeNumericColumns(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  requestedColumnIds: NonEmptyArray<string>,
+): Promise<Result<NullableNumericMatrix, NumericMaterializationProblem>> {
+  const selected = selectedNumericColumns(profile, requestedColumnIds)
+  if (!selected.ok) return selected
+  const projections = selected.value.map((column, index) =>
+    `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
+  )
+  return withSource(
+    source,
+    profile,
+    (detail): NumericMaterializationProblem => ({ kind: 'materialization-failed', detail }),
+    (expected, actual): NumericMaterializationProblem => ({ kind: 'source-changed', expected, actual }),
+    async (connection, relation) => numericMatrixFromTable(await connection.query(`SELECT ${projections.join(', ')} FROM ${relation}`), profile, selected.value),
+  )
+}
+
+/** Read the analysis columns together with one parsed temporal key and sort them chronologically. */
+export async function materializeTimeSeriesColumns(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  timeColumnId: ColumnId,
+  requestedColumnIds: NonEmptyArray<string>,
+): Promise<Result<TimeOrderedNumericMatrix, TimeSeriesMaterializationProblem>> {
+  const timeColumn = profile.columns.find((candidate) => candidate.id === timeColumnId)
+  if (timeColumn === undefined) return err({ kind: 'column-not-found', id: timeColumnId })
+  const selected = selectedNumericColumns(profile, requestedColumnIds)
+  if (!selected.ok) return selected
+  const projections = selected.value.map((column, index) =>
+    `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
+  )
+  const time = sqlIdentifier(timeColumn.name)
+  const ordinal = isNumericDuckDbType(timeColumn.duckdbType)
+  const timeProjection = ordinal
+    ? `CAST(${time} AS DOUBLE)`
+    : `epoch_ms(TRY_CAST(${time} AS TIMESTAMPTZ))`
+  return withSource(
+    source,
+    profile,
+    (detail): TimeSeriesMaterializationProblem => ({ kind: 'materialization-failed', detail }),
+    (expected, actual): TimeSeriesMaterializationProblem => ({ kind: 'source-changed', expected, actual }),
+    async (connection, relation) => {
+      const table = await connection.query(`
+        SELECT ${timeProjection} AS hirmos_time, ${projections.join(', ')}
+        FROM ${relation}
+        ORDER BY hirmos_time ASC NULLS LAST
+      `)
+      const base = numericMatrixFromTable(table, profile, selected.value)
+      if (!base.ok) return base
+      const vector = table.getChild('hirmos_time')
+      if (vector === null) return err({ kind: 'materialization-failed', detail: `DuckDB omitted parsed time column ${timeColumn.name}.` })
+      const times = new Float64Array(profile.rowCount)
+      for (let row = 0; row < profile.rowCount; row += 1) {
+        const value = vector.get(row)
+        if (value === null || value === undefined) return err({ kind: 'time-value-unparseable', name: timeColumn.name, row })
+        const timestamp = scalarNumber(value, 'time value')
+        if (!Number.isFinite(timestamp)) return err({ kind: 'time-value-unparseable', name: timeColumn.name, row })
+        if (row > 0 && timestamp === times[row - 1]) return err({ kind: 'duplicate-time-value', name: timeColumn.name, row })
+        times[row] = timestamp
+      }
+      return ok({
+        ...base.value,
+        kind: 'time-ordered-numeric-matrix',
+        timeColumn: { id: timeColumn.id, name: timeColumn.name },
+        timeAxis: ordinal ? { kind: 'ordinal', values: times } : { kind: 'calendar', timestamps: times },
+      })
+    },
+  )
 }
 
 const panelColumn = (profile: DatasetProfile, id: ColumnId): Result<PhysicalColumnProfile, PanelDataProblem> => {
@@ -949,7 +964,7 @@ export async function previewWindow(source: SelectedSource, profile: DatasetProf
       for (let rowIndex = 0; rowIndex < table.numRows; rowIndex += 1) {
         rows.push({
           index: scalarNumber(indexVector?.get(rowIndex), 'row index'),
-          cells: profile.columns.map((_, columnIndex) => previewCell(table.getChildAt(columnIndex + 1)?.get(rowIndex))),
+          cells: profile.columns.map((column, columnIndex) => previewCell(table.getChildAt(columnIndex + 1)?.get(rowIndex), column.duckdbType)),
         })
       }
       return ok({ kind: 'preview-window', sourceFingerprint: profile.source.fingerprint, offset: query.offset, total: total.value, rows })

@@ -14,7 +14,9 @@ interface AppShellProps {
 /** Header, chapter nav, and the stage as flex siblings behind hairlines: no overlays or shadows on desktop. The row is the shell container the nav queries. */
 export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppShellProps) {
   return (
-    <div className="flex h-full min-h-0 flex-col bg-stage text-ink">
+    // Vaul scales this element back while a bottom sheet is open, which is how the sheet reads as a
+    // layer on the dark themes, where a scrim over a near-black page dims almost nothing.
+    <div data-vaul-drawer-wrapper className="flex h-full min-h-0 flex-col bg-stage text-ink">
       <a href={`#${skipTarget}`} className="sr-only rounded-md border border-edge bg-panel px-3 py-1.5 text-body text-ink focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-(--z-overlay)">Skip to workspace</a>
       <header className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-line bg-panel px-3.5">
         {header}

@@ -5,7 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import { Select } from '@/components/ui/Select'
-import { button, field, label, num } from '@/components/ui/recipes'
+import { button, field, caption, label, num } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { Alert } from '@/components/ui/Alert'
 import {
@@ -45,7 +45,7 @@ function GrangerPlot({ artifact }: { readonly artifact: GrangerEvidenceArtifact 
   }, theme), [artifact, theme])
   return (
     <div className="mt-3 rounded-lg border border-hair bg-well p-3">
-      <p className={label('m-0 text-faint')}>p-value by lag order · alpha 0.05 reference, log scale</p>
+      <p className={caption('m-0')}>p-value by lag order · alpha 0.05 reference, log scale</p>
       <EChart option={option} label="Granger p-values by lag order" className="h-[clamp(160px,26cqb,240px)]" />
     </div>
   )

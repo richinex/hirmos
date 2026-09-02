@@ -2,6 +2,7 @@ import { Icon } from '@/components/Icon'
 import type { ChapterId } from '@/domain/navigation'
 import { assertNever } from '@/domain/dop'
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
+import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
@@ -143,6 +144,9 @@ interface ChapterNavProps {
  * the header and its toggle stay put and the stage keeps the full width; a swipe from the left
  * edge opens it and a drag closes it. Gated chapters stay in the tab order.
  */
+/** One phone nav at a time, so the layer stack needs no per-instance id. */
+const PHONE_NAV_LAYER = 'chapter-nav-phone'
+
 export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch, phoneOpen, onPhoneOpen, onPhoneClose }: ChapterNavProps) {
   const phone = useIsMobile()
   const rail = collapsed && !phone
@@ -151,9 +155,10 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch
   const drag = phone ? slide.drag : null
   const slidIn = phone && (phoneOpen || drag !== null)
   const panelHandlers = phone ? slide.handlers('panel') : {}
+  useEffect(() => (slidIn ? pushLayer(PHONE_NAV_LAYER) : undefined), [slidIn])
   useEffect(() => {
     if (!slidIn) return
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') onPhoneClose() }
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && escapeFor(PHONE_NAV_LAYER, event)) onPhoneClose() }
     window.addEventListener('keydown', escape)
     return () => window.removeEventListener('keydown', escape)
   }, [onPhoneClose, slidIn])

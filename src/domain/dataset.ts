@@ -25,6 +25,24 @@ export interface NullableNumericMatrix {
   readonly missingCells: number
 }
 
+export type TimeAxis =
+  | { readonly kind: 'calendar'; readonly timestamps: Float64Array }
+  | { readonly kind: 'ordinal'; readonly values: Float64Array }
+
+/** Numeric values paired with one parsed, chronologically sorted time key per source row. */
+export interface TimeOrderedNumericMatrix {
+  readonly kind: 'time-ordered-numeric-matrix'
+  readonly sourceFingerprint: SourceFingerprint
+  readonly layout: 'column-major'
+  readonly rowCount: number
+  readonly timeColumn: NumericColumnSelection
+  readonly timeAxis: TimeAxis
+  readonly columns: NonEmptyArray<NumericColumnSelection>
+  readonly values: Float64Array
+  readonly validity: Uint8Array
+  readonly missingCells: number
+}
+
 export type PreviewCell =
   | { readonly kind: 'null' }
   | { readonly kind: 'number'; readonly value: number }
@@ -135,6 +153,10 @@ export type NumericMaterializationProblem =
   | { readonly kind: 'worker-unavailable'; readonly detail: string }
   | { readonly kind: 'worker-protocol-failed'; readonly detail: string }
 
+export type TimeSeriesMaterializationProblem = NumericMaterializationProblem
+  | { readonly kind: 'time-value-unparseable'; readonly name: string; readonly row: number }
+  | { readonly kind: 'duplicate-time-value'; readonly name: string; readonly row: number }
+
 export type NumericMatrixBoundaryProblem = {
   readonly kind: 'invalid-numeric-matrix'
   readonly detail: string
@@ -206,6 +228,22 @@ const nullableNumericMatrixSchema = z.object({
   sourceFingerprint: z.string(),
   layout: z.literal('column-major'),
   rowCount: z.number().int().positive(),
+  columns: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
+  values: z.instanceof(Float64Array),
+  validity: z.instanceof(Uint8Array),
+  missingCells: z.number().int().nonnegative(),
+}).strict()
+
+const timeOrderedNumericMatrixSchema = z.object({
+  kind: z.literal('time-ordered-numeric-matrix'),
+  sourceFingerprint: z.string(),
+  layout: z.literal('column-major'),
+  rowCount: z.number().int().positive(),
+  timeColumn: z.object({ id: z.string(), name: z.string() }).strict(),
+  timeAxis: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('calendar'), timestamps: z.instanceof(Float64Array) }).strict(),
+    z.object({ kind: z.literal('ordinal'), values: z.instanceof(Float64Array) }).strict(),
+  ]),
   columns: z.array(z.object({ id: z.string(), name: z.string() }).strict()),
   values: z.instanceof(Float64Array),
   validity: z.instanceof(Uint8Array),
@@ -390,6 +428,31 @@ export function parseNullableNumericMatrix(
   return ok({ ...parsed.data, sourceFingerprint: fingerprint.value, columns })
 }
 
+export function parseTimeOrderedNumericMatrix(
+  value: unknown,
+): Result<TimeOrderedNumericMatrix, NumericMatrixBoundaryProblem> {
+  const parsed = timeOrderedNumericMatrixSchema.safeParse(value)
+  if (!parsed.success) return err({ kind: 'invalid-numeric-matrix', detail: z.prettifyError(parsed.error) })
+  const { timeColumn, timeAxis, ...numeric } = parsed.data
+  const base = parseNullableNumericMatrix({ ...numeric, kind: 'nullable-numeric-matrix' })
+  if (!base.ok) return base
+  const timeId = columnIdFromWire(timeColumn.id, timeColumn.name)
+  if (!timeId.ok) return err({ kind: 'invalid-numeric-matrix', detail: 'The time column identity is invalid.' })
+  const times = parsed.data.timeAxis.kind === 'calendar' ? parsed.data.timeAxis.timestamps : parsed.data.timeAxis.values
+  if (times.length !== parsed.data.rowCount) return err({ kind: 'invalid-numeric-matrix', detail: 'The time axis length does not match the materialized rows.' })
+  for (let row = 0; row < times.length; row += 1) {
+    const time = times[row]
+    if (!Number.isFinite(time)) return err({ kind: 'invalid-numeric-matrix', detail: `Parsed time ${row} is not finite.` })
+    if (row > 0 && time <= times[row - 1]) return err({ kind: 'invalid-numeric-matrix', detail: 'Parsed times are not strictly increasing.' })
+  }
+  return ok({
+    ...base.value,
+    kind: 'time-ordered-numeric-matrix',
+    timeColumn: { id: timeId.value, name: timeColumn.name },
+    timeAxis,
+  })
+}
+
 export function validateNumericMatrixAgainstProfile(
   matrix: NullableNumericMatrix,
   profile: DatasetProfile,
@@ -405,6 +468,19 @@ export function validateNumericMatrixAgainstProfile(
     }
   }
   return ok(matrix)
+}
+
+export function validateTimeOrderedMatrixAgainstProfile(
+  matrix: TimeOrderedNumericMatrix,
+  profile: DatasetProfile,
+): Result<TimeOrderedNumericMatrix, NumericMatrixBoundaryProblem> {
+  if (matrix.sourceFingerprint !== profile.source.fingerprint || matrix.rowCount !== profile.rowCount) {
+    return err({ kind: 'invalid-numeric-matrix', detail: 'The time-ordered matrix does not match its requested profile.' })
+  }
+  const time = profile.columns.find((column) => column.id === matrix.timeColumn.id)
+  if (time === undefined || time.name !== matrix.timeColumn.name) return err({ kind: 'invalid-numeric-matrix', detail: 'The parsed time column is outside its requested profile.' })
+  const numeric = validateNumericMatrixAgainstProfile({ ...matrix, kind: 'nullable-numeric-matrix' }, profile)
+  return numeric.ok ? ok(matrix) : err(numeric.error)
 }
 
 /** Per-column facts for the schema table, computed after the profile so the first paint never waits on them. */

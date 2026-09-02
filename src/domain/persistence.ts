@@ -185,14 +185,20 @@ export function parseSnapshot(raw: string): Result<PersistedProject, SnapshotPro
 export const taggedJsonReplacer = (_key: string, value: unknown): unknown => (value instanceof Float64Array ? { [F64]: Array.from(value) } : value)
 export const taggedJsonReviver = revive
 
-/** Upgrade the one version-1 artifact shape written before prepared transformations were persisted. */
+/** Add preparation fields introduced while the version-1 envelope remained stable. */
 const upgradePreparedTransformRecord = (value: ParsedEnvelope['prepared']): Result<ParsedEnvelope['prepared'], SnapshotProblem> => {
-  if (value === null || Reflect.get(value, 'kind') !== 'prepared-time-series' || Array.isArray(Reflect.get(value, 'seriesTransforms'))) return ok(value)
+  if (value === null || Reflect.get(value, 'kind') !== 'prepared-time-series') return ok(value)
   const columns = Reflect.get(value, 'columns')
   if (!Array.isArray(columns) || !columns.every((column) => typeof column === 'string')) {
     return err({ kind: 'invalid-snapshot', detail: 'prepared time series: columns are missing' })
   }
-  return ok({ ...value, seriesTransforms: columns.map((column) => ({ column, transform: { kind: 'levels' } })) })
+  return ok({
+    ...value,
+    seriesTransforms: Array.isArray(Reflect.get(value, 'seriesTransforms'))
+      ? Reflect.get(value, 'seriesTransforms')
+      : columns.map((column) => ({ column, transform: { kind: 'levels' } })),
+    resampling: Reflect.get(value, 'resampling') ?? { kind: 'none' },
+  })
 }
 
 /** Rename the version-1 stationarity display field; no numerical evidence is recomputed. */

@@ -71,6 +71,7 @@ export function counterfactualCurvesOption(view: CounterfactualCurvesView, theme
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
       axisLabel: axisLabelStyle(theme),
+      splitLine: { show: false },
       scale: true,
     },
     yAxis: { ...valueAxis(theme, `expected ${view.outcome}`), scale: true },

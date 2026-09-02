@@ -53,7 +53,7 @@ export function pValueBarsOption(view: PValueBarsView, theme: ChartTheme): EChar
       barMaxWidth: 36,
       barMinWidth: 3,
       data: shown.map((p, index) => (view.pValues[index] < view.alpha
-        ? { value: p, itemStyle: { color: theme.signal, decal: hatch } }
+        ? { value: p, itemStyle: { color: theme.signal, decal: hatch(theme) } }
         : { value: p, itemStyle: { color: theme.bone } })),
       markLine: {
         silent: true,

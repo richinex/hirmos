@@ -5,6 +5,14 @@ import { seasonalPeriodOf, type SeasonalAdjustmentRecord } from './seasonal'
 import type { StationarityBattery } from './stationarity'
 import type { StationarityAssessment } from './stationarityAssessment'
 import type { PanelStructureEvidence } from './panel'
+import {
+  effectiveFrequency,
+  readyResamplingRecipe,
+  type ResamplingAggregation,
+  type ResamplingDraft,
+  type ResamplingRecipe,
+  type ResamplingRecord,
+} from './resampling'
 
 export type PreparedDatasetVersionId = Brand<string, 'PreparedDatasetVersionId'>
 export type TransformRecipeId = Brand<string, 'TransformRecipeId'>
@@ -85,6 +93,8 @@ export interface PreprocessingDraft {
   readonly sampling: SamplingDraft
   readonly variables: VariableDraft
   readonly missingness: MissingnessDraft
+  /** A saved calendar aggregation for regular daily series; never a chart-only grouping. */
+  readonly resampling: ResamplingDraft
   readonly seasonal: SeasonalAdjustmentDraft
   /** Preparation choices. Missing entries are levels until the recipe is made. */
   readonly seriesTransforms: readonly ColumnSeriesTransform[]
@@ -102,6 +112,7 @@ export type ReadyPreprocessingRecipe =
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
       readonly columns: NonEmptyArray<ColumnId>
       readonly missingness: DenseReadyMissingness
+      readonly resampling: ResamplingRecipe
       readonly seasonalAdjustment: SeasonalAdjustmentRecord
       readonly seriesTransforms: NonEmptyArray<ColumnSeriesTransform>
     }
@@ -145,6 +156,8 @@ export type PreparedDatasetArtifact =
       readonly kind: 'prepared-time-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
       readonly missingness: DenseReadyMissingness
+      /** Calendar aggregation and its realised row counts. */
+      readonly resampling: ResamplingRecord
       /** One record per analysis column. Materialisation applies these after missingness and STL. */
       readonly seriesTransforms: NonEmptyArray<ColumnSeriesTransform>
     }
@@ -179,6 +192,8 @@ export type PreprocessingEvent =
   | { readonly type: 'frequency-selected'; readonly frequency: Frequency }
   | { readonly type: 'variable-toggled'; readonly column: ColumnId }
   | { readonly type: 'missingness-selected'; readonly resolution: MissingnessDraft }
+  | { readonly type: 'resampling-selected'; readonly resampling: ResamplingDraft }
+  | { readonly type: 'resampling-aggregation-selected'; readonly column: ColumnId; readonly aggregation: ResamplingAggregation }
   | { readonly type: 'seasonal-adjustment-selected'; readonly seasonal: SeasonalAdjustmentDraft }
   | { readonly type: 'series-transform-selected'; readonly column: ColumnId; readonly transform: SeriesTransform }
   | { readonly type: 'all-series-transforms-selected'; readonly transform: SeriesTransform }
@@ -202,6 +217,7 @@ export type PreprocessingReadinessProblem =
   | { readonly kind: 'structural-zero-unconfirmed' }
   | { readonly kind: 'seasonal-period-unavailable' }
   | { readonly kind: 'seasonal-columns-required' }
+  | { readonly kind: 'resampling-aggregations-required'; readonly columns: NonEmptyArray<ColumnId> }
 
 export const initialPreprocessingDraft = (profile: DatasetProfile): PreprocessingDraft => {
   const missingCells = profile.columns.reduce((sum, column) => sum + column.nullCount, 0)
@@ -211,6 +227,7 @@ export const initialPreprocessingDraft = (profile: DatasetProfile): Preprocessin
     missingness: missingCells === 0
       ? { kind: 'not-present' }
       : { kind: 'unresolved', cells: missingCells },
+    resampling: { kind: 'none' },
     seasonal: { kind: 'none' },
     seriesTransforms: [],
     diagnosticTransform: { kind: 'levels' },
@@ -273,6 +290,7 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         ...state,
         sampling: { kind: 'cross-sectional' },
         seasonal: { kind: 'none' },
+        resampling: { kind: 'none' },
         seriesTransforms: [],
         diagnosticTransform: { kind: 'levels' },
         ...resetStructuralWork(),
@@ -283,7 +301,7 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         sampling: state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys'
           ? state.sampling
           : { kind: 'regular-panel-awaiting-keys', unitColumn: null, timeColumn: null, frequency: 'yearly' },
-        seasonal: { kind: 'none' }, seriesTransforms: [], diagnosticTransform: { kind: 'levels' }, ...resetStructuralWork(),
+        seasonal: { kind: 'none' }, resampling: { kind: 'none' }, seriesTransforms: [], diagnosticTransform: { kind: 'levels' }, ...resetStructuralWork(),
       }
     case 'unit-column-selected': {
       if (state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
@@ -316,10 +334,10 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
     }
     case 'frequency-selected':
       if (state.sampling.kind === 'regular-series') {
-        return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
+        return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' }, ...resetStructuralWork() }
       }
       if (state.sampling.kind === 'regular-series-awaiting-time') {
-        return { ...state, sampling: { kind: 'regular-series-awaiting-time', frequency: event.frequency }, ...resetStructuralWork() }
+        return { ...state, sampling: { kind: 'regular-series-awaiting-time', frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' }, ...resetStructuralWork() }
       }
       if (state.sampling.kind === 'regular-panel') return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
       if (state.sampling.kind === 'regular-panel-awaiting-keys') return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
@@ -329,12 +347,31 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
       const kept: readonly ColumnId[] = variables.kind === 'selected' ? variables.columns : []
       const seasonal: SeasonalAdjustmentDraft = state.seasonal.kind === 'stl' ? { ...state.seasonal, columns: state.seasonal.columns.filter((column) => kept.includes(column)) } : state.seasonal
       const seriesTransforms = state.seriesTransforms.filter((candidate) => kept.includes(candidate.column))
-      return { ...state, variables, seasonal, seriesTransforms, ...resetStructuralWork() }
+      const resampling: ResamplingDraft = state.resampling.kind === 'daily-downsample'
+        ? { ...state.resampling, aggregations: state.resampling.aggregations.filter((candidate) => kept.includes(candidate.column)) }
+        : state.resampling
+      return { ...state, variables, seasonal, resampling, seriesTransforms, ...resetStructuralWork() }
     }
     case 'seasonal-adjustment-selected':
       return { ...state, seasonal: event.seasonal, ...resetStructuralWork() }
     case 'missingness-selected':
       return { ...state, missingness: event.resolution, ...resetStructuralWork() }
+    case 'resampling-selected':
+      if (state.sampling.kind !== 'regular-series' || state.sampling.frequency !== 'daily') return state
+      return { ...state, resampling: event.resampling, ...resetStructuralWork() }
+    case 'resampling-aggregation-selected':
+      if (state.resampling.kind !== 'daily-downsample' || state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
+      return {
+        ...state,
+        resampling: {
+          ...state.resampling,
+          aggregations: [
+            ...state.resampling.aggregations.filter((candidate) => candidate.column !== event.column),
+            { column: event.column, aggregation: event.aggregation },
+          ],
+        },
+        ...resetStructuralWork(),
+      }
     case 'series-transform-selected':
       if (state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
       return { ...state, seriesTransforms: setSeriesTransform(state.seriesTransforms, event.column, event.transform), ...resetStructuralWork() }
@@ -394,7 +431,9 @@ export function readyPreprocessingRecipe(
             missingness: state.missingness,
           })
         case 'regular-series': {
-          const period = seasonalPeriodOf(state.sampling.frequency)
+          const resampling = readyResamplingRecipe(state.sampling.frequency, state.variables.columns, state.resampling)
+          if (!resampling.ok) return err({ kind: 'resampling-aggregations-required', columns: resampling.error.columns })
+          const period = seasonalPeriodOf(effectiveFrequency(state.sampling.frequency, resampling.value))
           let seasonalAdjustment: SeasonalAdjustmentRecord = { kind: 'none' }
           if (state.seasonal.kind === 'stl') {
             if (period === null) return err({ kind: 'seasonal-period-unavailable' })
@@ -407,6 +446,7 @@ export function readyPreprocessingRecipe(
             sampling: state.sampling,
             columns: state.variables.columns,
             missingness: state.missingness,
+            resampling: resampling.value,
             seasonalAdjustment,
             seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({
               column,
@@ -474,6 +514,7 @@ export function describeReadinessProblem(problem: PreprocessingReadinessProblem)
     case 'structural-zero-unconfirmed': return 'Confirm that each missing value represents a true zero.'
     case 'seasonal-period-unavailable': return 'Yearly rows have no seasonal period, so seasonal-trend decomposition using loess (STL) does not apply.'
     case 'seasonal-columns-required': return 'Choose at least one selected column to adjust seasonally, or switch the adjustment off.'
+    case 'resampling-aggregations-required': return `Choose how to aggregate ${problem.columns.length === 1 ? 'the selected column' : 'every selected column'} into the new calendar interval.`
     default: return assertNever(problem)
   }
 }

@@ -36,8 +36,8 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   // diagnostics
   await page.getByRole('button', { name: /Run stationarity/ }).click()
   await expect(page.getByText(/Stationarity tests · 192 rows/)).toBeVisible({ timeout: 120_000 })
-  await page.getByRole('radio', { name: /Breaks and seasonality/ }).click()
-  await page.getByRole('button', { name: /Find breaks/ }).click()
+  await page.getByRole('radio', { name: /Breaks/ }).click()
+  await page.getByRole('button', { name: /Analyse temporal structure/ }).click()
   await expect(page.getByText(/4 series checked/)).toBeVisible({ timeout: 120_000 })
   await page.getByRole('radio', { name: /Granger/ }).click()
   await choose(page.getByLabel('Candidate cause'), 'kms')

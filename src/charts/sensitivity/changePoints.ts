@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { baseOption, gridAuto, responsive, tooltip, valueAxis } from '../grammar'
+import { baseOption, gridAuto, responsive, tooltip, valueAxis, zoomPair } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface ChangePointsChartView {
@@ -9,6 +9,11 @@ export interface ChangePointsChartView {
   /** One-based row numbers where a new segment starts. */
   readonly changePoints: readonly number[]
   readonly stepLabel: string
+  /**
+   * Offer the zoom slider. A figure the reader scrubs earns the control; a thumbnail read at a
+   * glance does not, and on a short strip the slider costs a quarter of the plot.
+   */
+  readonly zoom?: boolean
 }
 
 /** The series as a hairline with a dashed rule at every PELT segment boundary. */
@@ -38,12 +43,18 @@ export function changePointsOption(view: ChangePointsChartView, theme: ChartThem
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
       axisLabel: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize, hideOverlap: true, alignMinLabel: 'left', alignMaxLabel: 'right' },
+      splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
+    ...(view.zoom === false ? {} : { dataZoom: zoomPair(theme) }),
     series: [{
       type: 'line',
       name: view.name,
       data: view.values.map((value, index) => [index + 1, value]),
+      // Thousands of points into a short strip: downsample to the pixels available. `minmax` emits the
+      // real minimum and maximum of each frame in their original order, so a spike is never smoothed
+      // away or dropped by a heuristic — which matters when the outliers are what the plot is for.
+      sampling: 'minmax',
       symbol: 'none',
       lineStyle: { color: theme.ink, width: 1.2 },
       markLine: {

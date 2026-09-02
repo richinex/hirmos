@@ -4,7 +4,7 @@ import { EChart } from '@/charts/EChart'
 import { edgeStrengthBarsOption } from '@/charts/discovery/edgeStrengthBars'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
 import { useChartTheme } from '@/charts/theme'
-import { field, label } from '@/components/ui/recipes'
+import { caption, field } from '@/components/ui/recipes'
 import type { DiscoveryRunArtifact } from '@/domain/discovery'
 import { lagGraphFromRun } from '@/domain/lagGraph'
 import { LagGraphViews } from './LagGraphViews'
@@ -43,7 +43,7 @@ export function TimeGraphPlot({ run }: { readonly run: TimeGraphRun }) {
   return (
     <div className="mt-3 rounded-lg border border-hair bg-well p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={label('m-0 text-faint')}>Reported links · {run.kind === 'lpcmci-run' ? 'PAG marks' : 'lag-graph marks'}</p>
+        <p className={caption('m-0')}>Reported links · {run.kind === 'lpcmci-run' ? 'PAG marks' : 'lag-graph marks'}</p>
         <LagSelect lags={run.result.tauMax} value={lag} onChange={setLag} contemporaneous />
       </div>
       <EChart option={option} label={`Partial correlation heatmap at lag ${lag}`} className="h-[clamp(220px,34cqb,320px)]" />
@@ -71,7 +71,7 @@ export function WeightPlot({ run }: { readonly run: WeightRun }) {
   return (
     <div className="mt-3 rounded-lg border border-hair bg-well p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={label('m-0 text-faint')}>{run.kind === 'direct-lingam-run' ? 'Nonzero weights · source → target' : 'Nonzero weights · source(t−lag) → target(t)'}</p>
+        <p className={caption('m-0')}>{run.kind === 'direct-lingam-run' ? 'Nonzero weights · source → target' : 'Nonzero weights · source(t−lag) → target(t)'}</p>
         {run.kind !== 'direct-lingam-run' && <LagSelect lags={run.result.laggedWeights.length} value={lag} onChange={setLag} contemporaneous />}
       </div>
       <EChart
@@ -98,7 +98,7 @@ export function OcsePlot({ run }: { readonly run: OcseRun }) {
   if (run.result.edges.length === 0) return null
   return (
     <div className="mt-3 rounded-lg border border-hair bg-well p-3">
-      <p className={label('m-0 text-faint')}>Selected relations by conditional mutual information</p>
+      <p className={caption('m-0')}>Selected relations by conditional mutual information</p>
       <EChart option={option} label="Selected oCSE relations ranked by CMI" className="h-[clamp(160px,28cqb,280px)]" />
     </div>
   )
@@ -111,7 +111,7 @@ export function StructurePlot({ run, label: name }: { readonly run: DiscoveryRun
   if (graph.value.links.length === 0) return <p className="mt-3 text-body text-faint">No link to draw: the run reported no relation.</p>
   return (
     <div className="mt-3">
-      <p className={label('mb-1 text-faint')}>Structure · {graph.value.semantics.replaceAll('-', ' ')}</p>
+      <p className={caption('mb-1')}>Structure · {graph.value.semantics.replaceAll('-', ' ')}</p>
       <LagGraphViews graph={graph.value} label={name} />
     </div>
   )

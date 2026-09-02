@@ -1,6 +1,7 @@
 import { BarChart, CustomChart, GraphChart, HeatmapChart, LineChart, ScatterChart } from 'echarts/charts'
 import {
   AriaComponent,
+  AxisPointerComponent,
   BrushComponent,
   DataZoomInsideComponent,
   DataZoomSliderComponent,
@@ -20,6 +21,7 @@ import { SVGRenderer } from 'echarts/renderers'
 
 use([
   AriaComponent,
+  AxisPointerComponent,
   BarChart,
   BrushComponent,
   CustomChart,

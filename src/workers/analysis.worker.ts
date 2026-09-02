@@ -16,6 +16,7 @@ import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImp
 import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
+import { parsePandasResamplingEvidence } from '@/domain/resampling'
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
@@ -53,6 +54,16 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
     case 'stationarity-battery':
       return { kind: 'stationarityBattery' }
+    case 'pandas-resample-daily':
+      return {
+        kind: 'pandasResampleDaily',
+        rows: command.rows,
+        columns: command.columns,
+        target: command.target,
+        incompleteBins: command.incompleteBins,
+        aggregations: command.aggregations,
+        imputedCells: command.imputedCells,
+      }
     case 'pcmci-plus':
       return {
         kind: 'pcmciPlus',
@@ -169,7 +180,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'unobserved-confounding':
       return { kind: 'unobservedConfounding', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, kappaT: command.kappaT, kappaY: command.kappaY }
     case 'series-structure':
-      return { kind: 'seriesStructure', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, peltMinSize: command.peltMinSize, peltJump: command.peltJump, peltPenalty: command.peltPenalty }
+      return { kind: 'seriesStructure', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, correlationMaxLag: command.correlationMaxLag, peltMinSize: command.peltMinSize, peltJump: command.peltJump, peltPenalty: command.peltPenalty }
     case 'seasonal-adjust':
       return { kind: 'seasonalAdjust', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, adjust: command.adjust }
     case 'double-ml':
@@ -250,6 +261,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'stationarity-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'pandas-resample-daily': {
+        const result = parsePandasResamplingEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'pandas-resampling-succeeded', request: command.request, result: result.value })
         return
       }
       case 'pcmci-plus': {

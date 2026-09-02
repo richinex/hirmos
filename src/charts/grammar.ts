@@ -68,6 +68,26 @@ export const categoryAxis = (theme: ChartTheme, data: readonly string[], name?: 
   axisLabel: axisLabelStyle(theme),
 })
 
+/**
+ * The x-axis of a series plotted against a numbered step: row, observation, lag.
+ *
+ * Vertical rules are suppressed. `valueAxis` already draws horizontal rules in `hair`, and a second
+ * set crossing them turns the plot into a mesh; left unset, ECharts also supplies its own blue-grey
+ * default, so the two families of rule do not even agree in colour.
+ */
+export const stepAxis = (theme: ChartTheme, name: string, nameGap = 24) => ({
+  type: 'value' as const,
+  minInterval: 1,
+  name,
+  nameLocation: 'middle' as const,
+  nameGap,
+  nameTextStyle: axisNameStyle(theme),
+  axisLine: { lineStyle: { color: theme.hair } },
+  axisTick: { show: false },
+  axisLabel: axisLabelStyle(theme),
+  splitLine: { show: false },
+})
+
 export const tooltip = (theme: ChartTheme, trigger: 'item' | 'axis' = 'item', confine = true) => ({
   trigger,
   borderColor: theme.hair,
@@ -93,10 +113,40 @@ export const legend = (theme: ChartTheme, data?: readonly string[]) => ({
   ...(data === undefined ? {} : { data: [...data] }),
 })
 
-/** A diagonal hatch for the cells or bars that carry a verdict, so significance is not colour alone. */
-export const hatch = { symbol: 'rect', dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: Math.PI / 4, color: 'rgba(255,255,255,0.35)' } as const
+/**
+ * A diagonal hatch for the cells or bars that carry a verdict, so significance is not colour alone.
+ *
+ * The grooves are drawn in the surface colour rather than in white, so they read as cut out of the
+ * bar on a light theme as well as a dark one.
+ */
+export const hatch = (theme: ChartTheme) => ({ symbol: 'rect', dashArrayX: [1, 0], dashArrayY: [2, 4], rotation: Math.PI / 4, color: theme.panel }) as const
 
 /** Every evidence chart starts here: deterministic (no animation), described for assistive technology. */
+/**
+ * The zoom pair for a chart the reader scrubs: wheel and drag anywhere, plus a slider whose knobs
+ * say the range can be narrowed. `inside` alone is invisible, so a chart carrying it and nothing
+ * else offers no sign that it zooms at all.
+ */
+export const zoomPair = (theme: ChartTheme, xAxisIndex: number | readonly number[] = 0) => [
+  { type: 'inside' as const, xAxisIndex, filterMode: 'none' as const },
+  {
+    type: 'slider' as const,
+    xAxisIndex,
+    height: 18,
+    bottom: 6,
+    showDetail: false,
+    handleSize: '150%',
+    borderColor: theme.hair,
+    backgroundColor: theme.well,
+    fillerColor: `${theme.muted}33`,
+    dataBackground: { lineStyle: { color: theme.muted }, areaStyle: { color: theme.hair } },
+    selectedDataBackground: { lineStyle: { color: theme.bone }, areaStyle: { color: theme.hair } },
+    handleStyle: { color: theme.panel, borderColor: theme.muted },
+    moveHandleStyle: { color: theme.hair },
+    textStyle: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
+  },
+]
+
 export const baseOption = (theme: ChartTheme, description: string) => ({
   animation: false,
   useUTC: true,

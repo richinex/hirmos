@@ -199,7 +199,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
         <summary className="cursor-pointer text-ink">Ljung–Box by lag</summary>
         <div className="figure-strip mt-2 overflow-x-auto">
         <table className="w-full border-collapse text-body" aria-label="Ljung-Box by lag">
-          <thead><tr className="text-left"><th scope="col" className={label('px-2 py-1 font-normal text-muted')}>Lag</th><th scope="col" className={label('px-2 py-1 text-right font-normal text-muted')}>Q</th><th scope="col" className={label('px-2 py-1 text-right font-normal text-muted')}>p</th></tr></thead>
+          <thead><tr className="text-left"><th scope="col" className="px-2 py-1 text-label font-medium text-muted">Lag</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">Q</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">p</th></tr></thead>
           <tbody>
             {evidence.ljungBoxLags.map((lag, index) => (
               <tr key={lag} className="border-t border-hair">

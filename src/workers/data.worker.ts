@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { inspectPanelStructure, materializeNumericColumns, materializePanelLong, previewWindow, profileColumn, profileSource, summarizeColumns } from '@/data/duckdb'
+import { inspectPanelStructure, materializeNumericColumns, materializePanelLong, materializeTimeSeriesColumns, previewWindow, profileColumn, profileSource, summarizeColumns } from '@/data/duckdb'
 import { assertNever } from '@/domain/dop'
 import { describeSourceSelectionProblem, selectSource } from '@/domain/workflow'
 import { parseDataWorkerCommand, type DataWorkerEvent } from './dataProtocol'
@@ -24,6 +24,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         case 'profile-source': emit({ kind: 'profile-failed', request: command.request, problem }); return
         case 'profile-column': emit({ kind: 'column-profile-failed', request: command.request, problem }); return
         case 'materialize-numeric': emit({ kind: 'materialization-failed', request: command.request, problem }); return
+        case 'materialize-time-series': emit({ kind: 'materialization-failed', request: command.request, problem }); return
         case 'summarize-columns': emit({ kind: 'summary-failed', request: command.request, problem }); return
         case 'preview-window': emit({ kind: 'preview-window-failed', request: command.request, problem }); return
         case 'inspect-panel': emit({ kind: 'panel-data-failed', request: command.request, problem }); return
@@ -49,6 +50,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit(
           { kind: 'materialization-succeeded', request: command.request, matrix: result.value },
           [result.value.values.buffer, result.value.validity.buffer],
+        )
+        return
+      }
+      case 'materialize-time-series': {
+        const result = await materializeTimeSeriesColumns(source.value, command.profile, command.timeColumn, command.columnIds)
+        if (!result.ok) { emit({ kind: 'materialization-failed', request: command.request, problem: result.error }); return }
+        emit(
+          { kind: 'time-series-materialization-succeeded', request: command.request, matrix: result.value },
+          [result.value.timeAxis.kind === 'calendar' ? result.value.timeAxis.timestamps.buffer : result.value.timeAxis.values.buffer, result.value.values.buffer, result.value.validity.buffer],
         )
         return
       }

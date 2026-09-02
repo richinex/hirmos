@@ -1,13 +1,24 @@
 import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
-import { useReducer, useState, type ReactNode } from 'react'
+import { useMemo, useReducer, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { EligibilityView } from '@/components/EligibilityView'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import {
+  EVIDENCE_SCOPES,
+  explainEvidenceScope,
+  describeEvidenceScope,
+  matchesEvidenceSelection,
+  NO_EVIDENCE_SELECTION,
+  selectsEverything,
+  type EvidenceScope,
+  type EvidenceSelection,
+} from '@/domain/evidenceScope'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { OcsePlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
@@ -175,20 +186,68 @@ function ResultCard({ run, method, title, meta, open, current, children }: {
 
 type TimeGraphRun = Extract<DiscoveryRunArtifact, { readonly kind: 'pcmci-plus-run' | 'lpcmci-run' }>
 
-function TimeGraphResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: TimeGraphRun }) {
-  const cells = run.result.graph.flatMap((targets, sourceIndex) =>
-    targets.flatMap((lags, targetIndex) =>
-      lags.map((mark, lag) => ({
-        sourceIndex,
-        targetIndex,
-        lag,
-        mark,
-        p: run.result.pMatrix[sourceIndex][targetIndex][lag],
-        value: run.result.valMatrix[sourceIndex][targetIndex][lag],
-      })),
-    ),
+/**
+ * The scope, source, target and lag controls for a lag-graph evidence table.
+ *
+ * Every ordered pair appears at every lag, so the unfiltered table is mostly absences. These
+ * controls answer the questions a reader actually brings to it.
+ */
+function EvidenceScopeControls({ selection, onChange, variables, tauMax, alpha }: {
+  readonly selection: EvidenceSelection
+  readonly onChange: (next: EvidenceSelection) => void
+  readonly variables: readonly string[]
+  readonly tauMax: number
+  readonly alpha: number
+}) {
+  const lags = Array.from({ length: tauMax + 1 }, (_, lag) => lag)
+  return (
+    <>
+      <SegmentedControl<EvidenceScope['kind']>
+        size="sm"
+        ariaLabel="Which cells to show"
+        value={selection.scope.kind}
+        onChange={(kind) => onChange({ ...selection, scope: EVIDENCE_SCOPES.find((scope) => scope.kind === kind) ?? { kind: 'all' } })}
+        options={EVIDENCE_SCOPES.map((scope) => ({ value: scope.kind, label: describeEvidenceScope(scope), title: explainEvidenceScope(scope, alpha) }))}
+      />
+      <Select className={field('text', 'w-28')} aria-label="Filter by source" value={selection.source ?? ''} onChange={(event) => onChange({ ...selection, source: event.target.value === '' ? null : event.target.value })}>
+        <option value="">Any source</option>
+        {variables.map((name) => <option key={name} value={name}>{name}</option>)}
+      </Select>
+      <Select className={field('text', 'w-28')} aria-label="Filter by target" value={selection.target ?? ''} onChange={(event) => onChange({ ...selection, target: event.target.value === '' ? null : event.target.value })}>
+        <option value="">Any target</option>
+        {variables.map((name) => <option key={name} value={name}>{name}</option>)}
+      </Select>
+      <Select className={field('text', 'w-24')} aria-label="Filter by lag" value={selection.lag === null ? '' : String(selection.lag)} onChange={(event) => onChange({ ...selection, lag: event.target.value === '' ? null : Number(event.target.value) })}>
+        <option value="">Any lag</option>
+        {lags.map((lag) => <option key={lag} value={lag}>lag {lag}</option>)}
+      </Select>
+    </>
   )
-  const rows = cells.map((cell) => ({ key: `${cell.sourceIndex}:${cell.targetIndex}:${cell.lag}`, source: run.variables[cell.sourceIndex].name, target: run.variables[cell.targetIndex].name, lag: cell.lag, mark: cell.mark, p: cell.p, value: cell.value }))
+}
+
+function TimeGraphResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: TimeGraphRun }) {
+  const [selection, setSelection] = useState<EvidenceSelection>(NO_EVIDENCE_SELECTION)
+  const rows = useMemo(
+    () => run.result.graph.flatMap((targets, sourceIndex) =>
+      targets.flatMap((lags, targetIndex) =>
+        lags.map((mark, lag) => ({
+          key: `${sourceIndex}:${targetIndex}:${lag}`,
+          source: run.variables[sourceIndex].name,
+          target: run.variables[targetIndex].name,
+          lag,
+          mark,
+          p: run.result.pMatrix[sourceIndex][targetIndex][lag],
+          value: run.result.valMatrix[sourceIndex][targetIndex][lag],
+        })),
+      ),
+    ),
+    [run],
+  )
+  const selected = useMemo(
+    () => (selectsEverything(selection) ? rows : rows.filter((row) => matchesEvidenceSelection(row, selection, run.result.pcAlpha))),
+    [rows, selection, run.result.pcAlpha],
+  )
+  const variableNames = useMemo(() => run.variables.map((variable) => variable.name), [run])
   const isLpcmci = run.kind === 'lpcmci-run'
   const methodLabel = isLpcmci ? 'LPCMCI · ParCorr' : 'PCMCI+ · ParCorr'
   const resultTitle = isLpcmci ? 'Latent-aware partial ancestral graph evidence' : 'Stationary lag-graph evidence'
@@ -202,10 +261,13 @@ function TimeGraphResult({ run, open, current }: { readonly open: boolean; reado
       <p className="mb-3 mt-3 text-body text-muted">Empty marks appear as “—”. {isLpcmci ? 'The legend under the structure view defines each mark.' : 'Unoriented same-period links keep the o-o mark.'}</p>
       <EvidenceTable<typeof rows[number]>
         title={tableLabel}
-        rows={rows}
+        rows={selected}
+        total={rows.length}
         rowKey={(row) => row.key}
         noun="cell"
         empty="The run reported no cell."
+        exportName={`${isLpcmci ? 'lpcmci' : 'pcmci-plus'}-evidence`}
+        filters={<EvidenceScopeControls selection={selection} onChange={setSelection} variables={variableNames} tauMax={run.result.tauMax} alpha={run.result.pcAlpha} />}
         columns={[
           ...linkColumns<typeof rows[number]>(),
           { id: 'mark', header: 'Mark', mono: true, value: (row) => row.mark, format: (value) => (value === '' ? '—' : value) },

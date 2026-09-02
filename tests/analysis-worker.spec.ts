@@ -5,6 +5,8 @@ import { dagCheckEvidenceSchema } from '../src/domain/dagValidation'
 import { directLingamEvidenceSchema } from '../src/domain/discovery'
 import { identifiedDiscreteQueryEvidenceSchema } from '../src/domain/intervention'
 import { binaryEttEvidenceSchema, causalEffectsEvidenceSchema, frontdoorTwoStageEvidenceSchema } from '../src/domain/estimation'
+import { seasonalAdjustedEvidenceSchema } from '../src/domain/seasonal'
+import { parseSeriesStructureEvidence, seriesStructureEvidenceSchema } from '../src/domain/sensitivity'
 
 const browserOutcomeSchema = z.object({
   result: z.discriminatedUnion('ok', [
@@ -37,6 +39,49 @@ test('rejects an effect attached to an unidentifiable intervention result', () =
     result: { kind: 'unidentifiable', hedgeGraph: [0, 1], hedgeSubgraph: [1], effect: 0.4 },
   })
   expect(parsed.success).toBe(false)
+})
+
+test('requires complete STL components and aligned lag-correlation evidence', () => {
+  const seasonal = seasonalAdjustedEvidenceSchema.safeParse({
+    kind: 'seasonalAdjusted', rows: 3, columns: 1, period: 2, values: [1, 2, 3],
+    adjusted: [{ column: 0, seasonalStrengthBefore: 0.8, seasonalStrengthAfter: 0.1 }],
+  })
+  expect(seasonal.success).toBe(false)
+
+  const structure = parseSeriesStructureEvidence({
+    kind: 'seriesStructure', observations: 20, period: 4,
+    series: [{ column: 0, trendStrength: 0.5, seasonalStrength: 0.5, correlationMaxLag: 3, acf: [1, 0.2], acfLimits: [0, 0.4], pacf: [1, 0.2], pacfLimits: [0, 0.4], changePoints: [], peltPenalty: 2 }],
+  })
+  expect(structure.ok).toBe(false)
+})
+
+test('returns STL components and notebook-compatible ACF/PACF through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Numerical boundary contract runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const values = Float64Array.from({ length: 72 }, (_, row) => 0.04 * row + 2 * Math.sin(row * Math.PI / 3) + 0.1 * Math.cos(row * 0.7))
+    const seasonal = await analysis.seasonalAdjustInWorker(Float64Array.from(values), 72, 1, { period: 6, robust: true, adjust: [0] })
+    const structure = await analysis.runSeriesStructure(values, 72, 1, { period: 6, robust: true, correlationMaxLag: 12, peltMinSize: 4, peltJump: 1, peltPenalty: 10 })
+    return { seasonal, structure }
+  })
+  const parsed = z.object({
+    seasonal: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), value: seasonalAdjustedEvidenceSchema }).strict(), z.object({ ok: z.literal(false), error: z.unknown() }).strict()]),
+    structure: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), value: seriesStructureEvidenceSchema }).strict(), z.object({ ok: z.literal(false), error: z.unknown() }).strict()]),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success || !parsed.data.seasonal.ok || !parsed.data.structure.ok) return
+  const component = parsed.data.seasonal.value.adjusted[0]
+  expect(component.observed).toHaveLength(72)
+  expect(component.trend).toHaveLength(72)
+  expect(component.seasonal).toHaveLength(72)
+  expect(component.remainder).toHaveLength(72)
+  expect(component.observed[20]).toBeCloseTo(component.trend[20] + component.seasonal[20] + component.remainder[20], 12)
+  const correlation = parsed.data.structure.value.series[0]
+  expect(correlation.acf).toHaveLength(13)
+  expect(correlation.pacf).toHaveLength(13)
+  expect(correlation.acfLimits).toHaveLength(13)
+  expect(correlation.pacfLimits).toHaveLength(13)
 })
 
 test('runs the stationarity battery in the Rust analysis worker', async ({ page }, testInfo) => {

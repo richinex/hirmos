@@ -426,6 +426,7 @@ mod tests {
                 assert_eq!(pc_alpha, 0.05);
             }
             AnalysisCommand::StationarityBattery
+            | AnalysisCommand::PandasResampleDaily { .. }
             | AnalysisCommand::Lpcmci { .. }
             | AnalysisCommand::Dynotears { .. }
             | AnalysisCommand::DirectLingam { .. }

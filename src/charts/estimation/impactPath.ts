@@ -44,6 +44,7 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
       axisLine: { lineStyle: { color: theme.hair } },
       axisTick: { show: false },
       axisLabel: axisLabelStyle(theme),
+      splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
     series: [

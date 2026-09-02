@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
+import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { label, literal, num, pill, segment, tableFoot, th, rowPadding } from '@/components/ui/recipes'
+import { literal, num, pill, segment, tableFoot, th, rowPadding } from '@/components/ui/recipes'
 import type { HistogramBins } from '@/domain/dataset'
 import type { TableDensity } from '@/domain/shellLayout'
 import { formatCount } from '@/lib/format/number'
@@ -34,7 +35,7 @@ export function DensityToggle({ density, onChange }: { readonly density: TableDe
   )
 }
 
-export function TableShell({ title, titleId, toolbar, lead, count, foot, children, className, scrollRef, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]' }: {
+export function TableShell({ title, titleId, toolbar, lead, count, foot, children, className, scrollRef, collapsible = false, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]' }: {
   readonly title: string
   readonly titleId: string
   /** Search, facets, chips: the row under the title. */
@@ -46,20 +47,37 @@ export function TableShell({ title, titleId, toolbar, lead, count, foot, childre
   readonly children: ReactNode
   readonly className?: string
   readonly scrollRef?: React.RefObject<HTMLDivElement | null>
+  /** Let the title fold the body away, for a table read once and then kept out of the way. */
+  readonly collapsible?: boolean
   readonly maxHeight?: string
 }) {
+  const [open, setOpen] = useState(true)
+  const folded = collapsible && !open
   return (
     <section className={cn('flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-hair bg-panel', className)} aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hair px-3.5 py-2">
-        <h3 id={titleId} className={label('m-0 text-muted')}>{title}</h3>
-        {toolbar && <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
+        {collapsible ? (
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            aria-expanded={open}
+            aria-controls={`${titleId}-body`}
+            className="-mx-1 flex items-center gap-1.5 rounded px-1 text-title font-medium text-ink transition-colors hover:text-muted"
+          >
+            <Icon name="expand_more" size={14} className={cn('shrink-0 transition-transform duration-150', open && 'rotate-180')} />
+            <span id={titleId}>{title}</span>
+          </button>
+        ) : (
+          <h3 id={titleId} className="m-0 text-title font-medium text-ink">{title}</h3>
+        )}
+        {toolbar && !folded && <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
       </div>
-      {lead}
-      <div ref={scrollRef} className={cn('figure-strip panel-scroll min-h-0 overflow-auto', maxHeight)}>
+      {!folded && lead}
+      <div id={`${titleId}-body`} hidden={folded} ref={scrollRef} className={cn('figure-strip panel-scroll min-h-0 overflow-auto', maxHeight)}>
         {children}
       </div>
-      {foot}
-      <p aria-live="polite" className={cn(tableFoot, 'm-0')}>{count}</p>
+      {!folded && foot}
+      {!folded && <p aria-live="polite" className={cn(tableFoot, 'm-0')}>{count}</p>}
     </section>
   )
 }
@@ -87,7 +105,7 @@ export function SortHeader({ sorted, canSort = true, onToggle, align = 'left', c
           type="button"
           onClick={onToggle}
           title={title ?? (sorted === 'asc' ? 'Sorted ascending. Click to sort descending.' : sorted === 'desc' ? 'Sorted descending. Click to clear the sort.' : 'Click to sort ascending.')}
-          className={cn(label('flex w-full items-center gap-1 whitespace-nowrap px-3.5 py-[7px] font-normal transition-colors hover:text-ink'), align === 'right' ? 'justify-end text-right' : 'text-left')}
+          className={cn('flex w-full items-center gap-1 whitespace-nowrap px-3.5 py-[7px] text-label font-medium transition-colors hover:text-ink', align === 'right' ? 'justify-end text-right' : 'text-left')}
         >
           <span>{children}</span>
           {sorted !== false && <Icon name={sorted === 'asc' ? 'arrow_upward' : 'arrow_downward'} size={11} className="shrink-0" />}
@@ -231,6 +249,8 @@ export function HeaderMenu({ label: menuLabel, items, className }: { readonly la
   // pane cannot clip it; any scroll or resize closes it rather than leaving it stranded.
   const [anchor, setAnchor] = useState<{ readonly top: number; readonly right: number } | null>(null)
   const id = useId()
+  const menuLayer = `header-menu-${id.replaceAll(':', '')}`
+  useEffect(() => (open ? pushLayer(menuLayer) : undefined), [menuLayer, open])
   useEffect(() => {
     if (!open) return
     const place = () => {
@@ -243,7 +263,7 @@ export function HeaderMenu({ label: menuLabel, items, className }: { readonly la
       if (host.current?.contains(target) === true || menu.current?.contains(target) === true) return
       setOpen(false)
     }
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && escapeFor(menuLayer, event)) setOpen(false) }
     const onScroll = () => setOpen(false)
     document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)

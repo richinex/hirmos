@@ -36,22 +36,20 @@ pub fn acf(x: &[f64], nlags: usize) -> Vec<f64> {
     acov.iter().map(|v| v / acov[0]).collect()
 }
 
-/// `pacf(method="ywadjusted")`: for each order, solve the Yule-Walker system built from
-/// autocovariances divided by the overlap, and keep the last coefficient.
-pub fn pacf_yw_adjusted(x: &[f64], nlags: usize) -> Vec<f64> {
+fn pacf_yw(x: &[f64], nlags: usize, adjusted: bool) -> Vec<f64> {
     let n = x.len();
     let mean = x.iter().sum::<f64>() / n as f64;
     let xo: Vec<f64> = x.iter().map(|v| v - mean).collect();
     let mut r = vec![0.0; nlags + 1];
     r[0] = xo.iter().map(|v| v * v).sum::<f64>() / n as f64;
     for k in 1..=nlags {
-        // The adjusted estimator divides by the number of overlapping terms.
+        // statsmodels' adjusted form divides by the overlap; its MLE form keeps n.
         r[k] = xo[..n - k]
             .iter()
             .zip(&xo[k..])
             .map(|(a, b)| a * b)
             .sum::<f64>()
-            / (n - k) as f64;
+            / if adjusted { (n - k) as f64 } else { n as f64 };
     }
     let mut out = vec![1.0];
     for k in 1..=nlags {
@@ -64,6 +62,44 @@ pub fn pacf_yw_adjusted(x: &[f64], nlags: usize) -> Vec<f64> {
         out.push(rho[k - 1]);
     }
     out
+}
+
+/// `pacf(method="ywadjusted")`: for each order, solve the Yule-Walker system built from
+/// autocovariances divided by the overlap, and keep the last coefficient.
+pub fn pacf_yw_adjusted(x: &[f64], nlags: usize) -> Vec<f64> {
+    pacf_yw(x, nlags, true)
+}
+
+/// `plot_pacf`'s default `method="ywm"`: Yule-Walker with maximum-likelihood
+/// autocovariances, whose denominator remains the full sample size at every lag.
+pub fn pacf_yw_mle(x: &[f64], nlags: usize) -> Vec<f64> {
+    pacf_yw(x, nlags, false)
+}
+
+/// The positive, zero-centred 95% limits drawn by statsmodels' default `plot_acf` and
+/// `plot_pacf`. ACF uses Bartlett's lag-dependent variance; PACF uses 1/sqrt(n).
+pub fn correlation_plot_limits(acf_values: &[f64], observations: usize) -> (Vec<f64>, Vec<f64>) {
+    const Z_975: f64 = 1.959_963_984_540_054;
+    let mut acf_limits = vec![0.0; acf_values.len()];
+    let mut preceding_squares = 0.0;
+    for lag in 1..acf_values.len() {
+        if lag > 1 {
+            preceding_squares += acf_values[lag - 1] * acf_values[lag - 1];
+        }
+        acf_limits[lag] = Z_975
+            * ((1.0
+                + if lag > 1 {
+                    2.0 * preceding_squares
+                } else {
+                    0.0
+                })
+                / observations as f64)
+                .sqrt();
+    }
+    let pacf_limit = Z_975 / (observations as f64).sqrt();
+    let mut pacf_limits = vec![pacf_limit; acf_values.len()];
+    pacf_limits[0] = 0.0;
+    (acf_limits, pacf_limits)
 }
 
 /// `acorr_ljungbox`: the cumulative Ljung-Box statistic and its chi-square p value.
