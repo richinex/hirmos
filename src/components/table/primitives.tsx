@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { literal, num, pill, segment, tableFoot, th, rowPadding } from '@/components/ui/recipes'
+import { literal, num, panel, pill, rowPadding, segment, tableFoot, th } from '@/components/ui/recipes'
 import type { HistogramBins } from '@/domain/dataset'
 import type { TableDensity } from '@/domain/shellLayout'
 import { formatCount } from '@/lib/format/number'
@@ -35,7 +35,7 @@ export function DensityToggle({ density, onChange }: { readonly density: TableDe
   )
 }
 
-export function TableShell({ title, titleId, toolbar, lead, count, foot, children, className, scrollRef, collapsible = false, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]' }: {
+export function TableShell({ title, titleId, toolbar, lead, count, foot, children, className, scrollRef, collapsible = false, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]', frame = 'panel' }: {
   readonly title: string
   readonly titleId: string
   /** Search, facets, chips: the row under the title. */
@@ -50,11 +50,19 @@ export function TableShell({ title, titleId, toolbar, lead, count, foot, childre
   /** Let the title fold the body away, for a table read once and then kept out of the way. */
   readonly collapsible?: boolean
   readonly maxHeight?: string
+  /**
+   * `panel` gives the table its own card; `none` leaves it on the surface it sits on.
+   *
+   * A table dropped straight into a section of the same fill and the same radius draws a second
+   * border around the first for no gain. Its own header rule already separates the head from the
+   * body, which is the division a reader actually uses.
+   */
+  readonly frame?: 'panel' | 'none'
 }) {
   const [open, setOpen] = useState(true)
   const folded = collapsible && !open
   return (
-    <section className={cn('flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-hair bg-panel', className)} aria-labelledby={titleId}>
+    <section className={cn('flex min-h-0 min-w-0 flex-col overflow-hidden', frame === 'panel' && panel(), className)} aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hair px-3.5 py-2">
         {collapsible ? (
           <button

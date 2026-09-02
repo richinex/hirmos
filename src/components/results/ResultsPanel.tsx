@@ -3,7 +3,7 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { IntervalFigure } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
-import { button, chip, label, literal, num, statusText, table, td, th, tr } from '@/components/ui/recipes'
+import { button, chip, label, literal, num, panel, statusText, table, td, th, tr } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
@@ -117,7 +117,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       </article>
 
       {manifest.warnings.length > 0 && (
-        <section className="rounded-xl border border-hair bg-panel p-4" aria-label="Unresolved requirements">
+        <section className={panel('p-4')} aria-label="Unresolved requirements">
           <h3 className="mb-2 mt-0 text-warn text-label font-medium">Requirements to review</h3>
           <ul className="m-0 space-y-1 pl-4 text-body text-muted">
             {manifest.warnings.map((warning) => <li key={warning}>{warning}</li>)}
@@ -125,7 +125,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
         </section>
       )}
 
-      <div className="space-y-3 rounded-xl border border-hair bg-panel p-4" aria-label="Analysis record">
+      <div className={panel('space-y-3 p-4')} aria-label="Analysis record">
       <Section title="Estimator">
         <Row term="Method">{describeEstimator(run.configuration.kind)}</Row>
         <Row term="Configuration"><span className={literal('text-muted')}>{Object.entries(run.configuration).filter(([key]) => key !== 'kind').map(([key, value]) => `${key} ${JSON.stringify(value)}`).join(' · ') || 'defaults'}</span></Row>
@@ -239,7 +239,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         </label>
       </div>
       {otherManifest !== null && manifest !== null && (
-        <section className="rounded-xl border border-hair bg-panel p-4" aria-label="Differences">
+        <section className={panel('p-4')} aria-label="Differences">
           <h3 className="mb-2 mt-0 text-faint text-label font-medium">Differences · {differences.length}</h3>
           {differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : (
             <div className="figure-strip overflow-x-auto">

@@ -1,7 +1,7 @@
 import { Select } from '@/components/ui/Select'
 import { useMemo } from 'react'
 import { LagGraphViews } from '@/components/discovery/LagGraphViews'
-import { label, literal, num } from '@/components/ui/recipes'
+import { label, literal, num, well } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
 import {
   describeEvidenceSemantics,
@@ -127,7 +127,7 @@ export function EvidenceInspector({
             type="button"
             aria-pressed={selectedCandidate?.id === candidate.id}
             onClick={() => onCandidateSelected(candidate)}
-            className="block w-full rounded-lg border border-hair bg-well px-2.5 py-2 text-left transition-colors hover:border-edge aria-pressed:border-signal aria-pressed:bg-raised"
+            className={well('block w-full px-2.5 py-2 text-left transition-colors hover:border-edge aria-pressed:border-signal aria-pressed:bg-raised')}
           >
             <span className="block text-body font-medium text-ink">{candidate.source.name} {candidate.kind === 'endpoint-marked' || candidate.kind === 'regime-endpoint-marked' ? candidate.mark : '→'} {candidate.target.name}</span>
             <span className={num('mt-0.5 block text-label text-faint')}>{candidateDetail(candidate)}</span>

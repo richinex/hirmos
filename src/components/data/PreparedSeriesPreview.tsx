@@ -4,7 +4,7 @@ import { decompositionOption } from '@/charts/data/decomposition'
 import { changePointsOption } from '@/charts/sensitivity/changePoints'
 import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
-import { button, caption, label } from '@/components/ui/recipes'
+import { button, caption, label, panel, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -75,7 +75,7 @@ function DecompositionPlot({ series }: { readonly series: PreparedSeries & { rea
 
 function PreparedSeriesCell({ series }: { readonly series: PreparedSeries }) {
   return (
-    <li className="rounded-lg border border-hair bg-well p-3">
+    <li className={well('p-3')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">{series.name}</span>
         <span className={caption()}>{series.transform}{series.decomposition !== null ? ' · STL-adjusted' : ''}</span>
@@ -146,7 +146,7 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
   useEffect(() => { void load() }, [load])
 
   return (
-    <section className="mt-4 rounded-xl border border-hair bg-panel p-4" aria-labelledby="prepared-preview-title">
+    <section className={panel('mt-4 p-4')} aria-labelledby="prepared-preview-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 id="prepared-preview-title" className="m-0 text-title font-medium text-ink">Prepared values</h3>
@@ -158,7 +158,7 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
       </div>
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{job.detail}</p>}
       {job.kind === 'ready' && (
-        <div className="mt-4 rounded-md border border-line bg-panel">
+        <div className="mt-4 rounded-md border border-line">
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}

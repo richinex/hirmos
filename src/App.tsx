@@ -7,7 +7,7 @@ import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { button, chromeAction, field, iconControl, label, literal, num } from '@/components/ui/recipes'
+import { button, chromeAction, field, iconControl, label, literal, num, panel, well } from '@/components/ui/recipes'
 import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
 import { formatTimestamp } from '@/lib/format/date'
 import { DataStudio } from '@/components/data/DataStudio'
@@ -104,9 +104,9 @@ const formatBytes = (bytes: number): string => {
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
   return (
-    <div className="lift rounded-xl border border-hair bg-panel p-4">
+    <div className={panel('lift p-4')}>
       <div className="flex items-start gap-3">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hair bg-well text-muted">
+        <span className={well('grid h-9 w-9 shrink-0 place-items-center text-muted')}>
           <Icon name="table" size={18} />
         </span>
         <div className="min-w-0 flex-1">
@@ -477,7 +477,7 @@ function App() {
       stage={(
         <>
             {!route.ok && (
-              <p role="alert" className="mb-4 rounded-lg border border-hair bg-well px-3 py-2 text-body text-muted">
+              <p role="alert" className={well('mb-4 px-3 py-2 text-body text-muted')}>
                 {describeRouteProblem(route.error)}; showing {activeName}.
               </p>
             )}
@@ -600,7 +600,7 @@ function App() {
                 <h2 id="import-failed-title" className="mb-3 mt-3 text-heading text-ink">{describeDatasetProfileProblem(workflow.problem)}</h2>
                 <SourceSummary source={workflow.source} />
                 {datasetProfileProblemDetail(workflow.problem) && (
-                  <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body text-muted">
+                  <details className={well('mt-3 px-3 py-2 text-body text-muted')}>
                     <summary>Technical detail</summary>
                     <p className={literal('mb-0 mt-2 break-words text-faint')}>{datasetProfileProblemDetail(workflow.problem)}</p>
                   </details>

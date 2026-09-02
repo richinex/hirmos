@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { label as labelCn, num } from './recipes'
+import { label as labelCn, num, well } from './recipes'
 import { formatCount, formatEstimate, formatInterval, type EffectScale, type Formatted, type IntervalType } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 
@@ -96,7 +96,7 @@ export function RefusalTile({ label, headline, reason, rule, actions, testId }: 
   readonly testId?: string
 }) {
   return (
-    <div className="rounded-lg border border-hair bg-well px-4 py-3" data-testid={testId} data-context={rule} role="status">
+    <div className={well('px-4 py-3')} data-testid={testId} data-context={rule} role="status">
       <span className={labelCn('block text-muted')}>{label}</span>
       <p className="mb-0 mt-1 text-heading font-semibold text-bone">{headline}</p>
       <div className="mt-1 text-body text-bone">{reason}</div>

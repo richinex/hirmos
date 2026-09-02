@@ -90,7 +90,7 @@ export function EdgeLedgerTable({ document, selectedEdge, onSelectEdge }: {
     <TableShell
       title="Arrows"
       titleId={titleId}
-      className="rounded-none border-0 bg-transparent"
+      frame="none"
       maxHeight="max-h-none"
       toolbar={(
         <>

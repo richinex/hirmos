@@ -1,9 +1,9 @@
-import { label } from '@/components/ui/recipes'
+import { label, panel } from '@/components/ui/recipes'
 
 /** One shared explanation of what changes between association, intervention and counterfactual questions. */
 export function CausalHierarchy() {
   return (
-    <details className="rounded-xl border border-hair bg-panel px-4 py-3 text-body">
+    <details className={panel('px-4 py-3 text-body')}>
       <summary className="cursor-pointer text-ink">Causal hierarchy and the data-generating process</summary>
       <p className="mb-3 mt-2 max-w-[70ch] text-muted">The data-generating process is the set of mechanisms assumed to produce the observed variables. A DAG records claims about those mechanisms. Discovery results provide statistical evidence about possible structure; they do not establish the DAG by themselves.</p>
       <dl className="m-0 grid gap-3 @lg/panel:grid-cols-3">

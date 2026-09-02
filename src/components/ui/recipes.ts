@@ -148,6 +148,24 @@ export const caption = (extra?: string): string => cn('text-label text-faint', e
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
 
+/**
+ * A section of the workbench: the outermost surface a reader sees inside a chapter.
+ *
+ * One recipe so the app has one panel, and so a surface can be dropped in one place rather than in
+ * fifteen. A panel holds content, never another panel: two of these nested draw the same border
+ * twice around the same thing, and the inner one stops meaning anything. Where a component would
+ * land its own surface inside this one, reach for its `frame` escape hatch instead.
+ */
+export const panel = (extra?: string): string => cn('rounded-xl border border-hair bg-panel', extra)
+
+/**
+ * A recessed area inside a panel: a control group, a figure, a quoted reading.
+ *
+ * One step in from `panel()`, and the innermost surface that should carry a border. A well inside a
+ * well reads as a mistake, and the give-away is a call site passing `bg-panel` back to cancel it.
+ */
+export const well = (extra?: string): string => cn('rounded-lg border border-hair bg-well', extra)
+
 /** A hairline-joined grid of figure cells: the 1px gaps draw the rules, so the cells carry no borders of their own. */
 export const figureGrid = (extra?: string): string => cn('grid gap-px overflow-hidden rounded-lg border border-hair bg-hair', extra)
 

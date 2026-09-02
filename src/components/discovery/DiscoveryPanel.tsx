@@ -23,7 +23,7 @@ import {
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
-import { button, field, figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { button, field, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
 import {
   DISCOVERY_LAG_OPTIONS,
@@ -173,7 +173,7 @@ function RpcmciControls({ configuration, onChange }: {
           {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
         </Select>
       </div>
-      <details className="@md/panel:col-span-2 @2xl/panel:col-span-3 rounded-lg border border-hair bg-well px-3 py-2">
+      <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
         <summary className="cursor-pointer text-body text-ink">Annealing and conditional-independence settings</summary>
         <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
           <div className="text-body text-ink">
@@ -222,7 +222,7 @@ function ResultEligibility({ eligibility }: { readonly eligibility: MethodEligib
 
 function RunRecord({ run }: { readonly run: DiscoveryRunArtifact }) {
   return (
-    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+    <details className={well('mt-3 px-3 py-2 text-body')}>
       <summary className="cursor-pointer text-ink">Run details</summary>
       <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
         <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
@@ -341,6 +341,7 @@ function TimeGraphResult({ run, open, current }: { readonly open: boolean; reado
       <TimeGraphPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">Empty marks appear as “—”. {isLpcmci ? 'The legend under the structure view defines each mark.' : 'Unoriented same-period links keep the o-o mark.'}</p>
       <EvidenceTable<typeof rows[number]>
+        frame="none"
         title={tableLabel}
         rows={selected}
         total={rows.length}
@@ -407,6 +408,7 @@ function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly
       <RpcmciTimeGraphPlot run={run} regime={regime} />
       <p className="mb-3 mt-3 text-body text-muted">The selected regime changes both the graph and its partial-correlation matrix. Regime numbers are labels and may be exchanged without changing the fitted model.</p>
       <EvidenceTable<typeof rows[number]>
+        frame="none"
         title={`RPCMCI regime ${regime + 1} raw evidence`}
         rows={selected}
         total={rows.length}
@@ -440,6 +442,7 @@ function DynotearsResult({ run, open, current }: { readonly open: boolean; reado
       <WeightPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">All fitted weights are retained without a display threshold. Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
       <EvidenceTable<typeof rows[number]>
+        frame="none"
         title="DYNOTEARS raw weights"
         rows={rows}
         rowKey={(row) => row.key}
@@ -467,6 +470,7 @@ function VarLingamResult({ run, open, current }: { readonly open: boolean; reado
       <WeightPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
       <EvidenceTable<typeof rows[number]>
+        frame="none"
         title="VAR-LiNGAM raw weights"
         rows={rows}
         rowKey={(row) => row.key}
@@ -496,6 +500,7 @@ function DirectLingamResult({ run, open, current }: { readonly open: boolean; re
       <WeightPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">A nonzero row denotes source → target. The coefficient is a fitted structural weight on the variables' observed scales, not an intervention-effect estimate.</p>
       <EvidenceTable<typeof rows[number]>
+        frame="none"
         title="DirectLiNGAM raw weights"
         rows={rows}
         rowKey={(row) => row.key}
@@ -521,6 +526,7 @@ function OcseResult({ run, open, current }: { readonly open: boolean; readonly c
       <OcsePlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">Selected lagged relations can be reviewed in the DAG workspace. They are not estimates of intervention effects.</p>
       <EvidenceTable<typeof rows[number]>
+        frame="none"
         title="oCSE raw evidence"
         rows={rows}
         rowKey={(row) => row.key}
@@ -746,7 +752,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       </div>
 
       <div className="grid gap-4">
-        <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="discovery-method-title">
+        <section className={panel('p-4')} aria-labelledby="discovery-method-title">
           <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
           <SegmentedControl
             wrap
@@ -760,7 +766,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             <h4 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h4>
             <p className="mb-0 mt-0.5 max-w-[65ch] text-label text-faint">{visibleGroup.description}</p>
           </div>
-          <RadioList
+          <RadioList frame="none"
             className="mt-1"
             legend="Discovery method"
             legendHidden

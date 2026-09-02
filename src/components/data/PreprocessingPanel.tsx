@@ -13,7 +13,7 @@ import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { describeResolutionRecord, type MissingnessResolutionRecord } from '@/domain/missingness'
-import { button, field, fieldLabel, label, num, table, td, th, tr } from '@/components/ui/recipes'
+import { button, field, fieldLabel, label, num, panel, table, td, th, tr, well } from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
@@ -480,10 +480,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       </div>
 
       <div className="grid gap-4 @3xl/panel:grid-cols-2">
-        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="sampling-title">
+        <section className={panel('@container/card p-4')} aria-labelledby="sampling-title">
           <span className={label('text-faint')}>How rows are organised</span>
           <h3 id="sampling-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose the observation structure</h3>
-          <RadioList
+          <RadioList frame="none"
             className="mb-3"
             legend="Observation structure"
             legendHidden
@@ -543,7 +543,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           )}
         </section>
 
-        <section className="@container/card rounded-xl border border-hair bg-panel p-4" aria-labelledby="variables-title">
+        <section className={panel('@container/card p-4')} aria-labelledby="variables-title">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <span className={label('text-faint')}>Variables</span>
@@ -578,7 +578,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           </div>
         </section>
 
-        <section className="@container/card rounded-xl border border-hair bg-panel p-4 @3xl/panel:col-span-2" aria-labelledby="missingness-title">
+        <section className={panel('@container/card p-4 @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
           <span className={label('text-faint')}>Missing values</span>
           <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose how to handle missing data</h3>
           {draft.missingness.kind === 'not-present' ? (
@@ -691,7 +691,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                   <div>
                     <span className={fieldLabel}>Method</span>
-                    <RadioList
+                    <RadioList frame="none"
                       className="mt-1"
                       legend="Imputation method"
                       legendHidden
@@ -716,13 +716,13 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </section>
 
         {(timeSeriesSelected || panelSelected) && (
-        <section className="@container/card rounded-xl border border-hair bg-panel p-4 @3xl/panel:col-span-2" aria-labelledby="transform-title">
+        <section className={panel('@container/card p-4 @3xl/panel:col-span-2')} aria-labelledby="transform-title">
           <span className={label('text-faint')}>Time-series values</span>
           <h3 id="transform-title" className="mb-1 mt-1 text-title font-medium text-ink">Prepare the analysis scale</h3>
           {timeSeriesSelected ? (
             <>
               <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">A transformation changes the values used by later analyses. Save a separate prepared version so results on levels and transformed values remain comparable. Missingness is resolved before calendar resampling, seasonal adjustment, and per-column transformations.</p>
-              <div className="mt-4 rounded-md border border-line bg-panel p-3">
+              <div className="mt-4 rounded-md border border-line p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <span className={fieldLabel}>Calendar resampling</span>
@@ -829,7 +829,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 )}
               </div>
               <div className="mt-4 border-t border-hair pt-3">
-                <div className="rounded-md border border-line bg-panel" role="group" aria-label="Transformations by column">
+                <div className="rounded-md border border-line" role="group" aria-label="Transformations by column">
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hair px-3 py-1.5">
                     <span className="text-body text-muted">All columns</span>
                     <div className="flex flex-wrap items-center gap-1 pr-[5px]" role="group" aria-label="Set transformation for all selected columns">
@@ -893,7 +893,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
       {(timeSeriesSelected || preparedTimeSeries !== null) && (
-        <section className="mt-4 rounded-xl border border-hair bg-panel p-4" aria-labelledby="diagnostics-title">
+        <section className={panel('mt-4 p-4')} aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 id="diagnostics-title" className="m-0 text-title font-medium text-ink">Diagnostics</h3>
@@ -925,7 +925,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div className="mt-3">
             <span className={fieldLabel}>Run the tests on</span>
             <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">This moves the reported statistics only. The verdict is read from the values in levels and their first difference either way, because integration order is a property of the series rather than of the scale it is inspected on.</p>
-            <RadioList
+            <RadioList frame="none"
               className="mt-2"
               legend="Run the stationarity tests on"
               legendHidden
@@ -958,7 +958,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           </div>
           {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
           {stationarityEvidence !== null && (
-          <div className="mt-4 rounded-md border border-line bg-panel">
+          <div className="mt-4 rounded-md border border-line">
             <button
               type="button"
               onClick={() => setStationarityOpen((value) => !value)}
@@ -1063,7 +1063,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   },
                 ] as const
                 return (
-                  <details key={evidence.column} className="rounded-lg border border-hair bg-well px-3 py-2">
+                  <details key={evidence.column} className={well('px-3 py-2')}>
                     <summary className="cursor-pointer text-body font-medium text-ink">
                       {column?.name ?? evidence.column} · test statistics
                     </summary>

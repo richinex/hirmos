@@ -15,7 +15,7 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
@@ -214,7 +214,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
         </table>
         </div>
       </details>
-      <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+      <details className={well('mt-3 px-3 py-2 text-body')}>
         <summary className="cursor-pointer text-ink">Run details</summary>
         <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
           <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
@@ -255,7 +255,7 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
         <MetricTile label="Sign changes" size="compact" frame="cell" value={formatCount(flips)} context={`of ${formatCount(flat.length).text} cells`} />
       </div>
       <EChart option={option} label="Refitted effect over simulated confounder strengths" className="mt-3 h-[300px]" testId="unobserved-grid" />
-      <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+      <details className={well('mt-3 px-3 py-2 text-body')}>
         <summary className="cursor-pointer text-ink">Run details</summary>
         <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
           <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
@@ -382,7 +382,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
         <p className="m-0 max-w-[65ch] text-body text-muted">A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
 
-      <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="sensitivity-setup-title">
+      <section className={panel('p-4')} aria-labelledby="sensitivity-setup-title">
         <h3 id="sensitivity-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">{describeProbe(state.probe)}</h3>
         {estimationRuns.length === 0 ? (
           <Alert tone="info" live={false}><p className="m-0">Run an estimate before choosing a sensitivity probe.</p></Alert>
@@ -398,7 +398,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               </Select>
             </label>
             <div className="mt-4">
-              <RadioList legend="Probe" value={state.probe} onChange={(probe) => dispatch({ type: 'probe-chosen', probe })} options={PROBES.map((probe) => ({ value: probe, label: describeProbe(probe), hint: probeHint(probe) }))} />
+              <RadioList frame="none" legend="Probe" value={state.probe} onChange={(probe) => dispatch({ type: 'probe-chosen', probe })} options={PROBES.map((probe) => ({ value: probe, label: describeProbe(probe), hint: probeHint(probe) }))} />
             </div>
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               {configuration.kind === 'linear-refutation' && (

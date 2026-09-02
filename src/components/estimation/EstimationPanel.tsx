@@ -22,7 +22,7 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -269,7 +269,7 @@ function SyntheticControlEvidenceDetails({ run }: { readonly run: Extract<Estima
   const { evidence } = run
   const donorNames = run.columns.slice(2).map((column) => column.name)
   return (
-    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+    <details className={well('mt-3 px-3 py-2 text-body')}>
       <summary className="cursor-pointer text-ink">Synthetic-control inference</summary>
       <div className="mt-3 grid gap-4">
         {evidence.crossFit.kind === 'available' ? (
@@ -313,7 +313,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
     ['Synthetic difference-in-differences', evidence.syntheticDid, evidence.syntheticDidPlacebo, evidence.syntheticDidInTime],
   ] as const
   return (
-    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+    <details className={well('mt-3 px-3 py-2 text-body')}>
       <summary className="cursor-pointer text-ink">Panel weights and period effects</summary>
       <div className="mt-3 grid gap-4">
         <div className="figure-strip overflow-x-auto">
@@ -355,7 +355,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
 
 function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
   return (
-    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+    <details className={well('mt-3 px-3 py-2 text-body')}>
       <summary className="cursor-pointer text-ink">Run details</summary>
       <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
         <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
@@ -1426,7 +1426,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 </div>
                 {explicitAdjustment.nodes.length === 0 && <p className="m-0 text-body text-faint">The empty set will be tested. It is valid only when the graph has no open non-causal treatment–outcome path.</p>}
                 {adjustmentDraft.kind === 'editing' && (
-                  <div className="grid grid-cols-[minmax(0,1fr)_8rem_auto_auto] items-end gap-2 rounded-lg border border-hair bg-well p-2">
+                  <div className={well('grid grid-cols-[minmax(0,1fr)_8rem_auto_auto] items-end gap-2 p-2')}>
                     <label className="block">
                       <ParameterLabel className={fieldLabel} label="Variable" help={ESTIMATION_PARAMETER_HELP.causalEffects.variable} />
                       <Select className={field('text', 'mt-1')} value={adjustmentDraft.variable ?? ''} onChange={(event) => setAdjustmentDraft({ ...adjustmentDraft, variable: event.target.value === '' ? null : Number(event.target.value) })}>
@@ -1521,7 +1521,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         <p className="m-0 max-w-[65ch] text-body text-muted">Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 
-      <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="estimation-setup-title">
+      <section className={panel('p-4')} aria-labelledby="estimation-setup-title">
         <h3 id="estimation-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">{method.ok ? method.value.name : 'Estimator'}</h3>
         {identified.length === 0 ? (
           <Alert tone="info" live={false}>
@@ -1554,7 +1554,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                   <h3 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h3>
                   <p className="mb-0 mt-0.5 max-w-[65ch] text-label text-faint">{visibleGroup.description}</p>
                 </div>
-                <RadioList
+                <RadioList frame="none"
                   columns={2}
                   legend={visibleGroup.name}
                   legendHidden

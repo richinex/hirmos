@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { well } from './recipes'
 
 /**
  * A single-choice control: one raised knob slides to the chosen option inside a bordered well.
@@ -47,6 +48,13 @@ export interface SegmentedControlProps<V extends string> {
   readonly fill?: boolean
   /** A wrapping choice grid for longer catalogues: no sliding knob; each chip carries its own selected surface, focus ring, press acknowledgement, and a hatch when disabled. */
   readonly wrap?: boolean
+  /**
+   * `well` gives the track its own recessed surface; `none` leaves it on the surface it sits on.
+   *
+   * The knob reads by its own raised fill against whatever is behind it, so a track dropped into a
+   * well of the same fill adds a border without adding contrast.
+   */
+  readonly frame?: 'well' | 'none'
   readonly disabled?: boolean
   /** Native form field name. A stable, instance-local name is generated when this is omitted. */
   readonly name?: string
@@ -81,7 +89,7 @@ const CHIP_LAYERS = [
   'has-[:focus-visible]:outline-none has-[:focus-visible]:before:scale-100 has-[:focus-visible]:before:opacity-100',
 ].join(' ')
 
-export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', fill = false, wrap = false, disabled = false, name, required = false }: SegmentedControlProps<V>) {
+export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', fill = false, wrap = false, disabled = false, name, required = false, frame = 'well' }: SegmentedControlProps<V>) {
   const host = useRef<HTMLDivElement>(null)
   const [knob, setKnob] = useState<Frame | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -215,7 +223,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
       onPointerUp={dragEnabled ? () => { setDragging(false); radios()[checkedIndex]?.focus() } : undefined}
       onPointerCancel={dragEnabled ? () => setDragging(false) : undefined}
       className={cn(
-        'relative max-w-full flex-wrap gap-1 rounded-lg border border-hair bg-well p-1',
+        frame === 'well' ? well('relative max-w-full flex-wrap gap-1 p-1') : 'relative max-w-full flex-wrap gap-1 p-1',
         !wrap && 'touch-none',
         fill ? 'flex w-full' : 'inline-flex',
         className,

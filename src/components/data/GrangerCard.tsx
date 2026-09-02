@@ -5,7 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import { Select } from '@/components/ui/Select'
-import { button, field, caption, label, num } from '@/components/ui/recipes'
+import { button, caption, field, label, num, panel, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { Alert } from '@/components/ui/Alert'
 import {
@@ -44,7 +44,7 @@ function GrangerPlot({ artifact }: { readonly artifact: GrangerEvidenceArtifact 
     alpha: 0.05,
   }, theme), [artifact, theme])
   return (
-    <div className="mt-3 rounded-lg border border-hair bg-well p-3">
+    <div className={well('mt-3 p-3')}>
       <p className={caption('m-0')}>p-value by lag order · alpha 0.05 reference, log scale</p>
       <EChart option={option} label="Granger p-values by lag order" className="h-[clamp(160px,26cqb,240px)]" />
     </div>
@@ -62,7 +62,7 @@ const TEST_COLUMNS: readonly EvidenceColumn<TestRow>[] = [
 function GrangerRecord({ artifact, open }: { readonly artifact: GrangerEvidenceArtifact; readonly open: boolean }) {
   return (
     <li>
-      <details className="group rounded-lg border border-hair bg-well" open={open}>
+      <details className={well('group')} open={open}>
         <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-3 py-2 transition-colors hover:bg-raised [&::-webkit-details-marker]:hidden">
           <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
           <span className="text-body font-medium text-ink">{artifact.candidateCause.name} → {artifact.target.name}</span>
@@ -73,7 +73,7 @@ function GrangerRecord({ artifact, open }: { readonly artifact: GrangerEvidenceA
           <p className="m-0 text-body text-muted">{describeGrangerVerdict(artifact)}</p>
           <GrangerPlot artifact={artifact} />
           <div className="mt-3">
-            <EvidenceTable<TestRow> title="Granger raw evidence" rows={artifact.result.tests} rowKey={(test) => String(test.lag)} noun="lag" empty="The test reported no lag." columns={TEST_COLUMNS} maxHeight="max-h-72" />
+            <EvidenceTable<TestRow> frame="none" title="Granger raw evidence" rows={artifact.result.tests} rowKey={(test) => String(test.lag)} noun="lag" empty="The test reported no lag." columns={TEST_COLUMNS} maxHeight="max-h-72" />
           </div>
         </div>
       </details>
@@ -146,7 +146,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
 
   const recorded = [...evidence].reverse()
   return (
-    <section className={embedded ? undefined : 'mt-4 rounded-xl border border-hair bg-panel p-4'} aria-labelledby="granger-title">
+    <section className={embedded ? undefined : panel('mt-4 p-4')} aria-labelledby="granger-title">
       <h3 id="granger-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Granger predictive test</h3>
       <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
       <div className="mt-3 flex flex-wrap items-end gap-2">

@@ -117,7 +117,7 @@ const plural = (count: number, noun: string): string => `${count} ${noun}${count
 export function IdentificationRecord({ identification }: { readonly identification: Identification }) {
   if (identification.kind === 'backdoor-not-identified') {
     return (
-      <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
+      <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
         <span className="block text-body font-medium text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment set</p>
         <p className="mb-1 mt-1 text-body text-muted">The general ID result and its hedge, when present, are listed below.</p>
@@ -131,7 +131,7 @@ export function IdentificationRecord({ identification }: { readonly identificati
     const assumed = identification.basis.filter(isOwned)
     const derived = identification.basis.filter((entry) => !isOwned(entry))
     return (
-      <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
+      <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
         <span className="block text-body font-medium text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {identification.kind === 'graphically-identified' ? 'The ID algorithm returned an observational expression' : 'IDC* returned the two expressions required for binary ETT'}</p>
         <p className="mb-2 mt-1 text-body text-muted">{identification.kind === 'graphically-identified' ? 'No back-door adjustment estimator is enabled for this expression.' : 'The binary ETT evaluator is enabled when every observed graph variable contains only 0 and 1.'}</p>
@@ -164,7 +164,7 @@ export function IdentificationRecord({ identification }: { readonly identificati
     : `${plural(paths.length, 'back-door path')} · ${closersAreTheSet ? `blocked at ${closers.join(', ')}` : 'all blocked'}`
 
   return (
-    <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3">
+    <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
       <span className="block text-body font-medium text-ink">Identification record</span>
       <ul className="m-0 mt-1 list-none space-y-0.5 p-0 text-body">
         <li className="flex items-center gap-2 text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {pathSummary}</li>

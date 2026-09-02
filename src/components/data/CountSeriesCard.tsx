@@ -6,7 +6,7 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { LagListField } from '@/components/ui/LagListField'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, label, num } from '@/components/ui/recipes'
+import { button, field, fieldLabel, label, num, well } from '@/components/ui/recipes'
 import {
   describeCountSeriesReadiness,
   newCountSeriesModelId,
@@ -50,7 +50,7 @@ function CountSeriesRecord({ artifact, open }: { readonly artifact: CountSeriesM
   const strongest = artifact.result.candidates.find((candidate) => candidate.referencePoint === artifact.result.strongestReferencePoint)
   return (
     <li>
-      <details className="rounded-lg border border-hair bg-well" open={open}>
+      <details className={well()} open={open}>
         <summary className="cursor-pointer px-3 py-2 text-body text-ink">
           <span className="font-medium">{artifact.outcome.name}</span>
           <span className={num('ml-3 text-label text-faint')}>{artifact.result.link === 'identity' ? 'additive' : 'multiplicative'} · count lags {artifact.result.pastObservationLags.join(', ')} · mean lags {artifact.result.pastMeanLags.join(', ')}</span>

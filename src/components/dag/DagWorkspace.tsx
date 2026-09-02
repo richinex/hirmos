@@ -9,7 +9,7 @@ import type { SelectedSource } from '@/domain/workflow'
 import type { AnalysisProgress } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
-import { button, field, iconControl, label, literal, pill, segment } from '@/components/ui/recipes'
+import { button, field, iconControl, label, literal, panel, pill, segment, well } from '@/components/ui/recipes'
 import {
   createDagDocument,
   describeDagCreateProblem,
@@ -318,7 +318,7 @@ function OriginChoice({
       onClick={onClick}
       className={`rounded-xl border p-4 text-left transition-colors ${active ? 'border-signal bg-raised' : 'border-line bg-panel hover:border-edge disabled:cursor-not-allowed disabled:opacity-45'}`}
     >
-      <span className="mb-3 grid h-9 w-9 place-items-center rounded-lg border border-hair bg-well text-muted"><Icon name={icon} size={18} /></span>
+      <span className={well('mb-3 grid h-9 w-9 place-items-center text-muted')}><Icon name={icon} size={18} /></span>
       <span className="block text-title font-medium text-ink">{title}</span>
       <span className="mt-1 block text-body text-faint">{detail}</span>
     </button>
@@ -338,7 +338,7 @@ function PathList({ document, flow }: { readonly document: DagDocument; readonly
     }
   }
   return (
-    <ul className="m-0 mt-2 list-none divide-y divide-line border-y border-line p-0 text-body" aria-label="Paths from treatment to outcome">
+    <ul className="m-0 mt-2 list-none divide-y divide-line border-t border-line p-0 text-body" aria-label="Paths from treatment to outcome">
       {flow.paths.map((path) => {
         const verdict = status(path)
         return (
@@ -590,12 +590,12 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
             </div>
           </details>
           <div className="mt-3 grid gap-3 @sm/inspector:grid-cols-2">
-            <div className="rounded-lg border border-hair bg-well p-3">
+            <div className={well('p-3')}>
               <span className="block text-label text-faint">Raw p-value distribution</span>
               <strong className="mt-1 block text-title font-medium tabular-nums text-ink">KS p = {evidence.uniformity.pValue.toPrecision(3)}</strong>
               <p className="mb-0 mt-1 text-label text-muted">{evidence.uniformity.pValue < evidence.significanceLevel ? 'The raw p-values are inconsistent with a uniform distribution under the graph.' : 'The test did not find evidence that the raw p-values differ from a uniform distribution under the graph.'} Treat this as a supplementary check because the implication tests can be dependent.</p>
             </div>
-            <div className="rounded-lg border border-hair bg-well p-3">
+            <div className={well('p-3')}>
               {evidence.falsification.kind === 'completed' ? (
                 <>
                   <span className="block text-label text-faint">Relabeled-graph comparison</span>
@@ -792,7 +792,7 @@ export function DagWorkspace({
           <section aria-labelledby="dag-workspace-title">
             {header}
             {state.kind === 'creating' ? (
-              <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="dag-origin-title">
+              <section className={panel('p-4')} aria-labelledby="dag-origin-title">
                 <h3 id="dag-origin-title" className="mb-2 mt-0 text-title font-medium text-ink">Graph basis</h3>
                 <div className="grid gap-3 @md/panel:grid-cols-3">
                   <OriginChoice active={state.origin === 'domain-knowledge'} icon="psychology" title="Substantive knowledge" detail="Theory, prior studies, expert knowledge, institutions, and the treatment-assignment process." onClick={() => dispatch({ type: 'origin-selected', origin: 'domain-knowledge' })} />
@@ -820,7 +820,7 @@ export function DagWorkspace({
     <section aria-labelledby="dag-workspace-title" className="@container/panel flex h-full min-h-0 flex-col">
       {header}
       {documents.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-1 self-start rounded-lg border border-hair bg-well p-1" aria-label="DAG documents">
+        <div className={well('mb-3 flex flex-wrap gap-1 self-start p-1')} aria-label="DAG documents">
           {documents.map((candidate) => <button key={candidate.id} type="button" className={segment(candidate.id === document.id)} aria-pressed={candidate.id === document.id} onClick={() => dispatch({ type: 'document-selected', document: candidate.id, latestRun: latestRunId(discoveryRuns) })}>{candidate.name}</button>)}
         </div>
       )}
@@ -854,7 +854,7 @@ export function DagWorkspace({
         </label>
       </div>
       {state.latentVariable.kind === 'adding' && (
-        <form className="mb-3 flex flex-wrap items-end gap-2 rounded-lg border border-hair bg-well p-3" onSubmit={(event) => { event.preventDefault(); addLatentVariable(document) }}>
+        <form className={well('mb-3 flex flex-wrap items-end gap-2 p-3')} onSubmit={(event) => { event.preventDefault(); addLatentVariable(document) }}>
           <label className="min-w-[14rem] flex-1 text-body text-ink">Unmeasured variable name<input autoFocus className={field('text', 'mt-1')} value={state.latentVariable.name} onChange={(event) => dispatch({ type: 'latent-variable-name-changed', value: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') dispatch({ type: 'latent-variable-edit-cancelled' }) }} /></label>
           <button type="submit" className={button('outline')}>Add to DAG</button>
           <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'latent-variable-edit-cancelled' })}>Cancel</button>

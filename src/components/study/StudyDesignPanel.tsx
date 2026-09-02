@@ -12,7 +12,7 @@ import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
 import { RadioList } from '@/components/ui/RadioList'
 import { Formula } from '@/components/ui/Formula'
-import { button, chip, field, fieldHint, fieldLabel, label, literal, num } from '@/components/ui/recipes'
+import { button, chip, field, fieldHint, fieldLabel, label, literal, num, panel, well } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { cn } from '@/lib/utils'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
@@ -104,7 +104,7 @@ const assignmentHint = (kind: AssignmentMechanism['kind']): string => {
 
 function StudyRecord({ study, identification }: { readonly study: StudySpecification; readonly identification: IdentificationArtifact | null }) {
   return (
-    <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+    <details className={well('mt-3 px-3 py-2 text-body')}>
       <summary className="cursor-pointer text-ink">Study details</summary>
       <RecordList className="mt-2 text-label">
         <RecordRow term="Study"><span className={literal('text-muted')} title={study.id}>{study.id.slice(0, 8)}</span></RecordRow>
@@ -349,7 +349,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
 
       <CausalHierarchy />
 
-      <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="study-form-title">
+      <section className={panel('p-4')} aria-labelledby="study-form-title">
         <h3 id="study-form-title" className="mb-3 mt-0 text-title font-medium text-ink">Define the estimand and select a graph</h3>
         {documents.length === 0 && (
           <Alert tone="info" live={false}>
@@ -506,7 +506,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         {roles === null
           ? <p className="m-0 text-body text-faint">Choose a graph, a treatment, and an outcome to see which variables may be adjusted for.</p>
           : (
-            <ul className="m-0 list-none divide-y divide-line border-y border-line p-0 text-body" aria-label="Variable roles">
+            <ul className="m-0 list-none divide-y divide-line border-t border-line p-0 text-body" aria-label="Variable roles">
               {roles.map(({ node, role }) => (
                 <li key={node.node} className="flex flex-col py-1.5">
                   <span className="text-ink">{node.name} <span className="text-faint">· {roleWord(role)}</span></span>

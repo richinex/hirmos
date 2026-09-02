@@ -6,7 +6,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { MetricTile } from '@/components/ui/figures'
-import { button, field, figureGrid, label, num } from '@/components/ui/recipes'
+import { button, field, figureGrid, label, num, panel, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile, TimeAxis } from '@/domain/dataset'
 import { SERIES_STRUCTURE_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -58,7 +58,7 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
   const correlation = useMemo(() => lagCorrelationOption({ name: facts.name, ...facts.evidence }, theme), [facts, theme])
   const strength = (value: number | null) => (value === null ? formatAbsent('notApplicable', period === null ? 'no seasonal period for yearly rows' : 'too few rows for two seasons') : formatStatistic('score', value))
   return (
-    <li className="rounded-lg border border-hair bg-well p-3">
+    <li className={well('p-3')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">{facts.name}</span>
         <span className={num('text-micro text-faint')}>{describeChangePoints(facts.evidence.changePoints, facts.timeAxis)} · penalty {formatStatistic('raw', facts.evidence.peltPenalty).text}</span>
@@ -119,7 +119,7 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
   }
 
   return (
-    <section className={embedded ? undefined : 'mt-4 rounded-xl border border-hair bg-panel p-4'} aria-labelledby="structure-title">
+    <section className={embedded ? undefined : panel('mt-4 p-4')} aria-labelledby="structure-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 id="structure-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Temporal structure</h3>

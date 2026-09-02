@@ -17,7 +17,7 @@ import { Formula } from '@/components/ui/Formula'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, field, fieldLabel, figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
 import { DEFAULT_DYNAMIC_LINEAR_SCM, DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualConfiguration, type CounterfactualRunArtifact, type DynamicCounterfactualUncertainty } from '@/domain/counterfactual'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -194,7 +194,7 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
       <ResultInterpretation interpretation={interpretCounterfactualResult(run, study, stepLabel)} className="mt-3" />
       <ExpandableChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" />
       {effectOption !== null && <ExpandableChart option={effectOption} label={`${study.outcome.name} counterfactual contrast with pointwise block-bootstrap interval`} className="mt-3 h-[240px]" testId="counterfactual-effect-interval" />}
-      <div className="mt-3 grid items-start gap-3 rounded-lg border border-hair bg-well p-3 @md/panel:grid-cols-[auto_1fr]">
+      <div className={well('mt-3 grid items-start gap-3 p-3 @md/panel:grid-cols-[auto_1fr]')}>
         <label className="block text-body text-ink"><span className={fieldLabel}>Inspect plotted point</span><input type="number" min={1} max={view.plottedObservations} aria-label="Inspect plotted point" className={field('text', 'mt-1 w-28')} value={row} onChange={(event) => setRow(Math.max(1, Math.min(view.plottedObservations, Math.floor(Number(event.target.value) || 1))))} /></label>
         <dl className="m-0 grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-body" aria-label={`${stepLabel} ${view.firstStep + index} counterfactual`}>
           <dt className="text-faint">Observed {study.outcome.name}</dt><dd className={num('m-0 text-right text-ink')}>{formatStatistic('raw', view.factual[index] ?? Number.NaN).text}</dd>
@@ -205,7 +205,7 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
         </dl>
       </div>
       <EquationsTable run={run} />
-      <details className="mt-3 rounded-lg border border-hair bg-well px-3 py-2 text-body">
+      <details className={well('mt-3 px-3 py-2 text-body')}>
         <summary className="cursor-pointer text-muted">Run details</summary>
         <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
           <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
@@ -390,7 +390,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
         <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate counterfactual outcomes</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
       </div>
-      <section className="rounded-xl border border-hair bg-panel p-4" aria-labelledby="counterfactual-setup-title">
+      <section className={panel('p-4')} aria-labelledby="counterfactual-setup-title">
         <h3 id="counterfactual-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">Structural counterfactual</h3>
         {identified.length === 0 ? (
           <p className="m-0 text-body text-faint">Identify a study first.</p>
@@ -467,7 +467,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             </div>
             {dynamicConfiguration !== null && (
               <div className="mt-4 border-t border-hair pt-4">
-                <RadioList
+                <RadioList frame="none"
                   legend="Sampling uncertainty"
                   value={dynamicConfiguration.uncertainty.kind}
                   onChange={configureDynamicUncertaintyMode}

@@ -1,5 +1,5 @@
 import { useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
-import { fieldLabel } from '@/components/ui/recipes'
+import { fieldLabel, well } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 
 /**
@@ -17,7 +17,7 @@ export interface RadioOption<V extends string> {
   readonly title?: string
 }
 
-export function RadioList<V extends string>({ legend, legendHidden = false, value, onChange, options, className, columns = 1 }: {
+export function RadioList<V extends string>({ legend, legendHidden = false, value, onChange, options, className, columns = 1, frame = 'well' }: {
   readonly legend: ReactNode
   /** Keep the legend for assistive technology only, when a heading directly above already names the choice. */
   readonly legendHidden?: boolean
@@ -27,6 +27,14 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
   readonly className?: string
   /** Two columns keep a long list of short options from stretching across a wide panel. */
   readonly columns?: 1 | 2
+  /**
+   * `well` draws the group its own surface; `none` leaves it on the surface it sits on.
+   *
+   * The surface says "these options are one control". Where a heading, field label or rule directly
+   * above already says that, drawing it again puts a box inside a box and the border stops carrying
+   * meaning. The chosen row keeps its own surface either way, since that is what marks the selection.
+   */
+  readonly frame?: 'well' | 'none'
 }) {
   const name = useId()
   const group = useRef<HTMLFieldSetElement | null>(null)
@@ -46,7 +54,7 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
   return (
     <fieldset ref={group} role="radiogroup" onKeyDown={jumpToEnd} className={cn('m-0 min-w-0 border-0 p-0', className)}>
       <legend className={legendHidden ? 'sr-only' : fieldLabel}>{legend}</legend>
-      <div className={cn('grid gap-1 rounded-lg border border-hair bg-well p-1', columns === 2 && '@3xl/panel:grid-cols-2', !legendHidden && 'mt-1')}>
+      <div className={cn('grid gap-1', frame === 'well' && well('p-1'), columns === 2 && '@3xl/panel:grid-cols-2', !legendHidden && 'mt-1')}>
         {options.map((option) => {
           const chosen = option.value === value
           return (

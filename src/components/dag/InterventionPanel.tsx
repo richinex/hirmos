@@ -6,7 +6,7 @@ import { Icon } from '@/components/Icon'
 import { Formula } from '@/components/ui/Formula'
 import { MetricTile } from '@/components/ui/figures'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, figureGrid, num } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, num, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DagDocument, DagNodeId } from '@/domain/dag'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
@@ -38,7 +38,7 @@ const BIN_OPTIONS = [2, 3, 4, 5] as const
 function QueryFrame({ query, open, summary, children }: { readonly query: InterventionQueryArtifact; readonly open: boolean; readonly summary: ReactNode; readonly children: ReactNode }) {
   return (
     <li>
-      <details className="group rounded-lg border border-hair bg-well" open={open}>
+      <details className={well('group')} open={open}>
         <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-3 py-2 transition-colors hover:bg-raised [&::-webkit-details-marker]:hidden">
           <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
           <span className="text-body font-medium text-ink">do({query.set.name}) → {query.read.name}</span>
@@ -70,7 +70,7 @@ function DistributionRecord({ query, result, context, methodNote, formula }: { r
         <MetricTile label={`${query.read.name} if ${query.set.name} set high`} size="compact" frame="cell" value={formatStatistic('raw', result.expectations[1])} context={`bin ${result.treatmentStates[1]}`} />
         <MetricTile label="Difference" size="compact" frame="cell" value={formatStatistic('raw', result.effect)} context={context} />
       </div>
-      <div className="mt-3 rounded-lg border border-hair bg-well p-2">
+      <div className={well('mt-3 p-2')}>
         <EChart option={option} label={`${query.read.name} distribution under do(${query.set.name})`} className="h-[200px]" />
       </div>
       <p className="mb-0 mt-2 text-label text-faint">Graph revision {query.dagRevision.slice(0, 8)} · {result.observations} rows</p>

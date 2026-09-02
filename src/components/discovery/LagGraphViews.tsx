@@ -6,7 +6,7 @@ import { lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discove
 import { useChartTheme } from '@/charts/theme'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { summarizeLagGraph, type LagGraph, type LagGraphSemantics } from '@/domain/lagGraph'
-import { literal } from '@/components/ui/recipes'
+import { literal, well } from '@/components/ui/recipes'
 
 interface MarkMeaning { readonly mark: string; readonly meaning: string }
 
@@ -66,10 +66,10 @@ export function LagGraphViews({ graph, label, highlighted = [], initial = 'summa
   const height = view === 'summary' ? summaryMetrics.height : Math.min(gridSize.height, 520)
   const meanings = markMeanings(graph.semantics)
   return (
-    <div className="rounded-lg border border-hair bg-well p-2">
+    <div className={well('p-2')}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
         {graph.tauMax > 0
-          ? <SegmentedControl size="sm" className="bg-panel" ariaLabel="Structure view" value={view} onChange={setView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
+          ? <SegmentedControl size="sm" frame="none" ariaLabel="Structure view" value={view} onChange={setView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
           : <span className="text-micro text-faint">Directed structure</span>}
         <span className="text-micro text-faint">{graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}</span>
       </div>

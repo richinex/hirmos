@@ -1,6 +1,6 @@
 import { Select } from '@/components/ui/Select'
 import type { FormEvent } from 'react'
-import { button, field, label } from '@/components/ui/recipes'
+import { button, field, label, panel } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import {
@@ -61,7 +61,7 @@ export function QuestionView({ profile, state, dispatch }: {
         <section className="rise my-auto w-full max-w-2xl" aria-labelledby="framed-question-title">
           <span className={label('text-faint')}>05 · Study design</span>
           <h2 id="framed-question-title" className="mb-6 mt-3 text-heading text-ink">Causal question</h2>
-          <div className="lift flex items-center gap-3 rounded-xl border border-hair bg-panel px-4 py-5 text-title text-ink">
+          <div className={panel('lift flex items-center gap-3 px-4 py-5 text-title text-ink')}>
             <span>{nameOfColumn(profile, state.question.treatment)}</span>
             <span aria-label="affects" className="text-signal">→</span>
             <span>{nameOfColumn(profile, state.question.outcome)}</span>

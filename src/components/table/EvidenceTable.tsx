@@ -33,7 +33,7 @@ export interface EvidenceColumn<Row> {
 
 type CellMeta = { readonly align: 'left' | 'right'; readonly mono: boolean }
 
-export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96' }: {
+export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel' }: {
   readonly title: string
   readonly rows: readonly Row[]
   readonly columns: readonly EvidenceColumn<Row>[]
@@ -49,6 +49,8 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
   /** File stem for the CSV download; omit to withhold the export. */
   readonly exportName?: string
   readonly maxHeight?: string
+  /** `none` where the table already sits inside a card of the same fill. */
+  readonly frame?: 'panel' | 'none'
 }) {
   const titleId = useId()
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -153,6 +155,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
     <TableShell
       title={title}
       titleId={titleId}
+      frame={frame}
       maxHeight={maxHeight}
       scrollRef={scrollRef}
       toolbar={(

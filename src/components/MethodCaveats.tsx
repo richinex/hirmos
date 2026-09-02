@@ -77,7 +77,7 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
   return (
     <section className="mt-4 border-t border-hair pt-4" aria-label="Method requirements">
       {identification !== null && <IdentificationRecord identification={identification} />}
-      <div className="divide-y divide-hair border-y border-hair">
+      <div className="divide-y divide-hair border-y border-hair first:border-t-0">
         {methods.map((method) => {
           return (
             <details key={method.id} className="group" open={methods.length === 1}>
