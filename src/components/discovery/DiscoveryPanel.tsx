@@ -1,7 +1,6 @@
-import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
@@ -36,11 +35,11 @@ import {
   discoveryMethodGroupById,
   discoveryMethodGroupFor,
   evaluateDiscoveryEligibility,
-  initialDiscoveryDraftFor,
   newDiscoveryRunId,
   readyDiscoverySpecification,
-  stepDiscovery,
   type DiscoveryConfiguration,
+  type DiscoveryDraft,
+  type DiscoveryEvent,
   type DiscoveryLag,
   type DiscoveryRunArtifact,
   type DynotearsPenalty,
@@ -66,9 +65,7 @@ import {
 } from '@/domain/methods'
 import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
-import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
-import type { RunActivity } from '@/domain/activity'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
@@ -88,8 +85,10 @@ interface DiscoveryPanelProps {
   readonly prepared: PreparedDatasetArtifact
   readonly stationarity: StationarityEvidenceArtifact | null
   readonly runs: readonly DiscoveryRunArtifact[]
+  readonly draft: DiscoveryDraft
+  readonly onEvent: (event: DiscoveryEvent) => void
+  readonly cancellation: { requested: boolean }
   readonly onRun: (artifact: DiscoveryRunArtifact) => void
-  readonly onActivity?: (activity: RunActivity | null) => void
 }
 
 const lagFromValue = (value: string): DiscoveryLag | null =>
@@ -748,10 +747,8 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
   }
 }
 
-export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, onRun, onActivity }: DiscoveryPanelProps) {
-  const [draft, dispatch] = useReducer(stepDiscovery, prepared, initialDiscoveryDraftFor)
+export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, draft, onEvent: dispatch, cancellation, onRun }: DiscoveryPanelProps) {
   const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
-  const cancelRequested = useRef(false)
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
   const selectedMethod = methodDefinition(methodId)
@@ -759,7 +756,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   useEffect(() => setVisibleMethodGroup(discoveryMethodGroupFor(configuration.kind).id), [configuration.kind])
   const visibleGroup = discoveryMethodGroupById(visibleMethodGroup)
   const selectedMethodIsVisible = visibleGroup.methods.includes(configuration.kind)
-  useRunActivity(onActivity, draft.job.kind === 'running' ? { label: selectedMethod.ok ? selectedMethod.value.name : 'Discovery', progress: draft.job.progress === null ? null : draft.job.progress.completed / Math.max(1, draft.job.progress.total) } : null)
   const preparedColumns = profile.columns.filter((column) => prepared.columns.includes(column.id))
   if (!selectedMethod.ok) {
     return <p role="alert" className="text-body text-danger">The selected discovery method is not registered.</p>
@@ -785,7 +781,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
     if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused') return
-    cancelRequested.current = false
+    cancellation.requested = false
     dispatch({ type: 'run-started' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
@@ -793,7 +789,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         import('@/analysis/client'),
       ])
       const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
-      if (cancelRequested.current) {
+      if (cancellation.requested) {
         dispatch({ type: 'run-cancelled' })
         return
       }
@@ -960,7 +956,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   }
 
   const cancelRun = () => {
-    cancelRequested.current = true
+    cancellation.requested = true
     void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns())
   }
 
@@ -1175,7 +1171,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 <span>{draft.job.progress.stage}</span>
                 <span className={num()}>{draft.job.progress.completed} / {draft.job.progress.total}</span>
               </div>
-              <progress className="block h-1.5 w-full accent-signal" max={draft.job.progress.total} value={draft.job.progress.completed} />
+              <div className="bar-live h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={draft.job.progress.total} aria-valuenow={draft.job.progress.completed}>
+                <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((draft.job.progress.completed / Math.max(1, draft.job.progress.total)) * 100)}%` }} />
+              </div>
             </div>
           )}
           <div className="mt-4 flex items-center gap-3">
@@ -1189,7 +1187,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
               Run {method.name}
             </button>
             {draft.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={cancelRun}>Cancel run</button>}
-            {draft.job.kind === 'running' && <Orb state="searching" aria-label="Discovery method running" />}
           </div>
             </>
           )}

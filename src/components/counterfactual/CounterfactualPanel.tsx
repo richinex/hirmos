@@ -1,4 +1,3 @@
-import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -503,12 +502,13 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
               <button type="button" className={button('signal')} disabled={eligibility === null || eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
                 Run counterfactual
               </button>
-              {state.job.kind === 'running' && <Orb state="shaping" aria-label="Counterfactual running" />}
             </div>
             {state.job.kind === 'running' && state.job.progress !== null && (
               <div className="mt-2 max-w-sm text-label text-faint">
                 <div className="mb-1 flex justify-between gap-3"><span>Bootstrap refits</span><span className={num()}>{state.job.progress.completed} / {state.job.progress.total}</span></div>
-                <progress className="block h-1.5 w-full accent-signal" max={state.job.progress.total} value={state.job.progress.completed} />
+                <div className="bar-live h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={state.job.progress.total} aria-valuenow={state.job.progress.completed}>
+                <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((state.job.progress.completed / Math.max(1, state.job.progress.total)) * 100)}%` }} />
+              </div>
               </div>
             )}
           </>

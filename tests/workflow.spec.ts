@@ -189,6 +189,16 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await discoveryMethods.getByRole('radio', { name: 'cMLP' }).click()
   await page.getByRole('button', { name: 'Run cMLP' }).click()
   await expect(page.getByRole('button', { name: 'Cancel run' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await mobileNav.getByRole('button', { name: /Data studio/ }).click()
+  const discoveryActivity = page.getByRole('button', { name: 'Discovery running in Discovery lab; open it' })
+  await expect(discoveryActivity).toBeVisible()
+  await discoveryActivity.click()
+  await expect(discoveryFamilies.getByRole('radio', { name: 'Neural' })).toBeChecked()
+  await expect(discoveryMethods.getByRole('radio', { name: 'cMLP' })).toBeChecked()
+  await expect(page.getByRole('button', { name: 'Cancel run' })).toBeVisible()
+
   await page.getByRole('button', { name: 'Cancel run' }).click()
   await expect(page.getByRole('button', { name: 'Cancel run' })).toBeHidden()
   await expect(page.getByRole('button', { name: 'Run cMLP' })).toBeEnabled()

@@ -36,6 +36,12 @@ import {
   type SelectedSource,
 } from '@/domain/workflow'
 import { identificationAllowsEstimation } from '@/domain/study'
+import {
+  initialDiscoverySessionFor,
+  stepDiscoverySession,
+  type DiscoveryEvent,
+} from '@/domain/discovery'
+import { useRunActivity } from '@/lib/useRunActivity'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
 const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
@@ -127,6 +133,31 @@ function App() {
   const shell = useShellLayout()
   const theme = useTheme()
   const profiled = workflow.kind === 'profiled' ? workflow : null
+  const currentPrepared = profiled?.prepared ?? null
+  const [discoverySession, dispatchDiscoverySession] = useReducer(
+    stepDiscoverySession,
+    currentPrepared,
+    initialDiscoverySessionFor,
+  )
+  const discoveryCancellation = useRef({ requested: false })
+
+  useEffect(() => {
+    const currentId = currentPrepared?.id ?? null
+    const sessionId = discoverySession.kind === 'with-prepared-dataset'
+      ? discoverySession.preparedDataset
+      : null
+    if (currentId === sessionId) return
+
+    if (discoverySession.kind === 'with-prepared-dataset' && discoverySession.draft.job.kind === 'running') {
+      discoveryCancellation.current.requested = true
+      void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns())
+    }
+    dispatchDiscoverySession({ type: 'prepared-dataset-changed', prepared: currentPrepared })
+  }, [currentPrepared, discoverySession])
+
+  const reportDiscoveryEvent = useCallback((event: DiscoveryEvent) => {
+    dispatchDiscoverySession({ type: 'discovery-event-received', event })
+  }, [])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -188,6 +219,22 @@ function App() {
     if (run === null) { if (!(chapter in current)) return current; const { [chapter]: _ended, ...rest } = current; return rest }
     return { ...current, [chapter]: run }
   })])) as Record<ChapterId, (run: RunActivity | null) => void>, [])
+  const discoveryDraft = discoverySession.kind === 'with-prepared-dataset'
+    && currentPrepared !== null
+    && discoverySession.preparedDataset === currentPrepared.id
+    ? discoverySession.draft
+    : null
+  useRunActivity(
+    reportActivity.discovery,
+    discoveryDraft?.job.kind === 'running'
+      ? {
+          label: 'Discovery',
+          progress: discoveryDraft.job.progress === null
+            ? null
+            : discoveryDraft.job.progress.completed / Math.max(1, discoveryDraft.job.progress.total),
+        }
+      : null,
+  )
   const [saved, setSaved] = useState<readonly SavedProjectHeader[]>([])
   /** The example's row: its saved copy when there is one, otherwise the shipped bundle as it would be listed. */
   const exampleEntry: SavedProjectHeader = saved.find((entry) => entry.id === EXAMPLE_PROJECT_ID)
@@ -446,7 +493,6 @@ function App() {
             aria-label={`${running.label} running in ${CHAPTERS.find((chapter) => chapter.id === running.chapter)?.name ?? running.chapter}; open it`}
             onClick={() => navigateToChapter(running.chapter)}
           >
-            <span aria-hidden className="pulse-live h-1.5 w-1.5 shrink-0 rounded-full bg-signal" />
             <span className="truncate normal-case tracking-normal">{running.label}</span>
             <span aria-hidden className="bar-live absolute inset-x-2 bottom-[3px] h-[2px] rounded-full bg-line">
               <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((running.progress ?? 0) * 100)}%` }} />
@@ -671,15 +717,17 @@ function App() {
                   </details>
                   </DataStudio>
                 )}
-                {activeChapter === 'discovery' && workflow.prepared !== null && (
+                {activeChapter === 'discovery' && workflow.prepared !== null && discoveryDraft !== null && (
                   <DiscoveryPanel
                     key={workflow.prepared.id}
-                    onActivity={reportActivity.discovery}
                     source={workflow.source}
                     profile={workflow.profile}
                     prepared={workflow.prepared}
                     stationarity={workflow.stationarity}
                     runs={workflow.discoveryRuns}
+                    draft={discoveryDraft}
+                    onEvent={reportDiscoveryEvent}
+                    cancellation={discoveryCancellation.current}
                     onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
                   />
                 )}

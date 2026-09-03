@@ -654,6 +654,14 @@ export interface DiscoveryDraft {
   readonly job: DiscoveryJob
 }
 
+export type DiscoverySession =
+  | { readonly kind: 'without-prepared-dataset' }
+  | {
+      readonly kind: 'with-prepared-dataset'
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly draft: DiscoveryDraft
+    }
+
 export type DiscoveryEvent =
   | { readonly type: 'method-selected'; readonly method: DiscoveryMethodChoice }
   | { readonly type: 'tau-max-selected'; readonly value: DiscoveryLag }
@@ -673,6 +681,10 @@ export type DiscoveryEvent =
   | { readonly type: 'run-failed'; readonly problem: DiscoveryRunProblem }
   | { readonly type: 'run-succeeded'; readonly artifact: DiscoveryRunArtifact }
 
+export type DiscoverySessionEvent =
+  | { readonly type: 'prepared-dataset-changed'; readonly prepared: PreparedDatasetArtifact | null }
+  | { readonly type: 'discovery-event-received'; readonly event: DiscoveryEvent }
+
 export const INITIAL_DISCOVERY_DRAFT: DiscoveryDraft = {
   configuration: { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 },
   job: { kind: 'idle' },
@@ -684,6 +696,29 @@ export const initialDiscoveryDraftFor = (prepared: PreparedDatasetArtifact): Dis
     : INITIAL_DISCOVERY_DRAFT.configuration,
   job: { kind: 'idle' },
 })
+
+export const initialDiscoverySessionFor = (prepared: PreparedDatasetArtifact | null): DiscoverySession =>
+  prepared === null
+    ? { kind: 'without-prepared-dataset' }
+    : {
+        kind: 'with-prepared-dataset',
+        preparedDataset: prepared.id,
+        draft: initialDiscoveryDraftFor(prepared),
+      }
+
+export function stepDiscoverySession(state: DiscoverySession, event: DiscoverySessionEvent): DiscoverySession {
+  switch (event.type) {
+    case 'prepared-dataset-changed':
+      if (event.prepared === null) return { kind: 'without-prepared-dataset' }
+      if (state.kind === 'with-prepared-dataset' && state.preparedDataset === event.prepared.id) return state
+      return initialDiscoverySessionFor(event.prepared)
+    case 'discovery-event-received':
+      return state.kind === 'with-prepared-dataset'
+        ? { ...state, draft: stepDiscovery(state.draft, event.event) }
+        : state
+    default: return assertNever(event)
+  }
+}
 
 export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): DiscoveryDraft {
   switch (event.type) {
@@ -756,8 +791,8 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
     case 'dynotears': return { kind: 'dynotears', maxLag: 2, lambdaW: 0.1, lambdaA: 0.1 }
     case 'var-lingam': return { kind: 'var-lingam', maxLag: 2, prune: true }
     case 'ocse': return { kind: 'ocse', maxLag: 2, alpha: 0.05, nShuffles: 50, method: 'gaussian', k: 5 }
-    case 'cmlp': return { kind: 'cmlp', lag: 3, hidden: [100], activation: 'relu', penalty: 'hierarchical', lambda: 0.005, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 50_000, checkEvery: 100, lookback: 5, seed: 0 }
-    case 'clstm': return { kind: 'clstm', context: 10, hidden: 100, lambda: 0.005, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 20_000, checkEvery: 50, lookback: 5, seed: 0 }
+    case 'cmlp': return { kind: 'cmlp', lag: 3, hidden: [100], activation: 'relu', penalty: 'hierarchical', lambda: 0.1, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 50_000, checkEvery: 100, lookback: 5, seed: 0 }
+    case 'clstm': return { kind: 'clstm', context: 10, hidden: 100, lambda: 0.1, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 20_000, checkEvery: 50, lookback: 5, seed: 0 }
     default: return assertNever(method)
   }
 }
