@@ -1,7 +1,8 @@
 //! PCMCI (PC1 lagged parent selection + MCI) ported 1:1 from tigramite's run_pcmci with ParCorr
 //! and analytic significance: same candidate order, condition choice, and symmetrisation.
 
-use crate::parcorr::{CiKind, Node, ParCorrCi, TimeSeries};
+use crate::parcorr::{CiKind, Node, ParCorrCi, RoleAwareSamplePolicy, TimeSeries};
+use crate::preprocessing::{PreprocessingError, TigramiteFrame};
 
 pub struct PcmciResult {
     pub parents: Vec<Vec<Node>>,
@@ -237,14 +238,41 @@ pub fn run_pcmci_filtered(
     kind: CiKind,
     filter: Option<Vec<bool>>,
 ) -> PcmciResult {
-    let n = data.n;
     // One CI cache across the PC and MCI stages, as one cond_ind_test serves both in the oracle.
     let mut ci = ParCorrCi::with_kind(kind);
     ci.sample_filter = filter;
+    run_pcmci_with_ci(data, tau_min, tau_max, pc_alpha, &mut ci)
+}
+
+pub fn run_pcmci_frame(
+    frame: TigramiteFrame,
+    tau_min: usize,
+    tau_max: usize,
+    pc_alpha: f64,
+    kind: CiKind,
+    sample_policy: RoleAwareSamplePolicy,
+) -> Result<PcmciResult, PreprocessingError> {
+    let data = frame.data.clone();
+    let mut ci = ParCorrCi::with_frame(kind, frame, sample_policy);
+    let result = run_pcmci_with_ci(&data, tau_min, tau_max, pc_alpha, &mut ci);
+    match ci.preprocessing_error().cloned() {
+        Some(error) => Err(error),
+        None => Ok(result),
+    }
+}
+
+fn run_pcmci_with_ci(
+    data: &TimeSeries,
+    tau_min: usize,
+    tau_max: usize,
+    pc_alpha: f64,
+    ci: &mut ParCorrCi,
+) -> PcmciResult {
+    let n = data.n;
     let parents: Vec<Vec<Node>> = (0..n)
-        .map(|j| pc_stable_single(&mut ci, data, j, n, tau_min, tau_max, pc_alpha).parents)
+        .map(|j| pc_stable_single(ci, data, j, n, tau_min, tau_max, pc_alpha).parents)
         .collect();
-    let (val_matrix, p_matrix) = mci_stage(&mut ci, data, &parents, tau_min, tau_max);
+    let (val_matrix, p_matrix) = mci_stage(ci, data, &parents, tau_min, tau_max);
     PcmciResult {
         parents,
         val_matrix,

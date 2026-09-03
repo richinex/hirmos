@@ -72,7 +72,7 @@ data = np.column_stack([
 ])
 corr = np.corrcoef(data.T)
 keep, drop, clusters = _cluster_redundant(corr, 0.9)
-fixtures["cluster"] = {"data": data.tolist(), "threshold": 0.9, "keep": keep, "drop": drop, "clusters": clusters}
+fixtures["cluster"] = {"data": data.tolist(), "correlation": corr.tolist(), "threshold": 0.9, "keep": keep, "drop": drop, "clusters": clusters}
 print("cluster keep:", keep, "drop:", drop)
 
 keep_v, drop_v, hist = _vif_redundant(data, 10.0)

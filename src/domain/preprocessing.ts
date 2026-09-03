@@ -38,13 +38,14 @@ export type MissingnessDraft =
   | {
       readonly kind: 'lag-aware-exclusion'
       readonly cells: number
-      readonly history:
-        | { readonly kind: 'method-default' }
-        | { readonly kind: 'minimum-for-features' }
-        | { readonly kind: 'fixed-warmup'; readonly observations: number }
-      readonly gapInfluence:
-        | { readonly kind: 'direct-only' }
-        | { readonly kind: 'following-guard'; readonly steps: number }
+      readonly cutOff:
+        | 'method-default'
+        | '2xtau-max'
+        | 'tau-max'
+        | 'max-lag'
+        | 'max-lag-or-tau-max'
+        | '2xtau-max-future'
+      readonly propagateThroughMaxLag: boolean
       readonly analysisExclusions:
         | { readonly kind: 'ignore' }
         | {
@@ -105,13 +106,14 @@ export interface PreprocessingDraft {
 }
 
 export type DenseReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' | 'lag-aware-exclusion' }>
+export type TimeSeriesReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' }>
 
 export type ReadyPreprocessingRecipe =
   | {
       readonly kind: 'regular-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
       readonly columns: NonEmptyArray<ColumnId>
-      readonly missingness: DenseReadyMissingness
+      readonly missingness: TimeSeriesReadyMissingness
       readonly resampling: ResamplingRecipe
       readonly seasonalAdjustment: SeasonalAdjustmentRecord
       readonly seriesTransforms: NonEmptyArray<ColumnSeriesTransform>
@@ -155,7 +157,7 @@ export type PreparedDatasetArtifact =
   | PreparedDatasetIdentity & {
       readonly kind: 'prepared-time-series'
       readonly sampling: Extract<SamplingDraft, { readonly kind: 'regular-series' }>
-      readonly missingness: DenseReadyMissingness
+      readonly missingness: TimeSeriesReadyMissingness
       /** Calendar aggregation and its realised row counts. */
       readonly resampling: ResamplingRecord
       /** One record per analysis column. Materialisation applies these after missingness and STL. */
@@ -191,6 +193,7 @@ export type PreprocessingEvent =
   | { readonly type: 'time-column-selected'; readonly timeColumn: ColumnId }
   | { readonly type: 'frequency-selected'; readonly frequency: Frequency }
   | { readonly type: 'variable-toggled'; readonly column: ColumnId }
+  | { readonly type: 'column-selection-replaced'; readonly columns: NonEmptyArray<ColumnId> }
   | { readonly type: 'missingness-selected'; readonly resolution: MissingnessDraft }
   | { readonly type: 'resampling-selected'; readonly resampling: ResamplingDraft }
   | { readonly type: 'resampling-aggregation-selected'; readonly column: ColumnId; readonly aggregation: ResamplingAggregation }
@@ -213,6 +216,7 @@ export type PreprocessingReadinessProblem =
   | { readonly kind: 'variables-required' }
   | { readonly kind: 'missingness-unresolved'; readonly cells: number }
   | { readonly kind: 'lag-exclusion-needs-compatible-method'; readonly cells: number }
+  | { readonly kind: 'lag-exclusion-needs-untransformed-grid' }
   | { readonly kind: 'panel-missingness-unsupported'; readonly cells: number }
   | { readonly kind: 'structural-zero-unconfirmed' }
   | { readonly kind: 'seasonal-period-unavailable' }
@@ -248,6 +252,20 @@ const toggleColumn = (variables: VariableDraft, column: ColumnId): VariableDraft
     : [...current, column]
   return isNonEmpty(next) ? { kind: 'selected', columns: next } : { kind: 'empty' }
 }
+
+const retainColumnConfiguration = (
+  state: PreprocessingDraft,
+  columns: NonEmptyArray<ColumnId>,
+): Pick<PreprocessingDraft, 'variables' | 'seasonal' | 'resampling' | 'seriesTransforms'> => ({
+  variables: { kind: 'selected', columns },
+  seasonal: state.seasonal.kind === 'stl'
+    ? { ...state.seasonal, columns: state.seasonal.columns.filter((column) => columns.includes(column)) }
+    : state.seasonal,
+  resampling: state.resampling.kind === 'daily-downsample'
+    ? { ...state.resampling, aggregations: state.resampling.aggregations.filter((candidate) => columns.includes(candidate.column)) }
+    : state.resampling,
+  seriesTransforms: state.seriesTransforms.filter((candidate) => columns.includes(candidate.column)),
+})
 
 export const seriesTransformFor = (
   transforms: readonly ColumnSeriesTransform[],
@@ -352,6 +370,8 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         : state.resampling
       return { ...state, variables, seasonal, resampling, seriesTransforms, ...resetStructuralWork() }
     }
+    case 'column-selection-replaced':
+      return { ...state, ...retainColumnConfiguration(state, event.columns), ...resetStructuralWork() }
     case 'seasonal-adjustment-selected':
       return { ...state, seasonal: event.seasonal, ...resetStructuralWork() }
     case 'missingness-selected':
@@ -415,7 +435,24 @@ export function readyPreprocessingRecipe(
   }
   switch (state.missingness.kind) {
     case 'unresolved': return err({ kind: 'missingness-unresolved', cells: state.missingness.cells })
-    case 'lag-aware-exclusion': return err({ kind: 'lag-exclusion-needs-compatible-method', cells: state.missingness.cells })
+    case 'lag-aware-exclusion': {
+      if (state.sampling.kind !== 'regular-series') {
+        return err({ kind: 'lag-exclusion-needs-compatible-method', cells: state.missingness.cells })
+      }
+      const transformed = state.variables.columns.some((column) => seriesTransformFor(state.seriesTransforms, column).kind !== 'levels')
+      if (state.resampling.kind !== 'none' || state.seasonal.kind !== 'none' || transformed) {
+        return err({ kind: 'lag-exclusion-needs-untransformed-grid' })
+      }
+      return ok({
+        kind: 'regular-series',
+        sampling: state.sampling,
+        columns: state.variables.columns,
+        missingness: state.missingness,
+        resampling: { kind: 'none' },
+        seasonalAdjustment: { kind: 'none' },
+        seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({ column, transform: { kind: 'levels' } })),
+      })
+    }
     case 'complete-interval':
     case 'imputation':
     case 'not-present': {
@@ -510,6 +547,7 @@ export function describeReadinessProblem(problem: PreprocessingReadinessProblem)
     case 'variables-required': return 'Choose at least one numeric analysis variable.'
     case 'missingness-unresolved': return `${problem.cells} missing values still need a policy.`
     case 'lag-exclusion-needs-compatible-method': return 'Choose a complete interval or approved imputation for dense diagnostics. Lag-aware exclusion keeps the original time grid.'
+    case 'lag-exclusion-needs-untransformed-grid': return 'Lag-aware exclusion currently requires the original time grid and values. Turn off resampling, seasonal adjustment, differencing, and detrending.'
     case 'panel-missingness-unsupported': return `This panel has ${problem.cells} missing values. Complete them separately within each unit before preparing the panel.`
     case 'structural-zero-unconfirmed': return 'Confirm that each missing value represents a true zero.'
     case 'seasonal-period-unavailable': return 'Yearly rows have no seasonal period, so seasonal-trend decomposition using loess (STL) does not apply.'

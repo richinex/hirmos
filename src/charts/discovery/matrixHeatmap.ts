@@ -15,6 +15,8 @@ export interface MatrixHeatmapView {
   readonly scale: 'signed' | 'magnitude'
   /** Name of the quantity in a cell, for the tooltip and the description. */
   readonly quantity: string
+  /** Symmetric matrices compare an unordered pair and must not be narrated as a directed edge. */
+  readonly relation?: 'directed' | 'symmetric'
   /** Text drawn in a cell instead of its number, for example a link mark. */
   readonly cellText?: (source: number, target: number) => string | null
 }
@@ -35,8 +37,13 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
     }
   }))
   const magnitude = Math.max(peak, 1e-9)
-  const description = `${view.title}: ${view.sources.length} sources by ${view.targets.length} targets, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.`
+  const description = view.relation === 'symmetric'
+    ? `${view.title}: ${view.sources.length} by ${view.targets.length}, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.`
+    : `${view.title}: ${view.sources.length} sources by ${view.targets.length} targets, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.`
   const showLabels = view.sources.length * view.targets.length <= 64
+  // Neither axis is named. The row and column labels already carry the variables, an axis name at the
+  // grid's end would sit under the button that lifts the figure into a floating window, and on a
+  // symmetric matrix 'source' and 'target' would assert a direction the quantity does not have.
   // The ramp sits under the grid, which reserves nothing for it: bar thickness, its labels and the offset.
   const rampReserve = 20 + theme.labelSize + 14
   const base = {
@@ -53,17 +60,16 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
         const cell = value[2]
         const text = cell === null || cell === undefined ? 'no relation' : `${view.quantity} <strong>${formatStatistic('score', Number(cell)).text}</strong>`
         const mark = view.cellText?.(source, target)
-        return `${escapeHtml(view.sources[source] ?? '')} → ${escapeHtml(view.targets[target] ?? '')}<br/>${text}${mark ? `<br/>${escapeHtml(mark)}` : ''}`
+        const pair = view.relation === 'symmetric'
+          ? `${escapeHtml(view.sources[source] ?? '')} × ${escapeHtml(view.targets[target] ?? '')}`
+          : `${escapeHtml(view.sources[source] ?? '')} → ${escapeHtml(view.targets[target] ?? '')}`
+        return `${pair}<br/>${text}${mark ? `<br/>${escapeHtml(mark)}` : ''}`
       },
     },
     xAxis: {
       type: 'category',
       data: [...view.targets],
       position: 'top',
-      name: 'target',
-      nameLocation: 'end',
-      nameGap: 8,
-      nameTextStyle: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
       axisLine: { show: false },
       axisTick: { show: false },
       // Every label while they fit; past six columns the auto interval thins them instead of forcing an overlap.
@@ -73,10 +79,6 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
     yAxis: {
       type: 'category',
       data: [...view.sources].reverse(),
-      name: 'source',
-      nameLocation: 'end',
-      nameGap: 8,
-      nameTextStyle: { color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
       axisLine: { show: false },
       axisTick: { show: false },
       axisLabel: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },

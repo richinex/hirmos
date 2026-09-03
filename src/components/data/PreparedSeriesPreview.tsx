@@ -33,7 +33,7 @@ type PreviewJob =
   | { readonly kind: 'failed'; readonly detail: string }
   | { readonly kind: 'ready'; readonly rows: number; readonly leadingRowsRemoved: number; readonly series: NonEmptyArray<PreparedSeries> }
 
-function StagePlot({ name, stage, final }: { readonly name: string; readonly stage: PreparedStage; readonly final: boolean }) {
+function StagePlot({ name, stage, final, labelled }: { readonly name: string; readonly stage: PreparedStage; readonly final: boolean; readonly labelled: boolean }) {
   const theme = useChartTheme()
   const option = useMemo(() => changePointsOption({
     name,
@@ -44,8 +44,9 @@ function StagePlot({ name, stage, final }: { readonly name: string; readonly sta
   }, theme), [name, stage, theme])
   return (
     <li>
-      <span className={label('text-faint')}>{stage.label}</span>
-      <ExpandableChart option={option} label={`${name}, ${stage.label}`} className="mt-1 h-[110px]" testId={final ? 'prepared-series' : undefined} />
+      {/* The stage name separates one step of the preparation from the next, so a lone stage is left unlabelled. */}
+      {labelled && <span className={label('text-faint')}>{stage.label}</span>}
+      <ExpandableChart option={option} label={`${name}, ${stage.label}`} className={`${labelled ? 'mt-1' : ''} h-[110px]`} testId={final ? 'prepared-series' : undefined} />
     </li>
   )
 }
@@ -82,7 +83,7 @@ function PreparedSeriesCell({ series }: { readonly series: PreparedSeries }) {
       </div>
       <ul className="m-0 mt-2 grid list-none gap-2 p-0" aria-label={`${series.name} preparation stages`}>
         {series.stages.map((stage, index) => (
-          <StagePlot key={stage.label} name={series.name} stage={stage} final={index === series.stages.length - 1} />
+          <StagePlot key={stage.label} name={series.name} stage={stage} final={index === series.stages.length - 1} labelled={series.stages.length > 1} />
         ))}
       </ul>
       {series.decomposition !== null && <DecompositionPlot series={{ ...series, decomposition: series.decomposition }} />}

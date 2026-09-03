@@ -35,7 +35,7 @@ export interface LagLink {
   readonly mark: string | null
 }
 
-export type LagGraphSemantics = 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
+export type LagGraphSemantics = 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
 
 export interface LagGraph {
   readonly variables: NonEmptyArray<LagVariable>
@@ -92,7 +92,7 @@ export const lagGraphFromMarkedMatrices = (
   graph: readonly (readonly (readonly string[])[])[],
   values: readonly (readonly (readonly number[])[])[],
   tauMax: number,
-  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graph'>,
+  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graph'>,
 ): LagGraphProjection => {
   const links: LagLink[] = []
   const warnings: LagGraphWarning[] = []
@@ -152,6 +152,27 @@ export function lagGraphFromRpcmciRun(
   )
 }
 
+/** CD-NOTS retains its generated context nodes in the evidence view without treating them as dataset columns. */
+export function lagGraphFromCdnotsRun(
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'cdnots-run' | 'cdnots-plus-run' }>,
+): LagGraphProjection {
+  const variables = [
+    ...variablesOf(run),
+    ...run.result.contextVariables.map((name) => ({
+      id: `context:${run.id}:${name}`,
+      name,
+      latent: false,
+    })),
+  ]
+  return lagGraphFromMarkedMatrices(
+    isNonEmpty(variables) ? variables : [{ id: 'none', name: '—', latent: false }],
+    run.result.graph,
+    run.result.valMatrix,
+    run.result.maxLag,
+    'nonstationary-lag-graph',
+  )
+}
+
 /** Fitted weight matrices into links: every nonzero coefficient is a tail → arrow link at its lag. */
 export function lagGraphFromWeightRun(
   run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>,
@@ -207,6 +228,28 @@ export function lagGraphFromCmlpRun(run: Extract<DiscoveryRunArtifact, { readonl
   return { variables: variablesOf(run), tauMax: run.result.lag, links, semantics: 'neural-lagged-granger' }
 }
 
+/** GRACE gate values are nonnegative edge-selection scores at explicit lags. */
+export function lagGraphFromGraceRun(run: Extract<DiscoveryRunArtifact, { readonly kind: 'grace-run' }>): LagGraph {
+  const links: LagLink[] = []
+  for (let source = 0; source < run.result.variables; source += 1) {
+    for (let target = 0; target < run.result.variables; target += 1) {
+      for (let lag = 0; lag <= run.result.maxLag; lag += 1) {
+        if (!run.result.graph[source][target][lag]) continue
+        links.push({
+          from: source,
+          to: target,
+          lag,
+          fromEndpoint: 'tail',
+          toEndpoint: 'arrow',
+          strength: { kind: 'nonnegative', value: run.result.gateValues[source][target][lag] },
+          mark: null,
+        })
+      }
+    }
+  }
+  return { variables: variablesOf(run), tauMax: run.result.maxLag, links, semantics: 'neural-lagged-granger' }
+}
+
 export type LagResolvedDiscoveryRun = Exclude<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }>
 
 export function lagGraphFromRun(run: LagResolvedDiscoveryRun, regime = 0): LagGraphProjection {
@@ -215,6 +258,9 @@ export function lagGraphFromRun(run: LagResolvedDiscoveryRun, regime = 0): LagGr
     case 'pcmci-plus-run':
     case 'lpcmci-run': return lagGraphFromTimeGraphRun(run)
     case 'rpcmci-run': return lagGraphFromRpcmciRun(run, regime)
+    case 'cdnots-run':
+    case 'cdnots-plus-run': return lagGraphFromCdnotsRun(run)
+    case 'grace-run': return { graph: lagGraphFromGraceRun(run), warnings: [] }
     case 'dynotears-run':
     case 'var-lingam-run': return { graph: lagGraphFromWeightRun(run), warnings: [] }
     case 'ocse-run': return { graph: lagGraphFromOcseRun(run), warnings: [] }

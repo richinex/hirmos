@@ -725,10 +725,12 @@ function App() {
                     prepared={workflow.prepared}
                     stationarity={workflow.stationarity}
                     runs={workflow.discoveryRuns}
+                    documents={workflow.dagDocuments}
                     draft={discoveryDraft}
                     onEvent={reportDiscoveryEvent}
                     cancellation={discoveryCancellation.current}
                     onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
+                    onDeleteRun={(deletion) => dispatch({ type: 'discovery-run-deletion-committed', deletion })}
                   />
                 )}
                 {activeChapter === 'dag' && workflow.prepared !== null && (

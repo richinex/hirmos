@@ -164,7 +164,13 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       <Section title="Data">
         <Row term="Source">{manifest.source.name} · {formatCount(manifest.source.bytes).text} bytes · rows not included</Row>
         <Row term="Prepared dataset">{shortId(String(manifest.prepared.id))} ·{manifest.prepared.kind === 'prepared-time-series' ? `${manifest.prepared.sampling.frequency} series` : manifest.prepared.kind === 'prepared-panel' ? `panel · ${manifest.prepared.panel.units} units × ${manifest.prepared.panel.periods} periods` : 'independent rows'} · {formatCount(manifest.prepared.observations).text} rows</Row>
-        <Row term="Missing data">{manifest.prepared.resolution.kind === 'none' ? 'none' : manifest.prepared.resolution.kind === 'window' ? `rows ${manifest.prepared.resolution.start + 1} to ${manifest.prepared.resolution.endExclusive}` : `${manifest.prepared.resolution.method}, ${manifest.prepared.resolution.cells} cells`}</Row>
+        <Row term="Missing data">{manifest.prepared.resolution.kind === 'none'
+          ? 'none'
+          : manifest.prepared.resolution.kind === 'window'
+            ? `rows ${manifest.prepared.resolution.start + 1} to ${manifest.prepared.resolution.endExclusive}`
+            : manifest.prepared.resolution.kind === 'lag-aware-exclusion'
+              ? `${manifest.prepared.resolution.cells} cells excluded during lagged sample construction`
+              : `${manifest.prepared.resolution.method}, ${manifest.prepared.resolution.cells} cells`}</Row>
         <Row term="Seasonal adjustment">{manifest.prepared.seasonalAdjustment.kind === 'none' ? 'none' : `seasonal-trend decomposition using loess (STL), period ${manifest.prepared.seasonalAdjustment.period}`}</Row>
         <Row term="Series transformations">{manifest.prepared.kind !== 'prepared-time-series' ? 'not applicable' : manifest.prepared.seriesTransforms.map((record, index) => <span key={String(record.column)}>{index > 0 && <span className="text-faint"> · </span>}{manifest.schema.find((column) => column.id === String(record.column))?.name ?? record.column}: {describeSeriesTransform(record.transform)}</span>)}</Row>
         {manifest.stationarity !== null && (

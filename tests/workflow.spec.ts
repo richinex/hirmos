@@ -264,17 +264,17 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   // eligible method decides the family, and the time-series methods are checked in their own.
   const discoveryFamilies = page.getByRole('radiogroup', { name: 'Discovery method family' })
   const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method', exact: true })
-  await expect(discoveryFamilies.getByRole('radio')).toHaveCount(5)
+  await expect(discoveryFamilies.getByRole('radio')).toHaveCount(6)
   await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
   await expect(discoveryMethods.getByRole('radio', { name: /VAR-LiNGAM/ })).toBeDisabled()
-  await discoveryFamilies.getByRole('radio').first().click()
+  await discoveryFamilies.getByRole('radio', { name: 'PCMCI' }).click()
   await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toBeDisabled()
-  await discoveryFamilies.getByRole('radio').nth(1).click()
+  await discoveryFamilies.getByRole('radio', { name: 'LiNGAM' }).click()
   await expect(page.getByRole('radio', { name: 'DirectLiNGAM' })).toBeChecked()
   await discoveryFamilies.getByRole('radio', { name: 'Neural' }).click()
   await expect(discoveryMethods.getByRole('radio', { name: 'cMLP' })).toBeDisabled()
   await expect(discoveryMethods.getByRole('radio', { name: 'cLSTM' })).toBeDisabled()
-  await discoveryFamilies.getByRole('radio').nth(1).click()
+  await discoveryFamilies.getByRole('radio', { name: 'LiNGAM' }).click()
   await page.getByRole('button', { name: 'Run DirectLiNGAM' }).click()
 
   await expect(page.getByLabel('DirectLiNGAM causal order')).toContainText('→', { timeout: 30_000 })
@@ -285,6 +285,9 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
 
   await navigation.getByRole('button', { name: /DAG workspace/ }).click()
   await page.getByRole('button', { name: 'Discovery-informed' }).click()
+  // The origin records only the runs that are ticked, so the contributing run is chosen explicitly.
+  await page.getByRole('group', { name: 'Discovery runs reviewed for this DAG' })
+    .getByRole('checkbox', { name: /DirectLiNGAM/ }).check()
   await page.getByLabel('DAG name').fill('DirectLiNGAM review')
   await page.getByRole('button', { name: 'Create DAG draft' }).click()
   await expect(page.getByRole('heading', { name: 'DirectLiNGAM', exact: true })).toBeVisible()
@@ -369,6 +372,8 @@ test('explains the opposing stationarity null hypotheses and labels every critic
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
   await expect(page.getByText('Prepared time series · 96 rows')).toBeVisible({ timeout: 30_000 })
 
+  // Diagnostics open on redundancy, so the stationarity pane has to be selected before it is read.
+  await page.getByRole('radio', { name: /Stationarity/ }).click()
   await expect(page.getByText(/ADF tests a unit root as its null; KPSS tests stationarity as its null/)).toBeVisible()
   await expect(page.getByText(/prepared data are not changed unless first differencing is saved as a transformation/)).toBeVisible()
   await page.getByRole('button', { name: 'Run stationarity tests' }).click()

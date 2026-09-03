@@ -1,4 +1,4 @@
-import { brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import { brand, err, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 
 export type MethodId = Brand<string, 'MethodId'>
 export type MethodCaveatId = Brand<string, 'MethodCaveatId'>
@@ -133,6 +133,9 @@ export const COUNT_SERIES_INTERVENTION_SCAN_METHOD_ID = methodId('count-series-i
 export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
 export const LPCMCI_PAR_CORR_METHOD_ID = methodId('lpcmci-parcorr')
 export const RPCMCI_PAR_CORR_METHOD_ID = methodId('rpcmci-parcorr')
+export const CDNOTS_PAR_CORR_METHOD_ID = methodId('cdnots-parcorr')
+export const CDNOTS_PLUS_PAR_CORR_METHOD_ID = methodId('cdnots-plus-parcorr')
+export const GRACE_METHOD_ID = methodId('grace')
 export const DYNOTEARS_METHOD_ID = methodId('dynotears')
 export const DIRECT_LINGAM_METHOD_ID = methodId('direct-lingam')
 export const VAR_LINGAM_METHOD_ID = methodId('var-lingam')
@@ -223,6 +226,8 @@ const RUNGE_2020 = paper('Discovering contemporaneous and lagged causal relation
 const GERHARDUS_RUNGE_2020 = paper('High-recall causal discovery for autocorrelated time series with latent confounders (Gerhardus and Runge, 2020)', 'Advances in Neural Information Processing Systems 33; LPCMCI')
 const SAGGIORO_2020 = paper('Reconstructing regime-dependent causal relationships from observational time series (Saggioro, de Wiljes, Kretschmer and Runge, 2020)', 'Chaos 30(11), 113115; doi:10.1063/5.0020538')
 const TANK_2021 = paper('Neural Granger Causality (Tank, Covert, Foti, Shojaie and Fox, 2021)', 'IEEE Transactions on Pattern Analysis and Machine Intelligence 44(8), 4267–4279; arXiv:1802.05842')
+const CDNOTS_2025 = paper('Causal Discovery from Nonstationary Time Series (Sadeghi, Gopal and Fesanghary, 2025)', 'International Journal of Data Science and Analytics 19, 33–59; doi:10.1007/s41060-024-00679-7')
+const GRACE_2026 = paper('GRACE: Gated Refinement for Accurate Causal Edge Discovery in High-Dimensional Time Series (Fesanghary and Havaldar, 2026)', 'arXiv:2606.23880')
 const LJUNG_BOX_1978 = paper('On a Measure of Lack of Fit in Time Series Models (Ljung and Box, 1978)', 'Biometrika 65(2), 297–303')
 const SHAPIRO_WILK_1965 = paper('An Analysis of Variance Test for Normality (Complete Samples) (Shapiro and Wilk, 1965)', 'Biometrika 52(3/4), 591–611')
 const KILLICK_2012 = paper('Optimal Detection of Changepoints with a Linear Computational Cost (Killick, Fearnhead and Eckley, 2012)', 'Journal of the American Statistical Association 107(500), 1590–1598; PELT')
@@ -513,6 +518,119 @@ const RPCMCI_PAR_CORR: MethodDefinition = {
       requirement: 'Regime labels are exchangeable; interpret the membership paths and the corresponding graph together.',
       consequenceIfUnmet: 'A label permutation is mistaken for a substantive difference between runs.',
       sources: [SAGGIORO_2020],
+    },
+  ],
+}
+
+const CDNOTS_PAR_CORR: MethodDefinition = {
+  id: CDNOTS_PAR_CORR_METHOD_ID,
+  name: 'CD-NOTS with ParCorr',
+  family: 'discovery',
+  summary: 'Extends constraint-based discovery to lagged data and uses an explicit time-context variable to orient relations associated with changing mechanisms.',
+  caveats: [
+    {
+      id: caveatId('cdnots-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows follow one regular temporal grid, and the selected maximum lag covers the relevant history.',
+      consequenceIfUnmet: 'Embedded variables represent the wrong time intervals or omit relevant lagged relations.',
+      sources: [CDNOTS_2025],
+    },
+    {
+      id: caveatId('cdnots-markov-faithfulness'),
+      category: 'identification',
+      requirement: 'The causal Markov, faithfulness and causal-sufficiency assumptions used by the method are credible for the measured system.',
+      consequenceIfUnmet: 'Conditional independences need not correspond to the reported causal adjacencies and orientations.',
+      sources: [CDNOTS_2025],
+    },
+    {
+      id: caveatId('cdnots-context-basis'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'The selected time-context basis represents the mechanism changes relevant to the study window.',
+      consequenceIfUnmet: 'The nonstationarity-orientation phase can omit changes or attribute an unsuitable pattern to them.',
+      sources: [CDNOTS_2025],
+    },
+    {
+      id: caveatId('cdnots-parcorr-form'),
+      category: 'functional-form',
+      requirement: 'Partial correlation is an adequate conditional-independence test for the selected variables.',
+      consequenceIfUnmet: 'Nonlinear or non-Gaussian conditional relations can produce incorrect edge decisions.',
+      sources: [CDNOTS_2025],
+    },
+    {
+      id: caveatId('cdnots-missingness'),
+      category: 'missingness',
+      requirement: 'Pairwise-complete testing or VAR-EM imputation is appropriate for the process that produced the missing observations.',
+      consequenceIfUnmet: 'The retained test samples or imputed trajectories can distort conditional-independence decisions.',
+      sources: [CDNOTS_2025],
+    },
+    {
+      id: caveatId('cdnots-graph-reading'),
+      category: 'interpretation',
+      requirement: 'Unoriented and conflicting endpoints remain unresolved; directed marks are discovery evidence rather than intervention-effect estimates.',
+      consequenceIfUnmet: 'Graph uncertainty is presented as a uniquely identified causal effect.',
+      sources: [CDNOTS_2025],
+    },
+  ],
+}
+
+const CDNOTS_PLUS_PAR_CORR: MethodDefinition = {
+  ...CDNOTS_PAR_CORR,
+  id: CDNOTS_PLUS_PAR_CORR_METHOD_ID,
+  name: 'CD-NOTS+ with ParCorr',
+  summary: 'Uses a PCMCI+-style two-stage skeleton before applying the CD-NOTS orientation rules for nonstationary time series.',
+  caveats: mapNonEmpty(CDNOTS_PAR_CORR.caveats, (caveat) => ({
+    ...caveat,
+    id: caveatId(caveat.id.replace('cdnots-', 'cdnots-plus-')),
+  })),
+}
+
+const GRACE: MethodDefinition = {
+  id: GRACE_METHOD_ID,
+  name: 'GRACE',
+  family: 'discovery',
+  summary: 'Refines a high-recall CD-NOTS skeleton with hard-concrete gates that retain candidate lagged inputs that improve nonlinear prediction.',
+  caveats: [
+    {
+      id: caveatId('grace-ordered-time-series'),
+      category: 'sampling-structure',
+      requirement: 'Rows follow one regular temporal grid, and the maximum lag covers the candidate predictive history.',
+      consequenceIfUnmet: 'The neural windows join incorrect time points or omit relevant history.',
+      sources: [GRACE_2026],
+    },
+    {
+      id: caveatId('grace-skeleton'),
+      category: 'identification',
+      requirement: 'The CD-NOTS skeleton has sufficient recall because the neural stage can remove candidates but cannot recover an edge excluded by the skeleton.',
+      consequenceIfUnmet: 'A true relation missing from the first stage is structurally unavailable to the gated model.',
+      sources: [GRACE_2026],
+    },
+    {
+      id: caveatId('grace-dense-input'),
+      category: 'missingness',
+      requirement: 'The dense neural tensor is observed or produced by a defensible recorded imputation model.',
+      consequenceIfUnmet: 'Imputed patterns can be selected as predictive relations.',
+      sources: [GRACE_2026],
+    },
+    {
+      id: caveatId('grace-model-form'),
+      category: 'functional-form',
+      requirement: 'The additive gated encoder and per-target nonlinear decoder adequately represent the predictive mechanisms.',
+      consequenceIfUnmet: 'Gate values can suppress relations that require an unsupported interaction or representation.',
+      sources: [GRACE_2026],
+    },
+    {
+      id: caveatId('grace-optimization'),
+      category: 'computation',
+      requirement: 'The seed, training budget, regularization and gate threshold are assessed because neural optimization and edge selection are tuning-sensitive.',
+      consequenceIfUnmet: 'Different initializations or thresholds can select different graphs.',
+      sources: [GRACE_2026],
+    },
+    {
+      id: caveatId('grace-result-reading'),
+      category: 'interpretation',
+      requirement: 'A retained gate is lagged predictive evidence within the fitted system, not an intervention-effect estimate.',
+      consequenceIfUnmet: 'Predictive selection is reported as the effect of manipulating a variable.',
+      sources: [GRACE_2026],
     },
   ],
 }
@@ -1945,6 +2063,9 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   PCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
   RPCMCI_PAR_CORR,
+  CDNOTS_PAR_CORR,
+  CDNOTS_PLUS_PAR_CORR,
+  GRACE,
   DYNOTEARS,
   DIRECT_LINGAM,
   VAR_LINGAM,
@@ -2003,6 +2124,9 @@ export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   PCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
   RPCMCI_PAR_CORR,
+  CDNOTS_PAR_CORR,
+  CDNOTS_PLUS_PAR_CORR,
+  GRACE,
   DYNOTEARS,
   VAR_LINGAM,
   OCSE,

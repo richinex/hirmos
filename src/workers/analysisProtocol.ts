@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
@@ -18,6 +19,9 @@ import {
   ocseEvidenceSchema,
   cmlpEvidenceSchema,
   clstmEvidenceSchema,
+  cdnotsEvidenceSchema,
+  cdnotsPlusEvidenceSchema,
+  graceEvidenceSchema,
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
   parseLpcmciEvidence,
@@ -25,6 +29,9 @@ import {
   parseOcseEvidence,
   parseCmlpEvidence,
   parseClstmEvidence,
+  parseCdnotsResult,
+  parseCdnotsPlusResult,
+  parseGraceEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
   pcmciPlusEvidenceSchema,
@@ -36,6 +43,9 @@ import {
   type OcseEvidence,
   type CmlpEvidence,
   type ClstmEvidence,
+  type CdnotsEvidence,
+  type CdnotsPlusEvidence,
+  type GraceEvidence,
   type PcmciPlusEvidence,
   type VarLingamEvidence,
 } from '@/domain/discovery'
@@ -92,11 +102,31 @@ export interface AnalysisProgress {
   readonly total: number
 }
 
+export type TemporalSamples =
+  | { readonly kind: 'dense' }
+  | {
+      readonly kind: 'role-aware'
+      readonly validity: Uint8Array
+      readonly analysisMask: Uint8Array
+      readonly cutOff: 'methodDefault' | 'twoTauMax' | 'tauMax' | 'maxLag' | 'maxLagOrTauMax' | 'twoTauMaxFuture'
+      readonly propagateThroughMaxLag: boolean
+      readonly maskType: 'none' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz' | 'xyz'
+    }
+
 export type AnalysisWorkerCommand =
   | {
       readonly kind: 'stationarity-battery'
       readonly request: WorkerRequestId
       readonly values: Float64Array
+    }
+  | {
+      readonly kind: 'multicollinearity'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly correlationThreshold: number
+      readonly vifThreshold: number
     }
   | {
       readonly kind: 'pandas-resample-daily'
@@ -118,6 +148,7 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly tauMax: number
       readonly pcAlpha: number
+      readonly samples: TemporalSamples
     }
   | {
       readonly kind: 'lpcmci'
@@ -127,6 +158,7 @@ export type AnalysisWorkerCommand =
       readonly columns: number
       readonly tauMax: number
       readonly pcAlpha: number
+      readonly samples: TemporalSamples
     }
   | {
       readonly kind: 'rpcmci'
@@ -143,6 +175,45 @@ export type AnalysisWorkerCommand =
       readonly tauMax: number
       readonly pcAlpha: number
       readonly alphaLevel: number
+      readonly seed: number
+    }
+  | {
+      readonly kind: 'cdnots'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly validity: Uint8Array
+      readonly rows: number
+      readonly columns: number
+      readonly maxLag: number
+      readonly alpha: number
+      readonly missing: 'pairwiseComplete' | 'varEm'
+      readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+    }
+  | {
+      readonly kind: 'cdnots-plus'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly validity: Uint8Array
+      readonly rows: number
+      readonly columns: number
+      readonly maxLag: number
+      readonly alpha: number
+      readonly missing: 'pairwiseComplete' | 'varEm'
+      readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+    }
+  | {
+      readonly kind: 'grace'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly validity: Uint8Array
+      readonly rows: number
+      readonly columns: number
+      readonly maxLag: number
+      readonly alpha: number
+      readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+      readonly gateThreshold: number
+      readonly epochs: number
+      readonly patience: number
       readonly seed: number
     }
   | {
@@ -607,6 +678,7 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: StationarityBattery
     }
+  | { readonly kind: 'multicollinearity-succeeded'; readonly request: WorkerRequestId; readonly result: MulticollinearityEvidence }
   | { readonly kind: 'pandas-resampling-succeeded'; readonly request: WorkerRequestId; readonly result: PandasResamplingEvidence }
   | {
       readonly kind: 'pcmci-plus-succeeded'
@@ -623,6 +695,9 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: RpcmciEvidence
     }
+  | { readonly kind: 'cdnots-succeeded'; readonly request: WorkerRequestId; readonly result: CdnotsEvidence }
+  | { readonly kind: 'cdnots-plus-succeeded'; readonly request: WorkerRequestId; readonly result: CdnotsPlusEvidence }
+  | { readonly kind: 'grace-succeeded'; readonly request: WorkerRequestId; readonly result: GraceEvidence }
   | {
       readonly kind: 'dynotears-succeeded'
       readonly request: WorkerRequestId
@@ -706,11 +781,46 @@ const workerRequestId = (value: string): Result<WorkerRequestId, { readonly kind
 export const newWorkerRequestId = (): WorkerRequestId =>
   brand<string, 'WorkerRequestId'>(crypto.randomUUID())
 
+const temporalSamplesSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('dense') }).strict(),
+  z.object({
+    kind: z.literal('role-aware'),
+    validity: z.instanceof(Uint8Array),
+    analysisMask: z.instanceof(Uint8Array),
+    cutOff: z.enum(['methodDefault', 'twoTauMax', 'tauMax', 'maxLag', 'maxLagOrTauMax', 'twoTauMaxFuture']),
+    propagateThroughMaxLag: z.boolean(),
+    maskType: z.enum(['none', 'x', 'y', 'z', 'xy', 'xz', 'yz', 'xyz']),
+  }).strict(),
+])
+
+const cdnotsContextCommandSchema = z.enum(['none', 'linear', 'linearSine', 'linearExponential', 'linearQuadratic', 'step', 'stepLinear'])
+
+const cdnotsCommandBaseSchema = z.object({
+  request: requestSchema,
+  values: z.instanceof(Float64Array),
+  validity: z.instanceof(Uint8Array),
+  rows: z.number().int().positive(),
+  columns: z.number().int().min(2).max(32),
+  maxLag: z.number().int().min(1).max(20),
+  alpha: z.number().finite().positive().max(1),
+  missing: z.enum(['pairwiseComplete', 'varEm']),
+  context: cdnotsContextCommandSchema,
+})
+
 const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('stationarity-battery'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
+  }).strict(),
+  z.object({
+    kind: z.literal('multicollinearity'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(3),
+    columns: z.number().int().min(2).max(64),
+    correlationThreshold: z.number().finite().gt(0).max(1),
+    vifThreshold: z.number().finite().gt(1),
   }).strict(),
   z.object({
     kind: z.literal('pandas-resample-daily'),
@@ -731,6 +841,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     columns: z.number().int().min(2).max(32),
     tauMax: z.number().int().min(1).max(20),
     pcAlpha: z.number().finite().positive().max(1),
+    samples: temporalSamplesSchema,
   }).strict(),
   z.object({
     kind: z.literal('lpcmci'),
@@ -740,6 +851,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     columns: z.number().int().min(2).max(32),
     tauMax: z.number().int().min(1).max(20),
     pcAlpha: z.number().finite().positive().max(1),
+    samples: temporalSamplesSchema,
   }).strict(),
   z.object({
     kind: z.literal('rpcmci'),
@@ -758,6 +870,23 @@ const commandSchema = z.discriminatedUnion('kind', [
     alphaLevel: z.number().finite().positive().max(1),
     seed: z.number().int().nonnegative(),
   }).strict(),
+  cdnotsCommandBaseSchema.extend({ kind: z.literal('cdnots') }).strict(),
+  cdnotsCommandBaseSchema.extend({ kind: z.literal('cdnots-plus') }).strict(),
+  z.object({
+    kind: z.literal('grace'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    validity: z.instanceof(Uint8Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(32),
+    maxLag: z.number().int().min(1).max(20),
+    alpha: z.number().finite().positive().max(1),
+    context: cdnotsContextCommandSchema,
+    gateThreshold: z.number().finite().min(0).max(1),
+    epochs: z.number().int().min(1).max(2_000),
+    patience: z.number().int().min(1).max(500),
+    seed: z.number().int().nonnegative(),
+  }).strict().refine((value) => value.patience <= value.epochs, { message: 'GRACE patience cannot exceed epochs.' }),
   z.object({
     kind: z.literal('dynotears'),
     request: requestSchema,
@@ -1246,6 +1375,7 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: stationarityBatterySchema,
   }).strict(),
+  z.object({ kind: z.literal('multicollinearity-succeeded'), request: requestSchema, result: multicollinearityEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('pandas-resampling-succeeded'),
     request: requestSchema,
@@ -1266,6 +1396,9 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: rpcmciEvidenceSchema,
   }).strict(),
+  z.object({ kind: z.literal('cdnots-succeeded'), request: requestSchema, result: cdnotsEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('cdnots-plus-succeeded'), request: requestSchema, result: cdnotsPlusEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('grace-succeeded'), request: requestSchema, result: graceEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('dynotears-succeeded'),
     request: requestSchema,
@@ -1352,6 +1485,24 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   if (parsed.data.kind !== 'pandas-resample-daily' && 'columns' in parsed.data && parsed.data.values.length !== parsed.data.rows * parsed.data.columns) {
     return err({ kind: 'invalid-command', detail: 'The multivariate matrix dimensions do not match its numeric buffer.' })
   }
+  if ((parsed.data.kind === 'pcmci-plus' || parsed.data.kind === 'lpcmci') && parsed.data.samples.kind === 'role-aware') {
+    const cells = parsed.data.rows * parsed.data.columns
+    if (parsed.data.samples.validity.length !== cells || parsed.data.samples.analysisMask.length !== cells) {
+      return err({ kind: 'invalid-command', detail: 'Role-aware validity and analysis-mask bytes must match the time-series matrix.' })
+    }
+    if (parsed.data.samples.validity.some((value) => value > 1) || parsed.data.samples.analysisMask.some((value) => value > 1)) {
+      return err({ kind: 'invalid-command', detail: 'Role-aware validity and analysis-mask cells must be encoded as 0 or 1.' })
+    }
+  }
+  if (parsed.data.kind === 'cdnots' || parsed.data.kind === 'cdnots-plus' || parsed.data.kind === 'grace') {
+    const cells = parsed.data.rows * parsed.data.columns
+    if (parsed.data.validity.length !== cells) {
+      return err({ kind: 'invalid-command', detail: 'Causal-TS validity bytes must match the time-series matrix.' })
+    }
+    if (parsed.data.validity.some((value) => value > 1)) {
+      return err({ kind: 'invalid-command', detail: 'Causal-TS validity cells must be encoded as 0 or 1.' })
+    }
+  }
   if (parsed.data.kind === 'granger-ssr-f' && parsed.data.values.length !== parsed.data.rows * 2) {
     return err({ kind: 'invalid-command', detail: 'The Granger matrix must contain exactly two columns.' })
   }
@@ -1385,6 +1536,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (!request.ok) return err({ kind: 'invalid-event', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'analysis-failed') return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'analysis-progress') return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'multicollinearity-succeeded') {
+    const result = parseMulticollinearityEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'multicollinearity-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.kind === 'invalid-evidence' ? result.error.detail : 'The multicollinearity result does not match its columns.' })
+  }
   if (parsed.data.kind === 'pcmci-plus-succeeded') {
     const result = parsePcmciPlusEvidence(parsed.data.result)
     return result.ok
@@ -1401,6 +1558,24 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseRpcmciEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'rpcmci-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'cdnots-succeeded') {
+    const result = parseCdnotsResult(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'cdnots-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'cdnots-plus-succeeded') {
+    const result = parseCdnotsPlusResult(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'cdnots-plus-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'grace-succeeded') {
+    const result = parseGraceEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'grace-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'dynotears-succeeded') {

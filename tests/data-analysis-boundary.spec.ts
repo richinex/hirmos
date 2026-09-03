@@ -522,7 +522,7 @@ test('runs PCMCI+ as a distinct heavy discovery method over three materialized c
       [x.id, y.id, z.id],
     )
     if (!materialized.ok) throw new Error(`Materialization failed: ${materialized.error.kind}`)
-    const result = await analysisModule.runPcmciPlus(materialized.value.values, 120, 3, 2, 0.05)
+    const result = await analysisModule.runPcmciPlus(materialized.value.values, 120, 3, 2, 0.05, { kind: 'dense' })
     return { result, detachedBytes: materialized.value.values.byteLength }
   })
 
@@ -548,6 +548,118 @@ test('runs PCMCI+ as a distinct heavy discovery method over three materialized c
   expect(parsed.data.result.value.graph).toHaveLength(3)
   expect(parsed.data.result.value.graph.flat(2).filter((mark) => mark.length > 0).length).toBeGreaterThan(0)
   expect([...externalRequests]).toEqual([])
+})
+
+test('runs PCMCI+ with Tigramite-compatible role-aware missing-sample construction', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
+  await page.goto('/app')
+
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 80
+    const columns = 3
+    const values = new Float64Array(rows * columns)
+    for (let row = 0; row < rows; row += 1) {
+      values[row] = Math.sin(row / 3)
+      values[rows + row] = Math.cos(row / 5)
+      values[2 * rows + row] = Math.sin(row / 7)
+    }
+    const validity = new Uint8Array(values.length).fill(1)
+    const analysisMask = new Uint8Array(values.length)
+    values[17] = Number.NaN
+    validity[17] = 0
+    analysisMask[rows + 31] = 1
+
+    const result = await analysis.runPcmciPlus(values, rows, columns, 2, 0.05, {
+      kind: 'role-aware',
+      validity,
+      analysisMask,
+      cutOff: 'twoTauMax',
+      propagateThroughMaxLag: true,
+      maskType: 'xyz',
+    })
+    return {
+      result,
+      detached: {
+        values: values.byteLength,
+        validity: validity.byteLength,
+        analysisMask: analysisMask.byteLength,
+      },
+    }
+  })
+
+  const parsed = z.object({
+    result: z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), value: pcmciPlusEvidenceSchema }).strict(),
+      z.object({ ok: z.literal(false), error: z.object({ kind: z.string(), detail: z.string() }).strict() }).strict(),
+    ]),
+    detached: z.object({ values: z.number(), validity: z.number(), analysisMask: z.number() }).strict(),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(parsed.data.detached).toEqual({ values: 0, validity: 0, analysisMask: 0 })
+  if (!parsed.data.result.ok) throw new Error(`${parsed.data.result.error.kind}: ${parsed.data.result.error.detail}`)
+  expect(parsed.data.result.value.observations).toBe(80)
+  expect(parsed.data.result.value.variables).toBe(3)
+})
+
+test('offers role-aware samples only to PCMCI+ and LPCMCI', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture boundary runs once')
+  await page.goto('/app')
+
+  const verdicts: unknown = await page.evaluate(async () => {
+    const [discovery, methods] = await Promise.all([
+      import(new URL('/src/domain/discovery.ts', window.location.href).href),
+      import(new URL('/src/domain/methods.ts', window.location.href).href),
+    ])
+    const prepared = {
+      kind: 'prepared-time-series',
+      id: 'prepared-role-aware',
+      recipe: 'recipe-role-aware',
+      sourceProfile: 'profile-role-aware',
+      observations: 80,
+      columns: ['x', 'y'],
+      resolution: { kind: 'lag-aware-exclusion', cells: 1 },
+      seasonalAdjustment: { kind: 'none' },
+      sampling: { kind: 'regular-series', timeColumn: 'date', frequency: 'daily' },
+      missingness: {
+        kind: 'lag-aware-exclusion',
+        cells: 1,
+        cutOff: '2xtau-max',
+        propagateThroughMaxLag: false,
+        analysisExclusions: { kind: 'ignore' },
+      },
+      resampling: { kind: 'none' },
+      seriesTransforms: [
+        { column: 'x', transform: { kind: 'levels' } },
+        { column: 'y', transform: { kind: 'levels' } },
+      ],
+    }
+    const eligibility = (id: string) => {
+      const definition = methods.methodDefinition(id)
+      if (!definition.ok) throw new Error(`Method ${id} is absent.`)
+      return discovery.evaluateDiscoveryEligibility(definition.value, prepared, null).kind
+    }
+    return {
+      pcmci: eligibility(methods.PCMCI_PLUS_PAR_CORR_METHOD_ID),
+      lpcmci: eligibility(methods.LPCMCI_PAR_CORR_METHOD_ID),
+      rpcmci: eligibility(methods.RPCMCI_PAR_CORR_METHOD_ID),
+      dynotears: eligibility(methods.DYNOTEARS_METHOD_ID),
+      pcmciReady: discovery.readyDiscoverySpecification({ kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }, prepared).ok,
+      lpcmciReady: discovery.readyDiscoverySpecification({ kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }, prepared).ok,
+      rpcmciReady: discovery.readyDiscoverySpecification({ kind: 'rpcmci', numRegimes: 2, maxTransitions: 4, tauMin: 1, tauMax: 2, pcAlpha: 0.2, alphaLevel: 0.01, switchThres: 0.05, numIterations: 20, maxAnneal: 10, seed: 43 }, prepared).ok,
+    }
+  })
+
+  expect(verdicts).toEqual({
+    pcmci: 'caution',
+    lpcmci: 'caution',
+    rpcmci: 'refused',
+    dynotears: 'refused',
+    pcmciReady: true,
+    lpcmciReady: true,
+    rpcmciReady: false,
+  })
 })
 
 test('runs the Granger SSR F port with target then candidate-cause column order', async ({ page }, testInfo) => {
@@ -610,7 +722,7 @@ test('runs LPCMCI, DYNOTEARS, and corrected oCSE through Wasm with progress call
     const dynotearsProgress: unknown[] = []
     const ocseProgress: unknown[] = []
     const varLingamProgress: unknown[] = []
-    const lpcmci = await analysis.runLpcmci(makeValues(), rows, columns, 1, 0.05, (progress: unknown) => lpcmciProgress.push(progress))
+    const lpcmci = await analysis.runLpcmci(makeValues(), rows, columns, 1, 0.05, { kind: 'dense' }, (progress: unknown) => lpcmciProgress.push(progress))
     const dynotears = await analysis.runDynotears(makeValues(), rows, columns, 1, 0.1, 0.1, (progress: unknown) => dynotearsProgress.push(progress))
     const ocse = await analysis.runOcse(makeValues(), rows, columns, 1, 0.05, 20, 'gaussian', 5, (progress: unknown) => ocseProgress.push(progress))
     const varLingam = await analysis.runVarLingam(makeValues(), rows, columns, 2, true, (progress: unknown) => varLingamProgress.push(progress))

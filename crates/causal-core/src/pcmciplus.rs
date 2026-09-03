@@ -2,8 +2,9 @@
 //! contemp_conds skeleton with MCI conditions, majority collider rule with conflict resolution,
 //! and the timeseries Meek rules. Also the fdr_bh correction of get_corrected_pvalues.
 
-use crate::parcorr::{CiKind, Node, ParCorrCi, TimeSeries};
+use crate::parcorr::{CiKind, Node, ParCorrCi, RoleAwareSamplePolicy, TimeSeries};
 use crate::pcmci::pc_stable_single;
+use crate::preprocessing::{PreprocessingError, TigramiteFrame};
 
 type Mark = Option<[u8; 3]>;
 
@@ -179,9 +180,32 @@ pub fn run_pcmciplus_windowed(
     kind: CiKind,
     window: Option<(usize, usize)>,
 ) -> PcmciPlusResult {
-    let n = data.n;
     let mut ci = ParCorrCi::with_kind(kind);
     ci.window = window;
+    run_pcmciplus_with_ci(data, tau_max, pc_alpha, ci)
+        .expect("dense PCMCI+ sample construction must succeed")
+}
+
+pub fn run_pcmciplus_frame(
+    frame: TigramiteFrame,
+    tau_max: usize,
+    pc_alpha: f64,
+    kind: CiKind,
+    sample_policy: RoleAwareSamplePolicy,
+) -> Result<PcmciPlusResult, PreprocessingError> {
+    let data = frame.data.clone();
+    let ci = ParCorrCi::with_frame(kind, frame, sample_policy);
+    run_pcmciplus_with_ci(&data, tau_max, pc_alpha, ci)
+}
+
+fn run_pcmciplus_with_ci(
+    data: &TimeSeries,
+    tau_max: usize,
+    pc_alpha: f64,
+    ci: ParCorrCi,
+) -> Result<PcmciPlusResult, PreprocessingError> {
+    let n = data.n;
+    let mut ci = ci;
 
     // Phase 1: PC1 lagged parent supersets with their max p-values and statistics.
     let mut lagged_parents: Vec<Vec<Node>> = Vec::new();
@@ -481,10 +505,14 @@ pub fn run_pcmciplus_windowed(
         })
         .collect();
 
-    PcmciPlusResult {
+    let result = PcmciPlusResult {
         graph: graph_out,
         p_matrix: p_full,
         val_matrix: val_full,
+    };
+    match this.ci.preprocessing_error().cloned() {
+        Some(error) => Err(error),
+        None => Ok(result),
     }
 }
 

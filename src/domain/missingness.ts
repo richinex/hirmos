@@ -104,6 +104,7 @@ export function describeMissingnessRefusal(refusal: MissingnessRefusal): string 
 /** What the prepared version records about its executed resolution. */
 export type MissingnessResolutionRecord =
   | { readonly kind: 'none' }
+  | { readonly kind: 'lag-aware-exclusion'; readonly cells: number }
   | { readonly kind: 'imputed'; readonly method: ImputationMethod; readonly maxGap: number; readonly cells: number }
   | { readonly kind: 'window'; readonly start: number; readonly endExclusive: number; readonly sourceRows: number }
 
@@ -119,6 +120,7 @@ export function describeImputationMethod(method: ImputationMethod): string {
 export function describeResolutionRecord(record: MissingnessResolutionRecord): string | null {
   switch (record.kind) {
     case 'none': return null
+    case 'lag-aware-exclusion': return `${record.cells} missing cell${record.cells === 1 ? '' : 's'} retained on the time grid for lag-aware sample exclusion`
     case 'imputed': return `${record.cells} cell${record.cells === 1 ? '' : 's'} imputed by ${describeImputationMethod(record.method)}${record.method === 'structuralZero' ? '' : `, gaps up to ${record.maxGap}`}`
     case 'window': return `rows ${record.start + 1} to ${record.endExclusive} kept as the longest complete interval (${record.start} before and ${record.sourceRows - record.endExclusive} after dropped)`
     default: return assertNever(record)

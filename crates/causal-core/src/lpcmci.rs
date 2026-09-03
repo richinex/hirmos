@@ -1,7 +1,8 @@
 //! LPCMCI ported 1:1 from tigramite/lpcmci.py at default parameters, ParCorr with analytic
 //! significance. Method names mirror the oracle for line-by-line auditing.
 
-use crate::parcorr::{CiKind, Node, ParCorrCi, TimeSeries};
+use crate::parcorr::{CiKind, Node, ParCorrCi, RoleAwareSamplePolicy, TimeSeries};
+use crate::preprocessing::{PreprocessingError, TigramiteFrame};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A link is three ASCII marks, or absent.
@@ -139,6 +140,27 @@ pub fn run_lpcmci_with(
         .0
 }
 
+pub fn run_lpcmci_frame_with_progress<F>(
+    frame: TigramiteFrame,
+    tau_max: usize,
+    pc_alpha: f64,
+    kind: CiKind,
+    sample_policy: RoleAwareSamplePolicy,
+    progress: F,
+) -> Result<LpcmciResult, PreprocessingError>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    let data = frame.data.clone();
+    let ci = ParCorrCi::with_frame(kind, frame, sample_policy);
+    let mut lpcmci = Lpcmci::new_with_ci(&data, tau_max as i32, pc_alpha, ci);
+    let result = lpcmci.run_inner_with_progress(progress);
+    match lpcmci.ci.preprocessing_error().cloned() {
+        Some(error) => Err(error),
+        None => Ok(result),
+    }
+}
+
 pub fn run_lpcmci_traced(
     data: &TimeSeries,
     tau_max: usize,
@@ -150,10 +172,14 @@ pub fn run_lpcmci_traced(
 
 impl<'a> Lpcmci<'a> {
     fn new(data: &'a TimeSeries, tau_max: i32, pc_alpha: f64, kind: CiKind) -> Self {
+        Self::new_with_ci(data, tau_max, pc_alpha, ParCorrCi::with_kind(kind))
+    }
+
+    fn new_with_ci(data: &'a TimeSeries, tau_max: i32, pc_alpha: f64, ci: ParCorrCi) -> Self {
         let n = data.n;
         let mut this = Lpcmci {
             data,
-            ci: ParCorrCi::with_kind(kind),
+            ci,
             n,
             tau_max,
             pc_alpha,

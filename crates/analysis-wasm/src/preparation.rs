@@ -2,6 +2,73 @@
 
 use super::*;
 
+pub(crate) fn multicollinearity(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    correlation_threshold: f64,
+    vif_threshold: f64,
+) -> Result<AnalysisResult, String> {
+    validate_dense_matrix("multicollinearity diagnostics", values, rows, columns)?;
+    if rows < 3 {
+        return Err("multicollinearity diagnostics need at least three observations".to_owned());
+    }
+    if !(2..=64).contains(&columns) {
+        return Err("multicollinearity diagnostics need between two and 64 variables".to_owned());
+    }
+    if !correlation_threshold.is_finite() || !(0.0..=1.0).contains(&correlation_threshold) {
+        return Err(
+            "the correlation threshold must be greater than zero and at most one".to_owned(),
+        );
+    }
+    if !vif_threshold.is_finite() || vif_threshold <= 1.0 {
+        return Err("the VIF threshold must be finite and greater than one".to_owned());
+    }
+
+    let matrix = DMatrix::from_column_slice(rows, columns, values);
+    for column in 0..columns {
+        let first = matrix[(0, column)];
+        if (1..rows).all(|row| matrix[(row, column)] == first) {
+            return Err(format!(
+                "multicollinearity diagnostics are undefined for constant variable {column}"
+            ));
+        }
+    }
+
+    let correlation = correlation_matrix(&matrix);
+    let (correlation_keep, correlation_drop, correlation_clusters) =
+        cluster_redundant(&correlation, correlation_threshold);
+    let (vif_keep, vif_drop, vif_history) = vif_redundant(&matrix, vif_threshold);
+    let correlation = (0..columns)
+        .map(|row| {
+            (0..columns)
+                .map(|column| correlation[(row, column)])
+                .collect()
+        })
+        .collect();
+    let vif_history = vif_history
+        .into_iter()
+        .map(|(column, vif)| VifEliminationEvidence {
+            column,
+            vif: vif.is_finite().then_some(vif),
+        })
+        .collect();
+
+    Ok(AnalysisResult::Multicollinearity {
+        observations: rows,
+        variables: columns,
+        correlation_threshold,
+        vif_threshold,
+        correlation,
+        correlation_keep,
+        correlation_drop,
+        correlation_clusters,
+        vif_keep,
+        vif_drop,
+        vif_history,
+    })
+}
+
 pub(crate) fn seasonal_adjust(
     values: &[f64],
     rows: usize,
@@ -79,6 +146,33 @@ pub(crate) fn seasonal_adjust(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn multicollinearity_serializes_correlation_groups_and_vif_path() {
+        let rows = 8;
+        let x = [1.0, 2.0, 4.0, 7.0, 11.0, 16.0, 22.0, 29.0];
+        let near_x = [1.1, 2.1, 3.9, 7.2, 10.8, 16.1, 21.9, 29.2];
+        let z = [2.0, -1.0, 3.0, 0.5, -2.0, 4.0, 1.0, -3.0];
+        let values: Vec<f64> = x.into_iter().chain(near_x).chain(z).collect();
+        let result =
+            multicollinearity(&values, rows, 3, 0.99, 10.0).expect("diagnostics should run");
+        let value = serde_json::to_value(result).unwrap();
+        assert_eq!(value["kind"], "multicollinearity");
+        assert_eq!(value["correlation"].as_array().unwrap().len(), 3);
+        assert_eq!(value["correlationClusters"][0], serde_json::json!([0, 1]));
+        assert_eq!(value["correlationDrop"], serde_json::json!([1]));
+        assert!(!value["vifHistory"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn multicollinearity_refuses_a_constant_variable() {
+        let values = [1.0, 2.0, 3.0, 1.0, 1.0, 1.0];
+        let error = match multicollinearity(&values, 3, 2, 0.9, 10.0) {
+            Ok(_) => panic!("constant input should be refused"),
+            Err(error) => error,
+        };
+        assert!(error.contains("constant variable 1"));
+    }
 
     #[test]
     fn seasonal_adjustment_removes_the_seasonal_component_and_leaves_other_columns() {

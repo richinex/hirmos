@@ -3,6 +3,10 @@
 
 use nalgebra::{DMatrix, DVector};
 
+use crate::preprocessing::{
+    construct_array_tracked, ConstructOptions, PreprocessingError, SampleExclusion, TigramiteFrame,
+};
+
 /// (variable index, lag <= 0).
 pub type Node = (usize, i32);
 
@@ -402,6 +406,32 @@ pub fn run_test(
 
 /// The oracle's cached_ci_results: keys are order-independent within X, Y and Z, and symmetric in
 /// X and Y, on the cleaned node lists.
+#[derive(Clone, Copy, Debug)]
+pub struct RoleAwareSamplePolicy {
+    pub cut_off: CutOff,
+    pub remove_missing_upto_maxlag: bool,
+    pub mask_type: crate::preprocessing::MaskType,
+}
+
+#[derive(Clone, Debug)]
+pub struct CiSampleAudit {
+    pub x: Vec<Node>,
+    pub y: Vec<Node>,
+    pub z: Vec<Node>,
+    pub retained_reference_points: Vec<usize>,
+    pub exclusions: Vec<SampleExclusion>,
+}
+
+#[derive(Default)]
+enum SampleSource {
+    #[default]
+    Dense,
+    RoleAware {
+        frame: TigramiteFrame,
+        policy: RoleAwareSamplePolicy,
+    },
+}
+
 #[derive(Default)]
 pub struct ParCorrCi {
     kind: CiKind,
@@ -411,8 +441,11 @@ pub struct ParCorrCi {
     pub sample_filter: Option<Vec<bool>>,
     /// Normal-scores transform per node: the transform is row-local, so it is reusable across
     /// tests on the same dataset and window.
-    trafo_cache: std::collections::HashMap<Node, Vec<f64>>,
-    cache: std::collections::HashMap<(Vec<Node>, Vec<Node>, Vec<Node>), (f64, f64)>,
+    trafo_cache: std::collections::HashMap<(Node, Vec<usize>), Vec<f64>>,
+    cache: std::collections::HashMap<(Vec<Node>, Vec<Node>, Vec<Node>, Vec<usize>), (f64, f64)>,
+    sample_source: SampleSource,
+    preprocessing_error: Option<PreprocessingError>,
+    pub sample_audits: Vec<CiSampleAudit>,
     /// Every run_test call in order: (X, Y, sorted Z, val, pval). For parity debugging.
     pub trace: Vec<(Node, Node, Vec<Node>, f64, f64)>,
 }
@@ -429,6 +462,25 @@ impl ParCorrCi {
         }
     }
 
+    pub fn with_frame(
+        kind: CiKind,
+        frame: TigramiteFrame,
+        sample_policy: RoleAwareSamplePolicy,
+    ) -> Self {
+        Self {
+            kind,
+            sample_source: SampleSource::RoleAware {
+                frame,
+                policy: sample_policy,
+            },
+            ..Self::default()
+        }
+    }
+
+    pub fn preprocessing_error(&self) -> Option<&PreprocessingError> {
+        self.preprocessing_error.as_ref()
+    }
+
     pub fn run_test(
         &mut self,
         data: &TimeSeries,
@@ -437,15 +489,56 @@ impl ParCorrCi {
         z: &[Node],
         tau_max: usize,
     ) -> (f64, f64) {
-        let (array, cleaned) = construct_array_filtered(
-            data,
-            x,
-            y,
-            z,
-            tau_max,
-            self.window,
-            self.sample_filter.as_deref(),
-        );
+        if self.preprocessing_error.is_some() {
+            return (0.0, 1.0);
+        }
+
+        let (array, cleaned, retained_reference_points) =
+            if let SampleSource::RoleAware { frame, policy } = &self.sample_source {
+                match construct_array_tracked(
+                    frame,
+                    x,
+                    y,
+                    z,
+                    &[],
+                    tau_max,
+                    ConstructOptions {
+                        cut_off: policy.cut_off,
+                        remove_missing_upto_maxlag: policy.remove_missing_upto_maxlag,
+                        mask_type: policy.mask_type,
+                        window: self.window,
+                        reference_points: None,
+                        reference_filter: self.sample_filter.as_deref(),
+                    },
+                ) {
+                    Ok(constructed) => {
+                        let retained = constructed.retained_reference_points.clone();
+                        self.sample_audits.push(CiSampleAudit {
+                            x: constructed.cleaned.x.clone(),
+                            y: constructed.cleaned.y.clone(),
+                            z: constructed.cleaned.z.clone(),
+                            retained_reference_points: retained.clone(),
+                            exclusions: constructed.exclusions.clone(),
+                        });
+                        (constructed.values, constructed.cleaned, retained)
+                    }
+                    Err(error) => {
+                        self.preprocessing_error = Some(error);
+                        return (0.0, 1.0);
+                    }
+                }
+            } else {
+                let (array, cleaned) = construct_array_filtered(
+                    data,
+                    x,
+                    y,
+                    z,
+                    tau_max,
+                    self.window,
+                    self.sample_filter.as_deref(),
+                );
+                (array, cleaned, Vec::new())
+            };
         let mut xk = cleaned.x.clone();
         let mut yk = cleaned.y.clone();
         let mut zk = cleaned.z.clone();
@@ -453,9 +546,19 @@ impl ParCorrCi {
         yk.sort_unstable();
         zk.sort_unstable();
         let key = if xk <= yk {
-            (xk.clone(), yk, zk.clone())
+            (
+                xk.clone(),
+                yk,
+                zk.clone(),
+                retained_reference_points.clone(),
+            )
         } else {
-            (yk, xk.clone(), zk.clone())
+            (
+                yk,
+                xk.clone(),
+                zk.clone(),
+                retained_reference_points.clone(),
+            )
         };
         if let Some(&hit) = self.cache.get(&key) {
             self.trace.push((x[0], y[0], zk, hit.0, hit.1));
@@ -487,11 +590,12 @@ impl ParCorrCi {
             let mut node_iter = nodes.iter();
             for row in array.iter_mut() {
                 let node = *node_iter.next().expect("row/node mismatch");
-                match self.trafo_cache.get(&node) {
+                let transform_key = (node, retained_reference_points.clone());
+                match self.trafo_cache.get(&transform_key) {
                     Some(cached) => row.clone_from(cached),
                     None => {
                         trafo_row(row);
-                        self.trafo_cache.insert(node, row.clone());
+                        self.trafo_cache.insert(transform_key, row.clone());
                     }
                 }
             }

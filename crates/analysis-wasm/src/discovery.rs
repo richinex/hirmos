@@ -2,12 +2,467 @@
 
 use super::*;
 
+fn role_aware_policy(
+    cut_off: TemporalCutOff,
+    propagate_through_max_lag: bool,
+    mask_type: TemporalMaskType,
+) -> RoleAwareSamplePolicy {
+    let cut_off = match cut_off {
+        TemporalCutOff::MethodDefault | TemporalCutOff::TwoTauMax => CutOff::TwoTauMax,
+        TemporalCutOff::TauMax => CutOff::TauMax,
+        TemporalCutOff::MaxLag => CutOff::MaxLag,
+        TemporalCutOff::MaxLagOrTauMax => CutOff::MaxLagOrTauMax,
+        TemporalCutOff::TwoTauMaxFuture => CutOff::TwoTauMaxFuture,
+    };
+    let mask_type = match mask_type {
+        TemporalMaskType::None => MaskType::NONE,
+        TemporalMaskType::X => MaskType::X,
+        TemporalMaskType::Y => MaskType::Y,
+        TemporalMaskType::Z => MaskType::Z,
+        TemporalMaskType::Xy => MaskType::XY,
+        TemporalMaskType::Xz => MaskType::XZ,
+        TemporalMaskType::Yz => MaskType::YZ,
+        TemporalMaskType::Xyz => MaskType::XYZ,
+    };
+    RoleAwareSamplePolicy {
+        cut_off,
+        remove_missing_upto_maxlag: propagate_through_max_lag,
+        mask_type,
+    }
+}
+
+fn role_aware_frame(
+    values: &[f64],
+    validity: &[u8],
+    analysis_mask: &[u8],
+    rows: usize,
+    columns: usize,
+) -> Result<TigramiteFrame, String> {
+    let cells = rows.saturating_mul(columns);
+    if values.len() != cells || validity.len() != cells || analysis_mask.len() != cells {
+        return Err(
+            "role-aware values, validity, and analysis mask must have identical matrix shapes"
+                .to_owned(),
+        );
+    }
+    if validity.iter().chain(analysis_mask).any(|&value| value > 1) {
+        return Err("validity and analysis-mask cells must be encoded as 0 or 1".to_owned());
+    }
+    let matrix: Vec<Vec<f64>> = (0..rows)
+        .map(|row| {
+            (0..columns)
+                .map(|column| values[column * rows + row])
+                .collect()
+        })
+        .collect();
+    let valid: Vec<Vec<bool>> = (0..rows)
+        .map(|row| {
+            (0..columns)
+                .map(|column| validity[column * rows + row] == 1)
+                .collect()
+        })
+        .collect();
+    let mask: Vec<Vec<bool>> = (0..rows)
+        .map(|row| {
+            (0..columns)
+                .map(|column| analysis_mask[column * rows + row] == 1)
+                .collect()
+        })
+        .collect();
+    TigramiteFrame::from_validity(matrix, valid, Some(mask))
+        .map_err(|problem| format!("role-aware sample matrix refused: {problem}"))
+}
+
+fn causal_ts_context(value: CdnotsContext) -> Option<CausalTsContextPreset> {
+    match value {
+        CdnotsContext::None => None,
+        CdnotsContext::Linear => Some(CausalTsContextPreset::Linear),
+        CdnotsContext::LinearSine => Some(CausalTsContextPreset::LinearSine),
+        CdnotsContext::LinearExponential => Some(CausalTsContextPreset::LinearExponential),
+        CdnotsContext::LinearQuadratic => Some(CausalTsContextPreset::LinearQuadratic),
+        CdnotsContext::Step => Some(CausalTsContextPreset::Step),
+        CdnotsContext::StepLinear => Some(CausalTsContextPreset::StepLinear),
+    }
+}
+
+fn causal_ts_context_names(value: CdnotsContext) -> Vec<String> {
+    match value {
+        CdnotsContext::None => vec![],
+        CdnotsContext::Linear => vec!["C_lin".to_owned()],
+        CdnotsContext::LinearSine => vec!["C_lin".to_owned(), "C_sin".to_owned()],
+        CdnotsContext::LinearExponential => vec!["C_lin".to_owned(), "C_exp".to_owned()],
+        CdnotsContext::LinearQuadratic => vec!["C_lin".to_owned(), "C_quad".to_owned()],
+        CdnotsContext::Step => vec!["C_step".to_owned()],
+        CdnotsContext::StepLinear => vec!["C_step".to_owned(), "C_lin".to_owned()],
+    }
+}
+
+fn causal_ts_rows(
+    values: &[f64],
+    validity: &[u8],
+    rows: usize,
+    columns: usize,
+) -> Result<Vec<Vec<Option<f64>>>, String> {
+    let cells = rows.saturating_mul(columns);
+    if values.len() != cells || (!validity.is_empty() && validity.len() != cells) {
+        return Err("causal-ts values and validity must have identical matrix shapes".to_owned());
+    }
+    if validity.iter().any(|&value| value > 1) {
+        return Err("causal-ts validity cells must be encoded as 0 or 1".to_owned());
+    }
+
+    Ok((0..rows)
+        .map(|row| {
+            (0..columns)
+                .map(|column| {
+                    let index = column * rows + row;
+                    if validity.is_empty() || validity[index] == 1 {
+                        values[index].is_finite().then_some(values[index])
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        })
+        .collect())
+}
+
+fn cdnots_missing(value: CdnotsMissingStrategy) -> CdnotsMissingPolicy {
+    match value {
+        CdnotsMissingStrategy::PairwiseComplete => CdnotsMissingPolicy::PairwiseComplete {
+            minimum_samples: 30,
+        },
+        CdnotsMissingStrategy::VarEm => CdnotsMissingPolicy::VarEm(VarEmConfiguration {
+            lags: 1,
+            maximum_iterations: 50,
+            tolerance: 1e-4,
+        }),
+    }
+}
+
+fn endpoint_mark(left: i8, right: i8) -> Option<String> {
+    if left == 0 && right == 0 {
+        return None;
+    }
+    let left = match left {
+        -1 => '-',
+        1 => '<',
+        _ => 'x',
+    };
+    let right = match right {
+        -1 => '-',
+        1 => '>',
+        _ => 'x',
+    };
+    Some(format!("{left}-{right}"))
+}
+
+struct CdnotsMatrices {
+    graph: Vec<Vec<Vec<String>>>,
+    p_matrix: Vec<Vec<Vec<f64>>>,
+    val_matrix: Vec<Vec<Vec<f64>>>,
+}
+
+fn cdnots_matrices(
+    result: &hirmos_causal_core::cdnots::CdnotsResult,
+    variables: usize,
+    max_lag: usize,
+) -> CdnotsMatrices {
+    let mut graph = vec![vec![vec![String::new(); max_lag + 1]; variables]; variables];
+    let mut p_matrix = vec![vec![vec![1.0; max_lag + 1]; variables]; variables];
+    let mut val_matrix = vec![vec![vec![0.0; max_lag + 1]; variables]; variables];
+
+    for source in 0..variables {
+        for target in 0..variables {
+            if source != target {
+                if let Some(mark) =
+                    endpoint_mark(result.graph[source][target], result.graph[target][source])
+                {
+                    graph[source][target][0] = mark;
+                }
+            }
+            for lag in 1..=max_lag {
+                let lagged_source = lag * variables + source;
+                if let Some(mark) = endpoint_mark(
+                    result.graph[lagged_source][target],
+                    result.graph[target][lagged_source],
+                ) {
+                    graph[source][target][lag] = mark;
+                }
+            }
+        }
+    }
+
+    for test in &result.pvalues {
+        let first_lag = test.first / variables;
+        let second_lag = test.second / variables;
+        let mapped = if first_lag == 0 && second_lag <= max_lag {
+            Some((test.second % variables, test.first % variables, second_lag))
+        } else if second_lag == 0 && first_lag <= max_lag {
+            Some((test.first % variables, test.second % variables, first_lag))
+        } else {
+            None
+        };
+        let Some((source, target, lag)) = mapped else {
+            continue;
+        };
+        if test.p_value <= p_matrix[source][target][lag] {
+            p_matrix[source][target][lag] = test.p_value;
+            val_matrix[source][target][lag] = test.statistic.clamp(-1.0, 1.0);
+        }
+        if lag == 0 && test.p_value <= p_matrix[target][source][0] {
+            p_matrix[target][source][0] = test.p_value;
+            val_matrix[target][source][0] = test.statistic.clamp(-1.0, 1.0);
+        }
+    }
+
+    CdnotsMatrices {
+        graph,
+        p_matrix,
+        val_matrix,
+    }
+}
+
+pub(crate) fn cdnots_evidence<F>(
+    values: &[f64],
+    validity: &[u8],
+    rows: usize,
+    columns: usize,
+    max_lag: usize,
+    alpha: f64,
+    missing: CdnotsMissingStrategy,
+    context: CdnotsContext,
+    plus: bool,
+    progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    if !(2..=32).contains(&columns) || !(1..=20).contains(&max_lag) {
+        return Err("CD-NOTS requires 2–32 variables and a maximum lag from 1 to 20".to_owned());
+    }
+    let input = causal_ts_rows(values, validity, rows, columns)?;
+    let context_preset = causal_ts_context(context);
+    let result = if plus {
+        run_cdnots_plus_with_progress(
+            &input,
+            CdnotsPlusConfiguration {
+                max_lag,
+                alpha,
+                max_degree: None,
+                max_conds_y: None,
+                max_conds_x: None,
+                priority: ColliderPriority::MarkConflict,
+                missing: cdnots_missing(missing),
+                context: context_preset,
+                legacy_mci_conditions: false,
+                orient_margin: 0.1,
+            },
+            progress,
+        )
+    } else {
+        run_cdnots_with_progress(
+            &input,
+            CdnotsConfiguration {
+                max_lag,
+                alpha,
+                max_degree: None,
+                max_combinations: Some(20),
+                priority: ColliderPriority::KeepFirst,
+                missing: cdnots_missing(missing),
+                context: context_preset,
+                orient_margin: 0.0,
+            },
+            progress,
+        )
+    }
+    .map_err(|problem| format!("CD-NOTS refused: {problem}"))?;
+    let context_variables = causal_ts_context_names(context);
+    let variables = columns + context_variables.len();
+    let matrices = cdnots_matrices(&result, variables, max_lag);
+    let common = (
+        rows,
+        columns,
+        context_variables,
+        max_lag,
+        alpha,
+        missing,
+        context,
+        matrices,
+    );
+    Ok(if plus {
+        AnalysisResult::CdnotsPlus {
+            observations: common.0,
+            observed_variables: common.1,
+            context_variables: common.2,
+            max_lag: common.3,
+            alpha: common.4,
+            missing: common.5,
+            context: common.6,
+            graph: common.7.graph,
+            p_matrix: common.7.p_matrix,
+            val_matrix: common.7.val_matrix,
+        }
+    } else {
+        AnalysisResult::Cdnots {
+            observations: common.0,
+            observed_variables: common.1,
+            context_variables: common.2,
+            max_lag: common.3,
+            alpha: common.4,
+            missing: common.5,
+            context: common.6,
+            graph: common.7.graph,
+            p_matrix: common.7.p_matrix,
+            val_matrix: common.7.val_matrix,
+        }
+    })
+}
+
+pub(crate) fn grace_evidence<F>(
+    values: &[f64],
+    validity: &[u8],
+    rows: usize,
+    columns: usize,
+    max_lag: usize,
+    alpha: f64,
+    context: CdnotsContext,
+    gate_threshold: f64,
+    epochs: usize,
+    patience: usize,
+    seed: u64,
+    mut progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    let nullable = causal_ts_rows(values, validity, rows, columns)?;
+    let missing_cells = nullable
+        .iter()
+        .flatten()
+        .filter(|value| value.is_none())
+        .count();
+    let imputation = causal_ts_var_em(
+        &nullable,
+        VarEmConfiguration {
+            lags: 1,
+            maximum_iterations: 50,
+            tolerance: 1e-4,
+        },
+    )
+    .map_err(|problem| format!("GRACE VAR-EM preparation refused: {problem}"))?;
+    progress("imputation", 1, 3);
+    let dense = imputation
+        .values
+        .iter()
+        .map(|row| row.iter().copied().map(Some).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let skeleton_result = run_cdnots_with_progress(
+        &dense,
+        CdnotsConfiguration {
+            max_lag,
+            alpha,
+            max_degree: None,
+            max_combinations: Some(20),
+            priority: ColliderPriority::KeepFirst,
+            missing: CdnotsMissingPolicy::PairwiseComplete {
+                minimum_samples: 30,
+            },
+            context: causal_ts_context(context),
+            orient_margin: 0.0,
+        },
+        |_, completed, total| progress("skeleton", completed, total),
+    )
+    .map_err(|problem| format!("GRACE skeleton refused: {problem}"))?;
+    let all_variables = skeleton_result.time_graph.len();
+    let lags = max_lag + 1;
+    let mut skeleton = vec![0_u8; columns * columns * lags];
+    for source in 0..columns {
+        for target in 0..columns {
+            for lag in 0..lags {
+                skeleton[(source * columns + target) * lags + lag] =
+                    skeleton_result.time_graph[source][target][lag];
+            }
+        }
+    }
+    debug_assert!(all_variables >= columns);
+    let windows = prepare_grace_dense(&imputation.values, max_lag, true)
+        .map_err(|problem| format!("GRACE dense preparation refused: {problem}"))?;
+    let possible = columns * columns * lags - columns;
+    let density = if possible == 0 {
+        0.0
+    } else {
+        skeleton.iter().map(|&value| value as usize).sum::<usize>() as f64 / possible as f64
+    };
+    let lambda_l0 = (0.007 + 0.16 * density)
+        .max(1.0 / columns as f64 + 4.0 / rows as f64 - 0.4 * density.powf(0.8));
+    let configuration = GraceConfiguration {
+        max_lag,
+        lambda_l0,
+        gate_threshold,
+        epochs,
+        patience,
+        seed,
+        ..GraceConfiguration::default()
+    };
+    let result = fit_grace_with_progress(&windows, &skeleton, &configuration, |state| {
+        progress("neural-training", state.epoch, state.maximum_epochs)
+    })
+    .map_err(|problem| format!("GRACE refused: {problem}"))?;
+    progress("complete", 3, 3);
+    let matrix = |values: &[u8]| {
+        (0..columns)
+            .map(|source| {
+                (0..columns)
+                    .map(|target| {
+                        (0..lags)
+                            .map(|lag| values[(source * columns + target) * lags + lag] != 0)
+                            .collect()
+                    })
+                    .collect()
+            })
+            .collect()
+    };
+    let gates = (0..columns)
+        .map(|source| {
+            (0..columns)
+                .map(|target| {
+                    (0..lags)
+                        .map(|lag| result.gate_values[(source * columns + target) * lags + lag])
+                        .collect()
+                })
+                .collect()
+        })
+        .collect();
+    Ok(AnalysisResult::Grace {
+        observations: rows,
+        variables: columns,
+        max_lag,
+        alpha,
+        context,
+        gate_threshold,
+        lambda_l0,
+        epochs: result.epochs,
+        patience,
+        seed,
+        imputed_cells: missing_cells,
+        skeleton: matrix(&result.skeleton),
+        gate_values: gates,
+        graph: matrix(&result.time_graph),
+        loss: result.trajectory.iter().map(|step| step.loss).collect(),
+        rmse: result.trajectory.iter().map(|step| step.rmse).collect(),
+    })
+}
+
 pub(crate) fn pcmci_plus(
     values: &[f64],
+    validity: &[u8],
+    analysis_mask: &[u8],
     rows: usize,
     columns: usize,
     tau_max: usize,
     pc_alpha: f64,
+    samples: TemporalSamples,
 ) -> Result<AnalysisResult, String> {
     if !(2..=32).contains(&columns) {
         return Err("PCMCI+ requires between 2 and 32 selected variables".to_owned());
@@ -18,12 +473,31 @@ pub(crate) fn pcmci_plus(
     if !pc_alpha.is_finite() || !(0.0..=1.0).contains(&pc_alpha) || pc_alpha == 0.0 {
         return Err("PCMCI+ pcAlpha must be finite and in (0, 1]".to_owned());
     }
-    validate_dense_matrix("PCMCI+", values, rows, columns)?;
     if rows < (2 * tau_max + 16).max(24) {
         return Err("PCMCI+ has too few observations for the selected maximum lag".to_owned());
     }
-    let data = time_series_from_column_major(values, rows, columns);
-    let result = run_pcmciplus(&data, tau_max, pc_alpha, CiKind::ParCorr);
+    let result = match samples {
+        TemporalSamples::Dense => {
+            validate_dense_matrix("PCMCI+", values, rows, columns)?;
+            let data = time_series_from_column_major(values, rows, columns);
+            run_pcmciplus(&data, tau_max, pc_alpha, CiKind::ParCorr)
+        }
+        TemporalSamples::RoleAware {
+            cut_off,
+            propagate_through_max_lag,
+            mask_type,
+        } => {
+            let frame = role_aware_frame(values, validity, analysis_mask, rows, columns)?;
+            run_pcmciplus_frame(
+                frame,
+                tau_max,
+                pc_alpha,
+                CiKind::ParCorr,
+                role_aware_policy(cut_off, propagate_through_max_lag, mask_type),
+            )
+            .map_err(|problem| format!("PCMCI+ sample construction refused: {problem}"))?
+        }
+    };
     Ok(AnalysisResult::PcmciPlus {
         observations: rows,
         variables: columns,
@@ -37,10 +511,13 @@ pub(crate) fn pcmci_plus(
 
 pub(crate) fn lpcmci_evidence<F>(
     values: &[f64],
+    validity: &[u8],
+    analysis_mask: &[u8],
     rows: usize,
     columns: usize,
     tau_max: usize,
     pc_alpha: f64,
+    samples: TemporalSamples,
     progress: F,
 ) -> Result<AnalysisResult, String>
 where
@@ -55,16 +532,36 @@ where
     if !pc_alpha.is_finite() || !(0.0..=1.0).contains(&pc_alpha) || pc_alpha == 0.0 {
         return Err("LPCMCI pcAlpha must be finite and in (0, 1]".to_owned());
     }
-    validate_dense_matrix("LPCMCI", values, rows, columns)?;
     if rows < (2 * tau_max + 16).max(24) {
         return Err("LPCMCI has too few observations for the selected maximum lag".to_owned());
     }
-    let result = run_lpcmci_with_progress(
-        &time_series_from_column_major(values, rows, columns),
-        tau_max,
-        pc_alpha,
-        progress,
-    );
+    let result = match samples {
+        TemporalSamples::Dense => {
+            validate_dense_matrix("LPCMCI", values, rows, columns)?;
+            run_lpcmci_with_progress(
+                &time_series_from_column_major(values, rows, columns),
+                tau_max,
+                pc_alpha,
+                progress,
+            )
+        }
+        TemporalSamples::RoleAware {
+            cut_off,
+            propagate_through_max_lag,
+            mask_type,
+        } => {
+            let frame = role_aware_frame(values, validity, analysis_mask, rows, columns)?;
+            run_lpcmci_frame_with_progress(
+                frame,
+                tau_max,
+                pc_alpha,
+                CiKind::ParCorr,
+                role_aware_policy(cut_off, propagate_through_max_lag, mask_type),
+                progress,
+            )
+            .map_err(|problem| format!("LPCMCI sample construction refused: {problem}"))?
+        }
+    };
     Ok(AnalysisResult::Lpcmci {
         observations: rows,
         variables: columns,
@@ -785,7 +1282,7 @@ mod tests {
             values[rows + row] = y;
             values[2 * rows + row] = z;
         }
-        let json = pcmci_plus(&values, rows, 3, 2, 0.05)
+        let json = pcmci_plus(&values, &[], &[], rows, 3, 2, 0.05, TemporalSamples::Dense)
             .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
             .expect("fixture should produce PCMCI+ evidence");
         let value: serde_json::Value = serde_json::from_str(&json).expect("valid result JSON");
@@ -799,7 +1296,7 @@ mod tests {
     #[test]
     fn pcmci_plus_command_accepts_the_browser_camel_case_contract() {
         let command: AnalysisCommand = serde_json::from_str(
-            r#"{"kind":"pcmciPlus","rows":120,"columns":3,"tauMax":2,"pcAlpha":0.05}"#,
+            r#"{"kind":"pcmciPlus","rows":120,"columns":3,"tauMax":2,"pcAlpha":0.05,"samples":{"kind":"dense"}}"#,
         )
         .expect("browser command should parse");
         match command {
@@ -808,16 +1305,22 @@ mod tests {
                 columns,
                 tau_max,
                 pc_alpha,
+                samples,
             } => {
                 assert_eq!(rows, 120);
                 assert_eq!(columns, 3);
                 assert_eq!(tau_max, 2);
                 assert_eq!(pc_alpha, 0.05);
+                assert!(matches!(samples, TemporalSamples::Dense));
             }
             AnalysisCommand::StationarityBattery
+            | AnalysisCommand::Multicollinearity { .. }
             | AnalysisCommand::PandasResampleDaily { .. }
             | AnalysisCommand::Lpcmci { .. }
             | AnalysisCommand::Rpcmci { .. }
+            | AnalysisCommand::Cdnots { .. }
+            | AnalysisCommand::CdnotsPlus { .. }
+            | AnalysisCommand::Grace { .. }
             | AnalysisCommand::Dynotears { .. }
             | AnalysisCommand::Cmlp { .. }
             | AnalysisCommand::Clstm { .. }
@@ -961,10 +1464,53 @@ mod tests {
 
     #[test]
     fn pcmci_plus_refuses_bad_shape_and_missing_values() {
-        assert!(pcmci_plus(&[0.0; 100], 40, 3, 2, 0.05).is_err());
+        assert!(pcmci_plus(
+            &[0.0; 100],
+            &[],
+            &[],
+            40,
+            3,
+            2,
+            0.05,
+            TemporalSamples::Dense
+        )
+        .is_err());
         let mut values = vec![0.0; 120];
         values[7] = f64::NAN;
-        assert!(pcmci_plus(&values, 40, 3, 2, 0.05).is_err());
+        assert!(pcmci_plus(&values, &[], &[], 40, 3, 2, 0.05, TemporalSamples::Dense).is_err());
+    }
+
+    #[test]
+    fn role_aware_pcmci_plus_accepts_an_explicitly_invalid_cell() {
+        let rows = 40;
+        let columns = 3;
+        let mut values = vec![0.0; rows * columns];
+        for row in 0..rows {
+            values[row] = (row as f64 / 3.0).sin();
+            values[rows + row] = (row as f64 / 5.0).cos();
+            values[2 * rows + row] = (row as f64 / 7.0).sin();
+        }
+        let mut validity = vec![1; values.len()];
+        let analysis_mask = vec![0; values.len()];
+        values[11] = f64::NAN;
+        validity[11] = 0;
+
+        let result = pcmci_plus(
+            &values,
+            &validity,
+            &analysis_mask,
+            rows,
+            columns,
+            1,
+            0.05,
+            TemporalSamples::RoleAware {
+                cut_off: TemporalCutOff::TwoTauMax,
+                propagate_through_max_lag: false,
+                mask_type: TemporalMaskType::Xyz,
+            },
+        );
+
+        assert!(result.is_ok());
     }
 
     #[test]
@@ -988,9 +1534,19 @@ mod tests {
         }
 
         let mut lpcmci_progress = Vec::new();
-        let lpcmci = lpcmci_evidence(&values, rows, columns, 1, 0.05, |stage, done, total| {
-            lpcmci_progress.push((stage, done, total));
-        })
+        let lpcmci = lpcmci_evidence(
+            &values,
+            &[],
+            &[],
+            rows,
+            columns,
+            1,
+            0.05,
+            TemporalSamples::Dense,
+            |stage, done, total| {
+                lpcmci_progress.push((stage, done, total));
+            },
+        )
         .expect("LPCMCI fixture should run");
         let lpcmci_json = serde_json::to_value(lpcmci).expect("LPCMCI result serializes");
         assert_eq!(lpcmci_json["kind"], "lpcmci");

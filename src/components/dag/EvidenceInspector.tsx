@@ -19,6 +19,9 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
     case 'pcmci-plus-run': return 'PCMCI+'
     case 'lpcmci-run': return 'LPCMCI'
     case 'rpcmci-run': return 'RPCMCI'
+    case 'cdnots-run': return 'CD-NOTS'
+    case 'cdnots-plus-run': return 'CD-NOTS+'
+    case 'grace-run': return 'GRACE'
     case 'dynotears-run': return 'DYNOTEARS'
     case 'var-lingam-run': return 'VAR-LiNGAM'
     case 'ocse-run': return 'oCSE'
@@ -34,6 +37,9 @@ const variablesOf = (view: DiscoveryEvidenceView) => {
     case 'pcmci-plus-run':
     case 'lpcmci-run':
     case 'rpcmci-run':
+    case 'cdnots-run':
+    case 'cdnots-plus-run':
+    case 'grace-run':
     case 'dynotears-run':
     case 'var-lingam-run':
     case 'ocse-run': return view.run.variables
@@ -55,7 +61,7 @@ const candidateLabel = (candidate: DiscoveryCandidate): string => {
     case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1} · ${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · t−${candidate.lag}`
-    case 'neural-lagged': return `score ${statistic(candidate.score)} · t−${candidate.lag}`
+    case 'neural-lagged': return `${candidate.method === 'GRACE' ? 'gate' : 'score'} ${statistic(candidate.score)} · t−${candidate.lag}`
     case 'neural-window': return `score ${statistic(candidate.score)} · ${candidate.context}-step window`
     default: return assertNever(candidate)
   }
@@ -67,7 +73,9 @@ const candidateDetail = (candidate: DiscoveryCandidate): string => {
     case 'regime-endpoint-marked': return `regime ${candidate.regime + 1} · mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
     case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ' · contemporaneous' : ` · lag ${candidate.lag}`}`
     case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · p ${pValue(candidate.pValue)} · lag ${candidate.lag}`
-    case 'neural-lagged': return `input-group norm ${statistic(candidate.score)} · lag ${candidate.lag}`
+    case 'neural-lagged': return candidate.method === 'GRACE'
+      ? `gate value ${statistic(candidate.score)} · lag ${candidate.lag}`
+      : `input-group norm ${statistic(candidate.score)} · lag ${candidate.lag}`
     case 'neural-window': return `input-group norm ${statistic(candidate.score)} · ${candidate.context}-step history; no individual lag selected`
     default: return assertNever(candidate)
   }

@@ -316,6 +316,24 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
       { kind: 'magnitude', text: `RPCMCI assigned each of the ${run.result.observations} time points to one of ${run.result.numRegimes} regimes and estimated a separate lag graph for each regime. ${run.result.errorFreeAnnealings} of ${run.result.maxAnneal} annealing runs completed without an optimisation error.` },
       { kind: 'qualification', text: 'The regime memberships and conditional-dependence graphs depend on the selected number of regimes, transition budget, linear partial-correlation test and assumption that each regime has a stationary causal structure. Regime labels have no ordering or substantive meaning by themselves.' },
     ] }
+    case 'cdnots-run':
+    case 'cdnots-plus-run': {
+      const method = run.kind === 'cdnots-run' ? 'CD-NOTS' : 'CD-NOTS+'
+      const context = run.result.contextVariables.length === 0
+        ? 'No time-context node was included.'
+        : `The graph includes ${run.result.contextVariables.join(' and ')} as generated time-context ${run.result.contextVariables.length === 1 ? 'node' : 'nodes'}.`
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `${method} tested lagged and same-period conditional independences through lag ${run.result.maxLag}. ${context}` },
+        { kind: 'qualification', text: `The endpoint marks represent the graph orientations supported by the ${method} rules and the selected partial-correlation test. Causal interpretation requires the method's Markov, faithfulness, causal-sufficiency and time-context assumptions; the marks are not intervention-effect estimates.` },
+      ] }
+    }
+    case 'grace-run': {
+      const selected = run.result.graph.flatMap((targets) => targets.flatMap((lags) => lags)).filter(Boolean).length
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `${selected} source–target–lag gates meet the ${number(run.result.gateThreshold)} threshold after GRACE refined the CD-NOTS skeleton. Each displayed value is the fitted hard-concrete gate for that candidate relation.` },
+        { kind: 'qualification', text: 'The initial skeleton and neural refinement depend on the selected lag window, conditional-independence test, nonstationarity context, regularisation and optimization. A retained gate is discovery evidence, not an intervention-effect estimate.' },
+      ] }
+    }
     case 'dynotears-run': return { kind: 'result-interpretation', statements: [
       { kind: 'magnitude', text: 'Each nonzero weight is a fitted linear structural coefficient from source(t−lag) to target(t). Its sign gives the fitted direction of association; its magnitude depends on the variables’ scales and the selected penalties.' },
       { kind: 'qualification', text: 'DYNOTEARS supplies a sparse candidate structure under its model assumptions. The weights are not uncertainty intervals or identified intervention effects.' },

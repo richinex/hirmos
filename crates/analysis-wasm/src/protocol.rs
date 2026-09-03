@@ -5,6 +5,64 @@ use super::*;
 pub(crate) const MIN_STATIONARITY_OBSERVATIONS: usize = 24;
 pub(crate) const MAX_MINIMAL_ADJUSTMENT_SETS: usize = 128;
 
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum TemporalCutOff {
+    MethodDefault,
+    TwoTauMax,
+    TauMax,
+    MaxLag,
+    MaxLagOrTauMax,
+    TwoTauMaxFuture,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub(crate) enum TemporalMaskType {
+    None,
+    X,
+    Y,
+    Z,
+    Xy,
+    Xz,
+    Yz,
+    Xyz,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum TemporalSamples {
+    Dense,
+    RoleAware {
+        cut_off: TemporalCutOff,
+        propagate_through_max_lag: bool,
+        mask_type: TemporalMaskType,
+    },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CdnotsMissingStrategy {
+    PairwiseComplete,
+    VarEm,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CdnotsContext {
+    None,
+    Linear,
+    LinearSine,
+    LinearExponential,
+    LinearQuadratic,
+    Step,
+    StepLinear,
+}
+
 #[derive(Serialize)]
 #[serde(
     tag = "kind",
@@ -136,6 +194,12 @@ pub(crate) enum IdentifiedDiscreteResult {
 )]
 pub(crate) enum AnalysisCommand {
     StationarityBattery,
+    Multicollinearity {
+        rows: usize,
+        columns: usize,
+        correlation_threshold: f64,
+        vif_threshold: f64,
+    },
     PandasResampleDaily {
         rows: usize,
         columns: usize,
@@ -149,12 +213,14 @@ pub(crate) enum AnalysisCommand {
         columns: usize,
         tau_max: usize,
         pc_alpha: f64,
+        samples: TemporalSamples,
     },
     Lpcmci {
         rows: usize,
         columns: usize,
         tau_max: usize,
         pc_alpha: f64,
+        samples: TemporalSamples,
     },
     Rpcmci {
         rows: usize,
@@ -168,6 +234,33 @@ pub(crate) enum AnalysisCommand {
         tau_max: usize,
         pc_alpha: f64,
         alpha_level: f64,
+        seed: u64,
+    },
+    Cdnots {
+        rows: usize,
+        columns: usize,
+        max_lag: usize,
+        alpha: f64,
+        missing: CdnotsMissingStrategy,
+        context: CdnotsContext,
+    },
+    CdnotsPlus {
+        rows: usize,
+        columns: usize,
+        max_lag: usize,
+        alpha: f64,
+        missing: CdnotsMissingStrategy,
+        context: CdnotsContext,
+    },
+    Grace {
+        rows: usize,
+        columns: usize,
+        max_lag: usize,
+        alpha: f64,
+        context: CdnotsContext,
+        gate_threshold: f64,
+        epochs: usize,
+        patience: usize,
         seed: u64,
     },
     Dynotears {
@@ -569,6 +662,14 @@ pub(crate) enum NeuralCmlpPenalty {
 pub(crate) struct NeuralStandardizationEvidence {
     pub(crate) means: Vec<f64>,
     pub(crate) scales: Vec<f64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct VifEliminationEvidence {
+    pub(crate) column: usize,
+    /// Exact collinearity produces an infinite VIF, represented as null in JSON.
+    pub(crate) vif: Option<f64>,
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -1131,6 +1232,19 @@ pub(crate) enum AnalysisResult {
         kpss: DeterministicEvidence<KpssEvidence>,
         zivot_andrews: BreakEvidence,
     },
+    Multicollinearity {
+        observations: usize,
+        variables: usize,
+        correlation_threshold: f64,
+        vif_threshold: f64,
+        correlation: Vec<Vec<f64>>,
+        correlation_keep: Vec<usize>,
+        correlation_drop: Vec<usize>,
+        correlation_clusters: Vec<Vec<usize>>,
+        vif_keep: Vec<usize>,
+        vif_drop: Vec<usize>,
+        vif_history: Vec<VifEliminationEvidence>,
+    },
     PandasResampled {
         values: Vec<f64>,
         timestamps_ms: Vec<i64>,
@@ -1179,6 +1293,48 @@ pub(crate) enum AnalysisResult {
         diff_g_all: Vec<Option<Vec<f64>>>,
         diff_g_best: Vec<f64>,
         error_free_annealings: usize,
+    },
+    Cdnots {
+        observations: usize,
+        observed_variables: usize,
+        context_variables: Vec<String>,
+        max_lag: usize,
+        alpha: f64,
+        missing: CdnotsMissingStrategy,
+        context: CdnotsContext,
+        graph: Vec<Vec<Vec<String>>>,
+        p_matrix: Vec<Vec<Vec<f64>>>,
+        val_matrix: Vec<Vec<Vec<f64>>>,
+    },
+    CdnotsPlus {
+        observations: usize,
+        observed_variables: usize,
+        context_variables: Vec<String>,
+        max_lag: usize,
+        alpha: f64,
+        missing: CdnotsMissingStrategy,
+        context: CdnotsContext,
+        graph: Vec<Vec<Vec<String>>>,
+        p_matrix: Vec<Vec<Vec<f64>>>,
+        val_matrix: Vec<Vec<Vec<f64>>>,
+    },
+    Grace {
+        observations: usize,
+        variables: usize,
+        max_lag: usize,
+        alpha: f64,
+        context: CdnotsContext,
+        gate_threshold: f64,
+        lambda_l0: f64,
+        epochs: usize,
+        patience: usize,
+        seed: u64,
+        imputed_cells: usize,
+        skeleton: Vec<Vec<Vec<bool>>>,
+        gate_values: Vec<Vec<Vec<f64>>>,
+        graph: Vec<Vec<Vec<bool>>>,
+        loss: Vec<f64>,
+        rmse: Vec<f64>,
     },
     Dynotears {
         observations: usize,

@@ -3,6 +3,7 @@ import { Select } from '@/components/ui/Select'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { EligibilityView } from '@/components/EligibilityView'
@@ -22,8 +23,9 @@ import {
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { CmlpLagPlot, NeuralSummaryPlot, OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
-import { button, field, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, field, figureGrid, iconControl, label, literal, num, panel, well } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
+import type { DagDocument } from '@/domain/dag'
 import {
   DISCOVERY_LAG_OPTIONS,
   DISCOVERY_METHOD_GROUPS,
@@ -50,8 +52,16 @@ import {
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
 import {
+  assessDiscoveryRunDeletion,
+  type DeletableDiscoveryRun,
+  type DiscoveryRunReference,
+} from '@/domain/discoveryLifecycle'
+import {
   DYNOTEARS_METHOD_ID,
   DIRECT_LINGAM_METHOD_ID,
+  CDNOTS_PAR_CORR_METHOD_ID,
+  CDNOTS_PLUS_PAR_CORR_METHOD_ID,
+  GRACE_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   RPCMCI_PAR_CORR_METHOD_ID,
   OCSE_METHOD_ID,
@@ -63,16 +73,18 @@ import {
   type MethodDefinition,
   type MethodEligibility,
 } from '@/domain/methods'
-import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import { describeSeriesTransform, type MissingnessDraft, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
-import type { AnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import type { AnalysisWorkerProblem, TemporalSamples } from '@/workers/analysisProtocol'
+import type { PreparedMatrix, RoleAwarePreparedMatrix } from '@/data/prepared'
 
 const DISCOVERY_GROUP_LABELS: Readonly<Record<DiscoveryMethodGroupId, string>> = {
   'pcmci-family': 'PCMCI',
+  'nonstationary-constraint': 'Nonstationary',
   'lingam-family': 'LiNGAM',
   'continuous-optimization': 'DYNOTEARS',
   'causation-entropy': 'oCSE',
@@ -85,10 +97,43 @@ interface DiscoveryPanelProps {
   readonly prepared: PreparedDatasetArtifact
   readonly stationarity: StationarityEvidenceArtifact | null
   readonly runs: readonly DiscoveryRunArtifact[]
+  readonly documents: readonly DagDocument[]
   readonly draft: DiscoveryDraft
   readonly onEvent: (event: DiscoveryEvent) => void
   readonly cancellation: { requested: boolean }
   readonly onRun: (artifact: DiscoveryRunArtifact) => void
+  readonly onDeleteRun: (deletion: DeletableDiscoveryRun) => void
+}
+
+type DiscoveryDeletionDialog =
+  | { readonly kind: 'closed' }
+  | {
+      readonly kind: 'confirming'
+      readonly run: DiscoveryRunArtifact
+      readonly deletion: DeletableDiscoveryRun
+    }
+  | {
+      readonly kind: 'blocked'
+      readonly run: DiscoveryRunArtifact
+      readonly references: readonly [DiscoveryRunReference, ...DiscoveryRunReference[]]
+    }
+  | { readonly kind: 'not-found'; readonly run: DiscoveryRunArtifact }
+
+const describeDiscoveryReference = (reference: DiscoveryRunReference): string => {
+  switch (reference.kind) {
+    case 'dag-origin-reference':
+      return `${reference.documentName} records this run as part of its graph basis.`
+    case 'edge-evidence-reference': {
+      const timing = reference.timing.kind === 'contemporaneous' ? '' : ` at lag ${reference.timing.lag}`
+      return `${reference.documentName}, revision ${formatTimestamp(reference.revisionCreatedAt)}: ${reference.cause} → ${reference.effect}${timing}.`
+    }
+    default: return assertNever(reference)
+  }
+}
+
+const discoveryRunName = (run: DiscoveryRunArtifact): string => {
+  const definition = methodDefinition(run.method)
+  return definition.ok ? definition.value.name : 'discovery'
 }
 
 const lagFromValue = (value: string): DiscoveryLag | null =>
@@ -103,12 +148,77 @@ const penaltyFromValue = (value: string): DynotearsPenalty | null =>
 const shufflesFromValue = (value: string): OcseShuffles | null =>
   OCSE_SHUFFLE_OPTIONS.find((candidate) => String(candidate) === value) ?? null
 
+type LagAwareMissingness = Extract<MissingnessDraft, { readonly kind: 'lag-aware-exclusion' }>
+type DiscoveryInput =
+  | { readonly kind: 'dense'; readonly matrix: PreparedMatrix }
+  | {
+      readonly kind: 'role-aware'
+      readonly matrix: RoleAwarePreparedMatrix
+      readonly missingness: LagAwareMissingness
+    }
+
+const maskTypeFor = (
+  exclusions: LagAwareMissingness['analysisExclusions'],
+): Extract<TemporalSamples, { readonly kind: 'role-aware' }>['maskType'] => {
+  if (exclusions.kind === 'ignore') return 'none'
+  const x = exclusions.roles.includes('candidate-cause')
+  const y = exclusions.roles.includes('tested-outcome')
+  const z = exclusions.roles.includes('conditioner')
+  if (x && y && z) return 'xyz'
+  if (x && y) return 'xy'
+  if (x && z) return 'xz'
+  if (y && z) return 'yz'
+  if (x) return 'x'
+  if (y) return 'y'
+  if (z) return 'z'
+  return 'none'
+}
+
+const temporalSamplesFor = (input: DiscoveryInput): TemporalSamples => {
+  switch (input.kind) {
+    case 'dense': return { kind: 'dense' }
+    case 'role-aware': {
+      const cutOff = (() => {
+        switch (input.missingness.cutOff) {
+          case 'method-default': return 'methodDefault'
+          case '2xtau-max': return 'twoTauMax'
+          case 'tau-max': return 'tauMax'
+          case 'max-lag': return 'maxLag'
+          case 'max-lag-or-tau-max': return 'maxLagOrTauMax'
+          case '2xtau-max-future': return 'twoTauMaxFuture'
+          default: return assertNever(input.missingness.cutOff)
+        }
+      })()
+      return {
+        kind: 'role-aware',
+        validity: input.matrix.validity,
+        analysisMask: input.matrix.analysisMask,
+        cutOff,
+        propagateThroughMaxLag: input.missingness.propagateThroughMaxLag,
+        maskType: maskTypeFor(input.missingness.analysisExclusions),
+      }
+    }
+    default: return assertNever(input)
+  }
+}
+
+const validityFor = (input: DiscoveryInput): Uint8Array => {
+  switch (input.kind) {
+    case 'dense': return new Uint8Array(input.matrix.values.length).fill(1)
+    case 'role-aware': return input.matrix.validity
+    default: return assertNever(input)
+  }
+}
+
 const methodIdForChoice = (method: DiscoveryMethodChoice) => {
   switch (method) {
     case 'direct-lingam': return DIRECT_LINGAM_METHOD_ID
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
     case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
     case 'rpcmci': return RPCMCI_PAR_CORR_METHOD_ID
+    case 'cdnots': return CDNOTS_PAR_CORR_METHOD_ID
+    case 'cdnots-plus': return CDNOTS_PLUS_PAR_CORR_METHOD_ID
+    case 'grace': return GRACE_METHOD_ID
     case 'dynotears': return DYNOTEARS_METHOD_ID
     case 'var-lingam': return VAR_LINGAM_METHOD_ID
     case 'ocse': return OCSE_METHOD_ID
@@ -220,6 +330,128 @@ function RpcmciControls({ configuration, onChange }: {
           <div className="text-body text-ink">
             <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.rpcmci.seed} htmlFor="rpcmci-seed" />
             <input id="rpcmci-seed" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
+          </div>
+        </div>
+      </details>
+    </div>
+  )
+}
+
+const CDN_CONTEXT_OPTIONS = [
+  { value: 'none', label: 'None' },
+  { value: 'linear', label: 'Linear time' },
+  { value: 'linearSine', label: 'Linear + sine' },
+  { value: 'linearExponential', label: 'Linear + exponential' },
+  { value: 'linearQuadratic', label: 'Linear + quadratic' },
+  { value: 'step', label: 'Step' },
+  { value: 'stepLinear', label: 'Step + linear' },
+] as const
+
+type CdnotsConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'cdnots' | 'cdnots-plus' }>
+
+function CdnotsControls({ configuration, onChange }: {
+  readonly configuration: CdnotsConfiguration
+  readonly onChange: (configuration: CdnotsConfiguration) => void
+}) {
+  return (
+    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
+      <div className="text-body text-ink">
+        <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.cdnots.maximumLag} htmlFor="cdnots-maximum-lag" />
+        <Select id="cdnots-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+          const maxLag = lagFromValue(event.target.value)
+          if (maxLag !== null) onChange({ ...configuration, maxLag })
+        }}>
+          {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Alpha" help={DISCOVERY_PARAMETER_HELP.cdnots.alpha} htmlFor="cdnots-alpha" />
+        <Select id="cdnots-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
+          const alpha = alphaFromValue(event.target.value)
+          if (alpha !== null) onChange({ ...configuration, alpha })
+        }}>
+          {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Missing observations" help={DISCOVERY_PARAMETER_HELP.cdnots.missing} htmlFor="cdnots-missing" />
+        <Select id="cdnots-missing" className={field('text', 'mt-1')} value={configuration.missing} onChange={(event) => {
+          const missing = event.target.value
+          if (missing === 'pairwiseComplete' || missing === 'varEm') onChange({ ...configuration, missing })
+        }}>
+          <option value="pairwiseComplete">Pairwise complete</option>
+          <option value="varEm">VAR-EM imputation</option>
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Time context" help={DISCOVERY_PARAMETER_HELP.cdnots.context} htmlFor="cdnots-context" />
+        <Select id="cdnots-context" className={field('text', 'mt-1')} value={configuration.context} onChange={(event) => {
+          const option = CDN_CONTEXT_OPTIONS.find(({ value }) => value === event.target.value)
+          if (option !== undefined) onChange({ ...configuration, context: option.value })
+        }}>
+          {CDN_CONTEXT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </Select>
+      </div>
+    </div>
+  )
+}
+
+type GraceConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'grace' }>
+
+function GraceControls({ configuration, onChange }: {
+  readonly configuration: GraceConfiguration
+  readonly onChange: (configuration: GraceConfiguration) => void
+}) {
+  const changeNumber = (fieldName: 'gateThreshold' | 'epochs' | 'patience' | 'seed', value: number) => {
+    if (Number.isFinite(value)) onChange({ ...configuration, [fieldName]: value })
+  }
+  return (
+    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+      <div className="text-body text-ink">
+        <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.grace.maximumLag} htmlFor="grace-maximum-lag" />
+        <Select id="grace-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
+          const maxLag = lagFromValue(event.target.value)
+          if (maxLag !== null) onChange({ ...configuration, maxLag })
+        }}>
+          {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Skeleton alpha" help={DISCOVERY_PARAMETER_HELP.grace.alpha} htmlFor="grace-alpha" />
+        <Select id="grace-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
+          const alpha = alphaFromValue(event.target.value)
+          if (alpha !== null) onChange({ ...configuration, alpha })
+        }}>
+          {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Time context" help={DISCOVERY_PARAMETER_HELP.grace.context} htmlFor="grace-context" />
+        <Select id="grace-context" className={field('text', 'mt-1')} value={configuration.context} onChange={(event) => {
+          const option = CDN_CONTEXT_OPTIONS.find(({ value }) => value === event.target.value)
+          if (option !== undefined) onChange({ ...configuration, context: option.value })
+        }}>
+          {CDN_CONTEXT_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </Select>
+      </div>
+      <div className="text-body text-ink">
+        <ParameterLabel label="Gate threshold" help={DISCOVERY_PARAMETER_HELP.grace.gateThreshold} htmlFor="grace-gate-threshold" />
+        <input id="grace-gate-threshold" className={field('text', 'mt-1')} type="number" min={0} max={1} step={0.05} value={configuration.gateThreshold} onChange={(event) => changeNumber('gateThreshold', event.currentTarget.valueAsNumber)} />
+      </div>
+      <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
+        <summary className="cursor-pointer text-body text-ink">Training settings</summary>
+        <div className="mt-3 grid gap-3 @md/panel:grid-cols-3">
+          <div className="text-body text-ink">
+            <ParameterLabel label="Epochs" help={DISCOVERY_PARAMETER_HELP.grace.epochs} htmlFor="grace-epochs" />
+            <input id="grace-epochs" className={field('text', 'mt-1')} type="number" min={1} max={5000} step={1} value={configuration.epochs} onChange={(event) => changeNumber('epochs', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Patience" help={DISCOVERY_PARAMETER_HELP.grace.patience} htmlFor="grace-patience" />
+            <input id="grace-patience" className={field('text', 'mt-1')} type="number" min={1} max={configuration.epochs} step={1} value={configuration.patience} onChange={(event) => changeNumber('patience', event.currentTarget.valueAsNumber)} />
+          </div>
+          <div className="text-body text-ink">
+            <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.grace.seed} htmlFor="grace-seed" />
+            <input id="grace-seed" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
           </div>
         </div>
       </details>
@@ -372,7 +604,7 @@ function ResultCard({ run, method, title, meta, open, current, children }: {
   return (
     <article aria-labelledby={`run-${run.id}`}>
       <details className={`group rounded-xl border bg-panel ${current ? 'border-edge' : 'border-hair'}`} open={open}>
-        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl p-4 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl py-4 pl-4 pr-14 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
           <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-150 group-open:rotate-180" />
           <div className="min-w-0 flex-1">
             <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
@@ -549,6 +781,89 @@ function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly
         ]}
       />
       <p className="mb-0 mt-3 text-micro text-faint">{run.result.errorFreeAnnealings} of {run.result.maxAnneal} annealing runs completed without an optimisation error · switch threshold {run.result.switchThres} · transition budget {run.result.maxTransitions} · seed {run.result.seed}</p>
+    </ResultCard>
+  )
+}
+
+type CdnotsRun = Extract<DiscoveryRunArtifact, { readonly kind: 'cdnots-run' | 'cdnots-plus-run' }>
+
+function CdnotsResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: CdnotsRun }) {
+  const method = run.kind === 'cdnots-run' ? 'CD-NOTS' : 'CD-NOTS+'
+  const names = [...run.variables.map(({ name }) => name), ...run.result.contextVariables]
+  const rows = run.result.graph.flatMap((targets, source) => targets.flatMap((lags, target) => lags.map((mark, lag) => ({
+    key: `${source}:${target}:${lag}`,
+    source: names[source],
+    target: names[target],
+    lag,
+    mark,
+    p: run.result.pMatrix[source][target][lag],
+    value: run.result.valMatrix[source][target][lag],
+  }))))
+  const context = run.result.contextVariables.length === 0 ? 'no time-context node' : run.result.contextVariables.join(' + ')
+  return (
+    <ResultCard run={run} open={open} current={current} method={`${method} · ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.observedVariables} observed variables · maximum lag {run.result.maxLag} · {context}</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <StructurePlot run={run} label={`${method} structure`} />
+      <p className="mb-3 mt-3 text-body text-muted">Generated context nodes appear in this evidence graph but are not dataset columns and cannot be copied into the editable DAG.</p>
+      <EvidenceTable<typeof rows[number]>
+        frame="none"
+        title={`${method} raw evidence`}
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="cell"
+        empty="The run reported no cell."
+        exportName={`${run.kind === 'cdnots-run' ? 'cdnots' : 'cdnots-plus'}-evidence`}
+        columns={[
+          ...linkColumns<typeof rows[number]>(),
+          { id: 'mark', header: 'Mark', value: (row) => row.mark || '—' },
+          figureColumn<typeof rows[number]>('p', 'p', (row) => row.p, pValue),
+          figureColumn<typeof rows[number]>('value', 'Partial r', (row) => row.value),
+        ]}
+      />
+    </ResultCard>
+  )
+}
+
+function GraceResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'grace-run' }> }) {
+  const rows = run.result.gateValues.flatMap((targets, source) => targets.flatMap((lags, target) => lags.map((gate, lag) => ({
+    key: `${source}:${target}:${lag}`,
+    source: run.variables[source].name,
+    target: run.variables[target].name,
+    lag,
+    skeleton: run.result.skeleton[source][target][lag],
+    gate,
+    selected: run.result.graph[source][target][lag],
+  }))))
+  const finalLoss = run.result.loss.at(-1)
+  const finalRmse = run.result.rmse.at(-1)
+  return (
+    <ResultCard run={run} open={open} current={current} method="GRACE" title={<>Gated lag-graph refinement</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · {run.result.epochs} epochs · seed {run.result.seed}</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <StructurePlot run={run} label="GRACE retained relations" />
+      <dl className={figureGrid('mt-3 grid-cols-2 @2xl/panel:grid-cols-4')}>
+        <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Gate threshold</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{statistic(run.result.gateThreshold)}</dd></div>
+        <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>L0 λ</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{statistic(run.result.lambdaL0)}</dd></div>
+        <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Final loss</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{finalLoss === undefined ? '—' : statistic(finalLoss)}</dd></div>
+        <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Final RMSE</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{finalRmse === undefined ? '—' : statistic(finalRmse)}</dd></div>
+      </dl>
+      <p className="mb-3 mt-3 text-body text-muted">The skeleton limits which links can be trained. A link is retained when its fitted hard-concrete gate meets the recorded threshold. {run.result.imputedCells === 0 ? 'The neural input contained no missing cells.' : `VAR-EM filled ${formatCount(run.result.imputedCells).text} missing cells before the dense neural windows were constructed.`}</p>
+      <EvidenceTable<typeof rows[number]>
+        frame="none"
+        title="GRACE gate values"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="gate"
+        empty="The run reported no gate."
+        exportName="grace-gates"
+        columns={[
+          ...linkColumns<typeof rows[number]>(),
+          { id: 'skeleton', header: 'In skeleton', value: (row) => row.skeleton ? 'Yes' : 'No' },
+          figureColumn<typeof rows[number]>('gate', 'Gate', (row) => row.gate),
+          { id: 'selected', header: 'Retained', value: (row) => row.selected ? 'Yes' : 'No' },
+        ]}
+      />
     </ResultCard>
   )
 }
@@ -738,6 +1053,9 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
     case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'rpcmci-run': return <RpcmciResult run={run} open={open} current={current} />
+    case 'cdnots-run': return <CdnotsResult run={run} open={open} current={current} />
+    case 'cdnots-plus-run': return <CdnotsResult run={run} open={open} current={current} />
+    case 'grace-run': return <GraceResult run={run} open={open} current={current} />
     case 'dynotears-run': return <DynotearsResult run={run} open={open} current={current} />
     case 'var-lingam-run': return <VarLingamResult run={run} open={open} current={current} />
     case 'ocse-run': return <OcseResult run={run} open={open} current={current} />
@@ -747,8 +1065,9 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
   }
 }
 
-export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, draft, onEvent: dispatch, cancellation, onRun }: DiscoveryPanelProps) {
+export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, documents, draft, onEvent: dispatch, cancellation, onRun, onDeleteRun }: DiscoveryPanelProps) {
   const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
+  const [deletionDialog, setDeletionDialog] = useState<DiscoveryDeletionDialog>({ kind: 'closed' })
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
   const selectedMethod = methodDefinition(methodId)
@@ -778,47 +1097,91 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     }]
   })
 
+  const requestDeletion = (run: DiscoveryRunArtifact) => {
+    const decision = assessDiscoveryRunDeletion(runs.map((candidate) => candidate.id), documents, run.id)
+    switch (decision.kind) {
+      case 'deletable':
+        setDeletionDialog({ kind: 'confirming', run, deletion: decision.deletion })
+        return
+      case 'referenced':
+        setDeletionDialog({ kind: 'blocked', run, references: decision.references })
+        return
+      case 'not-found':
+        setDeletionDialog({ kind: 'not-found', run })
+        return
+      default: return assertNever(decision)
+    }
+  }
+
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
     if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused') return
     cancellation.requested = false
     dispatch({ type: 'run-started' })
     try {
-      const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
+      const [{ materialisePrepared, materialiseRoleAwarePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
         import('@/data/prepared'),
         import('@/analysis/client'),
       ])
-      const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
+      const roleAwarePrepared = prepared.kind === 'prepared-time-series' && prepared.missingness.kind === 'lag-aware-exclusion'
+        ? { prepared, missingness: prepared.missingness }
+        : null
+      let input: DiscoveryInput
+      if (roleAwarePrepared === null) {
+        const materialised = await materialisePrepared(source, profile, prepared, prepared.columns)
+        if (!materialised.ok) {
+          dispatch(materialised.error.kind === 'missing-values-remain'
+            ? { type: 'run-failed', problem: { kind: 'missing-values-remain', cells: materialised.error.cells } }
+            : { type: 'run-failed', problem: { kind: 'materialization-refused', detail: describePreparedMaterialisationProblem(materialised.error) } })
+          return
+        }
+        input = { kind: 'dense', matrix: materialised.value }
+      } else {
+        const materialised = await materialiseRoleAwarePrepared(
+          source,
+          profile,
+          roleAwarePrepared.prepared,
+          roleAwarePrepared.prepared.columns,
+        )
+        if (!materialised.ok) {
+          dispatch(materialised.error.kind === 'missing-values-remain'
+            ? { type: 'run-failed', problem: { kind: 'missing-values-remain', cells: materialised.error.cells } }
+            : { type: 'run-failed', problem: { kind: 'materialization-refused', detail: describePreparedMaterialisationProblem(materialised.error) } })
+          return
+        }
+        input = {
+          kind: 'role-aware',
+          matrix: materialised.value,
+          missingness: roleAwarePrepared.missingness,
+        }
+      }
       if (cancellation.requested) {
         dispatch({ type: 'run-cancelled' })
         return
       }
-      if (!matrix.ok) {
-        dispatch(matrix.error.kind === 'missing-values-remain'
-          ? { type: 'run-failed', problem: { kind: 'missing-values-remain', cells: matrix.error.cells } }
-          : { type: 'run-failed', problem: { kind: 'materialization-refused', detail: describePreparedMaterialisationProblem(matrix.error) } })
-        return
-      }
+      const matrix = input.matrix
 
       switch (specification.value.kind) {
       case 'direct-lingam': {
-        const result = await analysis.runDirectLingam(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, (progress) => dispatch({ type: 'run-progressed', progress }))
+        const result = await analysis.runDirectLingam(matrix.values, matrix.rowCount, matrix.columns.length, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
       case 'pcmci-plus': {
+        if (prepared.kind !== 'prepared-time-series') return
         const result = await analysis.runPcmciPlus(
-          matrix.value.values,
-          matrix.value.rowCount,
-          matrix.value.columns.length,
+          matrix.values,
+          matrix.rowCount,
+          matrix.columns.length,
           specification.value.tauMax,
           specification.value.pcAlpha,
+          temporalSamplesFor(input),
         )
         if (!result.ok) {
           dispatch(analysisFailureEvent(result.error))
@@ -830,7 +1193,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           preparedDataset: prepared.id,
           createdAt: new Date().toISOString(),
           method: PCMCI_PLUS_PAR_CORR_METHOD_ID,
-          variables: matrix.value.columns,
+          variables: matrix.columns,
           eligibility,
           result: result.value,
         }
@@ -839,21 +1202,22 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         return
       }
       case 'lpcmci': {
-        const result = await analysis.runLpcmci(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.tauMax, specification.value.pcAlpha, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (prepared.kind !== 'prepared-time-series') return
+        const result = await analysis.runLpcmci(matrix.values, matrix.rowCount, matrix.columns.length, specification.value.tauMax, specification.value.pcAlpha, temporalSamplesFor(input), (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
       case 'rpcmci': {
         const result = await analysis.runRpcmci(
-          matrix.value.values,
-          matrix.value.rowCount,
-          matrix.value.columns.length,
+          matrix.values,
+          matrix.rowCount,
+          matrix.columns.length,
           specification.value,
           (progress) => dispatch({ type: 'run-progressed', progress }),
         )
@@ -867,7 +1231,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           preparedDataset: prepared.id,
           createdAt: new Date().toISOString(),
           method: RPCMCI_PAR_CORR_METHOD_ID,
-          variables: matrix.value.columns,
+          variables: matrix.columns,
           eligibility,
           result: result.value,
         }
@@ -875,44 +1239,98 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         onRun(artifact)
         return
       }
-      case 'dynotears': {
-        const result = await analysis.runDynotears(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.lambdaW, specification.value.lambdaA, (progress) => dispatch({ type: 'run-progressed', progress }))
+      case 'cdnots': {
+        const result = await analysis.runCdnots(
+          matrix.values,
+          validityFor(input),
+          matrix.rowCount,
+          matrix.columns.length,
+          specification.value,
+          (progress) => dispatch({ type: 'run-progressed', progress }),
+        )
         if (!result.ok) {
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'cdnots-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'cdnots-plus': {
+        const result = await analysis.runCdnotsPlus(
+          matrix.values,
+          validityFor(input),
+          matrix.rowCount,
+          matrix.columns.length,
+          specification.value,
+          (progress) => dispatch({ type: 'run-progressed', progress }),
+        )
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'cdnots-plus-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PLUS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'grace': {
+        const result = await analysis.runGrace(
+          matrix.values,
+          validityFor(input),
+          matrix.rowCount,
+          matrix.columns.length,
+          specification.value,
+          (progress) => dispatch({ type: 'run-progressed', progress }),
+        )
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'grace-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: GRACE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'dynotears': {
+        const result = await analysis.runDynotears(matrix.values, matrix.rowCount, matrix.columns.length, specification.value.maxLag, specification.value.lambdaW, specification.value.lambdaA, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
       case 'var-lingam': {
-        const result = await analysis.runVarLingam(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.prune, (progress) => dispatch({ type: 'run-progressed', progress }))
+        const result = await analysis.runVarLingam(matrix.values, matrix.rowCount, matrix.columns.length, specification.value.maxLag, specification.value.prune, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
       case 'ocse': {
-        const result = await analysis.runOcse(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, specification.value.maxLag, specification.value.alpha, specification.value.nShuffles, specification.value.method, specification.value.k, (progress) => dispatch({ type: 'run-progressed', progress }))
+        const result = await analysis.runOcse(matrix.values, matrix.rowCount, matrix.columns.length, specification.value.maxLag, specification.value.alpha, specification.value.nShuffles, specification.value.method, specification.value.k, (progress) => dispatch({ type: 'run-progressed', progress }))
         if (!result.ok) {
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
       case 'cmlp': {
         const result = await analysis.runCmlp(
-          matrix.value.values,
-          matrix.value.rowCount,
-          matrix.value.columns.length,
+          matrix.values,
+          matrix.rowCount,
+          matrix.columns.length,
           specification.value,
           (progress) => dispatch({ type: 'run-progressed', progress }),
         )
@@ -920,16 +1338,16 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'cmlp-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CMLP_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'cmlp-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CMLP_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
       case 'clstm': {
         const result = await analysis.runClstm(
-          matrix.value.values,
-          matrix.value.rowCount,
-          matrix.value.columns.length,
+          matrix.values,
+          matrix.rowCount,
+          matrix.columns.length,
           specification.value,
           (progress) => dispatch({ type: 'run-progressed', progress }),
         )
@@ -937,7 +1355,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'clstm-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CLSTM_METHOD_ID, variables: matrix.value.columns, eligibility, result: result.value }
+        const artifact: DiscoveryRunArtifact = { kind: 'clstm-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CLSTM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1054,6 +1472,20 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             <RpcmciControls
               configuration={configuration}
               onChange={(next) => dispatch({ type: 'rpcmci-configured', configuration: next })}
+            />
+          )}
+
+          {(configuration.kind === 'cdnots' || configuration.kind === 'cdnots-plus') && (
+            <CdnotsControls
+              configuration={configuration}
+              onChange={(next) => dispatch({ type: 'cdnots-configured', configuration: next })}
+            />
+          )}
+
+          {configuration.kind === 'grace' && (
+            <GraceControls
+              configuration={configuration}
+              onChange={(next) => dispatch({ type: 'grace-configured', configuration: next })}
             />
           )}
 
@@ -1208,15 +1640,55 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             <span className={num('text-body text-faint')}>{runs.length} run{runs.length === 1 ? '' : 's'}</span>
           </div>
         </div>
+        {deletionDialog.kind === 'blocked' && (
+          <Alert tone="warn" className="mb-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="m-0">The {discoveryRunName(deletionDialog.run)} run cannot be deleted because a DAG audit record refers to it.</p>
+                <ul className="mb-0 mt-2 pl-5 text-label text-muted">
+                  {deletionDialog.references.map((reference) => (
+                    <li key={reference.kind === 'dag-origin-reference'
+                      ? `origin:${reference.document}`
+                      : `edge:${reference.document}:${reference.revision}:${reference.edge}:${reference.candidate}`}
+                    >{describeDiscoveryReference(reference)}</li>
+                  ))}
+                </ul>
+              </div>
+              <button type="button" className={iconControl('quiet')} aria-label="Dismiss deletion notice" onClick={() => setDeletionDialog({ kind: 'closed' })}><Icon name="close" size={14} /></button>
+            </div>
+          </Alert>
+        )}
+        {deletionDialog.kind === 'not-found' && (
+          <Alert tone="danger" className="mb-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="m-0">The {discoveryRunName(deletionDialog.run)} run is no longer present in the project.</p>
+              <button type="button" className={iconControl('quiet')} aria-label="Dismiss deletion notice" onClick={() => setDeletionDialog({ kind: 'closed' })}><Icon name="close" size={14} /></button>
+            </div>
+          </Alert>
+        )}
         {runs.length === 0 ? (
           <EmptyState>Choose a method and run discovery.</EmptyState>
         ) : (
           <div className="space-y-4">
             {[...runs].reverse().map((run, index) => (
-              <DiscoveryResult key={`${run.id}:${expanded}`} run={run} open={expanded === 'all' || (expanded === 'latest' && index === 0)} current={index === 0} />
+              <div key={`${run.id}:${expanded}`} className="relative">
+                <DiscoveryResult run={run} open={expanded === 'all' || (expanded === 'latest' && index === 0)} current={index === 0} />
+                <button type="button" className={iconControl('danger', 'absolute right-4 top-4 z-10')} aria-label={`Delete ${discoveryRunName(run)} run`} title={`Delete ${discoveryRunName(run)} run`} onClick={() => requestDeletion(run)}><Icon name="delete" size={14} /></button>
+              </div>
             ))}
           </div>
         )}
+        <ConfirmDialog
+          open={deletionDialog.kind === 'confirming'}
+          title={deletionDialog.kind === 'confirming' ? `Delete ${discoveryRunName(deletionDialog.run)} run?` : 'Delete discovery run?'}
+          danger
+          confirmLabel="Delete run"
+          message={deletionDialog.kind === 'confirming' ? 'The recorded result will be removed from this project and cannot be restored.' : ''}
+          onConfirm={() => {
+            if (deletionDialog.kind === 'confirming') onDeleteRun(deletionDialog.deletion)
+          }}
+          onClose={() => setDeletionDialog({ kind: 'closed' })}
+        />
       </section>
     </section>
   )

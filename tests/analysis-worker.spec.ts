@@ -2,11 +2,12 @@ import { expect, test } from '@playwright/test'
 import { z } from 'zod'
 import { stationarityBatterySchema } from '../src/domain/stationarity'
 import { dagCheckEvidenceSchema } from '../src/domain/dagValidation'
-import { directLingamEvidenceSchema } from '../src/domain/discovery'
+import { cdnotsEvidenceSchema, cdnotsPlusEvidenceSchema, directLingamEvidenceSchema, graceEvidenceSchema } from '../src/domain/discovery'
 import { identifiedDiscreteQueryEvidenceSchema } from '../src/domain/intervention'
 import { binaryEttEvidenceSchema, causalEffectsEvidenceSchema, frontdoorTwoStageEvidenceSchema } from '../src/domain/estimation'
 import { seasonalAdjustedEvidenceSchema } from '../src/domain/seasonal'
 import { parseSeriesStructureEvidence, seriesStructureEvidenceSchema } from '../src/domain/sensitivity'
+import { multicollinearityEvidenceSchema } from '../src/domain/multicollinearity'
 
 const browserOutcomeSchema = z.object({
   result: z.discriminatedUnion('ok', [
@@ -55,6 +56,45 @@ test('requires complete STL components and aligned lag-correlation evidence', ()
   expect(structure.ok).toBe(false)
 })
 
+test('requires multicollinearity selections to partition the matrix', () => {
+  const parsed = multicollinearityEvidenceSchema.safeParse({
+    kind: 'multicollinearity',
+    observations: 20,
+    variables: 2,
+    correlationThreshold: 0.9,
+    vifThreshold: 10,
+    correlation: [[1, 0.95], [0.95, 1]],
+    correlationKeep: [0],
+    correlationDrop: [],
+    correlationClusters: [[0, 1]],
+    vifKeep: [0],
+    vifDrop: [1],
+    vifHistory: [{ column: 1, vif: 14 }],
+  })
+  expect(parsed.success).toBe(false)
+})
+
+test('runs correlation clustering and VIF through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Numerical boundary contract runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const x = [1, 2, 4, 7, 11, 16, 22, 29]
+    const nearX = [1.1, 2.1, 3.9, 7.2, 10.8, 16.1, 21.9, 29.2]
+    const z = [2, -1, 3, 0.5, -2, 4, 1, -3]
+    return analysis.runMulticollinearity(Float64Array.from([...x, ...nearX, ...z]), 8, 3, { correlation: 0.99, vif: 10 })
+  })
+  const parsed = z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value: multicollinearityEvidenceSchema }).strict(),
+    z.object({ ok: z.literal(false), error: z.unknown() }).strict(),
+  ]).parse(raw)
+  expect(parsed.ok).toBe(true)
+  if (parsed.ok) {
+    expect(parsed.value.correlationClusters[0]).toEqual([0, 1])
+    expect(parsed.value.vifHistory.length).toBeGreaterThan(0)
+  }
+})
+
 test('returns STL components and notebook-compatible ACF/PACF through the Rust worker', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Numerical boundary contract runs once')
   await page.goto('/app')
@@ -82,6 +122,62 @@ test('returns STL components and notebook-compatible ACF/PACF through the Rust w
   expect(correlation.pacf).toHaveLength(13)
   expect(correlation.acfLimits).toHaveLength(13)
   expect(correlation.pacfLimits).toHaveLength(13)
+})
+
+test('runs CD-NOTS, CD-NOTS+ and GRACE through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Causal-TS boundary contract runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 96
+    const columns = 3
+    const values = new Float64Array(rows * columns)
+    for (let row = 0; row < rows; row += 1) {
+      values[row] = Math.sin(row / 7) + row * 0.003
+      values[rows + row] = (row === 0 ? 0 : values[row - 1]) + 0.1 * Math.cos(row / 5)
+      values[2 * rows + row] = 0.6 * values[rows + row] + Math.sin(row / 11)
+    }
+    const withMissingCell = () => {
+      const validity = new Uint8Array(rows * columns).fill(1)
+      validity[10] = 0
+      return validity
+    }
+    return {
+      cdnots: await analysis.runCdnots(Float64Array.from(values), withMissingCell(), rows, columns, {
+        maxLag: 1, alpha: 0.05, missing: 'pairwiseComplete', context: 'linear',
+      }),
+      plus: await analysis.runCdnotsPlus(Float64Array.from(values), withMissingCell(), rows, columns, {
+        maxLag: 1, alpha: 0.05, missing: 'varEm', context: 'linear',
+      }),
+      grace: await analysis.runGrace(Float64Array.from(values), withMissingCell(), rows, columns, {
+        maxLag: 1, alpha: 0.05, context: 'linear', gateThreshold: 0.5, epochs: 3, patience: 3, seed: 7,
+      }),
+    }
+  })
+  const outcome = <Value extends z.ZodType>(value: Value) => z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value }).strict(),
+    z.object({ ok: z.literal(false), error: z.unknown() }).strict(),
+  ])
+  const parsed = z.object({
+    cdnots: outcome(cdnotsEvidenceSchema),
+    plus: outcome(cdnotsPlusEvidenceSchema),
+    grace: outcome(graceEvidenceSchema),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(parsed.data.cdnots.ok, JSON.stringify(parsed.data.cdnots)).toBe(true)
+  expect(parsed.data.plus.ok, JSON.stringify(parsed.data.plus)).toBe(true)
+  expect(parsed.data.grace.ok, JSON.stringify(parsed.data.grace)).toBe(true)
+  if (parsed.data.cdnots.ok) expect(parsed.data.cdnots.value.contextVariables).toEqual(['C_lin'])
+  if (parsed.data.plus.ok) {
+    expect(parsed.data.plus.value.contextVariables).toEqual(['C_lin'])
+    expect(parsed.data.plus.value.missing).toBe('varEm')
+  }
+  if (parsed.data.grace.ok) {
+    expect(parsed.data.grace.value.imputedCells).toBe(1)
+    expect(parsed.data.grace.value.loss).toHaveLength(parsed.data.grace.value.epochs)
+    expect(parsed.data.grace.value.gateValues).toHaveLength(3)
+  }
 })
 
 test('runs the stationarity battery in the Rust analysis worker', async ({ page }, testInfo) => {

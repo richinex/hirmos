@@ -1,5 +1,6 @@
 import { err, ok, type Result } from '@/domain/dop'
 import type { CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
+import type { MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
   DynotearsEvidence,
@@ -9,6 +10,9 @@ import type {
   OcseEvidence,
   CmlpEvidence,
   ClstmEvidence,
+  CdnotsEvidence,
+  CdnotsPlusEvidence,
+  GraceEvidence,
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
@@ -31,10 +35,12 @@ import {
   type AnalysisProgress,
   type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
+  type TemporalSamples,
   type WorkerRequestId,
 } from '@/workers/analysisProtocol'
 
 type StationarityOutcome = Result<StationarityBattery, AnalysisWorkerProblem>
+type MulticollinearityOutcome = Result<MulticollinearityEvidence, AnalysisWorkerProblem>
 type PandasResamplingOutcome = Result<PandasResamplingEvidence, AnalysisWorkerProblem>
 type PcmciPlusOutcome = Result<PcmciPlusEvidence, AnalysisWorkerProblem>
 type GrangerOutcome = Result<GrangerSsrEvidence, AnalysisWorkerProblem>
@@ -46,6 +52,9 @@ type VarLingamOutcome = Result<VarLingamEvidence, AnalysisWorkerProblem>
 type OcseOutcome = Result<OcseEvidence, AnalysisWorkerProblem>
 type CmlpOutcome = Result<CmlpEvidence, AnalysisWorkerProblem>
 type ClstmOutcome = Result<ClstmEvidence, AnalysisWorkerProblem>
+type CdnotsOutcome = Result<CdnotsEvidence, AnalysisWorkerProblem>
+type CdnotsPlusOutcome = Result<CdnotsPlusEvidence, AnalysisWorkerProblem>
+type GraceOutcome = Result<GraceEvidence, AnalysisWorkerProblem>
 type BackdoorIdentificationOutcome = Result<BackdoorIdentificationEvidence, AnalysisWorkerProblem>
 type DagCheckOutcome = Result<DagCheckEvidence, AnalysisWorkerProblem>
 type BackdoorLinearOutcome = Result<BackdoorLinearEvidence, AnalysisWorkerProblem>
@@ -192,16 +201,20 @@ export function runLpcmci(
   columns: number,
   tauMax: number,
   pcAlpha: number,
+  samples: TemporalSamples,
   onProgress?: (progress: AnalysisProgress) => void,
 ): Promise<LpcmciOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
     pending.set(request, pendingRun('lpcmci-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
-      kind: 'lpcmci', request, values, rows, columns, tauMax, pcAlpha,
+      kind: 'lpcmci', request, values, rows, columns, tauMax, pcAlpha, samples,
     }
     try {
-      analysisWorker().postMessage(command, [values.buffer])
+      const transfer = samples.kind === 'role-aware'
+        ? [values.buffer, samples.validity.buffer, samples.analysisMask.buffer]
+        : [values.buffer]
+      analysisWorker().postMessage(command, transfer)
     } catch (cause: unknown) {
       pending.delete(request)
       resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
@@ -240,6 +253,57 @@ export function runRpcmci(
       resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }
   })
+}
+
+type CdnotsRunConfiguration = {
+  readonly maxLag: number
+  readonly alpha: number
+  readonly missing: 'pairwiseComplete' | 'varEm'
+  readonly context: 'none' | 'linear' | 'linearSine' | 'linearExponential' | 'linearQuadratic' | 'step' | 'stepLinear'
+}
+
+export function runCdnots(
+  values: Float64Array,
+  validity: Uint8Array,
+  rows: number,
+  columns: number,
+  configuration: CdnotsRunConfiguration,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<CdnotsOutcome> {
+  const request = newWorkerRequestId()
+  return postNullable('cdnots-succeeded', { kind: 'cdnots', request, values, validity, rows, columns, ...configuration }, onProgress)
+}
+
+export function runCdnotsPlus(
+  values: Float64Array,
+  validity: Uint8Array,
+  rows: number,
+  columns: number,
+  configuration: CdnotsRunConfiguration,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<CdnotsPlusOutcome> {
+  const request = newWorkerRequestId()
+  return postNullable('cdnots-plus-succeeded', { kind: 'cdnots-plus', request, values, validity, rows, columns, ...configuration }, onProgress)
+}
+
+export function runGrace(
+  values: Float64Array,
+  validity: Uint8Array,
+  rows: number,
+  columns: number,
+  configuration: {
+    readonly maxLag: number
+    readonly alpha: number
+    readonly context: CdnotsRunConfiguration['context']
+    readonly gateThreshold: number
+    readonly epochs: number
+    readonly patience: number
+    readonly seed: number
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<GraceOutcome> {
+  const request = newWorkerRequestId()
+  return postNullable('grace-succeeded', { kind: 'grace', request, values, validity, rows, columns, ...configuration }, onProgress)
 }
 
 export function runDynotears(
@@ -353,6 +417,20 @@ export function runStationarityBattery(values: Float64Array): Promise<Stationari
   })
 }
 
+export function runMulticollinearity(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  thresholds: { readonly correlation: number; readonly vif: number },
+): Promise<MulticollinearityOutcome> {
+  const request = newWorkerRequestId()
+  return post(
+    'multicollinearity-succeeded',
+    { kind: 'multicollinearity', request, values, rows, columns, correlationThreshold: thresholds.correlation, vifThreshold: thresholds.vif },
+    values,
+  )
+}
+
 export function runPandasResampling(
   timestamps: Float64Array,
   values: Float64Array,
@@ -380,6 +458,7 @@ export function runPcmciPlus(
   columns: number,
   tauMax: number,
   pcAlpha: number,
+  samples: TemporalSamples,
 ): Promise<PcmciPlusOutcome> {
   const request = newWorkerRequestId()
   return new Promise((resolve) => {
@@ -392,9 +471,13 @@ export function runPcmciPlus(
       columns,
       tauMax,
       pcAlpha,
+      samples,
     }
     try {
-      analysisWorker().postMessage(command, [values.buffer])
+      const transfer = samples.kind === 'role-aware'
+        ? [values.buffer, samples.validity.buffer, samples.analysisMask.buffer]
+        : [values.buffer]
+      analysisWorker().postMessage(command, transfer)
     } catch (cause: unknown) {
       pending.delete(request)
       resolve(err({
@@ -564,6 +647,24 @@ const post = <Kind extends SuccessfulAnalysisEventKind>(
     pending.set(command.request, pendingRun(expected, resolve, onProgress))
     try {
       analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(command.request)
+      resolve(err({
+        kind: 'worker-unavailable',
+        detail: `${command.kind}: ${cause instanceof Error ? cause.message : String(cause)}`,
+      }))
+    }
+  })
+
+const postNullable = <Kind extends SuccessfulAnalysisEventKind>(
+  expected: Kind,
+  command: Extract<AnalysisWorkerCommand, { readonly validity: Uint8Array }>,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<Result<SuccessfulAnalysisResult<Kind>, AnalysisWorkerProblem>> =>
+  new Promise((resolve) => {
+    pending.set(command.request, pendingRun(expected, resolve, onProgress))
+    try {
+      analysisWorker().postMessage(command, [command.values.buffer, command.validity.buffer])
     } catch (cause: unknown) {
       pending.delete(command.request)
       resolve(err({

@@ -117,11 +117,19 @@ export interface DagDocument {
 
 export type DagOriginChoice = 'domain-knowledge' | 'experimental-design' | 'discovery-informed'
 
+/** In-progress DAG creation input. Discovery evidence may be empty until the user selects a run. */
+export type DagOriginDraft =
+  | { readonly kind: 'domain-knowledge' }
+  | { readonly kind: 'experimental-design' }
+  | { readonly kind: 'discovery-informed'; readonly reports: readonly DiscoveryRunId[] }
+
 export type DagCreateProblem =
   | { readonly kind: 'empty-name' }
   | { readonly kind: 'name-too-long'; readonly maximum: number }
   | { readonly kind: 'prepared-column-missing'; readonly column: ColumnId }
   | { readonly kind: 'discovery-evidence-required' }
+  | { readonly kind: 'discovery-evidence-unavailable'; readonly run: DiscoveryRunId }
+  | { readonly kind: 'duplicate-discovery-evidence'; readonly run: DiscoveryRunId }
 
 export type DagEditProblem =
   | { readonly kind: 'cause-required' }
@@ -253,18 +261,24 @@ export const inspectDagStructure = (
   return isNonEmpty(unstated) ? { kind: 'incomplete', issues: unstated } : { kind: 'structurally-valid' }
 }
 
-const originFromChoice = (
-  choice: DagOriginChoice,
-  discoveryRuns: readonly DiscoveryRunArtifact[],
-): Result<DagOrigin, Extract<DagCreateProblem, { readonly kind: 'discovery-evidence-required' }>> => {
-  switch (choice) {
+export const resolveDagOrigin = (
+  choice: DagOriginDraft,
+  discoveryRuns: readonly DiscoveryRunId[],
+): Result<DagOrigin, Extract<DagCreateProblem, {
+  readonly kind: 'discovery-evidence-required' | 'discovery-evidence-unavailable' | 'duplicate-discovery-evidence'
+}>> => {
+  switch (choice.kind) {
     case 'domain-knowledge': return ok({ kind: 'user-authored', basis: 'domain-knowledge' })
     case 'experimental-design': return ok({ kind: 'user-authored', basis: 'experimental-design' })
     case 'discovery-informed': {
-      const reports = discoveryRuns.map((run) => run.id)
-      return isNonEmpty(reports)
-        ? ok({ kind: 'discovery-informed', reports })
-        : err({ kind: 'discovery-evidence-required' })
+      if (!isNonEmpty(choice.reports)) return err({ kind: 'discovery-evidence-required' })
+      const seen = new Set<DiscoveryRunId>()
+      for (const report of choice.reports) {
+        if (seen.has(report)) return err({ kind: 'duplicate-discovery-evidence', run: report })
+        if (!discoveryRuns.includes(report)) return err({ kind: 'discovery-evidence-unavailable', run: report })
+        seen.add(report)
+      }
+      return ok({ kind: 'discovery-informed', reports: choice.reports })
     }
     default: return assertNever(choice)
   }
@@ -272,14 +286,14 @@ const originFromChoice = (
 
 export function createDagDocument(
   rawName: string,
-  originChoice: DagOriginChoice,
+  originChoice: DagOriginDraft,
   prepared: PreparedDatasetArtifact,
   profile: DatasetProfile,
   discoveryRuns: readonly DiscoveryRunArtifact[],
 ): Result<DagDocument, DagCreateProblem> {
   const name = dagName(rawName)
   if (!name.ok) return name
-  const origin = originFromChoice(originChoice, discoveryRuns)
+  const origin = resolveDagOrigin(originChoice, discoveryRuns.map((run) => run.id))
   if (!origin.ok) return origin
 
   const nodes: ObservedDagNode[] = []
@@ -700,7 +714,9 @@ export function describeDagCreateProblem(problem: DagCreateProblem): string {
     case 'empty-name': return 'Give this DAG a name.'
     case 'name-too-long': return `Keep the DAG name to ${problem.maximum} characters or fewer.`
     case 'prepared-column-missing': return 'A prepared variable is missing from the source profile. Create another prepared dataset version.'
-    case 'discovery-evidence-required': return 'Run at least one discovery method before choosing a discovery-informed origin.'
+    case 'discovery-evidence-required': return 'Select at least one discovery run reviewed while developing this DAG.'
+    case 'discovery-evidence-unavailable': return 'A selected discovery run is no longer available. Review the selection and try again.'
+    case 'duplicate-discovery-evidence': return 'A discovery run was selected more than once. Review the selection and try again.'
     default: return assertNever(problem)
   }
 }

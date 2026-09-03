@@ -230,6 +230,26 @@ fn swilk(x: &[f64]) -> (f64, f64) {
     (w, alnorm((y - m) / s, true))
 }
 
+/// NumPy-compatible Pearson correlation matrix over columns.
+pub fn correlation_matrix(arr: &DMatrix<f64>) -> DMatrix<f64> {
+    let rows = arr.nrows();
+    let columns = arr.ncols();
+    let mut centered = arr.clone();
+    for mut column in centered.column_iter_mut() {
+        let mean = column.iter().sum::<f64>() / rows as f64;
+        for value in column.iter_mut() {
+            *value -= mean;
+        }
+    }
+    let covariance = centered.transpose() * &centered / (rows as f64 - 1.0);
+    let scales: Vec<f64> = (0..columns)
+        .map(|column| covariance[(column, column)].sqrt())
+        .collect();
+    DMatrix::from_fn(columns, columns, |row, column| {
+        (covariance[(row, column)] / scales[row] / scales[column]).clamp(-1.0, 1.0)
+    })
+}
+
 /// Complete-linkage clustering of 1-|r| cut at 1-threshold: keep the lowest index per cluster.
 pub fn cluster_redundant(
     corr: &DMatrix<f64>,
@@ -291,11 +311,13 @@ pub fn cluster_redundant(
 }
 
 fn rsquared(y: &DVector<f64>, x: &DMatrix<f64>) -> f64 {
-    let qr = x.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * y))
-        .expect("VIF design is rank deficient");
+    // statsmodels OLS uses its Moore-Penrose pseudo-inverse by default. This remains defined for
+    // the exact-collinearity cases that VIF is specifically meant to expose.
+    let decomposition = x.clone().svd(true, true);
+    let cutoff = 1e-15 * decomposition.singular_values.max();
+    let beta = decomposition
+        .solve(y, cutoff)
+        .expect("VIF pseudo-inverse solve failed");
     let fitted = x * beta;
     let ssr: f64 = (y - fitted).iter().map(|v| v * v).sum();
     let mean = y.iter().sum::<f64>() / y.len() as f64;

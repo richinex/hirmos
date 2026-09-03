@@ -1,5 +1,5 @@
 // Parity for the 902 preprocessing helpers: scipy shapiro, complete-linkage redundancy, VIF.
-use hirmos_causal_core::{cluster_redundant, shapiro, vif_redundant};
+use hirmos_causal_core::{cluster_redundant, correlation_matrix, shapiro, vif_redundant};
 use nalgebra::DMatrix;
 use serde_json::Value;
 
@@ -29,19 +29,17 @@ fn preprocess_matches_oracles() {
     let rows = data.len();
     let cols = data[0].len();
     let m = DMatrix::from_fn(rows, cols, |i, j| data[i][j]);
-    // np.corrcoef of the columns.
-    let mut centered = m.clone();
-    for mut c in centered.column_iter_mut() {
-        let mean = c.iter().sum::<f64>() / rows as f64;
-        for v in c.iter_mut() {
-            *v -= mean;
+    let corr = correlation_matrix(&m);
+    let want_corr: Vec<Vec<f64>> = serde_json::from_value(fx["correlation"].clone()).unwrap();
+    for row in 0..cols {
+        for column in 0..cols {
+            close(
+                &format!("correlation {row},{column}"),
+                corr[(row, column)],
+                want_corr[row][column],
+            );
         }
     }
-    let cov = centered.transpose() * &centered / (rows as f64 - 1.0);
-    let d: Vec<f64> = (0..cols).map(|i| cov[(i, i)].sqrt()).collect();
-    let corr = DMatrix::from_fn(cols, cols, |i, j| {
-        (cov[(i, j)] / d[i] / d[j]).clamp(-1.0, 1.0)
-    });
     let (keep, drop, clusters) = cluster_redundant(&corr, fx["threshold"].as_f64().unwrap());
     let want_keep: Vec<usize> = serde_json::from_value(fx["keep"].clone()).unwrap();
     let want_drop: Vec<usize> = serde_json::from_value(fx["drop"].clone()).unwrap();
@@ -66,4 +64,16 @@ fn preprocess_matches_oracles() {
         close(&format!("vif history value {k}"), got.1, want.1);
     }
     println!("vif: elimination path matches");
+}
+
+#[test]
+fn vif_reports_exact_collinearity_without_panicking() {
+    let matrix = DMatrix::from_row_slice(
+        4,
+        3,
+        &[1.0, 1.0, 3.0, 2.0, 2.0, 1.0, 3.0, 3.0, 4.0, 4.0, 4.0, 2.0],
+    );
+    let (keep, drop, history) = vif_redundant(&matrix, 10.0);
+    assert_eq!(keep.len() + drop.len(), 3);
+    assert!(history.first().is_some_and(|entry| entry.1.is_infinite()));
 }

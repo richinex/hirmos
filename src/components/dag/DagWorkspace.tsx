@@ -32,7 +32,7 @@ import {
   type DagEditProblem,
   type DagEdgeId,
   type DagNodeId,
-  type DagOriginChoice,
+  type DagOriginDraft,
   type DagVariableEditProblem,
   type DirectedDagEdge,
   type EdgeSupport,
@@ -52,7 +52,9 @@ import {
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DiscoveryRunArtifact, DiscoveryRunId } from '@/domain/discovery'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
+import { methodDefinition } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
+import { formatTime } from '@/lib/format/date'
 import { DagCanvas } from './DagCanvas'
 import { EdgeLedgerTable } from './EdgeLedgerTable'
 import { analyseDagCausalFlow, type DagCausalFlow } from '@/domain/dagFlow'
@@ -103,7 +105,7 @@ type DagWorkspaceState =
   | {
       readonly kind: 'creating'
       readonly nameDraft: string
-      readonly origin: DagOriginChoice
+      readonly origin: DagOriginDraft
       readonly problem: DagCreateProblem | null
     }
   | {
@@ -124,7 +126,8 @@ type DagWorkspaceState =
 type DagWorkspaceEvent =
   | { readonly type: 'new-document-requested' }
   | { readonly type: 'name-changed'; readonly value: string }
-  | { readonly type: 'origin-selected'; readonly origin: DagOriginChoice }
+  | { readonly type: 'origin-selected'; readonly origin: DagOriginDraft['kind'] }
+  | { readonly type: 'discovery-origin-run-toggled'; readonly run: DiscoveryRunId }
   | { readonly type: 'creation-refused'; readonly problem: DagCreateProblem }
   | { readonly type: 'document-created'; readonly document: DagDocumentId; readonly latestRun: DiscoveryRunId | null }
   | { readonly type: 'document-selected'; readonly document: DagDocumentId; readonly latestRun: DiscoveryRunId | null }
@@ -170,8 +173,17 @@ const latestRunId = (runs: readonly DiscoveryRunArtifact[]): DiscoveryRunId | nu
 const initialState = (documents: readonly DagDocument[]): DagWorkspaceState => {
   const [first] = documents
   return first === undefined
-    ? { kind: 'creating', nameDraft: '', origin: 'domain-knowledge', problem: null }
+    ? { kind: 'creating', nameDraft: '', origin: { kind: 'domain-knowledge' }, problem: null }
     : editingState(first.id, null)
+}
+
+const emptyOrigin = (kind: DagOriginDraft['kind']): DagOriginDraft => {
+  switch (kind) {
+    case 'domain-knowledge': return { kind: 'domain-knowledge' }
+    case 'experimental-design': return { kind: 'experimental-design' }
+    case 'discovery-informed': return { kind: 'discovery-informed', reports: [] }
+    default: return assertNever(kind)
+  }
 }
 
 const withSelectedEdge = (
@@ -183,9 +195,16 @@ const withSelectedEdge = (
 
 function stepDagWorkspace(state: DagWorkspaceState, event: DagWorkspaceEvent): DagWorkspaceState {
   switch (event.type) {
-    case 'new-document-requested': return { kind: 'creating', nameDraft: '', origin: 'domain-knowledge', problem: null }
+    case 'new-document-requested': return { kind: 'creating', nameDraft: '', origin: { kind: 'domain-knowledge' }, problem: null }
     case 'name-changed': return state.kind === 'creating' ? { ...state, nameDraft: event.value, problem: null } : state
-    case 'origin-selected': return state.kind === 'creating' ? { ...state, origin: event.origin, problem: null } : state
+    case 'origin-selected': return state.kind === 'creating' ? { ...state, origin: emptyOrigin(event.origin), problem: null } : state
+    case 'discovery-origin-run-toggled': {
+      if (state.kind !== 'creating' || state.origin.kind !== 'discovery-informed') return state
+      const reports = state.origin.reports.includes(event.run)
+        ? state.origin.reports.filter((run) => run !== event.run)
+        : [...state.origin.reports, event.run]
+      return { ...state, origin: { kind: 'discovery-informed', reports }, problem: null }
+    }
     case 'creation-refused': return state.kind === 'creating' ? { ...state, problem: event.problem } : state
     case 'document-created': return editingState(event.document, event.latestRun)
     case 'document-selected': return editingState(event.document, event.latestRun)
@@ -795,10 +814,31 @@ export function DagWorkspace({
               <section className={panel('p-4')} aria-labelledby="dag-origin-title">
                 <h3 id="dag-origin-title" className="mb-2 mt-0 text-title font-medium text-ink">Graph basis</h3>
                 <div className="grid gap-3 @md/panel:grid-cols-3">
-                  <OriginChoice active={state.origin === 'domain-knowledge'} icon="psychology" title="Substantive knowledge" detail="Theory, prior studies, expert knowledge, institutions, and the treatment-assignment process." onClick={() => dispatch({ type: 'origin-selected', origin: 'domain-knowledge' })} />
-                  <OriginChoice active={state.origin === 'experimental-design'} icon="experiment" title="Experimental design" detail="The randomisation protocol, intervention timing, and measurement design." onClick={() => dispatch({ type: 'origin-selected', origin: 'experimental-design' })} />
-                  <OriginChoice active={state.origin === 'discovery-informed'} disabled={discoveryRuns.length === 0} icon="schema" title="Discovery-informed" detail={discoveryRuns.length === 0 ? 'No discovery results are available for review.' : `Evaluate candidate relations from ${discoveryRuns.length} discovery run${discoveryRuns.length === 1 ? '' : 's'} against substantive knowledge.`} onClick={() => dispatch({ type: 'origin-selected', origin: 'discovery-informed' })} />
+                  <OriginChoice active={state.origin.kind === 'domain-knowledge'} icon="psychology" title="Substantive knowledge" detail="Theory, prior studies, expert knowledge, institutions, and the treatment-assignment process." onClick={() => dispatch({ type: 'origin-selected', origin: 'domain-knowledge' })} />
+                  <OriginChoice active={state.origin.kind === 'experimental-design'} icon="experiment" title="Experimental design" detail="The randomisation protocol, intervention timing, and measurement design." onClick={() => dispatch({ type: 'origin-selected', origin: 'experimental-design' })} />
+                  <OriginChoice active={state.origin.kind === 'discovery-informed'} disabled={discoveryRuns.length === 0} icon="schema" title="Discovery-informed" detail={discoveryRuns.length === 0 ? 'No discovery results are available for review.' : `Evaluate selected discovery results against substantive knowledge.`} onClick={() => dispatch({ type: 'origin-selected', origin: 'discovery-informed' })} />
                 </div>
+                {state.origin.kind === 'discovery-informed' && discoveryRuns.length > 0 && (
+                  <fieldset className={well('mt-4 p-3')}>
+                    <legend className="px-1 text-body font-medium text-ink">Discovery runs reviewed for this DAG</legend>
+                    <div className="mt-1 grid gap-2 @md/panel:grid-cols-2">
+                      {[...discoveryRuns].reverse().map((run) => {
+                        const method = methodDefinition(run.method)
+                        return (
+                          <label key={run.id} className="flex items-start gap-2 text-body text-ink">
+                            <input
+                              type="checkbox"
+                              className="mt-0.5"
+                              checked={state.origin.kind === 'discovery-informed' && state.origin.reports.includes(run.id)}
+                              onChange={() => dispatch({ type: 'discovery-origin-run-toggled', run: run.id })}
+                            />
+                            <span>{method.ok ? method.value.name : run.method}<span className="block text-label text-faint">{formatTime(run.createdAt)}</span></span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </fieldset>
+                )}
                 <label className="mt-4 block max-w-xl text-body font-medium text-ink">
                   DAG name
                   <input className={field('text', 'mt-1')} value={state.nameDraft} onChange={(event) => dispatch({ type: 'name-changed', value: event.target.value })} placeholder="For example: assignment mechanism and road fatalities" />

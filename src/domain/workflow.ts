@@ -3,6 +3,7 @@ import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from '.
 import type { DagDocument } from './dag'
 import type { DagCheckArtifact } from './dagValidation'
 import type { DiscoveryRunArtifact } from './discovery'
+import { deleteDiscoveryRun, type DeletableDiscoveryRun } from './discoveryLifecycle'
 import type { GrangerEvidenceArtifact } from './granger'
 import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
@@ -104,6 +105,7 @@ export type WorkflowEvent =
   | { readonly type: 'granger-evidence-created'; readonly evidence: GrangerEvidenceArtifact }
   | { readonly type: 'count-series-model-created'; readonly artifact: CountSeriesModelArtifact }
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
+  | { readonly type: 'discovery-run-deletion-committed'; readonly deletion: DeletableDiscoveryRun }
   | { readonly type: 'dag-document-created'; readonly document: DagDocument }
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
   | { readonly type: 'dag-check-created'; readonly check: DagCheckArtifact }
@@ -293,6 +295,12 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         && state.prepared !== null
         && event.artifact.preparedDataset === state.prepared.id) {
         return { ...state, discoveryRuns: [...state.discoveryRuns, event.artifact] }
+      }
+      if (event.type === 'discovery-run-deletion-committed') {
+        return {
+          ...state,
+          discoveryRuns: deleteDiscoveryRun(state.discoveryRuns, event.deletion),
+        }
       }
       if (event.type === 'dag-document-created'
         && state.prepared !== null

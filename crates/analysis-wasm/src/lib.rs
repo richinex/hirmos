@@ -11,17 +11,26 @@ use hirmos_causal_core::causal_effects::{
     TotalEffectBootstrapOptions, WrightCoefficientMethod, WrightEffectError, WrightMediation,
 };
 use hirmos_causal_core::causal_impact::causal_impact;
+use hirmos_causal_core::causal_ts_preparation::{
+    causal_ts_var_em, prepare_grace_dense, CausalTsContextPreset, CdnotsMissingPolicy,
+    VarEmConfiguration,
+};
+use hirmos_causal_core::cdnots::{
+    run_cdnots_plus_with_progress, run_cdnots_with_progress, CdnotsConfiguration,
+    CdnotsPlusConfiguration, ColliderPriority,
+};
 use hirmos_causal_core::counterfactual::{Equation, LinearScm};
 use hirmos_causal_core::counterfactual_evaluator::{estimate_binary_ett, identify_binary_ett};
 use hirmos_causal_core::discrete_bn::{discretize_805, Dag as DiscreteDag, DiscreteBn};
 use hirmos_causal_core::dynotears::dynotears_with_progress;
 use hirmos_causal_core::glm::{negative_binomial_p, poisson_glm};
+use hirmos_causal_core::grace::{fit_grace_with_progress, GraceConfiguration};
 use hirmos_causal_core::identified_expression::{evaluate_distribution, DiscreteTable};
 use hirmos_causal_core::ingarch::{
     detect_negative_binomial_intervention, fit_negative_binomial_ingarch, intervention_regressors,
     IngarchLink as CoreIngarchLink, IngarchSpecification, InterventionSchedule,
 };
-use hirmos_causal_core::lpcmci::run_lpcmci_with_progress;
+use hirmos_causal_core::lpcmci::{run_lpcmci_frame_with_progress, run_lpcmci_with_progress};
 use hirmos_causal_core::negbin_nuts::{irr_summary, quantile, PbcNegBinModel};
 use hirmos_causal_core::neural_granger::{
     fit_clstm_with, fit_cmlp_with, Activation as CoreNeuralActivation, ClstmConfig, CmlpConfig,
@@ -31,9 +40,10 @@ use hirmos_causal_core::nprandom::{Mt19937, NpRng};
 use hirmos_causal_core::nuts::NutsOptions;
 use hirmos_causal_core::ocse::{discover_network_with_progress, CmiMethod};
 use hirmos_causal_core::ols::Ols;
-use hirmos_causal_core::parcorr::{CiKind, TimeSeries};
-use hirmos_causal_core::pcmciplus::run_pcmciplus;
+use hirmos_causal_core::parcorr::{CiKind, CutOff, RoleAwareSamplePolicy, TimeSeries};
+use hirmos_causal_core::pcmciplus::{run_pcmciplus, run_pcmciplus_frame};
 use hirmos_causal_core::pelt::pelt_l2;
+use hirmos_causal_core::preprocessing::{MaskType, TigramiteFrame};
 use hirmos_causal_core::pss_tables::stat_star;
 use hirmos_causal_core::refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, WorkerStudy,
@@ -61,6 +71,7 @@ use hirmos_causal_core::{
     ols_hac, refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
     unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag, IdentificationError,
 };
+use hirmos_causal_core::{cluster_redundant, correlation_matrix, vif_redundant};
 use nalgebra::DMatrix;
 use nalgebra::DVector;
 use serde::Serialize;
@@ -101,6 +112,8 @@ use stationarity::*;
 pub fn run_analysis(
     command_json: &str,
     values: &[f64],
+    validity: &[u8],
+    analysis_mask: &[u8],
     progress_callback: &js_sys::Function,
 ) -> Result<String, JsError> {
     let command: AnalysisCommand = serde_json::from_str(command_json)
@@ -115,6 +128,12 @@ pub fn run_analysis(
     };
     let result = match command {
         AnalysisCommand::StationarityBattery => stationarity_battery(values),
+        AnalysisCommand::Multicollinearity {
+            rows,
+            columns,
+            correlation_threshold,
+            vif_threshold,
+        } => multicollinearity(values, rows, columns, correlation_threshold, vif_threshold),
         AnalysisCommand::PandasResampleDaily {
             rows,
             columns,
@@ -195,13 +214,34 @@ pub fn run_analysis(
             columns,
             tau_max,
             pc_alpha,
-        } => pcmci_plus(values, rows, columns, tau_max, pc_alpha),
+            samples,
+        } => pcmci_plus(
+            values,
+            validity,
+            analysis_mask,
+            rows,
+            columns,
+            tau_max,
+            pc_alpha,
+            samples,
+        ),
         AnalysisCommand::Lpcmci {
             rows,
             columns,
             tau_max,
             pc_alpha,
-        } => lpcmci_evidence(values, rows, columns, tau_max, pc_alpha, progress),
+            samples,
+        } => lpcmci_evidence(
+            values,
+            validity,
+            analysis_mask,
+            rows,
+            columns,
+            tau_max,
+            pc_alpha,
+            samples,
+            progress,
+        ),
         AnalysisCommand::Rpcmci {
             rows,
             columns,
@@ -228,6 +268,50 @@ pub fn run_analysis(
             tau_max,
             pc_alpha,
             alpha_level,
+            seed,
+            progress,
+        ),
+        AnalysisCommand::Cdnots {
+            rows,
+            columns,
+            max_lag,
+            alpha,
+            missing,
+            context,
+        } => cdnots_evidence(
+            values, validity, rows, columns, max_lag, alpha, missing, context, false, progress,
+        ),
+        AnalysisCommand::CdnotsPlus {
+            rows,
+            columns,
+            max_lag,
+            alpha,
+            missing,
+            context,
+        } => cdnots_evidence(
+            values, validity, rows, columns, max_lag, alpha, missing, context, true, progress,
+        ),
+        AnalysisCommand::Grace {
+            rows,
+            columns,
+            max_lag,
+            alpha,
+            context,
+            gate_threshold,
+            epochs,
+            patience,
+            seed,
+        } => grace_evidence(
+            values,
+            validity,
+            rows,
+            columns,
+            max_lag,
+            alpha,
+            context,
+            gate_threshold,
+            epochs,
+            patience,
             seed,
             progress,
         ),

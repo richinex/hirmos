@@ -19,6 +19,21 @@ export const DISCOVERY_PARAMETER_HELP = {
     annealingRuns: 'Number of random initializations attempted.',
     seed: 'Base seed used for reproducible initialization.',
   },
+  cdnots: {
+    maximumLag: 'Largest source lag included in conditional-independence tests.',
+    alpha: 'Significance threshold used to remove links during skeleton discovery.',
+    missing: 'Uses pairwise-complete test samples or records VAR-EM imputation before discovery.',
+    context: 'Time basis added as observed context so changes in causal mechanisms can inform orientation.',
+  },
+  grace: {
+    maximumLag: 'Largest source lag included in the CD-NOTS skeleton and neural refinement.',
+    alpha: 'Significance threshold used to construct the initial CD-NOTS skeleton.',
+    context: 'Time basis supplied to the initial skeleton to represent nonstationarity.',
+    gateThreshold: 'Minimum fitted hard-concrete gate value retained as a relation.',
+    epochs: 'Maximum number of neural optimization passes.',
+    patience: 'Epochs without an improved loss permitted before training stops.',
+    seed: 'Seed used for reproducible initialization and hard-concrete samples.',
+  },
   dynotears: {
     maximumLag: 'Largest autoregressive lag included in the model.',
     contemporaneousPenalty: 'Sparsity penalty applied to contemporaneous weights.',

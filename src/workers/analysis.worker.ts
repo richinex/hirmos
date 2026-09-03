@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { parseMulticollinearityEvidence } from '@/domain/multicollinearity'
 import { parseGrangerSsrEvidence } from '@/domain/granger'
 /// <reference lib="webworker" />
 
@@ -11,6 +12,9 @@ import {
   parseOcseEvidence,
   parseCmlpEvidence,
   parseClstmEvidence,
+  parseCdnotsResult,
+  parseCdnotsPlusResult,
+  parseGraceEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
 } from '@/domain/discovery'
@@ -35,6 +39,7 @@ import {
   type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
   type WorkerRequestId,
+  type TemporalSamples,
 } from './analysisProtocol'
 
 const emit = (event: AnalysisWorkerEvent) => self.postMessage(event)
@@ -53,10 +58,41 @@ const loadWasm = (): Promise<unknown> => {
   return wasmReady
 }
 
+const rustTemporalSamples = (samples: TemporalSamples): object => {
+  switch (samples.kind) {
+    case 'dense': return { kind: 'dense' }
+    case 'role-aware': return {
+      kind: 'roleAware',
+      cutOff: samples.cutOff,
+      propagateThroughMaxLag: samples.propagateThroughMaxLag,
+      maskType: samples.maskType,
+    }
+    default: return assertNever(samples)
+  }
+}
+
+const sampleArrays = (command: AnalysisWorkerCommand): readonly [Uint8Array, Uint8Array] => {
+  if ((command.kind === 'pcmci-plus' || command.kind === 'lpcmci') && command.samples.kind === 'role-aware') {
+    return [command.samples.validity, command.samples.analysisMask]
+  }
+  if (command.kind === 'cdnots' || command.kind === 'cdnots-plus' || command.kind === 'grace') {
+    return [command.validity, new Uint8Array()]
+  }
+  return [new Uint8Array(), new Uint8Array()]
+}
+
 const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
     case 'stationarity-battery':
       return { kind: 'stationarityBattery' }
+    case 'multicollinearity':
+      return {
+        kind: 'multicollinearity',
+        rows: command.rows,
+        columns: command.columns,
+        correlationThreshold: command.correlationThreshold,
+        vifThreshold: command.vifThreshold,
+      }
     case 'pandas-resample-daily':
       return {
         kind: 'pandasResampleDaily',
@@ -74,6 +110,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         columns: command.columns,
         tauMax: command.tauMax,
         pcAlpha: command.pcAlpha,
+        samples: rustTemporalSamples(command.samples),
       }
     case 'lpcmci':
       return {
@@ -82,6 +119,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         columns: command.columns,
         tauMax: command.tauMax,
         pcAlpha: command.pcAlpha,
+        samples: rustTemporalSamples(command.samples),
       }
     case 'rpcmci':
       return {
@@ -97,6 +135,30 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         tauMax: command.tauMax,
         pcAlpha: command.pcAlpha,
         alphaLevel: command.alphaLevel,
+        seed: command.seed,
+      }
+    case 'cdnots':
+    case 'cdnots-plus':
+      return {
+        kind: command.kind === 'cdnots' ? 'cdnots' : 'cdnotsPlus',
+        rows: command.rows,
+        columns: command.columns,
+        maxLag: command.maxLag,
+        alpha: command.alpha,
+        missing: command.missing,
+        context: command.context,
+      }
+    case 'grace':
+      return {
+        kind: 'grace',
+        rows: command.rows,
+        columns: command.columns,
+        maxLag: command.maxLag,
+        alpha: command.alpha,
+        context: command.context,
+        gateThreshold: command.gateThreshold,
+        epochs: command.epochs,
+        patience: command.patience,
         seed: command.seed,
       }
     case 'dynotears':
@@ -285,7 +347,8 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     const command = parsed.value
     let raw: string
     try {
-      raw = runAnalysis(JSON.stringify(rustCommand(command)), command.values, (stage: unknown, completed: unknown, total: unknown) => {
+      const [validity, analysisMask] = sampleArrays(command)
+      raw = runAnalysis(JSON.stringify(rustCommand(command)), command.values, validity, analysisMask, (stage: unknown, completed: unknown, total: unknown) => {
         const progress = analysisProgressSchema.safeParse({ stage, completed, total })
         if (progress.success) emit({ kind: 'analysis-progress', request: command.request, progress: progress.data })
       })
@@ -312,6 +375,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'stationarity-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'multicollinearity': {
+        const result = parseMulticollinearityEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.kind === 'invalid-evidence' ? result.error.detail : 'The multicollinearity result does not match its columns.' })
+          return
+        }
+        emit({ kind: 'multicollinearity-succeeded', request: command.request, result: result.value })
         return
       }
       case 'pandas-resample-daily': {
@@ -348,6 +420,33 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'rpcmci-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'cdnots': {
+        const result = parseCdnotsResult(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'cdnots-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'cdnots-plus': {
+        const result = parseCdnotsPlusResult(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'cdnots-plus-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'grace': {
+        const result = parseGraceEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'grace-succeeded', request: command.request, result: result.value })
         return
       }
       case 'dynotears': {

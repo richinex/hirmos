@@ -47,3 +47,51 @@ test('projects conflict endpoints and keeps links with unsupported marks', async
     { kind: 'unsupported-mark', source: 0, target: 2, lag: 0, mark: '+->' },
   ])
 })
+
+test('keeps CD-NOTS context nodes and GRACE gates in the shared lag graph', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Pure lag-graph projection contract runs once')
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const { lagGraphFromRun } = await import(new URL('/src/domain/lagGraph.ts', window.location.href).href)
+    const stringCube = () => Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => ['', '']))
+    const numberCube = () => Array.from({ length: 3 }, () => Array.from({ length: 3 }, () => [0, 0]))
+    const graph = stringCube()
+    graph[0][1][1] = '-->'
+    graph[0][2][0] = '<--'
+    const values = numberCube()
+    values[0][1][1] = 0.72
+    values[0][2][0] = -0.41
+    const cdnots = lagGraphFromRun({
+      kind: 'cdnots-run', id: 'run-cdn', variables: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }],
+      result: { observedVariables: 2, contextVariables: ['C_lin'], maxLag: 1, graph, valMatrix: values },
+    })
+    const active = Array.from({ length: 2 }, () => Array.from({ length: 2 }, () => [false, false]))
+    const gates = Array.from({ length: 2 }, () => Array.from({ length: 2 }, () => [0, 0]))
+    active[1][0][1] = true
+    gates[1][0][1] = 0.83
+    const grace = lagGraphFromRun({
+      kind: 'grace-run', variables: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }],
+      result: { variables: 2, maxLag: 1, graph: active, gateValues: gates },
+    })
+    return {
+      cdnots: {
+        semantics: cdnots.graph.semantics,
+        variables: cdnots.graph.variables.map((variable: { readonly id: string; readonly name: string }) => ({ id: variable.id, name: variable.name })),
+        links: cdnots.graph.links.map((link: LagLink) => ({ from: link.from, to: link.to, lag: link.lag, mark: link.mark })),
+      },
+      grace: {
+        semantics: grace.graph.semantics,
+        links: grace.graph.links.map((link: LagLink) => ({ from: link.from, to: link.to, lag: link.lag, strength: link.strength })),
+      },
+    }
+  })
+  expect(result.cdnots).toEqual({
+    semantics: 'nonstationary-lag-graph',
+    variables: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'context:run-cdn:C_lin', name: 'C_lin' }],
+    links: [{ from: 0, to: 1, lag: 1, mark: '-->' }, { from: 0, to: 2, lag: 0, mark: '<--' }],
+  })
+  expect(result.grace).toEqual({
+    semantics: 'neural-lagged-granger',
+    links: [{ from: 1, to: 0, lag: 1, strength: { kind: 'nonnegative', value: 0.83 } }],
+  })
+})

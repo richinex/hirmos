@@ -10,6 +10,7 @@ import { SeriesStructureCard } from './SeriesStructureCard'
 import { GrangerCard } from './GrangerCard'
 import { CountSeriesCard } from './CountSeriesCard'
 import { PreparedSeriesPreview } from './PreparedSeriesPreview'
+import { MulticollinearityCard } from './MulticollinearityCard'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { describeResolutionRecord, type MissingnessResolutionRecord } from '@/domain/missingness'
@@ -43,8 +44,10 @@ import {
 import { assessStationarity, decisiveEvidence, describeStationarityAssessment, describeStationarityConflict, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
 import { describeSeasonalAdjustment, seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
+import type { PreparedMatrix } from '@/data/prepared'
 import { formatP, formatStatistic } from '@/lib/format/number'
 import type { PanelStructureEvidence } from '@/domain/panel'
+import type { MulticollinearitySelection } from '@/domain/multicollinearity'
 import {
   aggregationFor,
   aggregationsForColumns,
@@ -71,7 +74,7 @@ interface PreprocessingPanelProps {
   readonly onCountSeriesModel: (artifact: CountSeriesModelArtifact) => void
 }
 
-type Diagnostic = 'stationarity' | 'structure' | 'granger' | 'count-series'
+type Diagnostic = 'multicollinearity' | 'stationarity' | 'structure' | 'granger' | 'count-series'
 
 /** A switch label with a fixed slot for the done glyph, so the knob's measured width does not change when a check appears. */
 function DiagnosticLabel({ text, done }: { readonly text: string; readonly done: boolean }) {
@@ -110,12 +113,19 @@ const RESAMPLING_AGGREGATIONS: readonly { readonly value: ResamplingAggregation;
 
 type MissingnessChoiceKind = 'unresolved' | 'lag-aware-exclusion' | 'complete-interval' | 'imputation'
 type LagAwareExclusionDraft = Extract<MissingnessDraft, { readonly kind: 'lag-aware-exclusion' }>
+type AnalysisMaskRole = Extract<LagAwareExclusionDraft['analysisExclusions'], { readonly kind: 'roles' }>['roles'][number]
 
 const MISSINGNESS_CHOICES: readonly MissingnessChoiceKind[] = [
   'unresolved',
   'lag-aware-exclusion',
   'complete-interval',
   'imputation',
+]
+
+const ANALYSIS_MASK_ROLES: readonly { readonly value: AnalysisMaskRole; readonly label: string }[] = [
+  { value: 'candidate-cause', label: 'Candidate cause (X)' },
+  { value: 'tested-outcome', label: 'Tested outcome (Y)' },
+  { value: 'conditioner', label: 'Conditioning variable (Z)' },
 ]
 
 const TONE_CLASS = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' } as const
@@ -163,8 +173,8 @@ const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): Missi
     case 'lag-aware-exclusion': return {
       kind,
       cells,
-      history: { kind: 'method-default' },
-      gapInfluence: { kind: 'direct-only' },
+      cutOff: 'method-default',
+      propagateThroughMaxLag: false,
       analysisExclusions: { kind: 'ignore' },
     }
     case 'complete-interval': return { kind, cells }
@@ -178,6 +188,17 @@ const missingnessChoice = (kind: MissingnessDraft['kind'], cells: number): Missi
     case 'not-present': return { kind }
     default: return assertNever(kind)
   }
+}
+
+const toggleAnalysisMaskRole = (
+  current: LagAwareExclusionDraft['analysisExclusions'],
+  role: AnalysisMaskRole,
+): LagAwareExclusionDraft['analysisExclusions'] => {
+  const selected: readonly AnalysisMaskRole[] = current.kind === 'roles' ? current.roles : []
+  const next = selected.includes(role)
+    ? selected.filter((candidate) => candidate !== role)
+    : [...selected, role]
+  return isNonEmpty(next) ? { kind: 'roles', roles: next } : { kind: 'ignore' }
 }
 
 const pValue = (value: number): string => formatP(value, { withLabel: false }).text
@@ -272,29 +293,30 @@ function preparedArtifact(
     sourceProfile: profile.id,
     observations,
     columns: recipe.columns,
-    missingness: recipe.missingness,
     resolution,
   }
   switch (recipe.kind) {
     case 'regular-series': return ok({
       ...identity,
       kind: 'prepared-time-series',
+      missingness: recipe.missingness,
       sampling: { ...recipe.sampling, frequency: effectiveFrequency(recipe.sampling.frequency, recipe.resampling) },
       resampling,
       seasonalAdjustment: recipe.seasonalAdjustment,
       seriesTransforms: recipe.seriesTransforms,
     })
-    case 'cross-sectional': return ok({ ...identity, kind: 'prepared-cross-section', sampling: recipe.sampling, seasonalAdjustment: { kind: 'none' } })
+    case 'cross-sectional': return ok({ ...identity, kind: 'prepared-cross-section', sampling: recipe.sampling, missingness: recipe.missingness, seasonalAdjustment: { kind: 'none' } })
     case 'regular-panel': {
       if (panel === null) return err({ kind: 'panel-evidence-missing' })
-      return ok({ ...identity, kind: 'prepared-panel', sampling: recipe.sampling, panel, seasonalAdjustment: { kind: 'none' } })
+      return ok({ ...identity, kind: 'prepared-panel', sampling: recipe.sampling, missingness: recipe.missingness, panel, seasonalAdjustment: { kind: 'none' } })
     }
     default: return assertNever(recipe)
   }
 }
 
 export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence, countSeriesModels, onCountSeriesModel }: PreprocessingPanelProps) {
-  const [diagnostic, setDiagnostic] = useState<Diagnostic>('stationarity')
+  const [diagnostic, setDiagnostic] = useState<Diagnostic>('multicollinearity')
+  const [multicollinearityChecked, setMulticollinearityChecked] = useState(false)
   const [structureChecked, setStructureChecked] = useState(false)
   const [draft, dispatch] = useReducer(
     stepPreprocessing,
@@ -327,6 +349,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const missingnessChoices = crossSectionSelected
     ? MISSINGNESS_CHOICES.filter((kind) => kind !== 'lag-aware-exclusion')
     : MISSINGNESS_CHOICES
+
+  const applyMulticollinearitySelection = (selection: MulticollinearitySelection) => {
+    dispatch({ type: 'column-selection-replaced', columns: selection.columns })
+  }
 
   const createPreparedVersion = async () => {
     const recipe = readyPreprocessingRecipe(draft)
@@ -364,16 +390,34 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       }
 
       const { describePreparedMaterialisationProblem, resolveNullableInput } = await import('@/data/prepared')
-      const resolved = await resolveNullableInput(matrix.value, recipe.value.missingness)
-      if (!resolved.ok) { dispatch({ type: 'preparation-failed', detail: describePreparedMaterialisationProblem(resolved.error) }); return }
-      let observations = resolved.value.matrix.rowCount
+      let observations: number
+      let resolution: MissingnessResolutionRecord
+      let resolvedMatrix: PreparedMatrix | null = null
+      if (recipe.value.missingness.kind === 'lag-aware-exclusion') {
+        if (matrix.value.missingCells !== recipe.value.missingness.cells) {
+          dispatch({ type: 'preparation-failed', detail: 'The source missing-value count changed. Profile the source again before saving this version.' })
+          return
+        }
+        observations = matrix.value.rowCount
+        resolution = { kind: 'lag-aware-exclusion', cells: matrix.value.missingCells }
+      } else {
+        const resolved = await resolveNullableInput(matrix.value, recipe.value.missingness)
+        if (!resolved.ok) { dispatch({ type: 'preparation-failed', detail: describePreparedMaterialisationProblem(resolved.error) }); return }
+        observations = resolved.value.matrix.rowCount
+        resolution = resolved.value.resolution
+        resolvedMatrix = resolved.value.matrix
+      }
       let resampling: ResamplingRecord = { kind: 'none' }
 
       if (recipe.value.kind === 'regular-series') {
         if (recipe.value.resampling.kind === 'daily-downsample') {
-          const timeAxis = resolved.value.matrix.timeAxis
+          if (resolvedMatrix === null) {
+            dispatch({ type: 'preparation-failed', detail: 'Calendar resampling requires a dense prepared matrix.' })
+            return
+          }
+          const timeAxis = resolvedMatrix.timeAxis
           if (timeAxis?.kind !== 'calendar') { dispatch({ type: 'preparation-failed', detail: 'Weekly and monthly resampling require a date or timestamp column. An ordinal time key can order rows but cannot define calendar bins.' }); return }
-          const input = { ...resolved.value.matrix, timestamps: timeAxis.timestamps }
+          const input = { ...resolvedMatrix, timestamps: timeAxis.timestamps }
           const aggregations = aggregationsForColumns(input.columns, recipe.value.resampling)
           if (!aggregations.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(aggregations.error) }); return }
           const { runPandasResampling } = await import('@/analysis/client')
@@ -392,7 +436,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         observations -= leadingRows
       }
 
-      const artifact = preparedArtifact(recipe.value, profile, observations, resolved.value.resolution, resampling, panelStructure)
+      const artifact = preparedArtifact(recipe.value, profile, observations, resolution, resampling, panelStructure)
       if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
       dispatch({ type: 'preparation-succeeded', artifact: artifact.value })
       onPrepared(artifact.value)
@@ -580,7 +624,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
 
         <section className={panel('@container/card p-4 @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
           <span className={label('text-faint')}>Missing values</span>
-          <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose how to handle missing data</h3>
+          <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</h3>
           {draft.missingness.kind === 'not-present' ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" /> No missing values detected.
@@ -612,79 +656,56 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               {lagExclusion !== null && (
                 <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-2">
                   <label className="block text-body text-ink">
-                    <span className={fieldLabel}>Leading history</span>
+                    <span className={fieldLabel}>Sample cutoff</span>
                     <Select
                       className={field('text', 'mt-1')}
-                      value={lagExclusion.history.kind}
-                      onChange={(event) => {
-                        const history: LagAwareExclusionDraft['history'] = event.target.value === 'minimum-for-features'
-                          ? { kind: 'minimum-for-features' }
-                          : event.target.value === 'fixed-warmup'
-                            ? { kind: 'fixed-warmup', observations: 1 }
-                            : { kind: 'method-default' }
-                        dispatch({ type: 'missingness-selected', resolution: { ...lagExclusion, history } })
-                      }}
+                      value={lagExclusion.cutOff}
+                      onChange={(event) => dispatch({
+                        type: 'missingness-selected',
+                        resolution: { ...lagExclusion, cutOff: event.target.value as LagAwareExclusionDraft['cutOff'] },
+                      })}
                     >
                       <option value="method-default">Method default</option>
-                      <option value="minimum-for-features">Only required feature history</option>
-                      <option value="fixed-warmup">Fixed warm-up</option>
+                      <option value="2xtau-max">2 × maximum lag</option>
+                      <option value="tau-max">Maximum lag</option>
+                      <option value="max-lag">Largest selected lag</option>
+                      <option value="max-lag-or-tau-max">Larger of selected and maximum lag</option>
+                      <option value="2xtau-max-future">Future-aligned 2 × maximum lag</option>
                     </Select>
                   </label>
-                  <label className="block text-body text-ink">
-                    <span className={fieldLabel}>Gap influence</span>
-                    <Select
-                      className={field('text', 'mt-1')}
-                      value={lagExclusion.gapInfluence.kind}
-                      onChange={(event) => {
-                        const gapInfluence: LagAwareExclusionDraft['gapInfluence'] = event.target.value === 'following-guard'
-                          ? { kind: 'following-guard', steps: 1 }
-                          : { kind: 'direct-only' }
-                        dispatch({ type: 'missingness-selected', resolution: { ...lagExclusion, gapInfluence } })
-                      }}
-                    >
-                      <option value="direct-only">Affected reference only</option>
-                      <option value="following-guard">Guard following references</option>
-                    </Select>
+                  <label className="flex items-start gap-2 pt-5 text-body text-ink">
+                    <input
+                      type="checkbox"
+                      checked={lagExclusion.propagateThroughMaxLag}
+                      onChange={(event) => dispatch({
+                        type: 'missingness-selected',
+                        resolution: { ...lagExclusion, propagateThroughMaxLag: event.target.checked },
+                      })}
+                    />
+                    <span>Exclude following samples through the cutoff window.</span>
                   </label>
-                  {lagExclusion.history.kind === 'fixed-warmup' && (
-                    <label className="block text-body text-ink">
-                      <span className={fieldLabel}>Warm-up observations</span>
-                      <input
-                        type="number"
-                        min={0}
-                        max={1000}
-                        className={field('text', 'mt-1 w-24')}
-                        value={lagExclusion.history.observations}
-                        onChange={(event) => dispatch({
-                          type: 'missingness-selected',
-                          resolution: {
-                            ...lagExclusion,
-                            history: { kind: 'fixed-warmup', observations: Math.max(0, Math.min(1000, Number(event.target.value) || 0)) },
-                          },
-                        })}
-                      />
-                    </label>
-                  )}
-                  {lagExclusion.gapInfluence.kind === 'following-guard' && (
-                    <label className="block text-body text-ink">
-                      <span className={fieldLabel}>Following references</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        className={field('text', 'mt-1 w-24')}
-                        value={lagExclusion.gapInfluence.steps}
-                        onChange={(event) => dispatch({
-                          type: 'missingness-selected',
-                          resolution: {
-                            ...lagExclusion,
-                            gapInfluence: { kind: 'following-guard', steps: Math.max(1, Math.min(1000, Number(event.target.value) || 1)) },
-                          },
-                        })}
-                      />
-                    </label>
-                  )}
-                  <p className="mb-0 text-body text-faint @md/card:col-span-2">The time grid stays intact. Compatible lagged methods apply this policy while constructing their analysis samples.</p>
+                  <fieldset className="@md/card:col-span-2">
+                    <legend className={fieldLabel}>Apply the analysis mask when a cell is used as</legend>
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-2">
+                      {ANALYSIS_MASK_ROLES.map((role) => (
+                        <label key={role.value} className="flex items-center gap-2 text-body text-ink">
+                          <input
+                            type="checkbox"
+                            checked={lagExclusion.analysisExclusions.kind === 'roles' && lagExclusion.analysisExclusions.roles.includes(role.value)}
+                            onChange={() => dispatch({
+                              type: 'missingness-selected',
+                              resolution: {
+                                ...lagExclusion,
+                                analysisExclusions: toggleAnalysisMaskRole(lagExclusion.analysisExclusions, role.value),
+                              },
+                            })}
+                          />
+                          <span>{role.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                  <p className="mb-0 text-body text-faint @md/card:col-span-2">Missing cells are always excluded. These roles apply only to separately marked analysis-mask cells. The original time grid is retained.</p>
                 </div>
               )}
               {draft.missingness.kind === 'imputation' && (
@@ -892,7 +913,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       )}
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
-      {(timeSeriesSelected || preparedTimeSeries !== null) && (
+      {(preparedCurrent !== null || timeSeriesSelected) && (
         <section className={panel('mt-4 p-4')} aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -905,16 +926,24 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               value={diagnostic}
               onChange={setDiagnostic}
               options={[
-                { value: 'stationarity', label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
-                { value: 'structure', label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
-                { value: 'granger', label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
-                { value: 'count-series', label: <DiagnosticLabel text="Count model" done={countSeriesModels.length > 0} /> },
+                { value: 'multicollinearity', label: <DiagnosticLabel text="Redundancy" done={multicollinearityChecked} /> },
+                ...(timeSeriesSelected || preparedTimeSeries !== null ? [
+                  { value: 'stationarity' as const, label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
+                  { value: 'structure' as const, label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
+                  { value: 'granger' as const, label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
+                  { value: 'count-series' as const, label: <DiagnosticLabel text="Count model" done={countSeriesModels.length > 0} /> },
+                ] : []),
               ]}
             />
           </div>
-          {preparedTimeSeries === null && (
+          {preparedCurrent === null && (
             <p role="status" className="mb-0 mt-3 text-body text-faint">Create a prepared dataset version to run these diagnostics.</p>
           )}
+          <div hidden={diagnostic !== 'multicollinearity'} className="mt-4 border-t border-hair pt-4">
+            {preparedCurrent !== null
+              ? <MulticollinearityCard source={source} profile={profile} prepared={preparedCurrent} onSelection={applyMulticollinearitySelection} onResult={() => setMulticollinearityChecked(true)} />
+              : null}
+          </div>
           <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>

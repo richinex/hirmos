@@ -6,6 +6,9 @@ import {
   DIRECT_LINGAM_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   RPCMCI_PAR_CORR_METHOD_ID,
+  CDNOTS_PAR_CORR_METHOD_ID,
+  CDNOTS_PLUS_PAR_CORR_METHOD_ID,
+  GRACE_METHOD_ID,
   CMLP_METHOD_ID,
   CLSTM_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
@@ -180,6 +183,51 @@ export const clstmEvidenceSchema = z.object({
 
 export type ClstmEvidence = z.infer<typeof clstmEvidenceSchema>
 
+export const cdnotsMissingStrategySchema = z.enum(['pairwiseComplete', 'varEm'])
+export type CdnotsMissingStrategy = z.infer<typeof cdnotsMissingStrategySchema>
+
+export const cdnotsContextSchema = z.enum(['none', 'linear', 'linearSine', 'linearExponential', 'linearQuadratic', 'step', 'stepLinear'])
+export type CdnotsContext = z.infer<typeof cdnotsContextSchema>
+
+const cdnotsEvidenceBaseSchema = z.object({
+  observations: z.number().int().positive(),
+  observedVariables: z.number().int().min(2).max(32),
+  contextVariables: z.array(z.string().trim().min(1)).max(2),
+  maxLag: z.number().int().min(1).max(20),
+  alpha: z.number().finite().positive().max(1),
+  missing: cdnotsMissingStrategySchema,
+  context: cdnotsContextSchema,
+  graph: z.array(z.array(z.array(z.string().max(3)))),
+  pMatrix: z.array(z.array(z.array(z.number().finite().min(0).max(1)))),
+  valMatrix: z.array(z.array(z.array(z.number().finite().min(-1).max(1)))),
+})
+
+export const cdnotsEvidenceSchema = cdnotsEvidenceBaseSchema.extend({ kind: z.literal('cdnots') }).strict()
+export const cdnotsPlusEvidenceSchema = cdnotsEvidenceBaseSchema.extend({ kind: z.literal('cdnotsPlus') }).strict()
+export type CdnotsEvidence = z.infer<typeof cdnotsEvidenceSchema>
+export type CdnotsPlusEvidence = z.infer<typeof cdnotsPlusEvidenceSchema>
+
+export const graceEvidenceSchema = z.object({
+  kind: z.literal('grace'),
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(32),
+  maxLag: z.number().int().min(1).max(20),
+  alpha: z.number().finite().positive().max(1),
+  context: cdnotsContextSchema,
+  gateThreshold: z.number().finite().min(0).max(1),
+  lambdaL0: z.number().finite().nonnegative(),
+  epochs: z.number().int().positive(),
+  patience: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  imputedCells: z.number().int().nonnegative(),
+  skeleton: z.array(z.array(z.array(z.boolean()))),
+  gateValues: z.array(z.array(z.array(z.number().finite().min(0).max(1)))),
+  graph: z.array(z.array(z.array(z.boolean()))),
+  loss: z.array(z.number().finite()),
+  rmse: z.array(z.number().finite().nonnegative()),
+}).strict()
+export type GraceEvidence = z.infer<typeof graceEvidenceSchema>
+
 
 export type PcmciPlusBoundaryProblem = {
   readonly kind: 'invalid-pcmci-plus-result'
@@ -188,7 +236,7 @@ export type PcmciPlusBoundaryProblem = {
 
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly method: 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
   readonly detail: string
 }
 
@@ -366,6 +414,51 @@ export function parseClstmEvidence(value: unknown): Result<ClstmEvidence, Discov
   return ok(result)
 }
 
+function cdnotsMatricesAreValid(result: CdnotsEvidence | CdnotsPlusEvidence): boolean {
+  const variables = result.observedVariables + result.contextVariables.length
+  const lags = result.maxLag + 1
+  return hasMatrixShape(result.graph, variables, lags)
+    && hasMatrixShape(result.pMatrix, variables, lags)
+    && hasMatrixShape(result.valMatrix, variables, lags)
+}
+
+export function parseCdnotsResult(value: unknown): Result<CdnotsEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = cdnotsEvidenceSchema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'CD-NOTS', detail: z.prettifyError(parsed.error) })
+  }
+  if (!cdnotsMatricesAreValid(parsed.data)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'CD-NOTS', detail: 'CD-NOTS evidence matrices have inconsistent dimensions.' })
+  }
+  return ok(parsed.data)
+}
+
+export function parseCdnotsPlusResult(value: unknown): Result<CdnotsPlusEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = cdnotsPlusEvidenceSchema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'CD-NOTS+', detail: z.prettifyError(parsed.error) })
+  }
+  if (!cdnotsMatricesAreValid(parsed.data)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'CD-NOTS+', detail: 'CD-NOTS+ evidence matrices have inconsistent dimensions.' })
+  }
+  return ok(parsed.data)
+}
+
+export function parseGraceEvidence(value: unknown): Result<GraceEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = graceEvidenceSchema.safeParse(value)
+  if (!parsed.success) return err({ kind: 'invalid-discovery-matrix-result', method: 'GRACE', detail: z.prettifyError(parsed.error) })
+  const result = parsed.data
+  const lags = result.maxLag + 1
+  if (!hasMatrixShape(result.skeleton, result.variables, lags)
+    || !hasMatrixShape(result.gateValues, result.variables, lags)
+    || !hasMatrixShape(result.graph, result.variables, lags)
+    || result.loss.length !== result.epochs
+    || result.rmse.length !== result.epochs) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'GRACE', detail: 'GRACE evidence dimensions do not match its declared configuration.' })
+  }
+  return ok(result)
+}
+
 export type DiscoveryRunId = Brand<string, 'DiscoveryRunId'>
 
 export const DISCOVERY_LAG_OPTIONS = [1, 2, 3, 4, 6, 8, 12, 20] as const
@@ -381,10 +474,10 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
+export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'cdnots' | 'cdnots-plus' | 'grace' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
-export type DiscoveryMethodGroupId = 'pcmci-family' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy' | 'neural-granger'
+export type DiscoveryMethodGroupId = 'pcmci-family' | 'nonstationary-constraint' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy' | 'neural-granger'
 
 export interface DiscoveryMethodGroup {
   readonly id: DiscoveryMethodGroupId
@@ -407,6 +500,13 @@ const LINGAM_FAMILY: DiscoveryMethodGroup = {
   methods: ['direct-lingam', 'var-lingam'],
 }
 
+const NONSTATIONARY_CONSTRAINT: DiscoveryMethodGroup = {
+  id: 'nonstationary-constraint',
+  name: 'Nonstationary constraint',
+  description: 'Constraint-based temporal discovery that represents changing mechanisms with an explicit time-context variable.',
+  methods: ['cdnots', 'cdnots-plus'],
+}
+
 const CONTINUOUS_OPTIMIZATION: DiscoveryMethodGroup = {
   id: 'continuous-optimization',
   name: 'DYNOTEARS',
@@ -425,11 +525,12 @@ const NEURAL_GRANGER: DiscoveryMethodGroup = {
   id: 'neural-granger',
   name: 'Neural Granger',
   description: 'Component-wise neural forecasting models with structured sparsity for nonlinear Granger-causality selection.',
-  methods: ['cmlp', 'clstm'],
+  methods: ['grace', 'cmlp', 'clstm'],
 }
 
 export const DISCOVERY_METHOD_GROUPS: NonEmptyArray<DiscoveryMethodGroup> = [
   PCMCI_FAMILY,
+  NONSTATIONARY_CONSTRAINT,
   LINGAM_FAMILY,
   CONTINUOUS_OPTIMIZATION,
   CAUSATION_ENTROPY,
@@ -439,6 +540,7 @@ export const DISCOVERY_METHOD_GROUPS: NonEmptyArray<DiscoveryMethodGroup> = [
 export function discoveryMethodGroupById(id: DiscoveryMethodGroupId): DiscoveryMethodGroup {
   switch (id) {
     case 'pcmci-family': return PCMCI_FAMILY
+    case 'nonstationary-constraint': return NONSTATIONARY_CONSTRAINT
     case 'lingam-family': return LINGAM_FAMILY
     case 'continuous-optimization': return CONTINUOUS_OPTIMIZATION
     case 'causation-entropy': return CAUSATION_ENTROPY
@@ -453,6 +555,9 @@ export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): Discover
     case 'lpcmci':
     case 'rpcmci':
       return PCMCI_FAMILY
+    case 'cdnots':
+    case 'cdnots-plus':
+      return NONSTATIONARY_CONSTRAINT
     case 'direct-lingam':
     case 'var-lingam':
       return LINGAM_FAMILY
@@ -460,6 +565,7 @@ export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): Discover
       return CONTINUOUS_OPTIMIZATION
     case 'ocse':
       return CAUSATION_ENTROPY
+    case 'grace':
     case 'cmlp':
     case 'clstm':
       return NEURAL_GRANGER
@@ -491,6 +597,23 @@ export type DiscoveryConfiguration =
       readonly tauMax: DiscoveryLag
       readonly pcAlpha: PcmciAlpha
       readonly alphaLevel: PcmciAlpha
+      readonly seed: number
+    }
+  | {
+      readonly kind: 'cdnots' | 'cdnots-plus'
+      readonly maxLag: DiscoveryLag
+      readonly alpha: PcmciAlpha
+      readonly missing: CdnotsMissingStrategy
+      readonly context: CdnotsContext
+    }
+  | {
+      readonly kind: 'grace'
+      readonly maxLag: DiscoveryLag
+      readonly alpha: PcmciAlpha
+      readonly context: CdnotsContext
+      readonly gateThreshold: number
+      readonly epochs: number
+      readonly patience: number
       readonly seed: number
     }
   | {
@@ -581,6 +704,36 @@ export type DiscoveryRunArtifact =
       readonly result: RpcmciEvidence
     }
   | {
+      readonly kind: 'cdnots-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof CDNOTS_PAR_CORR_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: CdnotsEvidence
+    }
+  | {
+      readonly kind: 'cdnots-plus-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof CDNOTS_PLUS_PAR_CORR_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: CdnotsPlusEvidence
+    }
+  | {
+      readonly kind: 'grace-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof GRACE_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: GraceEvidence
+    }
+  | {
       readonly kind: 'dynotears-run'
       readonly id: DiscoveryRunId
       readonly preparedDataset: PreparedDatasetVersionId
@@ -667,6 +820,8 @@ export type DiscoveryEvent =
   | { readonly type: 'tau-max-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'pc-alpha-selected'; readonly value: PcmciAlpha }
   | { readonly type: 'rpcmci-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }> }
+  | { readonly type: 'cdnots-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'cdnots' | 'cdnots-plus' }> }
+  | { readonly type: 'grace-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'grace' }> }
   | { readonly type: 'dynotears-lambda-w-selected'; readonly value: DynotearsPenalty }
   | { readonly type: 'dynotears-lambda-a-selected'; readonly value: DynotearsPenalty }
   | { readonly type: 'var-lingam-prune-selected'; readonly value: boolean }
@@ -739,6 +894,14 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
       return state.configuration.kind === 'rpcmci'
         ? { configuration: event.configuration, job: { kind: 'idle' } }
         : state
+    case 'cdnots-configured':
+      return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration, job: { kind: 'idle' } }
+        : state
+    case 'grace-configured':
+      return state.job.kind !== 'running' && state.configuration.kind === 'grace'
+        ? { configuration: event.configuration, job: { kind: 'idle' } }
+        : state
     case 'dynotears-lambda-w-selected':
       return state.configuration.kind === 'dynotears'
         ? { configuration: { ...state.configuration, lambdaW: event.value }, job: { kind: 'idle' } }
@@ -788,6 +951,9 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
     case 'pcmci-plus': return { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }
     case 'lpcmci': return { kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }
     case 'rpcmci': return { kind: 'rpcmci', numRegimes: 2, maxTransitions: 4, switchThres: 0.05, numIterations: 20, maxAnneal: 10, tauMin: 1, tauMax: 1, pcAlpha: 0.2, alphaLevel: 0.01, seed: 327 }
+    case 'cdnots': return { kind: 'cdnots', maxLag: 2, alpha: 0.05, missing: 'pairwiseComplete', context: 'linear' }
+    case 'cdnots-plus': return { kind: 'cdnots-plus', maxLag: 2, alpha: 0.01, missing: 'pairwiseComplete', context: 'linear' }
+    case 'grace': return { kind: 'grace', maxLag: 2, alpha: 0.05, context: 'linear', gateThreshold: 0.5, epochs: 150, patience: 20, seed: 0 }
     case 'dynotears': return { kind: 'dynotears', maxLag: 2, lambdaW: 0.1, lambdaA: 0.1 }
     case 'var-lingam': return { kind: 'var-lingam', maxLag: 2, prune: true }
     case 'ocse': return { kind: 'ocse', maxLag: 2, alpha: 0.05, nShuffles: 50, method: 'gaussian', k: 5 }
@@ -810,6 +976,7 @@ export type ReadyDiscoverySpecification =
       readonly pcAlpha: PcmciAlpha
     }
   | Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }>
+  | Extract<DiscoveryConfiguration, { readonly kind: 'cdnots' | 'cdnots-plus' | 'grace' }>
   | {
       readonly kind: 'dynotears'
       readonly maxLag: DiscoveryLag
@@ -837,7 +1004,7 @@ export type DiscoveryReadinessProblem =
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
   | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP'; readonly maximum: number }
   | { readonly kind: 'transition-budget-too-large'; readonly available: number }
 
@@ -845,7 +1012,14 @@ export function readyDiscoverySpecification(
   configuration: DiscoveryConfiguration,
   prepared: PreparedDatasetArtifact,
 ): Result<ReadyDiscoverySpecification, DiscoveryReadinessProblem> {
-  if (prepared.missingness.kind !== 'not-present') return err({ kind: 'dense-browser-boundary-required' })
+  if (prepared.missingness.kind === 'lag-aware-exclusion'
+    && configuration.kind !== 'pcmci-plus'
+    && configuration.kind !== 'lpcmci'
+    && configuration.kind !== 'cdnots'
+    && configuration.kind !== 'cdnots-plus'
+    && configuration.kind !== 'grace') {
+    return err({ kind: 'dense-browser-boundary-required' })
+  }
   if (configuration.kind === 'direct-lingam') {
     if (prepared.kind !== 'prepared-cross-section') return err({ kind: 'cross-section-required' })
     if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
@@ -879,6 +1053,24 @@ export function readyDiscoverySpecification(
       if (configuration.tauMax > 6) return err({ kind: 'browser-lag-limit', method: 'RPCMCI', maximum: 6 })
       if (configuration.maxTransitions >= prepared.observations) return err({ kind: 'transition-budget-too-large', available: prepared.observations })
       const required = Math.max(2 * configuration.tauMax + 24, 40)
+      return prepared.observations < required
+        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+        : ok(configuration)
+    }
+    case 'cdnots':
+    case 'cdnots-plus': {
+      if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+      const name = configuration.kind === 'cdnots' ? 'CD-NOTS' : 'CD-NOTS+'
+      if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: name, maximum: 32, available: prepared.columns.length })
+      const required = Math.max(2 * configuration.maxLag + 30, 40)
+      return prepared.observations < required
+        ? err({ kind: 'too-few-observations', required, available: prepared.observations })
+        : ok(configuration)
+    }
+    case 'grace': {
+      if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
+      if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'GRACE', maximum: 32, available: prepared.columns.length })
+      const required = Math.max(2 * configuration.maxLag + 30, configuration.maxLag + 32)
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
         : ok(configuration)
@@ -937,6 +1129,24 @@ export function evaluateDiscoveryEligibility(
   stationarity: StationarityEvidenceArtifact | null,
 ): MethodEligibility {
   const [firstCaveat] = method.caveats
+  const supportsRoleAwareSamples = method.id === PCMCI_PLUS_PAR_CORR_METHOD_ID
+    || method.id === LPCMCI_PAR_CORR_METHOD_ID
+    || method.id === CDNOTS_PAR_CORR_METHOD_ID
+    || method.id === CDNOTS_PLUS_PAR_CORR_METHOD_ID
+    || method.id === GRACE_METHOD_ID
+  if (prepared.missingness.kind === 'lag-aware-exclusion' && !supportsRoleAwareSamples) {
+    const missingnessCaveat = method.caveats.find((caveat) => caveat.category === 'missingness') ?? firstCaveat
+    return {
+      kind: 'refused',
+      satisfied: [],
+      unresolved: [],
+      violations: [{
+        kind: 'violated',
+        caveat: missingnessCaveat,
+        evidence: 'This method requires a dense prepared matrix. Lag-aware sample handling is available for PCMCI+, LPCMCI, CD-NOTS, CD-NOTS+ and GRACE.',
+      }],
+    }
+  }
   if (method.id === DIRECT_LINGAM_METHOD_ID) {
     if (prepared.kind !== 'prepared-cross-section') {
       const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat

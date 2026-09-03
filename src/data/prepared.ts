@@ -27,6 +27,15 @@ export interface PreparedMatrix {
   readonly timeAxis: TimeAxis | null
 }
 
+/** Nullable time-series values for discovery methods that construct samples per CI-test role. */
+export interface RoleAwarePreparedMatrix {
+  readonly values: Float64Array
+  readonly validity: Uint8Array
+  readonly analysisMask: Uint8Array
+  readonly rowCount: number
+  readonly columns: NonEmptyArray<NumericColumnSelection>
+}
+
 export type PreparedMaterialisationProblem =
   | { readonly kind: 'materialization-refused'; readonly detail: string }
   | { readonly kind: 'seasonal-adjustment-refused'; readonly detail: string }
@@ -35,6 +44,7 @@ export type PreparedMaterialisationProblem =
   | { readonly kind: 'resampling-refused'; readonly detail: string }
   | { readonly kind: 'resolution-record-mismatch' }
   | { readonly kind: 'column-outside-prepared'; readonly column: ColumnId }
+  | { readonly kind: 'role-aware-policy-required' }
 
 /** Unpack the bit-packed validity into one byte per cell, column-major like the values. */
 const unpackValidity = (validity: Uint8Array, cells: number): Uint8Array => {
@@ -56,6 +66,52 @@ export async function materialisePrepared(
 ): Promise<Result<PreparedMatrix, PreparedMaterialisationProblem>> {
   const stages = await materialisePreparedStages(source, profile, prepared, columnIds)
   return stages.ok ? ok(stages.value.final) : stages
+}
+
+/** Materialise the unchanged nullable grid used by PCMCI+ and LPCMCI role-aware projection. */
+export async function materialiseRoleAwarePrepared(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>,
+  columnIds: NonEmptyArray<ColumnId>,
+): Promise<Result<RoleAwarePreparedMatrix, PreparedMaterialisationProblem>> {
+  if (prepared.missingness.kind !== 'lag-aware-exclusion') return err({ kind: 'role-aware-policy-required' })
+  for (const column of columnIds) {
+    if (!prepared.columns.includes(column)) return err({ kind: 'column-outside-prepared', column })
+  }
+  const { materializeTimeSeriesColumnsInWorker } = await import('./client')
+  const sourceMatrix = await materializeTimeSeriesColumnsInWorker(
+    source.file,
+    profile,
+    prepared.sampling.timeColumn,
+    prepared.columns,
+  )
+  if (!sourceMatrix.ok) return err({ kind: 'materialization-refused', detail: sourceMatrix.error.kind })
+  if (sourceMatrix.value.missingCells !== prepared.missingness.cells) {
+    return err({ kind: 'resolution-record-mismatch' })
+  }
+
+  const rows = sourceMatrix.value.rowCount
+  const columns = mapNonEmpty(columnIds, (id) => {
+    const column = sourceMatrix.value.columns.find((candidate) => candidate.id === id)
+    if (column === undefined) throw new Error(`Prepared column ${id} is absent from the source matrix.`)
+    return column
+  })
+  const values = new Float64Array(rows * columns.length)
+  const validity = new Uint8Array(rows * columns.length)
+  const unpacked = unpackValidity(sourceMatrix.value.validity, rows * sourceMatrix.value.columns.length)
+  columns.forEach((column, target) => {
+    const sourceIndex = sourceMatrix.value.columns.findIndex((candidate) => candidate.id === column.id)
+    values.set(sourceMatrix.value.values.subarray(sourceIndex * rows, (sourceIndex + 1) * rows), target * rows)
+    validity.set(unpacked.subarray(sourceIndex * rows, (sourceIndex + 1) * rows), target * rows)
+  })
+  return ok({
+    values,
+    validity,
+    analysisMask: new Uint8Array(rows * columns.length),
+    rowCount: rows,
+    columns,
+  })
 }
 
 /** The pipeline's intermediate matrices, for before-and-after inspection of the recipe. */
@@ -162,6 +218,10 @@ async function materialiseResolved(
   prepared: PreparedDatasetArtifact,
   columnIds: NonEmptyArray<ColumnId>,
 ): Promise<Result<PreparedMatrix, PreparedMaterialisationProblem>> {
+  if (prepared.missingness.kind === 'lag-aware-exclusion') {
+    return err({ kind: 'missing-values-remain', cells: prepared.missingness.cells })
+  }
+  const missingness: DenseReadyMissingness = prepared.missingness
   for (const column of columnIds) {
     if (!prepared.columns.includes(column)) return err({ kind: 'column-outside-prepared', column })
   }
@@ -170,7 +230,7 @@ async function materialiseResolved(
     ? await materializeTimeSeriesColumnsInWorker(source.file, profile, prepared.sampling.timeColumn, prepared.columns)
     : await materializeNumericColumnsInWorker(source.file, profile, prepared.columns)
   if (!matrix.ok) return err({ kind: 'materialization-refused', detail: matrix.error.kind })
-  const resolved = await resolveNullableInput(matrix.value, prepared.missingness)
+  const resolved = await resolveNullableInput(matrix.value, missingness)
   if (!resolved.ok) return resolved
   if (!sameResolution(resolved.value.resolution, prepared.resolution)) return err({ kind: 'resolution-record-mismatch' })
   return ok(selectColumns(resolved.value.matrix, columnIds))
@@ -180,6 +240,7 @@ const sameResolution = (left: MissingnessResolutionRecord, right: MissingnessRes
   if (left.kind !== right.kind) return false
   switch (left.kind) {
     case 'none': return true
+    case 'lag-aware-exclusion': return right.kind === 'lag-aware-exclusion' && left.cells === right.cells
     case 'window': return right.kind === 'window' && left.start === right.start && left.endExclusive === right.endExclusive && left.sourceRows === right.sourceRows
     case 'imputed': return right.kind === 'imputed' && left.method === right.method && left.maxGap === right.maxGap && left.cells === right.cells
     default: return assertNever(left)
@@ -279,6 +340,7 @@ export function describePreparedMaterialisationProblem(problem: PreparedMaterial
     case 'resampling-refused': return `The recorded resampling could not be applied: ${problem.detail}`
     case 'resolution-record-mismatch': return 'The source no longer reproduces the saved preparation record. Recreate the prepared dataset version.'
     case 'column-outside-prepared': return 'A requested column is not part of the prepared dataset version. Select another column.'
+    case 'role-aware-policy-required': return 'This operation requires a time-series version prepared with lag-aware sample exclusion.'
     default: return assertNever(problem)
   }
 }

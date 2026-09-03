@@ -5,6 +5,8 @@
 
 pub mod backdoor;
 pub mod causal_effects;
+pub mod causal_ts_preparation;
+pub mod cdnots;
 pub mod data_preparation;
 pub mod discrete_bn;
 pub mod estimation;
@@ -33,12 +35,16 @@ pub use frontdoor::{
 };
 
 pub use mackinnon::Regression;
-pub use parcorr::{run_test as parcorr_test, CiKind, ParCorrCi, TimeSeries};
+pub use parcorr::{
+    run_test as parcorr_test, CiKind, CiSampleAudit, ParCorrCi, RoleAwareSamplePolicy, TimeSeries,
+};
 pub use pcmci::{
-    run_bivci, run_pcmci, run_pcmci_filtered, run_pcmci_selected, run_pcmci_with, PcmciResult,
+    run_bivci, run_pcmci, run_pcmci_filtered, run_pcmci_frame, run_pcmci_selected, run_pcmci_with,
+    PcmciResult,
 };
 pub use pcmciplus::{
-    fdr_bh, run_pcalg_standard, run_pcmciplus, run_sliding_window_pcmciplus, PcmciPlusResult,
+    fdr_bh, run_pcalg_standard, run_pcmciplus, run_pcmciplus_frame, run_sliding_window_pcmciplus,
+    PcmciPlusResult,
 };
 pub use preprocessing::{
     construct_array_tracked, forward_fill, linear_interpolate, longest_complete_interval,
@@ -77,6 +83,7 @@ pub mod dynamic_counterfactual;
 pub mod fminbound;
 pub mod glm;
 pub mod graph_falsification;
+pub mod grace;
 pub mod id_star;
 pub mod idc_star;
 pub mod identified_expression;
@@ -113,7 +120,7 @@ pub use graph_falsification::{
     GraphFalsificationResult, ImplicationDecision, UniformityTest,
 };
 pub use kci::{kernel_conditional_independence, KciError, KciResult};
-pub use preprocess::{cluster_redundant, shapiro, vif_redundant};
+pub use preprocess::{cluster_redundant, correlation_matrix, shapiro, vif_redundant};
 pub use refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, RefutationOutcome,
     WorkerStudy,

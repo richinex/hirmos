@@ -34,7 +34,7 @@ interface CandidateBase {
 export type DiscoveryCandidate =
   | CandidateBase & {
       readonly kind: 'endpoint-marked'
-      readonly method: 'PCMCI+' | 'LPCMCI'
+      readonly method: 'PCMCI+' | 'LPCMCI' | 'CD-NOTS' | 'CD-NOTS+'
       readonly lag: number
       readonly mark: string
       readonly pValue: number
@@ -64,7 +64,7 @@ export type DiscoveryCandidate =
     }
   | CandidateBase & {
       readonly kind: 'neural-lagged'
-      readonly method: 'cMLP'
+      readonly method: 'cMLP' | 'GRACE'
       readonly lag: number
       readonly score: number
     }
@@ -77,8 +77,8 @@ export type DiscoveryCandidate =
 
 export interface DiscoveryEvidenceView {
   readonly run: DiscoveryRunArtifact
-  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
-  readonly semantics: 'stationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
+  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly semantics: 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
   readonly candidates: readonly DiscoveryCandidate[]
 }
 
@@ -173,6 +173,37 @@ const regimeMatrixCandidates = (
   return candidates
 })
 
+/** Context-node links remain visible in the evidence graph; only observed-column links can enter the DAG ledger. */
+const cdnotsCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'cdnots-run' | 'cdnots-plus-run' }>,
+): readonly DiscoveryCandidate[] => {
+  const candidates: Extract<DiscoveryCandidate, { readonly kind: 'endpoint-marked' }>[] = []
+  for (let sourceIndex = 0; sourceIndex < run.result.observedVariables; sourceIndex += 1) {
+    for (let targetIndex = 0; targetIndex < run.result.observedVariables; targetIndex += 1) {
+      for (let lag = 0; lag <= run.result.maxLag; lag += 1) {
+        const mark = run.result.graph[sourceIndex][targetIndex][lag]
+        if (mark.length === 0 || (lag === 0 && sourceIndex > targetIndex)) continue
+        const source = variable(run.variables[sourceIndex])
+        const target = variable(run.variables[targetIndex])
+        candidates.push({
+          kind: 'endpoint-marked',
+          id: candidateId(run.id, `${sourceIndex}:${targetIndex}:${lag}:${mark}`),
+          run: run.id,
+          method: run.kind === 'cdnots-run' ? 'CD-NOTS' : 'CD-NOTS+',
+          source,
+          target,
+          lag,
+          mark,
+          pValue: run.result.pMatrix[sourceIndex][targetIndex][lag],
+          statistic: run.result.valMatrix[sourceIndex][targetIndex][lag],
+          relationMatch: markedRelationMatch(source, target, lag, mark),
+        })
+      }
+    }
+  }
+  return candidates
+}
+
 /** Every nonzero fitted weight, strongest first; weights[lag][source][target] with lag 0 contemporaneous. */
 const weightedCandidates = (
   run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' | 'dynotears-run' | 'var-lingam-run' }>,
@@ -245,6 +276,39 @@ const cmlpCandidates = (
   return candidates
 }
 
+const graceCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'grace-run' }>,
+): readonly DiscoveryCandidate[] => {
+  const candidates: Extract<DiscoveryCandidate, { readonly kind: 'neural-lagged' }>[] = []
+  for (let sourceIndex = 0; sourceIndex < run.result.variables; sourceIndex += 1) {
+    for (let targetIndex = 0; targetIndex < run.result.variables; targetIndex += 1) {
+      for (let lag = 0; lag <= run.result.maxLag; lag += 1) {
+        if (!run.result.graph[sourceIndex][targetIndex][lag]) continue
+        const source = variable(run.variables[sourceIndex])
+        const target = variable(run.variables[targetIndex])
+        candidates.push({
+          kind: 'neural-lagged',
+          id: candidateId(run.id, `${sourceIndex}:${targetIndex}:${lag}`),
+          run: run.id,
+          method: 'GRACE',
+          source,
+          target,
+          lag,
+          score: run.result.gateValues[sourceIndex][targetIndex][lag],
+          relationMatch: {
+            kind: 'directed-candidate',
+            cause: source,
+            effect: target,
+            timing: lag === 0 ? { kind: 'contemporaneous' } : { kind: 'lagged', lag },
+          },
+        })
+      }
+    }
+  }
+  candidates.sort((left, right) => right.score - left.score)
+  return candidates
+}
+
 const clstmCandidates = (
   run: Extract<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }>,
 ): readonly DiscoveryCandidate[] => {
@@ -296,6 +360,24 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
       method: 'RPCMCI',
       semantics: 'regime-specific-lag-graphs',
       candidates: regimeMatrixCandidates(run),
+    }
+    case 'cdnots-run': return {
+      run,
+      method: 'CD-NOTS',
+      semantics: 'nonstationary-lag-graph',
+      candidates: cdnotsCandidates(run),
+    }
+    case 'cdnots-plus-run': return {
+      run,
+      method: 'CD-NOTS+',
+      semantics: 'nonstationary-lag-graph',
+      candidates: cdnotsCandidates(run),
+    }
+    case 'grace-run': return {
+      run,
+      method: 'GRACE',
+      semantics: 'neural-lagged-granger',
+      candidates: graceCandidates(run),
     }
     case 'dynotears-run': return {
       run,
@@ -354,6 +436,7 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
 export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
   switch (view.semantics) {
     case 'stationary-lag-graph': return 'Conditional-dependence marks over lagged variables'
+    case 'nonstationary-lag-graph': return 'Conditional-dependence marks over lagged variables with recorded time-context nodes'
     case 'pag': return 'Partial ancestral graph marks; circles and bidirected endpoints remain unresolved'
     case 'regime-specific-lag-graphs': return 'A separately estimated lag graph for each inferred regime'
     case 'weighted-directed-evidence': return 'Fitted directed structural weights'
