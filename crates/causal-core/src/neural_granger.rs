@@ -153,12 +153,26 @@ struct MlpNetwork<B: Backend> {
 }
 
 impl<B: Backend> MlpNetwork<B> {
-    fn forward(&self, mut input: Tensor<B, 3>) -> Tensor<B, 3> {
+    fn forward(&self, mut input: Tensor<B, 2>) -> Tensor<B, 2> {
         for (index, layer) in self.layers.iter().enumerate() {
             if index > 0 {
                 input = activate(input, self.activation);
             }
-            input = layer.forward(input);
+            // The first kernel spans the complete lag window and every later kernel is 1.
+            // Flattening those windows gives the same cross-correlation as Conv1d here.
+            let [out_channels, in_channels, kernel_size] = layer.weight.shape().dims();
+            let weight = layer
+                .weight
+                .val()
+                .reshape([out_channels, in_channels * kernel_size])
+                .transpose();
+            input = input.matmul(weight)
+                + layer
+                    .bias
+                    .as_ref()
+                    .expect("configured bias")
+                    .val()
+                    .unsqueeze_dim::<2>(0);
         }
         input
     }
@@ -169,7 +183,10 @@ struct CmlpModel<B: Backend> {
     networks: Vec<MlpNetwork<B>>,
 }
 
-fn activate<B: Backend>(input: Tensor<B, 3>, activation: Activation) -> Tensor<B, 3> {
+fn activate<B: Backend, const D: usize>(
+    input: Tensor<B, D>,
+    activation: Activation,
+) -> Tensor<B, D> {
     match activation {
         Activation::Sigmoid => sigmoid(input),
         Activation::Tanh => input.tanh(),
@@ -367,23 +384,27 @@ fn cmlp_tensors<B: Backend>(
     columns: usize,
     lag: usize,
     device: &B::Device,
-) -> (Tensor<B, 3>, Vec<Tensor<B, 3>>) {
-    let input_values = values[..(rows - 1) * columns]
-        .iter()
-        .map(|value| *value as f32)
-        .collect::<Vec<_>>();
+) -> (Tensor<B, 2>, Vec<Tensor<B, 2>>) {
+    let samples = rows - lag;
+    let mut input_values = Vec::with_capacity(samples * columns * lag);
+    for sample in 0..samples {
+        for column in 0..columns {
+            for lag_index in 0..lag {
+                input_values.push(values[(sample + lag_index) * columns + column] as f32);
+            }
+        }
+    }
     let input = Tensor::from_data(
-        TensorData::new(input_values, [1, rows - 1, columns]),
+        TensorData::new(input_values, [samples, columns * lag]),
         device,
-    )
-    .swap_dims(1, 2);
+    );
 
     let targets = (0..columns)
         .map(|column| {
             let target = (lag..rows)
                 .map(|row| values[row * columns + column] as f32)
                 .collect::<Vec<_>>();
-            Tensor::from_data(TensorData::new(target, [1, 1, rows - lag]), device)
+            Tensor::from_data(TensorData::new(target, [samples, 1]), device)
         })
         .collect();
     (input, targets)
@@ -391,8 +412,8 @@ fn cmlp_tensors<B: Backend>(
 
 fn cmlp_smooth_loss<B: AutodiffBackend>(
     model: &CmlpModel<B>,
-    input: &Tensor<B, 3>,
-    targets: &[Tensor<B, 3>],
+    input: &Tensor<B, 2>,
+    targets: &[Tensor<B, 2>],
     ridge_lambda: f64,
 ) -> Tensor<B, 1> {
     let mut terms = Vec::with_capacity(model.networks.len());
@@ -660,7 +681,7 @@ pub fn cmlp_predict(
         .iter()
         .map(|network| network.forward(input.clone()))
         .collect::<Vec<_>>();
-    let output = Tensor::cat(outputs, 1).swap_dims(1, 2);
+    let output = Tensor::cat(outputs, 1);
     Ok(tensor_values(output)
         .into_iter()
         .map(|value| value as f64)
@@ -854,18 +875,22 @@ impl<B: Backend> LstmNetwork<B> {
         let mut hidden_state = Tensor::<B, 2>::zeros([batch, self.hidden], &device);
         let mut cell_state = Tensor::<B, 2>::zeros([batch, self.hidden], &device);
         let mut predictions = Vec::with_capacity(steps);
+        let input_weight = self.weight_ih.val().transpose();
+        let recurrent_weight = self.weight_hh.val().transpose();
+        let input_bias = self.bias_ih.val().unsqueeze_dim::<2>(0);
+        let recurrent_bias = self.bias_hh.val().unsqueeze_dim::<2>(0);
+        let output_weight = self.output_weight.val().transpose();
+        let output_bias = self.output_bias.val().unsqueeze_dim::<2>(0);
 
         for step in 0..steps {
             let current = input
                 .clone()
                 .slice([0..batch, step..step + 1, 0..input_columns])
                 .reshape([batch, input_columns]);
-            let gates = current.matmul(self.weight_ih.val().transpose())
-                + hidden_state
-                    .clone()
-                    .matmul(self.weight_hh.val().transpose())
-                + self.bias_ih.val().unsqueeze_dim::<2>(0)
-                + self.bias_hh.val().unsqueeze_dim::<2>(0);
+            let gates = current.matmul(input_weight.clone())
+                + hidden_state.clone().matmul(recurrent_weight.clone())
+                + input_bias.clone()
+                + recurrent_bias.clone();
             let input_gate = sigmoid(gates.clone().slice([0..batch, 0..self.hidden]));
             let forget_gate = sigmoid(
                 gates
@@ -880,10 +905,8 @@ impl<B: Backend> LstmNetwork<B> {
 
             cell_state = forget_gate * cell_state + input_gate * cell_gate;
             hidden_state = output_gate * cell_state.clone().tanh();
-            let prediction = hidden_state
-                .clone()
-                .matmul(self.output_weight.val().transpose())
-                + self.output_bias.val().unsqueeze_dim::<2>(0);
+            let prediction =
+                hidden_state.clone().matmul(output_weight.clone()) + output_bias.clone();
             predictions.push(prediction.unsqueeze_dim::<3>(1));
         }
 
