@@ -90,10 +90,24 @@ export interface LagGridMetrics {
 
 export const DEFAULT_LAG_GRID_METRICS: LagGridMetrics = { nodeSize: 22, dx: 104, dy: 78, left: 108, top: 44 }
 
+/** How far a link bows off the straight line between its two nodes. A repeated self-link is drawn well
+ *  clear of the row it sits on; everything else takes a slight bend so parallel links stay countable. */
+const curvenessOf = (link: { readonly from: number; readonly to: number; readonly lag: number }): number =>
+  link.from === link.to ? (link.lag <= 1 ? 0 : 0.45) : 0.18
+
 /** The left gutter sized to the widest row label (11px labels average about 0.58em a character), clamped to 72–160 so one long name cannot push the grid off the strip. */
 export const lagGridMetrics = (graph: LagGraph, base: LagGridMetrics = DEFAULT_LAG_GRID_METRICS): LagGridMetrics => {
   const widest = Math.max(0, ...graph.variables.map((variable) => variable.name.length))
-  return { ...base, left: Math.min(160, Math.max(72, Math.round(widest * 11 * 0.58) + base.nodeSize / 2 + 20)) }
+  // A curve leaves its chord by about curveness × chord ÷ 2, and only a link touching the first row can
+  // leave the frame at the top. Without this the arcs over the first row are drawn and then cut off.
+  const overhang = Math.max(0, ...graph.links
+    .filter((link) => link.from === 0 || link.to === 0)
+    .map((link) => curvenessOf(link) * Math.hypot(link.lag * base.dx, Math.abs(link.to - link.from) * base.dy) / 2))
+  return {
+    ...base,
+    left: Math.min(160, Math.max(72, Math.round(widest * 11 * 0.58) + base.nodeSize / 2 + 20)),
+    top: base.top + Math.ceil(overhang),
+  }
 }
 
 export const lagGridSize = (graph: LagGraph, metrics: LagGridMetrics = lagGridMetrics(graph)): { readonly width: number; readonly height: number } => ({
@@ -145,7 +159,7 @@ export function lagGridOption(graph: LagGraph, theme: ChartTheme, metrics: LagGr
       lineStyle: {
         color: strengthColour(link.strength, scale, theme),
         width: widthFor(link.strength, scale),
-        curveness: link.from === link.to ? (link.lag <= 1 ? 0 : 0.45) : 0.18,
+        curveness: curvenessOf(link),
         opacity: 1,
         type: link.fromEndpoint === 'unresolved' || link.toEndpoint === 'unresolved' ? 'dashed' : 'solid',
       },
