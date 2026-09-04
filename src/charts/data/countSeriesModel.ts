@@ -11,15 +11,15 @@ export function countSeriesFitOption(view: {
 }, theme: ChartTheme): EChartsCoreOption {
   return {
     ...baseOption(theme, `${view.name}: observed counts and fitted INGARCH conditional means across ${view.observed.length} reference points.`),
-    // The legend goes above the plot so it does not print over the axis name at the foot.
-    grid: gridAuto({ top: 30, bottom: 44 }),
+    // The legend goes above the plot so it does not print over the axis name at the foot, and the plot starts low enough that the scan-date label prints between the two rather than over the legend.
+    grid: gridAuto({ top: 48, bottom: 44 }),
     legend: { ...legend(theme, ['observed', 'fitted mean']), bottom: 'auto', top: 0 },
     tooltip: { ...tooltip(theme, 'axis'), axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } } },
     xAxis: { type: 'value', min: 1, max: Math.max(2, view.observed.length), minInterval: 1, name: 'reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
     yAxis: { ...valueAxis(theme, 'count'), scale: true },
     series: [
-      { type: 'line', name: 'observed', data: view.observed.map((value, index) => [index + 1, value]), symbol: 'none', lineStyle: { color: theme.ink, width: 1.1 }, markLine: { silent: true, symbol: 'none', label: { color: theme.muted, formatter: 'strongest scan date' }, lineStyle: { color: theme.signal, type: 'dashed', width: 1 }, data: [{ xAxis: view.strongestReferencePoint + 1 }] } },
-      { type: 'line', name: 'fitted mean', data: view.fitted.map((value, index) => [index + 1, value]), symbol: 'none', lineStyle: { color: theme.info, width: 1.4, type: 'dashed' } },
+      { type: 'line', name: 'observed', data: view.observed.map((value, index) => [index + 1, value]), symbol: 'none', itemStyle: { color: theme.ink }, lineStyle: { color: theme.ink, width: 1.1 }, markLine: { silent: true, symbol: 'none', label: { color: theme.muted, formatter: 'strongest scan date' }, lineStyle: { color: theme.signal, type: 'dashed', width: 1 }, data: [{ xAxis: view.strongestReferencePoint + 1 }] } },
+      { type: 'line', name: 'fitted mean', data: view.fitted.map((value, index) => [index + 1, value]), symbol: 'none', itemStyle: { color: theme.info }, lineStyle: { color: theme.info, width: 1.4, type: 'dashed' } },
     ],
   }
 }
