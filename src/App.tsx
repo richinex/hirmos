@@ -9,15 +9,16 @@ import { useIsMobile } from '@/lib/useMediaQuery'
 import { useShellLayout } from '@/components/shell/useShellLayout'
 import { button, chromeAction, field, iconControl, label, literal, num, panel, well } from '@/components/ui/recipes'
 import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
-import { formatTimestamp } from '@/lib/format/date'
+import { formatDay, formatTimestamp } from '@/lib/format/date'
 import { DataStudio } from '@/components/data/DataStudio'
 import { PreprocessingPanel } from '@/components/data/PreprocessingPanel'
 import { DiscoveryPanel } from '@/components/discovery/DiscoveryPanel'
 import { chapterPath, CHAPTER_IDS, describeRouteProblem, isCanonicalLocation, type ChapterId } from '@/domain/navigation'
 import type { ChapterActivity, RunActivity } from '@/domain/activity'
 import { describeSnapshotProblem, snapshotWorkflow, type PersistedProject, type SavedProjectHeader } from '@/domain/persistence'
-import { EXAMPLE_BUNDLE_URL, EXAMPLE_PROJECT_ID, EXAMPLE_PROJECT_NAME, EXAMPLE_SOURCE_NAME } from '@/domain/example'
-import { deleteProject, listProjects, loadProject, saveProject } from '@/data/projectStore'
+import { assessExampleCopy, isShippedExampleId, SHIPPED_EXAMPLES, stampExampleRelease, type ShippedExample } from '@/domain/example'
+import { ExampleLedger } from '@/components/projects/ExampleLedger'
+import { deleteProject, listProjects, loadProject, saveProject, saveProjectIfChanged } from '@/data/projectStore'
 import { lastStorageFailure, subscribeStorageHealth, type StorageFailure } from '@/data/storageHealth'
 import { cacheSource, readCachedSource, removeCachedSource, sourceCacheAvailable } from '@/data/sourceCache'
 import { buildBundle, bundleFileName, describeBundleProblem, parseBundle, serialiseBundle, type BundleData, type ProjectBundle } from '@/domain/bundle'
@@ -42,6 +43,7 @@ import {
   type DiscoveryEvent,
 } from '@/domain/discovery'
 import { useRunActivity } from '@/lib/useRunActivity'
+import { assertNever } from '@/domain/dop'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
 const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
@@ -236,23 +238,33 @@ function App() {
       : null,
   )
   const [saved, setSaved] = useState<readonly SavedProjectHeader[]>([])
-  /** The example's row: its saved copy when there is one, otherwise the shipped bundle as it would be listed. */
-  const exampleEntry: SavedProjectHeader = saved.find((entry) => entry.id === EXAMPLE_PROJECT_ID)
-    ?? { id: EXAMPLE_PROJECT_ID, name: EXAMPLE_PROJECT_NAME, savedAt: '', sourceName: EXAMPLE_SOURCE_NAME, cachedSource: null, estimationRuns: 0 }
+  /** The user's own projects; the shipped examples are listed by the ledger from the catalog instead. */
+  const yours = saved.filter((entry) => !isShippedExampleId(entry.id))
   const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(() => lastStorageFailure())
   const [reopenProblem, setReopenProblem] = useState<string | null>(null)
+  const [exampleNotice, setExampleNotice] = useState<string | null>(null)
   const refreshSaved = useCallback(() => { void listProjects().then(setSaved) }, [])
   useEffect(() => { refreshSaved() }, [refreshSaved])
   useEffect(() => subscribeStorageHealth(setStorageFailure), [])
-  // Every durable change is written after a short quiet period; a failed write surfaces in the header, never silently.
+  // Every durable change is written after a short quiet period; opening an unchanged record is not a new save.
   useEffect(() => {
     const snapshot = snapshotWorkflow(workflow, new Date().toISOString())
     if (snapshot === null) return
-    const handle = window.setTimeout(() => { void saveProject(snapshot).then((result) => { if (result.ok) refreshSaved() }) }, 400)
+    const handle = window.setTimeout(() => {
+      void saveProjectIfChanged(snapshot).then((result) => {
+        if (!result.ok) return
+        switch (result.value.kind) {
+          case 'saved': refreshSaved(); return
+          case 'unchanged': return
+          default: assertNever(result.value)
+        }
+      })
+    }, 400)
     return () => window.clearTimeout(handle)
   }, [workflow, refreshSaved])
   const reopenProject = async (id: SavedProjectHeader['id']) => {
     setReopenProblem(null)
+    setExampleNotice(null)
     const loaded = await loadProject(id)
     if (!loaded.ok) { setReopenProblem(loaded.error.kind === 'storage-unavailable' ? `The browser store could not be read: ${loaded.error.detail}` : loaded.error.kind === 'not-found' ? 'That project is no longer saved. Choose another project or import a bundle.' : describeSnapshotProblem(loaded.error)); return }
     const snapshot = loaded.value
@@ -311,31 +323,45 @@ function App() {
   const importBundle = async (file: File | undefined) => {
     if (!file) return
     setImportProblem(null)
+    setExampleNotice(null)
     const parsed = parseBundle(await file.text())
     if (!parsed.ok) { setImportProblem(describeBundleProblem(parsed.error)); return }
     await adoptBundle(parsed.value)
   }
   /**
-   * The shipped example. Its saved copy is reopened with the data file from the bundle, so it never
-   * asks for a file; a reset, or no saved copy, takes the bundle's own state.
+   * A shipped example. Edits to this release are retained, while a copy made from an older shipped
+   * release is replaced so newly completed chapters are not hidden behind stale browser state.
    */
-  const openExample = async (reset = false) => {
+  const openExample = async (example: ShippedExample, reset = false) => {
     setImportProblem(null)
+    setExampleNotice(null)
     let bundle: ProjectBundle
     try {
-      const response = await fetch(EXAMPLE_BUNDLE_URL)
+      const response = await fetch(example.bundleUrl)
       // A missing file comes back as the app shell in development, so the content type is the reliable check.
       if (!response.ok || !(response.headers.get('content-type') ?? '').includes('json')) { setImportProblem('The example bundle is not part of this build.'); return }
       const parsed = parseBundle(await response.text())
       if (!parsed.ok) { setImportProblem(describeBundleProblem(parsed.error)); return }
-      bundle = parsed.value
+      const stamped = stampExampleRelease(parsed.value.project, parsed.value.exportedAt, example.id)
+      if (!stamped.ok) { setImportProblem('The shipped example contains the wrong project.'); return }
+      bundle = { ...parsed.value, project: stamped.value }
     } catch (cause: unknown) {
       setImportProblem(`The example could not be loaded: ${cause instanceof Error ? cause.message : String(cause)}`)
       return
     }
-    const existing = reset ? null : await loadProject(EXAMPLE_PROJECT_ID)
-    if (existing !== null && existing.ok) await openWithBundleData(existing.value, bundle.data)
-    else await adoptBundle(bundle)
+    const existing = reset ? null : await loadProject(example.id)
+    if (existing !== null && existing.ok) {
+      const assessment = assessExampleCopy(existing.value, bundle.exportedAt, example.id)
+      switch (assessment.kind) {
+        case 'current-release': await openWithBundleData(assessment.snapshot, bundle.data); return
+        case 'replace-with-shipped':
+          setExampleNotice('The example changed in this build, so your earlier copy was replaced.')
+          break
+        case 'invalid-copy': setImportProblem(assessment.detail); return
+        default: assertNever(assessment)
+      }
+    }
+    await adoptBundle(bundle)
   }
   const changeSourcePersistence = async (kind: 'ephemeral' | 'cached-locally') => {
     if (workflow.kind !== 'profiled') return
@@ -406,7 +432,17 @@ function App() {
   // Keep the current chapter on screen while a cold code chunk is fetched. The request counter prevents
   // a slower first click from winning if the user chooses a different chapter before it has loaded.
   const navigationRequest = useRef(0)
+  // Leaving for the list saves the open project first, so the debounced save cannot be lost.
+  const closeProject = useCallback(async () => {
+    const snapshot = snapshotWorkflow(workflow, new Date().toISOString())
+    if (snapshot !== null) await saveProjectIfChanged(snapshot)
+    dispatch({ type: 'project-closed' })
+    refreshSaved()
+    navigate(chapterPath('projects'))
+  }, [workflow, refreshSaved])
+
   const navigateToChapter = useCallback((chapter: ChapterId) => {
+    if (chapter === 'projects' && workflow.kind !== 'awaiting-project') { void closeProject(); return }
     const request = ++navigationRequest.current
     const commit = () => {
       if (navigationRequest.current === request) navigate(chapterPath(chapter))
@@ -414,7 +450,7 @@ function App() {
     const load = PANEL_LOADERS[chapter]
     if (load === undefined) { commit(); return }
     void load().then(commit, commit)
-  }, [])
+  }, [workflow.kind, closeProject])
 
   const warmableChapterKey = chapters
     .filter((chapter) => chapter.status !== 'locked' && PANEL_LOADERS[chapter.id] !== undefined)
@@ -527,8 +563,11 @@ function App() {
                 {describeRouteProblem(route.error)}; showing {activeName}.
               </p>
             )}
+            {exampleNotice !== null && activeChapter === 'data' && (
+              <p role="status" className={well('mb-4 px-3 py-2 text-body text-muted')}>{exampleNotice}</p>
+            )}
             {workflow.kind === 'awaiting-project' && (
-              <section className="rise my-auto max-w-xl" aria-labelledby="new-analysis-title">
+              <section className="rise my-auto w-full max-w-6xl" aria-labelledby="new-analysis-title">
                 <span className={label('text-faint')}>01 · Projects</span>
                 <h2 id="new-analysis-title" className="mb-6 mt-3 text-heading text-ink">Create an analysis</h2>
                 <form onSubmit={createProject} className="max-w-md space-y-3">
@@ -543,48 +582,50 @@ function App() {
                     />
                   </label>
                   {workflow.problem && <p role="alert" className="text-body text-danger">{describeProjectNameProblem(workflow.problem)}</p>}
-                  <button type="submit" className={button('signal')}>Create project</button>
+                  {/* The two ways to get a project, side by side: make one, or open one exported earlier. */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button type="submit" className={button('signal')}>Create project</button>
+                    <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
+                    <button type="button" className={button('outline')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open an exported file</button>
+                  </div>
                 </form>
                 <section className="mt-8" aria-labelledby="projects-title">
-                  <h3 id="projects-title" className="mb-2 text-title font-medium text-ink">Projects</h3>
-                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file; the example brings its own.</p>
+                  <h3 id="projects-title" className="mb-2 text-title font-medium text-ink">Your projects</h3>
+                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file.</p>
                   {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
                   {importProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{importProblem}</p>}
-                  <ul className="m-0 list-none divide-y divide-hair rounded-lg border border-hair p-0" aria-label="Projects">
-                    {[exampleEntry, ...saved.filter((entry) => entry.id !== EXAMPLE_PROJECT_ID)].map((entry) => {
-                      const example = entry.id === EXAMPLE_PROJECT_ID
-                      const stored = saved.some((other) => other.id === entry.id)
-                      return (
-                        <li key={entry.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-well">
-                          <div className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2 text-body text-ink"><span className="truncate">{entry.name}</span>{example && <span className={label('shrink-0 text-faint')}>Example</span>}</span>
-                            <span className={num('block truncate text-label text-faint')}>
-                              {stored
-                                ? `${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`
-                                : `${entry.sourceName} · every chapter filled in`}
-                            </span>
-                          </div>
-                          {/* Every row renders all four action slots, hidden where a control does not apply, so the columns align down the list. */}
-                          <button type="button" className={button('outline')} onClick={() => void (example ? openExample() : reopenProject(entry.id))}>Open</button>
-                          {example && stored
-                            ? <button type="button" className={iconControl('quiet')} aria-label="Reset the example" title="Put the example back as shipped, discarding changes to this copy" onClick={() => void openExample(true)}><Icon name="restart_alt" size={14} /></button>
-                            : <span aria-hidden className={iconControl('quiet', 'invisible')} />}
-                          {stored
-                            ? <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
-                            : <span aria-hidden className={iconControl('quiet', 'invisible')} />}
-                          {stored
-                            ? <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
-                            : <span aria-hidden className={iconControl('danger', 'invisible')} />}
-                        </li>
-                      )
-                    })}
-                  </ul>
+                  {yours.length === 0
+                    ? <p className="m-0 text-body text-faint">None yet. Create one above, open an exported file, or start from an example below.</p>
+                    : (
+                      <ul className="m-0 list-none divide-y divide-hair rounded-lg border border-hair p-0" aria-label="Projects">
+                        {yours.map((entry) => (
+                          <li key={entry.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-well">
+                            <div className="min-w-0 flex-1">
+                              <span className="block truncate text-body text-ink">{entry.name}</span>
+                              <span className={num('block truncate text-label text-faint')}>
+                                {`${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`}
+                              </span>
+                            </div>
+                            <button type="button" className={button('outline')} onClick={() => void reopenProject(entry.id)}>Open</button>
+                            <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
+                            <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                 </section>
-                <section className="mt-8" aria-labelledby="import-bundle-title">
-                  <h3 id="import-bundle-title" className="mb-2 text-title font-medium text-ink">Open an exported project</h3>
-                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">A <span className="font-mono">.hirmos.json</span> file from Export project. If it was exported without its data file, you choose the file after opening.</p>
-                  <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
-                  <button type="button" className={button('outline')} onClick={() => bundleInput.current?.click()}>Choose a file</button>
+                <section className="mt-8" aria-labelledby="examples-title">
+                  <h3 id="examples-title" className="mb-2 text-title font-medium text-ink">Examples</h3>
+                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Complete walkthroughs, each with its data inside. Open one to read it, edit it freely, and reset it to get the shipped version back.</p>
+                  <ExampleLedger
+                    examples={SHIPPED_EXAMPLES}
+                    saved={saved}
+                    formatSaved={formatDay}
+                    onOpen={(example) => void openExample(example)}
+                    onReset={(example) => void openExample(example, true)}
+                    onExport={(id) => void exportSaved(id)}
+                    onDelete={(entry) => void removeProject(entry)}
+                  />
                 </section>
               </section>
             )}

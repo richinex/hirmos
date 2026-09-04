@@ -13,6 +13,7 @@ import type { CounterfactualRunArtifact, CounterfactualRunId } from './counterfa
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { PersistedProject } from './persistence'
+import type { ProjectOrigin } from './projectOrigin'
 
 export type ProjectId = Brand<string, 'ProjectId'>
 export type ProjectName = Brand<string, 'ProjectName'>
@@ -53,26 +54,30 @@ export type Workflow =
   | {
       readonly kind: 'awaiting-data'
       readonly project: Project
+      readonly origin: ProjectOrigin
       readonly problem: SourceSelectionProblem | null
       /** A saved project waiting for its source file; the artifacts return once the file's fingerprint matches. */
       readonly restore: PersistedProject | null
     }
-  | { readonly kind: 'source-selected'; readonly project: Project; readonly source: SelectedSource }
+  | { readonly kind: 'source-selected'; readonly project: Project; readonly origin: ProjectOrigin; readonly source: SelectedSource }
   | {
       readonly kind: 'profiling'
       readonly project: Project
+      readonly origin: ProjectOrigin
       readonly source: SelectedSource
       readonly request: ImportRequestId
     }
   | {
       readonly kind: 'import-failed'
       readonly project: Project
+      readonly origin: ProjectOrigin
       readonly source: SelectedSource
       readonly problem: DatasetProfileProblem
     }
   | {
       readonly kind: 'profiled'
       readonly project: Project
+      readonly origin: ProjectOrigin
       readonly source: SelectedSource
       readonly profile: DatasetProfile
       readonly prepared: PreparedDatasetArtifact | null
@@ -123,6 +128,7 @@ export type WorkflowEvent =
   | { readonly type: 'project-restored'; readonly file: File }
   | { readonly type: 'restore-rejected'; readonly problem: SourceSelectionProblem }
   | { readonly type: 'source-persistence-changed'; readonly persistence: SourcePersistence }
+  | { readonly type: 'project-closed' }
 
 export const INITIAL_WORKFLOW: Workflow = {
   kind: 'awaiting-project',
@@ -181,19 +187,21 @@ export function selectSource(file: File): Result<SelectedSource, SourceSelection
 }
 
 export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
+  // Closing returns to the list whatever the project's stage; the caller saves first.
+  if (event.type === 'project-closed') return INITIAL_WORKFLOW
   switch (state.kind) {
     case 'awaiting-project': {
       if (event.type === 'project-name-changed') {
         return { ...state, nameDraft: event.value, problem: null }
       }
       if (event.type === 'project-reopened') {
-        return { kind: 'awaiting-data', project: event.snapshot.project, problem: null, restore: event.snapshot.profile === null ? null : event.snapshot }
+        return { kind: 'awaiting-data', project: event.snapshot.project, origin: event.snapshot.origin, problem: null, restore: event.snapshot.profile === null ? null : event.snapshot }
       }
       if (event.type !== 'project-submitted') return state
       if (event.type !== 'project-submitted') return state
       const parsed = projectName(state.nameDraft)
       return parsed.ok
-        ? { kind: 'awaiting-data', project: newProject(parsed.value), problem: null, restore: null }
+        ? { kind: 'awaiting-data', project: newProject(parsed.value), origin: { kind: 'user' }, problem: null, restore: null }
         : { ...state, problem: parsed.error }
     }
     case 'awaiting-data': {
@@ -205,6 +213,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         return {
           kind: 'profiled',
           project: snapshot.project,
+          origin: snapshot.origin,
           source: parsed.value,
           profile: snapshot.profile ?? (() => { throw new Error('unreachable') })(),
           prepared: snapshot.prepared,
@@ -226,20 +235,21 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type !== 'file-selected' || state.restore !== null) return state
       const parsed = selectSource(event.file)
       return parsed.ok
-        ? { kind: 'source-selected', project: state.project, source: parsed.value }
+        ? { kind: 'source-selected', project: state.project, origin: state.origin, source: parsed.value }
         : { ...state, problem: parsed.error }
     }
     case 'source-selected':
       if (event.type === 'profile-requested') {
-        return { kind: 'profiling', project: state.project, source: state.source, request: event.request }
+        return { kind: 'profiling', project: state.project, origin: state.origin, source: state.source, request: event.request }
       }
-      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       return state
     case 'profiling':
       if (event.type === 'profile-succeeded' && event.request === state.request) {
         return {
           kind: 'profiled',
           project: state.project,
+          origin: state.origin,
           source: state.source,
           profile: event.profile,
           prepared: null,
@@ -259,20 +269,20 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         }
       }
       if (event.type === 'profile-failed' && event.request === state.request) {
-        return { kind: 'import-failed', project: state.project, source: state.source, problem: event.problem }
+        return { kind: 'import-failed', project: state.project, origin: state.origin, source: state.source, problem: event.problem }
       }
       return state
     case 'import-failed':
       if (event.type === 'profile-requested') {
-        return { kind: 'profiling', project: state.project, source: state.source, request: event.request }
+        return { kind: 'profiling', project: state.project, origin: state.origin, source: state.source, request: event.request }
       }
-      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       return state
     case 'profiled':
       if (event.type === 'source-persistence-changed') {
         return { ...state, profile: { ...state.profile, source: { ...state.profile.source, persistence: event.persistence } } }
       }
-      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, problem: null, restore: null }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
         return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
       }

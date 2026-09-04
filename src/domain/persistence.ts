@@ -7,11 +7,12 @@ import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
 import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
-import { err, ok, type Result } from './dop'
+import { brand, err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
+import type { ProjectOrigin } from './projectOrigin'
 import type { Project, SelectedSource, Workflow } from './workflow'
 
 /**
@@ -32,6 +33,7 @@ export interface PersistedProject {
   readonly kind: 'hirmos-project'
   readonly version: 1
   readonly savedAt: string
+  readonly origin: ProjectOrigin
   readonly project: Project
   readonly source: SourceDescriptor | null
   readonly profile: DatasetProfile | null
@@ -86,7 +88,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
     case 'awaiting-data':
       if (workflow.restore !== null) return null
       return {
-        kind: 'hirmos-project', version: 1, savedAt, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
+        kind: 'hirmos-project', version: 1, savedAt, origin: workflow.origin, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
         grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [],
       }
     case 'source-selected':
@@ -98,6 +100,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         kind: 'hirmos-project',
         version: 1,
         savedAt,
+        origin: workflow.origin,
         project: workflow.project,
         source: describeSource(workflow.source),
         profile: workflow.profile,
@@ -126,6 +129,13 @@ const F64 = '$f64'
 export const serialiseSnapshot = (snapshot: PersistedProject): string =>
   JSON.stringify(snapshot, (_key, value: unknown) => (value instanceof Float64Array ? { [F64]: Array.from(value) } : value))
 
+/**
+ * Whether two records contain the same durable analysis. `savedAt` describes a write, not the
+ * analysis, so opening an unchanged project must not make it appear newly edited.
+ */
+export const samePersistedProjectContent = (left: PersistedProject, right: PersistedProject): boolean =>
+  serialiseSnapshot({ ...left, savedAt: '' }) === serialiseSnapshot({ ...right, savedAt: '' })
+
 const revive = (_key: string, value: unknown): unknown => {
   if (typeof value === 'object' && value !== null && F64 in value) {
     const numbers = (value as Record<string, unknown>)[F64]
@@ -140,6 +150,10 @@ export type SnapshotProblem =
   | { readonly kind: 'unsupported-version'; readonly version: number }
 
 const artifact = z.object({ id: z.string().min(1) }).passthrough()
+const projectOriginSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('user') }).strict(),
+  z.object({ kind: z.literal('shipped-example'), exportedAt: z.string().datetime({ offset: true }) }).strict(),
+])
 const seriesTransformSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('levels') }).strict(),
   z.object({ kind: z.literal('difference'), order: z.literal(1) }).strict(),
@@ -150,7 +164,12 @@ const envelopeSchema = z.object({
   kind: z.literal('hirmos-project'),
   version: z.number().int(),
   savedAt: z.string().min(1),
-  project: z.object({ id: z.string().min(1), name: z.string().min(1), createdAt: z.string().min(1) }),
+  origin: projectOriginSchema.default({ kind: 'user' }),
+  project: z.object({
+    id: z.string().min(1),
+    name: z.string().min(1),
+    createdAt: z.string().min(1),
+  }).strict(),
   source: z.object({ name: z.string(), bytes: z.number().int().nonnegative(), mediaType: z.string(), lastModified: z.number(), format: z.enum(['csv', 'tsv', 'parquet']) }).nullable(),
   profile: z.unknown().nullable(),
   prepared: artifact.nullable(),
@@ -295,9 +314,16 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
+  const project: Project = {
+    id: brand<string, 'ProjectId'>(parsed.data.project.id),
+    name: brand<string, 'ProjectName'>(parsed.data.project.name),
+    createdAt: parsed.data.project.createdAt,
+  }
   return ok({
     ...(parsed.data as unknown as PersistedProject),
     version: 1,
+    origin: parsed.data.origin as ProjectOrigin,
+    project,
     profile,
     prepared: prepared.value as PreparedDatasetArtifact | null,
     stationarity: stationarity.value as StationarityEvidenceArtifact | null,

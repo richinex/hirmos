@@ -1,0 +1,5702 @@
+{
+  "kind": "hirmos-bundle",
+  "version": 1,
+  "exportedAt": "2026-09-04T15:02:50.387Z",
+  "application": {
+    "name": "hirmos",
+    "build": "0.1.0"
+  },
+  "project": {
+    "kind": "hirmos-project",
+    "version": 1,
+    "savedAt": "2026-09-04T15:02:50.383Z",
+    "origin": {
+      "kind": "user"
+    },
+    "project": {
+      "id": "5b2e8d4a-7c19-4f36-b8e2-1d9a3c6e4f57",
+      "name": "Proposition 99 and cigarette sales",
+      "createdAt": "2026-09-04T15:02:44.130Z"
+    },
+    "source": {
+      "name": "prop99-wide.csv",
+      "bytes": 11185,
+      "mediaType": "text/csv",
+      "lastModified": 1788533944227,
+      "format": "csv"
+    },
+    "profile": {
+      "id": "duckdb-wasm:1.30.0:54d585287c71e7c9272e5acf2679e4b8846ce4fe91b77ea7654eb4de792eda8f",
+      "source": {
+        "fingerprint": "54d585287c71e7c9272e5acf2679e4b8846ce4fe91b77ea7654eb4de792eda8f",
+        "fileName": "prop99-wide.csv",
+        "bytes": 11185,
+        "format": "csv",
+        "persistence": {
+          "kind": "ephemeral"
+        }
+      },
+      "parser": {
+        "kind": "duckdb-wasm",
+        "packageVersion": "1.30.0",
+        "engineVersion": "v1.3.2"
+      },
+      "rowCount": 31,
+      "columns": [
+        {
+          "id": "0:Year",
+          "name": "Year",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "1:prop99",
+          "name": "prop99",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "2:California",
+          "name": "California",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "3:Alabama",
+          "name": "Alabama",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "4:Arkansas",
+          "name": "Arkansas",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "5:Colorado",
+          "name": "Colorado",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "6:Connecticut",
+          "name": "Connecticut",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "7:Delaware",
+          "name": "Delaware",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "8:Georgia",
+          "name": "Georgia",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "9:Idaho",
+          "name": "Idaho",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "10:Illinois",
+          "name": "Illinois",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "11:Indiana",
+          "name": "Indiana",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "12:Iowa",
+          "name": "Iowa",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "13:Kansas",
+          "name": "Kansas",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "14:Kentucky",
+          "name": "Kentucky",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "15:Louisiana",
+          "name": "Louisiana",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "16:Maine",
+          "name": "Maine",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "17:Minnesota",
+          "name": "Minnesota",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "18:Mississippi",
+          "name": "Mississippi",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "19:Missouri",
+          "name": "Missouri",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "20:Montana",
+          "name": "Montana",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "21:Nebraska",
+          "name": "Nebraska",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "22:Nevada",
+          "name": "Nevada",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "23:NewHampshire",
+          "name": "NewHampshire",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "24:NewMexico",
+          "name": "NewMexico",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "25:NorthCarolina",
+          "name": "NorthCarolina",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "26:NorthDakota",
+          "name": "NorthDakota",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "27:Ohio",
+          "name": "Ohio",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "28:Oklahoma",
+          "name": "Oklahoma",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "29:Pennsylvania",
+          "name": "Pennsylvania",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "30:RhodeIsland",
+          "name": "RhodeIsland",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "31:SouthCarolina",
+          "name": "SouthCarolina",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "32:SouthDakota",
+          "name": "SouthDakota",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "33:Tennessee",
+          "name": "Tennessee",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "34:Texas",
+          "name": "Texas",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "35:Utah",
+          "name": "Utah",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "36:Vermont",
+          "name": "Vermont",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "37:Virginia",
+          "name": "Virginia",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "38:WestVirginia",
+          "name": "WestVirginia",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "39:Wisconsin",
+          "name": "Wisconsin",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "40:Wyoming",
+          "name": "Wyoming",
+          "duckdbType": "DOUBLE",
+          "nullable": false,
+          "nullCount": 0
+        }
+      ],
+      "preview": [
+        [
+          {
+            "kind": "integer",
+            "value": "1970"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 123
+          },
+          {
+            "kind": "number",
+            "value": 89.8
+          },
+          {
+            "kind": "number",
+            "value": 100.3
+          },
+          {
+            "kind": "number",
+            "value": 124.8
+          },
+          {
+            "kind": "number",
+            "value": 120
+          },
+          {
+            "kind": "number",
+            "value": 155
+          },
+          {
+            "kind": "number",
+            "value": 109.9
+          },
+          {
+            "kind": "number",
+            "value": 102.4
+          },
+          {
+            "kind": "number",
+            "value": 124.8
+          },
+          {
+            "kind": "number",
+            "value": 134.6
+          },
+          {
+            "kind": "number",
+            "value": 108.5
+          },
+          {
+            "kind": "number",
+            "value": 114
+          },
+          {
+            "kind": "number",
+            "value": 155.8
+          },
+          {
+            "kind": "number",
+            "value": 115.9
+          },
+          {
+            "kind": "number",
+            "value": 128.5
+          },
+          {
+            "kind": "number",
+            "value": 104.3
+          },
+          {
+            "kind": "number",
+            "value": 93.4
+          },
+          {
+            "kind": "number",
+            "value": 121.3
+          },
+          {
+            "kind": "number",
+            "value": 111.2
+          },
+          {
+            "kind": "number",
+            "value": 108.1
+          },
+          {
+            "kind": "number",
+            "value": 189.5
+          },
+          {
+            "kind": "number",
+            "value": 265.7
+          },
+          {
+            "kind": "number",
+            "value": 90
+          },
+          {
+            "kind": "number",
+            "value": 172.4
+          },
+          {
+            "kind": "number",
+            "value": 93.8
+          },
+          {
+            "kind": "number",
+            "value": 121.6
+          },
+          {
+            "kind": "number",
+            "value": 108.4
+          },
+          {
+            "kind": "number",
+            "value": 107.3
+          },
+          {
+            "kind": "number",
+            "value": 123.9
+          },
+          {
+            "kind": "number",
+            "value": 103.6
+          },
+          {
+            "kind": "number",
+            "value": 92.7
+          },
+          {
+            "kind": "number",
+            "value": 99.8
+          },
+          {
+            "kind": "number",
+            "value": 106.4
+          },
+          {
+            "kind": "number",
+            "value": 65.5
+          },
+          {
+            "kind": "number",
+            "value": 122.6
+          },
+          {
+            "kind": "number",
+            "value": 124.3
+          },
+          {
+            "kind": "number",
+            "value": 114.5
+          },
+          {
+            "kind": "number",
+            "value": 106.4
+          },
+          {
+            "kind": "number",
+            "value": 132.2
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1971"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 121
+          },
+          {
+            "kind": "number",
+            "value": 95.4
+          },
+          {
+            "kind": "number",
+            "value": 104.1
+          },
+          {
+            "kind": "number",
+            "value": 125.5
+          },
+          {
+            "kind": "number",
+            "value": 117.6
+          },
+          {
+            "kind": "number",
+            "value": 161.1
+          },
+          {
+            "kind": "number",
+            "value": 115.7
+          },
+          {
+            "kind": "number",
+            "value": 108.5
+          },
+          {
+            "kind": "number",
+            "value": 125.6
+          },
+          {
+            "kind": "number",
+            "value": 139.3
+          },
+          {
+            "kind": "number",
+            "value": 108.4
+          },
+          {
+            "kind": "number",
+            "value": 102.8
+          },
+          {
+            "kind": "number",
+            "value": 163.5
+          },
+          {
+            "kind": "number",
+            "value": 119.8
+          },
+          {
+            "kind": "number",
+            "value": 133.2
+          },
+          {
+            "kind": "number",
+            "value": 116.4
+          },
+          {
+            "kind": "number",
+            "value": 105.4
+          },
+          {
+            "kind": "number",
+            "value": 127.6
+          },
+          {
+            "kind": "number",
+            "value": 115.6
+          },
+          {
+            "kind": "number",
+            "value": 108.6
+          },
+          {
+            "kind": "number",
+            "value": 190.5
+          },
+          {
+            "kind": "number",
+            "value": 278
+          },
+          {
+            "kind": "number",
+            "value": 92.6
+          },
+          {
+            "kind": "number",
+            "value": 187.6
+          },
+          {
+            "kind": "number",
+            "value": 98.5
+          },
+          {
+            "kind": "number",
+            "value": 124.6
+          },
+          {
+            "kind": "number",
+            "value": 115.4
+          },
+          {
+            "kind": "number",
+            "value": 106.3
+          },
+          {
+            "kind": "number",
+            "value": 123.2
+          },
+          {
+            "kind": "number",
+            "value": 115
+          },
+          {
+            "kind": "number",
+            "value": 96.7
+          },
+          {
+            "kind": "number",
+            "value": 106.3
+          },
+          {
+            "kind": "number",
+            "value": 108.9
+          },
+          {
+            "kind": "number",
+            "value": 67.7
+          },
+          {
+            "kind": "number",
+            "value": 124.4
+          },
+          {
+            "kind": "number",
+            "value": 128.4
+          },
+          {
+            "kind": "number",
+            "value": 111.5
+          },
+          {
+            "kind": "number",
+            "value": 105.4
+          },
+          {
+            "kind": "number",
+            "value": 131.7
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1972"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 123.5
+          },
+          {
+            "kind": "number",
+            "value": 101.1
+          },
+          {
+            "kind": "number",
+            "value": 103.9
+          },
+          {
+            "kind": "number",
+            "value": 134.3
+          },
+          {
+            "kind": "number",
+            "value": 110.8
+          },
+          {
+            "kind": "number",
+            "value": 156.3
+          },
+          {
+            "kind": "number",
+            "value": 117
+          },
+          {
+            "kind": "number",
+            "value": 126.1
+          },
+          {
+            "kind": "number",
+            "value": 126.6
+          },
+          {
+            "kind": "number",
+            "value": 149.2
+          },
+          {
+            "kind": "number",
+            "value": 109.4
+          },
+          {
+            "kind": "number",
+            "value": 111
+          },
+          {
+            "kind": "number",
+            "value": 179.4
+          },
+          {
+            "kind": "number",
+            "value": 125.3
+          },
+          {
+            "kind": "number",
+            "value": 136.5
+          },
+          {
+            "kind": "number",
+            "value": 96.8
+          },
+          {
+            "kind": "number",
+            "value": 112.1
+          },
+          {
+            "kind": "number",
+            "value": 130
+          },
+          {
+            "kind": "number",
+            "value": 122.2
+          },
+          {
+            "kind": "number",
+            "value": 104.9
+          },
+          {
+            "kind": "number",
+            "value": 198.6
+          },
+          {
+            "kind": "number",
+            "value": 296.2
+          },
+          {
+            "kind": "number",
+            "value": 99.3
+          },
+          {
+            "kind": "number",
+            "value": 214.1
+          },
+          {
+            "kind": "number",
+            "value": 103.8
+          },
+          {
+            "kind": "number",
+            "value": 124.4
+          },
+          {
+            "kind": "number",
+            "value": 121.7
+          },
+          {
+            "kind": "number",
+            "value": 109
+          },
+          {
+            "kind": "number",
+            "value": 134.4
+          },
+          {
+            "kind": "number",
+            "value": 118.7
+          },
+          {
+            "kind": "number",
+            "value": 103
+          },
+          {
+            "kind": "number",
+            "value": 111.5
+          },
+          {
+            "kind": "number",
+            "value": 108.6
+          },
+          {
+            "kind": "number",
+            "value": 71.3
+          },
+          {
+            "kind": "number",
+            "value": 138
+          },
+          {
+            "kind": "number",
+            "value": 137
+          },
+          {
+            "kind": "number",
+            "value": 117.5
+          },
+          {
+            "kind": "number",
+            "value": 108.8
+          },
+          {
+            "kind": "number",
+            "value": 140
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1973"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 124.4
+          },
+          {
+            "kind": "number",
+            "value": 102.9
+          },
+          {
+            "kind": "number",
+            "value": 108
+          },
+          {
+            "kind": "number",
+            "value": 137.9
+          },
+          {
+            "kind": "number",
+            "value": 109.3
+          },
+          {
+            "kind": "number",
+            "value": 154.7
+          },
+          {
+            "kind": "number",
+            "value": 119.8
+          },
+          {
+            "kind": "number",
+            "value": 121.8
+          },
+          {
+            "kind": "number",
+            "value": 124.4
+          },
+          {
+            "kind": "number",
+            "value": 156
+          },
+          {
+            "kind": "number",
+            "value": 110.6
+          },
+          {
+            "kind": "number",
+            "value": 115.2
+          },
+          {
+            "kind": "number",
+            "value": 201.9
+          },
+          {
+            "kind": "number",
+            "value": 126.7
+          },
+          {
+            "kind": "number",
+            "value": 138
+          },
+          {
+            "kind": "number",
+            "value": 106.8
+          },
+          {
+            "kind": "number",
+            "value": 115
+          },
+          {
+            "kind": "number",
+            "value": 132.1
+          },
+          {
+            "kind": "number",
+            "value": 119.9
+          },
+          {
+            "kind": "number",
+            "value": 106.6
+          },
+          {
+            "kind": "number",
+            "value": 201.5
+          },
+          {
+            "kind": "number",
+            "value": 279
+          },
+          {
+            "kind": "number",
+            "value": 98.9
+          },
+          {
+            "kind": "number",
+            "value": 226.5
+          },
+          {
+            "kind": "number",
+            "value": 108.7
+          },
+          {
+            "kind": "number",
+            "value": 120.5
+          },
+          {
+            "kind": "number",
+            "value": 124.1
+          },
+          {
+            "kind": "number",
+            "value": 110.7
+          },
+          {
+            "kind": "number",
+            "value": 142
+          },
+          {
+            "kind": "number",
+            "value": 125.5
+          },
+          {
+            "kind": "number",
+            "value": 103.5
+          },
+          {
+            "kind": "number",
+            "value": 109.7
+          },
+          {
+            "kind": "number",
+            "value": 110.4
+          },
+          {
+            "kind": "number",
+            "value": 72.7
+          },
+          {
+            "kind": "number",
+            "value": 146.8
+          },
+          {
+            "kind": "number",
+            "value": 143.1
+          },
+          {
+            "kind": "number",
+            "value": 116.6
+          },
+          {
+            "kind": "number",
+            "value": 109.5
+          },
+          {
+            "kind": "number",
+            "value": 141.2
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1974"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 126.7
+          },
+          {
+            "kind": "number",
+            "value": 108.2
+          },
+          {
+            "kind": "number",
+            "value": 109.7
+          },
+          {
+            "kind": "number",
+            "value": 132.8
+          },
+          {
+            "kind": "number",
+            "value": 112.4
+          },
+          {
+            "kind": "number",
+            "value": 151.3
+          },
+          {
+            "kind": "number",
+            "value": 123.7
+          },
+          {
+            "kind": "number",
+            "value": 125.6
+          },
+          {
+            "kind": "number",
+            "value": 131.9
+          },
+          {
+            "kind": "number",
+            "value": 159.6
+          },
+          {
+            "kind": "number",
+            "value": 116.1
+          },
+          {
+            "kind": "number",
+            "value": 118.6
+          },
+          {
+            "kind": "number",
+            "value": 212.4
+          },
+          {
+            "kind": "number",
+            "value": 129.9
+          },
+          {
+            "kind": "number",
+            "value": 142.1
+          },
+          {
+            "kind": "number",
+            "value": 110.6
+          },
+          {
+            "kind": "number",
+            "value": 117.1
+          },
+          {
+            "kind": "number",
+            "value": 135.4
+          },
+          {
+            "kind": "number",
+            "value": 121.9
+          },
+          {
+            "kind": "number",
+            "value": 110.5
+          },
+          {
+            "kind": "number",
+            "value": 204.7
+          },
+          {
+            "kind": "number",
+            "value": 269.8
+          },
+          {
+            "kind": "number",
+            "value": 100.3
+          },
+          {
+            "kind": "number",
+            "value": 227.3
+          },
+          {
+            "kind": "number",
+            "value": 110.5
+          },
+          {
+            "kind": "number",
+            "value": 122.1
+          },
+          {
+            "kind": "number",
+            "value": 130.5
+          },
+          {
+            "kind": "number",
+            "value": 114.2
+          },
+          {
+            "kind": "number",
+            "value": 146.1
+          },
+          {
+            "kind": "number",
+            "value": 129.7
+          },
+          {
+            "kind": "number",
+            "value": 108.4
+          },
+          {
+            "kind": "number",
+            "value": 114.8
+          },
+          {
+            "kind": "number",
+            "value": 114.7
+          },
+          {
+            "kind": "number",
+            "value": 75.6
+          },
+          {
+            "kind": "number",
+            "value": 151.8
+          },
+          {
+            "kind": "number",
+            "value": 149.6
+          },
+          {
+            "kind": "number",
+            "value": 119.9
+          },
+          {
+            "kind": "number",
+            "value": 111.8
+          },
+          {
+            "kind": "number",
+            "value": 145.8
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1975"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 127.1
+          },
+          {
+            "kind": "number",
+            "value": 111.7
+          },
+          {
+            "kind": "number",
+            "value": 114.8
+          },
+          {
+            "kind": "number",
+            "value": 131
+          },
+          {
+            "kind": "number",
+            "value": 110.2
+          },
+          {
+            "kind": "number",
+            "value": 147.6
+          },
+          {
+            "kind": "number",
+            "value": 122.9
+          },
+          {
+            "kind": "number",
+            "value": 123.3
+          },
+          {
+            "kind": "number",
+            "value": 131.8
+          },
+          {
+            "kind": "number",
+            "value": 162.4
+          },
+          {
+            "kind": "number",
+            "value": 120.5
+          },
+          {
+            "kind": "number",
+            "value": 123.4
+          },
+          {
+            "kind": "number",
+            "value": 223
+          },
+          {
+            "kind": "number",
+            "value": 133.6
+          },
+          {
+            "kind": "number",
+            "value": 140.7
+          },
+          {
+            "kind": "number",
+            "value": 111.5
+          },
+          {
+            "kind": "number",
+            "value": 116.8
+          },
+          {
+            "kind": "number",
+            "value": 135.6
+          },
+          {
+            "kind": "number",
+            "value": 123.7
+          },
+          {
+            "kind": "number",
+            "value": 114.1
+          },
+          {
+            "kind": "number",
+            "value": 205.2
+          },
+          {
+            "kind": "number",
+            "value": 269.1
+          },
+          {
+            "kind": "number",
+            "value": 103.1
+          },
+          {
+            "kind": "number",
+            "value": 226
+          },
+          {
+            "kind": "number",
+            "value": 117.9
+          },
+          {
+            "kind": "number",
+            "value": 122.5
+          },
+          {
+            "kind": "number",
+            "value": 132.9
+          },
+          {
+            "kind": "number",
+            "value": 114.6
+          },
+          {
+            "kind": "number",
+            "value": 154.7
+          },
+          {
+            "kind": "number",
+            "value": 130.5
+          },
+          {
+            "kind": "number",
+            "value": 113.5
+          },
+          {
+            "kind": "number",
+            "value": 117.4
+          },
+          {
+            "kind": "number",
+            "value": 116
+          },
+          {
+            "kind": "number",
+            "value": 75.8
+          },
+          {
+            "kind": "number",
+            "value": 155.5
+          },
+          {
+            "kind": "number",
+            "value": 152.7
+          },
+          {
+            "kind": "number",
+            "value": 123.2
+          },
+          {
+            "kind": "number",
+            "value": 113.5
+          },
+          {
+            "kind": "number",
+            "value": 160.7
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1976"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 128
+          },
+          {
+            "kind": "number",
+            "value": 116.2
+          },
+          {
+            "kind": "number",
+            "value": 119.1
+          },
+          {
+            "kind": "number",
+            "value": 134.2
+          },
+          {
+            "kind": "number",
+            "value": 113.4
+          },
+          {
+            "kind": "number",
+            "value": 153
+          },
+          {
+            "kind": "number",
+            "value": 125.9
+          },
+          {
+            "kind": "number",
+            "value": 125.1
+          },
+          {
+            "kind": "number",
+            "value": 134.4
+          },
+          {
+            "kind": "number",
+            "value": 166.6
+          },
+          {
+            "kind": "number",
+            "value": 124.4
+          },
+          {
+            "kind": "number",
+            "value": 127.7
+          },
+          {
+            "kind": "number",
+            "value": 230.9
+          },
+          {
+            "kind": "number",
+            "value": 139.6
+          },
+          {
+            "kind": "number",
+            "value": 144.9
+          },
+          {
+            "kind": "number",
+            "value": 116.7
+          },
+          {
+            "kind": "number",
+            "value": 120.9
+          },
+          {
+            "kind": "number",
+            "value": 139.5
+          },
+          {
+            "kind": "number",
+            "value": 124.9
+          },
+          {
+            "kind": "number",
+            "value": 118.1
+          },
+          {
+            "kind": "number",
+            "value": 201.4
+          },
+          {
+            "kind": "number",
+            "value": 290.5
+          },
+          {
+            "kind": "number",
+            "value": 102.4
+          },
+          {
+            "kind": "number",
+            "value": 230.2
+          },
+          {
+            "kind": "number",
+            "value": 125.4
+          },
+          {
+            "kind": "number",
+            "value": 124.6
+          },
+          {
+            "kind": "number",
+            "value": 138.6
+          },
+          {
+            "kind": "number",
+            "value": 118.8
+          },
+          {
+            "kind": "number",
+            "value": 150.2
+          },
+          {
+            "kind": "number",
+            "value": 136.8
+          },
+          {
+            "kind": "number",
+            "value": 116.7
+          },
+          {
+            "kind": "number",
+            "value": 121.7
+          },
+          {
+            "kind": "number",
+            "value": 121.4
+          },
+          {
+            "kind": "number",
+            "value": 77.9
+          },
+          {
+            "kind": "number",
+            "value": 171.1
+          },
+          {
+            "kind": "number",
+            "value": 158.1
+          },
+          {
+            "kind": "number",
+            "value": 129.7
+          },
+          {
+            "kind": "number",
+            "value": 115.4
+          },
+          {
+            "kind": "number",
+            "value": 161.5
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1977"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 126.4
+          },
+          {
+            "kind": "number",
+            "value": 117.1
+          },
+          {
+            "kind": "number",
+            "value": 122.6
+          },
+          {
+            "kind": "number",
+            "value": 132
+          },
+          {
+            "kind": "number",
+            "value": 117.3
+          },
+          {
+            "kind": "number",
+            "value": 153.3
+          },
+          {
+            "kind": "number",
+            "value": 127.9
+          },
+          {
+            "kind": "number",
+            "value": 125
+          },
+          {
+            "kind": "number",
+            "value": 134
+          },
+          {
+            "kind": "number",
+            "value": 173
+          },
+          {
+            "kind": "number",
+            "value": 125.5
+          },
+          {
+            "kind": "number",
+            "value": 127.9
+          },
+          {
+            "kind": "number",
+            "value": 229.4
+          },
+          {
+            "kind": "number",
+            "value": 140
+          },
+          {
+            "kind": "number",
+            "value": 145.6
+          },
+          {
+            "kind": "number",
+            "value": 117.2
+          },
+          {
+            "kind": "number",
+            "value": 122.1
+          },
+          {
+            "kind": "number",
+            "value": 140.8
+          },
+          {
+            "kind": "number",
+            "value": 127
+          },
+          {
+            "kind": "number",
+            "value": 117.7
+          },
+          {
+            "kind": "number",
+            "value": 190.8
+          },
+          {
+            "kind": "number",
+            "value": 278.8
+          },
+          {
+            "kind": "number",
+            "value": 102.4
+          },
+          {
+            "kind": "number",
+            "value": 217
+          },
+          {
+            "kind": "number",
+            "value": 122.2
+          },
+          {
+            "kind": "number",
+            "value": 127.3
+          },
+          {
+            "kind": "number",
+            "value": 140.4
+          },
+          {
+            "kind": "number",
+            "value": 120.1
+          },
+          {
+            "kind": "number",
+            "value": 148.8
+          },
+          {
+            "kind": "number",
+            "value": 137.2
+          },
+          {
+            "kind": "number",
+            "value": 115.6
+          },
+          {
+            "kind": "number",
+            "value": 124.6
+          },
+          {
+            "kind": "number",
+            "value": 124.2
+          },
+          {
+            "kind": "number",
+            "value": 78
+          },
+          {
+            "kind": "number",
+            "value": 169.4
+          },
+          {
+            "kind": "number",
+            "value": 157.7
+          },
+          {
+            "kind": "number",
+            "value": 133.9
+          },
+          {
+            "kind": "number",
+            "value": 117.2
+          },
+          {
+            "kind": "number",
+            "value": 160.4
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1978"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 126.1
+          },
+          {
+            "kind": "number",
+            "value": 123
+          },
+          {
+            "kind": "number",
+            "value": 127.3
+          },
+          {
+            "kind": "number",
+            "value": 129.2
+          },
+          {
+            "kind": "number",
+            "value": 117.5
+          },
+          {
+            "kind": "number",
+            "value": 155.5
+          },
+          {
+            "kind": "number",
+            "value": 130.6
+          },
+          {
+            "kind": "number",
+            "value": 122.8
+          },
+          {
+            "kind": "number",
+            "value": 136.7
+          },
+          {
+            "kind": "number",
+            "value": 150.9
+          },
+          {
+            "kind": "number",
+            "value": 127.1
+          },
+          {
+            "kind": "number",
+            "value": 127.1
+          },
+          {
+            "kind": "number",
+            "value": 224.7
+          },
+          {
+            "kind": "number",
+            "value": 142.7
+          },
+          {
+            "kind": "number",
+            "value": 143.9
+          },
+          {
+            "kind": "number",
+            "value": 118.9
+          },
+          {
+            "kind": "number",
+            "value": 124.9
+          },
+          {
+            "kind": "number",
+            "value": 141.8
+          },
+          {
+            "kind": "number",
+            "value": 127.2
+          },
+          {
+            "kind": "number",
+            "value": 117.4
+          },
+          {
+            "kind": "number",
+            "value": 187
+          },
+          {
+            "kind": "number",
+            "value": 269.6
+          },
+          {
+            "kind": "number",
+            "value": 103.1
+          },
+          {
+            "kind": "number",
+            "value": 205.5
+          },
+          {
+            "kind": "number",
+            "value": 121.9
+          },
+          {
+            "kind": "number",
+            "value": 131.3
+          },
+          {
+            "kind": "number",
+            "value": 143.6
+          },
+          {
+            "kind": "number",
+            "value": 122.3
+          },
+          {
+            "kind": "number",
+            "value": 146.8
+          },
+          {
+            "kind": "number",
+            "value": 140.4
+          },
+          {
+            "kind": "number",
+            "value": 116.9
+          },
+          {
+            "kind": "number",
+            "value": 127.3
+          },
+          {
+            "kind": "number",
+            "value": 126.6
+          },
+          {
+            "kind": "number",
+            "value": 79.6
+          },
+          {
+            "kind": "number",
+            "value": 162.4
+          },
+          {
+            "kind": "number",
+            "value": 155.9
+          },
+          {
+            "kind": "number",
+            "value": 131.6
+          },
+          {
+            "kind": "number",
+            "value": 116.7
+          },
+          {
+            "kind": "number",
+            "value": 160.3
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1979"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 121.9
+          },
+          {
+            "kind": "number",
+            "value": 121.4
+          },
+          {
+            "kind": "number",
+            "value": 126.5
+          },
+          {
+            "kind": "number",
+            "value": 131.5
+          },
+          {
+            "kind": "number",
+            "value": 117.4
+          },
+          {
+            "kind": "number",
+            "value": 150.2
+          },
+          {
+            "kind": "number",
+            "value": 131
+          },
+          {
+            "kind": "number",
+            "value": 117.5
+          },
+          {
+            "kind": "number",
+            "value": 135.3
+          },
+          {
+            "kind": "number",
+            "value": 148.9
+          },
+          {
+            "kind": "number",
+            "value": 124.2
+          },
+          {
+            "kind": "number",
+            "value": 126.4
+          },
+          {
+            "kind": "number",
+            "value": 214.9
+          },
+          {
+            "kind": "number",
+            "value": 140.1
+          },
+          {
+            "kind": "number",
+            "value": 138.5
+          },
+          {
+            "kind": "number",
+            "value": 118.3
+          },
+          {
+            "kind": "number",
+            "value": 123.9
+          },
+          {
+            "kind": "number",
+            "value": 140.2
+          },
+          {
+            "kind": "number",
+            "value": 120.3
+          },
+          {
+            "kind": "number",
+            "value": 116.1
+          },
+          {
+            "kind": "number",
+            "value": 183.3
+          },
+          {
+            "kind": "number",
+            "value": 254.6
+          },
+          {
+            "kind": "number",
+            "value": 101
+          },
+          {
+            "kind": "number",
+            "value": 197.3
+          },
+          {
+            "kind": "number",
+            "value": 121.3
+          },
+          {
+            "kind": "number",
+            "value": 130.9
+          },
+          {
+            "kind": "number",
+            "value": 141.6
+          },
+          {
+            "kind": "number",
+            "value": 122.6
+          },
+          {
+            "kind": "number",
+            "value": 145.8
+          },
+          {
+            "kind": "number",
+            "value": 135.7
+          },
+          {
+            "kind": "number",
+            "value": 117.4
+          },
+          {
+            "kind": "number",
+            "value": 127.2
+          },
+          {
+            "kind": "number",
+            "value": 126.4
+          },
+          {
+            "kind": "number",
+            "value": 79.1
+          },
+          {
+            "kind": "number",
+            "value": 160.9
+          },
+          {
+            "kind": "number",
+            "value": 151.8
+          },
+          {
+            "kind": "number",
+            "value": 122.1
+          },
+          {
+            "kind": "number",
+            "value": 117.1
+          },
+          {
+            "kind": "number",
+            "value": 168.6
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1980"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 120.2
+          },
+          {
+            "kind": "number",
+            "value": 123.2
+          },
+          {
+            "kind": "number",
+            "value": 131.8
+          },
+          {
+            "kind": "number",
+            "value": 131
+          },
+          {
+            "kind": "number",
+            "value": 118
+          },
+          {
+            "kind": "number",
+            "value": 150.5
+          },
+          {
+            "kind": "number",
+            "value": 134
+          },
+          {
+            "kind": "number",
+            "value": 115.2
+          },
+          {
+            "kind": "number",
+            "value": 135.2
+          },
+          {
+            "kind": "number",
+            "value": 146.9
+          },
+          {
+            "kind": "number",
+            "value": 124.6
+          },
+          {
+            "kind": "number",
+            "value": 127.1
+          },
+          {
+            "kind": "number",
+            "value": 215.3
+          },
+          {
+            "kind": "number",
+            "value": 143.8
+          },
+          {
+            "kind": "number",
+            "value": 141.2
+          },
+          {
+            "kind": "number",
+            "value": 117.7
+          },
+          {
+            "kind": "number",
+            "value": 127
+          },
+          {
+            "kind": "number",
+            "value": 142.1
+          },
+          {
+            "kind": "number",
+            "value": 122
+          },
+          {
+            "kind": "number",
+            "value": 116.3
+          },
+          {
+            "kind": "number",
+            "value": 177.7
+          },
+          {
+            "kind": "number",
+            "value": 247.8
+          },
+          {
+            "kind": "number",
+            "value": 102.7
+          },
+          {
+            "kind": "number",
+            "value": 187.8
+          },
+          {
+            "kind": "number",
+            "value": 123.7
+          },
+          {
+            "kind": "number",
+            "value": 133.5
+          },
+          {
+            "kind": "number",
+            "value": 141.6
+          },
+          {
+            "kind": "number",
+            "value": 124
+          },
+          {
+            "kind": "number",
+            "value": 149.3
+          },
+          {
+            "kind": "number",
+            "value": 138.3
+          },
+          {
+            "kind": "number",
+            "value": 114.7
+          },
+          {
+            "kind": "number",
+            "value": 130.4
+          },
+          {
+            "kind": "number",
+            "value": 129.7
+          },
+          {
+            "kind": "number",
+            "value": 74.8
+          },
+          {
+            "kind": "number",
+            "value": 161.6
+          },
+          {
+            "kind": "number",
+            "value": 148.9
+          },
+          {
+            "kind": "number",
+            "value": 122.3
+          },
+          {
+            "kind": "number",
+            "value": 117.6
+          },
+          {
+            "kind": "number",
+            "value": 158.1
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "1981"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "number",
+            "value": 118.6
+          },
+          {
+            "kind": "number",
+            "value": 119.6
+          },
+          {
+            "kind": "number",
+            "value": 128.7
+          },
+          {
+            "kind": "number",
+            "value": 133.8
+          },
+          {
+            "kind": "number",
+            "value": 116.4
+          },
+          {
+            "kind": "number",
+            "value": 152.6
+          },
+          {
+            "kind": "number",
+            "value": 131.7
+          },
+          {
+            "kind": "number",
+            "value": 114.1
+          },
+          {
+            "kind": "number",
+            "value": 133
+          },
+          {
+            "kind": "number",
+            "value": 148.5
+          },
+          {
+            "kind": "number",
+            "value": 132.9
+          },
+          {
+            "kind": "number",
+            "value": 132
+          },
+          {
+            "kind": "number",
+            "value": 209.7
+          },
+          {
+            "kind": "number",
+            "value": 144
+          },
+          {
+            "kind": "number",
+            "value": 138.9
+          },
+          {
+            "kind": "number",
+            "value": 120.8
+          },
+          {
+            "kind": "number",
+            "value": 125.3
+          },
+          {
+            "kind": "number",
+            "value": 140.5
+          },
+          {
+            "kind": "number",
+            "value": 121.1
+          },
+          {
+            "kind": "number",
+            "value": 117
+          },
+          {
+            "kind": "number",
+            "value": 171.9
+          },
+          {
+            "kind": "number",
+            "value": 245.4
+          },
+          {
+            "kind": "number",
+            "value": 103
+          },
+          {
+            "kind": "number",
+            "value": 179.3
+          },
+          {
+            "kind": "number",
+            "value": 125.7
+          },
+          {
+            "kind": "number",
+            "value": 132.8
+          },
+          {
+            "kind": "number",
+            "value": 143.7
+          },
+          {
+            "kind": "number",
+            "value": 125.2
+          },
+          {
+            "kind": "number",
+            "value": 151.2
+          },
+          {
+            "kind": "number",
+            "value": 136.1
+          },
+          {
+            "kind": "number",
+            "value": 115.7
+          },
+          {
+            "kind": "number",
+            "value": 129.1
+          },
+          {
+            "kind": "number",
+            "value": 129
+          },
+          {
+            "kind": "number",
+            "value": 77.6
+          },
+          {
+            "kind": "number",
+            "value": 163.8
+          },
+          {
+            "kind": "number",
+            "value": 149.9
+          },
+          {
+            "kind": "number",
+            "value": 120.5
+          },
+          {
+            "kind": "number",
+            "value": 119.9
+          },
+          {
+            "kind": "number",
+            "value": 163.1
+          }
+        ]
+      ]
+    },
+    "prepared": {
+      "id": "6b9d0506-28b1-4385-8ea0-027791ac2879",
+      "recipe": "434ecc52-ab15-47b5-9fa6-95b2c21ebbf4",
+      "sourceProfile": "duckdb-wasm:1.30.0:54d585287c71e7c9272e5acf2679e4b8846ce4fe91b77ea7654eb4de792eda8f",
+      "observations": 31,
+      "columns": [
+        "1:prop99",
+        "2:California",
+        "3:Alabama",
+        "4:Arkansas",
+        "5:Colorado",
+        "6:Connecticut",
+        "7:Delaware",
+        "8:Georgia",
+        "9:Idaho",
+        "10:Illinois",
+        "11:Indiana",
+        "12:Iowa",
+        "13:Kansas",
+        "14:Kentucky",
+        "15:Louisiana",
+        "16:Maine",
+        "17:Minnesota",
+        "18:Mississippi",
+        "19:Missouri",
+        "20:Montana",
+        "21:Nebraska",
+        "22:Nevada",
+        "23:NewHampshire",
+        "24:NewMexico",
+        "25:NorthCarolina",
+        "26:NorthDakota",
+        "27:Ohio",
+        "28:Oklahoma",
+        "29:Pennsylvania",
+        "30:RhodeIsland",
+        "31:SouthCarolina",
+        "32:SouthDakota",
+        "33:Tennessee",
+        "34:Texas",
+        "35:Utah",
+        "36:Vermont",
+        "37:Virginia",
+        "38:WestVirginia",
+        "39:Wisconsin",
+        "40:Wyoming"
+      ],
+      "resolution": {
+        "kind": "none"
+      },
+      "kind": "prepared-time-series",
+      "missingness": {
+        "kind": "not-present"
+      },
+      "sampling": {
+        "kind": "regular-series",
+        "timeColumn": "0:Year",
+        "frequency": "yearly"
+      },
+      "resampling": {
+        "kind": "none"
+      },
+      "seasonalAdjustment": {
+        "kind": "none"
+      },
+      "seriesTransforms": [
+        {
+          "column": "1:prop99",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "2:California",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "3:Alabama",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "4:Arkansas",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "5:Colorado",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "6:Connecticut",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "7:Delaware",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "8:Georgia",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "9:Idaho",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "10:Illinois",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "11:Indiana",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "12:Iowa",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "13:Kansas",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "14:Kentucky",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "15:Louisiana",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "16:Maine",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "17:Minnesota",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "18:Mississippi",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "19:Missouri",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "20:Montana",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "21:Nebraska",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "22:Nevada",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "23:NewHampshire",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "24:NewMexico",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "25:NorthCarolina",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "26:NorthDakota",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "27:Ohio",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "28:Oklahoma",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "29:Pennsylvania",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "30:RhodeIsland",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "31:SouthCarolina",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "32:SouthDakota",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "33:Tennessee",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "34:Texas",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "35:Utah",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "36:Vermont",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "37:Virginia",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "38:WestVirginia",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "39:Wisconsin",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "40:Wyoming",
+          "transform": {
+            "kind": "levels"
+          }
+        }
+      ]
+    },
+    "stationarity": null,
+    "grangerEvidence": [],
+    "countSeriesModels": [],
+    "discoveryRuns": [],
+    "dagDocuments": [
+      {
+        "kind": "dag-document",
+        "id": "ee11ac1b-789c-4b9f-8ff5-575f90435ac2",
+        "name": "Proposition 99 and cigarette sales",
+        "preparedDataset": "6b9d0506-28b1-4385-8ea0-027791ac2879",
+        "dataset": {
+          "kind": "time-series",
+          "observations": 31
+        },
+        "origin": {
+          "kind": "user-authored",
+          "basis": "domain-knowledge"
+        },
+        "history": [
+          {
+            "kind": "draft",
+            "id": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
+            "parent": null,
+            "createdAt": "2026-09-04T15:02:46.936Z",
+            "graph": {
+              "kind": "editable-dag",
+              "nodes": [
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "column": "1:prop99",
+                  "name": "prop99"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "column": "2:California",
+                  "name": "California"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                  "column": "3:Alabama",
+                  "name": "Alabama"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                  "column": "4:Arkansas",
+                  "name": "Arkansas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                  "column": "5:Colorado",
+                  "name": "Colorado"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                  "column": "6:Connecticut",
+                  "name": "Connecticut"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                  "column": "7:Delaware",
+                  "name": "Delaware"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                  "column": "8:Georgia",
+                  "name": "Georgia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                  "column": "9:Idaho",
+                  "name": "Idaho"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                  "column": "10:Illinois",
+                  "name": "Illinois"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                  "column": "11:Indiana",
+                  "name": "Indiana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                  "column": "12:Iowa",
+                  "name": "Iowa"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                  "column": "13:Kansas",
+                  "name": "Kansas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                  "column": "14:Kentucky",
+                  "name": "Kentucky"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                  "column": "15:Louisiana",
+                  "name": "Louisiana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                  "column": "16:Maine",
+                  "name": "Maine"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                  "column": "17:Minnesota",
+                  "name": "Minnesota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                  "column": "18:Mississippi",
+                  "name": "Mississippi"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                  "column": "19:Missouri",
+                  "name": "Missouri"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                  "column": "20:Montana",
+                  "name": "Montana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                  "column": "21:Nebraska",
+                  "name": "Nebraska"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                  "column": "22:Nevada",
+                  "name": "Nevada"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                  "column": "23:NewHampshire",
+                  "name": "NewHampshire"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                  "column": "24:NewMexico",
+                  "name": "NewMexico"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                  "column": "25:NorthCarolina",
+                  "name": "NorthCarolina"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                  "column": "26:NorthDakota",
+                  "name": "NorthDakota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                  "column": "27:Ohio",
+                  "name": "Ohio"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                  "column": "28:Oklahoma",
+                  "name": "Oklahoma"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                  "column": "29:Pennsylvania",
+                  "name": "Pennsylvania"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                  "column": "30:RhodeIsland",
+                  "name": "RhodeIsland"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                  "column": "31:SouthCarolina",
+                  "name": "SouthCarolina"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                  "column": "32:SouthDakota",
+                  "name": "SouthDakota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                  "column": "33:Tennessee",
+                  "name": "Tennessee"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                  "column": "34:Texas",
+                  "name": "Texas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                  "column": "35:Utah",
+                  "name": "Utah"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                  "column": "36:Vermont",
+                  "name": "Vermont"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                  "column": "37:Virginia",
+                  "name": "Virginia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                  "column": "38:WestVirginia",
+                  "name": "WestVirginia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                  "column": "39:Wisconsin",
+                  "name": "Wisconsin"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                  "column": "40:Wyoming",
+                  "name": "Wyoming"
+                }
+              ],
+              "edges": []
+            },
+            "validation": {
+              "kind": "incomplete",
+              "issues": [
+                {
+                  "kind": "no-edges"
+                }
+              ]
+            }
+          }
+        ],
+        "future": [],
+        "audit": [
+          {
+            "kind": "draft",
+            "id": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
+            "parent": null,
+            "createdAt": "2026-09-04T15:02:46.936Z",
+            "graph": {
+              "kind": "editable-dag",
+              "nodes": [
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "column": "1:prop99",
+                  "name": "prop99"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "column": "2:California",
+                  "name": "California"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                  "column": "3:Alabama",
+                  "name": "Alabama"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                  "column": "4:Arkansas",
+                  "name": "Arkansas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                  "column": "5:Colorado",
+                  "name": "Colorado"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                  "column": "6:Connecticut",
+                  "name": "Connecticut"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                  "column": "7:Delaware",
+                  "name": "Delaware"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                  "column": "8:Georgia",
+                  "name": "Georgia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                  "column": "9:Idaho",
+                  "name": "Idaho"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                  "column": "10:Illinois",
+                  "name": "Illinois"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                  "column": "11:Indiana",
+                  "name": "Indiana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                  "column": "12:Iowa",
+                  "name": "Iowa"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                  "column": "13:Kansas",
+                  "name": "Kansas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                  "column": "14:Kentucky",
+                  "name": "Kentucky"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                  "column": "15:Louisiana",
+                  "name": "Louisiana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                  "column": "16:Maine",
+                  "name": "Maine"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                  "column": "17:Minnesota",
+                  "name": "Minnesota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                  "column": "18:Mississippi",
+                  "name": "Mississippi"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                  "column": "19:Missouri",
+                  "name": "Missouri"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                  "column": "20:Montana",
+                  "name": "Montana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                  "column": "21:Nebraska",
+                  "name": "Nebraska"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                  "column": "22:Nevada",
+                  "name": "Nevada"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                  "column": "23:NewHampshire",
+                  "name": "NewHampshire"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                  "column": "24:NewMexico",
+                  "name": "NewMexico"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                  "column": "25:NorthCarolina",
+                  "name": "NorthCarolina"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                  "column": "26:NorthDakota",
+                  "name": "NorthDakota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                  "column": "27:Ohio",
+                  "name": "Ohio"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                  "column": "28:Oklahoma",
+                  "name": "Oklahoma"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                  "column": "29:Pennsylvania",
+                  "name": "Pennsylvania"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                  "column": "30:RhodeIsland",
+                  "name": "RhodeIsland"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                  "column": "31:SouthCarolina",
+                  "name": "SouthCarolina"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                  "column": "32:SouthDakota",
+                  "name": "SouthDakota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                  "column": "33:Tennessee",
+                  "name": "Tennessee"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                  "column": "34:Texas",
+                  "name": "Texas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                  "column": "35:Utah",
+                  "name": "Utah"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                  "column": "36:Vermont",
+                  "name": "Vermont"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                  "column": "37:Virginia",
+                  "name": "Virginia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                  "column": "38:WestVirginia",
+                  "name": "WestVirginia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                  "column": "39:Wisconsin",
+                  "name": "Wisconsin"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                  "column": "40:Wyoming",
+                  "name": "Wyoming"
+                }
+              ],
+              "edges": []
+            },
+            "validation": {
+              "kind": "incomplete",
+              "issues": [
+                {
+                  "kind": "no-edges"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "draft",
+            "id": "88b67676-ae6d-4fc8-b3dc-99f8ba1e267e",
+            "parent": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
+            "createdAt": "2026-09-04T15:02:47.398Z",
+            "graph": {
+              "kind": "editable-dag",
+              "nodes": [
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "column": "1:prop99",
+                  "name": "prop99"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "column": "2:California",
+                  "name": "California"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                  "column": "3:Alabama",
+                  "name": "Alabama"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                  "column": "4:Arkansas",
+                  "name": "Arkansas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                  "column": "5:Colorado",
+                  "name": "Colorado"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                  "column": "6:Connecticut",
+                  "name": "Connecticut"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                  "column": "7:Delaware",
+                  "name": "Delaware"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                  "column": "8:Georgia",
+                  "name": "Georgia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                  "column": "9:Idaho",
+                  "name": "Idaho"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                  "column": "10:Illinois",
+                  "name": "Illinois"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                  "column": "11:Indiana",
+                  "name": "Indiana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                  "column": "12:Iowa",
+                  "name": "Iowa"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                  "column": "13:Kansas",
+                  "name": "Kansas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                  "column": "14:Kentucky",
+                  "name": "Kentucky"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                  "column": "15:Louisiana",
+                  "name": "Louisiana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                  "column": "16:Maine",
+                  "name": "Maine"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                  "column": "17:Minnesota",
+                  "name": "Minnesota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                  "column": "18:Mississippi",
+                  "name": "Mississippi"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                  "column": "19:Missouri",
+                  "name": "Missouri"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                  "column": "20:Montana",
+                  "name": "Montana"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                  "column": "21:Nebraska",
+                  "name": "Nebraska"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                  "column": "22:Nevada",
+                  "name": "Nevada"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                  "column": "23:NewHampshire",
+                  "name": "NewHampshire"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                  "column": "24:NewMexico",
+                  "name": "NewMexico"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                  "column": "25:NorthCarolina",
+                  "name": "NorthCarolina"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                  "column": "26:NorthDakota",
+                  "name": "NorthDakota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                  "column": "27:Ohio",
+                  "name": "Ohio"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                  "column": "28:Oklahoma",
+                  "name": "Oklahoma"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                  "column": "29:Pennsylvania",
+                  "name": "Pennsylvania"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                  "column": "30:RhodeIsland",
+                  "name": "RhodeIsland"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                  "column": "31:SouthCarolina",
+                  "name": "SouthCarolina"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                  "column": "32:SouthDakota",
+                  "name": "SouthDakota"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                  "column": "33:Tennessee",
+                  "name": "Tennessee"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                  "column": "34:Texas",
+                  "name": "Texas"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                  "column": "35:Utah",
+                  "name": "Utah"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                  "column": "36:Vermont",
+                  "name": "Vermont"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                  "column": "37:Virginia",
+                  "name": "Virginia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                  "column": "38:WestVirginia",
+                  "name": "WestVirginia"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                  "column": "39:Wisconsin",
+                  "name": "Wisconsin"
+                },
+                {
+                  "kind": "observed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                  "column": "40:Wyoming",
+                  "name": "Wyoming"
+                }
+              ],
+              "edges": [
+                {
+                  "kind": "directed",
+                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99->6b9d0506-28b1-4385-8ea0-027791ac2879:2:California@t",
+                  "cause": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "effect": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "timing": {
+                    "kind": "contemporaneous"
+                  },
+                  "support": {
+                    "kind": "user-assumption",
+                    "rationale": "Proposition 99 raised the cigarette excise tax in California from 1989 and funded a tobacco control programme."
+                  },
+                  "evidence": []
+                }
+              ]
+            },
+            "validation": {
+              "kind": "structurally-valid"
+            }
+          }
+        ],
+        "current": {
+          "kind": "draft",
+          "id": "88b67676-ae6d-4fc8-b3dc-99f8ba1e267e",
+          "parent": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
+          "createdAt": "2026-09-04T15:02:47.398Z",
+          "graph": {
+            "kind": "editable-dag",
+            "nodes": [
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                "column": "1:prop99",
+                "name": "prop99"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                "column": "2:California",
+                "name": "California"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                "column": "3:Alabama",
+                "name": "Alabama"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                "column": "4:Arkansas",
+                "name": "Arkansas"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                "column": "5:Colorado",
+                "name": "Colorado"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                "column": "6:Connecticut",
+                "name": "Connecticut"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                "column": "7:Delaware",
+                "name": "Delaware"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                "column": "8:Georgia",
+                "name": "Georgia"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                "column": "9:Idaho",
+                "name": "Idaho"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                "column": "10:Illinois",
+                "name": "Illinois"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                "column": "11:Indiana",
+                "name": "Indiana"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                "column": "12:Iowa",
+                "name": "Iowa"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                "column": "13:Kansas",
+                "name": "Kansas"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                "column": "14:Kentucky",
+                "name": "Kentucky"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                "column": "15:Louisiana",
+                "name": "Louisiana"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                "column": "16:Maine",
+                "name": "Maine"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                "column": "17:Minnesota",
+                "name": "Minnesota"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                "column": "18:Mississippi",
+                "name": "Mississippi"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                "column": "19:Missouri",
+                "name": "Missouri"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                "column": "20:Montana",
+                "name": "Montana"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                "column": "21:Nebraska",
+                "name": "Nebraska"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                "column": "22:Nevada",
+                "name": "Nevada"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                "column": "23:NewHampshire",
+                "name": "NewHampshire"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                "column": "24:NewMexico",
+                "name": "NewMexico"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                "column": "25:NorthCarolina",
+                "name": "NorthCarolina"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                "column": "26:NorthDakota",
+                "name": "NorthDakota"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                "column": "27:Ohio",
+                "name": "Ohio"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                "column": "28:Oklahoma",
+                "name": "Oklahoma"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                "column": "29:Pennsylvania",
+                "name": "Pennsylvania"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                "column": "30:RhodeIsland",
+                "name": "RhodeIsland"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                "column": "31:SouthCarolina",
+                "name": "SouthCarolina"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                "column": "32:SouthDakota",
+                "name": "SouthDakota"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                "column": "33:Tennessee",
+                "name": "Tennessee"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                "column": "34:Texas",
+                "name": "Texas"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                "column": "35:Utah",
+                "name": "Utah"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                "column": "36:Vermont",
+                "name": "Vermont"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                "column": "37:Virginia",
+                "name": "Virginia"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                "column": "38:WestVirginia",
+                "name": "WestVirginia"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                "column": "39:Wisconsin",
+                "name": "Wisconsin"
+              },
+              {
+                "kind": "observed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                "column": "40:Wyoming",
+                "name": "Wyoming"
+              }
+            ],
+            "edges": [
+              {
+                "kind": "directed",
+                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99->6b9d0506-28b1-4385-8ea0-027791ac2879:2:California@t",
+                "cause": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                "effect": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                "timing": {
+                  "kind": "contemporaneous"
+                },
+                "support": {
+                  "kind": "user-assumption",
+                  "rationale": "Proposition 99 raised the cigarette excise tax in California from 1989 and funded a tobacco control programme."
+                },
+                "evidence": []
+              }
+            ]
+          },
+          "validation": {
+            "kind": "structurally-valid"
+          }
+        }
+      }
+    ],
+    "dagChecks": [],
+    "interventionQueries": [],
+    "studyDraft": {
+      "dagDocument": "ee11ac1b-789c-4b9f-8ff5-575f90435ac2",
+      "treatment": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+      "outcome": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+      "estimand": "average-treatment-effect",
+      "assignment": {
+        "kind": "policy-change",
+        "description": "Proposition 99 took effect in California from 1989; the other states did not adopt it."
+      },
+      "consistencyRationale": "The programme means the same tax and campaign in every year it is in force.",
+      "noInterferenceRationale": "The donor states are assumed not to be affected by California policy."
+    },
+    "studies": [
+      {
+        "kind": "study-specification",
+        "id": "f72da682-4fe2-4852-b48c-70e74f59b39d",
+        "createdAt": "2026-09-04T15:02:48.736Z",
+        "preparedDataset": "6b9d0506-28b1-4385-8ea0-027791ac2879",
+        "dataset": {
+          "kind": "time-series",
+          "observations": 31
+        },
+        "dagDocument": "ee11ac1b-789c-4b9f-8ff5-575f90435ac2",
+        "dagRevision": "88b67676-ae6d-4fc8-b3dc-99f8ba1e267e",
+        "dagName": "Proposition 99 and cigarette sales",
+        "treatment": {
+          "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+          "column": "1:prop99",
+          "name": "prop99"
+        },
+        "outcome": {
+          "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+          "column": "2:California",
+          "name": "California"
+        },
+        "estimand": {
+          "kind": "average-treatment-effect",
+          "scale": "additive"
+        },
+        "population": {
+          "kind": "all-prepared-rows",
+          "observations": 31
+        },
+        "dagBasis": "domain-knowledge",
+        "assignment": {
+          "kind": "policy-change",
+          "description": "Proposition 99 took effect in California from 1989; the other states did not adopt it."
+        },
+        "designAssumptions": {
+          "consistency": {
+            "statement": "Consistency: each recorded treatment value represents one well-defined intervention, and a unit’s observed outcome equals its potential outcome under the treatment it received.",
+            "rationale": "The programme means the same tax and campaign in every year it is in force."
+          },
+          "noInterference": {
+            "statement": "No interference: one unit’s treatment does not affect another unit’s outcome.",
+            "rationale": "The donor states are assumed not to be affected by California policy."
+          }
+        },
+        "graph": {
+          "nodes": [
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+              "name": "prop99",
+              "column": "1:prop99"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+              "name": "California",
+              "column": "2:California"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+              "name": "Alabama",
+              "column": "3:Alabama"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+              "name": "Arkansas",
+              "column": "4:Arkansas"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+              "name": "Colorado",
+              "column": "5:Colorado"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+              "name": "Connecticut",
+              "column": "6:Connecticut"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+              "name": "Delaware",
+              "column": "7:Delaware"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+              "name": "Georgia",
+              "column": "8:Georgia"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+              "name": "Idaho",
+              "column": "9:Idaho"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+              "name": "Illinois",
+              "column": "10:Illinois"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+              "name": "Indiana",
+              "column": "11:Indiana"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+              "name": "Iowa",
+              "column": "12:Iowa"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+              "name": "Kansas",
+              "column": "13:Kansas"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+              "name": "Kentucky",
+              "column": "14:Kentucky"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+              "name": "Louisiana",
+              "column": "15:Louisiana"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+              "name": "Maine",
+              "column": "16:Maine"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+              "name": "Minnesota",
+              "column": "17:Minnesota"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+              "name": "Mississippi",
+              "column": "18:Mississippi"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+              "name": "Missouri",
+              "column": "19:Missouri"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+              "name": "Montana",
+              "column": "20:Montana"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+              "name": "Nebraska",
+              "column": "21:Nebraska"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+              "name": "Nevada",
+              "column": "22:Nevada"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+              "name": "NewHampshire",
+              "column": "23:NewHampshire"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+              "name": "NewMexico",
+              "column": "24:NewMexico"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+              "name": "NorthCarolina",
+              "column": "25:NorthCarolina"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+              "name": "NorthDakota",
+              "column": "26:NorthDakota"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+              "name": "Ohio",
+              "column": "27:Ohio"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+              "name": "Oklahoma",
+              "column": "28:Oklahoma"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+              "name": "Pennsylvania",
+              "column": "29:Pennsylvania"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+              "name": "RhodeIsland",
+              "column": "30:RhodeIsland"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+              "name": "SouthCarolina",
+              "column": "31:SouthCarolina"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+              "name": "SouthDakota",
+              "column": "32:SouthDakota"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+              "name": "Tennessee",
+              "column": "33:Tennessee"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+              "name": "Texas",
+              "column": "34:Texas"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+              "name": "Utah",
+              "column": "35:Utah"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+              "name": "Vermont",
+              "column": "36:Vermont"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+              "name": "Virginia",
+              "column": "37:Virginia"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+              "name": "WestVirginia",
+              "column": "38:WestVirginia"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+              "name": "Wisconsin",
+              "column": "39:Wisconsin"
+            },
+            {
+              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+              "name": "Wyoming",
+              "column": "40:Wyoming"
+            }
+          ],
+          "edges": [
+            [
+              0,
+              1
+            ]
+          ],
+          "laggedArrows": 0
+        },
+        "editableGraph": {
+          "kind": "editable-dag",
+          "nodes": [
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+              "column": "1:prop99",
+              "name": "prop99"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+              "column": "2:California",
+              "name": "California"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+              "column": "3:Alabama",
+              "name": "Alabama"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+              "column": "4:Arkansas",
+              "name": "Arkansas"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+              "column": "5:Colorado",
+              "name": "Colorado"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+              "column": "6:Connecticut",
+              "name": "Connecticut"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+              "column": "7:Delaware",
+              "name": "Delaware"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+              "column": "8:Georgia",
+              "name": "Georgia"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+              "column": "9:Idaho",
+              "name": "Idaho"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+              "column": "10:Illinois",
+              "name": "Illinois"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+              "column": "11:Indiana",
+              "name": "Indiana"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+              "column": "12:Iowa",
+              "name": "Iowa"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+              "column": "13:Kansas",
+              "name": "Kansas"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+              "column": "14:Kentucky",
+              "name": "Kentucky"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+              "column": "15:Louisiana",
+              "name": "Louisiana"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+              "column": "16:Maine",
+              "name": "Maine"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+              "column": "17:Minnesota",
+              "name": "Minnesota"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+              "column": "18:Mississippi",
+              "name": "Mississippi"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+              "column": "19:Missouri",
+              "name": "Missouri"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+              "column": "20:Montana",
+              "name": "Montana"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+              "column": "21:Nebraska",
+              "name": "Nebraska"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+              "column": "22:Nevada",
+              "name": "Nevada"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+              "column": "23:NewHampshire",
+              "name": "NewHampshire"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+              "column": "24:NewMexico",
+              "name": "NewMexico"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+              "column": "25:NorthCarolina",
+              "name": "NorthCarolina"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+              "column": "26:NorthDakota",
+              "name": "NorthDakota"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+              "column": "27:Ohio",
+              "name": "Ohio"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+              "column": "28:Oklahoma",
+              "name": "Oklahoma"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+              "column": "29:Pennsylvania",
+              "name": "Pennsylvania"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+              "column": "30:RhodeIsland",
+              "name": "RhodeIsland"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+              "column": "31:SouthCarolina",
+              "name": "SouthCarolina"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+              "column": "32:SouthDakota",
+              "name": "SouthDakota"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+              "column": "33:Tennessee",
+              "name": "Tennessee"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+              "column": "34:Texas",
+              "name": "Texas"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+              "column": "35:Utah",
+              "name": "Utah"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+              "column": "36:Vermont",
+              "name": "Vermont"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+              "column": "37:Virginia",
+              "name": "Virginia"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+              "column": "38:WestVirginia",
+              "name": "WestVirginia"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+              "column": "39:Wisconsin",
+              "name": "Wisconsin"
+            },
+            {
+              "kind": "observed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+              "column": "40:Wyoming",
+              "name": "Wyoming"
+            }
+          ],
+          "edges": [
+            {
+              "kind": "directed",
+              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99->6b9d0506-28b1-4385-8ea0-027791ac2879:2:California@t",
+              "cause": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+              "effect": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+              "timing": {
+                "kind": "contemporaneous"
+              },
+              "support": {
+                "kind": "user-assumption",
+                "rationale": "Proposition 99 raised the cigarette excise tax in California from 1989 and funded a tobacco control programme."
+              },
+              "evidence": []
+            }
+          ]
+        }
+      }
+    ],
+    "identifications": [
+      {
+        "kind": "identification",
+        "id": "e6c4bb1e-dbce-44de-861a-8746d351b10b",
+        "study": "f72da682-4fe2-4852-b48c-70e74f59b39d",
+        "createdAt": "2026-09-04T15:02:48.861Z",
+        "method": "backdoor-identification",
+        "evidence": {
+          "kind": "backdoorIdentification",
+          "nodes": 40,
+          "treatment": 0,
+          "outcome": 1,
+          "unobserved": [],
+          "result": {
+            "kind": "identified",
+            "canonicalSet": [],
+            "minimalSets": [
+              []
+            ],
+            "truncated": false
+          },
+          "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "graphicalIdentification": {
+            "kind": "identified",
+            "expression": "P(California | prop99)",
+            "latex": "P(California \\mid prop99)",
+            "projection": {
+              "directedEdges": [
+                [
+                  0,
+                  1
+                ]
+              ],
+              "bidirectedEdges": []
+            }
+          },
+          "counterfactualIdentification": {
+            "kind": "notApplicable"
+          }
+        },
+        "result": {
+          "kind": "identified",
+          "strategy": "backdoor-adjustment",
+          "adjustment": {
+            "kind": "minimal",
+            "ordinal": 0,
+            "variables": []
+          },
+          "canonicalAdjustmentSet": [],
+          "minimalAdjustmentSets": {
+            "kind": "complete",
+            "sets": [
+              []
+            ]
+          },
+          "mediators": [],
+          "basis": [
+            {
+              "kind": "design-record",
+              "id": "assignment-mechanism",
+              "statement": "Policy change treatment: Proposition 99 took effect in California from 1989; the other states did not adopt it. Quasi-experimental design: identification depends on the selected design’s assumptions, such as parallel trends, exclusion or continuity."
+            },
+            {
+              "kind": "graph-assumption",
+              "id": "graph-theory",
+              "statement": "The graph “Proposition 99 and cigarette sales” (revision 88b67676) states the causes of prop99 and California; a missing arrow claims there is no direct cause."
+            },
+            {
+              "kind": "graph-assumption",
+              "id": "no-unmeasured-confounding",
+              "statement": "No unmeasured common cause of prop99 and California exists. Test sensitivity to this assumption in the sensitivity chapter."
+            },
+            {
+              "kind": "design-assumption",
+              "id": "consistency",
+              "statement": "Consistency: each recorded treatment value represents one well-defined intervention, and a unit’s observed outcome equals its potential outcome under the treatment it received.",
+              "rationale": "The programme means the same tax and campaign in every year it is in force."
+            },
+            {
+              "kind": "design-assumption",
+              "id": "no-interference",
+              "statement": "No interference: one unit’s treatment does not affect another unit’s outcome.",
+              "rationale": "The donor states are assumed not to be affected by California policy."
+            },
+            {
+              "kind": "graph-result",
+              "id": "backdoor-criterion",
+              "statement": "No back-door path from prop99 to California is open; the back-door criterion holds without adjustment."
+            }
+          ]
+        }
+      }
+    ],
+    "estimationRuns": [
+      {
+        "id": "d00eae5f-6171-491c-9266-e4d2dfee8039",
+        "study": "f72da682-4fe2-4852-b48c-70e74f59b39d",
+        "identification": "e6c4bb1e-dbce-44de-861a-8746d351b10b",
+        "preparedDataset": "6b9d0506-28b1-4385-8ea0-027791ac2879",
+        "createdAt": "2026-09-04T15:02:49.447Z",
+        "eligibility": {
+          "kind": "caution",
+          "satisfied": [
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "estimand-target-compatibility",
+                "category": "interpretation",
+                "requirement": "The estimator must report the target population recorded in the study specification.",
+                "consequenceIfUnmet": "An ATE and an ATT answer different causal questions and cannot be substituted for one another.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Hernán and Robins, Causal Inference: What If",
+                    "locator": "https://www.hsph.harvard.edu/miguel-hernan/causal-inference-book/"
+                  }
+                ]
+              },
+              "evidence": "Estimator and study both target ATE."
+            },
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "synthetic-panel-layout",
+                "category": "sampling-structure",
+                "requirement": "Rows are periods, one column is the treated unit, donor columns are untreated units over the same periods.",
+                "consequenceIfUnmet": "Weights fitted on unrelated series match noise.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Synthetic Control Methods for Comparative Case Studies (Abadie, Diamond and Hainmueller, 2010)",
+                    "locator": "Journal of the American Statistical Association 105(490), 493–505"
+                  }
+                ]
+              },
+              "evidence": "Rows are a regular yearly series; the outcome column is the treated unit and the chosen columns the donors."
+            }
+          ],
+          "unresolved": [
+            {
+              "kind": "unresolved",
+              "caveat": {
+                "id": "synthetic-pre-period",
+                "category": "finite-sample",
+                "requirement": "A known intervention row with enough pre-periods to fit the weights; the pre-period loss is reported.",
+                "consequenceIfUnmet": "With a short pre-period, donor weights may fit idiosyncratic variation and generalise poorly after intervention.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Synthetic Control Methods for Comparative Case Studies (Abadie, Diamond and Hainmueller, 2010)",
+                    "locator": "Journal of the American Statistical Association 105(490), 493–505"
+                  },
+                  {
+                    "kind": "paper",
+                    "title": "Using Synthetic Controls: Feasibility, Data Requirements, and Methodological Aspects (Abadie, 2021)",
+                    "locator": "Journal of Economic Literature 59(2), 391–425"
+                  },
+                  {
+                    "kind": "hirmos-constraint",
+                    "locator": "crates/causal-core/src/synthetic_control.rs#fit_synthetic_control"
+                  }
+                ]
+              },
+              "missingEvidence": "The intervention row is read from the treatment column when the run starts: it must be zero before and non-zero after one point."
+            },
+            {
+              "kind": "unresolved",
+              "caveat": {
+                "id": "synthetic-donors-untreated",
+                "category": "identification",
+                "requirement": "Donors are untouched by the intervention and are not DAG descendants of the treatment.",
+                "consequenceIfUnmet": "A treated donor absorbs the effect.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Synthetic Control Methods for Comparative Case Studies (Abadie, Diamond and Hainmueller, 2010)",
+                    "locator": "Journal of the American Statistical Association 105(490), 493–505"
+                  },
+                  {
+                    "kind": "hirmos-constraint",
+                    "locator": "src/domain/estimation.ts#affectedNodes"
+                  }
+                ]
+              },
+              "missingEvidence": "No chosen donor is a DAG descendant of the treatment; whether columns outside the DAG were untouched is a judgement recorded with the run."
+            },
+            {
+              "kind": "unresolved",
+              "caveat": {
+                "id": "synthetic-convex-hull",
+                "category": "interpretation",
+                "requirement": "The treated series lies inside the donors’ convex hull before the intervention; a large loss says it does not.",
+                "consequenceIfUnmet": "The counterfactual extrapolates beyond any weighting of donors.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Synthetic Control Methods for Comparative Case Studies (Abadie, Diamond and Hainmueller, 2010)",
+                    "locator": "Journal of the American Statistical Association 105(490), 493–505"
+                  }
+                ]
+              },
+              "missingEvidence": "The pre-period loss is reported with the run; read a large loss as a treated series outside the donors’ reach."
+            },
+            {
+              "kind": "unresolved",
+              "caveat": {
+                "id": "synthetic-no-interval",
+                "category": "finite-sample",
+                "requirement": "Cross-fitted confidence inference, donor-placebo ranking, and fixed-weight prediction bands are interpreted separately because each quantifies a different source of uncertainty.",
+                "consequenceIfUnmet": "A prediction band or placebo rank is incorrectly presented as a confidence interval for the average effect.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Synthetic Control Methods for Comparative Case Studies (Abadie, Diamond and Hainmueller, 2010)",
+                    "locator": "Journal of the American Statistical Association 105(490), 493–505"
+                  },
+                  {
+                    "kind": "paper",
+                    "title": "Using Synthetic Controls: Feasibility, Data Requirements, and Methodological Aspects (Abadie, 2021)",
+                    "locator": "Journal of Economic Literature 59(2), 391–425"
+                  }
+                ]
+              },
+              "missingEvidence": "38 donors permit the placebo rank calculation. Cross-fitted inference uses 3 folds and prediction bands use alpha 0.05. Each result records whether its sample-size requirement was met."
+            }
+          ]
+        },
+        "kind": "synthetic-control-run",
+        "configuration": {
+          "kind": "synthetic-control",
+          "start": {
+            "kind": "from-treatment"
+          },
+          "donors": [
+            "3:Alabama",
+            "4:Arkansas",
+            "5:Colorado",
+            "6:Connecticut",
+            "7:Delaware",
+            "8:Georgia",
+            "9:Idaho",
+            "10:Illinois",
+            "11:Indiana",
+            "12:Iowa",
+            "13:Kansas",
+            "14:Kentucky",
+            "15:Louisiana",
+            "16:Maine",
+            "17:Minnesota",
+            "18:Mississippi",
+            "19:Missouri",
+            "20:Montana",
+            "21:Nebraska",
+            "22:Nevada",
+            "23:NewHampshire",
+            "24:NewMexico",
+            "25:NorthCarolina",
+            "26:NorthDakota",
+            "27:Ohio",
+            "28:Oklahoma",
+            "29:Pennsylvania",
+            "30:RhodeIsland",
+            "31:SouthCarolina",
+            "32:SouthDakota",
+            "33:Tennessee",
+            "34:Texas",
+            "35:Utah",
+            "36:Vermont",
+            "37:Virginia",
+            "38:WestVirginia",
+            "39:Wisconsin",
+            "40:Wyoming"
+          ],
+          "crossFitFolds": 3,
+          "alpha": 0.05
+        },
+        "evidence": {
+          "kind": "syntheticControl",
+          "observations": 31,
+          "nPre": 19,
+          "nPost": 12,
+          "weights": [
+            0,
+            0,
+            0.01481066027634572,
+            0.1090895974097043,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.23184023643683785,
+            0,
+            0.20492269442342387,
+            0.04542894963226754,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0.39390786182142074,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "loss": 52.12958343287154,
+          "iterations": 34,
+          "preGap": [
+            5.575956156735799,
+            1.1770106170961299,
+            -1.1464085021269739,
+            0.03277117409454888,
+            0.2263082318399512,
+            0.32620945421898284,
+            -0.4691594472470797,
+            -0.28458143565063665,
+            -0.04489755713458976,
+            -1.0317533398536227,
+            -0.033642418001207375,
+            -1.0972736044529796,
+            -1.1408305300067525,
+            -0.24687146718406439,
+            1.3486758617331986,
+            -0.3851058764846016,
+            0.07293823411301048,
+            -2.964959696118882,
+            -1.8658081168509426
+          ],
+          "postGap": [
+            -8.440481589041369,
+            -9.20695558689826,
+            -12.634298973065412,
+            -13.728696010453405,
+            -17.533607690940507,
+            -22.04910044235705,
+            -22.85757405847506,
+            -23.99737324121176,
+            -26.260770669666115,
+            -23.33779319548701,
+            -27.520282273966657,
+            -26.596642683435327
+          ],
+          "att": -19.513631367916492,
+          "treated": [
+            123,
+            121,
+            123.5,
+            124.4,
+            126.7,
+            127.1,
+            128,
+            126.4,
+            126.1,
+            121.9,
+            120.2,
+            118.6,
+            115.4,
+            110.8,
+            104.8,
+            102.8,
+            99.7,
+            97.5,
+            90.1,
+            82.4,
+            77.8,
+            68.7,
+            67.5,
+            63.4,
+            58.6,
+            56.4,
+            54.5,
+            53.8,
+            52.3,
+            47.2,
+            41.6
+          ],
+          "synthetic": [
+            117.4240438432642,
+            119.82298938290387,
+            124.64640850212697,
+            124.36722882590546,
+            126.47369176816005,
+            126.77379054578101,
+            128.46915944724708,
+            126.68458143565064,
+            126.14489755713458,
+            122.93175333985363,
+            120.23364241800121,
+            119.69727360445297,
+            116.54083053000676,
+            111.04687146718406,
+            103.4513241382668,
+            103.1851058764846,
+            99.62706176588699,
+            100.46495969611888,
+            91.96580811685094,
+            90.84048158904137,
+            87.00695558689826,
+            81.33429897306542,
+            81.2286960104534,
+            80.9336076909405,
+            80.64910044235705,
+            79.25757405847506,
+            78.49737324121176,
+            80.06077066966611,
+            75.637793195487,
+            74.72028227396666,
+            68.19664268343533
+          ],
+          "crossFit": {
+            "kind": "available",
+            "att": -17.9911226960198,
+            "standardError": 1.5631578677188644,
+            "tStatistic": -11.50947263072953,
+            "degreesOfFreedom": 2,
+            "pValue": 0.0074645757118728335,
+            "confidenceInterval": [
+              -24.71684816258972,
+              -11.265397229449881
+            ],
+            "blockSize": 6,
+            "folds": [
+              {
+                "heldOut": [
+                  1,
+                  2,
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "weights": [
+                  0,
+                  0,
+                  0.05978005639044949,
+                  0.09038601412764012,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.1522633137860107,
+                  0,
+                  0.17549397317766663,
+                  0.07366371479424495,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.448412927723988,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "bias": -0.21017794799292724,
+                "att": -18.85988400959019
+              },
+              {
+                "heldOut": [
+                  7,
+                  8,
+                  9,
+                  10,
+                  11,
+                  12
+                ],
+                "weights": [
+                  0,
+                  0,
+                  0.01641600775713694,
+                  0.0954557978686853,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.3044130952901209,
+                  0,
+                  0.19335077455161598,
+                  0.03927679408453942,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.3510875304479014,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "bias": -1.2214624978912216,
+                "att": -19.094953779641713
+              },
+              {
+                "heldOut": [
+                  13,
+                  14,
+                  15,
+                  16,
+                  17,
+                  18
+                ],
+                "weights": [
+                  0,
+                  0,
+                  0,
+                  0.30877403247933616,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.29610756803913063,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0.3500441298783651,
+                  0,
+                  0,
+                  0.045074269603167946,
+                  0,
+                  0
+                ],
+                "bias": -3.8649758167642716,
+                "att": -16.018530298827503
+              }
+            ]
+          },
+          "donorPlacebo": {
+            "kind": "available",
+            "treatedPreMspe": 2.7436622859406072,
+            "treatedPostMspe": 424.58943454043447,
+            "treatedMspeRatio": 154.75280493381598,
+            "placebos": [
+              {
+                "donor": 0,
+                "preMspe": 3.3144042603363704,
+                "postMspe": 13.746283735173288,
+                "mspeRatio": 4.1474372633645515
+              },
+              {
+                "donor": 1,
+                "preMspe": 4.199839091597088,
+                "postMspe": 17.74955551965452,
+                "mspeRatio": 4.226246561485486
+              },
+              {
+                "donor": 2,
+                "preMspe": 8.384838643002396,
+                "postMspe": 50.830543870157975,
+                "mspeRatio": 6.06219702421809
+              },
+              {
+                "donor": 3,
+                "preMspe": 8.686949149767813,
+                "postMspe": 215.49990791751353,
+                "mspeRatio": 24.80731775933942
+              },
+              {
+                "donor": 4,
+                "preMspe": 11.727228774638185,
+                "postMspe": 178.430312229725,
+                "mspeRatio": 15.215044889002774
+              },
+              {
+                "donor": 5,
+                "preMspe": 1.1926482894835237,
+                "postMspe": 97.93292480113728,
+                "mspeRatio": 82.11383495426563
+              },
+              {
+                "donor": 6,
+                "preMspe": 4.6477297099362955,
+                "postMspe": 39.81990075862144,
+                "mspeRatio": 8.567602516448238
+              },
+              {
+                "donor": 7,
+                "preMspe": 2.0817420713457837,
+                "postMspe": 24.592567401183732,
+                "mspeRatio": 11.81345553788293
+              },
+              {
+                "donor": 8,
+                "preMspe": 12.894095897569139,
+                "postMspe": 219.2245098122734,
+                "mspeRatio": 17.00192953067789
+              },
+              {
+                "donor": 9,
+                "preMspe": 6.049809690348184,
+                "postMspe": 25.780235352645004,
+                "mspeRatio": 4.261329971052573
+              },
+              {
+                "donor": 10,
+                "preMspe": 6.276329416489236,
+                "postMspe": 6.975976203326861,
+                "mspeRatio": 1.1114738791433583
+              },
+              {
+                "donor": 11,
+                "preMspe": 284.79569542387884,
+                "postMspe": 1598.0176518558449,
+                "mspeRatio": 5.611101844349921
+              },
+              {
+                "donor": 12,
+                "preMspe": 0.9814420796649184,
+                "postMspe": 30.362563592946348,
+                "mspeRatio": 30.93668411213086
+              },
+              {
+                "donor": 13,
+                "preMspe": 5.134573765754645,
+                "postMspe": 78.17082035370937,
+                "mspeRatio": 15.224403021546689
+              },
+              {
+                "donor": 14,
+                "preMspe": 11.062404488826761,
+                "postMspe": 20.56533360274005,
+                "mspeRatio": 1.859029257473945
+              },
+              {
+                "donor": 15,
+                "preMspe": 3.0155498188149648,
+                "postMspe": 34.5022797621828,
+                "mspeRatio": 11.441455732852502
+              },
+              {
+                "donor": 16,
+                "preMspe": 0.19166646556682768,
+                "postMspe": 109.70504047940675,
+                "mspeRatio": 572.3747247854178
+              },
+              {
+                "donor": 17,
+                "preMspe": 4.077844615225232,
+                "postMspe": 180.67785013476228,
+                "mspeRatio": 44.307193427668864
+              },
+              {
+                "donor": 18,
+                "preMspe": 0.7113711126710821,
+                "postMspe": 72.44334444237633,
+                "mspeRatio": 101.83621903110941
+              },
+              {
+                "donor": 19,
+                "preMspe": 40.3225711756769,
+                "postMspe": 82.78770853343698,
+                "mspeRatio": 2.0531356537942105
+              },
+              {
+                "donor": 20,
+                "preMspe": 3436.5949862595003,
+                "postMspe": 134.89242058782983,
+                "mspeRatio": 0.039251765519989615
+              },
+              {
+                "donor": 21,
+                "preMspe": 1.9223739781777898,
+                "postMspe": 7.8554959526096475,
+                "mspeRatio": 4.086351584958427
+              },
+              {
+                "donor": 22,
+                "preMspe": 81.3897105145301,
+                "postMspe": 56.44549315999675,
+                "mspeRatio": 0.6935212424661447
+              },
+              {
+                "donor": 23,
+                "preMspe": 7.373720763796043,
+                "postMspe": 80.02492017267663,
+                "mspeRatio": 10.852719100184537
+              },
+              {
+                "donor": 24,
+                "preMspe": 1.6981756693940715,
+                "postMspe": 6.914389728595636,
+                "mspeRatio": 4.071657516482243
+              },
+              {
+                "donor": 25,
+                "preMspe": 3.8470250349337625,
+                "postMspe": 254.02580368885822,
+                "mspeRatio": 66.03175216748544
+              },
+              {
+                "donor": 26,
+                "preMspe": 1.0328593198205225,
+                "postMspe": 8.371926725033624,
+                "mspeRatio": 8.105582787875115
+              },
+              {
+                "donor": 27,
+                "preMspe": 14.391865195553857,
+                "postMspe": 706.0545955612788,
+                "mspeRatio": 49.05928355828426
+              },
+              {
+                "donor": 28,
+                "preMspe": 1.4020629362983281,
+                "postMspe": 38.3882780136693,
+                "mspeRatio": 27.37985365694106
+              },
+              {
+                "donor": 29,
+                "preMspe": 1.270707769048432,
+                "postMspe": 66.39616258194417,
+                "mspeRatio": 52.2513233956733
+              },
+              {
+                "donor": 30,
+                "preMspe": 5.1793781267855294,
+                "postMspe": 113.9463197493631,
+                "mspeRatio": 22.00000018536616
+              },
+              {
+                "donor": 31,
+                "preMspe": 3.6756078085503456,
+                "postMspe": 245.8654996332302,
+                "mspeRatio": 66.89111364419459
+              },
+              {
+                "donor": 32,
+                "preMspe": 593.7642105263112,
+                "postMspe": 223.27583333333146,
+                "mspeRatio": 0.3760345089432391
+              },
+              {
+                "donor": 33,
+                "preMspe": 6.678367614372483,
+                "postMspe": 244.40153062689066,
+                "mspeRatio": 36.5959984144801
+              },
+              {
+                "donor": 34,
+                "preMspe": 0.6655367561566224,
+                "postMspe": 261.6438991569619,
+                "mspeRatio": 393.1321549660415
+              },
+              {
+                "donor": 35,
+                "preMspe": 6.338334007087968,
+                "postMspe": 294.54463671241047,
+                "mspeRatio": 46.470355835307835
+              },
+              {
+                "donor": 36,
+                "preMspe": 1.7051802603665933,
+                "postMspe": 63.786243828222666,
+                "mspeRatio": 37.407331829251525
+              },
+              {
+                "donor": 37,
+                "preMspe": 29.392580377570923,
+                "postMspe": 30.53478623618638,
+                "mspeRatio": 1.0388603465208879
+              }
+            ],
+            "pValue": 0.07692307692307693,
+            "nValidPlacebos": 38
+          },
+          "conformalBand": {
+            "kind": "available",
+            "alpha": 0.05,
+            "intervals": [
+              [
+                111.8480876865284,
+                123
+              ],
+              [
+                114.24703322616807,
+                125.39894553963967
+              ],
+              [
+                119.07045234539117,
+                130.22236465886277
+              ],
+              [
+                118.79127266916966,
+                129.94318498264124
+              ],
+              [
+                120.89773561142425,
+                132.04964792489585
+              ],
+              [
+                121.19783438904521,
+                132.34974670251682
+              ],
+              [
+                122.89320329051128,
+                134.04511560398288
+              ],
+              [
+                121.10862527891484,
+                132.26053759238644
+              ],
+              [
+                120.56894140039878,
+                131.72085371387038
+              ],
+              [
+                117.35579718311783,
+                128.50770949658943
+              ],
+              [
+                114.65768626126541,
+                125.80959857473701
+              ],
+              [
+                114.12131744771717,
+                125.27322976118877
+              ],
+              [
+                110.96487437327096,
+                122.11678668674256
+              ],
+              [
+                105.47091531044826,
+                116.62282762391986
+              ],
+              [
+                97.875367981531,
+                109.0272802950026
+              ],
+              [
+                97.6091497197488,
+                108.7610620332204
+              ],
+              [
+                94.0511056091512,
+                105.20301792262279
+              ],
+              [
+                94.88900353938308,
+                106.04091585285468
+              ],
+              [
+                86.38985196011514,
+                97.54176427358674
+              ],
+              [
+                85.26452543230558,
+                96.41643774577717
+              ],
+              [
+                81.43099943016246,
+                92.58291174363406
+              ],
+              [
+                75.75834281632962,
+                86.91025512980121
+              ],
+              [
+                75.6527398537176,
+                86.8046521671892
+              ],
+              [
+                75.3576515342047,
+                86.5095638476763
+              ],
+              [
+                75.07314428562125,
+                86.22505659909285
+              ],
+              [
+                73.68161790173926,
+                84.83353021521086
+              ],
+              [
+                72.92141708447596,
+                84.07332939794756
+              ],
+              [
+                74.48481451293031,
+                85.63672682640191
+              ],
+              [
+                70.06183703875121,
+                81.2137493522228
+              ],
+              [
+                69.14432611723086,
+                80.29623843070246
+              ],
+              [
+                62.62068652669953,
+                73.77259884017113
+              ]
+            ],
+            "halfWidth": 5.575956156735799,
+            "preMspe": 2.7436622859406072,
+            "postMspe": 424.58943454043447,
+            "mspeRatio": 154.75280493381598
+          },
+          "gaussianBand": {
+            "kind": "available",
+            "alpha": 0.05,
+            "intervals": [
+              [
+                114.09501554825168,
+                120.75307213827672
+              ],
+              [
+                116.49396108789135,
+                123.15201767791639
+              ],
+              [
+                121.31738020711445,
+                127.9754367971395
+              ],
+              [
+                121.03820053089294,
+                127.69625712091798
+              ],
+              [
+                123.14466347314753,
+                129.80272006317256
+              ],
+              [
+                123.44476225076849,
+                130.10281884079353
+              ],
+              [
+                125.14013115223456,
+                131.79818774225959
+              ],
+              [
+                123.35555314063812,
+                130.01360973066315
+              ],
+              [
+                122.81586926212206,
+                129.4739258521471
+              ],
+              [
+                119.60272504484111,
+                126.26078163486615
+              ],
+              [
+                116.90461412298869,
+                123.56267071301373
+              ],
+              [
+                116.36824530944045,
+                123.0263018994655
+              ],
+              [
+                113.21180223499424,
+                119.86985882501928
+              ],
+              [
+                107.71784317217154,
+                114.37589976219658
+              ],
+              [
+                100.12229584325428,
+                106.78035243327932
+              ],
+              [
+                99.85607758147208,
+                106.51413417149712
+              ],
+              [
+                96.29803347087447,
+                102.95609006089951
+              ],
+              [
+                97.13593140110636,
+                103.7939879911314
+              ],
+              [
+                88.63677982183842,
+                95.29483641186346
+              ],
+              [
+                87.51145329402885,
+                94.1695098840539
+              ],
+              [
+                83.67792729188574,
+                90.33598388191078
+              ],
+              [
+                78.0052706780529,
+                84.66332726807794
+              ],
+              [
+                77.89966771544088,
+                84.55772430546592
+              ],
+              [
+                77.60457939592798,
+                84.26263598595303
+              ],
+              [
+                77.32007214734453,
+                83.97812873736957
+              ],
+              [
+                75.92854576346254,
+                82.58660235348758
+              ],
+              [
+                75.16834494619924,
+                81.82640153622428
+              ],
+              [
+                76.73174237465359,
+                83.38979896467863
+              ],
+              [
+                72.30876490047449,
+                78.96682149049953
+              ],
+              [
+                71.39125397895414,
+                78.04931056897918
+              ],
+              [
+                64.86761438842281,
+                71.52567097844785
+              ]
+            ],
+            "halfWidth": 3.3290282950125163,
+            "preMspe": 2.7436622859406072,
+            "postMspe": 424.58943454043447,
+            "mspeRatio": 154.75280493381598
+          }
+        },
+        "method": "synthetic-control",
+        "columns": [
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+            "column": "1:prop99",
+            "name": "prop99"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "2:California",
+            "name": "California"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "3:Alabama",
+            "name": "Alabama"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "4:Arkansas",
+            "name": "Arkansas"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "5:Colorado",
+            "name": "Colorado"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "6:Connecticut",
+            "name": "Connecticut"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "7:Delaware",
+            "name": "Delaware"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "8:Georgia",
+            "name": "Georgia"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "9:Idaho",
+            "name": "Idaho"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "10:Illinois",
+            "name": "Illinois"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "11:Indiana",
+            "name": "Indiana"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "12:Iowa",
+            "name": "Iowa"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "13:Kansas",
+            "name": "Kansas"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "14:Kentucky",
+            "name": "Kentucky"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "15:Louisiana",
+            "name": "Louisiana"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "16:Maine",
+            "name": "Maine"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "17:Minnesota",
+            "name": "Minnesota"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "18:Mississippi",
+            "name": "Mississippi"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "19:Missouri",
+            "name": "Missouri"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "20:Montana",
+            "name": "Montana"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "21:Nebraska",
+            "name": "Nebraska"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "22:Nevada",
+            "name": "Nevada"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "23:NewHampshire",
+            "name": "NewHampshire"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "24:NewMexico",
+            "name": "NewMexico"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "25:NorthCarolina",
+            "name": "NorthCarolina"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "26:NorthDakota",
+            "name": "NorthDakota"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "27:Ohio",
+            "name": "Ohio"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "28:Oklahoma",
+            "name": "Oklahoma"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "29:Pennsylvania",
+            "name": "Pennsylvania"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "30:RhodeIsland",
+            "name": "RhodeIsland"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "31:SouthCarolina",
+            "name": "SouthCarolina"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "32:SouthDakota",
+            "name": "SouthDakota"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "33:Tennessee",
+            "name": "Tennessee"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "34:Texas",
+            "name": "Texas"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "35:Utah",
+            "name": "Utah"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "36:Vermont",
+            "name": "Vermont"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "37:Virginia",
+            "name": "Virginia"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "38:WestVirginia",
+            "name": "WestVirginia"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "39:Wisconsin",
+            "name": "Wisconsin"
+          },
+          {
+            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "column": "40:Wyoming",
+            "name": "Wyoming"
+          }
+        ],
+        "estimate": {
+          "kind": "causal-estimate",
+          "estimand": {
+            "kind": "average-treatment-effect",
+            "scale": "additive"
+          },
+          "effect": {
+            "kind": "path",
+            "values": [
+              {
+                "step": 20,
+                "actual": 82.4,
+                "counterfactual": 90.84048158904137,
+                "lower": 85.26452543230558,
+                "upper": 96.41643774577717,
+                "effect": -8.440481589041369
+              },
+              {
+                "step": 21,
+                "actual": 77.8,
+                "counterfactual": 87.00695558689826,
+                "lower": 81.43099943016246,
+                "upper": 92.58291174363406,
+                "effect": -9.20695558689826
+              },
+              {
+                "step": 22,
+                "actual": 68.7,
+                "counterfactual": 81.33429897306542,
+                "lower": 75.75834281632962,
+                "upper": 86.91025512980121,
+                "effect": -12.634298973065412
+              },
+              {
+                "step": 23,
+                "actual": 67.5,
+                "counterfactual": 81.2286960104534,
+                "lower": 75.6527398537176,
+                "upper": 86.8046521671892,
+                "effect": -13.728696010453405
+              },
+              {
+                "step": 24,
+                "actual": 63.4,
+                "counterfactual": 80.9336076909405,
+                "lower": 75.3576515342047,
+                "upper": 86.5095638476763,
+                "effect": -17.533607690940507
+              },
+              {
+                "step": 25,
+                "actual": 58.6,
+                "counterfactual": 80.64910044235705,
+                "lower": 75.07314428562125,
+                "upper": 86.22505659909285,
+                "effect": -22.04910044235705
+              },
+              {
+                "step": 26,
+                "actual": 56.4,
+                "counterfactual": 79.25757405847506,
+                "lower": 73.68161790173926,
+                "upper": 84.83353021521086,
+                "effect": -22.85757405847506
+              },
+              {
+                "step": 27,
+                "actual": 54.5,
+                "counterfactual": 78.49737324121176,
+                "lower": 72.92141708447596,
+                "upper": 84.07332939794756,
+                "effect": -23.99737324121176
+              },
+              {
+                "step": 28,
+                "actual": 53.8,
+                "counterfactual": 80.06077066966611,
+                "lower": 74.48481451293031,
+                "upper": 85.63672682640191,
+                "effect": -26.260770669666115
+              },
+              {
+                "step": 29,
+                "actual": 52.3,
+                "counterfactual": 75.637793195487,
+                "lower": 70.06183703875121,
+                "upper": 81.2137493522228,
+                "effect": -23.33779319548701
+              },
+              {
+                "step": 30,
+                "actual": 47.2,
+                "counterfactual": 74.72028227396666,
+                "lower": 69.14432611723086,
+                "upper": 80.29623843070246,
+                "effect": -27.520282273966657
+              },
+              {
+                "step": 31,
+                "actual": 41.6,
+                "counterfactual": 68.19664268343533,
+                "lower": 62.62068652669953,
+                "upper": 73.77259884017113,
+                "effect": -26.596642683435327
+              }
+            ],
+            "aggregate": {
+              "cumulative": -234.16357641499792,
+              "average": -19.513631367916492
+            }
+          },
+          "interval": {
+            "kind": "none",
+            "reason": "Cross-fitted confidence inference, the donor-placebo rank test, and fixed-weight prediction bands are reported with this run; they answer different uncertainty questions and are not combined into one interval."
+          },
+          "standardError": null,
+          "adjustment": {
+            "kind": "none"
+          },
+          "sample": {
+            "observations": 31,
+            "parameters": 38,
+            "degreesOfFreedom": null
+          }
+        }
+      }
+    ],
+    "sensitivityRuns": [],
+    "counterfactualRuns": []
+  },
+  "data": {
+    "kind": "source-file",
+    "name": "prop99-wide.csv",
+    "mediaType": "text/csv",
+    "lastModified": 1788533944227,
+    "bytes": 11185,
+    "base64": "WWVhcixwcm9wOTksQ2FsaWZvcm5pYSxBbGFiYW1hLEFya2Fuc2FzLENvbG9yYWRvLENvbm5lY3RpY3V0LERlbGF3YXJlLEdlb3JnaWEsSWRhaG8sSWxsaW5vaXMsSW5kaWFuYSxJb3dhLEthbnNhcyxLZW50dWNreSxMb3Vpc2lhbmEsTWFpbmUsTWlubmVzb3RhLE1pc3Npc3NpcHBpLE1pc3NvdXJpLE1vbnRhbmEsTmVicmFza2EsTmV2YWRhLE5ld0hhbXBzaGlyZSxOZXdNZXhpY28sTm9ydGhDYXJvbGluYSxOb3J0aERha290YSxPaGlvLE9rbGFob21hLFBlbm5zeWx2YW5pYSxSaG9kZUlzbGFuZCxTb3V0aENhcm9saW5hLFNvdXRoRGFrb3RhLFRlbm5lc3NlZSxUZXhhcyxVdGFoLFZlcm1vbnQsVmlyZ2luaWEsV2VzdFZpcmdpbmlhLFdpc2NvbnNpbixXeW9taW5nCjE5NzAsMCwxMjMuMDAwMCw4OS44MDAwLDEwMC4zMDAwLDEyNC44MDAwLDEyMC4wMDAwLDE1NS4wMDAwLDEwOS45MDAwLDEwMi40MDAwLDEyNC44MDAwLDEzNC42MDAwLDEwOC41MDAwLDExNC4wMDAwLDE1NS44MDAwLDExNS45MDAwLDEyOC41MDAwLDEwNC4zMDAwLDkzLjQwMDAsMTIxLjMwMDAsMTExLjIwMDAsMTA4LjEwMDAsMTg5LjUwMDAsMjY1LjcwMDAsOTAuMDAwMCwxNzIuNDAwMCw5My44MDAwLDEyMS42MDAwLDEwOC40MDAwLDEwNy4zMDAwLDEyMy45MDAwLDEwMy42MDAwLDkyLjcwMDAsOTkuODAwMCwxMDYuNDAwMCw2NS41MDAwLDEyMi42MDAwLDEyNC4zMDAwLDExNC41MDAwLDEwNi40MDAwLDEzMi4yMDAwCjE5NzEsMCwxMjEuMDAwMCw5NS40MDAwLDEwNC4xMDAwLDEyNS41MDAwLDExNy42MDAwLDE2MS4xMDAwLDExNS43MDAwLDEwOC41MDAwLDEyNS42MDAwLDEzOS4zMDAwLDEwOC40MDAwLDEwMi44MDAwLDE2My41MDAwLDExOS44MDAwLDEzMy4yMDAwLDExNi40MDAwLDEwNS40MDAwLDEyNy42MDAwLDExNS42MDAwLDEwOC42MDAwLDE5MC41MDAwLDI3OC4wMDAwLDkyLjYwMDAsMTg3LjYwMDAsOTguNTAwMCwxMjQuNjAwMCwxMTUuNDAwMCwxMDYuMzAwMCwxMjMuMjAwMCwxMTUuMDAwMCw5Ni43MDAwLDEwNi4zMDAwLDEwOC45MDAwLDY3LjcwMDAsMTI0LjQwMDAsMTI4LjQwMDAsMTExLjUwMDAsMTA1LjQwMDAsMTMxLjcwMDAKMTk3MiwwLDEyMy41MDAwLDEwMS4xMDAwLDEwMy45MDAwLDEzNC4zMDAwLDExMC44MDAwLDE1Ni4zMDAwLDExNy4wMDAwLDEyNi4xMDAwLDEyNi42MDAwLDE0OS4yMDAwLDEwOS40MDAwLDExMS4wMDAwLDE3OS40MDAwLDEyNS4zMDAwLDEzNi41MDAwLDk2LjgwMDAsMTEyLjEwMDAsMTMwLjAwMDAsMTIyLjIwMDAsMTA0LjkwMDAsMTk4LjYwMDAsMjk2LjIwMDAsOTkuMzAwMCwyMTQuMTAwMCwxMDMuODAwMCwxMjQuNDAwMCwxMjEuNzAwMCwxMDkuMDAwMCwxMzQuNDAwMCwxMTguNzAwMCwxMDMuMDAwMCwxMTEuNTAwMCwxMDguNjAwMCw3MS4zMDAwLDEzOC4wMDAwLDEzNy4wMDAwLDExNy41MDAwLDEwOC44MDAwLDE0MC4wMDAwCjE5NzMsMCwxMjQuNDAwMCwxMDIuOTAwMCwxMDguMDAwMCwxMzcuOTAwMCwxMDkuMzAwMCwxNTQuNzAwMCwxMTkuODAwMCwxMjEuODAwMCwxMjQuNDAwMCwxNTYuMDAwMCwxMTAuNjAwMCwxMTUuMjAwMCwyMDEuOTAwMCwxMjYuNzAwMCwxMzguMDAwMCwxMDYuODAwMCwxMTUuMDAwMCwxMzIuMTAwMCwxMTkuOTAwMCwxMDYuNjAwMCwyMDEuNTAwMCwyNzkuMDAwMCw5OC45MDAwLDIyNi41MDAwLDEwOC43MDAwLDEyMC41MDAwLDEyNC4xMDAwLDExMC43MDAwLDE0Mi4wMDAwLDEyNS41MDAwLDEwMy41MDAwLDEwOS43MDAwLDExMC40MDAwLDcyLjcwMDAsMTQ2LjgwMDAsMTQzLjEwMDAsMTE2LjYwMDAsMTA5LjUwMDAsMTQxLjIwMDAKMTk3NCwwLDEyNi43MDAwLDEwOC4yMDAwLDEwOS43MDAwLDEzMi44MDAwLDExMi40MDAwLDE1MS4zMDAwLDEyMy43MDAwLDEyNS42MDAwLDEzMS45MDAwLDE1OS42MDAwLDExNi4xMDAwLDExOC42MDAwLDIxMi40MDAwLDEyOS45MDAwLDE0Mi4xMDAwLDExMC42MDAwLDExNy4xMDAwLDEzNS40MDAwLDEyMS45MDAwLDExMC41MDAwLDIwNC43MDAwLDI2OS44MDAwLDEwMC4zMDAwLDIyNy4zMDAwLDExMC41MDAwLDEyMi4xMDAwLDEzMC41MDAwLDExNC4yMDAwLDE0Ni4xMDAwLDEyOS43MDAwLDEwOC40MDAwLDExNC44MDAwLDExNC43MDAwLDc1LjYwMDAsMTUxLjgwMDAsMTQ5LjYwMDAsMTE5LjkwMDAsMTExLjgwMDAsMTQ1LjgwMDAKMTk3NSwwLDEyNy4xMDAwLDExMS43MDAwLDExNC44MDAwLDEzMS4wMDAwLDExMC4yMDAwLDE0Ny42MDAwLDEyMi45MDAwLDEyMy4zMDAwLDEzMS44MDAwLDE2Mi40MDAwLDEyMC41MDAwLDEyMy40MDAwLDIyMy4wMDAwLDEzMy42MDAwLDE0MC43MDAwLDExMS41MDAwLDExNi44MDAwLDEzNS42MDAwLDEyMy43MDAwLDExNC4xMDAwLDIwNS4yMDAwLDI2OS4xMDAwLDEwMy4xMDAwLDIyNi4wMDAwLDExNy45MDAwLDEyMi41MDAwLDEzMi45MDAwLDExNC42MDAwLDE1NC43MDAwLDEzMC41MDAwLDExMy41MDAwLDExNy40MDAwLDExNi4wMDAwLDc1LjgwMDAsMTU1LjUwMDAsMTUyLjcwMDAsMTIzLjIwMDAsMTEzLjUwMDAsMTYwLjcwMDAKMTk3NiwwLDEyOC4wMDAwLDExNi4yMDAwLDExOS4xMDAwLDEzNC4yMDAwLDExMy40MDAwLDE1My4wMDAwLDEyNS45MDAwLDEyNS4xMDAwLDEzNC40MDAwLDE2Ni42MDAwLDEyNC40MDAwLDEyNy43MDAwLDIzMC45MDAwLDEzOS42MDAwLDE0NC45MDAwLDExNi43MDAwLDEyMC45MDAwLDEzOS41MDAwLDEyNC45MDAwLDExOC4xMDAwLDIwMS40MDAwLDI5MC41MDAwLDEwMi40MDAwLDIzMC4yMDAwLDEyNS40MDAwLDEyNC42MDAwLDEzOC42MDAwLDExOC44MDAwLDE1MC4yMDAwLDEzNi44MDAwLDExNi43MDAwLDEyMS43MDAwLDEyMS40MDAwLDc3LjkwMDAsMTcxLjEwMDAsMTU4LjEwMDAsMTI5LjcwMDAsMTE1LjQwMDAsMTYxLjUwMDAKMTk3NywwLDEyNi40MDAwLDExNy4xMDAwLDEyMi42MDAwLDEzMi4wMDAwLDExNy4zMDAwLDE1My4zMDAwLDEyNy45MDAwLDEyNS4wMDAwLDEzNC4wMDAwLDE3My4wMDAwLDEyNS41MDAwLDEyNy45MDAwLDIyOS40MDAwLDE0MC4wMDAwLDE0NS42MDAwLDExNy4yMDAwLDEyMi4xMDAwLDE0MC44MDAwLDEyNy4wMDAwLDExNy43MDAwLDE5MC44MDAwLDI3OC44MDAwLDEwMi40MDAwLDIxNy4wMDAwLDEyMi4yMDAwLDEyNy4zMDAwLDE0MC40MDAwLDEyMC4xMDAwLDE0OC44MDAwLDEzNy4yMDAwLDExNS42MDAwLDEyNC42MDAwLDEyNC4yMDAwLDc4LjAwMDAsMTY5LjQwMDAsMTU3LjcwMDAsMTMzLjkwMDAsMTE3LjIwMDAsMTYwLjQwMDAKMTk3OCwwLDEyNi4xMDAwLDEyMy4wMDAwLDEyNy4zMDAwLDEyOS4yMDAwLDExNy41MDAwLDE1NS41MDAwLDEzMC42MDAwLDEyMi44MDAwLDEzNi43MDAwLDE1MC45MDAwLDEyNy4xMDAwLDEyNy4xMDAwLDIyNC43MDAwLDE0Mi43MDAwLDE0My45MDAwLDExOC45MDAwLDEyNC45MDAwLDE0MS44MDAwLDEyNy4yMDAwLDExNy40MDAwLDE4Ny4wMDAwLDI2OS42MDAwLDEwMy4xMDAwLDIwNS41MDAwLDEyMS45MDAwLDEzMS4zMDAwLDE0My42MDAwLDEyMi4zMDAwLDE0Ni44MDAwLDE0MC40MDAwLDExNi45MDAwLDEyNy4zMDAwLDEyNi42MDAwLDc5LjYwMDAsMTYyLjQwMDAsMTU1LjkwMDAsMTMxLjYwMDAsMTE2LjcwMDAsMTYwLjMwMDAKMTk3OSwwLDEyMS45MDAwLDEyMS40MDAwLDEyNi41MDAwLDEzMS41MDAwLDExNy40MDAwLDE1MC4yMDAwLDEzMS4wMDAwLDExNy41MDAwLDEzNS4zMDAwLDE0OC45MDAwLDEyNC4yMDAwLDEyNi40MDAwLDIxNC45MDAwLDE0MC4xMDAwLDEzOC41MDAwLDExOC4zMDAwLDEyMy45MDAwLDE0MC4yMDAwLDEyMC4zMDAwLDExNi4xMDAwLDE4My4zMDAwLDI1NC42MDAwLDEwMS4wMDAwLDE5Ny4zMDAwLDEyMS4zMDAwLDEzMC45MDAwLDE0MS42MDAwLDEyMi42MDAwLDE0NS44MDAwLDEzNS43MDAwLDExNy40MDAwLDEyNy4yMDAwLDEyNi40MDAwLDc5LjEwMDAsMTYwLjkwMDAsMTUxLjgwMDAsMTIyLjEwMDAsMTE3LjEwMDAsMTY4LjYwMDAKMTk4MCwwLDEyMC4yMDAwLDEyMy4yMDAwLDEzMS44MDAwLDEzMS4wMDAwLDExOC4wMDAwLDE1MC41MDAwLDEzNC4wMDAwLDExNS4yMDAwLDEzNS4yMDAwLDE0Ni45MDAwLDEyNC42MDAwLDEyNy4xMDAwLDIxNS4zMDAwLDE0My44MDAwLDE0MS4yMDAwLDExNy43MDAwLDEyNy4wMDAwLDE0Mi4xMDAwLDEyMi4wMDAwLDExNi4zMDAwLDE3Ny43MDAwLDI0Ny44MDAwLDEwMi43MDAwLDE4Ny44MDAwLDEyMy43MDAwLDEzMy41MDAwLDE0MS42MDAwLDEyNC4wMDAwLDE0OS4zMDAwLDEzOC4zMDAwLDExNC43MDAwLDEzMC40MDAwLDEyOS43MDAwLDc0LjgwMDAsMTYxLjYwMDAsMTQ4LjkwMDAsMTIyLjMwMDAsMTE3LjYwMDAsMTU4LjEwMDAKMTk4MSwwLDExOC42MDAwLDExOS42MDAwLDEyOC43MDAwLDEzMy44MDAwLDExNi40MDAwLDE1Mi42MDAwLDEzMS43MDAwLDExNC4xMDAwLDEzMy4wMDAwLDE0OC41MDAwLDEzMi45MDAwLDEzMi4wMDAwLDIwOS43MDAwLDE0NC4wMDAwLDEzOC45MDAwLDEyMC44MDAwLDEyNS4zMDAwLDE0MC41MDAwLDEyMS4xMDAwLDExNy4wMDAwLDE3MS45MDAwLDI0NS40MDAwLDEwMy4wMDAwLDE3OS4zMDAwLDEyNS43MDAwLDEzMi44MDAwLDE0My43MDAwLDEyNS4yMDAwLDE1MS4yMDAwLDEzNi4xMDAwLDExNS43MDAwLDEyOS4xMDAwLDEyOS4wMDAwLDc3LjYwMDAsMTYzLjgwMDAsMTQ5LjkwMDAsMTIwLjUwMDAsMTE5LjkwMDAsMTYzLjEwMDAKMTk4MiwwLDExNS40MDAwLDExOS4xMDAwLDEyNy40MDAwLDEzMC41MDAwLDExNC43MDAwLDE1NC4xMDAwLDEzMS4yMDAwLDExMS41MDAwLDEzMC43MDAwLDE0Ny43MDAwLDExNi4yMDAwLDEzMC45MDAwLDIxMC42MDAwLDE0My45MDAwLDEzOS41MDAwLDExOS40MDAwLDEyNS44MDAwLDEzOS43MDAwLDEyMi40MDAwLDExNy4xMDAwLDE2NS4xMDAwLDIzOS44MDAwLDk3LjUwMDAsMTc5LjAwMDAsMTI2LjgwMDAsMTM0LjAwMDAsMTQ3LjAwMDAsMTIzLjMwMDAsMTQ2LjMwMDAsMTM2LjAwMDAsMTEzLjAwMDAsMTMxLjQwMDAsMTMxLjIwMDAsNzMuNjAwMCwxNjIuMzAwMCwxNDcuNDAwMCwxMTkuODAwMCwxMTUuNjAwMCwxNTcuNzAwMAoxOTgzLDAsMTEwLjgwMDAsMTE2LjMwMDAsMTI4LjAwMDAsMTI1LjMwMDAsMTE0LjEwMDAsMTQ5LjYwMDAsMTI4LjYwMDAsMTExLjMwMDAsMTI3LjkwMDAsMTQzLjAwMDAsMTE1LjYwMDAsMTI3LjYwMDAsMjAxLjEwMDAsMTMzLjcwMDAsMTM1LjQwMDAsMTEzLjIwMDAsMTIyLjMwMDAsMTM0LjEwMDAsMTEzLjcwMDAsMTEwLjgwMDAsMTU5LjIwMDAsMjMyLjkwMDAsOTYuMzAwMCwxNjkuODAwMCwxMTkuNjAwMCwxMzAuMDAwMCwxNDAuMDAwMCwxMjUuMzAwMCwxMzUuODAwMCwxMzEuMTAwMCwxMDkuODAwMCwxMjkuMDAwMCwxMjYuNDAwMCw2OS4wMDAwLDE1My44MDAwLDE0NC43MDAwLDExNS43MDAwLDEwNi4zMDAwLDE0MS4yMDAwCjE5ODQsMCwxMDQuODAwMCwxMTMuMDAwMCwxMjMuMTAwMCwxMTkuNzAwMCwxMTIuNTAwMCwxNDQuMDAwMCwxMjYuMzAwMCwxMDMuNjAwMCwxMjQuMDAwMCwxMzcuODAwMCwxMTEuMjAwMCwxMjEuNzAwMCwxODMuMjAwMCwxMjguOTAwMCwxMzUuNTAwMCwxMTAuODAwMCwxMTYuNDAwMCwxMzAuMDAwMCwxMTAuMTAwMCwxMDcuNzAwMCwxMzYuNjAwMCwyMTUuMTAwMCw4OC45MDAwLDE2MC42MDAwLDEwOS40MDAwLDEyNy4xMDAwLDEyOC4xMDAwLDExNS4zMDAwLDEzNi45MDAwLDEyNy4wMDAwLDEwNS43MDAwLDEyNS4xMDAwLDExNy4yMDAwLDY2LjMwMDAsMTQ0LjMwMDAsMTM2LjgwMDAsMTExLjkwMDAsMTA1LjYwMDAsMTI4LjkwMDAKMTk4NSwwLDEwMi44MDAwLDExNC41MDAwLDEyNS44MDAwLDExMi40MDAwLDExMS4wMDAwLDE0NC41MDAwLDEyOC44MDAwLDEwMC43MDAwLDEyMS42MDAwLDEzNS4zMDAwLDEwOS40MDAwLDExNS43MDAwLDE4Mi40MDAwLDEyNS4wMDAwLDEyNy45MDAwLDExMy4wMDAwLDExNS4zMDAwLDEyOS4yMDAwLDEwMy42MDAwLDEwNS4xMDAwLDE0Ni43MDAwLDIwMS4xMDAwLDg4LjAwMDAsMTU2LjMwMDAsMTAzLjIwMDAsMTI2LjcwMDAsMTI0LjIwMDAsMTE1LjgwMDAsMTMzLjQwMDAsMTI1LjQwMDAsMTA0LjQwMDAsMTI4LjcwMDAsMTE1LjkwMDAsNjYuNTAwMCwxNDQuNTAwMCwxMzQuNjAwMCwxMDkuMTAwMCwxMDcuMDAwMCwxMjUuNzAwMAoxOTg2LDAsOTkuNzAwMCwxMTYuMzAwMCwxMjYuMDAwMCwxMDkuOTAwMCwxMDguNTAwMCwxNDIuNDAwMCwxMjkuMDAwMCw5Ni43MDAwLDExOC4yMDAwLDEzNy42MDAwLDEwNC4xMDAwLDEwOS40MDAwLDE3OS44MDAwLDEyMS4yMDAwLDExOS4wMDAwLDEwNC4zMDAwLDExMy4yMDAwLDEyOC44MDAwLDk3LjgwMDAsMTAzLjEwMDAsMTQyLjYwMDAsMTk1LjkwMDAsODguMjAwMCwxNTQuNDAwMCw5OS44MDAwLDEyNi4zMDAwLDExOS45MDAwLDExMy45MDAwLDEzNi4zMDAwLDEyNi42MDAwLDk3LjAwMDAsMTI5LjAwMDAsMTEzLjcwMDAsNjQuNDAwMCwxMzEuMjAwMCwxMzUuODAwMCwxMTIuMTAwMCwxMDUuNDAwMCwxMjQuODAwMAoxOTg3LDAsOTcuNTAwMCwxMTQuMDAwMCwxMjIuMzAwMCwxMDIuNDAwMCwxMDkuMDAwMCwxNDEuMDAwMCwxMjkuMzAwMCw5NS4wMDAwLDEwOS41MDAwLDEzNC4wMDAwLDEwMS4xMDAwLDEwNS4yMDAwLDE3MS4yMDAwLDExNi41MDAwLDEyNS4wMDAwLDEwOC44MDAwLDExMC4wMDAwLDEyOC43MDAwLDkxLjcwMDAsMTAxLjMwMDAsMTQ3LjcwMDAsMTk1LjEwMDAsODIuMzAwMCwxNTAuNTAwMCw5Mi4zMDAwLDEyNC42MDAwLDExMy4xMDAwLDExMC42MDAwLDEyNC40MDAwLDEyNi42MDAwLDk1LjgwMDAsMTMwLjYwMDAsMTA1LjgwMDAsNjcuNzAwMCwxMjguMzAwMCwxMzMuMDAwMCwxMDcuNTAwMCwxMDYuMDAwMCwxMTAuNDAwMAoxOTg4LDAsOTAuMTAwMCwxMTIuMTAwMCwxMjEuNTAwMCw5NC42MDAwLDEwNC44MDAwLDEzNy4xMDAwLDEyNC4xMDAwLDg0LjUwMDAsMTA3LjYwMDAsMTM0LjAwMDAsMTAwLjIwMDAsMTAzLjIwMDAsMTczLjIwMDAsMTEwLjkwMDAsMTI1LjAwMDAsOTQuMTAwMCwxMDkuMDAwMCwxMjcuNDAwMCw4Ny4xMDAwLDkyLjkwMDAsMTQxLjkwMDAsMTgwLjQwMDAsNzcuNzAwMCwxNDYuMDAwMCw4Ny4xMDAwLDEyMi40MDAwLDEwMy42MDAwLDEwNy42MDAwLDEzOC4wMDAwLDEyNC40MDAwLDkxLjkwMDAsMTI1LjMwMDAsOTYuNTAwMCw1NS4wMDAwLDEyOC43MDAwLDEyOS41MDAwLDEwOS4xMDAwLDEwMi42MDAwLDExNC4zMDAwCjE5ODksMSw4Mi40MDAwLDEwNS42MDAwLDExOC4zMDAwLDg4LjgwMDAsMTAwLjYwMDAsMTMxLjcwMDAsMTE3LjEwMDAsNzguNDAwMCwxMDQuNjAwMCwxMzIuNTAwMCw5NC40MDAwLDk2LjUwMDAsMTcxLjYwMDAsMTAzLjYwMDAsMTIyLjQwMDAsOTIuMzAwMCwxMDguMzAwMCwxMjIuODAwMCw4Ni4yMDAwLDkzLjgwMDAsMTM3LjkwMDAsMTcyLjkwMDAsNzQuNDAwMCwxMzkuMzAwMCw4NC4xMDAwLDExOC42MDAwLDk3LjUwMDAsMTA3LjEwMDAsMTIwLjgwMDAsMTIyLjQwMDAsODcuNDAwMCwxMjQuNzAwMCw5NC41MDAwLDU3LjAwMDAsMTIwLjkwMDAsMTIyLjUwMDAsMTA0LjAwMDAsMTAwLjMwMDAsMTExLjQwMDAKMTk5MCwxLDc3LjgwMDAsMTA4LjYwMDAsMTEzLjEwMDAsODcuNDAwMCw5MS41MDAwLDEyNy4yMDAwLDExMy44MDAwLDkwLjEwMDAsOTQuMTAwMCwxMjguMzAwMCw5NS40MDAwLDk0LjMwMDAsMTgyLjUwMDAsMTAxLjUwMDAsMTE3LjUwMDAsOTAuNzAwMCwxMDEuODAwMCwxMTkuMTAwMCw4NC43MDAwLDg5LjkwMDAsMTM3LjMwMDAsMTUyLjQwMDAsNzAuODAwMCwxMzMuNzAwMCw3Ny4xMDAwLDExNS41MDAwLDg4LjQwMDAsMTAxLjMwMDAsMTAxLjQwMDAsMTE4LjYwMDAsODguMzAwMCwxMjEuODAwMCw4NS42MDAwLDUzLjQwMDAsMTI0LjMwMDAsMTE4LjkwMDAsMTA0LjEwMDAsOTQuMDAwMCw5Ni45MDAwCjE5OTEsMSw2OC43MDAwLDEwNy45MDAwLDExNi44MDAwLDkwLjIwMDAsODYuNzAwMCwxMTguODAwMCwxMDkuNjAwMCw4NS40MDAwLDk2LjEwMDAsMTI3LjIwMDAsOTcuMTAwMCw5MS44MDAwLDE3MC40MDAwLDEwNy4yMDAwLDExNi4xMDAwLDg2LjIwMDAsMTA1LjYwMDAsMTE5LjkwMDAsODIuOTAwMCw5Mi40MDAwLDExNS41MDAwLDE0NC44MDAwLDY5LjkwMDAsMTMyLjcwMDAsODUuMjAwMCwxMTMuMjAwMCw4Ny44MDAwLDEwMi41MDAwLDEwMy42MDAwLDEyMS41MDAwLDkxLjgwMDAsMTIwLjYwMDAsNzkuNDAwMCw1My41MDAwLDEyMC45MDAwLDEwOS4xMDAwLDEwMC4xMDAwLDk1LjUwMDAsMTA5LjEwMDAKMTk5MiwxLDY3LjUwMDAsMTA5LjEwMDAsMTI2LjAwMDAsODguMzAwMCw4My41MDAwLDEyMC4wMDAwLDEwOS4yMDAwLDg1LjEwMDAsOTQuODAwMCwxMjguMjAwMCw5NS4yMDAwLDkwLjAwMDAsMTY3LjYwMDAsMTA4LjUwMDAsMTE0LjUwMDAsODMuODAwMCwxMDMuOTAwMCwxMjIuMzAwMCw4Ni42MDAwLDkwLjYwMDAsMTEwLjAwMDAsMTQzLjcwMDAsNzEuNDAwMCwxMjguOTAwMCw3NC4zMDAwLDExMi4zMDAwLDg2LjMwMDAsOTYuMjAwMCwxMDAuMTAwMCwxMTIuODAwMCw5My4wMDAwLDEyMS4wMDAwLDc3LjIwMDAsNTUuMDAwMCwxMjYuNTAwMCwxMDguMjAwMCw5Ny45MDAwLDk2LjIwMDAsMTEwLjgwMDAKMTk5MywxLDYzLjQwMDAsMTA4LjUwMDAsMTEzLjgwMDAsODguNjAwMCw3OS4xMDAwLDEyMy44MDAwLDEwOS4yMDAwLDg2LjcwMDAsOTQuNjAwMCwxMjYuODAwMCw5Mi41MDAwLDg5LjkwMDAsMTY3LjYwMDAsMTA2LjIwMDAsMTA4LjUwMDAsODEuNjAwMCwxMDUuNDAwMCwxMjEuNjAwMCw4Ni4wMDAwLDkxLjEwMDAsMTA4LjEwMDAsMTQ4LjkwMDAsNjkuMDAwMCwxMjkuNzAwMCw4My4wMDAwLDEwOC45MDAwLDg2LjIwMDAsOTQuNzAwMCw5NC4xMDAwLDExNS4yMDAwLDkxLjYwMDAsMTIwLjgwMDAsODEuMzAwMCw1Ni4yMDAwLDExNy4yMDAwLDEwNS40MDAwLDExMS4wMDAwLDkxLjIwMDAsMTA4LjQwMDAKMTk5NCwxLDU4LjYwMDAsMTA3LjEwMDAsMTA4LjgwMDAsODkuMTAwMCw3Ni42MDAwLDEyNi4xMDAwLDEwNy44MDAwLDkzLjAwMDAsODUuNzAwMCwxMjguMjAwMCw5My40MDAwLDg5LjEwMDAsMTcwLjEwMDAsMTA1LjMwMDAsMTAxLjYwMDAsODMuNDAwMCwxMDYuMDAwMCwxMTkuNDAwMCw4OC4yMDAwLDg1LjkwMDAsMTA1LjIwMDAsMTUzLjgwMDAsNjguMjAwMCwxMTIuNzAwMCw4MS4wMDAwLDEwOC42MDAwLDEwNC44MDAwLDk1LjQwMDAsOTEuOTAwMCwxMTIuMjAwMCw5NC44MDAwLDExOC44MDAwLDc4LjgwMDAsNTUuODAwMCwxMjAuMzAwMCwxMDYuMjAwMCwxMDQuMjAwMCw5MS44MDAwLDExMS4yMDAwCjE5OTUsMSw1Ni40MDAwLDEwMi42MDAwLDExMy4wMDAwLDg1LjQwMDAsNzkuMzAwMCwxMjcuMjAwMCwxMDAuMzAwMCw3OC4yMDAwLDg0LjMwMDAsMTM1LjQwMDAsOTMuMDAwMCw5MC4xMDAwLDE3NS4zMDAwLDEwNS43MDAwLDEwMi4zMDAwLDg0LjEwMDAsMTA3LjUwMDAsMTI0LjAwMDAsOTAuNTAwMCw4OC41MDAwLDEwMC45MDAwLDE1OC41MDAwLDY3LjAwMDAsMTI0LjkwMDAsODAuNjAwMCwxMTEuNzAwMCwxMDkuNTAwMCw5NS40MDAwLDkwLjgwMDAsMTA5LjIwMDAsOTguNjAwMCwxMjUuNDAwMCw3NS4yMDAwLDUyLjAwMDAsMTIzLjIwMDAsMTA2LjcwMDAsMTE1LjIwMDAsOTMuNTAwMCwxMTUuMDAwMAoxOTk2LDEsNTQuNTAwMCwxMDEuNDAwMCwxMTAuNzAwMCw4My4xMDAwLDc2LjAwMDAsMTI4LjMwMDAsMTAyLjcwMDAsNzMuNjAwMCw4MS44MDAwLDEzNS4xMDAwLDk0LjAwMDAsODguNzAwMCwxNzkuMDAwMCwxMDYuODAwMCwxMDAuMDAwMCw4MS43MDAwLDEwNi45MDAwLDEyNC4xMDAwLDg3LjMwMDAsODYuMjAwMCw5OS4wMDAwLDE1OC4wMDAwLDY1LjcwMDAsMTI5LjcwMDAsODAuODAwMCwxMDcuNjAwMCwxMTAuODAwMCw5My4zMDAwLDg3LjUwMDAsMTAyLjkwMDAsOTIuMzAwMCwxMTkuMjAwMCw3NC42MDAwLDU0LjAwMDAsMTAyLjUwMDAsMTA0LjYwMDAsMTEyLjcwMDAsOTIuMTAwMCwxMTAuMzAwMAoxOTk3LDEsNTMuODAwMCwxMDQuOTAwMCwxMDguNzAwMCw4MS4zMDAwLDc1LjkwMDAsMTI0LjEwMDAsMTAwLjYwMDAsNzUuMDAwMCw3OS42MDAwLDEzNS4zMDAwLDkzLjkwMDAsODkuMjAwMCwxODYuODAwMCwxMDUuMzAwMCwxMDEuMTAwMCw4NC4xMDAwLDEwNi4zMDAwLDEyMC42MDAwLDg4LjkwMDAsODUuNTAwMCw5NS42MDAwLDE3NC40MDAwLDYxLjgwMDAsMTI1LjYwMDAsNzcuNTAwMCwxMDguNjAwMCwxMTEuODAwMCw5Mi45MDAwLDkwLjAwMDAsMTI0LjUwMDAsODguODAwMCwxMTguOTAwMCw3Mi42MDAwLDU3LjAwMDAsOTcuNzAwMCwxMDguMDAwMCwxMTQuNTAwMCw5MS45MDAwLDEwOC44MDAwCjE5OTgsMSw1Mi4zMDAwLDEwNi4yMDAwLDEwOS41MDAwLDgxLjIwMDAsNzUuNTAwMCwxMzIuODAwMCwxMDAuNTAwMCw3OC45MDAwLDgwLjMwMDAsMTM1LjkwMDAsOTQuMDAwMCw4Ny42MDAwLDE3MS4zMDAwLDEwMy4yMDAwLDk0LjUwMDAsODMuMjAwMCwxMDcuMDAwMCwxMjAuMTAwMCw4OS4xMDAwLDgzLjEwMDAsMTAyLjQwMDAsMTczLjgwMDAsNjIuNjAwMCwxMjYuMDAwMCw3OS4xMDAwLDEwNi40MDAwLDExMi4yMDAwLDkyLjEwMDAsODguNzAwMCwxMjYuOTAwMCw4OC4zMDAwLDExOS43MDAwLDczLjIwMDAsNDIuMzAwMCw5Ny4wMDAwLDEwNS42MDAwLDExNC42MDAwLDg4LjcwMDAsMTAyLjkwMDAKMTk5OSwxLDQ3LjIwMDAsMTAwLjcwMDAsMTA0LjgwMDAsNzkuNjAwMCw3My40MDAwLDEzOS41MDAwLDk3LjEwMDAsNzUuMTAwMCw3Mi4yMDAwLDEzMy4zMDAwLDkxLjcwMDAsODMuMzAwMCwxNjUuMzAwMCwxMDEuMDAwMCw4NS41MDAwLDgwLjcwMDAsMTAzLjkwMDAsMTE4LjAwMDAsODIuNjAwMCw4Ni42MDAwLDEwMy45MDAwLDE3MS43MDAwLDU5LjcwMDAsMTEzLjEwMDAsNzQuNzAwMCwxMDQuMDAwMCwxMTEuNDAwMCw5MS4xMDAwLDg2LjkwMDAsMTA5LjQwMDAsODMuNTAwMCwxMTUuNjAwMCw2Ny42MDAwLDQzLjkwMDAsOTQuMTAwMCwxMDIuMTAwMCwxMTIuNDAwMCw4NC40MDAwLDEwNC44MDAwCjIwMDAsMSw0MS42MDAwLDk2LjIwMDAsOTkuNDAwMCw3My4wMDAwLDcxLjQwMDAsMTQwLjcwMDAsODguNDAwMCw2Ni45MDAwLDcwLjAwMDAsMTI1LjUwMDAsODguOTAwMCw3OS44MDAwLDE1Ni4yMDAwLDEwNC4zMDAwLDgyLjkwMDAsNzYuMDAwMCw5Ny4yMDAwLDExMy44MDAwLDc1LjUwMDAsNzcuNjAwMCw5My4yMDAwLDE0Ny4zMDAwLDUzLjgwMDAsMTA5LjAwMDAsNzIuNTAwMCw5OS45MDAwLDEwOC45MDAwLDg3LjkwMDAsODMuMTAwMCwxMDMuOTAwMCw3NS4xMDAwLDEwOC43MDAwLDY5LjMwMDAsNDAuNzAwMCw4OC45MDAwLDk2LjcwMDAsMTA3LjkwMDAsODAuMTAwMCw5MC41MDAwCg=="
+  }
+}

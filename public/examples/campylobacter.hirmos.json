@@ -1,0 +1,1435 @@
+{
+  "kind": "hirmos-bundle",
+  "version": 1,
+  "exportedAt": "2026-09-04T15:26:54.054Z",
+  "application": {
+    "name": "hirmos",
+    "build": "0.1.0"
+  },
+  "project": {
+    "kind": "hirmos-project",
+    "version": 1,
+    "savedAt": "2026-09-04T15:26:54.047Z",
+    "origin": {
+      "kind": "user"
+    },
+    "project": {
+      "id": "8e1c4f7b-9a25-4d63-a7f0-2b5c9d8e1a64",
+      "name": "Campylobacter cases and an outbreak step",
+      "createdAt": "2026-09-04T15:26:48.310Z"
+    },
+    "source": {
+      "name": "campylobacter.csv",
+      "bytes": 2143,
+      "mediaType": "text/csv",
+      "lastModified": 1788533944229,
+      "format": "csv"
+    },
+    "profile": {
+      "id": "duckdb-wasm:1.30.0:903f2f1c1453d0de7417e0e7dbde7ffb3718496ea0a4bc16c619160dbcee4452",
+      "source": {
+        "fingerprint": "903f2f1c1453d0de7417e0e7dbde7ffb3718496ea0a4bc16c619160dbcee4452",
+        "fileName": "campylobacter.csv",
+        "bytes": 2143,
+        "format": "csv",
+        "persistence": {
+          "kind": "ephemeral"
+        }
+      },
+      "parser": {
+        "kind": "duckdb-wasm",
+        "packageVersion": "1.30.0",
+        "engineVersion": "v1.3.2"
+      },
+      "rowCount": 140,
+      "columns": [
+        {
+          "id": "0:period",
+          "name": "period",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "1:year",
+          "name": "year",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "2:season",
+          "name": "season",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "3:outbreak",
+          "name": "outbreak",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        },
+        {
+          "id": "4:cases",
+          "name": "cases",
+          "duckdbType": "BIGINT",
+          "nullable": false,
+          "nullCount": 0
+        }
+      ],
+      "preview": [
+        [
+          {
+            "kind": "integer",
+            "value": "1"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "1"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "2"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "2"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "2"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "3"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "3"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "3"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "4"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "4"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "4"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "1"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "5"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "5"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "6"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "6"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "6"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "9"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "7"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "7"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "12"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "8"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "8"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "8"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "9"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "9"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "5"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "10"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "10"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "7"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "11"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "11"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "11"
+          }
+        ],
+        [
+          {
+            "kind": "integer",
+            "value": "12"
+          },
+          {
+            "kind": "integer",
+            "value": "1990"
+          },
+          {
+            "kind": "integer",
+            "value": "12"
+          },
+          {
+            "kind": "integer",
+            "value": "0"
+          },
+          {
+            "kind": "integer",
+            "value": "9"
+          }
+        ]
+      ]
+    },
+    "prepared": {
+      "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
+      "recipe": "d7c19d95-8bd8-46a5-b33a-5acb7efd5d8f",
+      "sourceProfile": "duckdb-wasm:1.30.0:903f2f1c1453d0de7417e0e7dbde7ffb3718496ea0a4bc16c619160dbcee4452",
+      "observations": 140,
+      "columns": [
+        "3:outbreak",
+        "4:cases"
+      ],
+      "resolution": {
+        "kind": "none"
+      },
+      "kind": "prepared-time-series",
+      "missingness": {
+        "kind": "not-present"
+      },
+      "sampling": {
+        "kind": "regular-series",
+        "timeColumn": "0:period",
+        "frequency": "monthly"
+      },
+      "resampling": {
+        "kind": "none"
+      },
+      "seasonalAdjustment": {
+        "kind": "none"
+      },
+      "seriesTransforms": [
+        {
+          "column": "3:outbreak",
+          "transform": {
+            "kind": "levels"
+          }
+        },
+        {
+          "column": "4:cases",
+          "transform": {
+            "kind": "levels"
+          }
+        }
+      ]
+    },
+    "stationarity": null,
+    "grangerEvidence": [],
+    "countSeriesModels": [],
+    "discoveryRuns": [],
+    "dagDocuments": [
+      {
+        "kind": "dag-document",
+        "id": "39a4951e-1abc-4845-8c0f-d9e907f89c19",
+        "name": "Outbreak step and campylobacter cases",
+        "preparedDataset": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
+        "dataset": {
+          "kind": "time-series",
+          "observations": 140
+        },
+        "origin": {
+          "kind": "user-authored",
+          "basis": "domain-knowledge"
+        },
+        "history": [
+          {
+            "kind": "draft",
+            "id": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
+            "parent": null,
+            "createdAt": "2026-09-04T15:26:50.939Z",
+            "graph": {
+              "kind": "editable-dag",
+              "nodes": [
+                {
+                  "kind": "observed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "column": "3:outbreak",
+                  "name": "outbreak"
+                },
+                {
+                  "kind": "observed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "column": "4:cases",
+                  "name": "cases"
+                }
+              ],
+              "edges": []
+            },
+            "validation": {
+              "kind": "incomplete",
+              "issues": [
+                {
+                  "kind": "no-edges"
+                }
+              ]
+            }
+          }
+        ],
+        "future": [],
+        "audit": [
+          {
+            "kind": "draft",
+            "id": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
+            "parent": null,
+            "createdAt": "2026-09-04T15:26:50.939Z",
+            "graph": {
+              "kind": "editable-dag",
+              "nodes": [
+                {
+                  "kind": "observed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "column": "3:outbreak",
+                  "name": "outbreak"
+                },
+                {
+                  "kind": "observed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "column": "4:cases",
+                  "name": "cases"
+                }
+              ],
+              "edges": []
+            },
+            "validation": {
+              "kind": "incomplete",
+              "issues": [
+                {
+                  "kind": "no-edges"
+                }
+              ]
+            }
+          },
+          {
+            "kind": "draft",
+            "id": "b468b561-2bfe-4b69-8045-ee2f39ab4857",
+            "parent": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
+            "createdAt": "2026-09-04T15:26:51.200Z",
+            "graph": {
+              "kind": "editable-dag",
+              "nodes": [
+                {
+                  "kind": "observed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "column": "3:outbreak",
+                  "name": "outbreak"
+                },
+                {
+                  "kind": "observed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "column": "4:cases",
+                  "name": "cases"
+                }
+              ],
+              "edges": [
+                {
+                  "kind": "directed",
+                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak->d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases@t",
+                  "cause": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "effect": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "timing": {
+                    "kind": "contemporaneous"
+                  },
+                  "support": {
+                    "kind": "user-assumption",
+                    "rationale": "A sustained level shift is scanned for in the window the tscount example searches; the indicator marks the period from which it holds."
+                  },
+                  "evidence": []
+                }
+              ]
+            },
+            "validation": {
+              "kind": "structurally-valid"
+            }
+          }
+        ],
+        "current": {
+          "kind": "draft",
+          "id": "b468b561-2bfe-4b69-8045-ee2f39ab4857",
+          "parent": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
+          "createdAt": "2026-09-04T15:26:51.200Z",
+          "graph": {
+            "kind": "editable-dag",
+            "nodes": [
+              {
+                "kind": "observed",
+                "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                "column": "3:outbreak",
+                "name": "outbreak"
+              },
+              {
+                "kind": "observed",
+                "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                "column": "4:cases",
+                "name": "cases"
+              }
+            ],
+            "edges": [
+              {
+                "kind": "directed",
+                "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak->d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases@t",
+                "cause": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                "effect": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                "timing": {
+                  "kind": "contemporaneous"
+                },
+                "support": {
+                  "kind": "user-assumption",
+                  "rationale": "A sustained level shift is scanned for in the window the tscount example searches; the indicator marks the period from which it holds."
+                },
+                "evidence": []
+              }
+            ]
+          },
+          "validation": {
+            "kind": "structurally-valid"
+          }
+        }
+      }
+    ],
+    "dagChecks": [],
+    "interventionQueries": [],
+    "studyDraft": {
+      "dagDocument": "39a4951e-1abc-4845-8c0f-d9e907f89c19",
+      "treatment": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+      "outcome": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+      "estimand": "average-treatment-effect",
+      "assignment": {
+        "kind": "policy-change",
+        "description": "The indicator marks period 84 onward, the strongest level shift in the window the tscount example searches."
+      },
+      "consistencyRationale": "The indicator means the same raised-incidence regime in every period it marks.",
+      "noInterferenceRationale": "Periods affect one another only through the recorded count recursion."
+    },
+    "studies": [
+      {
+        "kind": "study-specification",
+        "id": "537f7389-e9b2-4325-a412-0cc61cfd9a60",
+        "createdAt": "2026-09-04T15:26:52.374Z",
+        "preparedDataset": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
+        "dataset": {
+          "kind": "time-series",
+          "observations": 140
+        },
+        "dagDocument": "39a4951e-1abc-4845-8c0f-d9e907f89c19",
+        "dagRevision": "b468b561-2bfe-4b69-8045-ee2f39ab4857",
+        "dagName": "Outbreak step and campylobacter cases",
+        "treatment": {
+          "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+          "column": "3:outbreak",
+          "name": "outbreak"
+        },
+        "outcome": {
+          "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+          "column": "4:cases",
+          "name": "cases"
+        },
+        "estimand": {
+          "kind": "average-treatment-effect",
+          "scale": "additive"
+        },
+        "population": {
+          "kind": "all-prepared-rows",
+          "observations": 140
+        },
+        "dagBasis": "domain-knowledge",
+        "assignment": {
+          "kind": "policy-change",
+          "description": "The indicator marks period 84 onward, the strongest level shift in the window the tscount example searches."
+        },
+        "designAssumptions": {
+          "consistency": {
+            "statement": "Consistency: each recorded treatment value represents one well-defined intervention, and a unit’s observed outcome equals its potential outcome under the treatment it received.",
+            "rationale": "The indicator means the same raised-incidence regime in every period it marks."
+          },
+          "noInterference": {
+            "statement": "No interference: one unit’s treatment does not affect another unit’s outcome.",
+            "rationale": "Periods affect one another only through the recorded count recursion."
+          }
+        },
+        "graph": {
+          "nodes": [
+            {
+              "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+              "name": "outbreak",
+              "column": "3:outbreak"
+            },
+            {
+              "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+              "name": "cases",
+              "column": "4:cases"
+            }
+          ],
+          "edges": [
+            [
+              0,
+              1
+            ]
+          ],
+          "laggedArrows": 0
+        },
+        "editableGraph": {
+          "kind": "editable-dag",
+          "nodes": [
+            {
+              "kind": "observed",
+              "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+              "column": "3:outbreak",
+              "name": "outbreak"
+            },
+            {
+              "kind": "observed",
+              "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+              "column": "4:cases",
+              "name": "cases"
+            }
+          ],
+          "edges": [
+            {
+              "kind": "directed",
+              "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak->d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases@t",
+              "cause": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+              "effect": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+              "timing": {
+                "kind": "contemporaneous"
+              },
+              "support": {
+                "kind": "user-assumption",
+                "rationale": "A sustained level shift is scanned for in the window the tscount example searches; the indicator marks the period from which it holds."
+              },
+              "evidence": []
+            }
+          ]
+        }
+      }
+    ],
+    "identifications": [
+      {
+        "kind": "identification",
+        "id": "3b98e24d-3c90-493e-9a5c-a3dc66e1227c",
+        "study": "537f7389-e9b2-4325-a412-0cc61cfd9a60",
+        "createdAt": "2026-09-04T15:26:52.495Z",
+        "method": "backdoor-identification",
+        "evidence": {
+          "kind": "backdoorIdentification",
+          "nodes": 2,
+          "treatment": 0,
+          "outcome": 1,
+          "unobserved": [],
+          "result": {
+            "kind": "identified",
+            "canonicalSet": [],
+            "minimalSets": [
+              []
+            ],
+            "truncated": false
+          },
+          "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "graphicalIdentification": {
+            "kind": "identified",
+            "expression": "P(cases | outbreak)",
+            "latex": "P(cases \\mid outbreak)",
+            "projection": {
+              "directedEdges": [
+                [
+                  0,
+                  1
+                ]
+              ],
+              "bidirectedEdges": []
+            }
+          },
+          "counterfactualIdentification": {
+            "kind": "notApplicable"
+          }
+        },
+        "result": {
+          "kind": "identified",
+          "strategy": "backdoor-adjustment",
+          "adjustment": {
+            "kind": "minimal",
+            "ordinal": 0,
+            "variables": []
+          },
+          "canonicalAdjustmentSet": [],
+          "minimalAdjustmentSets": {
+            "kind": "complete",
+            "sets": [
+              []
+            ]
+          },
+          "mediators": [],
+          "basis": [
+            {
+              "kind": "design-record",
+              "id": "assignment-mechanism",
+              "statement": "Policy change treatment: The indicator marks period 84 onward, the strongest level shift in the window the tscount example searches. Quasi-experimental design: identification depends on the selected design’s assumptions, such as parallel trends, exclusion or continuity."
+            },
+            {
+              "kind": "graph-assumption",
+              "id": "graph-theory",
+              "statement": "The graph “Outbreak step and campylobacter cases” (revision b468b561) states the causes of outbreak and cases; a missing arrow claims there is no direct cause."
+            },
+            {
+              "kind": "graph-assumption",
+              "id": "no-unmeasured-confounding",
+              "statement": "No unmeasured common cause of outbreak and cases exists. Test sensitivity to this assumption in the sensitivity chapter."
+            },
+            {
+              "kind": "design-assumption",
+              "id": "consistency",
+              "statement": "Consistency: each recorded treatment value represents one well-defined intervention, and a unit’s observed outcome equals its potential outcome under the treatment it received.",
+              "rationale": "The indicator means the same raised-incidence regime in every period it marks."
+            },
+            {
+              "kind": "design-assumption",
+              "id": "no-interference",
+              "statement": "No interference: one unit’s treatment does not affect another unit’s outcome.",
+              "rationale": "Periods affect one another only through the recorded count recursion."
+            },
+            {
+              "kind": "graph-result",
+              "id": "backdoor-criterion",
+              "statement": "No back-door path from outbreak to cases is open; the back-door criterion holds without adjustment."
+            }
+          ]
+        }
+      }
+    ],
+    "estimationRuns": [
+      {
+        "id": "0d18593e-beeb-4a13-aabe-755cbdd21e9d",
+        "study": "537f7389-e9b2-4325-a412-0cc61cfd9a60",
+        "identification": "3b98e24d-3c90-493e-9a5c-a3dc66e1227c",
+        "preparedDataset": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
+        "createdAt": "2026-09-04T15:26:53.579Z",
+        "eligibility": {
+          "kind": "caution",
+          "satisfied": [
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "estimand-target-compatibility",
+                "category": "interpretation",
+                "requirement": "The estimator must report the target population recorded in the study specification.",
+                "consequenceIfUnmet": "An ATE and an ATT answer different causal questions and cannot be substituted for one another.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Hernán and Robins, Causal Inference: What If",
+                    "locator": "https://www.hsph.harvard.edu/miguel-hernan/causal-inference-book/"
+                  }
+                ]
+              },
+              "evidence": "Estimator and study both target ATE."
+            },
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "ingarch-identified-regressors",
+                "category": "identification",
+                "requirement": "The treatment and supplied covariates are an identified contemporaneous adjustment set, and the proposed future regressor paths are well-defined interventions.",
+                "consequenceIfUnmet": "The two forecast paths are model-based scenarios rather than an identified causal contrast.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 7",
+                    "locator": "§7.2 back-door criterion"
+                  },
+                  {
+                    "kind": "paper",
+                    "title": "Causality: Models, Reasoning, and Inference, 2nd ed. (Pearl, 2009)",
+                    "locator": "§3.2 interventions and modified models"
+                  }
+                ]
+              },
+              "evidence": "The treatment and contemporaneous adjustment set are nothing. The requested future treatment path remains a modelling assumption."
+            },
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "ingarch-regular-count-series",
+                "category": "sampling-structure",
+                "requirement": "The outcome is a regularly sampled sequence of non-negative integer counts.",
+                "consequenceIfUnmet": "The count recursion and its lag spacing do not describe the observations.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)",
+                    "locator": "Journal of Statistical Software 82(5)"
+                  }
+                ]
+              },
+              "evidence": "The prepared rows are a regular time series and every outcome value is a non-negative integer."
+            },
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "ingarch-no-interval",
+                "category": "finite-sample",
+                "requirement": "Sampling uncertainty requires a dependence-aware bootstrap or another validated interval procedure.",
+                "consequenceIfUnmet": "The fitted baseline and intervention trajectories are point predictions, not uncertainty bounds.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)",
+                    "locator": "§3 prediction"
+                  }
+                ]
+              },
+              "evidence": "This release labels both trajectories as conditional-mean point forecasts and reports no sampling interval."
+            }
+          ],
+          "unresolved": [
+            {
+              "kind": "unresolved",
+              "caveat": {
+                "id": "ingarch-conditional-mean",
+                "category": "functional-form",
+                "requirement": "The selected identity or log conditional-mean form is adequately represented by the chosen past-count lags, past-mean lags, and regressors. Identity-link regressors must be non-negative.",
+                "consequenceIfUnmet": "The fitted treatment trajectory can reflect omitted dynamics or a misspecified response surface.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)",
+                    "locator": "§2 INGARCH and log-linear count time-series models"
+                  }
+                ]
+              },
+              "missingEvidence": "Review the selected additive conditional-mean form, count lags (1), mean lags (1), and contemporaneous regressors. The run requires their fitted and future values to be non-negative."
+            },
+            {
+              "kind": "unresolved",
+              "caveat": {
+                "id": "ingarch-stability",
+                "category": "stationarity-and-dynamics",
+                "requirement": "The fitted recursion is stable over the observed and forecast periods.",
+                "consequenceIfUnmet": "Small changes in recent counts can produce implausible or explosive forecasts.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)",
+                    "locator": "§2 stationarity and ergodicity"
+                  }
+                ]
+              },
+              "missingEvidence": "The run reports the fitted recursion and forecast path; inspect them for unstable or explosive behaviour."
+            }
+          ]
+        },
+        "kind": "negative-binomial-ingarch-run",
+        "configuration": {
+          "kind": "negative-binomial-ingarch",
+          "link": "identity",
+          "pastObservationLags": [
+            1
+          ],
+          "pastMeanLags": [
+            1
+          ],
+          "horizon": 12,
+          "controlValue": 0,
+          "treatmentValue": 1,
+          "schedule": {
+            "kind": "persistent"
+          }
+        },
+        "evidence": {
+          "kind": "negativeBinomialIngarch",
+          "observations": 140,
+          "outcome": 1,
+          "link": "identity",
+          "regressors": [
+            0
+          ],
+          "pastObservationLags": [
+            1
+          ],
+          "pastMeanLags": [
+            1
+          ],
+          "externalRegressors": [
+            false
+          ],
+          "horizon": 12,
+          "interventionRegressor": 0,
+          "controlValue": 0,
+          "treatmentValue": 1,
+          "schedule": {
+            "kind": "persistent"
+          },
+          "parameters": [
+            4.424920015158106,
+            0.45735971231418604,
+            0.00008688682625953287,
+            4.450890679060033
+          ],
+          "fittedMeans": [
+            8.155731782618654,
+            5.340348065436894,
+            5.797463157995191,
+            6.254862587589005,
+            4.882823192631217,
+            7.169502542053616,
+            8.541780361307518,
+            9.913978731114538,
+            8.084659107819144,
+            6.712421027100305,
+            7.627021222316971,
+            9.456539538281975,
+            8.541979074693659,
+            7.169820474494998,
+            7.1697012519891015,
+            8.541780378572794,
+            7.169820457230922,
+            9.913859525872718,
+            8.08465909746178,
+            7.627140451727778,
+            6.712381274756322,
+            8.999100355805574,
+            9.914018466197446,
+            9.914097960528345,
+            8.542018830492797,
+            9.91397875183437,
+            8.084659107820945,
+            8.54185987635705,
+            10.82869816265172,
+            6.712659447944912,
+            6.71230181840423,
+            8.541740636587678,
+            10.828698152291354,
+            8.08473858488657,
+            8.999219595576745,
+            11.743457325814555,
+            10.371616626978879,
+            9.914137719780237,
+            8.999378546261537,
+            7.627219928797602,
+            8.541820130918577,
+            7.169820460684877,
+            8.084420676616274,
+            7.16978071869796,
+            6.254981823906475,
+            7.169621764562212,
+            7.169701234723826,
+            9.456499803199668,
+            8.084619358927018,
+            8.99921958521758,
+            9.456658764242725,
+            10.37141793430957,
+            6.7126197163171595,
+            7.1696615272662605,
+            5.797622101236123,
+            6.254862601399079,
+            8.084341178831718,
+            5.340341862533906,
+            7.626902006712985,
+            9.913899240237894,
+            9.914097950169179,
+            10.828817392062826,
+            9.914177444503679,
+            7.627299412770536,
+            7.627100713196316,
+            8.084460408246125,
+            7.627140434464302,
+            7.627100699383195,
+            5.7976618466739955,
+            6.71222231716662,
+            6.712301780423323,
+            8.999100348898564,
+            7.627219904625916,
+            8.08446041860229,
+            10.371298708350318,
+            10.371497404471484,
+            9.456777997107187,
+            9.914058232355147,
+            7.169939690098384,
+            8.084420686975738,
+            6.255061294070489,
+            7.626981483781309,
+            7.169740973258288,
+            12.992671061084081,
+            15.279975558569873,
+            13.908095158255794,
+            13.907975959921803,
+            15.737414798821781,
+            18.939091739155632,
+            16.652571361132757,
+            11.1640561448637,
+            13.450377826766612,
+            14.365295902629732,
+            16.194814246214374,
+            11.62137608411497,
+            16.194575835729832,
+            13.908174624971174,
+            14.822695391454786,
+            15.737494275890104,
+            18.02437232143277,
+            34.032160952004695,
+            30.37467411944076,
+            21.684521798048255,
+            16.195450190523104,
+            18.481771824082944,
+            15.737812201428376,
+            12.993415513600265,
+            17.566774184823924,
+            18.024531261758398,
+            16.195132185561267,
+            15.2802538102532,
+            19.853771442516617,
+            16.195291122435037,
+            23.970088358032257,
+            17.567727913090263,
+            18.481891056939006,
+            17.1098913487307,
+            13.450894441516937,
+            16.65209450908768,
+            14.36557408963084,
+            15.737454558070972,
+            17.567012605667628,
+            17.109811857845656,
+            12.99353472229604,
+            12.535817359725542,
+            20.310892699457746,
+            16.652690552564458,
+            14.822933853733353,
+            18.48165257049445,
+            13.90837334181007,
+            14.365335696406476,
+            13.450655975786812,
+            14.822655639111403,
+            11.16389714929429,
+            12.078298676009432,
+            14.822536399341132,
+            16.652213686704158,
+            16.19501294924255,
+            18.481771786092438,
+            16.195171913739262
+          ],
+          "residuals": [
+            -6.155731782618654,
+            -2.3403480654368938,
+            -1.7974631579951907,
+            -5.254862587589005,
+            1.117176807368783,
+            1.8304974579463842,
+            3.4582196386924817,
+            -1.913978731114538,
+            -3.084659107819144,
+            0.2875789728996949,
+            3.372978777683029,
+            -0.4565395382819748,
+            -2.541979074693659,
+            -1.1698204744949976,
+            1.8302987480108985,
+            -2.5417803785727937,
+            4.830179542769078,
+            -1.9138595258727182,
+            -1.0846590974617794,
+            -2.6271404517277777,
+            3.2876187252436777,
+            3.0008996441944262,
+            2.0859815338025545,
+            -0.9140979605283448,
+            3.457981169507203,
+            -1.9139787518343692,
+            0.9153408921790547,
+            5.45814012364295,
+            -5.828698162651721,
+            -1.7126594479449118,
+            2.28769818159577,
+            5.458259363412322,
+            -2.828698152291354,
+            1.9152614151134308,
+            7.000780404423255,
+            1.2565426741854449,
+            1.628383373021121,
+            0.08586228021976261,
+            -1.9993785462615374,
+            1.3727800712023983,
+            -2.541820130918577,
+            0.8301795393151226,
+            -2.084420676616274,
+            -3.16978071869796,
+            -0.2549818239064754,
+            -1.169621764562212,
+            3.830298765276174,
+            -1.4564998031996677,
+            1.9153806410729821,
+            2.0007804147824206,
+            3.543341235757275,
+            -5.371417934309569,
+            -0.7126197163171595,
+            -4.1696615272662605,
+            -1.797622101236123,
+            1.7451373986009209,
+            -6.084341178831718,
+            1.659658137466094,
+            4.373097993287015,
+            2.0861007597621057,
+            4.085902049830821,
+            1.1711826079371743,
+            -2.9141774445036788,
+            -0.6272994127705358,
+            0.3728992868036842,
+            -1.0844604082461249,
+            -0.6271404344643017,
+            -4.627100699383195,
+            -0.7976618466739955,
+            -1.7122223171666198,
+            3.2876982195766766,
+            -1.9991003488985637,
+            0.3727800953740843,
+            4.915539581397709,
+            2.6287012916496817,
+            0.6285025955285164,
+            2.543222002892813,
+            -3.9140582323551474,
+            0.830060309901616,
+            -4.084420686975738,
+            0.7449387059295107,
+            -1.626981483781309,
+            1.8302590267417118,
+            1.0073289389159186,
+            -4.279975558569873,
+            -2.9080951582557937,
+            1.092024040078197,
+            6.262585201178219,
+            -1.9390917391556322,
+            -11.652571361132757,
+            -1.1640561448637001,
+            -1.450377826766612,
+            1.6347040973702676,
+            -10.194814246214374,
+            4.378623915885029,
+            -5.194575835729832,
+            -0.9081746249711742,
+            0.17730460854521368,
+            4.2625057241098965,
+            36.97562767856723,
+            12.967839047995305,
+            -2.3746741194407583,
+            -5.684521798048255,
+            4.804549809476896,
+            -3.4817718240829443,
+            -6.737812201428376,
+            6.006584486399735,
+            2.433225815176076,
+            -2.0245312617583977,
+            -2.195132185561267,
+            8.7197461897468,
+            -3.853771442516617,
+            16.804708877564963,
+            -4.970088358032257,
+            3.4322720869097374,
+            -0.4818910569390056,
+            -7.109891348730699,
+            3.5491055584830633,
+            -4.652094509087679,
+            0.6344259103691599,
+            3.262545441929028,
+            0.4329873943323719,
+            -8.109811857845656,
+            -4.99353472229604,
+            12.464182640274458,
+            -3.310892699457746,
+            -3.652690552564458,
+            6.177066146266647,
+            -7.48165257049445,
+            -1.9083733418100692,
+            -4.365335696406476,
+            -0.4506559757868125,
+            -9.822655639111403,
+            -4.163897149294289,
+            0.9217013239905683,
+            2.177463600658868,
+            -0.6522136867041581,
+            4.80498705075745,
+            -2.4817717860924375,
+            -7.195171913739262
+          ],
+          "logLikelihood": -395.77407161873947,
+          "size": 13.358705481926595,
+          "dispersion": 0.07485755272866303,
+          "score": [
+            0.3905985279516096,
+            1.8479481869063372,
+            2.3054799200424103,
+            0.31227614343313653
+          ],
+          "iterations": 2,
+          "functionEvaluations": 85,
+          "gradientEvaluations": 19,
+          "baselineMean": [
+            8.542564573074092,
+            8.332687127048501,
+            8.236679403127814,
+            8.192760996329081,
+            8.172670670499333,
+            8.16348041927289,
+            8.159276370104108,
+            8.15735324210923,
+            8.15647351374826,
+            8.156071085001368,
+            8.155886995339706,
+            8.15580278415004
+          ],
+          "interventionMean": [
+            12.993455252134126,
+            14.819622610390457,
+            15.654996657886105,
+            16.03713567492318,
+            16.211943868665664,
+            16.291909282395046,
+            16.32848918895441,
+            16.345222542806866,
+            16.352877158618888,
+            16.35637873658982,
+            16.35798052152425,
+            16.35871325259506
+          ],
+          "effectPath": [
+            4.450890679060034,
+            6.486935483341956,
+            7.418317254758291,
+            7.8443746785941,
+            8.039273198166331,
+            8.128428863122156,
+            8.169212818850303,
+            8.187869300697637,
+            8.196403644870628,
+            8.200307651588453,
+            8.202093526184544,
+            8.202910468445019
+          ],
+          "averageEffect": 7.627251463973288,
+          "cumulativeEffect": 91.52701756767945
+        },
+        "method": "negative-binomial-ingarch",
+        "columns": [
+          {
+            "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+            "column": "3:outbreak",
+            "name": "outbreak"
+          },
+          {
+            "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+            "column": "4:cases",
+            "name": "cases"
+          }
+        ],
+        "estimate": {
+          "kind": "causal-estimate",
+          "estimand": {
+            "kind": "average-treatment-effect",
+            "scale": "additive"
+          },
+          "effect": {
+            "kind": "path",
+            "values": [
+              {
+                "step": 1,
+                "actual": 12.993455252134126,
+                "counterfactual": 8.542564573074092,
+                "lower": 8.542564573074092,
+                "upper": 8.542564573074092,
+                "effect": 4.450890679060034
+              },
+              {
+                "step": 2,
+                "actual": 14.819622610390457,
+                "counterfactual": 8.332687127048501,
+                "lower": 8.332687127048501,
+                "upper": 8.332687127048501,
+                "effect": 6.486935483341956
+              },
+              {
+                "step": 3,
+                "actual": 15.654996657886105,
+                "counterfactual": 8.236679403127814,
+                "lower": 8.236679403127814,
+                "upper": 8.236679403127814,
+                "effect": 7.418317254758291
+              },
+              {
+                "step": 4,
+                "actual": 16.03713567492318,
+                "counterfactual": 8.192760996329081,
+                "lower": 8.192760996329081,
+                "upper": 8.192760996329081,
+                "effect": 7.8443746785941
+              },
+              {
+                "step": 5,
+                "actual": 16.211943868665664,
+                "counterfactual": 8.172670670499333,
+                "lower": 8.172670670499333,
+                "upper": 8.172670670499333,
+                "effect": 8.039273198166331
+              },
+              {
+                "step": 6,
+                "actual": 16.291909282395046,
+                "counterfactual": 8.16348041927289,
+                "lower": 8.16348041927289,
+                "upper": 8.16348041927289,
+                "effect": 8.128428863122156
+              },
+              {
+                "step": 7,
+                "actual": 16.32848918895441,
+                "counterfactual": 8.159276370104108,
+                "lower": 8.159276370104108,
+                "upper": 8.159276370104108,
+                "effect": 8.169212818850303
+              },
+              {
+                "step": 8,
+                "actual": 16.345222542806866,
+                "counterfactual": 8.15735324210923,
+                "lower": 8.15735324210923,
+                "upper": 8.15735324210923,
+                "effect": 8.187869300697637
+              },
+              {
+                "step": 9,
+                "actual": 16.352877158618888,
+                "counterfactual": 8.15647351374826,
+                "lower": 8.15647351374826,
+                "upper": 8.15647351374826,
+                "effect": 8.196403644870628
+              },
+              {
+                "step": 10,
+                "actual": 16.35637873658982,
+                "counterfactual": 8.156071085001368,
+                "lower": 8.156071085001368,
+                "upper": 8.156071085001368,
+                "effect": 8.200307651588453
+              },
+              {
+                "step": 11,
+                "actual": 16.35798052152425,
+                "counterfactual": 8.155886995339706,
+                "lower": 8.155886995339706,
+                "upper": 8.155886995339706,
+                "effect": 8.202093526184544
+              },
+              {
+                "step": 12,
+                "actual": 16.35871325259506,
+                "counterfactual": 8.15580278415004,
+                "lower": 8.15580278415004,
+                "upper": 8.15580278415004,
+                "effect": 8.202910468445019
+              }
+            ],
+            "aggregate": {
+              "cumulative": 91.52701756767945,
+              "average": 7.627251463973288
+            }
+          },
+          "interval": {
+            "kind": "none",
+            "reason": "The INGARCH run reports conditional-mean scenario paths without a sampling interval."
+          },
+          "standardError": null,
+          "adjustment": {
+            "kind": "none"
+          },
+          "sample": {
+            "observations": 140,
+            "parameters": 4,
+            "degreesOfFreedom": null
+          }
+        }
+      }
+    ],
+    "sensitivityRuns": [],
+    "counterfactualRuns": []
+  },
+  "data": {
+    "kind": "source-file",
+    "name": "campylobacter.csv",
+    "mediaType": "text/csv",
+    "lastModified": 1788533944229,
+    "bytes": 2143,
+    "base64": "cGVyaW9kLHllYXIsc2Vhc29uLG91dGJyZWFrLGNhc2VzCjEsMTk5MCwxLDAsMgoyLDE5OTAsMiwwLDMKMywxOTkwLDMsMCw0CjQsMTk5MCw0LDAsMQo1LDE5OTAsNSwwLDYKNiwxOTkwLDYsMCw5CjcsMTk5MCw3LDAsMTIKOCwxOTkwLDgsMCw4CjksMTk5MCw5LDAsNQoxMCwxOTkwLDEwLDAsNwoxMSwxOTkwLDExLDAsMTEKMTIsMTk5MCwxMiwwLDkKMTMsMTk5MCwxMywwLDYKMTQsMTk5MSwxLDAsNgoxNSwxOTkxLDIsMCw5CjE2LDE5OTEsMywwLDYKMTcsMTk5MSw0LDAsMTIKMTgsMTk5MSw1LDAsOAoxOSwxOTkxLDYsMCw3CjIwLDE5OTEsNywwLDUKMjEsMTk5MSw4LDAsMTAKMjIsMTk5MSw5LDAsMTIKMjMsMTk5MSwxMCwwLDEyCjI0LDE5OTEsMTEsMCw5CjI1LDE5OTEsMTIsMCwxMgoyNiwxOTkxLDEzLDAsOAoyNywxOTkyLDEsMCw5CjI4LDE5OTIsMiwwLDE0CjI5LDE5OTIsMywwLDUKMzAsMTk5Miw0LDAsNQozMSwxOTkyLDUsMCw5CjMyLDE5OTIsNiwwLDE0CjMzLDE5OTIsNywwLDgKMzQsMTk5Miw4LDAsMTAKMzUsMTk5Miw5LDAsMTYKMzYsMTk5MiwxMCwwLDEzCjM3LDE5OTIsMTEsMCwxMgozOCwxOTkyLDEyLDAsMTAKMzksMTk5MiwxMywwLDcKNDAsMTk5MywxLDAsOQo0MSwxOTkzLDIsMCw2CjQyLDE5OTMsMywwLDgKNDMsMTk5Myw0LDAsNgo0NCwxOTkzLDUsMCw0CjQ1LDE5OTMsNiwwLDYKNDYsMTk5Myw3LDAsNgo0NywxOTkzLDgsMCwxMQo0OCwxOTkzLDksMCw4CjQ5LDE5OTMsMTAsMCwxMAo1MCwxOTkzLDExLDAsMTEKNTEsMTk5MywxMiwwLDEzCjUyLDE5OTMsMTMsMCw1CjUzLDE5OTQsMSwwLDYKNTQsMTk5NCwyLDAsMwo1NSwxOTk0LDMsMCw0CjU2LDE5OTQsNCwwLDgKNTcsMTk5NCw1LDAsMgo1OCwxOTk0LDYsMCw3CjU5LDE5OTQsNywwLDEyCjYwLDE5OTQsOCwwLDEyCjYxLDE5OTQsOSwwLDE0CjYyLDE5OTQsMTAsMCwxMgo2MywxOTk0LDExLDAsNwo2NCwxOTk0LDEyLDAsNwo2NSwxOTk0LDEzLDAsOAo2NiwxOTk1LDEsMCw3CjY3LDE5OTUsMiwwLDcKNjgsMTk5NSwzLDAsMwo2OSwxOTk1LDQsMCw1CjcwLDE5OTUsNSwwLDUKNzEsMTk5NSw2LDAsMTAKNzIsMTk5NSw3LDAsNwo3MywxOTk1LDgsMCw4Cjc0LDE5OTUsOSwwLDEzCjc1LDE5OTUsMTAsMCwxMwo3NiwxOTk1LDExLDAsMTEKNzcsMTk5NSwxMiwwLDEyCjc4LDE5OTUsMTMsMCw2Cjc5LDE5OTYsMSwwLDgKODAsMTk5NiwyLDAsNAo4MSwxOTk2LDMsMCw3CjgyLDE5OTYsNCwwLDYKODMsMTk5Niw1LDAsOQo4NCwxOTk2LDYsMSwxNAo4NSwxOTk2LDcsMSwxMQo4NiwxOTk2LDgsMSwxMQo4NywxOTk2LDksMSwxNQo4OCwxOTk2LDEwLDEsMjIKODksMTk5NiwxMSwxLDE3CjkwLDE5OTYsMTIsMSw1CjkxLDE5OTYsMTMsMSwxMAo5MiwxOTk3LDEsMSwxMgo5MywxOTk3LDIsMSwxNgo5NCwxOTk3LDMsMSw2Cjk1LDE5OTcsNCwxLDE2Cjk2LDE5OTcsNSwxLDExCjk3LDE5OTcsNiwxLDEzCjk4LDE5OTcsNywxLDE1Cjk5LDE5OTcsOCwxLDIwCjEwMCwxOTk3LDksMSw1NQoxMDEsMTk5NywxMCwxLDQ3CjEwMiwxOTk3LDExLDEsMjgKMTAzLDE5OTcsMTIsMSwxNgoxMDQsMTk5NywxMywxLDIxCjEwNSwxOTk4LDEsMSwxNQoxMDYsMTk5OCwyLDEsOQoxMDcsMTk5OCwzLDEsMTkKMTA4LDE5OTgsNCwxLDIwCjEwOSwxOTk4LDUsMSwxNgoxMTAsMTk5OCw2LDEsMTQKMTExLDE5OTgsNywxLDI0CjExMiwxOTk4LDgsMSwxNgoxMTMsMTk5OCw5LDEsMzMKMTE0LDE5OTgsMTAsMSwxOQoxMTUsMTk5OCwxMSwxLDIxCjExNiwxOTk4LDEyLDEsMTgKMTE3LDE5OTgsMTMsMSwxMAoxMTgsMTk5OSwxLDEsMTcKMTE5LDE5OTksMiwxLDEyCjEyMCwxOTk5LDMsMSwxNQoxMjEsMTk5OSw0LDEsMTkKMTIyLDE5OTksNSwxLDE4CjEyMywxOTk5LDYsMSw5CjEyNCwxOTk5LDcsMSw4CjEyNSwxOTk5LDgsMSwyNQoxMjYsMTk5OSw5LDEsMTcKMTI3LDE5OTksMTAsMSwxMwoxMjgsMTk5OSwxMSwxLDIxCjEyOSwxOTk5LDEyLDEsMTEKMTMwLDE5OTksMTMsMSwxMgoxMzEsMjAwMCwxLDEsMTAKMTMyLDIwMDAsMiwxLDEzCjEzMywyMDAwLDMsMSw1CjEzNCwyMDAwLDQsMSw3CjEzNSwyMDAwLDUsMSwxMwoxMzYsMjAwMCw2LDEsMTcKMTM3LDIwMDAsNywxLDE2CjEzOCwyMDAwLDgsMSwyMQoxMzksMjAwMCw5LDEsMTYKMTQwLDIwMDAsMTAsMSw5Cg=="
+  }
+}

@@ -7,7 +7,7 @@ import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
-import { button, field, fieldLabel, num, table, td, th, tr, well } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, label, num, table, td, th, tr, well } from '@/components/ui/recipes'
 import type { PreparedMatrix } from '@/data/prepared'
 import type { DatasetProfile } from '@/domain/dataset'
 import {
@@ -129,9 +129,12 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
           </div>
           <p className="mb-0 mt-1 max-w-[78ch] text-body text-faint">Pairwise correlation groups variables with similar linear variation. Variance inflation factor (VIF) measures how well each variable is explained by all the others, then removes the largest value until the threshold is met.</p>
         </div>
-        <div className="flex flex-wrap items-end gap-2">
-          <label className="text-body text-ink"><span className={fieldLabel}>|r| threshold</span><input type="number" min={0.01} max={1} step={0.01} className={field('text', 'mt-1 w-24')} value={correlationThreshold} onChange={(event) => setCorrelationThreshold(Math.max(0.01, Math.min(1, Number(event.target.value) || 0.9)))} /></label>
-          <label className="text-body text-ink"><span className={fieldLabel}>VIF threshold</span><input type="number" min={1.01} step={0.5} className={field('text', 'mt-1 w-24')} value={vifThreshold} onChange={(event) => setVifThreshold(Math.max(1.01, Number(event.target.value) || 10))} /></label>
+        {/* Each threshold sits in its own cell, label over value, as the dataset-size strip does; on a narrow panel the strip fills the width and the button takes the row beneath. */}
+        <div className="flex w-full flex-col gap-2 @xl/panel:w-auto @xl/panel:flex-row @xl/panel:items-end">
+          <div className={figureGrid('grid-cols-2')}>
+            <label className="block bg-panel px-3 py-2"><span className={label('text-faint')}>|r| threshold</span><input type="number" min={0.01} max={1} step={0.01} className={num('mt-1 block w-full border-0 bg-transparent p-0 text-body text-ink focus:outline-none')} value={correlationThreshold} onChange={(event) => setCorrelationThreshold(Math.max(0.01, Math.min(1, Number(event.target.value) || 0.9)))} /></label>
+            <label className="block bg-panel px-3 py-2"><span className={label('text-faint')}>VIF threshold</span><input type="number" min={1.01} step={0.5} className={num('mt-1 block w-full border-0 bg-transparent p-0 text-body text-ink focus:outline-none')} value={vifThreshold} onChange={(event) => setVifThreshold(Math.max(1.01, Number(event.target.value) || 10))} /></label>
+          </div>
           <button type="button" className={button('quiet')} disabled={availability.kind === 'unavailable'} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Analyse redundancy</button>
         </div>
       </div>

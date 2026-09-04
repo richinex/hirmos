@@ -36,7 +36,7 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
           <h2 id="data-profile-title" className="mb-0 mt-2 text-heading text-ink">Data profile</h2>
           <p className="mb-0 mt-1 text-body text-muted">{profile.source.fileName}</p>
         </div>
-        <dl aria-label="Dataset size" className={figureGrid('m-0 grid-cols-3')}>
+        <dl aria-label="Dataset size" className={figureGrid('m-0 w-full grid-cols-3 @2xl/studio:w-auto')}>
           {sizeFigures.map(({ name, figure }) => (
             <div key={name} className="bg-panel px-3 py-2">
               <dt className={label('text-faint')}>{name}</dt>

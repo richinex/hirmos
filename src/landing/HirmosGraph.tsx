@@ -83,7 +83,7 @@ function textSprite(text: string, colour: THREE.Color, width: number, fontSize: 
   const context = canvas.getContext('2d')
   if (context !== null) {
     context.fillStyle = `#${colour.getHexString()}`
-    context.font = `500 ${fontSize}px Geist, ui-sans-serif, system-ui, sans-serif`
+    context.font = `500 ${fontSize}px "JetBrains Mono Variable", ui-monospace, monospace`
     context.textAlign = 'center'
     context.textBaseline = 'middle'
     context.fillText(text, canvas.width / 2, canvas.height / 2)

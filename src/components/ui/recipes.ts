@@ -126,7 +126,7 @@ export const fieldHint = 'mt-1 text-body text-faint'
  */
 
 /** Figures the reader compares down a column. `tabular-nums` fixes digit advance width, so a counter
- *  ticking 9 to 10 does not nudge what follows. Sans, because Geist's tabular figures align without the
+ *  ticking 9 to 10 does not nudge what follows. Sans, because JetBrains Mono's tabular figures align without the
  *  typeface change. */
 export const num = (extra?: string): string => cn('tabular-nums', extra)
 

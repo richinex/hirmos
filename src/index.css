@@ -44,8 +44,8 @@
    Elevation is NOT drop shadows: `.lift` is an inset top-edge highlight, `.float` a theme-aware shadow
    for surfaces that leave the plane. Components carry no `shadow-*` utilities. */
 @theme {
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
 
   /* The house curve is the default for every transition utility, so a button's 150ms colour change
      rides the same ease-out as .pop and .rise instead of Tailwind's own curve. */
@@ -241,7 +241,7 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
 }
 
 /* Figures in tables and definition lists align down a column without every cell opting in through
-   `num()`; Geist's figures are already lining, so `lining-nums` only guards a fallback face. */
+   `num()`; JetBrains Mono's figures are already lining, so `lining-nums` only guards a fallback face. */
 @layer base {
   table, dl { font-variant-numeric: tabular-nums lining-nums; }
 }
@@ -484,7 +484,7 @@ button[aria-busy="true"]::after {
   background: #FFFFFF;   /* a flat white sheet — no wash, no tint */
 }
 
-/* The sketchbook family's display voice, now same-family emphasis (weight and tracking in Geist)
+/* The sketchbook family's display voice, now same-family emphasis (weight and tracking in the app face)
    rather than a second typeface: one family per project, headings still read as headings. */
 :root[data-theme="sketchbook"] h2,
 :root[data-theme="sketchbook-white"] h2 {
@@ -659,7 +659,7 @@ mark.passage-bound {
 }
 
 /* 3D graph node labels. These are real DOM (CSS2DRenderer), not canvas textures baked into a sprite —
-   so they render Geist Mono at the display's true resolution instead of a fixed-pixel raster that goes
+   so they render the mono face at the display's true resolution instead of a fixed-pixel raster that goes
    soft on a retina panel, and they cost no GPU memory. `pointer-events: none` matters: a label sitting
    over a node must not swallow the click meant for the node behind it. Colour and size are set per node
    in GraphPanel (lit vs quiet), so only the invariant parts live here. */

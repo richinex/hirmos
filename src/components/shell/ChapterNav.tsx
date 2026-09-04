@@ -182,7 +182,7 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch
       onClickCapture={(event) => { slide.clickGuard(event) }}
       className={cn(
         'flex shrink-0 flex-col gap-1 overflow-hidden border-r border-line bg-panel py-2 transition-[width,translate] duration-200 ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
-        rail ? 'w-12 items-center' : 'w-52 px-2',
+        rail ? 'w-12 items-center' : 'w-60 px-2',
         '@max-md/shell:absolute @max-md/shell:inset-y-0 @max-md/shell:left-0 @max-md/shell:z-(--z-overlay) @max-md/shell:touch-pan-y @max-md/shell:will-change-transform',
         phoneOpen ? '@max-md/shell:translate-x-0' : '@max-md/shell:-translate-x-full',
       )}

@@ -1,5 +1,5 @@
 import { err, ok, type Result } from '@/domain/dop'
-import { headerOf, parseSnapshot, serialiseSnapshot, type PersistedProject, type SavedProjectHeader, type SnapshotProblem } from '@/domain/persistence'
+import { headerOf, parseSnapshot, samePersistedProjectContent, serialiseSnapshot, type PersistedProject, type SavedProjectHeader, type SnapshotProblem } from '@/domain/persistence'
 import type { ProjectId } from '@/domain/workflow'
 import { reportStorageFailure, reportStorageRecovered } from './storageHealth'
 
@@ -17,6 +17,10 @@ export type ProjectStoreProblem =
   | { readonly kind: 'storage-unavailable'; readonly detail: string }
   | { readonly kind: 'not-found'; readonly id: ProjectId }
   | SnapshotProblem
+
+export type SaveProjectOutcome =
+  | { readonly kind: 'saved'; readonly header: SavedProjectHeader }
+  | { readonly kind: 'unchanged'; readonly header: SavedProjectHeader }
 
 const open = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
   const request = indexedDB.open(DB_NAME, 1)
@@ -48,6 +52,19 @@ export async function saveProject(snapshot: PersistedProject): Promise<Result<Sa
     reportStorageFailure({ store: DB_NAME, reason: detail, at: new Date().toISOString() })
     return err({ kind: 'storage-unavailable', detail })
   }
+}
+
+/** Preserve the previous write time when the analysis itself has not changed. */
+export async function saveProjectIfChanged(snapshot: PersistedProject): Promise<Result<SaveProjectOutcome, ProjectStoreProblem>> {
+  const existing = await loadProject(snapshot.project.id)
+  if (existing.ok && samePersistedProjectContent(existing.value, snapshot)) {
+    return ok({ kind: 'unchanged', header: headerOf(existing.value) })
+  }
+
+  const saved = await saveProject(snapshot)
+  return saved.ok
+    ? ok({ kind: 'saved', header: saved.value })
+    : saved
 }
 
 export async function listProjects(): Promise<readonly SavedProjectHeader[]> {

@@ -931,7 +931,7 @@ export function DagWorkspace({
   const addEdgeForm = (
     <section className="border-t border-hair pt-4" aria-labelledby="add-edge-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 id="add-edge-title" className="m-0 text-body font-medium text-ink">Add an arrow</h3>
+        <h3 id="add-edge-title" className="m-0 text-body font-medium text-ink">Add an arrow or use the editor</h3>
         {(state.cause !== null || state.effect !== null || state.rationale.length > 0) && <button type="button" className="text-label text-muted hover:text-ink" onClick={() => dispatch({ type: 'edge-draft-cancelled' })}>Clear the draft</button>}
       </div>
       <div className="mt-2 grid gap-2">
@@ -991,10 +991,7 @@ export function DagWorkspace({
             </form>
           </aside>
         ) : (
-          <>
-            {addEdgeForm}
-            <p className="m-0 text-body text-faint">Or drag from one variable onto another. Select an arrow to record its rationale, change its timing, reverse it, replace it with an unmeasured cause, or remove it, or drag either of its ends to another variable.</p>
-          </>
+          addEdgeForm
         )
       )}
       {inspectorTab === 'intervene' && (

@@ -278,11 +278,148 @@ test('the shipped example uses the current applied-adjustment record', async ({ 
 test('opens the shipped example Estimation chapter without the compatibility boundary', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Example rendering runs once')
   await page.goto('/app')
-  const example = page.getByRole('listitem').filter({ hasText: 'Seat-belt law and road deaths' })
+  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
   await example.getByRole('button', { name: 'Open' }).click()
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByText('The Estimation chapter could not be displayed.')).toHaveCount(0)
   await expect(page.getByText('Runs · 3')).toBeVisible()
+})
+
+test('replaces an unstamped saved example even when it has the shipped project creation time', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Example release compatibility runs once')
+  await page.goto('/app')
+  await page.evaluate(async () => {
+    const [bundleModule, store] = await Promise.all([
+      import(new URL('/src/domain/bundle.ts', window.location.href).href),
+      import(new URL('/src/data/projectStore.ts', window.location.href).href),
+    ])
+    const response = await fetch('/examples/seatbelts.hirmos.json')
+    const parsed = bundleModule.parseBundle(await response.text())
+    if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
+    const stale = {
+      ...parsed.value.project,
+      savedAt: '2026-01-01T00:00:00.000Z',
+      studies: [],
+      identifications: [],
+      estimationRuns: [],
+      sensitivityRuns: [],
+      counterfactualRuns: [],
+    }
+    const saved = await store.saveProject(stale)
+    if (!saved.ok) throw new Error(`Stale example could not be seeded: ${saved.error.kind}`)
+  })
+  await page.reload()
+
+  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
+  await example.getByRole('button', { name: 'Open' }).click()
+  await expect(page.getByText('The example changed in this build, so your earlier copy was replaced.')).toBeVisible()
+  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await expect(page.getByText('Runs · 3')).toBeVisible()
+
+  const releases = await page.evaluate(async () => {
+    const [exampleModule, bundleModule, store] = await Promise.all([
+      import(new URL('/src/domain/example.ts', window.location.href).href),
+      import(new URL('/src/domain/bundle.ts', window.location.href).href),
+      import(new URL('/src/data/projectStore.ts', window.location.href).href),
+    ])
+    const stored = await store.loadProject(exampleModule.EXAMPLE_PROJECT_ID)
+    const response = await fetch('/examples/seatbelts.hirmos.json')
+    const shipped = bundleModule.parseBundle(await response.text())
+    if (!stored.ok || !shipped.ok) throw new Error('The refreshed example could not be read.')
+    return {
+      storedCreatedAt: stored.value.project.createdAt,
+      shippedCreatedAt: shipped.value.project.project.createdAt,
+      storedOrigin: stored.value.origin,
+      shippedExportedAt: shipped.value.exportedAt,
+    }
+  })
+  expect(releases.storedCreatedAt).toBe(releases.shippedCreatedAt)
+  expect(releases.storedOrigin).toEqual({ kind: 'shipped-example', exportedAt: releases.shippedExportedAt })
+})
+
+test('opening an unchanged project preserves its saved time', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Project persistence semantics run once')
+  await page.goto('/app')
+  const originalSavedAt = '2026-02-03T04:05:06.000Z'
+  await page.evaluate(async (savedAt) => {
+    const [bundleModule, exampleModule, store] = await Promise.all([
+      import(new URL('/src/domain/bundle.ts', window.location.href).href),
+      import(new URL('/src/domain/example.ts', window.location.href).href),
+      import(new URL('/src/data/projectStore.ts', window.location.href).href),
+    ])
+    const response = await fetch('/examples/seatbelts.hirmos.json')
+    const parsed = bundleModule.parseBundle(await response.text())
+    if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
+    const stamped = exampleModule.stampExampleRelease(parsed.value.project, parsed.value.exportedAt)
+    if (!stamped.ok) throw new Error(`Example could not be stamped: ${stamped.error.kind}`)
+    const saved = await store.saveProject({
+      ...stamped.value,
+      savedAt,
+      estimationRuns: stamped.value.estimationRuns.slice(0, 2),
+    })
+    if (!saved.ok) throw new Error(`Example could not be seeded: ${saved.error.kind}`)
+  }, originalSavedAt)
+  await page.reload()
+
+  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
+  await example.getByRole('button', { name: 'Open' }).click()
+  await page.waitForTimeout(700)
+  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await expect(page.getByText('Runs · 2')).toBeVisible()
+
+  const savedAt = await page.evaluate(async () => {
+    const [exampleModule, store] = await Promise.all([
+      import(new URL('/src/domain/example.ts', window.location.href).href),
+      import(new URL('/src/data/projectStore.ts', window.location.href).href),
+    ])
+    const stored = await store.loadProject(exampleModule.EXAMPLE_PROJECT_ID)
+    if (!stored.ok) throw new Error(`Example could not be read: ${stored.error.kind}`)
+    return stored.value.savedAt
+  })
+  expect(savedAt).toBe(originalSavedAt)
+})
+
+test('classifies current, different and missing example release stamps explicitly', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Example release decisions run once')
+  await page.goto('/app')
+  const assessments = await page.evaluate(async () => {
+    const [bundleModule, exampleModule] = await Promise.all([
+      import(new URL('/src/domain/bundle.ts', window.location.href).href),
+      import(new URL('/src/domain/example.ts', window.location.href).href),
+    ])
+    const response = await fetch('/examples/seatbelts.hirmos.json')
+    const parsed = bundleModule.parseBundle(await response.text())
+    if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
+    const stamped = exampleModule.stampExampleRelease(parsed.value.project, parsed.value.exportedAt)
+    if (!stamped.ok) throw new Error(`Example could not be stamped: ${stamped.error.kind}`)
+    const current = exampleModule.assessExampleCopy(stamped.value, parsed.value.exportedAt)
+    const reexported = bundleModule.buildBundle(stamped.value, { kind: 'not-included' }, '2026-09-04T12:00:00.000Z')
+    const reimported = bundleModule.parseBundle(bundleModule.serialiseBundle(reexported))
+    if (!reimported.ok) throw new Error(`Re-exported example failed: ${reimported.error.kind}`)
+    return {
+      current: current.kind,
+      different: exampleModule.assessExampleCopy(
+        { ...stamped.value, origin: { kind: 'shipped-example', exportedAt: '2026-01-01T00:00:00.000Z' } },
+        parsed.value.exportedAt,
+      ),
+      missing: exampleModule.assessExampleCopy({ ...stamped.value, origin: { kind: 'user' } }, parsed.value.exportedAt),
+      reimported: exampleModule.assessExampleCopy(reimported.value.project, parsed.value.exportedAt).kind,
+    }
+  })
+  expect(assessments.current).toBe('current-release')
+  expect(assessments.different).toEqual({ kind: 'replace-with-shipped', reason: 'different-release' })
+  expect(assessments.missing).toEqual({ kind: 'replace-with-shipped', reason: 'missing-stamp' })
+  expect(assessments.reimported).toBe('current-release')
+})
+
+test('serves workbench deep links without changing their paths', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Workbench route serving runs once')
+  for (const path of ['/app', '/app/projects']) {
+    const response = await page.goto(path)
+    expect(response?.status()).toBe(200)
+    expect(new URL(page.url()).pathname).toBe(path)
+    await expect(page.getByRole('heading', { name: 'Create an analysis' })).toBeVisible()
+  }
 })
 
 test('returns synthetic-control cross-fit, donor-placebo, and prediction-band evidence through Wasm', async ({ page }, testInfo) => {

@@ -47,7 +47,7 @@ export type BundleProblem =
 const bundleSchema = z.object({
   kind: z.literal('hirmos-bundle'),
   version: z.number().int(),
-  exportedAt: z.string().min(1),
+  exportedAt: z.string().datetime({ offset: true }),
   application: z.object({ name: z.literal('hirmos'), build: z.string() }).strict(),
   project: z.unknown(),
   data: z.discriminatedUnion('kind', [
