@@ -3079,6 +3079,43 @@
             3,
             2
           ],
+          "statePreparations": [
+            {
+              "node": 0,
+              "name": "DriversKilled",
+              "strategy": {
+                "kind": "quantiles",
+                "requested": 3,
+                "populated": 3
+              }
+            },
+            {
+              "node": 1,
+              "name": "kms",
+              "strategy": {
+                "kind": "quantiles",
+                "requested": 3,
+                "populated": 3
+              }
+            },
+            {
+              "node": 2,
+              "name": "PetrolPrice",
+              "strategy": {
+                "kind": "quantiles",
+                "requested": 3,
+                "populated": 3
+              }
+            },
+            {
+              "node": 3,
+              "name": "law",
+              "strategy": {
+                "kind": "observedStates",
+                "states": 2
+              }
+            }
+          ],
           "treatmentStates": [
             "0",
             "2"
@@ -4056,6 +4093,43 @@
             3,
             3,
             2
+          ],
+          "statePreparations": [
+            {
+              "node": 0,
+              "name": "DriversKilled",
+              "strategy": {
+                "kind": "quantiles",
+                "requested": 3,
+                "populated": 3
+              }
+            },
+            {
+              "node": 1,
+              "name": "kms",
+              "strategy": {
+                "kind": "quantiles",
+                "requested": 3,
+                "populated": 3
+              }
+            },
+            {
+              "node": 2,
+              "name": "PetrolPrice",
+              "strategy": {
+                "kind": "quantiles",
+                "requested": 3,
+                "populated": 3
+              }
+            },
+            {
+              "node": 3,
+              "name": "law",
+              "strategy": {
+                "kind": "observedStates",
+                "states": 2
+              }
+            }
           ],
           "treatmentStates": [
             "0",

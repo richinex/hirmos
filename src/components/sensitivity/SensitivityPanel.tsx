@@ -38,6 +38,7 @@ import {
   type SensitivityRunArtifact,
 } from '@/domain/sensitivity'
 import { estimandSentence, type StudySpecification, type StudyVariable } from '@/domain/study'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
 import { lowerFirst } from '@/lib/text'
@@ -324,7 +325,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       switch (configuration.kind) {
         case 'linear-refutation': {
           const result = await analysis.runLinearRefutation(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, simulations: configuration.simulations, subsetFraction: configuration.subsetFraction, seed: configuration.seed, ljungBoxLags: configuration.ljungBoxLags })
-          if (!result.ok) { dispatch({ type: 'job-failed', detail: result.error.detail }); return }
+          if (!result.ok) { dispatch({ type: 'job-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
           const evidence = result.value
           const refuters: NonEmptyArray<RefuterFact> = [
             { id: 'placebo', method: PLACEBO_REFUTER_METHOD_ID, original: evidence.estimate, refuted: evidence.placeboEffect, interpretation: { kind: 'reference-distance', reference: 'zero', reading: 'A permuted treatment should produce an estimate near zero.' } },
@@ -345,7 +346,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
         case 'dml-refutation': {
           if (estimation.kind !== 'double-ml-run') { dispatch({ type: 'job-failed', detail: 'The DML batch needs a double machine learning run.' }); return }
           const result = await analysis.runDmlRefutationBatch(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, model: estimation.evidence.model, att: estimation.evidence.att, seed: configuration.seed })
-          if (!result.ok) { dispatch({ type: 'job-failed', detail: result.error.detail }); return }
+          if (!result.ok) { dispatch({ type: 'job-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
           const evidence = result.value
           const refuters: NonEmptyArray<RefuterFact> = [
             { id: 'placebo', method: DML_REFUTATION_METHOD_ID, original: evidence.placebo.originalEffect, refuted: evidence.placebo.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'Null: the mean estimate across permuted-treatment refits is zero.', pValue: evidence.placebo.pValue, alpha: 0.05 } },
@@ -359,7 +360,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
           const treatment = Array.from(matrix.value.values.subarray(0, matrix.value.rowCount))
           if (treatment.some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'job-failed', detail: `${study.treatment.name} is not binary; the simulation flips a 0 or 1 treatment.` }); return }
           const result = await analysis.runUnobservedConfounding(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, seed: configuration.seed, kappaT: kappaValues(configuration.kappaT), kappaY: kappaValues(configuration.kappaY) })
-          if (!result.ok) { dispatch({ type: 'job-failed', detail: result.error.detail }); return }
+          if (!result.ok) { dispatch({ type: 'job-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
           onRun({ ...identity, kind: 'unobserved-confounding-run', configuration, evidence: result.value })
           dispatch({ type: 'job-finished' })
           return

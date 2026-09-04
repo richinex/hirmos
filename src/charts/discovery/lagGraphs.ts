@@ -45,6 +45,7 @@ const strengthColour = (strength: LagLinkStrength, scale: number, theme: ChartTh
       return mix(theme.muted, strength.value < 0 ? theme.info : theme.signal, share)
     }
     case 'nonnegative': return mix(theme.muted, theme.signal, Math.min(1, strength.value / Math.max(scale, 1e-9)))
+    case 'structural': return theme.ink
     case 'assumption': return theme.bone
     default: return assertNever(strength)
   }
@@ -62,7 +63,7 @@ const symbolFor = (endpoint: LagEndpoint): string => {
 }
 
 const widthFor = (strength: LagLinkStrength, scale: number): number =>
-  strength.kind === 'assumption' ? 1.6 : 1 + 2.2 * Math.min(1, strengthMagnitude(strength) / Math.max(scale, 1e-9))
+  strength.kind === 'assumption' || strength.kind === 'structural' ? 1.6 : 1 + 2.2 * Math.min(1, strengthMagnitude(strength) / Math.max(scale, 1e-9))
 
 /** A hidden cartesian grid the size of the drawing, so node x/y are pixels and nothing is auto-fitted or clipped. */
 const pixelFrame = (width: number, height: number) => ({

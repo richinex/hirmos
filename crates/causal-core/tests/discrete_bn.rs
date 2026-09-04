@@ -1,4 +1,4 @@
-// Parity for the pgmpy discrete Bayesian network lane of 805_dag step 3g.
+// Parity for pgmpy's discrete Bayesian-network operations, with a corrected input adapter.
 use hirmos_causal_core::discrete_bn::*;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -11,6 +11,10 @@ fn strings(v: &Value) -> Vec<String> {
     serde_json::from_value(v.clone()).unwrap()
 }
 
+fn budget(value: usize) -> StateBudget {
+    StateBudget::try_from(value).unwrap()
+}
+
 fn build(root: &Value) -> (DiscreteBn, HashMap<String, Vec<String>>) {
     let raw = root["raw"].as_object().unwrap();
     let bins = root["bins"].as_u64().unwrap() as usize;
@@ -19,7 +23,7 @@ fn build(root: &Value) -> (DiscreteBn, HashMap<String, Vec<String>>) {
         let x: Vec<f64> = serde_json::from_value(vals.clone()).unwrap();
         data.insert(
             col.clone(),
-            discretize_805(&x, bins)
+            discretize_for_discrete_bn(&x, budget(bins))
                 .expect("fixture columns are discretizable")
                 .labels,
         );
@@ -39,7 +43,7 @@ fn discretisation_matches() {
     let bins = root["bins"].as_u64().unwrap() as usize;
     for (col, want) in root["codes"].as_object().unwrap() {
         let x: Vec<f64> = serde_json::from_value(root["raw"][col].clone()).unwrap();
-        let got = discretize_805(&x, bins)
+        let got = discretize_for_discrete_bn(&x, budget(bins))
             .expect("fixture column is discretizable")
             .labels;
         assert_eq!(got, strings(want), "qcut codes for {col}");
@@ -51,7 +55,7 @@ fn discretisation_matches() {
 }
 
 #[test]
-fn discretisation_edge_cases_match_805_wrapper() {
+fn discretisation_preserves_states_and_handles_missing_values() {
     let root = fixture();
     let bins = root["bins"].as_u64().unwrap() as usize;
     for case in root["discretization_cases"].as_array().unwrap() {
@@ -60,9 +64,9 @@ fn discretisation_edge_cases_match_805_wrapper() {
             .into_iter()
             .map(|value| value.unwrap_or(f64::NAN))
             .collect();
-        let got = discretize_805(&raw, bins);
+        let got = discretize_for_discrete_bn(&raw, budget(bins));
         if case["labels"].is_null() {
-            assert!(got.is_none(), "{} should be dropped", case["name"]);
+            assert!(got.is_err(), "{} should be refused", case["name"]);
             continue;
         }
         let got = got.expect("case is discretizable");
@@ -86,6 +90,42 @@ fn discretisation_edge_cases_match_805_wrapper() {
             );
         }
     }
+
+    let imbalanced_binary = [0.0, 1.0, 1.0, 1.0, 1.0];
+    let got = discretize_for_discrete_bn(&imbalanced_binary, budget(bins)).unwrap();
+    assert_eq!(got.labels, ["0", "1", "1", "1", "1"]);
+    assert_eq!(got.means.len(), 2);
+    let pgmpy_states: Vec<f64> =
+        serde_json::from_value(root["pgmpy_observed_binary_states"].clone()).unwrap();
+    assert_eq!(pgmpy_states, vec![got.means["0"], got.means["1"]]);
+
+    let tied_continuous = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 2.0, 3.0];
+    assert_eq!(
+        discretize_for_discrete_bn(&tied_continuous, budget(bins)),
+        Err(DiscreteStateProblem::QuantileCollapse {
+            distinct_values: 4,
+            requested_states: 3,
+            populated_states: 1,
+        })
+    );
+    assert_eq!(
+        discretize_for_discrete_bn(&[4.0, 4.0], budget(bins)),
+        Err(DiscreteStateProblem::SingleObservedState {
+            value: 4.0,
+            observations: 2,
+        })
+    );
+    assert_eq!(
+        discretize_for_discrete_bn(&[f64::NAN], budget(bins)),
+        Err(DiscreteStateProblem::NoFiniteObservations { observations: 1 })
+    );
+    assert_eq!(
+        StateBudget::try_from(1),
+        Err(StateBudgetError {
+            requested: 1,
+            minimum: 2,
+        })
+    );
 }
 
 #[test]

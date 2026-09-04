@@ -23,6 +23,7 @@ import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from '@/do
 import type { SelectedSource } from '@/domain/workflow'
 import { formatTime } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Job =
   | { readonly kind: 'idle' }
@@ -125,7 +126,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
       const causeColumn = matrix.value.columns.find((column) => column.id === readiness.value.candidateCause)
       if (targetColumn === undefined || causeColumn === undefined) { setJob({ kind: 'failed', detail: 'The returned matrix omitted the selected pair.' }); return }
       const result = await analysis.runGrangerSsrF(matrix.value.values, matrix.value.rowCount, readiness.value.maxLag)
-      if (!result.ok) { setJob({ kind: 'failed', detail: result.error.detail }); return }
+      if (!result.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
       onEvidence({
         kind: 'granger-evidence',
         id: newGrangerEvidenceId(),

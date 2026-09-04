@@ -15,6 +15,7 @@ export type LagLinkStrength =
   | { readonly kind: 'signed-unit'; readonly value: number }
   | { readonly kind: 'signed-weight'; readonly value: number }
   | { readonly kind: 'nonnegative'; readonly value: number }
+  | { readonly kind: 'structural' }
   | { readonly kind: 'assumption' }
 
 export interface LagVariable {
@@ -35,7 +36,7 @@ export interface LagLink {
   readonly mark: string | null
 }
 
-export type LagGraphSemantics = 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
+export type LagGraphSemantics = 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'cpdag' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
 
 export interface LagGraph {
   readonly variables: NonEmptyArray<LagVariable>
@@ -69,6 +70,7 @@ export const strengthMagnitude = (strength: LagLinkStrength): number => {
     case 'signed-unit':
     case 'signed-weight':
     case 'nonnegative': return Math.abs(strength.value)
+    case 'structural':
     case 'assumption': return 1
     default: return assertNever(strength)
   }
@@ -79,6 +81,7 @@ export const describeStrength = (strength: LagLinkStrength): string => {
     case 'signed-unit': return `ParCorr ${strength.value.toFixed(3)}`
     case 'signed-weight': return `weight ${strength.value.toFixed(3)}`
     case 'nonnegative': return `strength ${strength.value.toFixed(3)}`
+    case 'structural': return 'reported adjacency'
     case 'assumption': return 'user assumption'
     default: return assertNever(strength)
   }
@@ -90,9 +93,9 @@ const variablesOf = (run: Extract<DiscoveryRunArtifact, { readonly variables: un
 export const lagGraphFromMarkedMatrices = (
   variables: NonEmptyArray<LagVariable>,
   graph: readonly (readonly (readonly string[])[])[],
-  values: readonly (readonly (readonly number[])[])[],
+  values: readonly (readonly (readonly number[])[])[] | null,
   tauMax: number,
-  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graph'>,
+  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'cpdag' | 'pag' | 'regime-specific-lag-graph'>,
 ): LagGraphProjection => {
   const links: LagLink[] = []
   const warnings: LagGraphWarning[] = []
@@ -114,7 +117,9 @@ export const lagGraphFromMarkedMatrices = (
           lag,
           fromEndpoint,
           toEndpoint,
-          strength: { kind: 'signed-unit', value: values[source][target][lag] },
+          strength: values === null
+            ? { kind: 'structural' }
+            : { kind: 'signed-unit', value: values[source][target][lag] },
           mark,
         })
       }
@@ -124,6 +129,18 @@ export const lagGraphFromMarkedMatrices = (
     graph: { variables, tauMax, links, semantics },
     warnings,
   }
+}
+
+export function lagGraphFromConstraintRun(
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'pc-stable-run' | 'fci-run' }>,
+): LagGraphProjection {
+  return lagGraphFromMarkedMatrices(
+    variablesOf(run),
+    run.result.graph,
+    null,
+    0,
+    run.kind === 'fci-run' ? 'pag' : 'cpdag',
+  )
 }
 
 /** Tigramite lag-graph marks into links. A contemporaneous pair is reported twice, mirrored; the lower index keeps it. */
@@ -255,6 +272,8 @@ export type LagResolvedDiscoveryRun = Exclude<DiscoveryRunArtifact, { readonly k
 export function lagGraphFromRun(run: LagResolvedDiscoveryRun, regime = 0): LagGraphProjection {
   switch (run.kind) {
     case 'direct-lingam-run': return { graph: lagGraphFromWeightRun(run), warnings: [] }
+    case 'pc-stable-run':
+    case 'fci-run': return lagGraphFromConstraintRun(run)
     case 'pcmci-plus-run':
     case 'lpcmci-run': return lagGraphFromTimeGraphRun(run)
     case 'rpcmci-run': return lagGraphFromRpcmciRun(run, regime)

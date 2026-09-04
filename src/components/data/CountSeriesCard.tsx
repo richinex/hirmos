@@ -21,6 +21,7 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatStatistic } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Job =
   | { readonly kind: 'idle' }
@@ -108,7 +109,7 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
         candidateReferencePoints,
         delta,
       }, (progress) => setJob({ kind: 'running', phase: progress.stage }))
-      if (!result.ok) { setJob({ kind: 'failed', detail: result.error.detail }); return }
+      if (!result.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
       const selected = matrix.value.columns[0]
       if (selected === undefined) { setJob({ kind: 'failed', detail: 'The prepared matrix omitted the selected count series.' }); return }
       onArtifact({

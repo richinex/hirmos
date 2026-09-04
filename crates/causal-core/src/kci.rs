@@ -154,6 +154,126 @@ fn unconditional(x: &DMatrix<f64>, y: &DMatrix<f64>) -> Result<KciResult, KciErr
     })
 }
 
+fn empirical_hsic_precision(rows: usize, columns: usize) -> f64 {
+    let width: f64 = if rows < 200 {
+        0.8
+    } else if rows < 1200 {
+        0.5
+    } else {
+        0.3
+    };
+    columns as f64 / width.powi(2)
+}
+
+fn empirical_kci_precision(rows: usize, conditioning_columns: usize) -> f64 {
+    let width: f64 = if rows < 200 {
+        1.2
+    } else if rows < 1200 {
+        0.7
+    } else {
+        0.4
+    };
+    1.0 / (width.powi(2) * conditioning_columns as f64)
+}
+
+/// causal-learn's default Gaussian KCI (`est_width="empirical"`, `approx=True`).
+///
+/// Unlike [`kernel_conditional_independence`], this preserves constant columns as zero after
+/// SciPy-style standardisation because that is what causal-learn's `KCI_UInd` and `KCI_CInd` do.
+pub fn causal_learn_kernel_conditional_independence(
+    x: &DMatrix<f64>,
+    y: &DMatrix<f64>,
+    z: Option<&DMatrix<f64>>,
+) -> Result<KciResult, KciError> {
+    if x.nrows() == 0 || y.nrows() == 0 {
+        return Err(KciError::EmptySample);
+    }
+    if x.nrows() != y.nrows() || z.is_some_and(|values| values.nrows() != x.nrows()) {
+        return Err(KciError::RowMismatch);
+    }
+    if !finite(x) || !finite(y) || z.is_some_and(|values| !finite(values)) {
+        return Err(KciError::NonFiniteValue);
+    }
+
+    match z {
+        None if x.ncols() > 0 && y.ncols() > 0 => {
+            let x_precision = empirical_hsic_precision(x.nrows(), x.ncols());
+            let y_precision = empirical_hsic_precision(y.nrows(), y.ncols());
+            let x = zscore(x);
+            let y = zscore(y);
+            let kx = center(&gaussian_gram_with_precision(&x, x_precision));
+            let ky = center(&gaussian_gram_with_precision(&y, y_precision));
+            let statistic = kx.component_mul(&ky).sum();
+            let n = x.nrows() as f64;
+            let mean = kx.trace() * ky.trace() / n;
+            let variance =
+                2.0 * kx.component_mul(&kx).sum() * ky.component_mul(&ky).sum() / (n * n);
+            Ok(KciResult {
+                p_value: gamma_survival(statistic, mean, variance)?,
+                statistic,
+                observations: x.nrows(),
+                conditioning_columns: 0,
+            })
+        }
+        Some(z) if z.ncols() > 0 && x.ncols() > 0 && y.ncols() > 0 => {
+            let x = zscore(x);
+            let y = zscore(y);
+            let z = zscore(z);
+            let xz = DMatrix::from_fn(x.nrows(), x.ncols() + z.ncols(), |row, column| {
+                if column < x.ncols() {
+                    x[(row, column)]
+                } else {
+                    0.5 * z[(row, column - x.ncols())]
+                }
+            });
+            let precision = empirical_kci_precision(z.nrows(), z.ncols());
+            let kx = center(&gaussian_gram_with_precision(&xz, precision));
+            let ky = center(&gaussian_gram_with_precision(&y, precision));
+            let kz = center(&gaussian_gram_with_precision(&z, precision));
+            let n = x.nrows();
+            let epsilon = 1e-3;
+            let residualizer =
+                symmetric_pseudo_inverse(kz + DMatrix::identity(n, n) * epsilon, 1e-15)? * epsilon;
+            let kxr = &residualizer * kx * &residualizer;
+            let kyr = &residualizer * ky * &residualizer;
+            let statistic = kxr.component_mul(&kyr).sum();
+            let vx = retained_eigen_features(&kxr, 1e-5);
+            let vy = retained_eigen_features(&kyr, 1e-5);
+            let size_u = vx.ncols() * vy.ncols();
+            if size_u == 0 {
+                return Ok(KciResult {
+                    p_value: 1.0,
+                    statistic,
+                    observations: n,
+                    conditioning_columns: z.ncols(),
+                });
+            }
+            let u = DMatrix::from_fn(n, size_u, |row, column| {
+                vx[(row, column / vy.ncols())] * vy[(row, column % vy.ncols())]
+            });
+            let uu_product = if size_u > n {
+                &u * u.transpose()
+            } else {
+                u.transpose() * &u
+            };
+            let mean = uu_product.trace();
+            let variance = 2.0 * (&uu_product * &uu_product).trace();
+            Ok(KciResult {
+                p_value: gamma_survival(statistic, mean, variance)?,
+                statistic,
+                observations: n,
+                conditioning_columns: z.ncols(),
+            })
+        }
+        _ => Ok(KciResult {
+            p_value: 1.0,
+            statistic: 0.0,
+            observations: x.nrows(),
+            conditioning_columns: z.map_or(0, DMatrix::ncols),
+        }),
+    }
+}
+
 fn symmetric_pseudo_inverse(
     matrix: DMatrix<f64>,
     tolerance: f64,

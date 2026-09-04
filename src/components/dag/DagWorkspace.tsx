@@ -6,7 +6,7 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { InterventionPanel } from './InterventionPanel'
 import type { InterventionOverlay, InterventionQueryArtifact } from '@/domain/intervention'
 import type { SelectedSource } from '@/domain/workflow'
-import type { AnalysisProgress } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
 import { button, field, iconControl, label, literal, panel, pill, segment, well } from '@/components/ui/recipes'
@@ -540,7 +540,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
       (progress) => setJob({ kind: 'running', progress }),
     )
     if (!result.ok) {
-      setJob({ kind: 'failed', detail: result.error.detail })
+      setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) })
       return
     }
     onCheck(recordDagCheck(document, result.value))

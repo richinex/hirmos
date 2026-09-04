@@ -2044,6 +2044,59 @@ pub(crate) fn bayesian_gaussian(
     })
 }
 
+fn discrete_state_strategy(strategy: CoreDiscreteStateStrategy) -> DiscreteStateStrategyEvidence {
+    match strategy {
+        CoreDiscreteStateStrategy::ObservedStates { states } => {
+            DiscreteStateStrategyEvidence::ObservedStates { states }
+        }
+        CoreDiscreteStateStrategy::Quantiles {
+            requested,
+            populated,
+        } => DiscreteStateStrategyEvidence::Quantiles {
+            requested,
+            populated,
+        },
+    }
+}
+
+fn discrete_state_problem(problem: CoreDiscreteStateProblem) -> DiscreteStateProblemEvidence {
+    match problem {
+        CoreDiscreteStateProblem::NoFiniteObservations { observations } => {
+            DiscreteStateProblemEvidence::NoFiniteObservations { observations }
+        }
+        CoreDiscreteStateProblem::SingleObservedState {
+            value,
+            observations,
+        } => DiscreteStateProblemEvidence::SingleObservedState {
+            value,
+            observations,
+        },
+        CoreDiscreteStateProblem::QuantileCollapse {
+            distinct_values,
+            requested_states,
+            populated_states,
+        } => DiscreteStateProblemEvidence::QuantileCollapse {
+            distinct_values,
+            requested_states,
+            populated_states,
+        },
+    }
+}
+
+fn discrete_state_refusal(
+    query: DiscreteStateQuery,
+    node: usize,
+    name: String,
+    problem: CoreDiscreteStateProblem,
+) -> AnalysisResult {
+    AnalysisResult::DiscreteStateRefused {
+        query,
+        node,
+        name,
+        problem: discrete_state_problem(problem),
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn discrete_bn_query(
     values: &[f64],
@@ -2079,24 +2132,37 @@ pub(crate) fn discrete_bn_query(
         return Err("discrete BN query edges must join distinct node positions".to_owned());
     }
     if !(2..=10).contains(&bins) {
-        return Err("discrete BN query bins must be between 2 and 10".to_owned());
+        return Err("discrete BN query state budget must be between 2 and 10".to_owned());
     }
     if !(equivalent_sample_size > 0.0) || !equivalent_sample_size.is_finite() {
         return Err("discrete BN query equivalent sample size must be positive".to_owned());
     }
+    let state_budget = StateBudget::try_from(bins)
+        .map_err(|_| "discrete BN query state budget must be at least 2".to_owned())?;
     let data = DMatrix::from_column_slice(rows, columns, values);
     let mut frame: HashMap<String, Vec<String>> = HashMap::new();
     let mut means: Vec<std::collections::BTreeMap<String, f64>> = Vec::with_capacity(nodes.len());
     let mut state_counts = Vec::with_capacity(nodes.len());
+    let mut state_preparations = Vec::with_capacity(nodes.len());
     for (position, &column) in nodes.iter().enumerate() {
         let series: Vec<f64> = (0..rows).map(|row| data[(row, column)]).collect();
-        let discretised = discretize_805(&series, bins).ok_or_else(|| {
-            format!(
-                "discrete BN query cannot discretise {}: it is constant",
-                names[position]
-            )
-        })?;
+        let discretised = match discretize_for_discrete_bn(&series, state_budget) {
+            Ok(discretised) => discretised,
+            Err(problem) => {
+                return Ok(discrete_state_refusal(
+                    DiscreteStateQuery::BayesianNetwork,
+                    position,
+                    names[position].clone(),
+                    problem,
+                ))
+            }
+        };
         state_counts.push(discretised.means.len());
+        state_preparations.push(DiscreteStatePreparationEvidence {
+            node: position,
+            name: names[position].clone(),
+            strategy: discrete_state_strategy(discretised.strategy),
+        });
         frame.insert(names[position].clone(), discretised.labels);
         means.push(discretised.means);
     }
@@ -2149,6 +2215,7 @@ pub(crate) fn discrete_bn_query(
         bins,
         equivalent_sample_size,
         state_counts,
+        state_preparations,
         treatment_states: (low, high),
         expectations,
         effect: expectations.1 - expectations.0,
@@ -2178,10 +2245,12 @@ pub(crate) fn identified_discrete_query(
     validate_dense_matrix("identified discrete query", values, rows, columns)?;
     if names.len() < 2 || !(2..=10).contains(&bins) {
         return Err(
-            "identified discrete query needs at least two graph nodes and between 2 and 10 bins"
+            "identified discrete query needs at least two graph nodes and a state budget between 2 and 10"
                 .to_owned(),
         );
     }
+    let state_budget = StateBudget::try_from(bins)
+        .map_err(|_| "identified discrete query state budget must be at least 2".to_owned())?;
     if treatment >= names.len() || outcome >= names.len() || treatment == outcome {
         return Err(
             "identified discrete query treatment and outcome must be distinct graph-node positions"
@@ -2234,15 +2303,26 @@ pub(crate) fn identified_discrete_query(
     let mut columns_by_name = BTreeMap::new();
     let mut means_by_position = HashMap::new();
     let mut state_counts = Vec::with_capacity(observed_nodes.len());
+    let mut state_preparations = Vec::with_capacity(observed_nodes.len());
     for (&position, &column) in observed_positions.iter().zip(observed_nodes) {
         let series = (0..rows).map(|row| data[(row, column)]).collect::<Vec<_>>();
-        let discretised = discretize_805(&series, bins).ok_or_else(|| {
-            format!(
-                "identified discrete query cannot discretise {}: it is constant",
-                names[position]
-            )
-        })?;
+        let discretised = match discretize_for_discrete_bn(&series, state_budget) {
+            Ok(discretised) => discretised,
+            Err(problem) => {
+                return Ok(discrete_state_refusal(
+                    DiscreteStateQuery::IdentifiedExpression,
+                    position,
+                    names[position].clone(),
+                    problem,
+                ))
+            }
+        };
         state_counts.push(discretised.means.len());
+        state_preparations.push(DiscreteStatePreparationEvidence {
+            node: position,
+            name: names[position].clone(),
+            strategy: discrete_state_strategy(discretised.strategy),
+        });
         means_by_position.insert(position, discretised.means);
         columns_by_name.insert(names[position].clone(), discretised.labels);
     }
@@ -2321,6 +2401,7 @@ pub(crate) fn identified_discrete_query(
                 observations: rows,
                 bins,
                 state_counts,
+                state_preparations,
                 treatment_states: (low, high),
                 query,
                 result: IdentifiedDiscreteResult::Unidentifiable {
@@ -2393,6 +2474,7 @@ pub(crate) fn identified_discrete_query(
         observations: rows,
         bins,
         state_counts,
+        state_preparations,
         treatment_states: (low, high),
         query,
         result: IdentifiedDiscreteResult::Identified {
@@ -3238,6 +3320,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result["kind"], "discreteBnQuery");
+        assert_eq!(result["statePreparations"].as_array().unwrap().len(), 3);
+        assert!(result["statePreparations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|entry| entry["strategy"]["kind"] == "quantiles"));
         assert_eq!(result["parentsAdjusted"].as_array().unwrap().len(), 1);
         assert_eq!(result["minimalAdjustmentSet"].as_array().unwrap().len(), 1);
         let effect = result["effect"].as_f64().unwrap();
@@ -3270,6 +3358,74 @@ mod tests {
     }
 
     #[test]
+    fn query_discretisation_preserves_imbalanced_binary_and_ordinal_states() {
+        let binary = [0.0, 1.0, 1.0, 1.0, f64::NAN];
+        let binary_result =
+            discretize_for_discrete_bn(&binary, StateBudget::try_from(3).unwrap()).unwrap();
+        assert_eq!(binary_result.labels, ["0", "1", "1", "1", "-1"]);
+        assert_eq!(binary_result.means.len(), 2);
+        assert_eq!(binary_result.means["0"], 0.0);
+        assert_eq!(binary_result.means["1"], 1.0);
+
+        let ordinal = [1.0, 1.0, 2.0, 3.0, 3.0, 3.0];
+        let ordinal_result =
+            discretize_for_discrete_bn(&ordinal, StateBudget::try_from(3).unwrap()).unwrap();
+        assert_eq!(ordinal_result.labels, ["0", "0", "1", "2", "2", "2"]);
+        assert_eq!(ordinal_result.means.len(), 3);
+        assert_eq!(ordinal_result.means["2"], 3.0);
+    }
+
+    #[test]
+    fn discrete_query_does_not_report_zero_for_an_imbalanced_binary_effect() {
+        let treatment = [0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0];
+        let outcome = treatment;
+        let values = treatment.into_iter().chain(outcome).collect::<Vec<_>>();
+        let names = vec!["treatment".to_owned(), "outcome".to_owned()];
+        let result = serde_json::to_value(
+            discrete_bn_query(
+                &values,
+                treatment.len(),
+                2,
+                &[0, 1],
+                &names,
+                &[(0, 1)],
+                0,
+                1,
+                3,
+                5.0,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(result["stateCounts"], serde_json::json!([2, 2]));
+        assert_eq!(result["statePreparations"][0]["name"], "treatment");
+        assert_eq!(
+            result["statePreparations"][0]["strategy"]["kind"],
+            "observedStates"
+        );
+        assert!(result["effect"].as_f64().unwrap() > 0.0);
+    }
+
+    #[test]
+    fn discrete_query_returns_a_typed_single_state_refusal() {
+        let values = vec![0.0, 1.0, 0.0, 1.0, 4.0, 4.0, 4.0, 4.0];
+        let names = vec!["treatment".to_owned(), "recovery".to_owned()];
+        let result = serde_json::to_value(
+            discrete_bn_query(&values, 4, 2, &[0, 1], &names, &[(0, 1)], 0, 1, 3, 5.0).unwrap(),
+        )
+        .unwrap();
+
+        assert_eq!(result["kind"], "discreteStateRefused");
+        assert_eq!(result["query"], "bayesianNetwork");
+        assert_eq!(result["node"], 1);
+        assert_eq!(result["name"], "recovery");
+        assert_eq!(result["problem"]["kind"], "singleObservedState");
+        assert_eq!(result["problem"]["value"], 4.0);
+        assert_eq!(result["problem"]["observations"], 4);
+    }
+
+    #[test]
     fn identified_discrete_query_evaluates_the_frontdoor_id_expression() {
         let (rows, values) = complete_binary_columns(3);
         let names = vec!["U", "X", "M", "Y"]
@@ -3294,6 +3450,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(result["kind"], "identifiedDiscreteQuery");
+        assert_eq!(result["statePreparations"].as_array().unwrap().len(), 3);
+        assert!(result["statePreparations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|entry| entry["strategy"]["kind"] == "observedStates"));
         assert_eq!(result["query"]["kind"], "unconditional");
         assert_eq!(result["result"]["kind"], "identified");
         assert_eq!(result["result"]["algorithm"], "ID");

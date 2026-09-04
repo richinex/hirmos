@@ -138,6 +138,8 @@ export const CDNOTS_PLUS_PAR_CORR_METHOD_ID = methodId('cdnots-plus-parcorr')
 export const GRACE_METHOD_ID = methodId('grace')
 export const DYNOTEARS_METHOD_ID = methodId('dynotears')
 export const DIRECT_LINGAM_METHOD_ID = methodId('direct-lingam')
+export const PC_STABLE_METHOD_ID = methodId('pc-stable')
+export const FCI_METHOD_ID = methodId('fci')
 export const VAR_LINGAM_METHOD_ID = methodId('var-lingam')
 export const OCSE_METHOD_ID = methodId('ocse')
 export const CMLP_METHOD_ID = methodId('neural-granger-cmlp')
@@ -220,6 +222,11 @@ const KUNSCH_1989 = paper('The Jackknife and the Bootstrap for General Stationar
 const CHERNOZHUKOV_OVB = paper('Long Story Short: Omitted Variable Bias in Causal Machine Learning (Chernozhukov, Cinelli, Newey, Sharma and Syrgkanis, 2022)', 'NBER Working Paper 30302; sensitivity bounds')
 const HYVARINEN_2010 = paper('Estimation of a Structural Vector Autoregression Model Using Non-Gaussianity (Hyvärinen, Zhang, Shimizu and Hoyer, 2010)', 'Journal of Machine Learning Research 11, 1709–1731')
 const SHIMIZU_2011 = paper('DirectLiNGAM: A Direct Method for Learning a Linear Non-Gaussian Structural Equation Model (Shimizu and others, 2011)', 'Journal of Machine Learning Research 12, 1225–1248')
+const SPIRTES_2000 = paper('Causation, Prediction, and Search, 2nd ed. (Spirtes, Glymour and Scheines, 2000)', 'MIT Press; PC and FCI algorithms')
+const COLOMBO_MAATHUIS_2014 = paper('Order-independent constraint-based causal structure learning (Colombo and Maathuis, 2014)', 'Journal of Machine Learning Research 15, 3921–3962')
+const SPIRTES_MEEK_RICHARDSON_1995 = paper('Causal inference in the presence of latent variables and selection bias (Spirtes, Meek and Richardson, 1995)', 'Proceedings of UAI 1995, 499–506; doi:10.7551/mitpress/2006.003.0009')
+const ZHANG_2008 = paper('On the completeness of orientation rules for causal discovery in the presence of latent confounders and selection bias (Zhang, 2008)', 'Artificial Intelligence 172(16–17), 1873–1896')
+const ZHANG_KCI_2011 = paper('Kernel-based conditional independence test and application in causal discovery (Zhang, Peters, Janzing and Schölkopf, 2011)', 'Proceedings of UAI 2011, 804–813')
 const PAMFIL_2020 = paper('DYNOTEARS: Structure Learning from Time-Series Data (Pamfil and others, 2020)', 'Proceedings of AISTATS, PMLR 108, 1595–1605')
 const SUN_2015 = paper('Causal Network Inference by Optimal Causation Entropy (Sun, Taylor and Bollt, 2015)', 'SIAM Journal on Applied Dynamical Systems 14(1), 65–83')
 const RUNGE_2020 = paper('Discovering contemporaneous and lagged causal relations in autocorrelated nonlinear time series datasets (Runge, 2020)', 'Proceedings of UAI, PMLR 124; PCMCI+')
@@ -689,6 +696,122 @@ const VAR_LINGAM: MethodDefinition = {
       requirement: 'Between 2 and 12 complete, varying columns and lags 1 to 6.',
       consequenceIfUnmet: 'A constant column or a gap refuses the run.',
       sources: [hirmos('crates/analysis-wasm/src/lib.rs#var_lingam_evidence')],
+    },
+  ],
+}
+
+const PC_STABLE: MethodDefinition = {
+  id: PC_STABLE_METHOD_ID,
+  name: 'PC-stable',
+  family: 'discovery',
+  summary: 'Uses conditional-independence tests to estimate a completed partially directed acyclic graph from independent observations.',
+  caveats: [
+    {
+      id: caveatId('pc-stable-independent-observations'),
+      category: 'sampling-structure',
+      requirement: 'Rows are independent observations from one unchanged data-generating process.',
+      consequenceIfUnmet: 'Serial dependence, repeated units, or mechanism changes can produce conditional dependences that the graph does not represent correctly.',
+      sources: [SPIRTES_2000, COLOMBO_MAATHUIS_2014],
+    },
+    {
+      id: caveatId('pc-stable-markov-faithful'),
+      category: 'identification',
+      requirement: 'The observational distribution is Markov and faithful to the causal graph.',
+      consequenceIfUnmet: 'Conditional independences may not correspond to missing graph connections, so the recovered equivalence class can be wrong.',
+      sources: [SPIRTES_MEEK_RICHARDSON_1995, SPIRTES_2000],
+    },
+    {
+      id: caveatId('pc-stable-causal-sufficiency'),
+      category: 'identification',
+      requirement: 'There are no unmeasured common causes or selection variables among the selected variables.',
+      consequenceIfUnmet: 'A CPDAG cannot represent the latent-confounding or selection structure responsible for the observed independences.',
+      sources: [SPIRTES_2000],
+    },
+    {
+      id: caveatId('pc-stable-ci-model'),
+      category: 'functional-form',
+      requirement: 'Fisher Z requires a linear Gaussian conditional-independence model; KCI replaces that model with kernel conditional-independence testing.',
+      consequenceIfUnmet: 'Misspecified or low-power conditional-independence tests can add, remove, or orient the wrong connections.',
+      sources: [SPIRTES_2000, ZHANG_KCI_2011],
+    },
+    {
+      id: caveatId('pc-stable-background-knowledge'),
+      category: 'interpretation',
+      requirement: 'Required directions, forbidden directions, and tiers are correct and mutually consistent.',
+      consequenceIfUnmet: 'The result is constrained to satisfy an incorrect causal claim.',
+      sources: [SPIRTES_2000],
+    },
+    {
+      id: caveatId('pc-stable-cpdag-interpretation'),
+      category: 'interpretation',
+      requirement: 'Undirected connections represent directions not determined within the Markov-equivalence class.',
+      consequenceIfUnmet: 'An unresolved connection is treated as a directed causal claim.',
+      sources: [SPIRTES_2000, COLOMBO_MAATHUIS_2014],
+    },
+    {
+      id: caveatId('pc-stable-complete-data'),
+      category: 'missingness',
+      requirement: 'The selected numeric columns form a complete matrix.',
+      consequenceIfUnmet: 'The browser refuses the run before conditional-independence testing.',
+      sources: [COLOMBO_MAATHUIS_2014],
+    },
+  ],
+}
+
+const FCI: MethodDefinition = {
+  id: FCI_METHOD_ID,
+  name: 'FCI',
+  family: 'discovery',
+  summary: 'Uses conditional-independence tests to estimate a partial ancestral graph that permits latent confounding and selection bias.',
+  caveats: [
+    {
+      id: caveatId('fci-independent-observations'),
+      category: 'sampling-structure',
+      requirement: 'Rows are independent observations from one unchanged data-generating process.',
+      consequenceIfUnmet: 'Temporal dependence, repeated units, or mechanism changes can be represented as graph structure.',
+      sources: [SPIRTES_2000],
+    },
+    {
+      id: caveatId('fci-markov-faithful-mag'),
+      category: 'identification',
+      requirement: 'The observed distribution is Markov and faithful to an underlying causal DAG whose latent projection is a maximal ancestral graph.',
+      consequenceIfUnmet: 'The PAG need not contain the causal structure that generated the observations.',
+      sources: [SPIRTES_MEEK_RICHARDSON_1995, SPIRTES_2000, ZHANG_2008],
+    },
+    {
+      id: caveatId('fci-ci-model'),
+      category: 'functional-form',
+      requirement: 'Fisher Z requires a linear Gaussian conditional-independence model; KCI uses kernel conditional-independence testing.',
+      consequenceIfUnmet: 'Conditional-independence errors propagate into the skeleton and endpoint orientations.',
+      sources: [SPIRTES_MEEK_RICHARDSON_1995, SPIRTES_2000, ZHANG_KCI_2011],
+    },
+    {
+      id: caveatId('fci-selection-semantics'),
+      category: 'identification',
+      requirement: 'Selection effects are represented by ancestral-graph endpoint semantics rather than interpreted as ordinary directed causes.',
+      consequenceIfUnmet: 'Tail, arrowhead, and circle endpoints are assigned causal meanings they do not establish.',
+      sources: [SPIRTES_MEEK_RICHARDSON_1995, SPIRTES_2000, ZHANG_2008],
+    },
+    {
+      id: caveatId('fci-background-knowledge'),
+      category: 'interpretation',
+      requirement: 'Required directions, forbidden directions, patterns, and tiers are correct and mutually consistent.',
+      consequenceIfUnmet: 'Orientation rules are forced to incorporate incorrect expert knowledge.',
+      sources: [SPIRTES_MEEK_RICHARDSON_1995, SPIRTES_2000],
+    },
+    {
+      id: caveatId('fci-pag-interpretation'),
+      category: 'interpretation',
+      requirement: 'The result is read as a PAG: circles are unresolved endpoints and bidirected connections can indicate latent confounding.',
+      consequenceIfUnmet: 'The PAG is converted into a DAG and claims directions or causal sufficiency that FCI did not establish.',
+      sources: [SPIRTES_2000, ZHANG_2008],
+    },
+    {
+      id: caveatId('fci-complete-data'),
+      category: 'missingness',
+      requirement: 'The selected numeric columns form a complete matrix.',
+      consequenceIfUnmet: 'The browser refuses the run before conditional-independence testing.',
+      sources: [SPIRTES_2000],
     },
   ],
 }
@@ -1862,9 +1985,9 @@ const DISCRETE_BN: MethodDefinition = {
     {
       id: caveatId('bn-discretisation'),
       category: 'functional-form',
-      requirement: 'Quantile binning is a recorded meaning change; each state stands for the mean of its values.',
-      consequenceIfUnmet: 'Within-bin variation is lost without a record.',
-      sources: [NESS_CH4('§4.4.6 discretise continuous variables at quantiles'), pgmpy('pgmpy/inference/CausalInference.py'), hirmos('crates/causal-core/src/discrete_bn.rs#discretize_805')],
+      requirement: 'Observed binary and ordinal states are preserved when they fit the state budget. Higher-cardinality variables are divided into quantile states, each represented in original units by its within-state mean.',
+      consequenceIfUnmet: 'Quantile discretisation removes within-state variation and can change the estimated contrast.',
+      sources: [NESS_CH4('§4.4.6 discretise continuous variables at quantiles'), pgmpy('pgmpy/estimators/base.py#BaseEstimator'), hirmos('crates/causal-core/src/discrete_bn.rs#discretize_for_discrete_bn')],
     },
     {
       id: caveatId('bn-observed-graph'),
@@ -2067,6 +2190,8 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   CDNOTS_PLUS_PAR_CORR,
   GRACE,
   DYNOTEARS,
+  PC_STABLE,
+  FCI,
   DIRECT_LINGAM,
   VAR_LINGAM,
   OCSE,
@@ -2118,7 +2243,7 @@ export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LIN
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
 export const COUNT_SERIES_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [COUNT_SERIES_INTERVENTION_SCAN]
-export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [DIRECT_LINGAM]
+export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [PC_STABLE, FCI, DIRECT_LINGAM]
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   GRANGER_SSR_F,
   PCMCI_PLUS_PAR_CORR,

@@ -17,6 +17,7 @@ import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { cn } from '@/lib/utils'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import type { DagDocument, DagDocumentId, DagNodeId } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
 import { lagGraphFromDag } from '@/domain/lagGraph'
@@ -322,7 +323,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       const analysis = await import('@/analysis/client')
       const outcome = await analysis.identifyBackdoor(backdoorIdentificationCommand(ready.value))
       if (!outcome.ok) {
-        dispatch({ type: 'run-failed', detail: outcome.error.detail })
+        dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(outcome.error) })
         return
       }
       if (outcome.value.result.kind === 'identified' && outcome.value.result.minimalSets.length > 1) {

@@ -29,7 +29,7 @@ import {
   type ColumnId,
 } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
-import type { PanelDataProblem, PanelLongMatrix, PanelStructureEvidence } from '@/domain/panel'
+import type { PanelDataProblem, PanelLongMatrix, PanelPeriod, PanelStructureEvidence } from '@/domain/panel'
 
 const DUCKDB_PACKAGE_VERSION = '1.30.0'
 const DUCKDB_ENGINE_VERSION = 'v1.3.2'
@@ -581,8 +581,8 @@ export async function materializePanelLong(
     const outcomeVector = table.getChild('outcome')
     const treatmentVector = table.getChild('treatment')
     const units: string[] = []
-    const times: number[] = []
-    const timeLabels: string[] = []
+    const periodCodes: number[] = []
+    const periodsByCode = new Map<number, string>()
     const values = new Float64Array(table.numRows * 2)
     let problem: PanelDataProblem | null = null
     for (let row = 0; row < table.numRows; row += 1) {
@@ -591,7 +591,16 @@ export async function materializePanelLong(
       const timeLabel = timeLabelVector?.get(row)
       if (unitValue === null || unitValue === undefined || String(unitValue) === '') { problem = { kind: 'missing-key', name: unitColumn.name, row }; break }
       if (timeValue === null || timeValue === undefined || timeLabel === null || timeLabel === undefined) { problem = { kind: 'missing-key', name: timeColumn.name, row }; break }
-      units.push(String(unitValue)); times.push(scalarNumber(timeValue, 'panel time code')); timeLabels.push(String(timeLabel))
+      const periodCode = scalarNumber(timeValue, 'panel time code')
+      const periodLabel = String(timeLabel)
+      const recordedLabel = periodsByCode.get(periodCode)
+      if (recordedLabel !== undefined && recordedLabel !== periodLabel) {
+        problem = { kind: 'panel-data-failed', detail: `Panel period code ${periodCode} is associated with both ${recordedLabel} and ${periodLabel}.` }
+        break
+      }
+      units.push(String(unitValue))
+      periodCodes.push(periodCode)
+      periodsByCode.set(periodCode, periodLabel)
       for (const [columnIndex, pair] of [[0, { vector: outcomeVector, column: outcomeColumn }], [1, { vector: treatmentVector, column: treatmentColumn }]] as const) {
         const value = pair.vector?.get(row)
         if (value === null || value === undefined) { problem = { kind: 'missing-value', name: pair.column.name, row }; break }
@@ -600,9 +609,12 @@ export async function materializePanelLong(
       }
       if (problem !== null) break
     }
-    outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(times) || !isNonEmpty(timeLabels)
+    const periods = [...periodsByCode]
+      .sort(([left], [right]) => left - right)
+      .map(([code, label]): PanelPeriod => ({ code, label }))
+    outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
       ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel query returned no rows.' })
-      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, times, timeLabels, values })
+      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods, values })
   } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
   try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })

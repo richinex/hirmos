@@ -20,6 +20,7 @@ import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, use
 import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
   describeSeriesTransform,
@@ -422,7 +423,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           if (!aggregations.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(aggregations.error) }); return }
           const { runPandasResampling } = await import('@/analysis/client')
           const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, recipe.value.resampling.targetFrequency, recipe.value.resampling.incompleteBins, aggregations.value, input.imputedCells)
-          if (!evidence.ok) { dispatch({ type: 'preparation-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'preparation-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const grouped = resampledMatrixFromEvidence(input, recipe.value.resampling, evidence.value)
           if (!grouped.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(grouped.error) }); return }
           observations = grouped.value.rowCount
@@ -470,7 +471,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         const levels = matrix.value.values.slice(start, start + matrix.value.rowCount)
         const levelsBattery = await runStationarityBattery(levels.slice())
         if (!levelsBattery.ok) {
-          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${levelsBattery.error.detail}` })
+          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(levelsBattery.error)}` })
           return
         }
         const differencedBattery = await runStationarityBattery(transformSeries(levels, { kind: 'difference', order: 1 }))
@@ -481,7 +482,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             ? ok(differenced)
             : await runStationarityBattery(transformSeries(levels, draft.diagnosticTransform))
         if (!viewed.ok) {
-          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${viewed.error.detail}` })
+          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(viewed.error)}` })
           return
         }
         evidence.push({ column: column.id, result: viewed.value, levels: levelsBattery.value, differenced, assessment: assessStationarity(levelsBattery.value, differenced) })
@@ -1073,21 +1074,21 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     name: 'Zivot–Andrews · level',
                     statistic: result.zivotAndrews.level.statistic,
                     p: result.zivotAndrews.level.pValue,
-                    fit: `base lag ${result.zivotAndrews.level.baseLags} · break ${result.zivotAndrews.level.breakIndex}`,
+                    fit: `base lag ${result.zivotAndrews.level.baseLags} · break row ${result.zivotAndrews.level.breakIndex + 1}`,
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.level.criticalValues),
                   },
                   {
                     name: 'Zivot–Andrews · trend',
                     statistic: result.zivotAndrews.trend.statistic,
                     p: result.zivotAndrews.trend.pValue,
-                    fit: `base lag ${result.zivotAndrews.trend.baseLags} · break ${result.zivotAndrews.trend.breakIndex}`,
+                    fit: `base lag ${result.zivotAndrews.trend.baseLags} · break row ${result.zivotAndrews.trend.breakIndex + 1}`,
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.trend.criticalValues),
                   },
                   {
                     name: 'Zivot–Andrews · level + trend',
                     statistic: result.zivotAndrews.levelAndTrend.statistic,
                     p: result.zivotAndrews.levelAndTrend.pValue,
-                    fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags} · break ${result.zivotAndrews.levelAndTrend.breakIndex}`,
+                    fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags} · break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.levelAndTrend.criticalValues),
                   },
                 ] as const

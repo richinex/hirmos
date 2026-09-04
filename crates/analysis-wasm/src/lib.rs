@@ -21,7 +21,11 @@ use hirmos_causal_core::cdnots::{
 };
 use hirmos_causal_core::counterfactual::{Equation, LinearScm};
 use hirmos_causal_core::counterfactual_evaluator::{estimate_binary_ett, identify_binary_ett};
-use hirmos_causal_core::discrete_bn::{discretize_805, Dag as DiscreteDag, DiscreteBn};
+use hirmos_causal_core::discrete_bn::{
+    discretize_for_discrete_bn, Dag as DiscreteDag, DiscreteBn,
+    DiscreteStateProblem as CoreDiscreteStateProblem,
+    DiscreteStateStrategy as CoreDiscreteStateStrategy, StateBudget,
+};
 use hirmos_causal_core::dynotears::dynotears_with_progress;
 use hirmos_causal_core::glm::{negative_binomial_p, poisson_glm};
 use hirmos_causal_core::grace::{fit_grace_with_progress, GraceConfiguration};
@@ -325,6 +329,40 @@ pub fn run_analysis(
         AnalysisCommand::DirectLingam { rows, columns } => {
             direct_lingam_evidence(values, rows, columns, progress)
         }
+        AnalysisCommand::PcStable {
+            rows,
+            columns,
+            names,
+            alpha,
+            max_depth,
+            ci_test,
+            background,
+        } => cross_sectional_constraint_evidence(
+            values, rows, columns, names, alpha, max_depth, None, ci_test, background, false,
+            progress,
+        ),
+        AnalysisCommand::Fci {
+            rows,
+            columns,
+            names,
+            alpha,
+            max_depth,
+            max_path_length,
+            ci_test,
+            background,
+        } => cross_sectional_constraint_evidence(
+            values,
+            rows,
+            columns,
+            names,
+            alpha,
+            max_depth,
+            max_path_length,
+            ci_test,
+            background,
+            true,
+            progress,
+        ),
         AnalysisCommand::VarLingam {
             rows,
             columns,

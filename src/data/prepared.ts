@@ -13,6 +13,7 @@ import { aggregationsForColumns, describeResamplingProblem, resampledMatrixFromE
 import type { MissingnessResolutionRecord } from '@/domain/missingness'
 import type { SelectedSource } from '@/domain/workflow'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 /** A dense column-major matrix over the prepared version's retained rows. */
 export interface PreparedMatrix {
@@ -142,7 +143,7 @@ export async function materialisePreparedStages(
     if (!aggregations.ok) return err({ kind: 'resampling-refused', detail: describeResamplingProblem(aggregations.error) })
     const { runPandasResampling } = await import('@/analysis/client')
     const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, prepared.resampling.targetFrequency, prepared.resampling.incompleteBins, aggregations.value, input.imputedCells)
-    if (!evidence.ok) return err({ kind: 'resampling-refused', detail: evidence.error.detail })
+    if (!evidence.ok) return err({ kind: 'resampling-refused', detail: describeAnalysisWorkerProblem(evidence.error) })
     const result = resampledMatrixFromEvidence(input, prepared.resampling, evidence.value)
     if (!result.ok) return err({ kind: 'resampling-refused', detail: describeResamplingProblem(result.error) })
     if (!sameResamplingRecord(result.value.record, prepared.resampling)) return err({ kind: 'resolution-record-mismatch' })
@@ -156,7 +157,7 @@ export async function materialisePreparedStages(
     if (adjust.length > 0) {
       const { seasonalAdjustInWorker } = await import('@/analysis/client')
       const result = await seasonalAdjustInWorker(matrix.values, matrix.rowCount, matrix.columns.length, { period: prepared.seasonalAdjustment.period, robust: prepared.seasonalAdjustment.robust, adjust })
-      if (!result.ok) return err({ kind: 'seasonal-adjustment-refused', detail: result.error.detail })
+      if (!result.ok) return err({ kind: 'seasonal-adjustment-refused', detail: describeAnalysisWorkerProblem(result.error) })
       stl = result.value
       adjusted = { ...matrix, values: Float64Array.from(result.value.values) }
     }
@@ -287,7 +288,7 @@ export async function resolveNullableInput(
 
   const { resolveMissingnessInWorker } = await import('@/analysis/client')
   const resolved = await resolveMissingnessInWorker(values, rowCount, columns.length, unpackValidity(validity, rowCount * columns.length), command)
-  if (!resolved.ok) return err({ kind: 'resolution-refused', detail: resolved.error.detail })
+  if (!resolved.ok) return err({ kind: 'resolution-refused', detail: describeAnalysisWorkerProblem(resolved.error) })
   const outcome = resolved.value.outcome
   if (outcome.kind === 'refused') {
     const { describeMissingnessRefusal } = await import('@/domain/missingness')

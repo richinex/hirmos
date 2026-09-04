@@ -4,6 +4,8 @@ import { columnNameOf, type NumericColumnSelection } from './dataset'
 import {
   DYNOTEARS_METHOD_ID,
   DIRECT_LINGAM_METHOD_ID,
+  FCI_METHOD_ID,
+  PC_STABLE_METHOD_ID,
   LPCMCI_PAR_CORR_METHOD_ID,
   RPCMCI_PAR_CORR_METHOD_ID,
   CDNOTS_PAR_CORR_METHOD_ID,
@@ -91,6 +93,54 @@ export const directLingamEvidenceSchema = z.object({
 }).strict()
 
 export type DirectLingamEvidence = z.infer<typeof directLingamEvidenceSchema>
+
+export const constraintCiTestSchema = z.enum(['fisherZ', 'kci'])
+export type ConstraintCiTest = z.infer<typeof constraintCiTestSchema>
+
+const constraintSeparatingSetSchema = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  variables: z.array(z.number().int().nonnegative()),
+}).strict()
+
+const constraintCiEvidenceSchema = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+  conditions: z.array(z.number().int().nonnegative()),
+  pValue: z.number().finite().min(0).max(1),
+}).strict()
+
+const constraintEvidenceBaseSchema = z.object({
+  observations: z.number().int().positive(),
+  variables: z.number().int().min(2).max(32),
+  alpha: z.number().finite().positive().max(1),
+  maxDepth: z.number().int().nonnegative().nullable(),
+  ciTest: constraintCiTestSchema,
+  graph: z.array(z.array(z.array(z.string().max(3)))),
+  separatingSets: z.array(constraintSeparatingSetSchema),
+  ciTests: z.array(constraintCiEvidenceSchema),
+})
+
+export const pcStableEvidenceSchema = constraintEvidenceBaseSchema.extend({
+  kind: z.literal('pcStable'),
+}).strict()
+
+export type PcStableEvidence = z.infer<typeof pcStableEvidenceSchema>
+
+const fciEdgePropertySchema = z.object({
+  left: z.number().int().nonnegative(),
+  right: z.number().int().nonnegative(),
+  directness: z.enum(['definitelyDirect', 'possiblyDirect']).nullable(),
+  latentConfounding: z.enum(['excluded', 'possible']).nullable(),
+}).strict()
+
+export const fciEvidenceSchema = constraintEvidenceBaseSchema.extend({
+  kind: z.literal('fci'),
+  maxPathLength: z.number().int().nonnegative().nullable(),
+  edgeProperties: z.array(fciEdgePropertySchema),
+}).strict()
+
+export type FciEvidence = z.infer<typeof fciEvidenceSchema>
 
 export const varLingamEvidenceSchema = z.object({
   kind: z.literal('varLingam'),
@@ -236,7 +286,7 @@ export type PcmciPlusBoundaryProblem = {
 
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'DirectLiNGAM' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly method: 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
   readonly detail: string
 }
 
@@ -340,6 +390,40 @@ export function parseDirectLingamEvidence(value: unknown): Result<DirectLingamEv
     return err({ kind: 'invalid-discovery-matrix-result', method: 'DirectLiNGAM', detail: 'DirectLiNGAM causal order is not a permutation of the variables.' })
   }
   return ok(parsed.data)
+}
+
+function parseConstraintEvidence<ResultValue extends PcStableEvidence | FciEvidence>(
+  value: unknown,
+  method: 'PC-stable' | 'FCI',
+  schema: z.ZodType<ResultValue>,
+): Result<ResultValue, DiscoveryMatrixBoundaryProblem> {
+  const parsed = schema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method, detail: z.prettifyError(parsed.error) })
+  }
+  const evidence = parsed.data
+  if (!hasMatrixShape(evidence.graph, evidence.variables, 1)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method, detail: `${method} returned an endpoint matrix with inconsistent dimensions.` })
+  }
+  const validIndex = (index: number) => index < evidence.variables
+  if (evidence.separatingSets.some((set) => !validIndex(set.x) || !validIndex(set.y) || set.variables.some((index) => !validIndex(index)))
+    || evidence.ciTests.some((test) => !validIndex(test.x) || !validIndex(test.y) || test.conditions.some((index) => !validIndex(index)))) {
+    return err({ kind: 'invalid-discovery-matrix-result', method, detail: `${method} returned a variable index outside the selected matrix.` })
+  }
+  return ok(evidence)
+}
+
+export function parsePcStableEvidence(value: unknown): Result<PcStableEvidence, DiscoveryMatrixBoundaryProblem> {
+  return parseConstraintEvidence(value, 'PC-stable', pcStableEvidenceSchema)
+}
+
+export function parseFciEvidence(value: unknown): Result<FciEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = parseConstraintEvidence(value, 'FCI', fciEvidenceSchema)
+  if (!parsed.ok) return parsed
+  if (parsed.value.edgeProperties.some((edge) => edge.left >= parsed.value.variables || edge.right >= parsed.value.variables)) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'FCI', detail: 'FCI returned an edge property outside the selected matrix.' })
+  }
+  return parsed
 }
 
 export function parseVarLingamEvidence(value: unknown): Result<VarLingamEvidence, DiscoveryMatrixBoundaryProblem> {
@@ -474,10 +558,10 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'direct-lingam' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'cdnots' | 'cdnots-plus' | 'grace' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
+export type DiscoveryMethodChoice = 'direct-lingam' | 'pc-stable' | 'fci' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'cdnots' | 'cdnots-plus' | 'grace' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
-export type DiscoveryMethodGroupId = 'pcmci-family' | 'nonstationary-constraint' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy' | 'neural-granger'
+export type DiscoveryMethodGroupId = 'cross-sectional-constraint' | 'pcmci-family' | 'nonstationary-constraint' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy' | 'neural-granger'
 
 export interface DiscoveryMethodGroup {
   readonly id: DiscoveryMethodGroupId
@@ -491,6 +575,13 @@ const PCMCI_FAMILY: DiscoveryMethodGroup = {
   name: 'PCMCI family',
   description: 'Conditional-independence methods for time-indexed graphs; RPCMCI also estimates persistent regimes.',
   methods: ['pcmci-plus', 'lpcmci', 'rpcmci'],
+}
+
+const CROSS_SECTIONAL_CONSTRAINT: DiscoveryMethodGroup = {
+  id: 'cross-sectional-constraint',
+  name: 'Cross-sectional constraint',
+  description: 'Conditional-independence methods for independent observations; PC-stable returns a CPDAG and FCI returns a PAG.',
+  methods: ['pc-stable', 'fci'],
 }
 
 const LINGAM_FAMILY: DiscoveryMethodGroup = {
@@ -529,6 +620,7 @@ const NEURAL_GRANGER: DiscoveryMethodGroup = {
 }
 
 export const DISCOVERY_METHOD_GROUPS: NonEmptyArray<DiscoveryMethodGroup> = [
+  CROSS_SECTIONAL_CONSTRAINT,
   PCMCI_FAMILY,
   NONSTATIONARY_CONSTRAINT,
   LINGAM_FAMILY,
@@ -539,6 +631,7 @@ export const DISCOVERY_METHOD_GROUPS: NonEmptyArray<DiscoveryMethodGroup> = [
 
 export function discoveryMethodGroupById(id: DiscoveryMethodGroupId): DiscoveryMethodGroup {
   switch (id) {
+    case 'cross-sectional-constraint': return CROSS_SECTIONAL_CONSTRAINT
     case 'pcmci-family': return PCMCI_FAMILY
     case 'nonstationary-constraint': return NONSTATIONARY_CONSTRAINT
     case 'lingam-family': return LINGAM_FAMILY
@@ -551,6 +644,9 @@ export function discoveryMethodGroupById(id: DiscoveryMethodGroupId): DiscoveryM
 
 export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): DiscoveryMethodGroup {
   switch (method) {
+    case 'pc-stable':
+    case 'fci':
+      return CROSS_SECTIONAL_CONSTRAINT
     case 'pcmci-plus':
     case 'lpcmci':
     case 'rpcmci':
@@ -574,8 +670,32 @@ export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): Discover
   }
 }
 
+export interface ConstraintBackgroundKnowledge {
+  readonly forbidden: readonly (readonly [number, number])[]
+  readonly required: readonly (readonly [number, number])[]
+  readonly forbiddenPatterns: readonly (readonly [string, string])[]
+  readonly requiredPatterns: readonly (readonly [string, string])[]
+  readonly tiers: readonly (number | null)[]
+  readonly forbiddenWithinTiers: readonly number[]
+}
+
 export type DiscoveryConfiguration =
   | { readonly kind: 'direct-lingam' }
+  | {
+      readonly kind: 'pc-stable'
+      readonly alpha: PcmciAlpha
+      readonly maxDepth: number | null
+      readonly ciTest: ConstraintCiTest
+      readonly background: ConstraintBackgroundKnowledge
+    }
+  | {
+      readonly kind: 'fci'
+      readonly alpha: PcmciAlpha
+      readonly maxDepth: number | null
+      readonly maxPathLength: number | null
+      readonly ciTest: ConstraintCiTest
+      readonly background: ConstraintBackgroundKnowledge
+    }
   | {
       readonly kind: 'pcmci-plus'
       readonly tauMax: DiscoveryLag
@@ -672,6 +792,26 @@ export type DiscoveryRunArtifact =
       readonly variables: NonEmptyArray<NumericColumnSelection>
       readonly eligibility: AcceptedDiscoveryEligibility
       readonly result: DirectLingamEvidence
+    }
+  | {
+      readonly kind: 'pc-stable-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof PC_STABLE_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: PcStableEvidence
+    }
+  | {
+      readonly kind: 'fci-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof FCI_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: FciEvidence
     }
   | {
       readonly kind: 'pcmci-plus-run'
@@ -819,6 +959,7 @@ export type DiscoveryEvent =
   | { readonly type: 'method-selected'; readonly method: DiscoveryMethodChoice }
   | { readonly type: 'tau-max-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'pc-alpha-selected'; readonly value: PcmciAlpha }
+  | { readonly type: 'constraint-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'pc-stable' | 'fci' }> }
   | { readonly type: 'rpcmci-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }> }
   | { readonly type: 'cdnots-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'cdnots' | 'cdnots-plus' }> }
   | { readonly type: 'grace-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'grace' }> }
@@ -890,6 +1031,10 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
       return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'lpcmci'
         ? { configuration: { ...state.configuration, pcAlpha: event.value }, job: { kind: 'idle' } }
         : state
+    case 'constraint-configured':
+      return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration, job: { kind: 'idle' } }
+        : state
     case 'rpcmci-configured':
       return state.configuration.kind === 'rpcmci'
         ? { configuration: event.configuration, job: { kind: 'idle' } }
@@ -948,6 +1093,8 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
 function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfiguration {
   switch (method) {
     case 'direct-lingam': return { kind: 'direct-lingam' }
+    case 'pc-stable': return { kind: 'pc-stable', alpha: 0.05, maxDepth: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() }
+    case 'fci': return { kind: 'fci', alpha: 0.05, maxDepth: null, maxPathLength: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() }
     case 'pcmci-plus': return { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }
     case 'lpcmci': return { kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }
     case 'rpcmci': return { kind: 'rpcmci', numRegimes: 2, maxTransitions: 4, switchThres: 0.05, numIterations: 20, maxAnneal: 10, tauMin: 1, tauMax: 1, pcAlpha: 0.2, alphaLevel: 0.01, seed: 327 }
@@ -963,8 +1110,20 @@ function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfig
   }
 }
 
+function emptyConstraintBackgroundKnowledge(): ConstraintBackgroundKnowledge {
+  return {
+    forbidden: [],
+    required: [],
+    forbiddenPatterns: [],
+    requiredPatterns: [],
+    tiers: [],
+    forbiddenWithinTiers: [],
+  }
+}
+
 export type ReadyDiscoverySpecification =
   | { readonly kind: 'direct-lingam' }
+  | Extract<DiscoveryConfiguration, { readonly kind: 'pc-stable' | 'fci' }>
   | {
       readonly kind: 'pcmci-plus'
       readonly tauMax: DiscoveryLag
@@ -1004,7 +1163,7 @@ export type DiscoveryReadinessProblem =
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
   | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP'; readonly maximum: number }
   | { readonly kind: 'transition-budget-too-large'; readonly available: number }
 
@@ -1020,10 +1179,12 @@ export function readyDiscoverySpecification(
     && configuration.kind !== 'grace') {
     return err({ kind: 'dense-browser-boundary-required' })
   }
-  if (configuration.kind === 'direct-lingam') {
+  if (configuration.kind === 'direct-lingam' || configuration.kind === 'pc-stable' || configuration.kind === 'fci') {
     if (prepared.kind !== 'prepared-cross-section') return err({ kind: 'cross-section-required' })
     if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-    if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'DirectLiNGAM', maximum: 12, available: prepared.columns.length })
+    const maximum = configuration.kind === 'direct-lingam' || configuration.ciTest === 'kci' ? 12 : 32
+    const method = configuration.kind === 'direct-lingam' ? 'DirectLiNGAM' : configuration.kind === 'pc-stable' ? 'PC-stable' : 'FCI'
+    if (prepared.columns.length > maximum) return err({ kind: 'browser-variable-limit', method, maximum, available: prepared.columns.length })
     const required = prepared.columns.length + 16
     return prepared.observations < required
       ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1147,7 +1308,7 @@ export function evaluateDiscoveryEligibility(
       }],
     }
   }
-  if (method.id === DIRECT_LINGAM_METHOD_ID) {
+  if (method.id === DIRECT_LINGAM_METHOD_ID || method.id === PC_STABLE_METHOD_ID || method.id === FCI_METHOD_ID) {
     if (prepared.kind !== 'prepared-cross-section') {
       const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat
       return {
@@ -1241,7 +1402,7 @@ export const newDiscoveryRunId = (): DiscoveryRunId =>
 export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): string {
   switch (problem.kind) {
     case 'time-series-required': return 'Temporal discovery needs a regular time series. This prepared dataset has another observation structure.'
-    case 'cross-section-required': return 'DirectLiNGAM needs independent cross-sectional observations. Prepare this dataset as a cross-section.'
+    case 'cross-section-required': return 'This method needs independent cross-sectional observations. Prepare this dataset as a cross-section.'
     case 'at-least-two-variables-required': return 'Select at least 2 variables.'
     case 'too-few-observations': return `This configuration needs at least ${problem.required} rows; ${problem.available} are available. Use more rows or choose a smaller configuration.`
     case 'dense-browser-boundary-required': return 'Choose a complete interval or imputation. This method needs complete numeric columns in the browser.'

@@ -18,6 +18,7 @@ import {
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatStatistic } from '@/lib/format/number'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Job =
   | { readonly kind: 'idle' }
@@ -69,7 +70,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
         { correlation: correlationThreshold, vif: vifThreshold },
       )
       if (!result.ok) {
-        setJob({ kind: 'failed', detail: result.error.detail })
+        setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) })
         return
       }
       const firstCluster = result.value.correlationClusters.find((cluster) => cluster.length > 1)

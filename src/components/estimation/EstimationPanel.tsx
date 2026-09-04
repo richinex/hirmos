@@ -26,7 +26,7 @@ import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num, 
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import { assertNever, type NonEmptyArray } from '@/domain/dop'
+import { assertNever, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import {
   additive,
   adjustmentLabels,
@@ -35,6 +35,7 @@ import {
   contemporaneousAdjustmentVariables,
   defaultConfiguration,
   describeCovariance,
+  describeDiscreteStatePreparations,
   describeEstimator,
   ESTIMATOR_GROUPS,
   ESTIMATOR_IDS,
@@ -70,7 +71,7 @@ import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
-import type { AnalysisProgress } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
 import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 
 const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
@@ -300,13 +301,26 @@ function SyntheticControlEvidenceDetails({ run }: { readonly run: Extract<Estima
   )
 }
 
+type PanelPeriodDisplay =
+  | { readonly kind: 'source-labels'; readonly labels: readonly string[] }
+  | { readonly kind: 'dense-codes'; readonly labels: readonly string[] }
+
+function panelPeriodDisplay(run: Extract<EstimationRunArtifact, { readonly kind: 'panel-intervention-run' }>): PanelPeriodDisplay {
+  const recorded: unknown = Reflect.get(run, 'timeLabels')
+  if (Array.isArray(recorded)
+    && recorded.length === run.evidence.times.length
+    && recorded.every((label) => typeof label === 'string' && label.length > 0)) {
+    return { kind: 'source-labels', labels: recorded }
+  }
+  return { kind: 'dense-codes', labels: run.evidence.times.map(String) }
+}
+
 function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArtifact, { readonly kind: 'panel-intervention-run' }> }) {
   const { evidence } = run
   const controls = evidence.units.slice(0, evidence.controlUnits)
-  // A run saved before period labels were recorded falls back to its numeric time codes.
-  const timeLabels: readonly string[] = Array.isArray(run.timeLabels) ? run.timeLabels : evidence.times.map(String)
-  const preLabels = timeLabels.slice(0, evidence.nPre)
-  const postLabels = timeLabels.slice(evidence.nPre)
+  const periods = panelPeriodDisplay(run)
+  const preLabels = periods.labels.slice(0, evidence.nPre)
+  const postLabels = periods.labels.slice(evidence.nPre)
   const estimates = [
     ['Difference-in-differences', evidence.did, null, null],
     ['Synthetic control', evidence.syntheticControl, evidence.syntheticControlPlacebo, evidence.syntheticControlInTime],
@@ -316,6 +330,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
     <details className={well('mt-3 px-3 py-2 text-body')}>
       <summary className="cursor-pointer text-ink">Panel weights and period effects</summary>
       <div className="mt-3 grid gap-4">
+        {periods.kind === 'dense-codes' && <Alert tone="info" live={false}><p className="m-0">This saved run does not contain source period labels. The period tables therefore show zero-based dense codes.</p></Alert>}
         <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel estimator comparison">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Estimator</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Estimate</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Placebo SE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">In-time placebo</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Noise level</th></tr></thead>
@@ -425,8 +440,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Cointegration rank', value: formatCount(evidence.rank), context: `Johansen trace at ${['90', '95', '99'][evidence.significance] ?? ''}% · ${evidence.kArDiff} lagged differences` },
           { label: 'Adjustment p', value: formatWords(evidence.pvaluesAlpha.map((row) => formatP(row[0] ?? Number.NaN, { withLabel: false }).text).join(' · ')), context: `alpha per equation · terms “${evidence.deterministic}”` },
           evidence.chow === null
-            ? { label: 'Chow break', value: formatWords('not requested'), context: 'set a break row to test stability' }
-            : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: `F ${formatStatistic('raw', evidence.chow[0]).text} at the chosen row` },
+            ? { label: 'Chow break', value: formatWords('not requested'), context: 'set a split after a row to test stability' }
+            : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: `F ${formatStatistic('raw', evidence.chow[0]).text} · split after row ${run.configuration.breakIndex}` },
         ]
       }
       case 'synthetic-control-run': {
@@ -489,7 +504,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       case 'discrete-bn-run': {
         const { evidence } = run
         return [
-          { label: 'Treatment bins', value: formatWords(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: `${evidence.bins} quantile bins · states ${evidence.stateCounts.join('/')}` },
+          { label: 'Treatment states', value: formatWords(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: `state budget ${evidence.bins} · counts ${evidence.stateCounts.join('/')}` },
+          { label: 'State preparation', value: formatWords(`${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'observedStates').length} observed · ${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'quantiles').length} quantile`), context: describeDiscreteStatePreparations(evidence.statePreparations) },
           { label: 'Expected outcome', value: formatWords(`${formatStatistic('raw', evidence.expectations[0]).text} → ${formatStatistic('raw', evidence.expectations[1]).text}`), context: 'under do(low) and do(high)' },
           ...(evidence.parentsAdjusted.join(', ') === adjustmentLabels(run.estimate.adjustment).join(', ') ? [] : [
   { label: 'Adjustment set', value: formatWords(evidence.parentsAdjusted.length === 0 ? 'none' : evidence.parentsAdjusted.join(', ')), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : evidence.minimalAdjustmentSet.join(', ')}` },
@@ -921,7 +937,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             seed: configuration.seed,
           },
         }, (progress) => dispatch({ type: 'run-progressed', progress }))
-        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
         const run = { kind: 'frontdoor-two-stage-run', configuration, evidence: evidence.value } as const
         const estimate = causalEstimateFrom(study, identification, run)
         finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The front-door identification record is no longer available.')
@@ -946,7 +962,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           outcome,
           unobserved: study.graph.nodes.flatMap((node, index) => node.column === null ? [index] : []),
         })
-        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
         const run = { kind: 'binary-ett-run', configuration, evidence: evidence.value } as const
         const estimate = causalEstimateFrom(study, identification, run)
         finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The IDC* identification record is no longer available.')
@@ -961,7 +977,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
           const matrix = await materialise(columns)
           const evidence = await analysis.runBackdoorLinear(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), hacMaxLags: null, level: configuration.level })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'backdoor-linear-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind) as typeof run extends never ? never : 'backdoor-linear-regression' extends string ? ReturnType<typeof methodIdOf> & typeof method.value.id : never, columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -973,7 +989,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const matrix = await materialise(columns)
           if (configuration.kind === 'dml-irm' && columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the interactive model needs a 0/1 treatment.` }); return }
           const evidence = await analysis.runDoubleMl(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), model: configuration.kind === 'dml-plr' ? 'plr' : 'irm', att: configuration.kind === 'dml-irm' && configuration.att, seed: configuration.seed })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'double-ml-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -983,7 +999,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome]
           const matrix = await materialise(columns)
           const evidence = await analysis.runArdlPss(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, maxLag: configuration.maxLag, trend: configuration.trend, case: configuration.case })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'ardl-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -993,7 +1009,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const columns: NonEmptyArray<StudyVariable> = [study.outcome, study.treatment, ...identification.result.adjustment.variables]
           const matrix = await materialise(columns)
           const evidence = await analysis.runVecm(matrix.values, matrix.rowCount, columns.length, { endogenous: columns.map((_, index) => index), maxLags: configuration.maxLags, deterministic: configuration.deterministic, significance: configuration.significance === 90 ? 0 : configuration.significance === 95 ? 1 : 2, breakIndex: configuration.breakIndex })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'vecm-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact,
@@ -1013,7 +1029,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             nPre = start.value
           }
           const evidence = await analysis.runSyntheticControl(matrix.values, matrix.rowCount, columns.length, { treated: 1, donors: donorVariables.map((_, index) => index + 2), nPre, crossFitFolds: configuration.crossFitFolds, alpha: configuration.alpha })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'synthetic-control-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The synthetic control run produced no post-intervention rows.')
@@ -1030,13 +1046,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             matrix.values.slice(),
             matrix.rowCount,
             matrix.units,
-            matrix.times,
+            matrix.periodCodes,
             { placeboReplications: configuration.placeboReplications, seed: configuration.seed },
             (progress) => dispatch({ type: 'run-progressed', progress }),
           )
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const columns: NonEmptyArray<StudyVariable> = [study.outcome, study.treatment]
-          const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: state.panelPreflight.layout.periodLabels } as const
+          const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: mapNonEmpty(state.panelPreflight.layout.periods, (period) => period.label) } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The panel intervention run produced no estimate.')
           return
@@ -1049,7 +1065,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const outcome = columnAt(matrix.values, matrix.rowCount, 1)
           if (outcome.some((value) => value < 0 || !Number.isInteger(value))) { dispatch({ type: 'run-failed', detail: `${study.outcome.name} is not a count: it holds negative or fractional values.` }); return }
           const evidence = await analysis.runNegbinNuts(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, confounder: 2, warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'negbin-nuts-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -1060,7 +1076,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const matrix = await materialise(columns)
           if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the Gaussian model needs a 0/1 treatment.` }); return }
           const evidence = await analysis.runBayesianGaussian(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'bayesian-gaussian-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -1081,7 +1097,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             bins: configuration.bins,
             equivalentSampleSize: configuration.equivalentSampleSize,
           })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'discrete-bn-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -1094,7 +1110,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const outcome = columnAt(matrix.values, matrix.rowCount, 1)
           if (outcome.some((value) => value < 0 || !Number.isInteger(value))) { dispatch({ type: 'run-failed', detail: `${study.outcome.name} is not a count: it holds negative or fractional values.` }); return }
           const evidence = await analysis.runCountGlm(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), family: configuration.kind === 'poisson-glm' ? 'poisson' : 'negativeBinomial' })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'count-glm-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
@@ -1121,7 +1137,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             treatmentValue: configuration.treatmentValue,
             schedule: configuration.schedule,
           }, (progress) => dispatch({ type: 'run-progressed', progress }))
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'negative-binomial-ingarch-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The INGARCH run produced no forecast path.')
@@ -1155,7 +1171,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             interventions: configuration.interventions,
             uncertainty: configuration.uncertainty,
           }, (progress) => dispatch({ type: 'run-progressed', progress }))
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           if (evidence.value.fit.kind === 'invalidAdjustment') {
             dispatch({
               type: 'run-failed',
@@ -1183,7 +1199,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             nPre = start.value
           }
           const evidence = await analysis.runCausalImpact(matrix.values, matrix.rowCount, columns.length, { outcome: 1, controls: controlVariables.map((_, index) => index + 2), nPre, maxIter: configuration.maxIter })
-          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: evidence.error.detail }); return }
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'causal-impact-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The impact run produced no post-intervention rows.')
@@ -1272,7 +1288,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <ParameterLabel className={fieldLabel} label="Trace significance" help={ESTIMATION_PARAMETER_HELP.vecm.traceSignificance} />
               <SegmentedControl className="mt-1" fill ariaLabel="Trace significance" value={String(configuration.significance)} onChange={(chosen) => { const level = TRACE_LEVELS.find((item) => String(item) === chosen); if (level !== undefined) configure({ ...configuration, significance: level }) }} options={TRACE_LEVELS.map((level) => ({ value: String(level), label: `${level}%` }))} />
             </div>
-            <label className="block"><ParameterLabel className={fieldLabel} label="Chow break row" help={ESTIMATION_PARAMETER_HELP.vecm.chowBreakRow} /><input type="number" min={4} max={prepared.observations - 4} aria-label="Chow break row" placeholder="none" className={field('text', 'mt-1')} value={configuration.breakIndex ?? ''} onChange={(event) => configure({ ...configuration, breakIndex: event.target.value === '' ? null : Math.max(4, Math.min(prepared.observations - 4, Math.floor(Number(event.target.value) || 4))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Chow split after row" help={ESTIMATION_PARAMETER_HELP.vecm.chowBreakRow} /><input type="number" min={4} max={prepared.observations - 4} aria-label="Chow split after row" placeholder="none" className={field('text', 'mt-1')} value={configuration.breakIndex ?? ''} onChange={(event) => configure({ ...configuration, breakIndex: event.target.value === '' ? null : Math.max(4, Math.min(prepared.observations - 4, Math.floor(Number(event.target.value) || 4))) })} /></label>
           </div>
         )
       case 'synthetic-control':
@@ -1324,7 +1340,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
             </div>
             {panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
-            {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted">Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units · {panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods · adoption at {panelPreflight.layout.adoptionLabel}.</p>}
+            {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted">Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units · {panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods · adoption at {panelPreflight.layout.adoption.label}.</p>}
           </div>
         )
       case 'negbin-nuts':
@@ -1348,9 +1364,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'discrete-bn-query':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><ParameterLabel className={fieldLabel} label="Quantile bins" help={ESTIMATION_PARAMETER_HELP.discreteBn.quantileBins} /><input type="number" min={2} max={10} aria-label="Quantile bins" className={field('text', 'mt-1')} value={configuration.bins} onChange={(event) => configure({ ...configuration, bins: Math.max(2, Math.min(10, Math.floor(Number(event.target.value) || 2))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="State budget" help={ESTIMATION_PARAMETER_HELP.discreteBn.stateBudget} /><input type="number" min={2} max={10} aria-label="State budget" className={field('text', 'mt-1')} value={configuration.bins} onChange={(event) => configure({ ...configuration, bins: Math.max(2, Math.min(10, Math.floor(Number(event.target.value) || 2))) })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Equivalent sample size" help={ESTIMATION_PARAMETER_HELP.discreteBn.equivalentSampleSize} /><input type="number" min={0.1} step="any" aria-label="Equivalent sample size" className={field('text', 'mt-1')} value={configuration.equivalentSampleSize} onChange={(event) => configure({ ...configuration, equivalentSampleSize: Math.max(0.1, Number(event.target.value) || 0.1) })} /></label>
-            <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Every DAG node is cut into quantile bins; the BDeu prior smooths the conditional tables; the effect contrasts the highest and lowest treatment bins.</p>
+            <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Observed binary and ordinal states are preserved when they fit the budget; higher-cardinality values are divided at quantiles. The BDeu prior smooths the conditional tables, and the effect contrasts the lowest and highest treatment states.</p>
           </div>
         )
       case 'binary-ett-idc-star':

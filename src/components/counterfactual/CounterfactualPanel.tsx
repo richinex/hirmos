@@ -31,7 +31,7 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretCounterfactualResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime } from '@/lib/format/date'
-import type { AnalysisProgress } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
 
 type Job = { readonly kind: 'idle' } | { readonly kind: 'running'; readonly progress: AnalysisProgress | null } | { readonly kind: 'failed'; readonly detail: string }
 
@@ -344,7 +344,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             interventions: state.configuration.interventions,
             observationNoise: state.configuration.observationNoise,
           })
-          if (!result.ok) { dispatch({ type: 'run-failed', detail: result.error.detail }); return }
+          if (!result.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
           onRun({ kind: 'linear-scm-run', id: newCounterfactualRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LINEAR_SCM_METHOD_ID, configuration: state.configuration, nodes, evidence: result.value, eligibility })
           break
         }
@@ -367,7 +367,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             interventions: state.configuration.interventions,
             uncertainty: state.configuration.uncertainty,
           }, (progress) => dispatch({ type: 'run-progressed', progress }))
-          if (!result.ok) { dispatch({ type: 'run-failed', detail: result.error.detail }); return }
+          if (!result.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
           onRun({ kind: 'dynamic-linear-scm-run', id: newCounterfactualRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNAMIC_LINEAR_SCM_METHOD_ID, configuration: state.configuration, nodes, evidence: result.value, eligibility })
           break
         }

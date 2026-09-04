@@ -59,6 +59,8 @@ import {
 import {
   DYNOTEARS_METHOD_ID,
   DIRECT_LINGAM_METHOD_ID,
+  FCI_METHOD_ID,
+  PC_STABLE_METHOD_ID,
   CDNOTS_PAR_CORR_METHOD_ID,
   CDNOTS_PLUS_PAR_CORR_METHOD_ID,
   GRACE_METHOD_ID,
@@ -79,10 +81,11 @@ import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
 import { formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
-import type { AnalysisWorkerProblem, TemporalSamples } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem, type AnalysisWorkerProblem, type TemporalSamples } from '@/workers/analysisProtocol'
 import type { PreparedMatrix, RoleAwarePreparedMatrix } from '@/data/prepared'
 
 const DISCOVERY_GROUP_LABELS: Readonly<Record<DiscoveryMethodGroupId, string>> = {
+  'cross-sectional-constraint': 'Constraint',
   'pcmci-family': 'PCMCI',
   'nonstationary-constraint': 'Nonstationary',
   'lingam-family': 'LiNGAM',
@@ -213,6 +216,8 @@ const validityFor = (input: DiscoveryInput): Uint8Array => {
 const methodIdForChoice = (method: DiscoveryMethodChoice) => {
   switch (method) {
     case 'direct-lingam': return DIRECT_LINGAM_METHOD_ID
+    case 'pc-stable': return PC_STABLE_METHOD_ID
+    case 'fci': return FCI_METHOD_ID
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
     case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
     case 'rpcmci': return RPCMCI_PAR_CORR_METHOD_ID
@@ -247,6 +252,8 @@ const analysisFailureEvent = (problem: AnalysisWorkerProblem) => {
     case 'worker-unavailable':
     case 'worker-protocol-failed':
       return { type: 'run-failed', problem: { kind: 'analysis-refused', detail: problem.detail } } as const
+    case 'discreteStateRefused':
+      return { type: 'run-failed', problem: { kind: 'analysis-refused', detail: describeAnalysisWorkerProblem(problem) } } as const
     default: return assertNever(problem)
   }
 }
@@ -255,6 +262,131 @@ const pValue = (value: number): string => value < 0.0001 ? '<0.0001' : value.toF
 const statistic = (value: number): string => Math.abs(value) >= 10_000 ? value.toExponential(4) : value.toFixed(6)
 
 const asNumber = (value: string | number): number => (typeof value === 'number' ? value : Number(value))
+
+type ConstraintConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'pc-stable' | 'fci' }>
+
+function ConstraintDiscoveryControls({
+  configuration,
+  variableNames,
+  onChange,
+}: {
+  readonly configuration: ConstraintConfiguration
+  readonly variableNames: readonly string[]
+  readonly onChange: (configuration: ConstraintConfiguration) => void
+}) {
+  const pairs = (kind: 'required' | 'forbidden') => configuration.background[kind]
+  const updatePairs = (kind: 'required' | 'forbidden', next: readonly (readonly [number, number])[]) => {
+    onChange({ ...configuration, background: { ...configuration.background, [kind]: next } })
+  }
+  const addPair = (kind: 'required' | 'forbidden') => {
+    if (variableNames.length < 2) return
+    const existing = pairs(kind)
+    const candidate = Array.from({ length: variableNames.length }, (_, from) =>
+      Array.from({ length: variableNames.length }, (_, to) => [from, to] as const),
+    ).flat().find(([from, to]) => from !== to && !existing.some(([left, right]) => left === from && right === to))
+    if (candidate !== undefined) updatePairs(kind, [...existing, candidate])
+  }
+  const tiers = variableNames.map((_, index) => configuration.background.tiers[index] ?? null)
+  const assignedTiers = [...new Set(tiers.filter((tier): tier is number => tier !== null))]
+  const forbidWithinTiers = assignedTiers.length > 0
+    && assignedTiers.every((tier) => configuration.background.forbiddenWithinTiers.includes(tier))
+
+  return (
+    <div className="mt-4 grid gap-4">
+      <div className="grid gap-3 @2xl/panel:grid-cols-4">
+        <div className="text-body text-ink">
+          <ParameterLabel label="Significance level" help="Edges are removed when the selected conditional-independence test does not reject independence at this level." htmlFor="constraint-alpha" />
+          <Select id="constraint-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
+            const alpha = alphaFromValue(event.target.value)
+            if (alpha !== null) onChange({ ...configuration, alpha })
+          }}>
+            {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </div>
+        <div className="text-body text-ink">
+          <ParameterLabel label="CI test" help="Fisher Z tests zero partial correlation under a linear Gaussian model. KCI uses causal-learn's kernel conditional-independence test and costs substantially more." htmlFor="constraint-ci-test" />
+          <Select id="constraint-ci-test" className={field('text', 'mt-1')} value={configuration.ciTest} onChange={(event) => onChange({ ...configuration, ciTest: event.target.value === 'kci' ? 'kci' : 'fisherZ' })}>
+            <option value="fisherZ">Fisher Z</option>
+            <option value="kci">KCI</option>
+          </Select>
+        </div>
+        <div className="text-body text-ink">
+          <ParameterLabel label="Maximum depth" help="Limits the largest conditioning set tested during skeleton discovery. Automatic follows the reference implementation until no larger set is available." htmlFor="constraint-depth" />
+          <Select id="constraint-depth" className={field('text', 'mt-1')} value={configuration.maxDepth ?? 'automatic'} onChange={(event) => onChange({ ...configuration, maxDepth: event.target.value === 'automatic' ? null : Number(event.target.value) })}>
+            <option value="automatic">Automatic</option>
+            {[0, 1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </div>
+        {configuration.kind === 'fci' && (
+          <div className="text-body text-ink">
+            <ParameterLabel label="Maximum path length" help="Limits the discriminating and uncovered paths used by FCI orientation rules. Automatic follows causal-learn's default." htmlFor="fci-path-length" />
+            <Select id="fci-path-length" className={field('text', 'mt-1')} value={configuration.maxPathLength ?? 'automatic'} onChange={(event) => onChange({ ...configuration, maxPathLength: event.target.value === 'automatic' ? null : Number(event.target.value) })}>
+              <option value="automatic">Automatic</option>
+              {[1, 2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
+            </Select>
+          </div>
+        )}
+      </div>
+
+      <div className={well('p-3')}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h4 className="m-0 text-body font-medium text-ink">Background knowledge</h4>
+            <p className="mb-0 mt-1 text-label text-faint">Required and forbidden directions constrain orientation. Tiers forbid arrows from a later tier to an earlier tier.</p>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" className={button('outline', 'sm')} onClick={() => addPair('required')}>Add required</button>
+            <button type="button" className={button('outline', 'sm')} onClick={() => addPair('forbidden')}>Add forbidden</button>
+          </div>
+        </div>
+        {(['required', 'forbidden'] as const).map((kind) => pairs(kind).length === 0 ? null : (
+          <div key={kind} className="mt-3 grid gap-2">
+            <span className={label('text-faint')}>{kind === 'required' ? 'Required directions' : 'Forbidden directions'}</span>
+            {pairs(kind).map(([from, to], index) => (
+              <div key={`${kind}:${index}`} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
+                <Select className={field('text')} aria-label={`${kind} direction source ${index + 1}`} value={from} onChange={(event) => {
+                  const next = [...pairs(kind)]
+                  next[index] = [Number(event.target.value), to]
+                  updatePairs(kind, next)
+                }}>{variableNames.map((name, position) => <option key={position} value={position} disabled={position === to}>{name}</option>)}</Select>
+                <span aria-hidden>→</span>
+                <Select className={field('text')} aria-label={`${kind} direction target ${index + 1}`} value={to} onChange={(event) => {
+                  const next = [...pairs(kind)]
+                  next[index] = [from, Number(event.target.value)]
+                  updatePairs(kind, next)
+                }}>{variableNames.map((name, position) => <option key={position} value={position} disabled={position === from}>{name}</option>)}</Select>
+                <button type="button" className={iconControl()} aria-label={`Remove ${kind} direction ${index + 1}`} onClick={() => updatePairs(kind, pairs(kind).filter((_, position) => position !== index))}><Icon name="delete" size={15} /></button>
+              </div>
+            ))}
+          </div>
+        ))}
+        <div className="mt-3 grid gap-2 @2xl/panel:grid-cols-3">
+          {variableNames.map((name, index) => (
+            <label key={name} className="text-label text-ink">{name}
+              <Select className={field('text', 'mt-1')} value={tiers[index] ?? 'none'} onChange={(event) => {
+                const next = [...tiers]
+                next[index] = event.target.value === 'none' ? null : Number(event.target.value)
+                onChange({ ...configuration, background: { ...configuration.background, tiers: next } })
+              }}>
+                <option value="none">No tier</option>
+                {[0, 1, 2, 3, 4, 5].map((tier) => <option key={tier} value={tier}>Tier {tier}</option>)}
+              </Select>
+            </label>
+          ))}
+        </div>
+        {assignedTiers.length > 0 && (
+          <label className="mt-3 flex items-center gap-2 text-label text-ink">
+            <input type="checkbox" checked={forbidWithinTiers} onChange={(event) => onChange({
+              ...configuration,
+              background: { ...configuration.background, forbiddenWithinTiers: event.target.checked ? assignedTiers : [] },
+            })} />
+            Forbid directions within assigned tiers
+          </label>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface LinkRow { readonly source: string; readonly target: string; readonly lag: number }
 
@@ -977,6 +1109,73 @@ function OcseResult({ run, open, current }: { readonly open: boolean; readonly c
   )
 }
 
+function ConstraintDiscoveryResult({ run, open, current }: {
+  readonly open: boolean
+  readonly current: boolean
+  readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'pc-stable-run' | 'fci-run' }>
+}) {
+  const links = run.result.graph.flatMap((targets, source) => targets.flatMap((lags, target) => {
+    const mark = lags[0] ?? ''
+    if (source >= target || mark.length === 0) return []
+    const property = run.kind === 'fci-run'
+      ? run.result.edgeProperties.find((edge) => edge.left === source && edge.right === target)
+      : undefined
+    return [{
+      key: `${source}:${target}`,
+      source: run.variables[source].name,
+      target: run.variables[target].name,
+      mark,
+      directness: property?.directness ?? null,
+      latentConfounding: property?.latentConfounding ?? null,
+    }]
+  }))
+  const separatingSets = run.result.separatingSets.map((set, index) => ({
+    key: `${set.x}:${set.y}:${index}`,
+    x: run.variables[set.x].name,
+    y: run.variables[set.y].name,
+    variables: set.variables.map((variable) => run.variables[variable].name).join(', ') || '∅',
+  }))
+  const method = run.kind === 'fci-run' ? 'FCI' : 'PC-stable'
+  const graphName = run.kind === 'fci-run' ? 'Partial ancestral graph' : 'Completed partially directed acyclic graph'
+  return (
+    <ResultCard run={run} open={open} current={current} method={method} title={<>{graphName}</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.ciTest === 'fisherZ' ? 'Fisher Z' : 'KCI'} · α {run.result.alpha} · {run.result.ciTests.length} CI tests</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <StructurePlot run={run} label={`${method} ${graphName.toLowerCase()}`} />
+      <EvidenceTable<typeof links[number]>
+        frame="none"
+        title={`${method} endpoint marks`}
+        rows={links}
+        rowKey={(row) => row.key}
+        noun="connection"
+        empty="The fitted graph contains no connections."
+        columns={[
+          { id: 'source', header: 'Variable', value: (row) => row.source },
+          { id: 'mark', header: 'Mark', value: (row) => row.mark },
+          { id: 'target', header: 'Variable', value: (row) => row.target },
+          ...(run.kind === 'fci-run' ? [
+            { id: 'directness', header: 'Directness', value: (row: typeof links[number]) => row.directness === null ? '—' : row.directness === 'definitelyDirect' ? 'Definitely direct' : 'Possibly direct' },
+            { id: 'confounding', header: 'Latent confounding', value: (row: typeof links[number]) => row.latentConfounding === null ? '—' : row.latentConfounding === 'excluded' ? 'Excluded' : 'Possible' },
+          ] : []),
+        ]}
+      />
+      <EvidenceTable<typeof separatingSets[number]>
+        frame="none"
+        title="Separating sets"
+        rows={separatingSets}
+        rowKey={(row) => row.key}
+        noun="set"
+        empty="No separating set was recorded."
+        columns={[
+          { id: 'x', header: 'Variable', value: (row) => row.x },
+          { id: 'y', header: 'Variable', value: (row) => row.y },
+          { id: 'set', header: 'Conditioning set', value: (row) => row.variables },
+        ]}
+      />
+    </ResultCard>
+  )
+}
+
 function CmlpResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'cmlp-run' }> }) {
   const rows = run.result.lagOrder.flatMap((lag, position) => run.result.lagScores.flatMap((targets, source) =>
     targets.map((scores, target) => ({
@@ -1050,6 +1249,8 @@ function ClstmResult({ run, open, current }: { readonly open: boolean; readonly 
 function DiscoveryResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: DiscoveryRunArtifact }) {
   switch (run.kind) {
     case 'direct-lingam-run': return <DirectLingamResult run={run} open={open} current={current} />
+    case 'pc-stable-run': return <ConstraintDiscoveryResult run={run} open={open} current={current} />
+    case 'fci-run': return <ConstraintDiscoveryResult run={run} open={open} current={current} />
     case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'rpcmci-run': return <RpcmciResult run={run} open={open} current={current} />
@@ -1169,6 +1370,51 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           return
         }
         const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'pc-stable': {
+        const configuration = specification.value
+        const background = {
+          ...configuration.background,
+          tiers: matrix.columns.map((_, index) => configuration.background.tiers[index] ?? null),
+        }
+        const result = await analysis.runPcStable(matrix.values, matrix.rowCount, matrix.columns.length, {
+          names: matrix.columns.map((column) => column.name),
+          alpha: configuration.alpha,
+          maxDepth: configuration.maxDepth,
+          ciTest: configuration.ciTest,
+          background,
+        }, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'pc-stable-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: PC_STABLE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'fci': {
+        const configuration = specification.value
+        const background = {
+          ...configuration.background,
+          tiers: matrix.columns.map((_, index) => configuration.background.tiers[index] ?? null),
+        }
+        const result = await analysis.runFci(matrix.values, matrix.rowCount, matrix.columns.length, {
+          names: matrix.columns.map((column) => column.name),
+          alpha: configuration.alpha,
+          maxDepth: configuration.maxDepth,
+          maxPathLength: configuration.maxPathLength,
+          ciTest: configuration.ciTest,
+          background,
+        }, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const artifact: DiscoveryRunArtifact = { kind: 'fci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: FCI_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1435,6 +1681,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
           {selectedMethodIsVisible && (
             <>
+          {(configuration.kind === 'pc-stable' || configuration.kind === 'fci') && (
+            <ConstraintDiscoveryControls
+              configuration={configuration}
+              variableNames={preparedColumns.map((column) => column.name)}
+              onChange={(next) => dispatch({ type: 'constraint-configured', configuration: next })}
+            />
+          )}
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
               <div className="text-body text-ink">

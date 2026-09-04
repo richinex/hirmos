@@ -87,7 +87,7 @@ export const ESTIMATION_PARAMETER_HELP = {
     maximumLags: 'Largest lag considered when selecting the VAR order.',
     deterministicTerms: 'Placement of constants and trends in the VECM.',
     traceSignificance: 'Significance level used by the Johansen trace test.',
-    chowBreakRow: 'Optional row at which the parameter-stability split is tested.',
+    chowBreakRow: 'Optional number of rows before the parameter-stability split; the next row begins the second fit.',
   },
   syntheticControl: {
     interventionStart: 'First observation in the post-intervention period.',
@@ -105,7 +105,7 @@ export const ESTIMATION_PARAMETER_HELP = {
     seed: 'Seed used to reproduce sampler initialization and draws.',
   },
   discreteBn: {
-    quantileBins: 'Number of quantile categories created for each variable.',
+    stateBudget: 'Maximum number of states retained or created for each variable. Observed low-cardinality states are preserved; higher-cardinality values are divided at quantiles.',
     equivalentSampleSize: 'Strength of the BDeu prior relative to the observed data.',
   },
   ingarch: {

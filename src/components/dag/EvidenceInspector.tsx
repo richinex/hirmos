@@ -16,6 +16,8 @@ import { lagGraphFromRun } from '@/domain/lagGraph'
 const methodTitle = (run: DiscoveryRunArtifact): string => {
   switch (run.kind) {
     case 'direct-lingam-run': return 'DirectLiNGAM'
+    case 'pc-stable-run': return 'PC-stable'
+    case 'fci-run': return 'FCI'
     case 'pcmci-plus-run': return 'PCMCI+'
     case 'lpcmci-run': return 'LPCMCI'
     case 'rpcmci-run': return 'RPCMCI'
@@ -34,6 +36,8 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
 const variablesOf = (view: DiscoveryEvidenceView) => {
   switch (view.run.kind) {
     case 'direct-lingam-run':
+    case 'pc-stable-run':
+    case 'fci-run':
     case 'pcmci-plus-run':
     case 'lpcmci-run':
     case 'rpcmci-run':
@@ -57,6 +61,7 @@ const pValue = (value: number): string => value < 0.001 ? value.toExponential(2)
 
 const candidateLabel = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
+    case 'cross-sectional-endpoint': return candidate.mark
     case 'endpoint-marked': return `${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1} · ${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
     case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
@@ -69,6 +74,13 @@ const candidateLabel = (candidate: DiscoveryCandidate): string => {
 
 const candidateDetail = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
+    case 'cross-sectional-endpoint': {
+      const properties = [
+        candidate.directness === null ? null : candidate.directness === 'definitelyDirect' ? 'definitely direct' : 'possibly direct',
+        candidate.latentConfounding === null ? null : candidate.latentConfounding === 'excluded' ? 'latent confounding excluded' : 'latent confounding possible',
+      ].filter((value): value is string => value !== null)
+      return [`mark ${candidate.mark}`, ...properties].join(' · ')
+    }
     case 'endpoint-marked': return `mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
     case 'regime-endpoint-marked': return `regime ${candidate.regime + 1} · mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
     case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ' · contemporaneous' : ` · lag ${candidate.lag}`}`

@@ -253,7 +253,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `Under the fitted interventional network, setting ${study.treatment.name} from ${low} to ${high} changes expected ${study.outcome.name} from ${number(expectedLow)} to ${number(expectedHigh)}, a difference of ${number(run.evidence.effect)}.` },
         noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No uncertainty interval is available.'),
-        { kind: 'qualification', text: 'The contrast is between quantile-bin states, not a 1-unit change on the original continuous scale. Its causal interpretation depends on the graph, adjustment and discretisation choices.' },
+        { kind: 'qualification', text: 'For a continuous treatment, the contrast is between quantile states rather than a 1-unit change on the original scale. Observed low-cardinality treatment states are preserved. The causal interpretation depends on the graph, adjustment and state preparation.' },
       ] }
     }
     case 'binary-ett-run': {
@@ -300,6 +300,20 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
 /** Discovery numbers describe fitted structural evidence, not identified intervention effects. */
 export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInterpretation {
   switch (run.kind) {
+    case 'pc-stable-run': {
+      const connections = run.result.graph.flatMap((targets, source) => targets.filter((lags, target) => source < target && (lags[0]?.length ?? 0) > 0)).length
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `PC-stable retained ${connections} adjacencies after ${run.result.ciTests.length} conditional-independence tests. Directed endpoints are compelled by the fitted equivalence class; undirected endpoints remain unresolved.` },
+        { kind: 'qualification', text: 'The CPDAG relies on causal sufficiency, the Markov and faithfulness assumptions, the selected conditional-independence test, and any background constraints. It is structural evidence rather than an intervention-effect estimate.' },
+      ] }
+    }
+    case 'fci-run': {
+      const connections = run.result.graph.flatMap((targets, source) => targets.filter((lags, target) => source < target && (lags[0]?.length ?? 0) > 0)).length
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `FCI retained ${connections} adjacencies after ${run.result.ciTests.length} conditional-independence tests. The displayed tails, arrowheads, and circles preserve the PAG returned by the orientation rules.` },
+        { kind: 'qualification', text: 'A PAG represents an equivalence class that can include latent confounding and selection. Circles are unresolved endpoints, and the graph must not be read as a fully directed causal DAG.' },
+      ] }
+    }
     case 'direct-lingam-run': return { kind: 'result-interpretation', statements: [
       { kind: 'magnitude', text: `The reported order places the ${run.result.variables} variables in the sequence inferred from non-Gaussianity. Each nonzero weight is the fitted linear structural coefficient from its source to its target after adaptive-lasso pruning.` },
       { kind: 'qualification', text: 'The order and weights identify a causal structure only under the linear, acyclic, causally sufficient model with mutually independent non-Gaussian disturbances. They are not intervention-effect estimates.' },

@@ -95,7 +95,7 @@ export function describeStationarityAssessment(assessment: StationarityAssessmen
   switch (assessment.kind) {
     case 'levelStationary': return { verdict: 'I(0), level-stationary', route: 'keep levels', tone: 'ok' }
     case 'trendStationary': return { verdict: 'trend-stationary', route: 'keep levels and include the trend, or detrend explicitly', tone: 'ok' }
-    case 'breakStationary': return { verdict: `break-stationary (${assessment.model} break at ${assessment.break + 1})`, route: 'keep levels and model the break or regime', tone: 'warn' }
+    case 'breakStationary': return { verdict: `break-stationary (${assessment.model} break at row ${assessment.break + 1})`, route: 'keep levels and model the break or regime', tone: 'warn' }
     case 'differenceStationary': return { verdict: 'I(1), difference-stationary', route: 'difference for short-run analysis, or keep levels with cointegration', tone: 'warn' }
     case 'higherOrderOrUnresolved': return { verdict: 'I(2) or unresolved', route: 'refuse I(0)/I(1)-only methods until the order is settled', tone: 'danger' }
     case 'inconclusive': return { verdict: 'inconclusive', route: 'do not choose a transformation silently; inspect trend and breaks', tone: 'muted' }
@@ -133,7 +133,7 @@ export function levelModelVerdict(name: string, assessment: StationarityAssessme
   switch (assessment.kind) {
     case 'levelStationary': return { kind: 'allowed', reason: `${name} is level-stationary.` }
     case 'trendStationary': return { kind: 'allowed', reason: `${name} is trend-stationary; a trend term or detrending is still owed.` }
-    case 'breakStationary': return { kind: 'unresolved', reason: `${name} is stationary only around a break at ${assessment.break + 1}; the model does not include it.` }
+    case 'breakStationary': return { kind: 'unresolved', reason: `${name} is stationary only around a break at row ${assessment.break + 1}; the model does not include it.` }
     case 'differenceStationary': return { kind: 'refused', reason: `${name} is I(1) on the prepared scale: a regression on those values risks a spurious relation. Create a differenced prepared version or use a suitable cointegration method.` }
     case 'higherOrderOrUnresolved': return { kind: 'refused', reason: `${name} is I(2) or unresolved; no I(0)/I(1) method applies until its order is settled.` }
     case 'inconclusive': return { kind: 'unresolved', reason: `${name}'s stationarity evidence is inconclusive: ${assessment.conflicts.map(describeStationarityConflict).join(' ')}` }

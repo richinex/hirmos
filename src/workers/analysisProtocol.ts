@@ -10,10 +10,12 @@ import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type Pan
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
-import { brand, err, ok, type Brand, type Result } from '@/domain/dop'
+import { assertNever, brand, err, ok, type Brand, type Result } from '@/domain/dop'
 import {
   dynotearsEvidenceSchema,
   directLingamEvidenceSchema,
+  fciEvidenceSchema,
+  pcStableEvidenceSchema,
   lpcmciEvidenceSchema,
   rpcmciEvidenceSchema,
   ocseEvidenceSchema,
@@ -24,6 +26,8 @@ import {
   graceEvidenceSchema,
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
+  parseFciEvidence,
+  parsePcStableEvidence,
   parseLpcmciEvidence,
   parseRpcmciEvidence,
   parseOcseEvidence,
@@ -38,6 +42,10 @@ import {
   varLingamEvidenceSchema,
   type DynotearsEvidence,
   type DirectLingamEvidence,
+  type FciEvidence,
+  type PcStableEvidence,
+  type ConstraintBackgroundKnowledge,
+  type ConstraintCiTest,
   type LpcmciEvidence,
   type RpcmciEvidence,
   type OcseEvidence,
@@ -232,6 +240,31 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly rows: number
       readonly columns: number
+    }
+  | {
+      readonly kind: 'pc-stable'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly names: readonly string[]
+      readonly alpha: number
+      readonly maxDepth: number | null
+      readonly ciTest: ConstraintCiTest
+      readonly background: ConstraintBackgroundKnowledge
+    }
+  | {
+      readonly kind: 'fci'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly names: readonly string[]
+      readonly alpha: number
+      readonly maxDepth: number | null
+      readonly maxPathLength: number | null
+      readonly ciTest: ConstraintCiTest
+      readonly background: ConstraintBackgroundKnowledge
     }
   | {
       readonly kind: 'var-lingam'
@@ -666,6 +699,49 @@ export type AnalysisWorkerProblem =
   | { readonly kind: 'worker-unavailable'; readonly detail: string }
   | { readonly kind: 'worker-protocol-failed'; readonly detail: string }
   | { readonly kind: 'analysis-cancelled'; readonly detail: string }
+  | DiscreteStateRefusal
+
+export type DiscreteStateRefusal =
+  | {
+      readonly kind: 'discreteStateRefused'
+      readonly query: 'bayesianNetwork' | 'identifiedExpression'
+      readonly node: number
+      readonly name: string
+      readonly problem:
+        | { readonly kind: 'noFiniteObservations'; readonly observations: number }
+        | { readonly kind: 'singleObservedState'; readonly value: number; readonly observations: number }
+        | {
+            readonly kind: 'quantileCollapse'
+            readonly distinctValues: number
+            readonly requestedStates: number
+            readonly populatedStates: number
+          }
+    }
+
+export const describeAnalysisWorkerProblem = (problem: AnalysisWorkerProblem): string => {
+  switch (problem.kind) {
+    case 'kernel-refused':
+    case 'wasm-unavailable':
+    case 'worker-unavailable':
+    case 'worker-protocol-failed':
+    case 'analysis-cancelled':
+      return problem.detail
+    case 'discreteStateRefused': {
+      switch (problem.problem.kind) {
+        case 'noFiniteObservations':
+          return `${problem.name} has no finite observations in the prepared data. Resolve or remove its missing values before running this discrete query.`
+        case 'singleObservedState':
+          return `${problem.name} takes only one value (${problem.problem.value}) across ${problem.problem.observations} prepared rows. This query requires at least two observed states.`
+        case 'quantileCollapse':
+          return `${problem.name} has ${problem.problem.distinctValues} distinct values, but a state budget of ${problem.problem.requestedStates} produced only ${problem.problem.populatedStates} populated quantile state. Tied values made the quantile cut points coincide; change the preparation or use a method that does not require discrete states.`
+        default:
+          return assertNever(problem.problem)
+      }
+    }
+    default:
+      return assertNever(problem)
+  }
+}
 
 export type AnalysisWorkerEvent =
   | {
@@ -708,6 +784,8 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: DirectLingamEvidence
     }
+  | { readonly kind: 'pc-stable-succeeded'; readonly request: WorkerRequestId; readonly result: PcStableEvidence }
+  | { readonly kind: 'fci-succeeded'; readonly request: WorkerRequestId; readonly result: FciEvidence }
   | {
       readonly kind: 'var-lingam-succeeded'
       readonly request: WorkerRequestId
@@ -807,6 +885,29 @@ const cdnotsCommandBaseSchema = z.object({
   context: cdnotsContextCommandSchema,
 })
 
+const constraintPairSchema = z.tuple([z.number().int().nonnegative(), z.number().int().nonnegative()])
+const constraintPatternSchema = z.tuple([z.string(), z.string()])
+const constraintBackgroundSchema = z.object({
+  forbidden: z.array(constraintPairSchema),
+  required: z.array(constraintPairSchema),
+  forbiddenPatterns: z.array(constraintPatternSchema),
+  requiredPatterns: z.array(constraintPatternSchema),
+  tiers: z.array(z.number().int().nonnegative().nullable()),
+  forbiddenWithinTiers: z.array(z.number().int().nonnegative()),
+}).strict()
+
+const constraintCommandBaseSchema = z.object({
+  request: requestSchema,
+  values: z.instanceof(Float64Array),
+  rows: z.number().int().positive(),
+  columns: z.number().int().min(2).max(32),
+  names: z.array(z.string().trim().min(1)).min(2).max(32),
+  alpha: z.number().finite().positive().max(1),
+  maxDepth: z.number().int().nonnegative().nullable(),
+  ciTest: z.enum(['fisherZ', 'kci']),
+  background: constraintBackgroundSchema,
+})
+
 const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('stationarity-battery'),
@@ -903,6 +1004,11 @@ const commandSchema = z.discriminatedUnion('kind', [
     values: z.instanceof(Float64Array),
     rows: z.number().int().positive(),
     columns: z.number().int().min(2).max(12),
+  }).strict(),
+  constraintCommandBaseSchema.extend({ kind: z.literal('pc-stable') }).strict(),
+  constraintCommandBaseSchema.extend({
+    kind: z.literal('fci'),
+    maxPathLength: z.number().int().nonnegative().nullable(),
   }).strict(),
   z.object({
     kind: z.literal('var-lingam'),
@@ -1348,12 +1454,37 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ])
 
+const discreteStateRefusalSchema = z.object({
+  kind: z.literal('discreteStateRefused'),
+  query: z.enum(['bayesianNetwork', 'identifiedExpression']),
+  node: z.number().int().nonnegative(),
+  name: z.string().trim().min(1),
+  problem: z.discriminatedUnion('kind', [
+    z.object({
+      kind: z.literal('noFiniteObservations'),
+      observations: z.number().int().nonnegative(),
+    }).strict(),
+    z.object({
+      kind: z.literal('singleObservedState'),
+      value: z.number().finite(),
+      observations: z.number().int().positive(),
+    }).strict(),
+    z.object({
+      kind: z.literal('quantileCollapse'),
+      distinctValues: z.number().int().min(2),
+      requestedStates: z.number().int().min(2),
+      populatedStates: z.number().int().max(1),
+    }).strict(),
+  ]),
+}).strict()
+
 const workerProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('kernel-refused'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('wasm-unavailable'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('worker-unavailable'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('worker-protocol-failed'), detail: z.string() }).strict(),
   z.object({ kind: z.literal('analysis-cancelled'), detail: z.string() }).strict(),
+  discreteStateRefusalSchema,
 ])
 
 export const analysisProgressSchema = z.object({
@@ -1409,6 +1540,8 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: directLingamEvidenceSchema,
   }).strict(),
+  z.object({ kind: z.literal('pc-stable-succeeded'), request: requestSchema, result: pcStableEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('fci-succeeded'), request: requestSchema, result: fciEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('var-lingam-succeeded'),
     request: requestSchema,
@@ -1528,6 +1661,18 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   return ok({ ...parsed.data, request: request.value })
 }
 
+export function parseAnalysisRefusal(
+  value: unknown,
+): Result<DiscreteStateRefusal | null, AnalysisProtocolProblem> {
+  if (typeof value !== 'object' || value === null || !('kind' in value) || value.kind !== 'discreteStateRefused') {
+    return ok(null)
+  }
+  const parsed = discreteStateRefusalSchema.safeParse(value)
+  return parsed.success
+    ? ok(parsed.data)
+    : err({ kind: 'invalid-event', detail: z.prettifyError(parsed.error) })
+}
+
 export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerEvent, AnalysisProtocolProblem> {
   const parsed = eventSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-event', detail: z.prettifyError(parsed.error) })
@@ -1588,6 +1733,18 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseDirectLingamEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'direct-lingam-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'pc-stable-succeeded') {
+    const result = parsePcStableEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'pc-stable-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'fci-succeeded') {
+    const result = parseFciEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'fci-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'var-lingam-succeeded') {

@@ -55,6 +55,8 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'cdnots-plus-parcorr',
     'grace',
     'dynotears',
+    'pc-stable',
+    'fci',
     'direct-lingam',
     'var-lingam',
     'ocse',

@@ -2,12 +2,13 @@ import { expect, test } from '@playwright/test'
 import { z } from 'zod'
 import { stationarityBatterySchema } from '../src/domain/stationarity'
 import { dagCheckEvidenceSchema } from '../src/domain/dagValidation'
-import { cdnotsEvidenceSchema, cdnotsPlusEvidenceSchema, directLingamEvidenceSchema, graceEvidenceSchema } from '../src/domain/discovery'
+import { cdnotsEvidenceSchema, cdnotsPlusEvidenceSchema, directLingamEvidenceSchema, fciEvidenceSchema, graceEvidenceSchema, pcStableEvidenceSchema } from '../src/domain/discovery'
 import { identifiedDiscreteQueryEvidenceSchema } from '../src/domain/intervention'
 import { binaryEttEvidenceSchema, causalEffectsEvidenceSchema, frontdoorTwoStageEvidenceSchema } from '../src/domain/estimation'
 import { seasonalAdjustedEvidenceSchema } from '../src/domain/seasonal'
 import { parseSeriesStructureEvidence, seriesStructureEvidenceSchema } from '../src/domain/sensitivity'
 import { multicollinearityEvidenceSchema } from '../src/domain/multicollinearity'
+import { describeAnalysisWorkerProblem, parseAnalysisRefusal } from '../src/workers/analysisProtocol'
 
 const browserOutcomeSchema = z.object({
   result: z.discriminatedUnion('ok', [
@@ -31,6 +32,23 @@ test('rejects impossible Holm evidence at the TypeScript boundary', () => {
     falsification: { kind: 'skipped', reason: 'latent variables' },
   })
   expect(parsed.success).toBe(false)
+})
+
+test('parses and explains a discrete-state refusal without flattening its cause', () => {
+  const parsed = parseAnalysisRefusal({
+    kind: 'discreteStateRefused',
+    query: 'identifiedExpression',
+    node: 2,
+    name: 'recovery',
+    problem: { kind: 'singleObservedState', value: 4, observations: 614 },
+  })
+
+  expect(parsed.ok).toBe(true)
+  if (!parsed.ok || parsed.value === null) return
+  expect(parsed.value.problem.kind).toBe('singleObservedState')
+  expect(describeAnalysisWorkerProblem(parsed.value)).toBe(
+    'recovery takes only one value (4) across 614 prepared rows. This query requires at least two observed states.',
+  )
 })
 
 test('rejects an effect attached to an unidentifiable intervention result', () => {
@@ -177,6 +195,60 @@ test('runs CD-NOTS, CD-NOTS+ and GRACE through the Rust worker', async ({ page }
     expect(parsed.data.grace.value.imputedCells).toBe(1)
     expect(parsed.data.grace.value.loss).toHaveLength(parsed.data.grace.value.epochs)
     expect(parsed.data.grace.value.gateValues).toHaveLength(3)
+  }
+})
+
+test('runs PC-stable and FCI with background knowledge through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Cross-sectional constraint boundary runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 160
+    const columns = 4
+    const values = new Float64Array(rows * columns)
+    for (let row = 0; row < rows; row += 1) {
+      const x = Math.sin(row * 0.71) + 0.2 * Math.cos(row * 1.13)
+      const y = Math.cos(row * 0.43) - 0.15 * Math.sin(row * 1.37)
+      values[row] = x
+      values[rows + row] = y
+      values[2 * rows + row] = x + y + 0.05 * Math.sin(row * 2.03)
+      values[3 * rows + row] = 0.7 * values[2 * rows + row] + 0.05 * Math.cos(row * 1.91)
+    }
+    const background = {
+      forbidden: [[3, 2]],
+      required: [[2, 3]],
+      forbiddenPatterns: [],
+      requiredPatterns: [],
+      tiers: [0, 0, 1, 2],
+      forbiddenWithinTiers: [],
+    }
+    const common = {
+      names: ['X', 'Y', 'M', 'O'], alpha: 0.05, maxDepth: null, ciTest: 'fisherZ', background,
+    } as const
+    return {
+      pc: await analysis.runPcStable(Float64Array.from(values), rows, columns, common),
+      fci: await analysis.runFci(Float64Array.from(values), rows, columns, { ...common, maxPathLength: null }),
+    }
+  })
+  const outcome = <Value extends z.ZodType>(value: Value) => z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value }).strict(),
+    z.object({ ok: z.literal(false), error: z.unknown() }).strict(),
+  ])
+  const parsed = z.object({
+    pc: outcome(pcStableEvidenceSchema),
+    fci: outcome(fciEvidenceSchema),
+  }).strict().safeParse(raw)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(parsed.data.pc.ok, JSON.stringify(parsed.data.pc)).toBe(true)
+  expect(parsed.data.fci.ok, JSON.stringify(parsed.data.fci)).toBe(true)
+  if (parsed.data.pc.ok) {
+    expect(parsed.data.pc.value.graph).toHaveLength(4)
+    expect(parsed.data.pc.value.ciTests.length).toBeGreaterThan(0)
+  }
+  if (parsed.data.fci.ok) {
+    expect(parsed.data.fci.value.graph).toHaveLength(4)
+    expect(parsed.data.fci.value.ciTests.length).toBeGreaterThan(0)
   }
 })
 

@@ -19,10 +19,11 @@ import {
   type InterventionOverlay,
   type InterventionQueryArtifact,
 } from '@/domain/intervention'
-import type { DiscreteBnEvidence } from '@/domain/estimation'
+import { describeDiscreteStatePreparations, type DiscreteBnEvidence } from '@/domain/estimation'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatStatistic } from '@/lib/format/number'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Job =
   | { readonly kind: 'idle' }
@@ -51,7 +52,7 @@ function QueryFrame({ query, open, summary, children }: { readonly query: Interv
   )
 }
 
-function DistributionRecord({ query, result, context, methodNote, formula }: { readonly query: InterventionQueryArtifact; readonly result: Pick<DiscreteBnEvidence, 'observations' | 'bins' | 'treatmentStates' | 'expectations' | 'effect' | 'distributionLow' | 'distributionHigh'>; readonly context: string; readonly methodNote: string; readonly formula?: { readonly plain: string; readonly tex: string } }) {
+function DistributionRecord({ query, result, context, methodNote, formula }: { readonly query: InterventionQueryArtifact; readonly result: Pick<DiscreteBnEvidence, 'observations' | 'bins' | 'statePreparations' | 'treatmentStates' | 'expectations' | 'effect' | 'distributionLow' | 'distributionHigh'>; readonly context: string; readonly methodNote: string; readonly formula?: { readonly plain: string; readonly tex: string } }) {
   const theme = useChartTheme()
   const option = useMemo(() => interventionBarsOption({
     set: query.set.name,
@@ -64,6 +65,7 @@ function DistributionRecord({ query, result, context, methodNote, formula }: { r
     <>
       <p className="m-0 text-body text-muted">{describeInterventionVerdict(query)}</p>
       <p className="mb-0 mt-1 text-label text-faint">{methodNote}</p>
+      <p className="mb-0 mt-1 text-label text-faint">State preparation: {describeDiscreteStatePreparations(result.statePreparations)}.</p>
       {formula !== undefined && <div className="mt-3 rounded-lg border border-hair bg-raised p-3"><Formula plain={formula.plain} tex={formula.tex} /></div>}
       <div className={figureGrid('mt-3 @sm/inspector:grid-cols-3')}>
         <MetricTile label={`${query.read.name} if ${query.set.name} set low`} size="compact" frame="cell" value={formatStatistic('raw', result.expectations[0])} context={`bin ${result.treatmentStates[0]}`} />
@@ -113,7 +115,7 @@ function IdentifiedExpressionRecord({ query, evidence, document, open }: { reado
         query={query}
         result={{ ...evidence, ...result }}
         context={context}
-        methodNote={`The ${result.algorithm} algorithm identified this distribution from the observed joint distribution.${conditionNote} Variables were discretised into ${evidence.bins} quantile bins; no uncertainty interval is reported. Normalization: ${result.normalizationLow.toFixed(6)} / ${result.normalizationHigh.toFixed(6)}.`}
+        methodNote={`The ${result.algorithm} algorithm identified this distribution from the observed joint distribution.${conditionNote} Each variable had a budget of ${evidence.bins} states; observed low-cardinality states were preserved and higher-cardinality values were divided at quantiles. No uncertainty interval is reported. Normalization: ${result.normalizationLow.toFixed(6)} / ${result.normalizationHigh.toFixed(6)}.`}
         formula={{ plain: result.expression, tex: result.latex }}
       />
     </QueryFrame>
@@ -185,7 +187,7 @@ export function InterventionPanel({ document, source, profile, prepared, queries
           nodes: observed.map((_, index) => index), names: observed.map((node) => node.name), edges: fullEdges,
           treatment: position(readiness.value.set.id), outcome: position(readiness.value.read.id), bins, equivalentSampleSize,
         })
-        if (!evidence.ok) { setJob({ kind: 'failed', detail: evidence.error.detail }); return }
+        if (!evidence.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
         onQuery({ ...base, route: { kind: 'bayesian-network', bins, equivalentSampleSize, result: evidence.value } })
       } else {
         const evidence = await analysis.runIdentifiedDiscreteQuery(matrix.value.values, matrix.value.rowCount, observed.length, {
@@ -194,7 +196,7 @@ export function InterventionPanel({ document, source, profile, prepared, queries
           unobserved: graphNodes.flatMap((node, index) => node.kind === 'latent' ? [index] : []), bins,
           condition: condition.kind === 'none' ? null : { variable: position(condition.node), state: condition.state },
         })
-        if (!evidence.ok) { setJob({ kind: 'failed', detail: evidence.error.detail }); return }
+        if (!evidence.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
         onQuery({ ...base, route: { kind: 'identified-expression', result: evidence.value } })
       }
       setJob({ kind: 'idle' })
@@ -224,14 +226,14 @@ export function InterventionPanel({ document, source, profile, prepared, queries
             <option value="">No condition</option>{observed.map((node) => <option key={node.id} value={node.id} disabled={node.id === set || node.id === read}>{node.name}</option>)}
           </Select>
         </label>
-        <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>Quantile bins</span>
-          <Select aria-label="Quantile bins" className={field('text', 'mt-1')} value={bins} onChange={(event) => { const value = Number(event.target.value); if (BIN_OPTIONS.some((option) => option === value)) { setBins(value); setCondition((current) => current.kind === 'selected' ? { ...current, state: Math.min(current.state, value - 1) } : current) } }}>
+        <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>State budget</span>
+          <Select aria-label="State budget" className={field('text', 'mt-1')} value={bins} onChange={(event) => { const value = Number(event.target.value); if (BIN_OPTIONS.some((option) => option === value)) { setBins(value); setCondition((current) => current.kind === 'selected' ? { ...current, state: Math.min(current.state, value - 1) } : current) } }}>
             {BIN_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
           </Select>
         </label>
-        {condition.kind === 'selected' && <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>Condition bin</span>
-          <Select aria-label="Condition bin" className={field('text', 'mt-1')} value={condition.state} onChange={(event) => setCondition((current) => current.kind === 'selected' ? { ...current, state: Number(event.target.value) } : current)}>
-            {Array.from({ length: bins }, (_, state) => <option key={state} value={state}>{state === 0 ? 'Lowest' : state === bins - 1 ? 'Highest' : `Bin ${state}`}</option>)}
+        {condition.kind === 'selected' && <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>Condition state</span>
+          <Select aria-label="Condition state" className={field('text', 'mt-1')} value={condition.state} onChange={(event) => setCondition((current) => current.kind === 'selected' ? { ...current, state: Number(event.target.value) } : current)}>
+            {Array.from({ length: bins }, (_, state) => <option key={state} value={state}>{state === 0 ? 'Lowest' : state === bins - 1 ? 'Highest' : `State ${state}`}</option>)}
           </Select>
         </label>}
         {!identifiedRoute && <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>Equivalent sample size</span>

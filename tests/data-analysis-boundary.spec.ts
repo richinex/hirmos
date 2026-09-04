@@ -326,7 +326,7 @@ test('validates, materializes, and estimates a balanced long panel through both 
         const b = 20 + 0.45 * time + 0.15 * Math.cos(time / 2)
         const post = time >= 5
         const outcome = unit === 'control-a' ? a : unit === 'control-b' ? b : 0.4 * a + 0.6 * b + (post ? 4 : 0)
-        rows.push(`${unit},${time},${outcome},${unit === 'treated' && post ? 1 : 0}`)
+        rows.push(`${unit},${time + 1},${outcome},${unit === 'treated' && post ? 1 : 0}`)
       }
     }
     const file = new File([rows.join('\n')], 'balanced-panel.csv', { type: 'text/csv' })
@@ -355,12 +355,22 @@ test('validates, materializes, and estimates a balanced long panel through both 
     const nonBinary = altered([[18, 0.5]])
     const nonAbsorbing = altered([[26, 0]])
     const noControls = altered([[5, 1], [6, 1], [7, 1], [8, 1], [14, 1], [15, 1], [16, 1], [17, 1]])
+    const duplicateCodes = [...matrix.value.periodCodes]
+    const firstControlRow = matrix.value.units.findIndex((unit: string, row: number) => unit === 'control-a' && matrix.value.periodCodes[row] === 0)
+    const secondControlRow = matrix.value.units.findIndex((unit: string, row: number) => unit === 'control-a' && matrix.value.periodCodes[row] === 1)
+    duplicateCodes[secondControlRow] = duplicateCodes[firstControlRow]
+    const duplicate = panelModule.assessPanelInterventionLayout({ ...matrix.value, periodCodes: duplicateCodes })
+    const incompleteUnits = [...matrix.value.units]
+    incompleteUnits[secondControlRow] = 'orphan'
+    const incomplete = panelModule.assessPanelInterventionLayout({ ...matrix.value, units: incompleteUnits })
+    const missingCatalog = panelModule.parsePanelLongMatrix({ ...matrix.value, periods: matrix.value.periods.slice(1) }, profiled.value)
+    const duplicateCatalog = panelModule.parsePanelLongMatrix({ ...matrix.value, periods: [...matrix.value.periods, { code: 0, label: 'another label' }] }, profiled.value)
     const progress: { stage: string; completed: number; total: number }[] = []
     const estimated = await analysisModule.runPanelIntervention(
       matrix.value.values,
       matrix.value.rowCount,
       matrix.value.units,
-      matrix.value.times,
+      matrix.value.periodCodes,
       { placeboReplications: 24, seed: 0 },
       (next: { stage: string; completed: number; total: number }) => progress.push(next),
     )
@@ -368,6 +378,13 @@ test('validates, materializes, and estimates a balanced long panel through both 
       structure,
       layout,
       preflightRefusals: [nonBinary, nonAbsorbing, noControls].map((result) => result.ok ? 'unexpected-ready' : result.error.kind),
+      nonAbsorbingPeriod: nonAbsorbing.ok || nonAbsorbing.error.kind !== 'non-simultaneous-adoption' ? null : nonAbsorbing.error.period,
+      nonAbsorbingDescription: nonAbsorbing.ok ? 'unexpected-ready' : panelModule.describePanelInterventionLayoutProblem(nonAbsorbing.error),
+      duplicatePeriod: duplicate.ok || duplicate.error.kind !== 'duplicate-panel-cell' ? null : duplicate.error.period,
+      duplicateDescription: duplicate.ok ? 'unexpected-ready' : panelModule.describePanelInterventionLayoutProblem(duplicate.error),
+      missingPeriod: incomplete.ok || incomplete.error.kind !== 'missing-panel-cell' ? null : incomplete.error.period,
+      missingDescription: incomplete.ok ? 'unexpected-ready' : panelModule.describePanelInterventionLayoutProblem(incomplete.error),
+      catalogRefusals: [missingCatalog, duplicateCatalog].map((result) => result.ok ? 'unexpected-valid' : result.error.detail),
       estimated,
       progress,
       detachedBytes: matrix.value.values.byteLength,
@@ -383,14 +400,24 @@ test('validates, materializes, and estimates a balanced long panel through both 
     }).strict(),
     layout: z.object({
       ok: z.literal(true),
-      value: z.object({ kind: z.literal('panel-intervention-layout'), controls: z.array(z.string()).length(2), treated: z.array(z.string()).length(1), prePeriods: z.literal(5), postPeriods: z.literal(4), adoptionLabel: z.literal('5'), controlPreDifferenceSd: z.number().positive() }).passthrough(),
+      value: z.object({ kind: z.literal('panel-intervention-layout'), controls: z.array(z.string()).length(2), treated: z.array(z.string()).length(1), prePeriods: z.literal(5), postPeriods: z.literal(4), adoption: z.object({ code: z.literal(5), label: z.literal('6') }).strict(), controlPreDifferenceSd: z.number().positive() }).passthrough(),
     }).strict(),
     preflightRefusals: z.tuple([z.literal('treatment-not-binary'), z.literal('non-simultaneous-adoption'), z.literal('no-control-unit')]),
+    nonAbsorbingPeriod: z.object({ code: z.literal(8), label: z.literal('9') }).strict(),
+    nonAbsorbingDescription: z.literal('treated does not follow the required simultaneous absorbing adoption pattern at period 9.'),
+    duplicatePeriod: z.object({ code: z.literal(0), label: z.literal('1') }).strict(),
+    duplicateDescription: z.literal('control-a has more than one observation at period 1.'),
+    missingPeriod: z.object({ code: z.literal(1), label: z.literal('2') }).strict(),
+    missingDescription: z.literal('control-a has no observation at period 2.'),
+    catalogRefusals: z.tuple([
+      z.literal('The long-panel period catalog does not match its row codes.'),
+      z.literal('The long panel repeats period code 0.'),
+    ]),
     estimated: z.object({ ok: z.literal(true), value: panelInterventionEvidenceSchema }).strict(),
     progress: z.array(z.object({ stage: z.string(), completed: z.number(), total: z.number() }).strict()),
     detachedBytes: z.literal(0),
   }).strict().safeParse(raw)
-  expect(parsed.success).toBe(true)
+  expect(parsed.success, parsed.success ? '' : z.prettifyError(parsed.error)).toBe(true)
   if (!parsed.success) return
   expect(Math.abs(parsed.data.estimated.value.syntheticDid.estimate - 4)).toBeLessThan(0.1)
   expect(Math.abs(parsed.data.estimated.value.syntheticControl.estimate - 4)).toBeLessThan(0.1)

@@ -1,6 +1,7 @@
-//! pgmpy's discrete Bayesian network lane, which is step 3g of `805_dag.py`: quantile
-//! discretisation, BDeu conditional probability tables, variable elimination, the minimal
-//! adjustment set, and the interventional do-query by parent adjustment.
+//! Discrete Bayesian-network operations ported from pgmpy. The input adapter preserves observed
+//! states for already-discrete columns and quantile-bins higher-cardinality measurements. The
+//! remaining operations cover BDeu tables, variable elimination, minimal adjustment, and
+//! parent-adjusted do-queries.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -63,42 +64,138 @@ pub fn qcut_codes(x: &[f64], q: usize) -> Vec<i32> {
         .collect()
 }
 
-/// The result of 805's `_dc_disc`: string labels for pgmpy and the original-unit
-/// mean represented by each non-missing ordinal state.
+/// Discrete state labels and the original-unit mean represented by each non-missing state.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Discretized805 {
+pub struct DiscreteStates {
     pub labels: Vec<String>,
     pub means: BTreeMap<String, f64>,
+    pub strategy: DiscreteStateStrategy,
 }
 
-/// The complete discretisation wrapper in step 3g of `805_dag.py`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StateBudget(usize);
+
+impl StateBudget {
+    pub const MINIMUM: usize = 2;
+
+    pub fn get(self) -> usize {
+        self.0
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StateBudgetError {
+    pub requested: usize,
+    pub minimum: usize,
+}
+
+impl TryFrom<usize> for StateBudget {
+    type Error = StateBudgetError;
+
+    fn try_from(requested: usize) -> Result<Self, Self::Error> {
+        if requested < Self::MINIMUM {
+            Err(StateBudgetError {
+                requested,
+                minimum: Self::MINIMUM,
+            })
+        } else {
+            Ok(Self(requested))
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiscreteStateStrategy {
+    ObservedStates { states: usize },
+    Quantiles { requested: usize, populated: usize },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DiscreteStateProblem {
+    NoFiniteObservations {
+        observations: usize,
+    },
+    SingleObservedState {
+        value: f64,
+        observations: usize,
+    },
+    QuantileCollapse {
+        distinct_values: usize,
+        requested_states: usize,
+        populated_states: usize,
+    },
+}
+
+/// Prepare one column for a discrete Bayesian network.
 ///
-/// Constant/all-missing columns return `None`. If duplicate qcut edges leave fewer than
-/// two populated bins, 805 falls back to `x > median(x)`. Missing values retain qcut's
-/// `-1` state unless that fallback is taken, in which case pandas comparison maps them to 0.
-pub fn discretize_805(x: &[f64], q: usize) -> Option<Discretized805> {
-    let mut valid: Vec<f64> = x.iter().copied().filter(|value| !value.is_nan()).collect();
-    valid.sort_by(|left, right| left.partial_cmp(right).expect("no NaN"));
-    valid.dedup_by(|left, right| *left == *right);
-    if valid.len() < 2 {
-        return None;
+/// pgmpy treats the sorted observed values as states when no explicit `state_names` are supplied.
+/// Preserve that state space when it fits the requested budget. Higher-cardinality measurements
+/// use qcut-compatible quantile bins. A constant column or a quantile result with fewer than two
+/// populated states is refused instead of being reported as a zero contrast.
+pub fn discretize_for_discrete_bn(
+    x: &[f64],
+    state_budget: StateBudget,
+) -> Result<DiscreteStates, DiscreteStateProblem> {
+    let mut states: Vec<f64> = x
+        .iter()
+        .copied()
+        .filter(|value| value.is_finite())
+        .collect();
+    states.sort_by(|left, right| left.partial_cmp(right).expect("finite values"));
+    states.dedup_by(|left, right| *left == *right);
+    if states.is_empty() {
+        return Err(DiscreteStateProblem::NoFiniteObservations {
+            observations: x.len(),
+        });
+    }
+    if states.len() == 1 {
+        return Err(DiscreteStateProblem::SingleObservedState {
+            value: states[0],
+            observations: x.len(),
+        });
     }
 
-    let mut codes = qcut_codes(x, q);
-    if codes.iter().copied().max().unwrap_or(-1) < 1 {
-        let mut ordered: Vec<f64> = x.iter().copied().filter(|value| !value.is_nan()).collect();
-        ordered.sort_by(|left, right| left.partial_cmp(right).expect("no NaN"));
-        let middle = ordered.len() / 2;
-        let median = if ordered.len() % 2 == 0 {
-            (ordered[middle - 1] + ordered[middle]) / 2.0
-        } else {
-            ordered[middle]
-        };
-        codes = x
+    let (codes, strategy) = if states.len() <= state_budget.get() {
+        (
+            x.iter()
+                .map(|value| {
+                    if !value.is_finite() {
+                        return -1;
+                    }
+                    states
+                        .iter()
+                        .position(|state| state == value)
+                        .expect("every finite value is an observed state")
+                        as i32
+                })
+                .collect(),
+            DiscreteStateStrategy::ObservedStates {
+                states: states.len(),
+            },
+        )
+    } else {
+        let codes = qcut_codes(x, state_budget.get());
+        let populated = codes
             .iter()
-            .map(|value| i32::from(!value.is_nan() && *value > median))
-            .collect();
-    }
+            .copied()
+            .filter(|code| *code >= 0)
+            .collect::<BTreeSet<_>>()
+            .len();
+        if populated < 2 {
+            return Err(DiscreteStateProblem::QuantileCollapse {
+                distinct_values: states.len(),
+                requested_states: state_budget.get(),
+                populated_states: populated,
+            });
+        }
+        (
+            codes,
+            DiscreteStateStrategy::Quantiles {
+                requested: state_budget.get(),
+                populated,
+            },
+        )
+    };
 
     let labels: Vec<String> = codes.iter().map(ToString::to_string).collect();
     let mut sums: BTreeMap<i32, (f64, usize)> = BTreeMap::new();
@@ -113,7 +210,11 @@ pub fn discretize_805(x: &[f64], q: usize) -> Option<Discretized805> {
         .into_iter()
         .map(|(code, (sum, count))| (code.to_string(), sum / count as f64))
         .collect();
-    Some(Discretized805 { labels, means })
+    Ok(DiscreteStates {
+        labels,
+        means,
+        strategy,
+    })
 }
 
 /// A directed acyclic graph over named nodes.

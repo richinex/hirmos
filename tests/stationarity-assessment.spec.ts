@@ -31,13 +31,16 @@ test('routes each ADF, KPSS and Zivot–Andrews combination to the documented as
       neitherRejects: module.assessStationarity(battery({ adfC: 0.3, kpssC: 0.3 }), null),
       breakAfterUnitRoot: module.assessStationarity(battery({ adfC: 0.6, kpssC: 0.01, za: 0.02 }), battery({ adfC: 0.3, kpssC: 0.3 })),
     }
-    return Object.fromEntries(Object.entries(cases).map(([name, assessment]) => [name, { kind: assessment.kind, conflicts: assessment.conflicts?.map((conflict: { kind: string }) => conflict.kind), model: assessment.model, break: assessment.break, verdict: module.describeStationarityAssessment(assessment).verdict, level: module.levelModelVerdict('x', assessment).kind }]))
+    return Object.fromEntries(Object.entries(cases).map(([name, assessment]) => {
+      const level = module.levelModelVerdict('x', assessment)
+      return [name, { kind: assessment.kind, conflicts: assessment.conflicts?.map((conflict: { kind: string }) => conflict.kind), model: assessment.model, break: assessment.break, verdict: module.describeStationarityAssessment(assessment).verdict, level: level.kind, levelReason: level.reason }]
+    }))
   })
-  const r = results as Record<string, { kind: string; conflicts?: string[]; model?: string; break?: number; verdict: string; level: string }>
+  const r = results as Record<string, { kind: string; conflicts?: string[]; model?: string; break?: number; verdict: string; level: string; levelReason: string }>
 
   expect(r.levelStationary).toMatchObject({ kind: 'levelStationary', level: 'allowed' })
   expect(r.trendStationary).toMatchObject({ kind: 'trendStationary', level: 'allowed' })
-  expect(r.breakStationary).toMatchObject({ kind: 'breakStationary', model: 'level', break: 40, level: 'unresolved' })
+  expect(r.breakStationary).toMatchObject({ kind: 'breakStationary', model: 'level', break: 40, verdict: 'break-stationary (level break at row 41)', level: 'unresolved', levelReason: 'x is stationary only around a break at row 41; the model does not include it.' })
   expect(r.differenceStationary).toMatchObject({ kind: 'differenceStationary', verdict: 'I(1), difference-stationary', level: 'refused' })
   expect(r.higherOrder).toMatchObject({ kind: 'higherOrderOrUnresolved', level: 'refused' })
   expect(r.differenceMissing).toMatchObject({ kind: 'inconclusive', conflicts: ['difference-battery-missing'], level: 'unresolved' })

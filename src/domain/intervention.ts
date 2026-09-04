@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
 import type { DagDocument, DagDocumentId, DagNode, DagNodeId, DagRevisionId } from './dag'
-import type { DiscreteBnEvidence } from './estimation'
+import { discreteStatePreparationSchema, type DiscreteBnEvidence } from './estimation'
 import type { PreparedDatasetVersionId } from './preprocessing'
 
 /**
@@ -57,6 +57,7 @@ export const identifiedDiscreteQueryEvidenceSchema = z.object({
   observations: z.number().int().positive(),
   bins: z.number().int().min(2).max(10),
   stateCounts: z.array(z.number().int().positive()).min(2),
+  statePreparations: z.array(discreteStatePreparationSchema).min(2),
   treatmentStates: z.tuple([z.string(), z.string()]),
   query: identifiedDiscreteQueryKindSchema,
   result: identifiedDiscreteResultSchema,

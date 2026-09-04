@@ -14,6 +14,7 @@ chrono = { version = "0.4", default-features = false }
 getrandom = { version = "0.4", default-features = false, features = ["wasm_js"] }
 libm = "0.2"
 nalgebra = { version = "0.34", features = ["libm", "std"] }
+regex = "1"
 spec_math = "0.1.6"
 
 [dev-dependencies]

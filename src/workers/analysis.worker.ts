@@ -7,6 +7,8 @@ import initWasm, { runAnalysis } from '@/generated/analysis-wasm/hirmos_analysis
 import {
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
+  parseFciEvidence,
+  parsePcStableEvidence,
   parseLpcmciEvidence,
   parseRpcmciEvidence,
   parseOcseEvidence,
@@ -34,6 +36,7 @@ import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
 import {
   analysisProgressSchema,
+  parseAnalysisRefusal,
   parseAnalysisWorkerCommand,
   type AnalysisWorkerCommand,
   type AnalysisWorkerEvent,
@@ -175,6 +178,29 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         kind: 'directLingam',
         rows: command.rows,
         columns: command.columns,
+      }
+    case 'pc-stable':
+      return {
+        kind: 'pcStable',
+        rows: command.rows,
+        columns: command.columns,
+        names: command.names,
+        alpha: command.alpha,
+        maxDepth: command.maxDepth,
+        ciTest: command.ciTest,
+        background: command.background,
+      }
+    case 'fci':
+      return {
+        kind: 'fci',
+        rows: command.rows,
+        columns: command.columns,
+        names: command.names,
+        alpha: command.alpha,
+        maxDepth: command.maxDepth,
+        maxPathLength: command.maxPathLength,
+        ciTest: command.ciTest,
+        background: command.background,
       }
     case 'var-lingam':
       return {
@@ -367,6 +393,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       })
       return
     }
+    const refusal = parseAnalysisRefusal(decoded)
+    if (!refusal.ok) {
+      fail(command.request, { kind: 'worker-protocol-failed', detail: refusal.error.detail })
+      return
+    }
+    if (refusal.value !== null) {
+      fail(command.request, refusal.value)
+      return
+    }
     switch (command.kind) {
       case 'stationarity-battery': {
         const result = parseStationarityBattery(decoded)
@@ -465,6 +500,24 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'direct-lingam-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'pc-stable': {
+        const result = parsePcStableEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'pc-stable-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'fci': {
+        const result = parseFciEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'fci-succeeded', request: command.request, result: result.value })
         return
       }
       case 'var-lingam': {

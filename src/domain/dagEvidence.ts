@@ -33,6 +33,13 @@ interface CandidateBase {
 
 export type DiscoveryCandidate =
   | CandidateBase & {
+      readonly kind: 'cross-sectional-endpoint'
+      readonly method: 'PC-stable' | 'FCI'
+      readonly mark: string
+      readonly directness: 'definitelyDirect' | 'possiblyDirect' | null
+      readonly latentConfounding: 'excluded' | 'possible' | null
+    }
+  | CandidateBase & {
       readonly kind: 'endpoint-marked'
       readonly method: 'PCMCI+' | 'LPCMCI' | 'CD-NOTS' | 'CD-NOTS+'
       readonly lag: number
@@ -77,8 +84,8 @@ export type DiscoveryCandidate =
 
 export interface DiscoveryEvidenceView {
   readonly run: DiscoveryRunArtifact
-  readonly method: 'DirectLiNGAM' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
-  readonly semantics: 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
+  readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly semantics: 'cpdag' | 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
   readonly candidates: readonly DiscoveryCandidate[]
 }
 
@@ -137,6 +144,36 @@ const matrixCandidates = (
           relationMatch: markedRelationMatch(source, target, lag, mark),
         })
       }
+    }
+  }
+  return candidates
+}
+
+const constraintCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'pc-stable-run' | 'fci-run' }>,
+): readonly DiscoveryCandidate[] => {
+  const candidates: Extract<DiscoveryCandidate, { readonly kind: 'cross-sectional-endpoint' }>[] = []
+  for (let sourceIndex = 0; sourceIndex < run.result.variables; sourceIndex += 1) {
+    for (let targetIndex = sourceIndex + 1; targetIndex < run.result.variables; targetIndex += 1) {
+      const mark = run.result.graph[sourceIndex][targetIndex][0]
+      if (mark.length === 0) continue
+      const source = variable(run.variables[sourceIndex])
+      const target = variable(run.variables[targetIndex])
+      const property = run.kind === 'fci-run'
+        ? run.result.edgeProperties.find((edge) => edge.left === sourceIndex && edge.right === targetIndex)
+        : undefined
+      candidates.push({
+        kind: 'cross-sectional-endpoint',
+        id: candidateId(run.id, `${sourceIndex}:${targetIndex}:${mark}`),
+        run: run.id,
+        method: run.kind === 'fci-run' ? 'FCI' : 'PC-stable',
+        source,
+        target,
+        mark,
+        directness: property?.directness ?? null,
+        latentConfounding: property?.latentConfounding ?? null,
+        relationMatch: markedRelationMatch(source, target, 0, mark),
+      })
     }
   }
   return candidates
@@ -343,6 +380,18 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
       semantics: 'weighted-directed-evidence',
       candidates: weightedCandidates(run, 'DirectLiNGAM'),
     }
+    case 'pc-stable-run': return {
+      run,
+      method: 'PC-stable',
+      semantics: 'cpdag',
+      candidates: constraintCandidates(run),
+    }
+    case 'fci-run': return {
+      run,
+      method: 'FCI',
+      semantics: 'pag',
+      candidates: constraintCandidates(run),
+    }
     case 'pcmci-plus-run': return {
       run,
       method: 'PCMCI+',
@@ -435,6 +484,7 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
 
 export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
   switch (view.semantics) {
+    case 'cpdag': return 'Completed partially directed acyclic graph; undirected connections remain unresolved within the equivalence class'
     case 'stationary-lag-graph': return 'Conditional-dependence marks over lagged variables'
     case 'nonstationary-lag-graph': return 'Conditional-dependence marks over lagged variables with recorded time-context nodes'
     case 'pag': return 'Partial ancestral graph marks; circles and bidirected endpoints remain unresolved'
@@ -449,6 +499,7 @@ export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
 
 export function discoveryEvidenceReference(candidate: DiscoveryCandidate) {
   switch (candidate.kind) {
+    case 'cross-sectional-endpoint': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'endpoint-marked' as const }
     case 'endpoint-marked': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'endpoint-marked' as const }
     case 'regime-endpoint-marked': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'endpoint-marked' as const }
     case 'weighted-directed': return { kind: 'discovery' as const, run: candidate.run, candidate: candidate.id, semantics: 'weighted-directed' as const }

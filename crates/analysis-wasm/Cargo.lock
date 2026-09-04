@@ -2547,6 +2547,7 @@ dependencies = [
  "getrandom 0.4.3",
  "libm",
  "nalgebra",
+ "regex",
  "spec_math",
 ]
 

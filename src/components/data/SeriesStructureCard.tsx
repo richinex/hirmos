@@ -15,6 +15,7 @@ import { defaultPeltPenalty, type SeriesStructureEvidence } from '@/domain/sensi
 import type { SelectedSource } from '@/domain/workflow'
 import { formatDay } from '@/lib/format/date'
 import { formatAbsent, formatCount, formatStatistic } from '@/lib/format/number'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 interface SeriesFacts {
   readonly column: ColumnId
@@ -105,7 +106,7 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
       for (const [index, column] of matrix.value.columns.entries()) {
         const values = Array.from(matrix.value.values.subarray(index * matrix.value.rowCount, (index + 1) * matrix.value.rowCount))
         const result = await runSeriesStructure(Float64Array.from(values), matrix.value.rowCount, 1, { period, robust: false, correlationMaxLag, peltMinSize: minSize, peltJump: 1, peltPenalty: defaultPeltPenalty(values) })
-        if (!result.ok) { setJob({ kind: 'failed', detail: `${column.name}: ${result.error.detail}` }); return }
+        if (!result.ok) { setJob({ kind: 'failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(result.error)}` }); return }
         const evidence = result.value.series[0]
         if (evidence === undefined) { setJob({ kind: 'failed', detail: `${column.name}: no structure evidence returned.` }); return }
         series.push({ column: column.id, name: column.name, values, evidence, timeAxis: matrix.value.timeAxis })

@@ -7,6 +7,7 @@ pub mod backdoor;
 pub mod causal_effects;
 pub mod causal_ts_preparation;
 pub mod cdnots;
+pub mod constraint_discovery;
 pub mod data_preparation;
 pub mod discrete_bn;
 pub mod estimation;
@@ -16,6 +17,7 @@ pub mod neural_granger;
 pub mod ols;
 pub mod panel;
 pub mod parcorr;
+pub mod pc_stable;
 pub mod pcmci;
 pub mod pcmciplus;
 pub mod preprocessing;
@@ -55,6 +57,7 @@ pub use stationarity::{adfuller, kpss, AdfResult, KpssResult};
 pub use zivot_andrews::{zivot_andrews, ZaModel, ZaResult};
 pub mod dynotears;
 pub mod expm;
+pub mod fci;
 pub mod lars;
 pub mod lbfgsb;
 pub mod lpcmci;
@@ -82,8 +85,8 @@ pub mod do_calculus;
 pub mod dynamic_counterfactual;
 pub mod fminbound;
 pub mod glm;
-pub mod graph_falsification;
 pub mod grace;
+pub mod graph_falsification;
 pub mod id_star;
 pub mod idc_star;
 pub mod identified_expression;
@@ -119,7 +122,10 @@ pub use graph_falsification::{
     uniformity_test, DagCheckResult, DagImplication, DagImplicationTest, GraphCheckError,
     GraphFalsificationResult, ImplicationDecision, UniformityTest,
 };
-pub use kci::{kernel_conditional_independence, KciError, KciResult};
+pub use kci::{
+    causal_learn_kernel_conditional_independence, kernel_conditional_independence, KciError,
+    KciResult,
+};
 pub use preprocess::{cluster_redundant, correlation_matrix, shapiro, vif_redundant};
 pub use refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, RefutationOutcome,

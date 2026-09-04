@@ -700,12 +700,43 @@ export const bayesianGaussianEvidenceSchema = z.object({
 export type BayesianGaussianEvidence = z.infer<typeof bayesianGaussianEvidenceSchema>
 export type BayesianGaussianCurve = BayesianGaussianEvidence['curves'][number]
 
+export const discreteStateStrategySchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('observedStates'), states: z.number().int().min(2) }).strict(),
+  z.object({
+    kind: z.literal('quantiles'),
+    requested: z.number().int().min(2),
+    populated: z.number().int().min(2),
+  }).strict(),
+])
+
+export const discreteStatePreparationSchema = z.object({
+  node: z.number().int().nonnegative(),
+  name: z.string().trim().min(1),
+  strategy: discreteStateStrategySchema,
+}).strict()
+
+export type DiscreteStatePreparation = z.infer<typeof discreteStatePreparationSchema>
+
+export const describeDiscreteStatePreparations = (
+  preparations: readonly DiscreteStatePreparation[],
+): string => preparations.map((preparation) => {
+  switch (preparation.strategy.kind) {
+    case 'observedStates':
+      return `${preparation.name}: ${preparation.strategy.states} observed states`
+    case 'quantiles':
+      return `${preparation.name}: ${preparation.strategy.populated} quantile states (budget ${preparation.strategy.requested})`
+    default:
+      return assertNever(preparation.strategy)
+  }
+}).join(' · ')
+
 export const discreteBnEvidenceSchema = z.object({
   kind: z.literal('discreteBnQuery'),
   observations: z.number().int().positive(),
   bins: z.number().int().min(2),
   equivalentSampleSize: z.number().positive(),
   stateCounts: z.array(z.number().int().positive()),
+  statePreparations: z.array(discreteStatePreparationSchema).min(2),
   treatmentStates: z.tuple([z.string(), z.string()]),
   expectations: z.tuple([z.number().finite(), z.number().finite()]),
   effect: z.number().finite(),
@@ -1267,7 +1298,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
           break
         case 'ready': {
           const layout = context.panelPreflight.layout
-          satisfy('panel-balanced-layout', `${layout.controls.length} control and ${layout.treated.length} treated units across ${layout.prePeriods} pre- and ${layout.postPeriods} post-periods; treatment adopts simultaneously at ${layout.adoptionLabel} and remains on.`)
+          satisfy('panel-balanced-layout', `${layout.controls.length} control and ${layout.treated.length} treated units across ${layout.prePeriods} pre- and ${layout.postPeriods} post-periods; treatment adopts simultaneously at ${layout.adoption.label} and remains on.`)
           break
         }
         default: assertNever(context.panelPreflight)
@@ -1425,7 +1456,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         if (latent.length > 0) violate('bn-observed-graph', `${latent.map((node) => node.name).join(', ')} ${latent.length === 1 ? 'is' : 'are'} unmeasured; the network needs every node in the data.`)
         else satisfy('bn-observed-graph', `All ${context.study.graph.nodes.length} DAG nodes are measured; the query adjusts for the treatment’s parents.`)
       }
-      satisfy('bn-discretisation', `Each variable is cut into ${configuration.bins} quantile bins. The run records the mean value for each state.`)
+      satisfy('bn-discretisation', `Each variable has a budget of ${configuration.bins} states. Observed low-cardinality states are preserved; higher-cardinality values are divided at quantiles. The run records the mean value represented by each state.`)
       leave('bn-sample-per-cell', `${prepared.observations} total rows do not establish support in every parent configuration. Cell counts are not reported in this release; sparse cells receive BDeu pseudo-counts with equivalent sample size ${configuration.equivalentSampleSize}.`)
       if (timeSeries) violate('bn-independent-rows', 'The prepared rows are a time series; this discrete network has no lag or serial-dependence model.')
       else if (panel) violate('bn-independent-rows', 'The prepared rows repeat units through time; this discrete network has no unit or serial-dependence model.')

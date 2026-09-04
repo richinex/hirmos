@@ -5,6 +5,10 @@ import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
   DynotearsEvidence,
   DirectLingamEvidence,
+  FciEvidence,
+  PcStableEvidence,
+  ConstraintBackgroundKnowledge,
+  ConstraintCiTest,
   LpcmciEvidence,
   RpcmciEvidence,
   OcseEvidence,
@@ -48,6 +52,8 @@ type LpcmciOutcome = Result<LpcmciEvidence, AnalysisWorkerProblem>
 type RpcmciOutcome = Result<RpcmciEvidence, AnalysisWorkerProblem>
 type DynotearsOutcome = Result<DynotearsEvidence, AnalysisWorkerProblem>
 type DirectLingamOutcome = Result<DirectLingamEvidence, AnalysisWorkerProblem>
+type PcStableOutcome = Result<PcStableEvidence, AnalysisWorkerProblem>
+type FciOutcome = Result<FciEvidence, AnalysisWorkerProblem>
 type VarLingamOutcome = Result<VarLingamEvidence, AnalysisWorkerProblem>
 type OcseOutcome = Result<OcseEvidence, AnalysisWorkerProblem>
 type CmlpOutcome = Result<CmlpEvidence, AnalysisWorkerProblem>
@@ -526,6 +532,58 @@ export function runDirectLingam(
     pending.set(request, pendingRun('direct-lingam-succeeded', resolve, onProgress))
     const command: AnalysisWorkerCommand = {
       kind: 'direct-lingam', request, values, rows, columns,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+interface ConstraintDiscoveryRequest {
+  readonly names: readonly string[]
+  readonly alpha: number
+  readonly maxDepth: number | null
+  readonly ciTest: ConstraintCiTest
+  readonly background: ConstraintBackgroundKnowledge
+}
+
+export function runPcStable(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  configuration: ConstraintDiscoveryRequest,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<PcStableOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('pc-stable-succeeded', resolve, onProgress))
+    const command: AnalysisWorkerCommand = {
+      kind: 'pc-stable', request, values, rows, columns, ...configuration,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runFci(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  configuration: ConstraintDiscoveryRequest & { readonly maxPathLength: number | null },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<FciOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('fci-succeeded', resolve, onProgress))
+    const command: AnalysisWorkerCommand = {
+      kind: 'fci', request, values, rows, columns, ...configuration,
     }
     try {
       analysisWorker().postMessage(command, [values.buffer])

@@ -22,21 +22,29 @@ export interface PanelLongMatrix {
   readonly sourceFingerprint: SourceFingerprint
   readonly rowCount: number
   readonly units: NonEmptyArray<string>
-  readonly times: NonEmptyArray<number>
-  readonly timeLabels: NonEmptyArray<string>
+  /** Dense period code for each source row. */
+  readonly periodCodes: NonEmptyArray<number>
+  /** Unique source label for every dense period code. */
+  readonly periods: NonEmptyArray<PanelPeriod>
   readonly values: Float64Array
+}
+
+/** One panel period in its computational and source-facing representations. */
+export interface PanelPeriod {
+  /** Zero-based dense code used by the numerical kernel. */
+  readonly code: number
+  /** Original value from the selected time column, used in records and UI copy. */
+  readonly label: string
 }
 
 export interface PanelInterventionLayout {
   readonly kind: 'panel-intervention-layout'
   readonly controls: NonEmptyArray<string>
   readonly treated: NonEmptyArray<string>
-  readonly periods: NonEmptyArray<number>
-  readonly periodLabels: NonEmptyArray<string>
+  readonly periods: NonEmptyArray<PanelPeriod>
   readonly prePeriods: number
   readonly postPeriods: number
-  readonly adoptionPeriod: number
-  readonly adoptionLabel: string
+  readonly adoption: PanelPeriod
   readonly controlPreDifferenceSd: number
 }
 
@@ -47,9 +55,12 @@ export type PanelInterventionLayoutProblem =
   | { readonly kind: 'no-post-period' }
   | { readonly kind: 'no-control-unit' }
   | { readonly kind: 'no-treated-unit' }
-  | { readonly kind: 'non-simultaneous-adoption'; readonly unit: string; readonly period: number }
-  | { readonly kind: 'duplicate-panel-cell'; readonly unit: string; readonly period: number }
-  | { readonly kind: 'missing-panel-cell'; readonly unit: string; readonly period: number }
+  | { readonly kind: 'incomplete-panel-row'; readonly row: number }
+  | { readonly kind: 'inconsistent-period-label'; readonly code: number; readonly first: string; readonly next: string }
+  | { readonly kind: 'missing-period-label'; readonly code: number }
+  | { readonly kind: 'non-simultaneous-adoption'; readonly unit: string; readonly period: PanelPeriod }
+  | { readonly kind: 'duplicate-panel-cell'; readonly unit: string; readonly period: PanelPeriod }
+  | { readonly kind: 'missing-panel-cell'; readonly unit: string; readonly period: PanelPeriod }
   | { readonly kind: 'degenerate-control-pre-period' }
 
 export type PanelInterventionPreflight =
@@ -101,9 +112,12 @@ export function describePanelInterventionLayoutProblem(problem: PanelInterventio
     case 'no-post-period': return 'The panel has no post-intervention period.'
     case 'no-control-unit': return 'Every panel unit is treated; at least one never-treated control unit is required.'
     case 'no-treated-unit': return 'No panel unit receives treatment.'
-    case 'non-simultaneous-adoption': return `${problem.unit} does not follow the required simultaneous absorbing adoption pattern at period ${problem.period}.`
-    case 'duplicate-panel-cell': return `${problem.unit} has more than one observation at period ${problem.period}.`
-    case 'missing-panel-cell': return `${problem.unit} has no observation at period ${problem.period}.`
+    case 'incomplete-panel-row': return `The panel matrix is incomplete at row ${problem.row + 1}.`
+    case 'inconsistent-period-label': return `Panel period code ${problem.code} is associated with both ${problem.first} and ${problem.next}.`
+    case 'missing-period-label': return `Panel period code ${problem.code} has no source value.`
+    case 'non-simultaneous-adoption': return `${problem.unit} does not follow the required simultaneous absorbing adoption pattern at period ${problem.period.label}.`
+    case 'duplicate-panel-cell': return `${problem.unit} has more than one observation at period ${problem.period.label}.`
+    case 'missing-panel-cell': return `${problem.unit} has no observation at period ${problem.period.label}.`
     case 'degenerate-control-pre-period': return 'The control pre-period does not contain enough non-constant first differences to fit synthetic DID weights.'
     default: return assertNever(problem)
   }
@@ -120,52 +134,67 @@ export function describePanelInterventionPreflight(preflight: Extract<PanelInter
 /** Browser preflight equivalent of the structural checks in causal-core `panel_matrices`. */
 export function assessPanelInterventionLayout(matrix: PanelLongMatrix): Result<PanelInterventionLayout, PanelInterventionLayoutProblem> {
   const units = [...new Set(matrix.units)].sort((left, right) => left.localeCompare(right))
-  const periods = [...new Set(matrix.times)].sort((left, right) => left - right)
   const labels = new Map<number, string>()
+  for (const period of matrix.periods) {
+    const recorded = labels.get(period.code)
+    if (recorded !== undefined && recorded !== period.label) {
+      return err({ kind: 'inconsistent-period-label', code: period.code, first: recorded, next: period.label })
+    }
+    labels.set(period.code, period.label)
+  }
+  const periodCodes = [...new Set(matrix.periodCodes)].sort((left, right) => left - right)
   const cells = new Map<string, Map<number, { readonly outcome: number; readonly treatment: number }>>()
   let sawZero = false
   let sawOne = false
 
   for (let row = 0; row < matrix.rowCount; row += 1) {
     const unit = matrix.units[row]
-    const period = matrix.times[row]
-    const periodLabel = matrix.timeLabels[row]
-    if (unit === undefined || period === undefined || periodLabel === undefined) return err({ kind: 'missing-panel-cell', unit: unit ?? 'unknown unit', period: period ?? -1 })
+    const periodCode = matrix.periodCodes[row]
+    if (unit === undefined || periodCode === undefined) return err({ kind: 'incomplete-panel-row', row })
+    const periodLabel = labels.get(periodCode)
+    if (periodLabel === undefined) return err({ kind: 'missing-period-label', code: periodCode })
     const treatment = matrix.values[matrix.rowCount + row]
     const outcome = matrix.values[row]
-    if (treatment === undefined || outcome === undefined) return err({ kind: 'missing-panel-cell', unit, period })
+    if (treatment === undefined || outcome === undefined) return err({ kind: 'incomplete-panel-row', row })
     if (treatment !== 0 && treatment !== 1) return err({ kind: 'treatment-not-binary', row, value: treatment })
     sawZero ||= treatment === 0
     sawOne ||= treatment === 1
-    labels.set(period, periodLabel)
     const unitCells = cells.get(unit) ?? new Map<number, { readonly outcome: number; readonly treatment: number }>()
-    if (unitCells.has(period)) return err({ kind: 'duplicate-panel-cell', unit, period })
-    unitCells.set(period, { outcome, treatment })
+    if (unitCells.has(periodCode)) return err({ kind: 'duplicate-panel-cell', unit, period: { code: periodCode, label: periodLabel } })
+    unitCells.set(periodCode, { outcome, treatment })
     cells.set(unit, unitCells)
   }
   if (!sawZero || !sawOne) return err({ kind: 'no-treatment-variation' })
 
+  const periods: PanelPeriod[] = []
+  for (const code of periodCodes) {
+    const label = labels.get(code)
+    if (label === undefined) return err({ kind: 'missing-period-label', code })
+    periods.push({ code, label })
+  }
+  if (!isNonEmpty(periods)) return err({ kind: 'no-post-period' })
+
   for (const unit of units) {
     const unitCells = cells.get(unit)
     for (const period of periods) {
-      if (unitCells?.has(period) !== true) return err({ kind: 'missing-panel-cell', unit, period })
+      if (unitCells?.has(period.code) !== true) return err({ kind: 'missing-panel-cell', unit, period })
     }
   }
 
-  const firstTreated = periods.findIndex((period) => units.some((unit) => cells.get(unit)?.get(period)?.treatment === 1))
+  const firstTreated = periods.findIndex((period) => units.some((unit) => cells.get(unit)?.get(period.code)?.treatment === 1))
   if (firstTreated < 0) return err({ kind: 'no-treated-unit' })
   if (firstTreated === 0) return err({ kind: 'no-pre-period' })
   if (firstTreated >= periods.length) return err({ kind: 'no-post-period' })
 
-  const controls = units.filter((unit) => periods.every((period) => cells.get(unit)?.get(period)?.treatment === 0))
-  const treated = units.filter((unit) => periods.some((period) => cells.get(unit)?.get(period)?.treatment === 1))
+  const controls = units.filter((unit) => periods.every((period) => cells.get(unit)?.get(period.code)?.treatment === 0))
+  const treated = units.filter((unit) => periods.some((period) => cells.get(unit)?.get(period.code)?.treatment === 1))
   if (!isNonEmpty(controls)) return err({ kind: 'no-control-unit' })
   if (!isNonEmpty(treated)) return err({ kind: 'no-treated-unit' })
 
   for (const unit of treated) {
     for (const [periodIndex, period] of periods.entries()) {
       const expected = periodIndex < firstTreated ? 0 : 1
-      if (cells.get(unit)?.get(period)?.treatment !== expected) return err({ kind: 'non-simultaneous-adoption', unit, period })
+      if (cells.get(unit)?.get(period.code)?.treatment !== expected) return err({ kind: 'non-simultaneous-adoption', unit, period })
     }
   }
 
@@ -175,8 +204,8 @@ export function assessPanelInterventionLayout(matrix: PanelLongMatrix): Result<P
       const currentPeriod = periods[periodIndex]
       const previousPeriod = periods[periodIndex - 1]
       if (currentPeriod === undefined || previousPeriod === undefined) return err({ kind: 'degenerate-control-pre-period' })
-      const current = cells.get(unit)?.get(currentPeriod)?.outcome
-      const previous = cells.get(unit)?.get(previousPeriod)?.outcome
+      const current = cells.get(unit)?.get(currentPeriod.code)?.outcome
+      const previous = cells.get(unit)?.get(previousPeriod.code)?.outcome
       if (current === undefined || previous === undefined) return err({ kind: 'missing-panel-cell', unit, period: currentPeriod })
       differences.push(current - previous)
     }
@@ -187,22 +216,16 @@ export function assessPanelInterventionLayout(matrix: PanelLongMatrix): Result<P
   const controlPreDifferenceSd = Math.sqrt(variance)
   if (!Number.isFinite(controlPreDifferenceSd) || controlPreDifferenceSd === 0) return err({ kind: 'degenerate-control-pre-period' })
 
-  if (!isNonEmpty(periods)) return err({ kind: 'no-post-period' })
-  const periodLabels = periods.map((period) => labels.get(period) ?? String(period))
-  if (!isNonEmpty(periodLabels)) return err({ kind: 'no-post-period' })
-  const adoptionPeriod = periods[firstTreated]
-  const adoptionLabel = periodLabels[firstTreated]
-  if (adoptionPeriod === undefined || adoptionLabel === undefined) return err({ kind: 'no-post-period' })
+  const adoption = periods[firstTreated]
+  if (adoption === undefined) return err({ kind: 'no-post-period' })
   return ok({
     kind: 'panel-intervention-layout',
     controls,
     treated,
     periods,
-    periodLabels,
     prePeriods: firstTreated,
     postPeriods: periods.length - firstTreated,
-    adoptionPeriod,
-    adoptionLabel,
+    adoption,
     controlPreDifferenceSd,
   })
 }
@@ -226,8 +249,8 @@ const longMatrixSchema = z.object({
   sourceFingerprint: z.string(),
   rowCount: z.number().int().positive(),
   units: z.array(z.string().min(1)).min(1),
-  times: z.array(z.number().int().nonnegative()).min(1),
-  timeLabels: z.array(z.string().min(1)).min(1),
+  periodCodes: z.array(z.number().int().nonnegative()).min(1),
+  periods: z.array(z.object({ code: z.number().int().nonnegative(), label: z.string().min(1) }).strict()).min(1),
   values: z.instanceof(Float64Array),
 }).strict()
 
@@ -286,22 +309,30 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
   if (parsed.data.sourceFingerprint !== profile.source.fingerprint || parsed.data.rowCount !== profile.rowCount) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long panel belongs to another source or row count.' })
   }
-  if (parsed.data.units.length !== parsed.data.rowCount || parsed.data.times.length !== parsed.data.rowCount || parsed.data.timeLabels.length !== parsed.data.rowCount || parsed.data.values.length !== parsed.data.rowCount * 2) {
+  if (parsed.data.units.length !== parsed.data.rowCount || parsed.data.periodCodes.length !== parsed.data.rowCount || parsed.data.values.length !== parsed.data.rowCount * 2) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel buffers do not match the row count.' })
   }
   if (parsed.data.values.some((value) => !Number.isFinite(value))) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel numeric buffer contains a non-finite value.' })
   }
-  if (!isNonEmpty(parsed.data.units) || !isNonEmpty(parsed.data.times) || !isNonEmpty(parsed.data.timeLabels)) {
+  if (!isNonEmpty(parsed.data.units) || !isNonEmpty(parsed.data.periodCodes) || !isNonEmpty(parsed.data.periods)) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel buffers must contain at least one row.' })
+  }
+  const labels = new Map<number, string>()
+  for (const period of parsed.data.periods) {
+    if (labels.has(period.code)) return err({ kind: 'invalid-panel-boundary', detail: `The long panel repeats period code ${period.code}.` })
+    labels.set(period.code, period.label)
+  }
+  if (parsed.data.periodCodes.some((code) => !labels.has(code)) || labels.size !== new Set(parsed.data.periodCodes).size) {
+    return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel period catalog does not match its row codes.' })
   }
   return ok({
     kind: parsed.data.kind,
     sourceFingerprint: profile.source.fingerprint,
     rowCount: parsed.data.rowCount,
     units: parsed.data.units,
-    times: parsed.data.times,
-    timeLabels: parsed.data.timeLabels,
+    periodCodes: parsed.data.periodCodes,
+    periods: parsed.data.periods,
     values: parsed.data.values,
   })
 }

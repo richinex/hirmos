@@ -95,3 +95,50 @@ test('keeps CD-NOTS context nodes and GRACE gates in the shared lag graph', asyn
     links: [{ from: 1, to: 0, lag: 1, strength: { kind: 'nonnegative', value: 0.83 } }],
   })
 })
+
+test('keeps every PAG endpoint pair unresolved unless FCI reports a directed edge', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Pure PAG projection contract runs once')
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const { lagGraphFromRun } = await import(new URL('/src/domain/lagGraph.ts', window.location.href).href)
+    const { discoveryEvidenceView } = await import(new URL('/src/domain/dagEvidence.ts', window.location.href).href)
+    const marks = ['---', '-->', '--o', '<--', '<->', '<-o', 'o--', 'o->', 'o-o']
+    const variables = Array.from({ length: marks.length + 1 }, (_, index) => ({ id: `v${index}`, name: `V${index}` }))
+    const graph = Array.from(
+      { length: variables.length },
+      () => Array.from({ length: variables.length }, () => ['']),
+    )
+    marks.forEach((mark, index) => {
+      graph[0][index + 1][0] = mark
+      graph[index + 1][0][0] = `${mark[2]}-${mark[0]}`
+    })
+    const run = {
+      kind: 'fci-run', id: 'fci-endpoints', preparedDataset: 'prepared', createdAt: '2026-09-04T00:00:00.000Z',
+      method: 'fci', variables, eligibility: { kind: 'eligible', satisfied: [] },
+      result: {
+        kind: 'fci', observations: 200, variables: variables.length, alpha: 0.05, maxDepth: null,
+        maxPathLength: null, ciTest: 'fisherZ', graph, separatingSets: [], ciTests: [], edgeProperties: [],
+      },
+    }
+    const projected = lagGraphFromRun(run)
+    const evidence = discoveryEvidenceView(run)
+    return {
+      semantics: projected.graph.semantics,
+      marks: projected.graph.links.map((link: LagLink) => link.mark),
+      endpoints: projected.graph.links.map((link: LagLink) => [link.fromEndpoint, link.toEndpoint]),
+      matches: evidence.candidates.map((candidate: { readonly relationMatch: { readonly kind: string } }) => candidate.relationMatch.kind),
+    }
+  })
+  expect(result.semantics).toBe('pag')
+  expect(result.marks).toEqual(['---', '-->', '--o', '<--', '<->', '<-o', 'o--', 'o->', 'o-o'])
+  expect(result.endpoints).toEqual([
+    ['tail', 'tail'], ['tail', 'arrow'], ['tail', 'circle'],
+    ['arrow', 'tail'], ['arrow', 'arrow'], ['arrow', 'circle'],
+    ['circle', 'tail'], ['circle', 'arrow'], ['circle', 'circle'],
+  ])
+  expect(result.matches).toEqual([
+    'orientation-unresolved', 'directed-candidate', 'orientation-unresolved',
+    'directed-candidate', 'orientation-unresolved', 'orientation-unresolved',
+    'orientation-unresolved', 'orientation-unresolved', 'orientation-unresolved',
+  ])
+})

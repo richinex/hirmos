@@ -6,7 +6,7 @@ import { lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discove
 import { useChartTheme } from '@/charts/theme'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { summarizeLagGraph, type LagGraph, type LagGraphSemantics, type LagGraphWarning } from '@/domain/lagGraph'
-import { literal, well } from '@/components/ui/recipes'
+import { well } from '@/components/ui/recipes'
 
 interface MarkMeaning { readonly mark: string; readonly meaning: string }
 
@@ -19,6 +19,10 @@ interface MarkMeaning { readonly mark: string; readonly meaning: string }
  */
 const markMeanings = (semantics: LagGraphSemantics): readonly MarkMeaning[] => {
   switch (semantics) {
+    case 'cpdag': return [
+      { mark: '-->', meaning: 'the direction is compelled within the fitted equivalence class' },
+      { mark: '---', meaning: 'the variables are adjacent; the direction is not determined' },
+    ]
     case 'pag': return [
       { mark: '-->', meaning: 'the source is an ancestor of the target' },
       { mark: '<->', meaning: 'neither is an ancestor of the other' },
@@ -113,12 +117,11 @@ export function LagGraphViews({ graph, warnings = [], label, highlighted = [], i
           : <EChart key="lag-grid" option={option} label={label} className="block" style={{ width: gridSize.width, height, minWidth: gridSize.width }} testId="lag-grid" />}
       </div>
       {meanings.length > 0 && (
-        <dl className="mb-0 mt-2 grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-1 text-label text-faint" aria-label="Link mark legend">
+        <dl className="mb-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-1 text-label text-faint" aria-label="Link mark legend">
           {[...meanings, { mark: '<--', meaning: 'mirrored: the same with the ends swapped' }].map((entry) => (
             <div key={entry.mark} className="contents">
-              <dt className="text-muted"><MarkSample mark={entry.mark} /></dt>
-              {/* The table's Mark column prints these same strings, so the notation stays beside the drawing. */}
-              <dd className={literal('m-0 text-muted')}>{entry.mark}</dd>
+              {/* The drawing is the key. Printing the notation beside it repeats the same mark twice. */}
+              <dt className="text-muted" aria-label={entry.mark}><MarkSample mark={entry.mark} /></dt>
               <dd className="m-0">{entry.meaning}</dd>
             </div>
           ))}

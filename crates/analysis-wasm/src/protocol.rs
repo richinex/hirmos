@@ -63,6 +63,50 @@ pub(crate) enum CdnotsContext {
     StepLinear,
 }
 
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ConstraintCiTest {
+    FisherZ,
+    Kci,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct BackgroundKnowledgeCommand {
+    pub(crate) forbidden: Vec<(usize, usize)>,
+    pub(crate) required: Vec<(usize, usize)>,
+    pub(crate) forbidden_patterns: Vec<(String, String)>,
+    pub(crate) required_patterns: Vec<(String, String)>,
+    pub(crate) tiers: Vec<Option<usize>>,
+    pub(crate) forbidden_within_tiers: Vec<usize>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConstraintSeparatingSetEvidence {
+    pub(crate) x: usize,
+    pub(crate) y: usize,
+    pub(crate) variables: Vec<usize>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ConstraintCiEvidence {
+    pub(crate) x: usize,
+    pub(crate) y: usize,
+    pub(crate) conditions: Vec<usize>,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FciEdgePropertyEvidence {
+    pub(crate) left: usize,
+    pub(crate) right: usize,
+    pub(crate) directness: Option<&'static str>,
+    pub(crate) latent_confounding: Option<&'static str>,
+}
+
 #[derive(Serialize)]
 #[serde(
     tag = "kind",
@@ -144,6 +188,53 @@ pub(crate) enum CounterfactualIdentificationEvidence {
 pub(crate) struct IdentifiedDiscreteCondition {
     pub(crate) variable: usize,
     pub(crate) state: usize,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DiscreteStateQuery {
+    BayesianNetwork,
+    IdentifiedExpression,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DiscreteStateStrategyEvidence {
+    ObservedStates { states: usize },
+    Quantiles { requested: usize, populated: usize },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DiscreteStatePreparationEvidence {
+    pub(crate) node: usize,
+    pub(crate) name: String,
+    pub(crate) strategy: DiscreteStateStrategyEvidence,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DiscreteStateProblemEvidence {
+    NoFiniteObservations {
+        observations: usize,
+    },
+    SingleObservedState {
+        value: f64,
+        observations: usize,
+    },
+    QuantileCollapse {
+        distinct_values: usize,
+        requested_states: usize,
+        populated_states: usize,
+    },
 }
 
 #[derive(Serialize)]
@@ -273,6 +364,25 @@ pub(crate) enum AnalysisCommand {
     DirectLingam {
         rows: usize,
         columns: usize,
+    },
+    PcStable {
+        rows: usize,
+        columns: usize,
+        names: Vec<String>,
+        alpha: f64,
+        max_depth: Option<usize>,
+        ci_test: ConstraintCiTest,
+        background: BackgroundKnowledgeCommand,
+    },
+    Fci {
+        rows: usize,
+        columns: usize,
+        names: Vec<String>,
+        alpha: f64,
+        max_depth: Option<usize>,
+        max_path_length: Option<usize>,
+        ci_test: ConstraintCiTest,
+        background: BackgroundKnowledgeCommand,
     },
     VarLingam {
         rows: usize,
@@ -1226,6 +1336,12 @@ pub(crate) enum DagFalsificationEvidence {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum AnalysisResult {
+    DiscreteStateRefused {
+        query: DiscreteStateQuery,
+        node: usize,
+        name: String,
+        problem: DiscreteStateProblemEvidence,
+    },
     StationarityBattery {
         observations: usize,
         adf: DeterministicEvidence<AdfEvidence>,
@@ -1350,6 +1466,28 @@ pub(crate) enum AnalysisResult {
         variables: usize,
         causal_order: Vec<usize>,
         weights: Vec<Vec<f64>>,
+    },
+    PcStable {
+        observations: usize,
+        variables: usize,
+        alpha: f64,
+        max_depth: Option<usize>,
+        ci_test: ConstraintCiTest,
+        graph: Vec<Vec<Vec<String>>>,
+        separating_sets: Vec<ConstraintSeparatingSetEvidence>,
+        ci_tests: Vec<ConstraintCiEvidence>,
+    },
+    Fci {
+        observations: usize,
+        variables: usize,
+        alpha: f64,
+        max_depth: Option<usize>,
+        max_path_length: Option<usize>,
+        ci_test: ConstraintCiTest,
+        graph: Vec<Vec<Vec<String>>>,
+        separating_sets: Vec<ConstraintSeparatingSetEvidence>,
+        ci_tests: Vec<ConstraintCiEvidence>,
+        edge_properties: Vec<FciEdgePropertyEvidence>,
     },
     VarLingam {
         observations: usize,
@@ -1706,6 +1844,7 @@ pub(crate) enum AnalysisResult {
         equivalent_sample_size: f64,
         /// State count per node, in node order.
         state_counts: Vec<usize>,
+        state_preparations: Vec<DiscreteStatePreparationEvidence>,
         treatment_states: (String, String),
         /// Outcome expectation under do(low) and do(high), from each state's original-unit mean.
         expectations: (f64, f64),
@@ -1723,6 +1862,7 @@ pub(crate) enum AnalysisResult {
         bins: usize,
         /// State count per observed node, in full graph-node order with latent nodes omitted.
         state_counts: Vec<usize>,
+        state_preparations: Vec<DiscreteStatePreparationEvidence>,
         treatment_states: (String, String),
         query: IdentifiedDiscreteQueryKind,
         result: IdentifiedDiscreteResult,

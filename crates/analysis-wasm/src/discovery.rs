@@ -1,6 +1,13 @@
 //! Cross-sectional and time-series discovery façades.
 
 use super::*;
+use hirmos_causal_core::constraint_discovery::{
+    BackgroundKnowledge, CrossSectionalCi, EndpointGraph,
+};
+use hirmos_causal_core::fci::{
+    run_fci_with_progress, Directness, FciConfiguration, LatentConfounding,
+};
+use hirmos_causal_core::pc_stable::{run_pc_stable_with_progress, PcStableConfiguration};
 
 fn role_aware_policy(
     cut_off: TemporalCutOff,
@@ -793,6 +800,206 @@ where
     })
 }
 
+fn constraint_ci(value: ConstraintCiTest) -> CrossSectionalCi {
+    match value {
+        ConstraintCiTest::FisherZ => CrossSectionalCi::FisherZ,
+        ConstraintCiTest::Kci => CrossSectionalCi::Kci,
+    }
+}
+
+fn constraint_background(
+    command: BackgroundKnowledgeCommand,
+    variables: usize,
+) -> Result<BackgroundKnowledge, String> {
+    if command.tiers.len() != variables {
+        return Err("background-knowledge tiers must contain one entry per variable".to_owned());
+    }
+    let mut background = BackgroundKnowledge::default();
+    for (from, to) in command.forbidden {
+        background.forbid(from, to);
+    }
+    for (from, to) in command.required {
+        background.require(from, to);
+    }
+    for (from, to) in command.forbidden_patterns {
+        background
+            .forbid_pattern(&from, &to)
+            .map_err(|problem| problem.to_string())?;
+    }
+    for (from, to) in command.required_patterns {
+        background
+            .require_pattern(&from, &to)
+            .map_err(|problem| problem.to_string())?;
+    }
+    for (node, tier) in command.tiers.into_iter().enumerate() {
+        if let Some(tier) = tier {
+            background.add_to_tier(node, tier);
+        }
+    }
+    for tier in command.forbidden_within_tiers {
+        background.forbid_within_tier(tier);
+    }
+    Ok(background)
+}
+
+fn pag_endpoint_mark(at_source: i8, at_target: i8) -> Option<String> {
+    if at_source == 0 && at_target == 0 {
+        return None;
+    }
+    let source = match at_source {
+        -1 => '-',
+        1 => '<',
+        2 => 'o',
+        _ => return None,
+    };
+    let target = match at_target {
+        -1 => '-',
+        1 => '>',
+        2 => 'o',
+        _ => return None,
+    };
+    Some(format!("{source}-{target}"))
+}
+
+fn constraint_graph(graph: &EndpointGraph) -> Vec<Vec<Vec<String>>> {
+    (0..graph.nodes())
+        .map(|source| {
+            (0..graph.nodes())
+                .map(|target| {
+                    vec![pag_endpoint_mark(
+                        graph.endpoints[source][target],
+                        graph.endpoints[target][source],
+                    )
+                    .unwrap_or_default()]
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn separating_set_evidence(
+    sets: Vec<hirmos_causal_core::pc_stable::SeparatedPair>,
+) -> Vec<ConstraintSeparatingSetEvidence> {
+    sets.into_iter()
+        .map(|set| ConstraintSeparatingSetEvidence {
+            x: set.x,
+            y: set.y,
+            variables: set.variables,
+        })
+        .collect()
+}
+
+fn constraint_ci_evidence(
+    tests: Vec<hirmos_causal_core::constraint_discovery::CiRecord>,
+) -> Vec<ConstraintCiEvidence> {
+    tests
+        .into_iter()
+        .map(|test| ConstraintCiEvidence {
+            x: test.x,
+            y: test.y,
+            conditions: test.conditions,
+            p_value: test.p_value,
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn cross_sectional_constraint_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    names: Vec<String>,
+    alpha: f64,
+    max_depth: Option<usize>,
+    max_path_length: Option<usize>,
+    ci_test: ConstraintCiTest,
+    background: BackgroundKnowledgeCommand,
+    fci: bool,
+    progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    if !(2..=32).contains(&columns) {
+        return Err("PC-stable and FCI require between 2 and 32 selected variables".to_owned());
+    }
+    if names.len() != columns {
+        return Err("PC-stable and FCI require one variable name per matrix column".to_owned());
+    }
+    if matches!(ci_test, ConstraintCiTest::Kci) && columns > 12 {
+        return Err("KCI is limited to 12 selected variables in the browser".to_owned());
+    }
+    validate_dense_matrix(if fci { "FCI" } else { "PC-stable" }, values, rows, columns)?;
+    let matrix = DMatrix::from_fn(rows, columns, |row, column| values[column * rows + row]);
+    let background = constraint_background(background, columns)?;
+    if fci {
+        let result = run_fci_with_progress(
+            &matrix,
+            names,
+            FciConfiguration {
+                alpha,
+                max_depth,
+                max_path_length,
+                ci_test: constraint_ci(ci_test),
+            },
+            &background,
+            progress,
+        )
+        .map_err(|problem| format!("FCI refused: {problem}"))?;
+        let edge_properties = result
+            .edge_properties
+            .into_iter()
+            .map(|edge| FciEdgePropertyEvidence {
+                left: edge.left,
+                right: edge.right,
+                directness: edge.directness.map(|value| match value {
+                    Directness::DefinitelyDirect => "definitelyDirect",
+                    Directness::PossiblyDirect => "possiblyDirect",
+                }),
+                latent_confounding: edge.latent_confounding.map(|value| match value {
+                    LatentConfounding::Excluded => "excluded",
+                    LatentConfounding::Possible => "possible",
+                }),
+            })
+            .collect();
+        return Ok(AnalysisResult::Fci {
+            observations: rows,
+            variables: columns,
+            alpha,
+            max_depth,
+            max_path_length,
+            ci_test,
+            graph: constraint_graph(&result.pag),
+            separating_sets: separating_set_evidence(result.separating_sets),
+            ci_tests: constraint_ci_evidence(result.ci_tests),
+            edge_properties,
+        });
+    }
+
+    let result = run_pc_stable_with_progress(
+        &matrix,
+        names,
+        PcStableConfiguration {
+            alpha,
+            max_depth,
+            ci_test: constraint_ci(ci_test),
+        },
+        &background,
+        progress,
+    )
+    .map_err(|problem| format!("PC-stable refused: {problem}"))?;
+    Ok(AnalysisResult::PcStable {
+        observations: rows,
+        variables: columns,
+        alpha,
+        max_depth,
+        ci_test,
+        graph: constraint_graph(&result.graph),
+        separating_sets: separating_set_evidence(result.separating_sets),
+        ci_tests: constraint_ci_evidence(result.ci_tests),
+    })
+}
+
 /// VAR-LiNGAM over a dense column-major matrix; `lags` bounds the BIC lag sweep.
 ///
 /// The kernel panics on a rank-deficient VAR design or a singular residual covariance, which a
@@ -1264,6 +1471,95 @@ pub(crate) fn granger_evidence(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hirmos_causal_core::constraint_discovery::{ARROW, CIRCLE, NONE, TAIL};
+
+    #[test]
+    fn constraint_endpoint_matrix_preserves_every_pag_mark() {
+        let marks = [
+            (TAIL, ARROW, "-->"),
+            (ARROW, TAIL, "<--"),
+            (ARROW, ARROW, "<->"),
+            (CIRCLE, ARROW, "o->"),
+            (ARROW, CIRCLE, "<-o"),
+            (CIRCLE, CIRCLE, "o-o"),
+            (TAIL, TAIL, "---"),
+            (TAIL, CIRCLE, "--o"),
+            (CIRCLE, TAIL, "o--"),
+        ];
+        for (left, right, expected) in marks {
+            let graph = EndpointGraph {
+                node_names: vec!["X".to_owned(), "Y".to_owned()],
+                endpoints: vec![vec![NONE, left], vec![right, NONE]],
+            };
+            let encoded = constraint_graph(&graph);
+            assert_eq!(encoded[0][1][0], expected);
+        }
+    }
+
+    #[test]
+    fn cross_sectional_constraint_facade_serializes_pc_and_fci_results() {
+        let rows = 240;
+        let columns = 3;
+        let mut values = vec![0.0; rows * columns];
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut uniform = || {
+            state ^= state >> 12;
+            state ^= state << 25;
+            state ^= state >> 27;
+            (state.wrapping_mul(0x2545_f491_4f6c_dd1d) >> 11) as f64 / ((1u64 << 53) as f64) - 0.5
+        };
+        for row in 0..rows {
+            let x = uniform();
+            let z = 1.2 * x + 0.3 * uniform();
+            let y = -0.8 * z + 0.3 * uniform();
+            values[row] = x;
+            values[rows + row] = z;
+            values[2 * rows + row] = y;
+        }
+        let background = || BackgroundKnowledgeCommand {
+            forbidden: vec![],
+            required: vec![],
+            forbidden_patterns: vec![],
+            required_patterns: vec![],
+            tiers: vec![None; columns],
+            forbidden_within_tiers: vec![],
+        };
+        let names = vec!["X".to_owned(), "Z".to_owned(), "Y".to_owned()];
+        let pc = cross_sectional_constraint_evidence(
+            &values,
+            rows,
+            columns,
+            names.clone(),
+            0.05,
+            None,
+            None,
+            ConstraintCiTest::FisherZ,
+            background(),
+            false,
+            |_, _, _| {},
+        )
+        .unwrap();
+        let fci = cross_sectional_constraint_evidence(
+            &values,
+            rows,
+            columns,
+            names,
+            0.05,
+            None,
+            None,
+            ConstraintCiTest::FisherZ,
+            background(),
+            true,
+            |_, _, _| {},
+        )
+        .unwrap();
+        let pc = serde_json::to_value(pc).unwrap();
+        let fci = serde_json::to_value(fci).unwrap();
+        assert_eq!(pc["kind"], "pcStable");
+        assert_eq!(fci["kind"], "fci");
+        assert_eq!(pc["graph"].as_array().unwrap().len(), columns);
+        assert!(!fci["edgeProperties"].as_array().unwrap().is_empty());
+    }
 
     #[test]
     fn pcmci_plus_accepts_column_major_input_and_serializes_raw_evidence() {
@@ -1325,6 +1621,8 @@ mod tests {
             | AnalysisCommand::Cmlp { .. }
             | AnalysisCommand::Clstm { .. }
             | AnalysisCommand::DirectLingam { .. }
+            | AnalysisCommand::PcStable { .. }
+            | AnalysisCommand::Fci { .. }
             | AnalysisCommand::VarLingam { .. }
             | AnalysisCommand::Ocse { .. }
             | AnalysisCommand::GrangerSsrF { .. }
