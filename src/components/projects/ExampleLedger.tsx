@@ -84,12 +84,12 @@ function Ledger({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelet
       <table className={`${table} table-fixed`} aria-label="Examples">
         <thead>
           <tr>
-            <th className={th('w-[120px] px-2.5')}>Question</th>
+            <th className={th('w-[160px] px-2.5')}>Question</th>
             <th className={th('w-14 px-2.5')}><span className="sr-only">Kind</span></th>
             <th className={th('px-2.5')}>Example</th>
-            <th className={th('w-[144px] px-2.5')}>Design</th>
+            <th className={th('w-[160px] px-2.5')}>Approach</th>
             <th className={th('w-[124px] px-2.5')}>Data</th>
-            <th className={th('w-[84px] px-2.5 text-right')}>Estimates</th>
+            <th className={th('w-[96px] whitespace-normal px-2.5 text-right')}>Estimation runs</th>
             <th className={th('w-[200px] px-2.5')}><span className="sr-only">Actions</span></th>
           </tr>
         </thead>
@@ -107,16 +107,16 @@ function Ledger({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelet
                 <td className={td('w-14 px-2.5')}><ExampleGlyph kind={example.glyph} /></td>
                 <td className={td('px-2.5')}>
                   <span className="block whitespace-normal text-ink">{example.name}</span>
-                  <span className={num('block truncate text-label text-faint')}>
+                  <span className={num('block whitespace-normal break-all text-label text-faint')}>
                     {copy === null ? example.sourceName : `saved ${formatSaved(copy.savedAt)}`}
                   </span>
                 </td>
-                <td className={td('max-w-[28ch] whitespace-normal px-2.5 text-muted')}>{example.design}</td>
+                <td className={td('max-w-[28ch] whitespace-normal px-2.5 text-muted')}>{example.approach}</td>
                 <td className={td(num('px-2.5 text-faint'))}>
                   <span className="block truncate">{example.shape}</span>
                   <span className="block whitespace-normal">{example.size}</span>
                 </td>
-                <td className={td(num('px-2.5 text-right text-faint'))}>{copy === null ? example.estimates : copy.estimationRuns}</td>
+                <td className={td(num('px-2.5 text-right text-faint'))}>{copy === null ? example.estimationRuns : copy.estimationRuns}</td>
                 <td className={td('px-2.5')}>
                   <span className="flex items-center gap-1.5">
                     <button type="button" className={button('outline')} onClick={() => onOpen(example)}>Open</button>
@@ -133,7 +133,7 @@ function Ledger({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelet
 }
 
 function Sections({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelete }: Props & { readonly groups: readonly Group[] }) {
-  const estimates = (count: number) => `${count} ${count === 1 ? 'estimate' : 'estimates'}`
+  const estimationRuns = (count: number) => `${count} estimation ${count === 1 ? 'run' : 'runs'}`
   return (
     <div className="flex flex-col gap-5">
       {groups.map((group) => (
@@ -145,14 +145,14 @@ function Sections({ groups, saved, formatSaved, onOpen, onReset, onExport, onDel
           <ul className="m-0 list-none divide-y divide-line rounded-lg border border-hair bg-panel p-0">
             {group.items.map((example) => {
               const copy = stored(saved, example)
-              const count = copy === null ? example.estimates : copy.estimationRuns
+              const count = copy === null ? example.estimationRuns : copy.estimationRuns
               return (
                 <li key={example.id} className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-3 py-2">
                   <ExampleGlyph kind={example.glyph} />
                   <div className="min-w-0">
                     <span className="block text-ink">{example.name}</span>
-                    <span className="block text-label text-muted">{example.design}</span>
-                    <span className={num('block text-label text-faint')}>{example.shape} · {example.size}{count > 0 ? ` · ${estimates(count)}` : ''}</span>
+                    <span className="block text-label text-muted">{example.approach}</span>
+                    <span className={num('block text-label text-faint')}>{example.shape} · {example.size}{count > 0 ? ` · ${estimationRuns(count)}` : ''}</span>
                   </div>
                   <button type="button" className={button('outline')} onClick={() => onOpen(example)}>Open</button>
                   {copy !== null && (
