@@ -10,8 +10,10 @@ pub mod cdnots;
 pub mod constraint_discovery;
 pub mod data_preparation;
 pub mod discrete_bn;
+pub mod dowhy_bootstrap;
 pub mod estimation;
 pub mod frontdoor;
+pub mod iv;
 pub mod mackinnon;
 pub mod neural_granger;
 pub mod ols;
@@ -35,6 +37,12 @@ pub use frontdoor::{
     FrontdoorBootstrap, FrontdoorError, FrontdoorIdentificationError, FrontdoorInput,
     FrontdoorOptions, FrontdoorResult,
 };
+pub use dowhy_bootstrap::{BootstrapError, DowhyBootstrap};
+pub use iv::{
+    identify_instrument_set, instrumental_variable, instrumental_variable_with_progress,
+    IvEstimator, IvError, IvIdentificationError, IvInput, IvOptions, IvResult,
+};
+pub use numpy_reduce::{numpy_mean, numpy_sum};
 
 pub use mackinnon::Regression;
 pub use parcorr::{
@@ -62,6 +70,7 @@ pub mod lars;
 pub mod lbfgsb;
 pub mod lpcmci;
 pub mod nprandom;
+pub mod numpy_reduce;
 pub mod ocse;
 pub mod var_lingam;
 pub mod ziggurat;

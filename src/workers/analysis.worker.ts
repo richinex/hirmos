@@ -21,7 +21,7 @@ import {
   parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
-import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
+import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
 import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
@@ -302,6 +302,16 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         secondStageAdjustment: command.secondStageAdjustment,
         controlValue: command.controlValue,
         treatmentValue: command.treatmentValue,
+        uncertainty: command.uncertainty,
+      }
+    case 'instrumental-variable':
+      return {
+        kind: 'instrumentalVariable',
+        rows: command.rows,
+        columns: command.columns,
+        treatment: command.treatment,
+        outcome: command.outcome,
+        instruments: command.instruments,
         uncertainty: command.uncertainty,
       }
     case 'count-glm':
@@ -596,6 +606,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parseFrontdoorTwoStageEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'frontdoor-two-stage-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'instrumental-variable': {
+        const result = parseInstrumentalVariableEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'instrumental-variable-succeeded', request: command.request, result: result.value })
         return
       }
       case 'count-glm': {

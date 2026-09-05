@@ -72,6 +72,10 @@ export const ESTIMATION_PARAMETER_HELP = {
     bootstrapResamples: 'Number of row-bootstrap samples used for the interval.',
     bootstrapSeed: 'Seed used to reproduce the bootstrap samples.',
   },
+  instrumentalVariable: {
+    bootstrapResamples: 'Number of row-bootstrap samples used for the interval.',
+    bootstrapSeed: 'Seed used to reproduce the bootstrap samples.',
+  },
   adjustedRegression: {
     interval: 'Covariance estimator used for the confidence interval.',
   },

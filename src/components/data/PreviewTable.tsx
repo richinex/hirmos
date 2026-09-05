@@ -132,7 +132,7 @@ function FilterEditor({ draft, onChange, onApply, onCancel }: {
       onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); onCancel() } }}
     >
       <div className="flex flex-wrap items-end gap-3">
-        <span className={label('text-muted')}>Filter <span className="normal-case tracking-normal">{draft.column.name}</span></span>
+        <span className={label('text-muted')}>Filter <span>{draft.column.name}</span></span>
         {numeric && (
           <>
             <label className="text-body text-ink">Min<input type="number" step="any" className={field('text', 'mt-1 w-32')} value={draft.min} placeholder={draft.summary?.min ?? ''} onChange={(event) => onChange({ ...draft, min: event.target.value })} /></label>
@@ -157,7 +157,7 @@ function FilterEditor({ draft, onChange, onApply, onCancel }: {
                 key={category.value}
                 type="button"
                 aria-pressed={active}
-                className={pill(active, 'min-h-6 px-2 py-0 normal-case tracking-normal')}
+                className={pill(active, 'min-h-6 px-2 py-0')}
                 onClick={() => onChange({ ...draft, values: active ? new Set([...draft.values].filter((value) => value !== category.value)) : new Set([...draft.values, category.value]) })}
               >
                 {category.value} <span className={num('text-faint')}>{formatCount(category.count, { compact: true }).text}</span>

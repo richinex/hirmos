@@ -504,7 +504,8 @@ function App() {
           <Icon name={navOpen ? 'left_panel_close' : 'left_panel_open'} size={16} />
         </button>
         <h1 className="m-0">
-          <InternalLink href="/" className="flex items-center gap-2 text-body font-medium uppercase tracking-[0.1em] text-ink transition-opacity hover:opacity-70" title="Hirmos home">
+          {/* The wordmark is the one uppercase in the app; every label and caption is sentence case. */}
+          <InternalLink href="/" className="flex items-center gap-2 text-body font-medium uppercase tracking-[0.1em] text-ink no-underline transition-opacity hover:opacity-70" title="Hirmos home">
             <HirmosMark className="text-signal" />
             hirmos
           </InternalLink>
@@ -520,7 +521,7 @@ function App() {
         {storageFailure !== null && (
           <span role="status" className={chromeAction('quiet', 'gap-1.5 text-warn')} title={`The browser refused the last save: ${storageFailure.reason}`}>
             <Icon name="cloud_off" size={14} />
-            <span className="normal-case tracking-normal">Not saved</span>
+            <span>Not saved</span>
           </span>
         )}
         {running !== null && (
@@ -530,7 +531,7 @@ function App() {
             aria-label={`${running.label} running in ${CHAPTERS.find((chapter) => chapter.id === running.chapter)?.name ?? running.chapter}; open it`}
             onClick={() => navigateToChapter(running.chapter)}
           >
-            <span className="truncate normal-case tracking-normal">{running.label}</span>
+            <span className="truncate">{running.label}</span>
             <span aria-hidden className="bar-live absolute inset-x-2 bottom-[3px] h-[2px] rounded-full bg-line">
               <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((running.progress ?? 0) * 100)}%` }} />
             </span>

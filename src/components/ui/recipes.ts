@@ -112,7 +112,7 @@ export const fieldLabel = 'block text-body font-medium text-ink'
 
 /** The help line below a field. Body size and the token's 1.5 line height, because the old
  *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. */
-export const fieldHint = 'mt-1 text-body text-faint'
+export const fieldHint = 'mt-1 text-body text-faint text-pretty'
 
 /**
  * Which typeface, and why.
@@ -143,7 +143,7 @@ export const label = (extra?: string): string => cn('text-label font-medium', ex
  *
  * A caption is a phrase, not a slot name, so it is sentence case: `label()` stays for the short fixed
  * nouns that name a field. Same tier and colour, so the two still read as one register. */
-export const caption = (extra?: string): string => cn('text-label text-faint', extra)
+export const caption = (extra?: string): string => cn('text-label text-faint text-pretty', extra)
 
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
@@ -176,7 +176,7 @@ export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { 
  *
  * A heading, so it is set in sentence case on the title tier, the ramp step named for a surface's
  * subject. Capitals are for a label naming a slot, not for a heading naming a surface. */
-export const panelTitle = 'text-title font-medium text-ink'
+export const panelTitle = 'text-title font-medium text-ink text-balance'
 
 /** Row padding per density: 24px compact and 32px comfortable rows with 12px body text, including the 1px hairline under the row. */
 export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px] pb-[6px]' } as const

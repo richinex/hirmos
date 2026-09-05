@@ -22,7 +22,7 @@ export function ResultInterpretation({ interpretation, className = '' }: {
       <h4 className="m-0 text-faint text-label font-medium">What this result means</h4>
       <div className="mt-2 space-y-1.5">
         {interpretation.statements.map((statement, index) => (
-          <p key={`${statement.kind}-${index}`} className={`m-0 max-w-[75ch] text-body ${statementClass(statement.kind)}`}>{statement.text}</p>
+          <p key={`${statement.kind}-${index}`} className={`m-0 max-w-[75ch] text-body text-pretty ${statementClass(statement.kind)}`}>{statement.text}</p>
         ))}
       </div>
     </section>

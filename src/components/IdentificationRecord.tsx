@@ -127,14 +127,24 @@ export function IdentificationRecord({ identification }: { readonly identificati
       </section>
     )
   }
-  if (identification.kind === 'graphically-identified' || identification.kind === 'counterfactually-identified') {
+  if (identification.kind === 'graphically-identified' || identification.kind === 'counterfactually-identified' || identification.kind === 'instrument-identified') {
     const assumed = identification.basis.filter(isOwned)
     const derived = identification.basis.filter((entry) => !isOwned(entry))
+    const headline = identification.kind === 'graphically-identified'
+      ? 'The ID algorithm returned an observational expression'
+      : identification.kind === 'counterfactually-identified'
+        ? 'IDC* returned the two expressions required for binary ETT'
+        : `Instrumental variable estimand through ${identification.instruments.map((variable) => variable.name).join(', ')}`
+    const enabled = identification.kind === 'graphically-identified'
+      ? 'No back-door adjustment estimator is enabled for this expression.'
+      : identification.kind === 'counterfactually-identified'
+        ? 'The binary ETT evaluator is enabled when every observed graph variable contains only 0 and 1.'
+        : 'The instrumental variable estimator is enabled. The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed.'
     return (
       <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
         <span className="block text-body font-medium text-ink">Identification record</span>
-        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {identification.kind === 'graphically-identified' ? 'The ID algorithm returned an observational expression' : 'IDC* returned the two expressions required for binary ETT'}</p>
-        <p className="mb-2 mt-1 text-body text-muted">{identification.kind === 'graphically-identified' ? 'No back-door adjustment estimator is enabled for this expression.' : 'The binary ETT evaluator is enabled when every observed graph variable contains only 0 and 1.'}</p>
+        <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {headline}</p>
+        <p className="mb-2 mt-1 text-body text-muted">{enabled}</p>
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
             <Icon name="expand_more" size={14} className="transition-transform duration-150 group-open:rotate-180" />

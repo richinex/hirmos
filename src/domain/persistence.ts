@@ -295,6 +295,27 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
   return upgradedEstimate === estimate ? value : { ...value, estimate: upgradedEstimate }
 }
 
+/**
+ * An identification recorded before the instrument search existed carries no instrument set. DoWhy's
+ * search is a graph result, so the record is completed with "not identified" rather than re-run: a
+ * back-door or ID-algorithm record stays exactly what it was, and the instrument route stays closed
+ * until the study is identified again.
+ */
+const upgradeIdentificationRecord = (value: Record<string, unknown>): Record<string, unknown> => {
+  const result = Reflect.get(value, 'result')
+  const evidence = Reflect.get(value, 'evidence')
+  const resultKind = typeof result === 'object' && result !== null ? Reflect.get(result, 'kind') : null
+  const needsResult = (resultKind === 'identified' || resultKind === 'graphically-identified')
+    && Reflect.get(result as object, 'instruments') === undefined
+  const needsEvidence = typeof evidence === 'object' && evidence !== null && Reflect.get(evidence, 'instruments') === undefined
+  if (!needsResult && !needsEvidence) return value
+  return {
+    ...value,
+    ...(needsResult ? { result: { ...(result as Record<string, unknown>), instruments: { kind: 'not-identified' } } } : {}),
+    ...(needsEvidence ? { evidence: { ...(evidence as Record<string, unknown>), instruments: { kind: 'notIdentified' } } } : {}),
+  }
+}
+
 export function parseSnapshotValue(value: unknown): Result<PersistedProject, SnapshotProblem> {
   const parsed = envelopeSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-snapshot', detail: z.prettifyError(parsed.error) })
@@ -314,6 +335,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
+  const identifications = parsed.data.identifications.map((identification) => upgradeIdentificationRecord(identification))
   const project: Project = {
     id: brand<string, 'ProjectId'>(parsed.data.project.id),
     name: brand<string, 'ProjectName'>(parsed.data.project.name),
@@ -329,6 +351,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     stationarity: stationarity.value as StationarityEvidenceArtifact | null,
     studyDraft,
     discoveryRuns: discoveryRuns as unknown as PersistedProject['discoveryRuns'],
+    identifications: identifications as unknown as PersistedProject['identifications'],
     estimationRuns: estimationRuns as unknown as PersistedProject['estimationRuns'],
   })
 }

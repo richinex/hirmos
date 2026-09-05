@@ -67,6 +67,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'counterfactual-identification-id-star',
     'backdoor-linear-regression',
     'frontdoor-two-stage',
+    'instrumental-variable',
     'poisson-glm',
     'negative-binomial-p',
     'negative-binomial-ingarch',

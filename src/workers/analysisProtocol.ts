@@ -60,17 +60,20 @@ import {
 import {
   backdoorLinearEvidenceSchema,
   frontdoorTwoStageEvidenceSchema,
+  instrumentalVariableEvidenceSchema,
   causalEffectsEvidenceSchema,
   causalImpactEvidenceSchema,
   countGlmEvidenceSchema,
   parseBackdoorLinearEvidence,
   parseFrontdoorTwoStageEvidence,
+  parseInstrumentalVariableEvidence,
   parseCausalEffectsEvidence,
   parseCausalImpactEvidence,
   parseCountGlmEvidence,
   parseNegativeBinomialIngarchEvidence,
   type BackdoorLinearEvidence,
   type FrontdoorTwoStageEvidence,
+  type InstrumentalVariableEvidence,
   type CausalEffectsEvidence,
   type CausalImpactEvidence,
   type CountGlmEvidence,
@@ -383,6 +386,23 @@ export type AnalysisWorkerCommand =
       readonly secondStageAdjustment: readonly number[]
       readonly controlValue: number
       readonly treatmentValue: number
+      readonly uncertainty: {
+        readonly kind: 'bootstrap'
+        readonly simulations: number
+        readonly sampleSizeFraction: number
+        readonly confidenceLevel: number
+        readonly seed: number
+      }
+    }
+  | {
+      readonly kind: 'instrumental-variable'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly instruments: readonly number[]
       readonly uncertainty: {
         readonly kind: 'bootstrap'
         readonly simulations: number
@@ -815,6 +835,7 @@ export type AnalysisWorkerEvent =
       readonly result: BackdoorLinearEvidence
     }
   | { readonly kind: 'frontdoor-two-stage-succeeded'; readonly request: WorkerRequestId; readonly result: FrontdoorTwoStageEvidence }
+  | { readonly kind: 'instrumental-variable-succeeded'; readonly request: WorkerRequestId; readonly result: InstrumentalVariableEvidence }
   | { readonly kind: 'count-glm-succeeded'; readonly request: WorkerRequestId; readonly result: CountGlmEvidence }
   | { readonly kind: 'negative-binomial-ingarch-succeeded'; readonly request: WorkerRequestId; readonly result: NegativeBinomialIngarchEvidence }
   | { readonly kind: 'count-series-intervention-scan-succeeded'; readonly request: WorkerRequestId; readonly result: CountSeriesInterventionScanEvidence }
@@ -1127,6 +1148,23 @@ const commandSchema = z.discriminatedUnion('kind', [
     secondStageAdjustment: z.array(z.number().int().nonnegative()),
     controlValue: z.number().finite(),
     treatmentValue: z.number().finite(),
+    uncertainty: z.object({
+      kind: z.literal('bootstrap'),
+      simulations: z.number().int().min(20).max(10_000),
+      sampleSizeFraction: z.number().gt(0).max(2),
+      confidenceLevel: z.number().gt(0.5).lt(1),
+      seed: z.number().int().nonnegative(),
+    }).strict(),
+  }).strict(),
+  z.object({
+    kind: z.literal('instrumental-variable'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(3).max(64),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    instruments: z.array(z.number().int().nonnegative()).min(1),
     uncertainty: z.object({
       kind: z.literal('bootstrap'),
       simulations: z.number().int().min(20).max(10_000),
@@ -1571,6 +1609,7 @@ const eventSchema = z.discriminatedUnion('kind', [
     result: backdoorLinearEvidenceSchema,
   }).strict(),
   z.object({ kind: z.literal('frontdoor-two-stage-succeeded'), request: requestSchema, result: frontdoorTwoStageEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('instrumental-variable-succeeded'), request: requestSchema, result: instrumentalVariableEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count-glm-succeeded'), request: requestSchema, result: countGlmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('negative-binomial-ingarch-succeeded'), request: requestSchema, result: negativeBinomialIngarchEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count-series-intervention-scan-succeeded'), request: requestSchema, result: countSeriesInterventionScanEvidenceSchema }).strict(),
@@ -1799,6 +1838,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseFrontdoorTwoStageEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'frontdoor-two-stage-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'instrumental-variable-succeeded') {
+    const result = parseInstrumentalVariableEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'instrumental-variable-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'count-glm-succeeded') {

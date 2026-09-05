@@ -425,7 +425,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onSelectEdge }: {
               const edge = document.current.graph.edges.find((candidate) => candidate.id === edgeId)
               return edge === undefined ? null : (
                 <li key={edgeId}>
-                  <button type="button" className={pill(false, 'normal-case tracking-normal text-warn')} onClick={() => onSelectEdge(edgeId)}>
+                  <button type="button" className={pill(false, 'text-warn')} onClick={() => onSelectEdge(edgeId)}>
                     {nameOfDagNode(document, edge.cause)} → {nameOfDagNode(document, edge.effect)}
                   </button>
                 </li>

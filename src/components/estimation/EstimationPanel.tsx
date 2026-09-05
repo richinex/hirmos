@@ -36,9 +36,11 @@ import {
   causalEstimateFrom,
   contemporaneousAdjustmentVariables,
   defaultConfiguration,
+  defaultEstimatorFor,
   describeCovariance,
   describeDiscreteStatePreparations,
   describeEstimator,
+  describeInstrumentalVariableRoute,
   ESTIMATOR_GROUPS,
   ESTIMATOR_IDS,
   evaluateEstimatorEligibility,
@@ -65,7 +67,7 @@ import {
   type PanelInterventionPreflight,
   type PanelLongMatrix,
 } from '@/domain/panel'
-import { estimandSentence, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
+import { describeIdentificationStrategy, estimableIdentification, estimandSentence, identifiedInstruments, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatEstimate, formatInterval, formatP, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
@@ -387,6 +389,15 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Mediator → outcome', value: formatStatistic('raw', evidence.secondStageEffect), context: `${formatCount(evidence.secondStageParams.length).text} second-stage parameters` },
         ]
       }
+      case 'instrumental-variable-run': {
+        const { evidence } = run
+        const instruments = evidence.instruments.map((index) => run.columns[index]?.name ?? String(index)).join(', ')
+        return [
+          { label: 'Estimator route', value: formatWords(describeInstrumentalVariableRoute(evidence.route)), context: `${formatCount(evidence.instruments.length, { noun: 'instrument' }).text} · ${formatCount(evidence.params.length, { noun: 'coefficient' }).text}` },
+          { label: 'Instruments', value: formatWords(instruments), context: `${formatCount(evidence.observations).text} rows` },
+          { label: 'Bootstrap SE', value: evidence.standardError === null ? formatWords('none') : formatStatistic('raw', evidence.standardError), context: evidence.uncertainty.kind === 'bootstrap' ? `${formatCount(evidence.uncertainty.simulations).text} resamples · seed ${evidence.uncertainty.seed}` : 'no bootstrap requested' },
+        ]
+      }
       case 'backdoor-linear-run': {
         const { evidence } = run
         return [
@@ -553,6 +564,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   })()
   const adjustmentValue = formatWords(run.kind === 'frontdoor-two-stage-run'
     ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
+    : run.kind === 'instrumental-variable-run'
+      ? 'None; the estimator uses no covariates'
     : run.estimate.adjustment.kind === 'structural-parent-model'
       ? `${run.estimate.adjustment.coefficients} parent coefficients · ${run.estimate.adjustment.paths} directed paths`
       : adjustmentLabels(run.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(run.estimate.adjustment).join(', '))
@@ -565,7 +578,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   return (
     <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
       <MetricTile
-        label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
+        label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.kind === 'instrumental-variable-run' ? 'Covariates' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
         size="compact"
         frame="cell"
         value={adjustmentValue}
@@ -708,19 +721,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   readonly onDeleteRun: (run: EstimationRunArtifact['id']) => void
   readonly onOpenStudy: () => void
 }) {
-  const identified = identifications.filter((identification) => identification.result.kind === 'identified'
-    || identification.result.kind === 'counterfactually-identified'
-    || (identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified'))
+  const identified = identifications.filter((identification) => estimableIdentification(identification.result))
   const chartTheme = useChartTheme()
   const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
   const [adjustmentDraft, setAdjustmentDraft] = useState<ExplicitAdjustmentMemberDraft>(CLOSED_ADJUSTMENT_DRAFT)
   const latestIdentification = identified.at(-1) ?? null
   const latestStudy = studies.find((candidate) => candidate.id === latestIdentification?.study) ?? null
-  const initialEstimator: EstimatorId = latestIdentification?.result.kind === 'graphically-identified'
-    ? 'frontdoor-two-stage'
-    : latestIdentification?.result.kind === 'counterfactually-identified'
-      ? 'binary-ett-idc-star'
-      : prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
+  const initialEstimator = defaultEstimatorFor(latestIdentification?.result ?? null, prepared)
   const [state, dispatch] = useReducer(step, null, (): State => ({
     identification: latestIdentification?.id ?? null,
     estimator: initialEstimator,
@@ -877,9 +884,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   useRunActivity(onActivity, state.job.kind === 'running' ? { label: describeEstimator(state.estimator), progress: state.job.progress === null ? null : state.job.progress.completed / Math.max(1, state.job.progress.total) } : null)
   const execute = async () => {
     if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running' || adjustmentDraftOpen || !method.ok) return
-    if (identification.result.kind !== 'identified'
-      && identification.result.kind !== 'counterfactually-identified'
-      && !(identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified')) return
+    if (!estimableIdentification(identification.result)) return
     dispatch({ type: 'run-started' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
@@ -923,6 +928,32 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         const run = { kind: 'frontdoor-two-stage-run', configuration, evidence: evidence.value } as const
         const estimate = causalEstimateFrom(study, identification, run)
         finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The front-door identification record is no longer available.')
+        return
+      }
+      if (configuration.kind === 'instrumental-variable') {
+        const instruments = identifiedInstruments(identification.result)
+        if (instruments === null) {
+          dispatch({ type: 'run-failed', detail: 'This identification record names no observed instrument.' })
+          return
+        }
+        const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...instruments]
+        const matrix = await materialise(columns)
+        const evidence = await analysis.runInstrumentalVariable(matrix.values, matrix.rowCount, columns.length, {
+          treatment: 0,
+          outcome: 1,
+          instruments: instruments.map((_, index) => 2 + index),
+          uncertainty: {
+            kind: 'bootstrap',
+            simulations: configuration.simulations,
+            sampleSizeFraction: configuration.sampleSizeFraction,
+            confidenceLevel: configuration.level,
+            seed: configuration.seed,
+          },
+        }, (progress) => dispatch({ type: 'run-progressed', progress }))
+        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+        const run = { kind: 'instrumental-variable-run', configuration, evidence: evidence.value } as const
+        const estimate = causalEstimateFrom(study, identification, run)
+        finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The instrument identification record is no longer available.')
         return
       }
       if (configuration.kind === 'binary-ett-idc-star') {
@@ -1216,6 +1247,14 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap resamples" help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapResamples} /><input type="number" min={20} max={5000} aria-label="Front-door bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapSeed} /><input type="number" min={0} aria-label="Front-door bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
             <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The first regression estimates treatment → mediator. The second estimates mediator → outcome while adjusting for treatment. Their product gives the linear front-door contrast; the interval uses a seeded row bootstrap.</p>
+          </div>
+        )
+      case 'instrumental-variable':
+        return (
+          <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap resamples" help={ESTIMATION_PARAMETER_HELP.instrumentalVariable.bootstrapResamples} /><input type="number" min={20} max={5000} aria-label="Instrumental-variable bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.instrumentalVariable.bootstrapSeed} /><input type="number" min={0} aria-label="Instrumental-variable bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The estimate is the ratio of the instrument’s effect on the outcome to its effect on the treatment: the Wald estimator for one binary instrument, a covariance ratio for one continuous instrument, and two-stage least squares otherwise. The effect is reported for the treatment set to 1 rather than 0; the interval uses a seeded row bootstrap.</p>
           </div>
         )
       case 'backdoor-linear-regression':
@@ -1530,7 +1569,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <div className="grid grid-cols-1 gap-4">
               <label className="block">
                 <span className={fieldLabel}>Identified study</span>
-                <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => { const chosen = event.target.value === '' ? null : (event.target.value as IdentificationId); const chosenIdentification = identifications.find((candidate) => candidate.id === chosen) ?? null; const chosenStudy = studies.find((candidate) => candidate.id === chosenIdentification?.study) ?? null; dispatch({ type: 'identification-chosen', identification: chosen, estimator: chosenIdentification?.result.kind === 'graphically-identified' ? 'frontdoor-two-stage' : chosenIdentification?.result.kind === 'counterfactually-identified' ? 'binary-ett-idc-star' : prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression', configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, chosenStudy)])) as Record<EstimatorId, EstimatorConfiguration> }) }}>
+                <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => { const chosen = event.target.value === '' ? null : (event.target.value as IdentificationId); const chosenIdentification = identifications.find((candidate) => candidate.id === chosen) ?? null; const chosenStudy = studies.find((candidate) => candidate.id === chosenIdentification?.study) ?? null; dispatch({ type: 'identification-chosen', identification: chosen, estimator: defaultEstimatorFor(chosenIdentification?.result ?? null, prepared), configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, chosenStudy)])) as Record<EstimatorId, EstimatorConfiguration> }) }}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
                   return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} · ${bound.dagName}`}</option>
@@ -1538,6 +1577,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </Select>
                 {identification !== null && identification.result.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
                 {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
+                {identification !== null && identifiedInstruments(identification.result) !== null && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Instruments: {(identifiedInstruments(identification.result) ?? []).map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
               </label>
               <div>
                 <SegmentedControl
@@ -1606,13 +1646,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     <div className="space-y-4">
       <section aria-labelledby="estimation-study-title">
         <h3 id="estimation-study-title" className="mb-2 mt-1 text-body font-medium text-ink">{study === null ? 'No study chosen' : estimandSentence(study)}</h3>
-        {study !== null && identification !== null && (identification.result.kind === 'identified' || identification.result.kind === 'counterfactually-identified' || (identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified')) && (
+        {study !== null && identification !== null && estimableIdentification(identification.result) && (
           <>
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Study binding">
               <dt className="text-faint">Treatment</dt><dd className="m-0 text-ink">{study.treatment.name}</dd>
               <dt className="text-faint">Outcome</dt><dd className="m-0 text-ink">{study.outcome.name}</dd>
               <dt className="text-faint">Graph</dt><dd className="m-0 text-ink">{study.dagName} · <span className={literal()}>{study.dagRevision.slice(0, 8)}</span></dd>
-              <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{identification.result.kind === 'identified' ? 'Back-door adjustment' : identification.result.kind === 'counterfactually-identified' ? 'IDC* counterfactual identification' : 'Front-door identification'}</dd>
+              <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{describeIdentificationStrategy(identification.result)}</dd>
               <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Independent'} · {formatCount(prepared.observations).text}</dd>
               {studyScale !== null && <><dt className="text-faint">Analysis scale</dt><dd className="m-0 text-ink">{studyScale}</dd></>}
             </dl>

@@ -1630,6 +1630,7 @@ mod tests {
             | AnalysisCommand::DagCheck { .. }
             | AnalysisCommand::BackdoorLinear { .. }
             | AnalysisCommand::FrontdoorTwoStage { .. }
+            | AnalysisCommand::InstrumentalVariable { .. }
             | AnalysisCommand::CountGlm { .. }
             | AnalysisCommand::NegativeBinomialIngarch { .. }
             | AnalysisCommand::CountSeriesInterventionScan { .. }

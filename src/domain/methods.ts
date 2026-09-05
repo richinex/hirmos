@@ -149,6 +149,7 @@ export const GRAPHICAL_IDENTIFICATION_METHOD_ID = methodId('graphical-identifica
 export const COUNTERFACTUAL_IDENTIFICATION_METHOD_ID = methodId('counterfactual-identification-id-star')
 export const BACKDOOR_LINEAR_REGRESSION_METHOD_ID = methodId('backdoor-linear-regression')
 export const FRONTDOOR_TWO_STAGE_METHOD_ID = methodId('frontdoor-two-stage')
+export const INSTRUMENTAL_VARIABLE_METHOD_ID = methodId('instrumental-variable')
 export const POISSON_GLM_METHOD_ID = methodId('poisson-glm')
 export const NEGATIVE_BINOMIAL_METHOD_ID = methodId('negative-binomial-p')
 export const NEGATIVE_BINOMIAL_INGARCH_METHOD_ID = methodId('negative-binomial-ingarch')
@@ -186,6 +187,8 @@ const NESS_CH4 = (locator: string): MethodSource => paper('Causal AI (Ness, Mann
 const NESS_CH11 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 11', locator)
 const NESS_CH10 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 10', locator)
 const NESS_CH13 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 13', locator)
+const MOLAK_CH6 = (locator: string): MethodSource => paper('Causal Inference and Discovery in Python (Molak, Packt), chapter 6', locator)
+const CIR_CH10 = (locator: string): MethodSource => paper('Causal Inference in R (Packt, 2024), chapter 10', locator)
 const SHPITSER_PEARL_ID = paper('Identification of joint interventional distributions in recursive semi-Markovian causal models (Shpitser and Pearl, 2006)', 'AAAI 2006, ID algorithm')
 const SHPITSER_PEARL_COUNTERFACTUAL = paper('Complete identification methods for the causal hierarchy (Shpitser and Pearl, 2008)', 'JMLR 9:1941–1979; ID* and IDC*')
 const CINELLI_FORNEY_PEARL = paper('A crash course in good and bad controls (Cinelli, Forney and Pearl, 2022)', 'good, neutral and bad controls')
@@ -1277,6 +1280,50 @@ const FRONTDOOR_TWO_STAGE: MethodDefinition = {
   ],
 }
 
+const INSTRUMENTAL_VARIABLE: MethodDefinition = {
+  id: INSTRUMENTAL_VARIABLE_METHOD_ID,
+  name: 'Instrumental variable',
+  family: 'estimation',
+  summary: 'Targets the instrumental variable estimand under a linearity assumption: the Wald estimator for one binary instrument, the covariance ratio for one continuous instrument, and two-stage least squares otherwise.',
+  caveats: [
+    {
+      id: caveatId('iv-identified-instrument'),
+      category: 'identification',
+      requirement: 'Each instrument meets the two level 2 definitional requirements for a valid instrument. As-if-random: any backdoor paths between the instrument and the outcome can be blocked. Exclusion: the instrument is a cause of the outcome only indirectly through the treatment.',
+      consequenceIfUnmet: 'DoWhy prohibits the existence of backdoor paths and non-treatment-mediated causal paths between the instrument and the outcome; with either present there is no instrumental variable estimand.',
+      sources: [NESS_CH11('§11.3.2 the instrumental variable estimand'), dowhy('dowhy/graph.py#get_instruments'), hirmos('crates/causal-core/src/iv.rs#identify_instrument_set')],
+    },
+    {
+      id: caveatId('iv-linearity'),
+      category: 'functional-form',
+      requirement: 'The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed. The estimator makes a linearity assumption and derives the ATE as a function of the coefficients of linear models of the outcome and the treatment given the instrument, without covariates.',
+      consequenceIfUnmet: 'The ratio of the two coefficients is the ATE only under that linear assumption.',
+      sources: [NESS_CH11('§11.3.2 parametric assumptions for instrumental variable estimation'), MOLAK_CH6('instrumental variables: fit Y ~ Z and X ~ Z and compute the ratio of their coefficients'), dowhy('dowhy/causal_estimators/instrumental_variable_estimator.py#estimate_effect')],
+    },
+    {
+      id: caveatId('iv-effect-homogeneity'),
+      category: 'functional-form',
+      requirement: 'Each unit’s treatment is affected in the same way by common causes of the treatment and outcome, and each unit’s outcome is affected in the same way by those common causes.',
+      consequenceIfUnmet: 'The Wald estimator reports one effect for every unit; variation of the effect across units is not represented.',
+      sources: [dowhy('dowhy/causal_estimators/instrumental_variable_estimator.py#construct_symbolic_estimator'), NESS_CH11('§11.3.2 the instrumental variable estimand')],
+    },
+    {
+      id: caveatId('iv-instrument-strength'),
+      category: 'noise-and-dependence',
+      requirement: 'The instrument is strong, meaning it has a strong causal effect on the treatment variable.',
+      consequenceIfUnmet: 'Weak instruments can lead to high variance estimates of the ATE.',
+      sources: [NESS_CH11('§11.4.5 good instrumental variables should be “strong”'), CIR_CH10('test for weak instruments: first-stage regression of the endogenous variable on the instruments, F statistic')],
+    },
+    {
+      id: caveatId('iv-bootstrap-rows'),
+      category: 'noise-and-dependence',
+      requirement: 'The row bootstrap is appropriate for the sampling design; dependent rows require a dependence-aware resampling scheme.',
+      consequenceIfUnmet: 'The confidence interval does not represent the estimator’s sampling variation.',
+      sources: [NESS_CH11('§11.4.5 instrumental variable methods'), dowhy('dowhy/causal_estimator.py#_estimate_confidence_intervals_with_bootstrap'), hirmos('crates/causal-core/src/dowhy_bootstrap.rs')],
+    },
+  ],
+}
+
 const countCaveats = (prefix: 'poisson' | 'negbin', model: string): NonEmptyArray<MethodCaveat> => [
   {
     id: caveatId(`${prefix}-identified-adjustment`),
@@ -2202,6 +2249,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   COUNTERFACTUAL_IDENTIFICATION,
   BACKDOOR_LINEAR_REGRESSION,
   FRONTDOOR_TWO_STAGE,
+  INSTRUMENTAL_VARIABLE,
   POISSON_GLM,
   NEGATIVE_BINOMIAL,
   NEGATIVE_BINOMIAL_INGARCH,
@@ -2239,7 +2287,7 @@ export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_S
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
 export const COUNT_SERIES_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [COUNT_SERIES_INTERVENTION_SCAN]

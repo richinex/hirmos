@@ -2,7 +2,10 @@
 
 use super::*;
 use hirmos_causal_core::frontdoor::{
-    frontdoor_two_stage_with_progress, FrontdoorBootstrap, FrontdoorInput, FrontdoorOptions,
+    frontdoor_two_stage_with_progress, FrontdoorInput, FrontdoorOptions,
+};
+use hirmos_causal_core::{
+    instrumental_variable_with_progress, DowhyBootstrap, IvEstimator, IvInput, IvOptions,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -117,7 +120,7 @@ pub(crate) fn frontdoor_two_stage_evidence<F>(
     second_stage_adjustment: &[usize],
     control_value: f64,
     treatment_value: f64,
-    uncertainty: FrontdoorUncertainty,
+    uncertainty: BootstrapUncertainty,
     mut progress: F,
 ) -> Result<AnalysisResult, String>
 where
@@ -181,20 +184,7 @@ where
     };
     let first_adjustment = adjustment_matrix(first_stage_adjustment);
     let second_adjustment = adjustment_matrix(second_stage_adjustment);
-    let bootstrap = match uncertainty {
-        FrontdoorUncertainty::None => None,
-        FrontdoorUncertainty::Bootstrap {
-            simulations,
-            sample_size_fraction,
-            confidence_level,
-            seed,
-        } => Some(FrontdoorBootstrap {
-            simulations,
-            sample_size_fraction,
-            confidence_level,
-            seed,
-        }),
-    };
+    let bootstrap = bootstrap_request(uncertainty);
     let result = frontdoor_two_stage_with_progress(
         FrontdoorInput {
             treatment: &treatment_values,
@@ -211,25 +201,7 @@ where
         |completed, total| progress("frontdoor-bootstrap", completed, total),
     )
     .map_err(|error| error.to_string())?;
-    let uncertainty = match (uncertainty, result.confidence_interval) {
-        (FrontdoorUncertainty::None, None) => FrontdoorUncertaintyEvidence::None,
-        (
-            FrontdoorUncertainty::Bootstrap {
-                simulations,
-                sample_size_fraction,
-                confidence_level,
-                seed,
-            },
-            Some(interval),
-        ) => FrontdoorUncertaintyEvidence::Bootstrap {
-            simulations,
-            sample_size_fraction,
-            confidence_level,
-            seed,
-            interval,
-        },
-        _ => return Err("front-door uncertainty result did not match its request".to_owned()),
-    };
+    let uncertainty = bootstrap_evidence(uncertainty, result.confidence_interval)?;
     Ok(AnalysisResult::FrontdoorTwoStage {
         observations: rows,
         treatment,
@@ -245,6 +217,116 @@ where
         second_stage_effect: result.second_stage_effect,
         estimate: result.ate,
         uncertainty,
+    })
+}
+
+fn bootstrap_request(uncertainty: BootstrapUncertainty) -> Option<DowhyBootstrap> {
+    match uncertainty {
+        BootstrapUncertainty::None => None,
+        BootstrapUncertainty::Bootstrap {
+            simulations,
+            sample_size_fraction,
+            confidence_level,
+            seed,
+        } => Some(DowhyBootstrap {
+            simulations,
+            sample_size_fraction,
+            confidence_level,
+            seed,
+        }),
+    }
+}
+
+fn bootstrap_evidence(
+    uncertainty: BootstrapUncertainty,
+    interval: Option<[f64; 2]>,
+) -> Result<BootstrapUncertaintyEvidence, String> {
+    match (uncertainty, interval) {
+        (BootstrapUncertainty::None, None) => Ok(BootstrapUncertaintyEvidence::None),
+        (
+            BootstrapUncertainty::Bootstrap {
+                simulations,
+                sample_size_fraction,
+                confidence_level,
+                seed,
+            },
+            Some(interval),
+        ) => Ok(BootstrapUncertaintyEvidence::Bootstrap {
+            simulations,
+            sample_size_fraction,
+            confidence_level,
+            seed,
+            interval,
+        }),
+        _ => Err("bootstrap uncertainty result did not match its request".to_owned()),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn instrumental_variable_evidence<F>(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    treatment: usize,
+    outcome: usize,
+    instruments: &[usize],
+    uncertainty: BootstrapUncertainty,
+    mut progress: F,
+) -> Result<AnalysisResult, String>
+where
+    F: FnMut(&'static str, usize, usize),
+{
+    validate_dense_matrix("instrumental-variable estimate", values, rows, columns)?;
+    let mut selected = vec![treatment, outcome];
+    selected.extend_from_slice(instruments);
+    if selected.iter().any(|&column| column >= columns) {
+        return Err("instrumental-variable columns must index the numeric matrix".to_owned());
+    }
+    if selected
+        .iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .len()
+        != selected.len()
+    {
+        return Err(
+            "instrumental-variable estimation needs distinct treatment, outcome, and instrument columns"
+                .to_owned(),
+        );
+    }
+    let data = DMatrix::from_column_slice(rows, columns, values);
+    let column_matrix = |selected: &[usize]| {
+        DMatrix::from_fn(rows, selected.len(), |row, column| data[(row, selected[column])])
+    };
+    let treatment_matrix = column_matrix(&[treatment]);
+    let instrument_matrix = column_matrix(instruments);
+    let outcome_values = (0..rows).map(|row| data[(row, outcome)]).collect::<Vec<_>>();
+    let result = instrumental_variable_with_progress(
+        IvInput {
+            treatments: &treatment_matrix,
+            instruments: &instrument_matrix,
+            outcome: &outcome_values,
+        },
+        IvOptions {
+            bootstrap: bootstrap_request(uncertainty),
+        },
+        |completed, total| progress("instrumental-variable-bootstrap", completed, total),
+    )
+    .map_err(|error| error.to_string())?;
+    let route = match result.estimator {
+        IvEstimator::WaldRatio => InstrumentalVariableRoute::WaldRatio,
+        IvEstimator::CovarianceRatio => InstrumentalVariableRoute::CovarianceRatio,
+        IvEstimator::TwoStageLeastSquares => InstrumentalVariableRoute::TwoStageLeastSquares,
+    };
+    Ok(AnalysisResult::InstrumentalVariable {
+        observations: rows,
+        treatment,
+        outcome,
+        instruments: instruments.to_vec(),
+        route,
+        estimate: result.estimate,
+        params: result.params,
+        standard_error: result.standard_error,
+        uncertainty: bootstrap_evidence(uncertainty, result.confidence_interval)?,
     })
 }
 
@@ -2709,7 +2791,7 @@ mod tests {
             &[0],
             0.0,
             1.0,
-            FrontdoorUncertainty::Bootstrap {
+            BootstrapUncertainty::Bootstrap {
                 simulations: 20,
                 sample_size_fraction: 1.0,
                 confidence_level: 0.95,
@@ -2745,7 +2827,7 @@ mod tests {
             &[0],
             0.0,
             1.0,
-            FrontdoorUncertainty::None,
+            BootstrapUncertainty::None,
             |_, _, _| {},
         )
         .is_err());

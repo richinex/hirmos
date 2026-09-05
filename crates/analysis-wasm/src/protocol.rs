@@ -159,6 +159,25 @@ pub(crate) enum FrontdoorSetEvidence {
     NotIdentified,
 }
 
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum InstrumentSetEvidence {
+    Identified { instruments: Vec<usize> },
+    NotIdentified,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum InstrumentalVariableRoute {
+    WaldRatio,
+    CovarianceRatio,
+    TwoStageLeastSquares,
+}
+
 #[derive(Clone, Copy, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum IdentificationEstimand {
@@ -473,7 +492,15 @@ pub(crate) enum AnalysisCommand {
         second_stage_adjustment: Vec<usize>,
         control_value: f64,
         treatment_value: f64,
-        uncertainty: FrontdoorUncertainty,
+        uncertainty: BootstrapUncertainty,
+    },
+    InstrumentalVariable {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        instruments: Vec<usize>,
+        uncertainty: BootstrapUncertainty,
     },
     CountGlm {
         rows: usize,
@@ -996,7 +1023,7 @@ pub(crate) enum DynamicCounterfactualUncertaintyEvidence {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
-pub(crate) enum FrontdoorUncertainty {
+pub(crate) enum BootstrapUncertainty {
     None,
     Bootstrap {
         simulations: usize,
@@ -1012,7 +1039,7 @@ pub(crate) enum FrontdoorUncertainty {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
-pub(crate) enum FrontdoorUncertaintyEvidence {
+pub(crate) enum BootstrapUncertaintyEvidence {
     None,
     Bootstrap {
         simulations: usize,
@@ -1563,6 +1590,7 @@ pub(crate) enum AnalysisResult {
         unobserved: Vec<usize>,
         result: BackdoorAdjustmentSetEvidence,
         frontdoor: FrontdoorSetEvidence,
+        instruments: InstrumentSetEvidence,
         graphical_identification: GraphicalIdentificationEvidence,
         counterfactual_identification: CounterfactualIdentificationEvidence,
     },
@@ -1607,7 +1635,18 @@ pub(crate) enum AnalysisResult {
         first_stage_effect: f64,
         second_stage_effect: f64,
         estimate: f64,
-        uncertainty: FrontdoorUncertaintyEvidence,
+        uncertainty: BootstrapUncertaintyEvidence,
+    },
+    InstrumentalVariable {
+        observations: usize,
+        treatment: usize,
+        outcome: usize,
+        instruments: Vec<usize>,
+        route: InstrumentalVariableRoute,
+        estimate: f64,
+        params: Vec<f64>,
+        standard_error: Option<f64>,
+        uncertainty: BootstrapUncertaintyEvidence,
     },
     CountGlm {
         observations: usize,

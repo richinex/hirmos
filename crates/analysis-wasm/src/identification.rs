@@ -72,6 +72,17 @@ pub(crate) fn backdoor_identification(
         .map_or(FrontdoorSetEvidence::NotIdentified, |mediators| {
             FrontdoorSetEvidence::Identified { mediators }
         });
+    // DoWhy's search returns every qualifying parent; only observed ones can be used.
+    let instruments = identify_instrument_set(&dag, &[treatment], &[outcome])
+        .map_err(|error| format!("instrument identification failed: {error}"))?
+        .into_iter()
+        .filter(|node| !unobserved.contains(node))
+        .collect::<Vec<_>>();
+    let instruments = if instruments.is_empty() {
+        InstrumentSetEvidence::NotIdentified
+    } else {
+        InstrumentSetEvidence::Identified { instruments }
+    };
     let named_edges = edges
         .iter()
         .map(|&(source, target)| (names[source].clone(), names[target].clone()))
@@ -162,6 +173,7 @@ pub(crate) fn backdoor_identification(
         unobserved: unobserved.to_vec(),
         result,
         frontdoor,
+        instruments,
         graphical_identification,
         counterfactual_identification,
     })

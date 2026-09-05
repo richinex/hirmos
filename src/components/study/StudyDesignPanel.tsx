@@ -29,6 +29,7 @@ import {
   describeIdentificationFailure,
   describeStudyDesignProblem,
   describeVariableRole,
+  estimableIdentification,
   estimandSentence,
   identifiedExpression,
   identifiedExpressionTex,
@@ -50,8 +51,10 @@ import {
   type AdjustmentSetChoice,
   type BackdoorIdentificationEvidence,
   type IdentificationArtifact,
+  type IdentificationFailure,
   type StudyDesignDraft,
   type StudySpecification,
+  type StudyVariable,
 } from '@/domain/study'
 
 type Job =
@@ -82,6 +85,7 @@ const ledgerLabel = (result: IdentificationArtifact['result']): string => {
     case 'identified': return 'back-door identified'
     case 'graphically-identified': return 'ID expression derived'
     case 'counterfactually-identified': return 'IDC* expressions derived'
+    case 'instrument-identified': return 'instruments identified'
     case 'backdoor-not-identified': return 'not identified'
     default: return assertNever(result)
   }
@@ -119,57 +123,56 @@ function StudyRecord({ study, identification }: { readonly study: StudySpecifica
   )
 }
 
-function IdentificationCard({ study, identification, current, onContinue, onOpenDag }: {
+const variableChips = (variables: readonly StudyVariable[]): React.ReactNode =>
+  variables.map((variable, index) => <span key={variable.node}>{index > 0 ? ', ' : ''}<span className={chip()}>{variable.name}</span></span>)
+
+const failureList = (reasons: readonly IdentificationFailure[]): React.ReactNode => (
+  <ul className="mb-0 mt-2 list-disc pl-4">{reasons.map((reason) => <li key={`${reason.kind}-${describeIdentificationFailure(reason)}`}>{describeIdentificationFailure(reason)}</li>)}</ul>
+)
+
+/** One block per identification outcome; the switch is exhaustive, so a new record kind cannot fall into another kind's copy. */
+function IdentificationOutcome({ study, identification, onOpenDag }: {
   readonly study: StudySpecification
   readonly identification: IdentificationArtifact
-  readonly current: boolean
-  readonly onContinue: () => void
   readonly onOpenDag: () => void
 }) {
   const result = identification.result
-  const title = estimandSentence(study)
-  const selectedLabel = result.kind === 'identified'
-    ? result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
-    : null
-  const body = (
-    <>
-      <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
-        <span className="text-ink">{describeAssignmentKind(study.assignment.kind)} treatment</span> · {study.assignment.description} {describeStudyDesignCategory(studyDesignCategory(study))}
-      </p>
-      {result.kind === 'identified' ? (
-        <>
-          <Alert tone="ok" live={false} className="mt-3">
-            <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by back-door adjustment</p>
-            <p className="mb-0 mt-1 text-muted">
-              {result.adjustment.variables.length === 0
-                ? 'No adjustment is needed: no back-door path is open.'
-                : <>{selectedLabel} {result.adjustment.variables.map((variable, index) => <span key={variable.node}>{index > 0 ? ', ' : ''}<span className={chip()}>{variable.name}</span></span>)}</>}
-            </p>
-            {result.adjustment.kind === 'minimal' && <p className="mb-0 mt-1 text-faint">Canonical set: {result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ') || 'none'}.</p>}
-            <details className="mt-2 text-muted">
-              <summary className="cursor-pointer text-body text-ink">Minimal valid sets · {result.minimalAdjustmentSets.sets.length}</summary>
-              <ol className="mb-0 mt-1 pl-5">
-                {result.minimalAdjustmentSets.sets.map((set, index) => (
-                  <li key={set.map((variable) => variable.node).join('|') || 'empty'}>
-                    {set.length === 0 ? 'No adjustment' : set.map((variable) => variable.name).join(', ')}
-                    <span className="text-faint"> · set {index + 1}</span>
-                  </li>
-                ))}
-              </ol>
-              {result.minimalAdjustmentSets.kind === 'truncated' && <p className="mb-0 mt-1 text-warn">The result limit was reached; additional minimal sets may exist.</p>}
-            </details>
-            <figure className="mb-0 mt-2">
-              <figcaption className={label('text-faint')}>Identified expression</figcaption>
-              <div className="mt-1">
-                <Formula tex={identifiedExpressionTex(study, result.adjustment.variables)} plain={identifiedExpression(study, result.adjustment.variables)} />
-              </div>
-            </figure>
-          </Alert>
-          {current && (
-            <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>
-          )}
-        </>
-      ) : result.kind === 'graphically-identified' ? (
+  switch (result.kind) {
+    case 'identified': {
+      const selectedLabel = result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
+      return (
+        <Alert tone="ok" live={false} className="mt-3">
+          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by back-door adjustment</p>
+          <p className="mb-0 mt-1 text-muted">
+            {result.adjustment.variables.length === 0
+              ? 'No adjustment is needed: no back-door path is open.'
+              : <>{selectedLabel} {variableChips(result.adjustment.variables)}</>}
+          </p>
+          {result.adjustment.kind === 'minimal' && <p className="mb-0 mt-1 text-faint">Canonical set: {result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ') || 'none'}.</p>}
+          <details className="mt-2 text-muted">
+            <summary className="cursor-pointer text-body text-ink">Minimal valid sets · {result.minimalAdjustmentSets.sets.length}</summary>
+            <ol className="mb-0 mt-1 pl-5">
+              {result.minimalAdjustmentSets.sets.map((set, index) => (
+                <li key={set.map((variable) => variable.node).join('|') || 'empty'}>
+                  {set.length === 0 ? 'No adjustment' : set.map((variable) => variable.name).join(', ')}
+                  <span className="text-faint"> · set {index + 1}</span>
+                </li>
+              ))}
+            </ol>
+            {result.minimalAdjustmentSets.kind === 'truncated' && <p className="mb-0 mt-1 text-warn">The result limit was reached; additional minimal sets may exist.</p>}
+          </details>
+          <figure className="mb-0 mt-2">
+            <figcaption className={label('text-faint')}>Identified expression</figcaption>
+            <div className="mt-1">
+              <Formula tex={identifiedExpressionTex(study, result.adjustment.variables)} plain={identifiedExpression(study, result.adjustment.variables)} />
+            </div>
+          </figure>
+          {result.instruments.kind === 'identified' && <p className="mb-0 mt-2 text-muted">{variableChips(result.instruments.instruments)} also {result.instruments.instruments.length === 1 ? 'meets' : 'meet'} the two definitional requirements for a valid instrument, so an instrumental variable estimand is available as well.</p>}
+        </Alert>
+      )
+    }
+    case 'graphically-identified':
+      return (
         <Alert tone="ok" live={false} className="mt-3">
           <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by the general ID algorithm</p>
           <p className="mb-0 mt-1 text-muted">The graph has no measured back-door adjustment set, but the interventional distribution can be written using observed probabilities.</p>
@@ -179,10 +182,13 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
           </figure>
           <p className="mb-0 mt-2 text-muted">{result.frontdoor.kind === 'identified' && result.frontdoor.mediators.length === 1
             ? 'The linear two-stage front-door estimator can evaluate this expression under its recorded stage-model assumptions.'
-            : 'No available estimator evaluates this expression. Back-door estimators target a different functional.'}</p>
-          {current && result.frontdoor.kind === 'identified' && result.frontdoor.mediators.length === 1 && <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>}
+            : result.instruments.kind === 'identified'
+              ? 'No available estimator evaluates this expression, but the graph names an instrument, so the instrumental variable estimand is available under its linearity assumption.'
+              : 'No available estimator evaluates this expression. Back-door estimators target a different functional.'}</p>
         </Alert>
-      ) : result.kind === 'counterfactually-identified' ? (
+      )
+    case 'counterfactually-identified':
+      return (
         <Alert tone="ok" live={false} className="mt-3">
           <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by IDC*</p>
           <p className="mb-0 mt-1 text-muted">The effect on the treated is identified through two conditional counterfactual distributions.</p>
@@ -197,18 +203,56 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
             </figure>
           </div>
           <p className="mb-0 mt-2 text-muted">The available evaluator requires all observed graph variables to be binary and reports a plug-in estimate without a sampling interval.</p>
-          {current && <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>}
         </Alert>
-      ) : (
+      )
+    case 'instrument-identified':
+      return (
+        <Alert tone="ok" live={false} className="mt-3">
+          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Instrumental variable estimand</p>
+          <p className="mb-0 mt-1 text-muted">
+            No measured back-door adjustment set and no observational expression were found, but the graph names {result.instruments.length === 1 ? 'an instrument' : 'instruments'}: {variableChips(result.instruments)}.
+          </p>
+          <p className="mb-0 mt-2 text-muted">The instrumental variable estimand does not rely on adjusting for all common causes. The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed, and the estimator makes a linearity assumption.</p>
+          <details className="mt-2 text-muted">
+            <summary className="cursor-pointer text-body text-ink">Why no observational expression · {result.reasons.length}</summary>
+            {failureList(result.reasons)}
+          </details>
+        </Alert>
+      )
+    case 'backdoor-not-identified':
+      return (
         <div className="mt-3">
           <RefusalTile
-            label={title}
+            label={estimandSentence(study)}
             headline="No identifying expression was found"
-            reason={<><p className="m-0">This record includes measured adjustment-set enumeration and the level-2 ID algorithm.</p><ul className="mb-0 mt-2 list-disc pl-4">{result.reasons.map((reason) => <li key={`${reason.kind}-${describeIdentificationFailure(reason)}`}>{describeIdentificationFailure(reason)}</li>)}</ul><p className="mb-0 mt-2">Revise the graph only when its causal assumptions are incorrect. Otherwise identification requires additional measurements, study-design information, experimental distributions, or stronger assumptions.</p></>}
+            reason={<><p className="m-0">This record includes measured adjustment-set enumeration, the level-2 ID algorithm, and the instrument search.</p>{failureList(result.reasons)}<p className="mb-0 mt-2">Revise the graph only when its causal assumptions are incorrect. Otherwise identification requires additional measurements, study-design information, experimental distributions, or stronger assumptions.</p></>}
             rule={`${identification.method} · ${study.dagName} r${study.dagRevision.slice(0, 8)}`}
             actions={<button type="button" className={button('outline')} onClick={onOpenDag}>Review the graph</button>}
           />
         </div>
+      )
+    default:
+      return assertNever(result)
+  }
+}
+
+function IdentificationCard({ study, identification, current, onContinue, onOpenDag }: {
+  readonly study: StudySpecification
+  readonly identification: IdentificationArtifact
+  readonly current: boolean
+  readonly onContinue: () => void
+  readonly onOpenDag: () => void
+}) {
+  const result = identification.result
+  const title = estimandSentence(study)
+  const body = (
+    <>
+      <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
+        <span className="text-ink">{describeAssignmentKind(study.assignment.kind)} treatment</span> · {study.assignment.description} {describeStudyDesignCategory(studyDesignCategory(study))}
+      </p>
+      <IdentificationOutcome study={study} identification={identification} onOpenDag={onOpenDag} />
+      {current && estimableIdentification(result) && (
+        <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>
       )}
       <StudyRecord study={study} identification={identification} />
     </>

@@ -208,8 +208,16 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
    the default, a utility overrides it. Nothing in the app was relying on the old behaviour; no anchor
    anywhere sets a text colour. */
 @layer base {
-  a { color: var(--color-signal); text-decoration: none; }
-  a:hover { color: color-mix(in oklab, var(--color-signal), white 18%); }
+  /* A link rests on an underline in the signal-line tone, so it is findable without colour (WCAG 1.4.1);
+     hover brings the underline up to the text colour instead of lightening the text. */
+  a {
+    color: var(--color-signal);
+    text-decoration: underline;
+    text-decoration-color: var(--color-signal-line);
+    text-underline-offset: 3px;
+    transition: text-decoration-color 150ms var(--default-transition-timing-function);
+  }
+  a:hover { text-decoration-color: currentColor; }
 }
 
 /* Tailwind v4's preflight sets buttons to cursor:default; restore the affordance for clickables. */
@@ -244,6 +252,8 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
    `num()`; JetBrains Mono's figures are already lining, so `lining-nums` only guards a fallback face. */
 @layer base {
   table, dl { font-variant-numeric: tabular-nums lining-nums; }
+  /* A heading balances its lines so one word is never left alone on the last line. */
+  h1, h2, h3 { text-wrap: balance; }
 }
 
 /* Material Symbols Sharp — squared terminals match the hairline chrome.
@@ -356,7 +366,13 @@ button[aria-busy="true"]::after {
 /* Elevation utilities. `.lift` is just the top-edge highlight for inline surfaces (cards, legend). `.float`
    adds a theme-aware drop shadow for surfaces that leave the plane (Rnd windows, modals), replacing the flat
    shadow-2xl so panels visibly lift off the stage. */
-.lift { box-shadow: inset 0 1px 0 var(--color-highlight); }
+.lift { box-shadow: var(--shadow-lift); }
+:root { --shadow-lift: inset 0 1px 0 var(--color-highlight); }
+/* On the two white themes the highlight is white on a white panel and paints nothing, so a lifted surface
+   sat flat on the stage. A hairline ring at five percent ink and a one-pixel shade give it an edge; it is
+   still not a drop shadow. */
+:root[data-theme="light"] { --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.06); }
+:root[data-theme="sketchbook-white"] { --shadow-lift: 0 0 0 1px rgb(43 36 26 / 0.05), 0 1px 2px -1px rgb(43 36 26 / 0.06); }
 /* Non-interactive texture: a faint 45° hatch says "not usable here" as a pattern, not a colour. */
 .hatch { background-image: repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-muted) 14%, transparent) 0 2px, transparent 2px 9px); }
 :root { --shadow-float: 0 24px 50px -12px rgba(0, 0, 0, 0.55); }

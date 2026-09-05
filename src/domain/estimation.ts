@@ -6,6 +6,7 @@ import type { CaveatEvaluation, MethodCaveat, MethodDefinition, MethodEligibilit
 import {
   BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
   FRONTDOOR_TWO_STAGE_METHOD_ID,
+  INSTRUMENTAL_VARIABLE_METHOD_ID,
   CAUSAL_EFFECTS_TOTAL_METHOD_ID,
   CAUSAL_IMPACT_METHOD_ID,
   ARDL_PSS_METHOD_ID,
@@ -25,7 +26,7 @@ import {
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type PreparedDatasetVersionId, type StationarityEvidenceArtifact } from './preprocessing'
 import { describePanelInterventionPreflight, type PanelInterventionPreflight } from './panel'
 import { describeStationarityConflict, levelModelVerdict, type LevelModelVerdict, type StationarityAssessment } from './stationarityAssessment'
-import { treatmentDescendants, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type StudyId, type StudySpecification, type StudyVariable } from './study'
+import { identifiedInstruments, treatmentDescendants, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type StudyId, type StudySpecification, type StudyVariable } from './study'
 
 /**
  * An estimate carries its meaning in the type: the estimand it answers, the scale, a named interval
@@ -48,6 +49,15 @@ export interface BackdoorLinearConfiguration {
 export interface FrontdoorTwoStageConfiguration {
   readonly kind: 'frontdoor-two-stage'
   readonly interventions: readonly [number, number]
+  readonly simulations: number
+  readonly sampleSizeFraction: number
+  readonly level: typeof CONFIDENCE_LEVEL
+  readonly seed: number
+}
+
+/** DoWhy's estimator ignores the requested intervention values and always reports the 0 → 1 contrast. */
+export interface InstrumentalVariableConfiguration {
+  readonly kind: 'instrumental-variable'
   readonly simulations: number
   readonly sampleSizeFraction: number
   readonly level: typeof CONFIDENCE_LEVEL
@@ -200,6 +210,7 @@ export interface BinaryEttConfiguration {
 export type EstimatorConfiguration =
   | BackdoorLinearConfiguration
   | FrontdoorTwoStageConfiguration
+  | InstrumentalVariableConfiguration
   | CountGlmConfiguration
   | NegativeBinomialIngarchConfiguration
   | DoubleMlConfiguration
@@ -235,8 +246,8 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
   {
     id: 'identified-functional',
     name: 'Identified-function estimators',
-    description: 'Methods tied to a front-door, interventional-distribution, or counterfactual identification result.',
-    estimators: ['frontdoor-two-stage', 'discrete-bn-query', 'binary-ett-idc-star'],
+    description: 'Methods tied to a front-door, instrument, interventional-distribution, or counterfactual identification result.',
+    estimators: ['frontdoor-two-stage', 'instrumental-variable', 'discrete-bn-query', 'binary-ett-idc-star'],
   },
   {
     id: 'graph-adjusted-temporal',
@@ -264,6 +275,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
   switch (estimator) {
     case 'backdoor-linear-regression': return BACKDOOR_LINEAR_REGRESSION_METHOD_ID
     case 'frontdoor-two-stage': return FRONTDOOR_TWO_STAGE_METHOD_ID
+    case 'instrumental-variable': return INSTRUMENTAL_VARIABLE_METHOD_ID
     case 'poisson-glm': return POISSON_GLM_METHOD_ID
     case 'negative-binomial-p': return NEGATIVE_BINOMIAL_METHOD_ID
     case 'negative-binomial-ingarch': return NEGATIVE_BINOMIAL_INGARCH_METHOD_ID
@@ -287,6 +299,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
   switch (estimator) {
     case 'backdoor-linear-regression': return { kind: estimator, covariance: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical', level: CONFIDENCE_LEVEL }
     case 'frontdoor-two-stage': return { kind: estimator, interventions: [0, 1], simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
+    case 'instrumental-variable': return { kind: estimator, simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
     case 'poisson-glm':
     case 'negative-binomial-p': return { kind: estimator }
     case 'negative-binomial-ingarch': return { kind: estimator, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], horizon: 12, controlValue: 0, treatmentValue: 1, schedule: { kind: 'persistent' } }
@@ -348,7 +361,8 @@ export const backdoorLinearEvidenceSchema = z.object({
 
 export type BackdoorLinearEvidence = z.infer<typeof backdoorLinearEvidenceSchema>
 
-const frontdoorUncertaintySchema = z.discriminatedUnion('kind', [
+/** DoWhy's generic bootstrap, shared by the front-door and instrumental-variable estimators. */
+const bootstrapUncertaintySchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('none') }).strict(),
   z.object({
     kind: z.literal('bootstrap'),
@@ -375,10 +389,37 @@ export const frontdoorTwoStageEvidenceSchema = z.object({
   firstStageEffect: z.number().finite(),
   secondStageEffect: z.number().finite(),
   estimate: z.number().finite(),
-  uncertainty: frontdoorUncertaintySchema,
+  uncertainty: bootstrapUncertaintySchema,
 }).strict()
 
 export type FrontdoorTwoStageEvidence = z.infer<typeof frontdoorTwoStageEvidenceSchema>
+
+export const INSTRUMENTAL_VARIABLE_ROUTES = ['waldRatio', 'covarianceRatio', 'twoStageLeastSquares'] as const
+export type InstrumentalVariableRoute = (typeof INSTRUMENTAL_VARIABLE_ROUTES)[number]
+
+export const instrumentalVariableEvidenceSchema = z.object({
+  kind: z.literal('instrumentalVariable'),
+  observations: z.number().int().positive(),
+  treatment: z.number().int().nonnegative(),
+  outcome: z.number().int().nonnegative(),
+  instruments: z.array(z.number().int().nonnegative()).min(1),
+  route: z.enum(INSTRUMENTAL_VARIABLE_ROUTES),
+  estimate: z.number().finite(),
+  params: z.array(z.number().finite()).min(1),
+  standardError: z.number().finite().nonnegative().nullable(),
+  uncertainty: bootstrapUncertaintySchema,
+}).strict()
+
+export type InstrumentalVariableEvidence = z.infer<typeof instrumentalVariableEvidenceSchema>
+
+export function describeInstrumentalVariableRoute(route: InstrumentalVariableRoute): string {
+  switch (route) {
+    case 'waldRatio': return 'Wald ratio'
+    case 'covarianceRatio': return 'Covariance ratio'
+    case 'twoStageLeastSquares': return 'Two-stage least squares'
+    default: return assertNever(route)
+  }
+}
 
 /** Rust serialises NaN as null; the count families leave each other's statistics null. */
 const nullableNumber = z.number().finite().nullable()
@@ -922,6 +963,18 @@ export function parseFrontdoorTwoStageEvidence(value: unknown): Result<Frontdoor
   return parsed
 }
 
+export function parseInstrumentalVariableEvidence(value: unknown): Result<InstrumentalVariableEvidence, EstimationEvidenceProblem> {
+  const parsed = parseWith(instrumentalVariableEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (parsed.value.uncertainty.kind === 'bootstrap' && parsed.value.uncertainty.interval[0] > parsed.value.uncertainty.interval[1]) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The instrumental-variable confidence interval has its bounds reversed.' })
+  }
+  if (new Set([parsed.value.treatment, parsed.value.outcome, ...parsed.value.instruments]).size !== 2 + parsed.value.instruments.length) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The instrumental-variable columns are not distinct.' })
+  }
+  return parsed
+}
+
 export const parseCountGlmEvidence = (value: unknown): Result<CountGlmEvidence, EstimationEvidenceProblem> => parseWith(countGlmEvidenceSchema, value)
 export const parseNegativeBinomialIngarchEvidence = (value: unknown): Result<NegativeBinomialIngarchEvidence, EstimationEvidenceProblem> => parseWith(negativeBinomialIngarchEvidenceSchema, value)
 
@@ -1073,6 +1126,7 @@ interface RunIdentity {
 export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
   | RunIdentity & { readonly kind: 'frontdoor-two-stage-run'; readonly method: typeof FRONTDOOR_TWO_STAGE_METHOD_ID; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
+  | RunIdentity & { readonly kind: 'instrumental-variable-run'; readonly method: typeof INSTRUMENTAL_VARIABLE_METHOD_ID; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
   | RunIdentity & { readonly kind: 'count-glm-run'; readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
   | RunIdentity & { readonly kind: 'negative-binomial-ingarch-run'; readonly method: typeof NEGATIVE_BINOMIAL_INGARCH_METHOD_ID; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
   | RunIdentity & { readonly kind: 'double-ml-run'; readonly method: typeof DML_PLR_METHOD_ID | typeof DML_IRM_METHOD_ID; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
@@ -1281,6 +1335,24 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (timeSeries) violate('frontdoor-bootstrap-rows', 'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.')
       else if (panel) violate('frontdoor-bootstrap-rows', 'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.')
       else leave('frontdoor-bootstrap-rows', `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`)
+      break
+    }
+    case 'instrumental-variable': {
+      const instruments = identifiedInstruments(identification)
+      const treatmentName = context.study?.treatment.name ?? 'the treatment'
+      const outcomeName = context.study?.outcome.name ?? 'the outcome'
+      if (instruments === null) {
+        violate('iv-identified-instrument', `The identification record names no observed instrument for ${treatmentName} and ${outcomeName}. If the instrumental variables are latent, an instrumental variable estimand cannot be targeted.`)
+      } else {
+        const names = instruments.map((variable) => variable.name).join(', ')
+        satisfy('iv-identified-instrument', `${names} ${instruments.length === 1 ? 'meets' : 'meet'} as-if-random (any backdoor paths between the instrument and ${outcomeName} can be blocked) and exclusion (the instrument is a cause of ${outcomeName} only indirectly through ${treatmentName}) in the recorded graph.`)
+      }
+      leave('iv-linearity', `Assess whether ${outcomeName} and ${treatmentName} are linear in the instrument: the estimate is the ratio of the coefficients of the linear models ${outcomeName} ~ instrument and ${treatmentName} ~ instrument, fitted without covariates.`)
+      leave('iv-effect-homogeneity', `Assess whether each unit’s ${treatmentName} is affected in the same way by the common causes of ${treatmentName} and ${outcomeName}, and each unit’s ${outcomeName} likewise; the estimator reports one effect for every unit.`)
+      leave('iv-instrument-strength', `Check that the instrument is strong, meaning it has a strong causal effect on ${treatmentName}; weak instruments can lead to high variance estimates of the ATE. The run reports no first-stage F statistic.`)
+      if (timeSeries) violate('iv-bootstrap-rows', 'The prepared rows are a time series, but this estimator uses an ordinary row bootstrap and does not preserve temporal dependence.')
+      else if (panel) violate('iv-bootstrap-rows', 'The prepared rows repeat units, but this estimator uses an ordinary row bootstrap and does not preserve within-unit dependence.')
+      else leave('iv-bootstrap-rows', `The run uses ${configuration.simulations} seeded row resamples; confirm that observations are independently sampled.`)
       break
     }
     case 'panel-intervention': {
@@ -1554,6 +1626,7 @@ export function causalEstimateFrom(
   run:
     | { readonly kind: 'backdoor-linear-run'; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
     | { readonly kind: 'frontdoor-two-stage-run'; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
+    | { readonly kind: 'instrumental-variable-run'; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
     | { readonly kind: 'count-glm-run'; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
     | { readonly kind: 'negative-binomial-ingarch-run'; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
     | { readonly kind: 'double-ml-run'; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
@@ -1583,6 +1656,26 @@ export function causalEstimateFrom(
       sample: {
         observations: run.evidence.observations,
         parameters: Math.max(run.evidence.firstStageParams.length, run.evidence.secondStageParams.length),
+        degreesOfFreedom: null,
+      },
+    }
+  }
+  if (run.kind === 'instrumental-variable-run') {
+    const instruments = identifiedInstruments(identification.result)
+    if (instruments === null || instruments.length !== run.evidence.instruments.length) return null
+    const interval = run.evidence.uncertainty
+    return {
+      kind: 'causal-estimate',
+      estimand: study.estimand,
+      effect: { kind: 'additive', value: run.evidence.estimate, unit: '' },
+      interval: interval.kind === 'bootstrap'
+        ? { kind: 'confidence', level: interval.confidenceLevel, lower: interval.interval[0], upper: interval.interval[1] }
+        : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
+      standardError: run.evidence.standardError,
+      adjustment: { kind: 'none' },
+      sample: {
+        observations: run.evidence.observations,
+        parameters: run.evidence.params.length,
         degreesOfFreedom: null,
       },
     }
@@ -1834,10 +1927,26 @@ export function describeCovariance(choice: CovarianceChoice): string {
   }
 }
 
+/** The estimator the chapter opens with for a record: the one its strategy calls for, else the plain adjustment route for the row structure. */
+export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact): EstimatorId {
+  const fallback: EstimatorId = prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
+  if (identification === null) return fallback
+  switch (identification.kind) {
+    case 'instrument-identified': return 'instrumental-variable'
+    case 'graphically-identified': return identification.frontdoor.kind === 'identified' ? 'frontdoor-two-stage' : 'instrumental-variable'
+    case 'counterfactually-identified': return 'binary-ett-idc-star'
+    case 'identified':
+    case 'backdoor-not-identified':
+      return fallback
+    default: return assertNever(identification)
+  }
+}
+
 export function describeEstimator(estimator: EstimatorId): string {
   switch (estimator) {
     case 'backdoor-linear-regression': return 'Adjusted linear regression'
     case 'frontdoor-two-stage': return 'Linear front-door regression'
+    case 'instrumental-variable': return 'Instrumental variable'
     case 'poisson-glm': return 'Poisson GLM'
     case 'negative-binomial-p': return 'Negative binomial'
     case 'negative-binomial-ingarch': return 'Negative-binomial INGARCH'

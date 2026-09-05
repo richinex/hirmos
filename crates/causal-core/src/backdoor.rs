@@ -150,25 +150,9 @@ impl Dag {
     }
 
     fn instruments(&self, treatment: usize, outcome: usize) -> BTreeSet<usize> {
-        let parents_t: BTreeSet<usize> = self.parents[treatment].iter().copied().collect();
-        // Graph with incoming edges of treatment removed.
-        let mut edges = Vec::new();
-        for (a, chs) in self.children.iter().enumerate() {
-            for &b in chs {
-                if b != treatment {
-                    edges.push((a, b));
-                }
-            }
-        }
-        let g = Dag::new(self.n, &edges);
-        let mut anc_y = g.ancestors_of(&[outcome]);
-        anc_y.remove(&outcome);
-        let candidates: BTreeSet<usize> = parents_t.difference(&anc_y).copied().collect();
-        let mut children_causes: BTreeSet<usize> = BTreeSet::new();
-        for &v in &anc_y {
-            children_causes.extend(g.descendants(v));
-        }
-        candidates.difference(&children_causes).copied().collect()
+        crate::iv::identify_instrument_set(self, &[treatment], &[outcome])
+            .map(|instruments| instruments.into_iter().collect())
+            .unwrap_or_default()
     }
 }
 

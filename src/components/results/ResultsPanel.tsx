@@ -42,6 +42,7 @@ const identificationMethod = (identification: IdentificationArtifact): string =>
     case 'identified': return 'back-door adjustment'
     case 'graphically-identified': return 'general ID expression'
     case 'counterfactually-identified': return 'IDC* counterfactual expressions'
+    case 'instrument-identified': return 'instrumental variables'
     case 'backdoor-not-identified': return 'not identified from the observational distribution'
     default: return assertNever(identification.result)
   }

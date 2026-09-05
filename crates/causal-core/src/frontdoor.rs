@@ -12,6 +12,7 @@
 //! criterion; it does not perform identification itself.
 
 use crate::backdoor::{combinations, Dag};
+use crate::dowhy_bootstrap::{basic_interval, resample_rows, BootstrapError, DowhyBootstrap};
 use crate::nprandom::Mt19937;
 use nalgebra::{DMatrix, DVector};
 use std::collections::BTreeSet;
@@ -32,26 +33,7 @@ pub struct FrontdoorInput<'a> {
     pub second_stage_adjustment: Option<&'a DMatrix<f64>>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct FrontdoorBootstrap {
-    pub simulations: usize,
-    pub sample_size_fraction: f64,
-    pub confidence_level: f64,
-    /// DoWhy v0.11 consumes NumPy's global RNG. An explicit seed makes that otherwise hidden
-    /// state reproducible at the Rust boundary.
-    pub seed: u32,
-}
-
-impl Default for FrontdoorBootstrap {
-    fn default() -> Self {
-        Self {
-            simulations: 399,
-            sample_size_fraction: 1.0,
-            confidence_level: 0.95,
-            seed: 0,
-        }
-    }
-}
+pub type FrontdoorBootstrap = DowhyBootstrap;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrontdoorOptions {
@@ -303,19 +285,12 @@ fn validate(input: FrontdoorInput<'_>, options: FrontdoorOptions) -> Result<(), 
         return Err(FrontdoorError::InvalidIntervention);
     }
     if let Some(bootstrap) = options.bootstrap {
-        if bootstrap.simulations == 0 {
-            return Err(FrontdoorError::InvalidBootstrapSimulations);
-        }
-        if !bootstrap.sample_size_fraction.is_finite() || bootstrap.sample_size_fraction <= 0.0 {
-            return Err(FrontdoorError::InvalidBootstrapSampleFraction);
-        }
-        if !bootstrap.confidence_level.is_finite()
-            || bootstrap.confidence_level <= 0.0
-            || bootstrap.confidence_level >= 1.0
-        {
-            return Err(FrontdoorError::InvalidConfidenceLevel);
-        }
-        let sample_size = (bootstrap.sample_size_fraction * n as f64) as usize;
+        bootstrap.validate().map_err(|error| match error {
+            BootstrapError::InvalidSimulations => FrontdoorError::InvalidBootstrapSimulations,
+            BootstrapError::InvalidSampleFraction => FrontdoorError::InvalidBootstrapSampleFraction,
+            BootstrapError::InvalidConfidenceLevel => FrontdoorError::InvalidConfidenceLevel,
+        })?;
+        let sample_size = bootstrap.sample_size(n);
         let first_parameters = 2 + input.first_stage_adjustment.map_or(0, DMatrix::ncols);
         let second_parameters = 2 + input.second_stage_adjustment.map_or(0, DMatrix::ncols);
         let parameters = first_parameters.max(second_parameters);
@@ -414,25 +389,16 @@ where
     };
 
     let n = input.treatment.len();
-    let sample_size = (bootstrap.sample_size_fraction * n as f64) as usize;
+    let sample_size = bootstrap.sample_size(n);
     let mut rng = Mt19937::seeded(bootstrap.seed);
     let mut estimates = Vec::with_capacity(bootstrap.simulations);
     progress(0, bootstrap.simulations);
     for completed in 0..bootstrap.simulations {
-        let rows: Vec<usize> = (0..sample_size)
-            .map(|_| rng.randint(n as u64) as usize)
-            .collect();
+        let rows = resample_rows(&mut rng, n, sample_size);
         estimates.push(fit_once(input, Some(&rows), difference)?.4);
         progress(completed + 1, bootstrap.simulations);
     }
-
-    // DoWhy v0.11 uses a basic bootstrap interval. It sorts bootstrap deviations from the
-    // original estimate, then reverses the selected tails around that original estimate.
-    let mut variations: Vec<f64> = estimates.iter().map(|estimate| estimate - ate).collect();
-    variations.sort_by(f64::total_cmp);
-    let upper_index = ((1.0 - bootstrap.confidence_level) * variations.len() as f64) as usize;
-    let lower_index = (bootstrap.confidence_level * variations.len() as f64) as usize;
-    let confidence_interval = [ate - variations[lower_index], ate - variations[upper_index]];
+    let confidence_interval = basic_interval(ate, &estimates, bootstrap.confidence_level);
 
     Ok(FrontdoorResult {
         first_stage_params: first_params,

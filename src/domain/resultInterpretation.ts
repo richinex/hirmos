@@ -107,6 +107,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'backdoor-linear-run':
     case 'double-ml-run': return `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
     case 'frontdoor-two-stage-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
+    case 'instrumental-variable-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0`
     case 'count-glm-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1-unit increase in ${study.treatment.name}`
     case 'negative-binomial-ingarch-run': return `additive forecast-path difference · expected ${study.outcome.name} count under ${study.treatment.name} = ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue} per ${stepLabel}`
     case 'negbin-nuts-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1 standard deviation increase in ${study.treatment.name}`
@@ -138,6 +139,20 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'magnitude', text: `Under the fitted two-stage model, setting ${study.treatment.name} from ${number(run.evidence.controlValue)} to ${number(run.evidence.treatmentValue)} changes expected ${study.outcome.name} by ${number(effect)} through ${mediator}.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
         { kind: 'qualification', text: `The estimate is the product of the fitted ${study.treatment.name} → ${mediator} and ${mediator} → ${study.outcome.name} coefficients. Its causal interpretation requires the recorded front-door conditions and adequate additive linear models for both stages.` },
+      ] }
+    }
+    case 'instrumental-variable-run': {
+      const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
+      const instruments = run.evidence.instruments.map((index) => run.columns[index]?.name ?? 'the instrument').join(', ')
+      const route = run.evidence.route === 'waldRatio'
+        ? `the ratio of the ${study.outcome.name} difference to the ${study.treatment.name} difference between the two ${instruments} groups`
+        : run.evidence.route === 'covarianceRatio'
+          ? `the ratio of the covariance of ${study.outcome.name} with ${instruments} to the covariance of ${study.treatment.name} with ${instruments}`
+          : `two-stage least squares of ${study.outcome.name} on ${study.treatment.name} with ${instruments} as instruments`
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `Under the linear instrumental-variable model, setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(effect)}.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
+        { kind: 'qualification', text: `The estimate is ${route}. Its causal interpretation requires the recorded as-if-random and exclusion conditions for ${instruments}, and the linearity assumption under which the ATE is a function of the coefficients of linear models of ${study.outcome.name} and ${study.treatment.name} given the instrument. The estimator uses no covariates.` },
       ] }
     }
     case 'backdoor-linear-run': {

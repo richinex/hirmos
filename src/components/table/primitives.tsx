@@ -307,7 +307,7 @@ export function HeaderMenu({ label: menuLabel, items, className }: { readonly la
                 role="menuitem"
                 disabled={item.disabled}
                 onClick={() => { setOpen(false); item.onSelect() }}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body normal-case tracking-normal text-ink hover:bg-well disabled:cursor-not-allowed disabled:text-dim"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-body text-ink hover:bg-well disabled:cursor-not-allowed disabled:text-dim"
               >
                 {item.icon && <Icon name={item.icon} size={14} className="text-muted" />}
                 {item.text}

@@ -20,7 +20,7 @@ import type {
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
-import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
+import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, InstrumentalVariableEvidence, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
@@ -65,6 +65,7 @@ type BackdoorIdentificationOutcome = Result<BackdoorIdentificationEvidence, Anal
 type DagCheckOutcome = Result<DagCheckEvidence, AnalysisWorkerProblem>
 type BackdoorLinearOutcome = Result<BackdoorLinearEvidence, AnalysisWorkerProblem>
 type FrontdoorTwoStageOutcome = Result<FrontdoorTwoStageEvidence, AnalysisWorkerProblem>
+type InstrumentalVariableOutcome = Result<InstrumentalVariableEvidence, AnalysisWorkerProblem>
 type CountGlmOutcome = Result<CountGlmEvidence, AnalysisWorkerProblem>
 type NegativeBinomialIngarchOutcome = Result<NegativeBinomialIngarchEvidence, AnalysisWorkerProblem>
 type CountSeriesInterventionScanOutcome = Result<CountSeriesInterventionScanEvidence, AnalysisWorkerProblem>
@@ -690,6 +691,33 @@ export function runFrontdoorTwoStage(
   return post(
     'frontdoor-two-stage-succeeded',
     { kind: 'frontdoor-two-stage', request, values, rows, columns, ...design },
+    values,
+    onProgress,
+  )
+}
+
+export function runInstrumentalVariable(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly treatment: number
+    readonly outcome: number
+    readonly instruments: readonly number[]
+    readonly uncertainty: {
+      readonly kind: 'bootstrap'
+      readonly simulations: number
+      readonly sampleSizeFraction: number
+      readonly confidenceLevel: number
+      readonly seed: number
+    }
+  },
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<InstrumentalVariableOutcome> {
+  const request = newWorkerRequestId()
+  return post(
+    'instrumental-variable-succeeded',
+    { kind: 'instrumental-variable', request, values, rows, columns, ...design },
     values,
     onProgress,
   )

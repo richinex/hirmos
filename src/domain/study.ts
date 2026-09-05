@@ -340,6 +340,11 @@ const frontdoorSetEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('notIdentified') }).strict(),
 ])
 
+const instrumentSetEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('identified'), instruments: z.array(z.number().int().nonnegative()).min(1) }).strict(),
+  z.object({ kind: z.literal('notIdentified') }).strict(),
+])
+
 const counterfactualIdentificationEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('notApplicable') }).strict(),
   z.object({
@@ -366,6 +371,7 @@ export const backdoorIdentificationEvidenceSchema = z.object({
     z.object({ kind: z.literal('notIdentified') }).strict(),
   ]),
   frontdoor: frontdoorSetEvidenceSchema,
+  instruments: instrumentSetEvidenceSchema,
   graphicalIdentification: graphicalIdentificationEvidenceSchema,
   counterfactualIdentification: counterfactualIdentificationEvidenceSchema,
 }).strict()
@@ -384,11 +390,12 @@ export function parseBackdoorIdentificationEvidence(value: unknown): Result<Back
     ? [...parsed.data.graphicalIdentification.hedgeGraph, ...parsed.data.graphicalIdentification.hedgeSubgraph]
     : []
   const frontdoorNodes = parsed.data.frontdoor.kind === 'identified' ? parsed.data.frontdoor.mediators : []
+  const instrumentNodes = parsed.data.instruments.kind === 'identified' ? parsed.data.instruments.instruments : []
   const projectedNodes = [
     ...parsed.data.graphicalIdentification.projection.directedEdges.flat(),
     ...parsed.data.graphicalIdentification.projection.bidirectedEdges.flat(),
   ]
-  const inRange = [parsed.data.treatment, parsed.data.outcome, ...parsed.data.unobserved, ...adjustmentNodes, ...graphicalNodes, ...frontdoorNodes, ...projectedNodes]
+  const inRange = [parsed.data.treatment, parsed.data.outcome, ...parsed.data.unobserved, ...adjustmentNodes, ...graphicalNodes, ...frontdoorNodes, ...instrumentNodes, ...projectedNodes]
     .every((index) => index < parsed.data.nodes)
   if (!inRange) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'An index exceeds the node count.' })
   if (parsed.data.frontdoor.kind === 'identified') {
@@ -397,6 +404,13 @@ export function parseBackdoorIdentificationEvidence(value: unknown): Result<Back
     if (mediators.size !== parsed.data.frontdoor.mediators.length) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'The front-door mediator set contains a duplicate node.' })
     if (mediators.has(parsed.data.treatment) || mediators.has(parsed.data.outcome)) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'A front-door mediator must differ from the treatment and outcome.' })
     if (parsed.data.frontdoor.mediators.some((index) => unobserved.has(index))) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'A front-door mediator must be observed.' })
+  }
+  if (parsed.data.instruments.kind === 'identified') {
+    const instruments = new Set(parsed.data.instruments.instruments)
+    const unobserved = new Set(parsed.data.unobserved)
+    if (instruments.size !== parsed.data.instruments.instruments.length) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'The instrument set contains a duplicate node.' })
+    if (instruments.has(parsed.data.treatment) || instruments.has(parsed.data.outcome)) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'An instrument must differ from the treatment and outcome.' })
+    if (parsed.data.instruments.instruments.some((index) => unobserved.has(index))) return err({ kind: 'invalid-backdoor-identification-evidence', detail: 'An instrument must be observed.' })
   }
   return ok(parsed.data)
 }
@@ -429,6 +443,11 @@ export type MinimalAdjustmentSetEnumeration =
   | { readonly kind: 'complete'; readonly sets: NonEmptyArray<readonly StudyVariable[]> }
   | { readonly kind: 'truncated'; readonly sets: NonEmptyArray<readonly StudyVariable[]> }
 
+/** The observed instruments DoWhy's search accepts for the treatment and outcome, when there are any. */
+export type InstrumentSet =
+  | { readonly kind: 'identified'; readonly instruments: NonEmptyArray<StudyVariable> }
+  | { readonly kind: 'not-identified' }
+
 export type Identification =
   | {
       readonly kind: 'identified'
@@ -437,6 +456,7 @@ export type Identification =
       readonly canonicalAdjustmentSet: readonly StudyVariable[]
       readonly minimalAdjustmentSets: MinimalAdjustmentSetEnumeration
       readonly mediators: readonly StudyGraphNode[]
+      readonly instruments: InstrumentSet
       readonly basis: NonEmptyArray<IdentificationBasisEntry>
     }
   | {
@@ -448,6 +468,15 @@ export type Identification =
       readonly frontdoor:
         | { readonly kind: 'identified'; readonly mediators: NonEmptyArray<StudyVariable> }
         | { readonly kind: 'not-identified' }
+      readonly instruments: InstrumentSet
+      readonly basis: NonEmptyArray<IdentificationBasisEntry>
+    }
+  /** No observational expression exists, but the graph names instruments; the effect is identified only under the instrumental-variable estimator's assumptions. */
+  | {
+      readonly kind: 'instrument-identified'
+      readonly strategy: 'instrumental-variable'
+      readonly instruments: NonEmptyArray<StudyVariable>
+      readonly reasons: NonEmptyArray<IdentificationFailure>
       readonly basis: NonEmptyArray<IdentificationBasisEntry>
     }
   | {
@@ -460,11 +489,40 @@ export type Identification =
     }
   | { readonly kind: 'backdoor-not-identified'; readonly reasons: NonEmptyArray<IdentificationFailure> }
 
+/** The strategy an identification record settled on, named once for every view that shows it. */
+export function describeIdentificationStrategy(identification: Identification): string {
+  switch (identification.kind) {
+    case 'identified': return 'Back-door adjustment'
+    case 'graphically-identified': return identification.frontdoor.kind === 'identified' ? 'Front-door identification' : 'General ID expression'
+    case 'counterfactually-identified': return 'IDC* counterfactual identification'
+    case 'instrument-identified': return 'Instrumental variable'
+    case 'backdoor-not-identified': return 'Not identified'
+    default: return assertNever(identification)
+  }
+}
+
+/** Whether some estimator in the catalogue can take this record: an ID expression alone has no evaluator yet. */
+export function estimableIdentification(identification: Identification): boolean {
+  switch (identification.kind) {
+    case 'identified':
+    case 'counterfactually-identified':
+    case 'instrument-identified':
+      return true
+    case 'graphically-identified':
+      return identification.frontdoor.kind === 'identified' || identification.instruments.kind === 'identified'
+    case 'backdoor-not-identified':
+      return false
+    default:
+      return assertNever(identification)
+  }
+}
+
 export function identificationAllowsEstimation(kind: Identification['kind']): boolean {
   switch (kind) {
     case 'identified':
     case 'graphically-identified':
     case 'counterfactually-identified':
+    case 'instrument-identified':
       return true
     case 'backdoor-not-identified':
       return false
@@ -531,6 +589,10 @@ export function identificationFrom(
     const node = study.graph.nodes[index]
     return node === undefined || node.column === null ? [] : [{ node: node.node, column: node.column, name: node.name }]
   })
+  const instrumentVariables = evidence.instruments.kind === 'identified' ? variablesFrom(evidence.instruments.instruments) : []
+  const instruments: InstrumentSet = isNonEmpty(instrumentVariables)
+    ? { kind: 'identified', instruments: instrumentVariables }
+    : { kind: 'not-identified' }
   if (evidence.result.kind === 'notIdentified') {
     const flow = studyFlow(study)
     const name = (node: DagNodeId): string => study.graph.nodes.find((candidate) => candidate.node === node)?.name ?? String(node)
@@ -600,6 +662,7 @@ export function identificationFrom(
         latex: evidence.graphicalIdentification.latex,
         projection: evidence.graphicalIdentification.projection,
         frontdoor,
+        instruments,
         basis,
       })
     }
@@ -613,6 +676,31 @@ export function identificationFrom(
     }
     if (study.estimand.kind === 'average-treatment-effect-on-treated') {
       reasons.push({ kind: 'att-requires-counterfactual-identification', estimand: 'ATT' })
+    }
+    if (study.estimand.kind === 'average-treatment-effect' && instruments.kind === 'identified') {
+      const names = instruments.instruments.map((variable) => variable.name).join(', ')
+      const plural = instruments.instruments.length > 1
+      const basis: NonEmptyArray<IdentificationBasisEntry> = [
+        { kind: 'design-record', id: 'assignment-mechanism', statement: `${describeAssignmentKind(study.assignment.kind)} treatment: ${study.assignment.description} ${describeStudyDesignCategory(studyDesignCategory(study))}` },
+        {
+          kind: 'graph-result',
+          id: 'instrument-set',
+          statement: `${names} ${plural ? 'meet' : 'meets'} the two level 2 definitional requirements for a valid instrument in “${study.dagName}”. As-if-random: any backdoor paths between the instrument and ${study.outcome.name} can be blocked. Exclusion: the instrument is a cause of ${study.outcome.name} only indirectly through ${study.treatment.name}.`,
+        },
+        {
+          kind: 'graph-assumption',
+          id: 'instrument-exclusion',
+          statement: `None of the other causes of ${study.outcome.name} are also causes of ${names}, so there are no backdoor paths between the ${plural ? 'instruments' : 'instrument'} and the outcome; and if the causal path from ${names} to ${study.treatment.name} were removed there would be no causal path from ${names} to ${study.outcome.name}.`,
+        },
+        { kind: 'design-assumption', id: 'consistency', statement: study.designAssumptions.consistency.statement, rationale: study.designAssumptions.consistency.rationale },
+        { kind: 'design-assumption', id: 'no-interference', statement: study.designAssumptions.noInterference.statement, rationale: study.designAssumptions.noInterference.rationale },
+        {
+          kind: 'qualification',
+          id: 'instrument-estimator',
+          statement: `No observational expression for the effect exists: ${reasons.map(describeIdentificationFailure).join(' ')} The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed. The estimator makes a linearity assumption and derives the ATE from the coefficients of linear models of ${study.outcome.name} and ${study.treatment.name} given the instrument.`,
+        },
+      ]
+      return ok({ kind: 'instrument-identified', strategy: 'instrumental-variable', instruments: instruments.instruments, reasons: reasons as unknown as NonEmptyArray<IdentificationFailure>, basis })
     }
     return ok({ kind: 'backdoor-not-identified', reasons: reasons as unknown as NonEmptyArray<IdentificationFailure> })
   }
@@ -705,6 +793,14 @@ export function identificationFrom(
       statement: `Identification projects ${study.graph.laggedArrows} lagged arrow${study.graph.laggedArrows === 1 ? '' : 's'} onto the variable-level graph. The adjustment set uses same-period variables.`,
     })
   }
+  if (instruments.kind === 'identified') {
+    const names = instruments.instruments.map((variable) => variable.name).join(', ')
+    basis.push({
+      kind: 'graph-result',
+      id: 'instrument-set',
+      statement: `${names} also ${instruments.instruments.length > 1 ? 'meet' : 'meets'} the two definitional requirements for a valid instrument, as-if-random and exclusion, so an instrumental variable estimand is available as well.`,
+    })
+  }
   return ok({
     kind: 'identified',
     strategy: 'backdoor-adjustment',
@@ -714,11 +810,24 @@ export function identificationFrom(
       ? { kind: 'truncated', sets: minimalSets }
       : { kind: 'complete', sets: minimalSets },
     mediators,
+    instruments,
     basis: basis as unknown as NonEmptyArray<IdentificationBasisEntry>,
   })
 }
 
 export const selectedAdjustmentSet = (identification: Extract<Identification, { kind: 'identified' }>): readonly StudyVariable[] => identification.adjustment.variables
+
+/** The instruments an instrumental-variable estimate may use, whichever strategy the record settled on. */
+export function identifiedInstruments(identification: Identification): NonEmptyArray<StudyVariable> | null {
+  switch (identification.kind) {
+    case 'instrument-identified': return identification.instruments
+    case 'identified':
+    case 'graphically-identified': return identification.instruments.kind === 'identified' ? identification.instruments.instruments : null
+    case 'counterfactually-identified':
+    case 'backdoor-not-identified': return null
+    default: return assertNever(identification)
+  }
+}
 
 export function describeStudyDesignProblem(problem: StudyDesignProblem): string {
   switch (problem.kind) {

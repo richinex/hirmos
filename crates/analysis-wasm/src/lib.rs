@@ -71,7 +71,7 @@ use hirmos_causal_core::{
 };
 use hirmos_causal_core::{
     backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_conditional_outcomes,
-    identify_frontdoor_set, identify_outcomes, infer_kappa_t, infer_kappa_y, latent_projection,
+    identify_frontdoor_set, identify_instrument_set, identify_outcomes, infer_kappa_t, infer_kappa_y, latent_projection,
     ols_hac, refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
     unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag, IdentificationError,
 };
@@ -519,6 +519,23 @@ pub fn run_analysis(
             &second_stage_adjustment,
             control_value,
             treatment_value,
+            uncertainty,
+            progress,
+        ),
+        AnalysisCommand::InstrumentalVariable {
+            rows,
+            columns,
+            treatment,
+            outcome,
+            instruments,
+            uncertainty,
+        } => instrumental_variable_evidence(
+            values,
+            rows,
+            columns,
+            treatment,
+            outcome,
+            &instruments,
             uncertainty,
             progress,
         ),

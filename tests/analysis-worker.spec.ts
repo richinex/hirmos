@@ -4,7 +4,7 @@ import { stationarityBatterySchema } from '../src/domain/stationarity'
 import { dagCheckEvidenceSchema } from '../src/domain/dagValidation'
 import { cdnotsEvidenceSchema, cdnotsPlusEvidenceSchema, directLingamEvidenceSchema, fciEvidenceSchema, graceEvidenceSchema, pcStableEvidenceSchema } from '../src/domain/discovery'
 import { identifiedDiscreteQueryEvidenceSchema } from '../src/domain/intervention'
-import { binaryEttEvidenceSchema, causalEffectsEvidenceSchema, frontdoorTwoStageEvidenceSchema } from '../src/domain/estimation'
+import { binaryEttEvidenceSchema, causalEffectsEvidenceSchema, frontdoorTwoStageEvidenceSchema, instrumentalVariableEvidenceSchema } from '../src/domain/estimation'
 import { seasonalAdjustedEvidenceSchema } from '../src/domain/seasonal'
 import { parseSeriesStructureEvidence, seriesStructureEvidenceSchema } from '../src/domain/sensitivity'
 import { multicollinearityEvidenceSchema } from '../src/domain/multicollinearity'
@@ -340,6 +340,7 @@ test('returns canonical and all minimal adjustment sets through the Rust worker'
     value: {
       kind: 'backdoorIdentification',
       frontdoor: { kind: 'notIdentified' },
+      instruments: { kind: 'notIdentified' },
       nodes: 5,
       treatment: 3,
       outcome: 2,
@@ -385,6 +386,7 @@ test('identifies front-door when no measured back-door set exists', async ({ pag
     value: {
       kind: 'backdoorIdentification',
       frontdoor: { kind: 'identified', mediators: [1] },
+      instruments: { kind: 'notIdentified' },
       nodes: 4,
       treatment: 0,
       outcome: 2,
@@ -507,6 +509,81 @@ test('runs the front-door estimator through the Rust worker', async ({ page }, t
   expect(parsed.data.result.value.uncertainty.kind).toBe('bootstrap')
   expect(parsed.data.progress[0]).toEqual({ stage: 'frontdoor-bootstrap', completed: 0, total: 20 })
   expect(parsed.data.progress.at(-1)).toEqual({ stage: 'frontdoor-bootstrap', completed: 20, total: 20 })
+})
+
+test('identifies an instrument when a latent common cause blocks every other strategy', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Architecture contract runs once')
+  await page.goto('/app')
+  const result: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    // Z -> X -> Y with U -> X and U -> Y; U is unmeasured, so Z is the only route.
+    return analysis.identifyBackdoor({
+      nodes: 4,
+      names: ['Z', 'X', 'Y', 'U'],
+      edges: [[0, 1], [1, 2], [3, 1], [3, 2]],
+      treatment: 1,
+      outcome: 2,
+      unobserved: [3],
+      estimand: 'ate',
+    })
+  })
+  const parsed = z.object({ ok: z.literal(true), value: z.object({ instruments: z.unknown(), frontdoor: z.unknown(), result: z.unknown(), graphicalIdentification: z.object({ kind: z.string() }).passthrough() }).passthrough() }).safeParse(result)
+  expect(parsed.success).toBe(true)
+  if (!parsed.success) return
+  expect(parsed.data.value.instruments).toEqual({ kind: 'identified', instruments: [0] })
+  expect(parsed.data.value.frontdoor).toEqual({ kind: 'notIdentified' })
+  expect(parsed.data.value.result).toEqual({ kind: 'notIdentified' })
+  expect(parsed.data.value.graphicalIdentification.kind).toBe('unidentifiable')
+})
+
+test('runs the instrumental-variable estimator through the Rust worker', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Numerical boundary contract runs once')
+  await page.goto('/app')
+  const raw: unknown = await page.evaluate(async () => {
+    const analysis = await import(new URL('/src/analysis/client.ts', window.location.href).href)
+    const rows = 96
+    const columns = 3
+    const values = new Float64Array(rows * columns)
+    for (let row = 0; row < rows; row += 1) {
+      // Six repeats of a 2^4 factorial: a binary instrument z, a latent u, and two disturbances, all orthogonal.
+      const cell = row % 16
+      const sign = (bit: number) => ((cell >> bit) & 1) === 0 ? -1 : 1
+      const z = ((cell >> 0) & 1)
+      const u = sign(1)
+      const treatment = 2 * z + u + 0.5 * sign(2)
+      const outcome = 3 * treatment + 4 * u + sign(3)
+      values[row] = treatment
+      values[rows + row] = outcome
+      values[2 * rows + row] = z
+    }
+    const progress: unknown[] = []
+    const result = await analysis.runInstrumentalVariable(values, rows, columns, {
+      treatment: 0,
+      outcome: 1,
+      instruments: [2],
+      uncertainty: { kind: 'bootstrap', simulations: 20, sampleSizeFraction: 1, confidenceLevel: 0.95, seed: 0 },
+    }, (event: unknown) => progress.push(event))
+    return { result, progress, detachedBytes: values.byteLength }
+  })
+  const parsed = z.object({
+    result: z.discriminatedUnion('ok', [
+      z.object({ ok: z.literal(true), value: instrumentalVariableEvidenceSchema }).strict(),
+      z.object({ ok: z.literal(false), error: z.unknown() }).strict(),
+    ]),
+    progress: z.array(z.object({ stage: z.string(), completed: z.number(), total: z.number() }).strict()),
+    detachedBytes: z.number().int().nonnegative(),
+  }).strict().safeParse(raw)
+
+  expect(parsed.success).toBe(true)
+  if (!parsed.success || !parsed.data.result.ok) return
+  expect(parsed.data.detachedBytes).toBe(0)
+  expect(parsed.data.result.value.route).toBe('waldRatio')
+  // The Wald ratio removes the latent confounding exactly: (6 outcome units) / (2 treatment units).
+  expect(parsed.data.result.value.estimate).toBeCloseTo(3, 10)
+  expect(parsed.data.result.value.uncertainty.kind).toBe('bootstrap')
+  expect(parsed.data.result.value.standardError).not.toBeNull()
+  expect(parsed.data.progress[0]).toEqual({ stage: 'instrumental-variable-bootstrap', completed: 0, total: 20 })
+  expect(parsed.data.progress.at(-1)).toEqual({ stage: 'instrumental-variable-bootstrap', completed: 20, total: 20 })
 })
 
 test('runs ID, IDC and hedge outcomes through the discrete intervention boundary', async ({ page }, testInfo) => {

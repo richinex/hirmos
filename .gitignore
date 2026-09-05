@@ -32,3 +32,6 @@ blob-report/
 # Screenshots dropped in the project root by browser sessions
 /*.png
 videos/
+
+# Working checklist, local only
+/TODO.md

@@ -78,6 +78,8 @@
 .landing-primary:hover { color: var(--color-signal-ink); filter: brightness(1.08); }
 .landing-secondary { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.8rem; padding: .7rem .5rem; color: var(--color-muted); font-size: var(--text-title); transition: color 150ms; }
 .landing-secondary:hover { color: var(--color-ink); }
+/* These anchors are drawn as controls, not prose links, so they opt out of the base underline. */
+.landing-wordmark, .landing-open, .landing-primary, .landing-secondary { text-decoration: none; }
 
 .landing-content-veil { position: relative; z-index: 2; padding-top: 6rem; background: linear-gradient(180deg, transparent 0, color-mix(in srgb, var(--color-stage) 96%, transparent) 4rem, var(--color-stage) 15rem); }
 .workflow-section, .feature-section, .structures-section { padding-block: 8rem; border-top: 1px solid var(--color-line); scroll-margin-top: 2rem; }
