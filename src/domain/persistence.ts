@@ -292,6 +292,12 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
       },
     }
   }
+  // A DML run saved before group effects carries the plain average and nothing to group by.
+  if (Reflect.get(value, 'kind') === 'double-ml-run'
+    && typeof evidence === 'object' && evidence !== null
+    && Reflect.get(evidence, 'groups') === undefined) {
+    return { ...value, estimate: upgradedEstimate, evidence: { ...evidence, groups: { kind: 'none' } } }
+  }
   return upgradedEstimate === estimate ? value : { ...value, estimate: upgradedEstimate }
 }
 

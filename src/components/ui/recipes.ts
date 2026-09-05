@@ -27,7 +27,7 @@ const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-hi
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
  * remains "not ready"; a busy button keeps focus so nothing jumps when the run ends. */
-const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-150 aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
+const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
   signal: cn('bg-signal', FILLED),
@@ -72,7 +72,7 @@ const CHROME_TONE: Record<ChromeTone, string> = {
 
 export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'grid h-8 w-8 shrink-0 place-items-center rounded-lg border pointer-coarse:h-10 pointer-coarse:w-10 transition-colors duration-150 disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'grid h-8 w-8 shrink-0 place-items-center rounded-lg border pointer-coarse:h-10 pointer-coarse:w-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
     extra,
   )
@@ -81,8 +81,19 @@ export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string 
  * as one control family even when some actions need labels and others only need a familiar glyph. */
 export const chromeAction = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'flex min-h-8 items-center gap-1.5 rounded-lg border px-2 text-label pointer-coarse:min-h-10 transition-colors duration-150 disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'flex min-h-8 items-center gap-1.5 rounded-lg border px-2 text-label pointer-coarse:min-h-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
+    extra,
+  )
+
+/** A filter facet. Until something is chosen its border is dashed, which says "nothing set here" without a
+ * badge or a colour; chosen is the raised surface with a solid edge, the same selection the rest of the
+ * chrome uses. Counts and words inside it stay in the label register. */
+export const facet = (active: boolean, extra?: string): string =>
+  cn(
+    'min-h-8 rounded-full border px-2.5 pointer-coarse:min-h-10 transition-colors',
+    label(),
+    active ? 'border-solid border-edge bg-raised text-ink' : 'border-dashed border-hair text-faint hover:border-edge hover:text-muted',
     extra,
   )
 
@@ -151,12 +162,16 @@ export const chip = (extra?: string): string => cn('inline-block rounded-md bord
 /**
  * A section of the workbench: the outermost surface a reader sees inside a chapter.
  *
+ * Its padding is one variable, `--panel-space`, that a call site spends as `p-(--panel-space)`: 16px on
+ * a panel, 12px on a well, and one step less each when the chapter column is narrower than a tablet.
+ * Density is then a property of the surface, retuned in one place, not a padding chosen per call site.
+ *
  * One recipe so the app has one panel, and so a surface can be dropped in one place rather than in
  * fifteen. A panel holds content, never another panel: two of these nested draw the same border
  * twice around the same thing, and the inner one stops meaning anything. Where a component would
  * land its own surface inside this one, reach for its `frame` escape hatch instead.
  */
-export const panel = (extra?: string): string => cn('rounded-xl border border-hair bg-panel', extra)
+export const panel = (extra?: string): string => cn('rounded-xl border border-hair bg-panel [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
 
 /**
  * A recessed area inside a panel: a control group, a figure, a quoted reading.
@@ -164,7 +179,7 @@ export const panel = (extra?: string): string => cn('rounded-xl border border-ha
  * One step in from `panel()`, and the innermost surface that should carry a border. A well inside a
  * well reads as a mistake, and the give-away is a call site passing `bg-panel` back to cancel it.
  */
-export const well = (extra?: string): string => cn('rounded-lg border border-hair bg-well', extra)
+export const well = (extra?: string): string => cn('rounded-lg border border-hair bg-well [--panel-space:--spacing(3)] @max-md/panel:[--panel-space:--spacing(2)]', extra)
 
 /** A hairline-joined grid of figure cells: the 1px gaps draw the rules, so the cells carry no borders of their own. */
 export const figureGrid = (extra?: string): string => cn('grid gap-px overflow-hidden rounded-lg border border-hair bg-hair', extra)
@@ -189,10 +204,11 @@ export const table = 'w-full border-collapse text-left text-body'
 export const th = (extra?: string): string =>
   cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-well px-3.5 py-2 text-left text-label font-medium text-muted', extra)
 
-/** A body row. `action` rows fill on hover and focus; `selected` is a surface, never a colour or a weight. */
+/** A body row. `action` rows fill on hover and focus; `selected` is a surface, never a colour or a weight.
+ *  A row whose menu or expander is open stays filled, so the reader keeps which row they are acting on. */
 export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: string): string =>
   cn(
-    'border-b border-line transition-colors',
+    'border-b border-line transition-colors has-[[aria-expanded=true]]:bg-well',
     state !== 'static' && 'cursor-pointer hover:bg-well has-[button:focus-visible]:bg-well',
     state === 'selected' && 'bg-raised',
     extra,

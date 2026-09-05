@@ -90,6 +90,7 @@ pub mod counterfactual_evaluator;
 pub mod counterfactual_graph;
 pub mod counterfactual_query;
 pub mod dml;
+pub mod dml_groups;
 pub mod do_calculus;
 pub mod dynamic_counterfactual;
 pub mod fminbound;
@@ -122,6 +123,7 @@ pub mod vecm;
 
 pub use coint::{coint, coint_johansen, CointResult, JohansenResult};
 pub use dml::{dml_irm, dml_plr, DmlResult, SensitivityResult, SensitivityScenario};
+pub use dml_groups::{group_effects, GroupEffect, GroupEffectError, GroupEffects};
 pub use do_calculus::{
     identify_conditional_outcomes, identify_outcomes, latent_projection, Admg,
     Expression as IdentifiedExpression, GraphError as AdmgError, Hedge, IdentificationError,

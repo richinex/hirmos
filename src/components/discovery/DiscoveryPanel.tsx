@@ -329,7 +329,7 @@ function ConstraintDiscoveryControls({
         )}
       </div>
 
-      <div className={well('p-3')}>
+      <div className={well('p-(--panel-space)')}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Background knowledge</h4>
@@ -738,7 +738,7 @@ function ResultCard({ run, method, title, meta, open, current, children }: {
     <article aria-labelledby={`run-${run.id}`}>
       <details className={`group rounded-xl border bg-panel ${current ? 'border-edge' : 'border-hair'}`} open={open}>
         <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl py-4 pl-4 pr-14 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-150 group-open:rotate-180" />
+          <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
           <div className="min-w-0 flex-1">
             <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
             <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{title}</h3>
@@ -1667,7 +1667,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       </div>
 
       <div className="grid gap-4">
-        <section className={panel('p-4')} aria-labelledby="discovery-method-title">
+        <section className={panel('p-(--panel-space)')} aria-labelledby="discovery-method-title">
           <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
           <SegmentedControl
             wrap

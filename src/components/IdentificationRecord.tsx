@@ -77,7 +77,7 @@ function PathTable({ paths }: { readonly paths: readonly PathEntry[] }) {
       {rest.length > 0 && (
         <details className="group border-t border-hair">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 px-2 py-1 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-            <Icon name="expand_more" size={14} className="transition-transform duration-150 group-open:rotate-180" />
+            <Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
             Show all {paths.length} paths
           </summary>
           <ol className="m-0 list-none divide-y divide-hair border-t border-hair p-0 text-body">
@@ -147,7 +147,7 @@ export function IdentificationRecord({ identification }: { readonly identificati
         <p className="mb-2 mt-1 text-body text-muted">{enabled}</p>
         <details className="group">
           <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-            <Icon name="expand_more" size={14} className="transition-transform duration-150 group-open:rotate-180" />
+            <Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
             Show the full record · {plural(identification.basis.length, 'entry').replace('entrys', 'entries')}
           </summary>
           <div className="mt-2 space-y-3">
@@ -186,7 +186,7 @@ export function IdentificationRecord({ identification }: { readonly identificati
       </ul>
       <details className="group mt-2">
         <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={14} className="transition-transform duration-150 group-open:rotate-180" />
+          <Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
           Show the full record · {plural(basis.length, 'entry').replace('entrys', 'entries')}
         </summary>
         <div className="mt-2 space-y-3">

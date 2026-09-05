@@ -45,7 +45,7 @@ function GrangerPlot({ artifact }: { readonly artifact: GrangerEvidenceArtifact 
     alpha: 0.05,
   }, theme), [artifact, theme])
   return (
-    <div className={well('mt-3 p-3')}>
+    <div className={well('mt-3 p-(--panel-space)')}>
       <p className={caption('m-0')}>p-value by lag order · alpha 0.05 reference, log scale</p>
       <EChart option={option} label="Granger p-values by lag order" className="h-[clamp(160px,26cqb,240px)]" />
     </div>
@@ -65,7 +65,7 @@ function GrangerRecord({ artifact, open }: { readonly artifact: GrangerEvidenceA
     <li>
       <details className={well('group')} open={open}>
         <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-3 py-2 transition-colors hover:bg-raised [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
+          <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
           <span className="text-body font-medium text-ink">{artifact.candidateCause.name} → {artifact.target.name}</span>
           <span className={num('text-label text-faint')}>lags 1 to {artifact.maxLag} · {formatCount(artifact.result.observations).text} rows</span>
           <span className={num('ml-auto text-micro text-faint')}>{formatTime(artifact.createdAt)}</span>
@@ -147,7 +147,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
 
   const recorded = [...evidence].reverse()
   return (
-    <section className={embedded ? undefined : panel('mt-4 p-4')} aria-labelledby="granger-title">
+    <section className={embedded ? undefined : panel('mt-4 p-(--panel-space)')} aria-labelledby="granger-title">
       <h3 id="granger-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Granger predictive test</h3>
       <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
       <div className="mt-3 flex flex-wrap items-end gap-2">

@@ -51,7 +51,7 @@ function MarkedMatrixPlot({ graph, values, names, tauMax, title, caption: text }
     cellText: (source, target) => graph[source][target][lag] || null,
   }, theme), [graph, lag, names, theme, title, values])
   return (
-    <div className={well('mt-3 p-3')}>
+    <div className={well('mt-3 p-(--panel-space)')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={caption('m-0')}>{text}</p>
         <LagSelect lags={tauMax} value={lag} onChange={setLag} contemporaneous />
@@ -90,11 +90,11 @@ export function RpcmciMembershipPlot({ run }: { readonly run: RpcmciRun }) {
   const objective = useMemo(() => annealingObjectiveOption({ best: run.result.diffGBest }, theme), [run.result.diffGBest, theme])
   return (
     <div className="mt-3 grid gap-3">
-      <div className={well('p-3')}>
+      <div className={well('p-(--panel-space)')}>
         <p className={caption('m-0')}>Regime membership by observation</p>
         <ExpandableChart option={membership} label="RPCMCI regime membership by observation" className="h-[clamp(200px,30cqb,300px)]" testId="rpcmci-membership" />
       </div>
-      <div className={well('p-3')}>
+      <div className={well('p-(--panel-space)')}>
         <p className={caption('m-0')}>Best annealing objective</p>
         <ExpandableChart option={objective} label="RPCMCI best annealing objective by iteration" className="h-[clamp(200px,30cqb,300px)]" testId="rpcmci-objective" />
       </div>
@@ -120,7 +120,7 @@ export function WeightPlot({ run }: { readonly run: WeightRun }) {
     quantity: 'weight',
   }, theme), [lag, matrices, method, names, run.kind, theme])
   return (
-    <div className={well('mt-3 p-3')}>
+    <div className={well('mt-3 p-(--panel-space)')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={caption('m-0')}>{run.kind === 'direct-lingam-run' ? 'Nonzero weights · source → target' : 'Nonzero weights · source(t−lag) → target(t)'}</p>
         {run.kind !== 'direct-lingam-run' && <LagSelect lags={run.result.laggedWeights.length} value={lag} onChange={setLag} contemporaneous />}
@@ -148,7 +148,7 @@ export function OcsePlot({ run }: { readonly run: OcseRun }) {
   }, theme), [run, theme])
   if (run.result.edges.length === 0) return null
   return (
-    <div className={well('mt-3 p-3')}>
+    <div className={well('mt-3 p-(--panel-space)')}>
       <p className={caption('m-0')}>Selected relations by conditional mutual information</p>
       <EChart option={option} label="Selected oCSE relations ranked by CMI" className="h-[clamp(160px,28cqb,280px)]" />
     </div>
@@ -170,7 +170,7 @@ export function NeuralSummaryPlot({ run, compact = false }: { readonly run: Neur
     quantity: 'input-group norm',
   }, theme), [names, run, theme])
   return (
-    <div className={well('mt-3 p-3')}>
+    <div className={well('mt-3 p-(--panel-space)')}>
       <p className={caption('m-0')}>{run.kind === 'cmlp-run' ? 'Selected relations across the fitted lag window' : `Selected relations across a ${run.result.context}-step history window`}</p>
       <EChart option={option} label={`${run.kind === 'cmlp-run' ? 'cMLP' : 'cLSTM'} Granger score heatmap`} className={compact ? 'h-[230px]' : 'h-[clamp(220px,34cqb,320px)]'} />
     </div>
@@ -194,7 +194,7 @@ export function CmlpLagPlot({ run }: { readonly run: CmlpRun }) {
     quantity: 'lag-group norm',
   }, theme), [lag, names, position, run.result.lagActive, run.result.lagScores, theme])
   return (
-    <div className={well('mt-3 p-3')}>
+    <div className={well('mt-3 p-(--panel-space)')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className={caption('m-0')}>Selected relations at one lag</p>
         <label className="flex items-center gap-2 text-label text-muted">

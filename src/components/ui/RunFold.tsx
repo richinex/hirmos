@@ -20,7 +20,7 @@ export function RunFold({ title, figure, stamp, onDelete, deleteLabel, defaultOp
     <li>
       <details className="group/fold" open={defaultOpen}>
         <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={14} className="shrink-0 text-faint transition-transform duration-150 group-open/fold:rotate-180" />
+          <Icon name="expand_more" size={14} className="shrink-0 text-faint transition-transform duration-(--motion-fast) group-open/fold:rotate-180" />
           <span className="min-w-0 text-body text-ink">{title}</span>
           {figure !== undefined && <span className={num('text-body font-medium text-ink')}>{figure}</span>}
           <span className={num('ml-auto text-micro text-faint')}>{stamp}</span>

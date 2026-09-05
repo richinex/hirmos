@@ -98,14 +98,17 @@ const ratioMeaning = (ratio: number, outcome: string): string => {
 const intervalDisplay = (run: EstimationRunArtifact, scale: EffectScale): string => {
   const { interval, effect } = run.estimate
   if (interval.kind === 'none' || effect.kind === 'path') return 'no interval'
-  return formatInterval(effect.value, interval.lower, interval.upper, intervalTypeOf(interval), scale).text
+  const value = effect.kind === 'byGroup' ? effect.overall : effect.value
+  return formatInterval(value, interval.lower, interval.upper, intervalTypeOf(interval), scale).text
 }
 
 /** The scale line shown under the figure. Method-specific standardisation belongs here, not in UI branches. */
 export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecification, stepLabel: string): string {
   switch (run.kind) {
     case 'backdoor-linear-run':
-    case 'double-ml-run': return `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
+    case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
+      ? `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}, within each group of ${run.estimate.effect.modifier}`
+      : `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
     case 'frontdoor-two-stage-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
     case 'instrumental-variable-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0`
     case 'count-glm-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1-unit increase in ${study.treatment.name}`
@@ -182,8 +185,21 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       ] }
     }
     case 'double-ml-run': {
-      const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const contrast = run.evidence.model === 'irm' ? `Changing ${study.treatment.name} from 0 to 1` : `A 1-unit increase in ${study.treatment.name}`
+      if (estimate.effect.kind === 'byGroup') {
+        const { groups, modifier, overall } = estimate.effect
+        const largest = groups.reduce((best, group) => (group.value > best.value ? group : best), groups[0])
+        const smallest = groups.reduce((best, group) => (group.value < best.value ? group : best), groups[0])
+        const overlap = largest.interval.lower <= smallest.interval.upper
+        return { kind: 'result-interpretation', statements: [
+          { kind: 'magnitude', text: `${contrast} corresponds to ${groups.map((group) => `${change(group.value, study.outcome.name)} where ${modifier} is ${group.label}`).join('; ')}, after cross-fitted adjustment. Over the whole population it is ${number(overall)}.` },
+          { kind: 'comparison', text: groups.length === 1
+            ? 'One group was formed, so no contrast between groups can be read.'
+            : `The effect is largest where ${modifier} is ${largest.label} (${number(largest.value)}) and smallest where it is ${smallest.label} (${number(smallest.value)}); their ${formatPercent(largest.interval.level, { precision: 0 }).text} intervals ${overlap ? 'overlap, so the data do not separate the two' : 'do not overlap'}.` },
+          { kind: 'qualification', text: `Each group effect is the average treatment effect conditioned on ${modifier}, estimated by DoubleML’s group average treatment effect: the effect is linear in ${study.treatment.name} within a group and free to differ between groups. The recorded identification and overlap assumptions must hold within every group.` },
+        ] }
+      }
+      const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `${contrast} corresponds to ${change(effect, study.outcome.name)} ${targetPopulation(study)} after cross-fitted adjustment.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),

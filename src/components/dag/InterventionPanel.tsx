@@ -41,7 +41,7 @@ function QueryFrame({ query, open, summary, children }: { readonly query: Interv
     <li>
       <details className={well('group')} open={open}>
         <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-3 py-2 transition-colors hover:bg-raised [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
+          <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
           <span className="text-body font-medium text-ink">do({query.set.name}) → {query.read.name}</span>
           {summary}
           <span className={num('ml-auto text-micro text-faint')}>{query.createdAt.slice(11, 19)}</span>

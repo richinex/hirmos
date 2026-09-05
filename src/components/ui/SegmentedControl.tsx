@@ -84,8 +84,8 @@ const SIZE: Record<'sm' | 'md', string> = {
  */
 const CHIP_LAYERS = [
   'isolate',
-  "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:scale-90 after:rounded-md after:border after:border-edge after:bg-raised after:opacity-0 after:transition-[opacity,transform] after:duration-150 after:content-['']",
-  "before:pointer-events-none before:absolute before:-inset-[3px] before:scale-110 before:rounded-lg before:border-2 before:border-signal before:opacity-0 before:transition-[opacity,transform] before:duration-150 before:content-['']",
+  "after:pointer-events-none after:absolute after:inset-0 after:-z-10 after:scale-90 after:rounded-md after:border after:border-edge after:bg-raised after:opacity-0 after:transition-[opacity,transform] after:duration-(--motion-fast) after:content-['']",
+  "before:pointer-events-none before:absolute before:-inset-[3px] before:scale-110 before:rounded-lg before:border-2 before:border-signal before:opacity-0 before:transition-[opacity,transform] before:duration-(--motion-fast) before:content-['']",
   'has-[:focus-visible]:outline-none has-[:focus-visible]:before:scale-100 has-[:focus-visible]:before:opacity-100',
 ].join(' ')
 
@@ -233,7 +233,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
         <span
           aria-hidden
           className={cn(
-            'pointer-events-none absolute left-0 top-0 rounded-md border border-edge bg-raised duration-200 ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+            'pointer-events-none absolute left-0 top-0 rounded-md border border-edge bg-raised duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
             !motionReady ? 'transition-none' : dragging ? 'transition-[width,height]' : 'transition-[transform,width,height]',
           )}
           style={{ width: knob.width, height: knob.height, transform: `translate(${knob.left}px, ${knob.top}px)${dragging ? ' scale(0.96)' : ''}` }}
@@ -249,7 +249,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
             data-segment-option
             title={option.title}
             className={cn(
-              'relative grid cursor-pointer place-items-center whitespace-nowrap rounded-md border border-transparent transition-colors duration-150 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal pointer-coarse:min-h-10',
+              'relative grid cursor-pointer place-items-center whitespace-nowrap rounded-md border border-transparent transition-colors duration-(--motion-fast) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal pointer-coarse:min-h-10',
               SIZE[size],
               fill && 'min-w-0 flex-1 basis-0 truncate text-center',
               wrap && CHIP_LAYERS,

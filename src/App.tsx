@@ -587,8 +587,9 @@ function App() {
                       />
                     </label>
                     {workflow.problem && <p role="alert" className="text-body text-danger">{describeProjectNameProblem(workflow.problem)}</p>}
-                    {/* The two ways to get a project, side by side: make one, or open one exported earlier. */}
-                    <div className="flex flex-wrap items-center gap-2">
+                    {/* The two ways to get a project, side by side: make one, or open one exported earlier.
+                        On a narrow stage the two share the row, so no dead space sits to the right. */}
+                    <div className="flex flex-wrap items-center gap-2 @max-md/panel:*:flex-1">
                       <button type="submit" className={button('signal')}>Create project</button>
                       <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
                       <button type="button" className={button('outline')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open an exported file</button>

@@ -26,7 +26,8 @@ import {
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type PreparedDatasetVersionId, type StationarityEvidenceArtifact } from './preprocessing'
 import { describePanelInterventionPreflight, type PanelInterventionPreflight } from './panel'
 import { describeStationarityConflict, levelModelVerdict, type LevelModelVerdict, type StationarityAssessment } from './stationarityAssessment'
-import { identifiedInstruments, treatmentDescendants, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type StudyId, type StudySpecification, type StudyVariable } from './study'
+import { describeGrouping, identifiedInstruments, treatmentDescendants, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type ModifierGrouping, type StudyId, type StudySpecification, type StudyVariable } from './study'
+import { formatStatistic } from '@/lib/format/number'
 
 /**
  * An estimate carries its meaning in the type: the estimand it answers, the scale, a named interval
@@ -491,6 +492,31 @@ export const negativeBinomialIngarchEvidenceSchema = z.object({
 
 export type NegativeBinomialIngarchEvidence = z.infer<typeof negativeBinomialIngarchEvidenceSchema>
 
+/** One group of the effect modifier with DoubleML's group average treatment effect for it. */
+export const dmlGroupEffectSchema = z.object({
+  lower: z.number().finite().nullable(),
+  upper: z.number().finite().nullable(),
+  observations: z.number().int().positive(),
+  effect: z.number().finite(),
+  standardError: z.number().finite().nonnegative(),
+  interval: z.tuple([z.number().finite(), z.number().finite()]),
+  fewObservations: z.boolean(),
+}).strict()
+
+export const dmlGroupEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({
+    kind: z.literal('grouped'),
+    modifier: z.number().int().nonnegative(),
+    grouping: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('levels') }).strict(),
+      z.object({ kind: z.literal('quantiles'), bins: z.number().int().min(2).max(10) }).strict(),
+    ]),
+    level: z.number().gt(0.5).lt(1),
+    groups: z.array(dmlGroupEffectSchema).min(1),
+  }).strict(),
+])
+
 export const doubleMlEvidenceSchema = z.object({
   kind: z.literal('doubleMl'),
   observations: z.number().int().positive(),
@@ -502,6 +528,7 @@ export const doubleMlEvidenceSchema = z.object({
   standardError: z.number().finite().nonnegative(),
   interval: z.tuple([z.number().finite(), z.number().finite()]),
   level: z.number().gt(0.5).lt(1),
+  groups: dmlGroupEvidenceSchema,
 }).strict()
 
 export type DoubleMlEvidence = z.infer<typeof doubleMlEvidenceSchema>
@@ -1023,6 +1050,19 @@ export function parseCausalImpactEvidence(value: unknown): Result<CausalImpactEv
   return parsed
 }
 
+/** One group of the effect modifier and the effect estimated within it. */
+export interface GroupEffectEstimate {
+  readonly label: string
+  readonly lower: number | null
+  readonly upper: number | null
+  readonly value: number
+  readonly standardError: number
+  readonly interval: { readonly level: number; readonly lower: number; readonly upper: number }
+  readonly observations: number
+  /** DoubleML warns below six observations; the group is shown but read with that in mind. */
+  readonly fewObservations: boolean
+}
+
 export interface TimeEffectPoint {
   /** One-based row in the prepared series. */
   readonly step: number
@@ -1037,6 +1077,8 @@ export type EffectEstimate =
   | { readonly kind: 'additive'; readonly value: number; readonly unit: string }
   | { readonly kind: 'incidenceRateRatio'; readonly value: number }
   | { readonly kind: 'path'; readonly values: NonEmptyArray<TimeEffectPoint>; readonly aggregate: { readonly cumulative: number; readonly average: number } }
+  /** One additive effect per group of an effect modifier, with the whole-population average beside them. */
+  | { readonly kind: 'byGroup'; readonly modifier: string; readonly overall: number; readonly groups: NonEmptyArray<GroupEffectEstimate> }
 
 export type EstimateInterval =
   | { readonly kind: 'confidence'; readonly level: number; readonly lower: number; readonly upper: number }
@@ -1273,6 +1315,33 @@ const TARGET_COMPATIBILITY_CAVEAT: MethodCaveat = {
   sources: [{ kind: 'paper', title: 'Hernán and Robins, Causal Inference: What If', locator: 'https://www.hsph.harvard.edu/miguel-hernan/causal-inference-book/' }],
 }
 
+/** Whether an estimator reports the study's target, decided once per target. */
+type TargetVerdict =
+  | { readonly kind: 'reported'; readonly evidence: string }
+  | { readonly kind: 'not-reported'; readonly evidence: string }
+
+const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evidence })
+const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
+
+function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
+  switch (estimand.kind) {
+    case 'average-treatment-effect':
+      if (configuration.kind === 'binary-ett-idc-star') return notReported('The binary IDC* evaluator reports ETT/ATT, but this study records ATE.')
+      if (configuration.kind === 'dml-irm' && configuration.att) return notReported('The DML configuration reports ATT, but the study records ATE.')
+      return reported('Estimator and study both target ATE.')
+    case 'average-treatment-effect-on-treated':
+      if (configuration.kind === 'binary-ett-idc-star') return reported('Estimator and study both target ATT.')
+      if (configuration.kind === 'dml-irm') return configuration.att ? reported('Estimator and study both target ATT.') : notReported('The DML configuration reports ATE, but the study records ATT.')
+      return notReported('This study targets ATT. DML interactive and the binary IDC* evaluator report ATT.')
+    case 'conditional-average-treatment-effect':
+      if (configuration.kind === 'dml-plr' || (configuration.kind === 'dml-irm' && !configuration.att)) {
+        return reported(`The estimator reports DoubleML group average treatment effects within groups of ${estimand.modifier.name} beside the overall average.`)
+      }
+      return notReported(`This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`)
+    default: return assertNever(estimand)
+  }
+}
+
 const verdict = (satisfied: Satisfied[], unresolved: Unresolved[], violations: Violated[]): MethodEligibility => {
   if (isNonEmpty(violations)) return { kind: 'refused', satisfied, unresolved, violations }
   if (isNonEmpty(unresolved)) return { kind: 'caution', satisfied, unresolved }
@@ -1280,6 +1349,12 @@ const verdict = (satisfied: Satisfied[], unresolved: Unresolved[], violations: V
 }
 
 /** Rules over the identification, the sampling structure, the data shape, and the chosen configuration. */
+/** What the double machine learning nuisance learners see: the identified set, plus the effect modifier of a conditional target. */
+export function dmlNuisanceInputs(adjustment: readonly StudyVariable[], estimand: Estimand | null): readonly StudyVariable[] {
+  const modifier = estimand?.kind === 'conditional-average-treatment-effect' ? estimand.modifier : null
+  return modifier === null || adjustment.some((variable) => variable.column === modifier.column) ? adjustment : [...adjustment, modifier]
+}
+
 export function evaluateEstimatorEligibility(method: MethodDefinition, context: EligibilityContext): MethodEligibility {
   const { identification, prepared, configuration } = context
   const timeSeries = prepared.kind === 'prepared-time-series'
@@ -1295,15 +1370,11 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     : null
 
   if (context.study !== null) {
-    const targetIsAtt = context.study.estimand.kind === 'average-treatment-effect-on-treated'
-    if (targetIsAtt && configuration.kind !== 'dml-irm' && configuration.kind !== 'binary-ett-idc-star') {
-      violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: 'This study targets ATT. DML interactive and the binary IDC* evaluator report ATT.' })
-    } else if (!targetIsAtt && configuration.kind === 'binary-ett-idc-star') {
-      violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: 'The binary IDC* evaluator reports ETT/ATT, but this study records ATE.' })
-    } else if (configuration.kind === 'dml-irm' && configuration.att !== targetIsAtt) {
-      violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: `The DML configuration reports ${configuration.att ? 'ATT' : 'ATE'}, but the study records ${targetIsAtt ? 'ATT' : 'ATE'}.` })
-    } else {
-      satisfied.push({ kind: 'satisfied', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: `Estimator and study both target ${targetIsAtt ? 'ATT' : 'ATE'}.` })
+    const verdict = targetCompatibility(context.study.estimand, configuration)
+    switch (verdict.kind) {
+      case 'reported': satisfied.push({ kind: 'satisfied', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: verdict.evidence }); break
+      case 'not-reported': violations.push({ kind: 'violated', caveat: TARGET_COMPATIBILITY_CAVEAT, evidence: verdict.evidence }); break
+      default: assertNever(verdict)
     }
   }
 
@@ -1424,9 +1495,10 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     case 'dml-plr':
     case 'dml-irm': {
       const prefix = configuration.kind
-      if (adjustment === null) violate(`${prefix}-identified-adjustment`, 'No measured back-door adjustment set was found, so there is no identified set for the nuisance learners.')
-      else if (identification.kind === 'identified' && identification.adjustment.variables.length === 0) violate(`${prefix}-identified-adjustment`, 'The identified adjustment set is empty; double machine learning needs covariates to partial out. Use the adjusted linear regression.')
-      else satisfy(`${prefix}-identified-adjustment`, `Nuisance learners see the identified set: ${adjustment}.`)
+      const nuisance = identification.kind === 'identified' ? dmlNuisanceInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
+      if (identification.kind !== 'identified') violate(`${prefix}-identified-adjustment`, 'No measured back-door adjustment set was found, so there is no identified set for the nuisance learners.')
+      else if (nuisance.length === 0) violate(`${prefix}-identified-adjustment`, 'The identified adjustment set is empty; double machine learning needs covariates to partial out. Use the adjusted linear regression, or target the effect within groups of a modifier.')
+      else satisfy(`${prefix}-identified-adjustment`, `Nuisance learners see ${nuisance.map((variable) => variable.name).join(', ')}.`)
       if (panel) violate(`${prefix}-independent-rows`, 'The rows are a panel; shuffled folds would split a unit across folds, and unit-blocked cross-fitting is not ported yet.')
       else if (timeSeries) violate(`${prefix}-independent-rows`, 'The rows are a time series and the folds are shuffled; blocked or rolling cross-fitting is not ported yet.')
       else satisfy(`${prefix}-independent-rows`, 'The prepared dataset holds independent rows, so shuffled folds are valid.')
@@ -1438,6 +1510,12 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         leave('dml-plr-partial-linearity', 'Partial linearity in the treatment is assumed; compare with the interactive model when the treatment is binary.')
       }
       leave(`${prefix}-overlap`, 'Inspect treatment overlap against the adjustment variables in Data studio.')
+      if (context.study?.estimand.kind === 'conditional-average-treatment-effect') {
+        const modifier = context.study.estimand.modifier.name
+        leave(`${prefix}-group-effects`, `Assess whether the effect of ${context.study.treatment.name} is linear within each group of ${modifier} (${describeGrouping(context.study.estimand.grouping)}), and whether identification and overlap hold inside every group.`)
+      } else {
+        satisfy(`${prefix}-group-effects`, 'The study targets one average, so no group effects are estimated.')
+      }
       satisfy(`${prefix}-learner-settings`, `The run records 5 folds, 200 trees, minimum leaf 5, learner seed 7, and fold seed ${configuration.seed}.`)
       if (prepared.observations < 100) leave(`${prefix}-interval`, `${prepared.observations} rows is a small sample for random-forest nuisances; read the interval as approximate.`)
       else satisfy(`${prefix}-interval`, `${prepared.observations} rows for the sandwich interval.`)
@@ -1619,6 +1697,40 @@ function affectedNodes(study: StudySpecification | null): readonly { readonly co
 
 const affectedColumns = (study: StudySpecification | null): ReadonlySet<ColumnId> => new Set(affectedNodes(study).map((node) => node.column))
 
+/** A group's label from its bounds: the level itself, or the quantile band it spans. */
+export const groupLabel = (group: { readonly lower: number | null; readonly upper: number | null }, grouping: ModifierGrouping): string => {
+  const text = (value: number) => formatStatistic('raw', value).text
+  switch (grouping.kind) {
+    case 'levels': return group.lower === null ? 'level' : text(group.lower)
+    case 'quantiles':
+      if (group.lower === null && group.upper !== null) return `≤ ${text(group.upper)}`
+      if (group.upper === null && group.lower !== null) return `> ${text(group.lower)}`
+      return group.lower === null || group.upper === null ? 'all' : `${text(group.lower)} to ${text(group.upper)}`
+    default: return assertNever(grouping)
+  }
+}
+
+/** The DML effect in the shape the study asked for: the plain average, or one effect per modifier group. */
+const groupedEffectFrom = (study: StudySpecification, evidence: DoubleMlEvidence): CausalEstimate['effect'] | null => {
+  if (study.estimand.kind !== 'conditional-average-treatment-effect') {
+    return evidence.groups.kind === 'none' ? { kind: 'additive', value: evidence.estimate, unit: '' } : null
+  }
+  if (evidence.groups.kind !== 'grouped') return null
+  const grouping = study.estimand.grouping
+  if (evidence.groups.grouping.kind !== grouping.kind || (grouping.kind === 'quantiles' && evidence.groups.grouping.kind === 'quantiles' && evidence.groups.grouping.bins !== grouping.bins)) return null
+  const groups = evidence.groups.groups.map((group): GroupEffectEstimate => ({
+    label: groupLabel(group, grouping),
+    lower: group.lower,
+    upper: group.upper,
+    value: group.effect,
+    standardError: group.standardError,
+    interval: { level: evidence.level, lower: group.interval[0], upper: group.interval[1] },
+    observations: group.observations,
+    fewObservations: group.fewObservations,
+  }))
+  return isNonEmpty(groups) ? { kind: 'byGroup', modifier: study.estimand.modifier.name, overall: evidence.estimate, groups } : null
+}
+
 /** The typed estimate from each façade's evidence; the interval follows the configuration. */
 export function causalEstimateFrom(
   study: StudySpecification,
@@ -1751,10 +1863,12 @@ export function causalEstimateFrom(
       const { evidence } = run
       const studyTargetsAtt = study.estimand.kind === 'average-treatment-effect-on-treated'
       if (evidence.att !== studyTargetsAtt || run.configuration.att !== studyTargetsAtt) return null
+      const effect = groupedEffectFrom(study, evidence)
+      if (effect === null) return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'additive', value: evidence.estimate, unit: '' },
+        effect,
         interval: { kind: 'confidence', level: evidence.level, lower: evidence.interval[0], upper: evidence.interval[1] },
         standardError: evidence.standardError,
         adjustment,
@@ -1928,7 +2042,9 @@ export function describeCovariance(choice: CovarianceChoice): string {
 }
 
 /** The estimator the chapter opens with for a record: the one its strategy calls for, else the plain adjustment route for the row structure. */
-export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact): EstimatorId {
+export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorId {
+  // A conditional target is reported only by the DML estimators; the partially linear one runs for any treatment.
+  if (study?.estimand.kind === 'conditional-average-treatment-effect') return 'dml-plr'
   const fallback: EstimatorId = prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
   if (identification === null) return fallback
   switch (identification.kind) {

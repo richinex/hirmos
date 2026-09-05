@@ -439,10 +439,11 @@ mod tests {
             .copied()
             .collect();
         let fit = serde_json::to_value(
-            double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Plr, false, 7).unwrap(),
+            double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Plr, false, 7, DmlGroups::None).unwrap(),
         )
         .unwrap();
         assert_eq!(fit["kind"], "doubleMl");
+        assert_eq!(fit["groups"]["kind"], "none");
         let estimate = fit["estimate"].as_f64().unwrap();
         assert!((estimate - 2.0).abs() < 0.6, "estimate {estimate}");
         let batch = serde_json::to_value(
@@ -457,7 +458,7 @@ mod tests {
             batch["sensitivity"]["scenarios"].as_array().unwrap().len(),
             3
         );
-        let irm = double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Irm, true, 7).unwrap();
+        let irm = double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Irm, true, 7, DmlGroups::None).unwrap();
         assert!(matches!(
             irm,
             AnalysisResult::DoubleMl {
@@ -466,7 +467,32 @@ mod tests {
                 ..
             }
         ));
-        assert!(double_ml(&values, rows, 4, 2, 1, &[0, 3], DmlModel::Irm, false, 7).is_err());
-        assert!(double_ml(&values, rows, 4, 0, 1, &[], DmlModel::Plr, false, 7).is_err());
+        assert!(double_ml(&values, rows, 4, 2, 1, &[0, 3], DmlModel::Irm, false, 7, DmlGroups::None).is_err());
+        assert!(double_ml(&values, rows, 4, 0, 1, &[], DmlModel::Plr, false, 7, DmlGroups::None).is_err());
+
+        // Group effects over terciles of a covariate carry one row per group and cover every row.
+        let grouped = serde_json::to_value(
+            double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Plr, false, 7, DmlGroups::Quantiles { column: 2, bins: 3 }).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(grouped["groups"]["kind"], "grouped");
+        assert_eq!(grouped["groups"]["modifier"], 2);
+        let groups = grouped["groups"]["groups"].as_array().unwrap();
+        assert_eq!(groups.len(), 3);
+        assert_eq!(groups.iter().map(|group| group["observations"].as_u64().unwrap()).sum::<u64>(), rows as u64);
+        assert!(groups[0]["lower"].is_null() && groups[2]["upper"].is_null());
+        assert_eq!(groups[0]["upper"], groups[1]["lower"]);
+        // The treatment cannot be its own modifier, and a continuous column has too many levels.
+        assert!(double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Plr, false, 7, DmlGroups::Levels { column: 0 }).is_err());
+        assert!(double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Plr, false, 7, DmlGroups::Levels { column: 2 }).is_err());
+        // The effect on the treated has no group-effect signal, as in the reference.
+        assert!(double_ml(&values, rows, 4, 0, 1, &[2, 3], DmlModel::Irm, true, 7, DmlGroups::Quantiles { column: 2, bins: 3 }).is_err());
+        // With nothing to adjust for, the modifier alone feeds the nuisance learners; without a modifier there is no input.
+        let modifier_only = serde_json::to_value(
+            double_ml(&values, rows, 4, 0, 1, &[], DmlModel::Plr, false, 7, DmlGroups::Quantiles { column: 2, bins: 3 }).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(modifier_only["groups"]["kind"], "grouped");
+        assert!(double_ml(&values, rows, 4, 0, 1, &[], DmlModel::Plr, false, 7, DmlGroups::None).is_err());
     }
 }

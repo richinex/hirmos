@@ -720,6 +720,7 @@ pub fn run_analysis(
             model,
             att,
             seed,
+            groups,
         } => double_ml(
             values,
             rows,
@@ -730,6 +731,7 @@ pub fn run_analysis(
             model,
             att,
             seed,
+            groups,
         ),
         AnalysisCommand::DmlRefutationBatch {
             rows,

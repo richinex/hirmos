@@ -1,11 +1,13 @@
 //! Estimator façades: regression, count models, CausalEffects, causal impact, DML, ARDL, VECM, synthetic control, panel DID / SC / SDID, NUTS, discrete BN.
 
 use super::*;
+use hirmos_causal_core::causal_effects::numpy_percentile;
 use hirmos_causal_core::frontdoor::{
     frontdoor_two_stage_with_progress, FrontdoorInput, FrontdoorOptions,
 };
 use hirmos_causal_core::{
-    instrumental_variable_with_progress, DowhyBootstrap, IvEstimator, IvInput, IvOptions,
+    group_effects, instrumental_variable_with_progress, DowhyBootstrap, IvEstimator, IvInput,
+    IvOptions,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -1114,8 +1116,8 @@ fn uncertainty_evidence_from_flat_predictions(
         .collect();
     let tail = (1.0 - confidence_level) / 2.0;
     let effect_interval = [
-        hirmos_causal_core::causal_effects::numpy_percentile(&effect_draws, tail),
-        hirmos_causal_core::causal_effects::numpy_percentile(&effect_draws, 1.0 - tail),
+        numpy_percentile(&effect_draws, tail),
+        numpy_percentile(&effect_draws, 1.0 - tail),
     ];
     CausalEffectsUncertaintyEvidence::Bootstrap {
         samples,
@@ -1285,7 +1287,20 @@ pub(crate) fn double_ml(
     model: DmlModel,
     att: bool,
     seed: u32,
+    groups: DmlGroups,
 ) -> Result<AnalysisResult, String> {
+    let cut = match groups {
+        DmlGroups::None => None,
+        DmlGroups::Levels { column } => Some(cut_modifier(values, rows, columns, column, treatment, outcome, None)?),
+        DmlGroups::Quantiles { column, bins } => Some(cut_modifier(values, rows, columns, column, treatment, outcome, Some(bins))?),
+    };
+    // The modifier joins the nuisance inputs, as DoubleML's heterogeneous-effects data passes the
+    // covariate that shapes the effect among `x_cols` before `gate` groups on it.
+    let nuisance: Vec<usize> = adjustment
+        .iter()
+        .copied()
+        .chain(cut.as_ref().map(|cut| cut.column).filter(|column| !adjustment.contains(column)))
+        .collect();
     let (x, y, d, treat_binary) = dml_frame(
         "double machine learning",
         values,
@@ -1293,7 +1308,7 @@ pub(crate) fn double_ml(
         columns,
         treatment,
         outcome,
-        adjustment,
+        &nuisance,
         model,
     )?;
     let study = WorkerStudy {
@@ -1306,6 +1321,33 @@ pub(crate) fn double_ml(
     };
     let mut fold_stream = Mt19937::seeded(seed);
     let fit = worker_fit(&study, &mut fold_stream);
+    let level = 0.95;
+    let groups = match cut {
+        None => DmlGroupEvidence::None,
+        Some(cut) => {
+            let effects = group_effects(&fit, &cut.labels, cut.bounds.len(), level)
+                .map_err(|error| format!("double machine learning group effects failed: {error}"))?;
+            DmlGroupEvidence::Grouped {
+                modifier: cut.column,
+                grouping: cut.grouping,
+                level,
+                groups: effects
+                    .groups
+                    .iter()
+                    .zip(&cut.bounds)
+                    .map(|(group, &(lower, upper))| DmlGroupEffectEvidence {
+                        lower,
+                        upper,
+                        observations: group.observations,
+                        effect: group.effect,
+                        standard_error: group.standard_error,
+                        interval: (group.confidence_interval[0], group.confidence_interval[1]),
+                        few_observations: group.few_observations,
+                    })
+                    .collect(),
+            }
+        }
+    };
     Ok(AnalysisResult::DoubleMl {
         observations: rows,
         model,
@@ -1315,8 +1357,100 @@ pub(crate) fn double_ml(
         estimate: fit.coef,
         standard_error: fit.se,
         interval: (fit.ci_low, fit.ci_high),
-        level: 0.95,
+        level,
+        groups,
     })
+}
+
+struct ModifierCut {
+    column: usize,
+    grouping: DmlGroupingEvidence,
+    /// Each row's zero-based group.
+    labels: Vec<usize>,
+    /// Each group's bounds on the modifier; `None` at an open outer edge.
+    bounds: Vec<(Option<f64>, Option<f64>)>,
+}
+
+const MAX_MODIFIER_LEVELS: usize = 12;
+
+/// Cut the modifier column into groups: one per distinct value, or `bins` quantile groups that are
+/// right-inclusive with the lowest bin closed, as `pandas.qcut` cuts them.
+fn cut_modifier(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    column: usize,
+    treatment: usize,
+    outcome: usize,
+    bins: Option<usize>,
+) -> Result<ModifierCut, String> {
+    if column >= columns {
+        return Err("the effect modifier must index the numeric matrix".to_owned());
+    }
+    if column == treatment || column == outcome {
+        return Err("the effect modifier must differ from the treatment and outcome".to_owned());
+    }
+    let modifier: Vec<f64> = (0..rows).map(|row| values[column * rows + row]).collect();
+    if let Some(row) = modifier.iter().position(|value| !value.is_finite()) {
+        return Err(format!("the effect modifier has a non-finite value at row {row}"));
+    }
+    let mut sorted = modifier.clone();
+    sorted.sort_by(f64::total_cmp);
+    match bins {
+        None => {
+            let mut levels = sorted.clone();
+            levels.dedup();
+            if levels.len() > MAX_MODIFIER_LEVELS {
+                return Err(format!(
+                    "the effect modifier has {} distinct values; group by quantiles or choose a variable with at most {MAX_MODIFIER_LEVELS} levels",
+                    levels.len()
+                ));
+            }
+            let labels = modifier
+                .iter()
+                .map(|value| levels.iter().position(|level| level == value).expect("level present"))
+                .collect();
+            Ok(ModifierCut {
+                column,
+                grouping: DmlGroupingEvidence::Levels,
+                labels,
+                bounds: levels.iter().map(|&level| (Some(level), Some(level))).collect(),
+            })
+        }
+        Some(bins) => {
+            if !(2..=10).contains(&bins) {
+                return Err("quantile groups must number between 2 and 10".to_owned());
+            }
+            // pandas.qcut takes its probabilities from numpy.linspace(0, 1, bins + 1), and pandas.Series.quantile
+            // hands them to numpy.percentile as percentages, which divides by 100 again. Repeating both
+            // roundings puts a value that sits on an edge in the same group pandas gives it.
+            let step = 1.0 / bins as f64;
+            let edges: Vec<f64> = (1..bins)
+                .map(|k| numpy_percentile(&modifier, (k as f64 * step) * 100.0 / 100.0))
+                .collect();
+            if edges.windows(2).any(|pair| pair[0] >= pair[1]) || edges.first() == sorted.first() || edges.last() == sorted.last() {
+                return Err(format!(
+                    "the effect modifier has too few distinct values for {bins} quantile groups; group by its levels instead"
+                ));
+            }
+            let labels = modifier
+                .iter()
+                .map(|value| edges.iter().filter(|edge| value > edge).count())
+                .collect();
+            let bounds = (0..bins)
+                .map(|group| (
+                    (group > 0).then(|| edges[group - 1]),
+                    (group + 1 < bins).then(|| edges[group]),
+                ))
+                .collect();
+            Ok(ModifierCut {
+                column,
+                grouping: DmlGroupingEvidence::Quantiles { bins },
+                labels,
+                bounds,
+            })
+        }
+    }
 }
 
 pub(crate) fn ardl_pss(

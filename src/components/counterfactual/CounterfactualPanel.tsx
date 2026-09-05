@@ -392,7 +392,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
         <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate counterfactual outcomes</h2>
         <p className="m-0 max-w-[65ch] text-body text-muted">A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
       </div>
-      <section className={panel('p-4')} aria-labelledby="counterfactual-setup-title">
+      <section className={panel('p-(--panel-space)')} aria-labelledby="counterfactual-setup-title">
         <h3 id="counterfactual-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">Structural counterfactual</h3>
         {identified.length === 0 ? (
           <p className="m-0 text-body text-faint">Identify a study first.</p>

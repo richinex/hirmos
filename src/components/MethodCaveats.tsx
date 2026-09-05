@@ -1,7 +1,7 @@
 import { Icon } from '@/components/Icon'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility } from '@/domain/methods'
+import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
 import type { Identification } from '@/domain/study'
 import { IdentificationRecord } from '@/components/IdentificationRecord'
 
@@ -9,11 +9,36 @@ interface MethodCaveatsProps {
   readonly methods: NonEmptyArray<MethodDefinition>
   readonly eligibility?: MethodEligibility | null
   readonly identification?: Identification | null
+  /** Folds that belong in the same list ahead of the methods, sharing its rules and dividers. */
+  readonly leading?: React.ReactNode
 }
 
-/** The literature behind a method's conditions, each work once. Implementation references stay in the method record and the manifest. */
-const literature = (method: MethodDefinition): readonly string[] =>
-  [...new Set(method.caveats.flatMap((caveat) => caveat.sources.flatMap((source) => (source.kind === 'paper' ? [`${source.title} · ${source.locator}`] : []))))]
+/** The works behind a set of sources, each once. Implementation references stay in the method record and the manifest. */
+export const literatureOf = (sources: readonly MethodSource[]): readonly string[] =>
+  [...new Set(sources.flatMap((source) => (source.kind === 'paper' ? [`${source.title} · ${source.locator}`] : [])))]
+
+const literature = (method: MethodDefinition): readonly string[] => literatureOf(method.caveats.flatMap((caveat) => caveat.sources))
+
+/** One disclosure row in the requirements panel: a name, an optional tally, the body, and the literature line. */
+export function RequirementsFold({ name, tally: tallyText = null, open = false, literature: works = [], children }: {
+  readonly name: string
+  readonly tally?: string | null
+  readonly open?: boolean
+  readonly literature?: readonly string[]
+  readonly children: React.ReactNode
+}) {
+  return (
+    <details className="group" open={open}>
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md py-2 text-body transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+        <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
+        <span className="min-w-0 font-medium text-ink">{name}</span>
+        {tallyText !== null && <span className="ml-auto whitespace-nowrap text-label text-faint">{tallyText}</span>}
+      </summary>
+      {children}
+      {works.length > 0 && <p className="mb-2 mt-2 text-label text-faint">Literature: {works.join('; ')}</p>}
+    </details>
+  )
+}
 
 const eligibilityEvaluations = (eligibility: MethodEligibility | null | undefined): readonly CaveatEvaluation[] => {
   if (eligibility === null || eligibility === undefined) return []
@@ -70,7 +95,7 @@ const tally = (method: MethodDefinition, evaluations: ReadonlyMap<string, Caveat
   return parts.length === 0 ? `${total} condition${total === 1 ? '' : 's'}` : parts.join(' · ')
 }
 
-export function MethodCaveats({ methods, eligibility = null, identification = null }: MethodCaveatsProps) {
+export function MethodCaveats({ methods, eligibility = null, identification = null, leading = null }: MethodCaveatsProps) {
   const evaluations = new Map(eligibilityEvaluations(eligibility).map((evaluation) => [evaluation.caveat.id, evaluation]))
   // Without an evaluator (diagnostics, identification methods) a status column is noise: the method reads as prose.
   const evaluated = eligibility !== null && eligibility !== undefined
@@ -78,14 +103,10 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
     <section className="mt-4 border-t border-hair pt-4" aria-label="Method requirements">
       {identification !== null && <IdentificationRecord identification={identification} />}
       <div className="divide-y divide-hair border-y border-hair first:border-t-0">
+        {leading}
         {methods.map((method) => {
           return (
-            <details key={method.id} className="group" open={methods.length === 1}>
-              <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md py-2 text-body transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
-                <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-150 group-open:rotate-180" />
-                <span className="min-w-0 font-medium text-ink">{method.name}</span>
-                {evaluated && <span className="ml-auto whitespace-nowrap text-label text-faint">{tally(method, evaluations)}</span>}
-              </summary>
+            <RequirementsFold key={method.id} name={method.name} tally={evaluated ? tally(method, evaluations) : null} open={methods.length === 1} literature={literature(method)}>
               {!evaluated && (
                 <p className="mb-2 mt-0 max-w-[65ch] text-body text-muted">
                   {[method.summary, ...method.caveats.flatMap((caveat) => (caveat.category === 'interpretation' ? [caveat.requirement] : [caveat.requirement, `If this is not met: ${caveat.consequenceIfUnmet}`]))].join(' ')}
@@ -107,8 +128,7 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
                   )
                 })}
               </ol>}
-              {literature(method).length > 0 && <p className="mb-2 mt-2 text-label text-faint">Literature: {literature(method).join('; ')}</p>}
-            </details>
+            </RequirementsFold>
           )
         })}
       </div>

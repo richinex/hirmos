@@ -29,6 +29,8 @@
    4. MOTION HAS ONE CURVE AND FOUR DURATIONS. Arrivals ease out on cubic-bezier(0.2, 0.7, 0.2, 1) at
       150ms (colour, hover), 200ms (`.pop`, a surface entering) or 280ms (`.rise`). Loops are LINEAR
       on a 0.9s period: `.jobflow-run` marches, `.pulse-live` breathes. The split is not decoration.
+      The four are named once, as --motion-fast, --motion-base, --motion-slow and --motion-loop, and
+      every class and utility reads them, so a duration is a token the way a colour is.
       An ease-out is shaped for something that starts fast and settles, so a loop built on it lurches
       at the seam where it restarts; linear has no seam.
       This is stated as a rule because six places had drifted onto Tailwind's `animate-pulse` — a 2s
@@ -215,7 +217,7 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
     text-decoration: underline;
     text-decoration-color: var(--color-signal-line);
     text-underline-offset: 3px;
-    transition: text-decoration-color 150ms var(--default-transition-timing-function);
+    transition: text-decoration-color var(--motion-fast) var(--default-transition-timing-function);
   }
   a:hover { text-decoration-color: currentColor; }
 }
@@ -254,6 +256,25 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
   table, dl { font-variant-numeric: tabular-nums lining-nums; }
   /* A heading balances its lines so one word is never left alone on the last line. */
   h1, h2, h3 { text-wrap: balance; }
+  /* Chrome is operated, not read: a drag or double-click across it must not paint a selection. */
+  button, summary, th, nav { user-select: none; }
+}
+
+/* A checkbox or radio beside its words is a 16px box on a 24px line. On a coarse pointer the label row
+   takes the 40px height the buttons already take, and the box grows to 20px, so the target is the row
+   and not the box. Fine pointers see no change. */
+@layer base {
+  @media (pointer: coarse) {
+    label:has(> input[type="checkbox"]), label:has(> input[type="radio"]) { min-height: 2.5rem; }
+    input[type="checkbox"], input[type="radio"] { inline-size: 1.25rem; block-size: 1.25rem; }
+  }
+}
+
+/* Safari on iOS zooms the page into any field set under 16px when it takes focus. Fields sit at the
+   12px body tier, so on that platform alone they take the root size instead. Unlayered on purpose: it
+   has to beat the text-body utility on the field. */
+@supports (-webkit-touch-callout: none) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"]), select, textarea { font-size: 1rem; }
 }
 
 /* Material Symbols Sharp — squared terminals match the hairline chrome.
@@ -279,17 +300,25 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
 ::-webkit-scrollbar { width: 0; height: 0; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.rise { animation: rise 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+/* The house durations. Read by the classes below, by `duration-(--motion-*)` utilities, and by the
+   landing choreography; nowhere else states a number. */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 200ms;
+  --motion-slow: 280ms;
+  --motion-loop: 0.9s;
+}
+.rise { animation: rise var(--motion-slow) cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
 /* One entrance for every floating surface (Rnd panels, dialogs, drawer), using the same sharp easing as
    `rise` — a settle, not a bounce, which would read wrong on a technical instrument. */
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
-.pop { animation: pop 0.2s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.pop { animation: pop var(--motion-base) cubic-bezier(0.2, 0.7, 0.2, 1) both; }
 
 /* The extraction-flow edge while its unit runs: a dash march along the gradient stroke, reading as
    "data in flight" from the source card to the unit. Killed with everything else by reduced-motion. */
 @keyframes jobflow-dash { to { stroke-dashoffset: -24; } }
-.jobflow-run { stroke-dasharray: 7 5; animation: jobflow-dash 0.9s linear infinite; }
+.jobflow-run { stroke-dasharray: 7 5; animation: jobflow-dash var(--motion-loop) linear infinite; }
 
 /* "Working" — a live status dot, or a placeholder standing in for content that has not arrived.
    The house loop period is 0.9s, set by the dash march above; `alternate` at 0.45s completes the round
@@ -298,7 +327,7 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
    This replaces Tailwind's `animate-pulse`, which ran 2s on its own curve and was the only motion in the
    app outside the documented vocabulary. */
 @keyframes pulse-live { to { opacity: 0.45; } }
-.pulse-live { animation: pulse-live 0.45s ease-in-out infinite alternate; }
+.pulse-live { animation: pulse-live calc(var(--motion-loop) / 2) ease-in-out infinite alternate; }
 
 /* Skeleton sweep — Kinetics' "Skeleton to Content", on our surfaces.
    A placeholder that SHOWS ITS SHAPE beats a word that describes its absence: the reader learns the layout
@@ -318,7 +347,7 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
    when the wait is real. The delay sits on the appearing state alone; removal is instant, so a
    late arrival is never held back by its own placeholder. */
 @keyframes hold-appear { to { opacity: 1; } }
-.hold-appear { opacity: 0; animation: hold-appear 150ms var(--default-transition-timing-function) 200ms both; }
+.hold-appear { opacity: 0; animation: hold-appear var(--motion-fast) var(--default-transition-timing-function) var(--motion-base) both; }
 
 /* A determinate bar that is also alive: `.bar-live` is the TRACK. A 48px highlight crosses the whole
    track at one speed whatever the fill, and a 14px bright edge marks the fill's frontier. 1.8s and linear:
@@ -521,7 +550,7 @@ button[aria-busy="true"]::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-property: color, background-color, border-color, outline-color, fill, stroke, opacity !important;
-    transition-duration: 150ms !important;
+    transition-duration: var(--motion-fast) !important;
   }
 }
 
@@ -532,7 +561,7 @@ button[aria-busy="true"]::after {
    "this scrolls" is visible before the first wheel. Same reasoning as .figure-strip, other axis. */
 /* Pane separators: the seam is a one-pixel hairline; an 8px hit area either side does the ergonomics.
    react-resizable-panels sets data-separator="active" while dragging. */
-.seam { position: relative; background: var(--color-line); transition: background-color 150ms; }
+.seam { position: relative; background: var(--color-line); transition: background-color var(--motion-fast); }
 .seam::before { content: ''; position: absolute; inset: 0 -4px; }
 .seam-h::before { inset: -4px 0; }
 .seam:hover, .seam[data-separator="active"] { background: var(--color-edge); }
@@ -560,7 +589,7 @@ button[aria-busy="true"]::after {
 .log-fade[data-clipped-top='1'] { --fade-top: 18px; }
 .log-fade[data-clipped-bottom='1'] { --fade-bottom: 18px; }
 /* cmdk publishes its list height; animate it on the house curve. */
-.cmdk-list { height: var(--cmdk-list-height); transition: height 150ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+.cmdk-list { height: var(--cmdk-list-height); transition: height var(--motion-fast) cubic-bezier(0.2, 0.7, 0.2, 1); }
 .figure-strip::-webkit-scrollbar { height: 6px; }
 .figure-strip::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }
 .figure-strip::-webkit-scrollbar-track { background: transparent; }
@@ -631,7 +660,7 @@ button[aria-busy="true"]::after {
   transform: translateX(calc(-1 * var(--smart-truncate-fade-width)));
   opacity: 0;
   background: linear-gradient(to right, color-mix(in srgb, var(--smart-truncate-surface) 0%, transparent), var(--smart-truncate-surface) 80%);
-  transition: opacity 150ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: opacity var(--motion-fast) cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 @container smart-truncate (min-height: 1.5lh) {
   .smart-truncate__fade { opacity: 1; }

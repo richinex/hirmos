@@ -4,7 +4,7 @@ import { useVirtualizer } from '@tanstack/react-virtual'
 import { Icon } from '@/components/Icon'
 import { cellPadding, Chip, FilterField, HeaderMenu, ROW_HEIGHT, TableShell, useTableDensity, type MenuItem } from '@/components/table/primitives'
 import { Alert } from '@/components/ui/Alert'
-import { button, field, label, literal, num, pill, table as tableCn, th } from '@/components/ui/recipes'
+import { facet, button, field, label, literal, num, table as tableCn, th } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type ColumnId, type ColumnSummary, type DatasetProfile, type PhysicalColumnProfile, type PreviewCell, type PreviewFilter, type PreviewSort } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import type { SelectedSource } from '@/domain/workflow'
@@ -157,7 +157,7 @@ function FilterEditor({ draft, onChange, onApply, onCancel }: {
                 key={category.value}
                 type="button"
                 aria-pressed={active}
-                className={pill(active, 'min-h-6 px-2 py-0')}
+                className={facet(active, 'min-h-6 px-2 py-0')}
                 onClick={() => onChange({ ...draft, values: active ? new Set([...draft.values].filter((value) => value !== category.value)) : new Set([...draft.values, category.value]) })}
               >
                 {category.value} <span className={num('text-faint')}>{formatCount(category.count, { compact: true }).text}</span>
@@ -251,7 +251,7 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
             </Chip>
           ))}
           <details className="relative">
-            <summary className={cn(pill(hidden.size > 0, 'flex min-h-6 cursor-pointer list-none items-center gap-1 px-2 py-0'))}>
+            <summary className={cn(facet(hidden.size > 0, 'flex min-h-6 cursor-pointer list-none items-center gap-1 px-2 py-0'))}>
               <Icon name="view_column" size={13} /> Columns <span className={num('text-faint')}>{visibleColumns.length} of {profile.columns.length}</span>
             </summary>
             <div className="float absolute right-0 top-full z-20 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-edge bg-panel p-2">

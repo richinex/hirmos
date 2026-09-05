@@ -40,7 +40,7 @@ import {
   describeCovariance,
   describeDiscreteStatePreparations,
   describeEstimator,
-  describeInstrumentalVariableRoute,
+  describeInstrumentalVariableRoute, dmlNuisanceInputs,
   ESTIMATOR_GROUPS,
   ESTIMATOR_IDS,
   evaluateEstimatorEligibility,
@@ -75,7 +75,7 @@ import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
-import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem, type AnalysisProgress, type DmlGroupsRequest } from '@/workers/analysisProtocol'
 import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 
 const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
@@ -177,17 +177,30 @@ type PanelPreflightJob =
   | { readonly kind: 'ready'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
   | { readonly kind: 'refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
 
-interface State {
+/** The identification the panel works from, with the estimator that fits it and fresh defaults for every estimator. */
+interface EstimationSelection {
   readonly identification: IdentificationId | null
   readonly estimator: EstimatorId
   readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>>
+}
+
+const estimationSelection = (identification: IdentificationArtifact | null, studies: readonly StudySpecification[], prepared: PreparedDatasetArtifact): EstimationSelection => {
+  const study = studies.find((candidate) => candidate.id === identification?.study) ?? null
+  return {
+    identification: identification?.id ?? null,
+    estimator: defaultEstimatorFor(identification?.result ?? null, prepared, study),
+    configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, study)])) as Record<EstimatorId, EstimatorConfiguration>,
+  }
+}
+
+interface State extends EstimationSelection {
   readonly job: Job
   readonly panelPreflight: PanelPreflightJob
   readonly studyDataPreflight: StudyDataPreflightJob
 }
 
 type Event =
-  | { readonly type: 'identification-chosen'; readonly identification: IdentificationId | null; readonly estimator: EstimatorId; readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>> }
+  | { readonly type: 'identification-chosen'; readonly selection: EstimationSelection }
   | { readonly type: 'estimator-chosen'; readonly estimator: EstimatorId }
   | { readonly type: 'configured'; readonly configuration: EstimatorConfiguration }
   | { readonly type: 'run-started' }
@@ -205,7 +218,7 @@ type Event =
 
 const step = (state: State, event: Event): State => {
   switch (event.type) {
-    case 'identification-chosen': return { ...state, identification: event.identification, estimator: event.estimator, configurations: event.configurations, job: { kind: 'idle' } }
+    case 'identification-chosen': return { ...state, ...event.selection, job: { kind: 'idle' } }
     case 'estimator-chosen': return { ...state, estimator: event.estimator, job: { kind: 'idle' } }
     case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration }, job: { kind: 'idle' } }
     case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
@@ -227,7 +240,7 @@ const step = (state: State, event: Event): State => {
 
 const intervalText = (estimate: CausalEstimate): string => {
   if (estimate.interval.kind === 'none') return 'none'
-  const value = estimate.effect.kind === 'path' ? estimate.effect.aggregate.cumulative : estimate.effect.value
+  const value = estimate.effect.kind === 'path' ? estimate.effect.aggregate.cumulative : estimate.effect.kind === 'byGroup' ? estimate.effect.overall : estimate.effect.value
   const figure = formatInterval(value, estimate.interval.lower, estimate.interval.upper, intervalTypeOf(estimate.interval), scaleOf(estimate))
   return `[${figure.bounds.lower}, ${figure.bounds.upper}]`
 }
@@ -635,11 +648,23 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       }, theme)
   }, [curves, curveIndex, adjustmentVariables, study.outcome.name, study.treatment.name, theme])
   const stamp = `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''} · ${formatTime(run.createdAt)}`
+  // A grouped effect draws each group's interval on the shared axis, the whole-population average last.
+  const groupChart = useMemo(() => (estimate.effect.kind === 'byGroup'
+    ? runComparisonOption([
+      ...estimate.effect.groups.map((group): RunComparisonRow => ({ label: group.label, estimate: group.value, lower: group.interval.lower, upper: group.interval.upper, current: false })),
+      { label: 'All rows', estimate: estimate.effect.overall, lower: estimate.interval.kind === 'none' ? null : estimate.interval.lower, upper: estimate.interval.kind === 'none' ? null : estimate.interval.upper, current },
+    ], theme)
+    : null), [estimate, current, theme])
   const body = (
     <>
       <div className="mt-3">
         <EstimateHeadline estimate={estimate} sentence={sentence} scaleLine={scaleLine} stepLabel={stepLabel} accent={current} testId="effect-estimate" />
       </div>
+      {groupChart !== null && estimate.effect.kind === 'byGroup' && (
+        <div className="mt-3">
+          <ExpandableChart option={groupChart} label={`Effect of ${study.treatment.name} on ${study.outcome.name} by group of ${estimate.effect.modifier}`} className="h-[220px]" testId="group-effects" />
+        </div>
+      )}
       {chart !== null && (
         <div className="mt-3">
           {ghosts.length > 0 && (
@@ -725,18 +750,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const chartTheme = useChartTheme()
   const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
   const [adjustmentDraft, setAdjustmentDraft] = useState<ExplicitAdjustmentMemberDraft>(CLOSED_ADJUSTMENT_DRAFT)
-  const latestIdentification = identified.at(-1) ?? null
-  const latestStudy = studies.find((candidate) => candidate.id === latestIdentification?.study) ?? null
-  const initialEstimator = defaultEstimatorFor(latestIdentification?.result ?? null, prepared)
   const [state, dispatch] = useReducer(step, null, (): State => ({
-    identification: latestIdentification?.id ?? null,
-    estimator: initialEstimator,
-    configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, latestStudy)])) as Record<EstimatorId, EstimatorConfiguration>,
+    ...estimationSelection(identified.at(-1) ?? null, studies, prepared),
     job: { kind: 'idle' },
     panelPreflight: { kind: 'not-required' },
     studyDataPreflight: { kind: 'not-required' },
   }))
-  const [visibleEstimatorGroup, setVisibleEstimatorGroup] = useState<EstimatorGroupId>(() => estimatorGroupFor(initialEstimator).id)
+  const [visibleEstimatorGroup, setVisibleEstimatorGroup] = useState<EstimatorGroupId>(() => estimatorGroupFor(state.estimator).id)
   useEffect(() => setVisibleEstimatorGroup(estimatorGroupFor(state.estimator).id), [state.estimator])
   const visibleGroup = ESTIMATOR_GROUPS.find((group) => group.id === visibleEstimatorGroup) ?? ESTIMATOR_GROUPS[0]
   const selectedEstimatorIsVisible = visibleGroup.estimators.includes(state.estimator)
@@ -998,10 +1018,17 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         }
         case 'dml-plr':
         case 'dml-irm': {
-          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
+          const nuisance = dmlNuisanceInputs(identification.result.adjustment.variables, study.estimand)
+          const modifier = study.estimand.kind === 'conditional-average-treatment-effect' ? study.estimand.modifier : null
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...nuisance]
           const matrix = await materialise(columns)
           if (configuration.kind === 'dml-irm' && columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the interactive model needs a 0/1 treatment.` }); return }
-          const evidence = await analysis.runDoubleMl(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), model: configuration.kind === 'dml-plr' ? 'plr' : 'irm', att: configuration.kind === 'dml-irm' && configuration.att, seed: configuration.seed })
+          const groups: DmlGroupsRequest = study.estimand.kind !== 'conditional-average-treatment-effect'
+            ? { kind: 'none' }
+            : study.estimand.grouping.kind === 'levels'
+              ? { kind: 'levels', column: columns.findIndex((variable) => variable.column === modifier?.column) }
+              : { kind: 'quantiles', column: columns.findIndex((variable) => variable.column === modifier?.column), bins: study.estimand.grouping.bins }
+          const evidence = await analysis.runDoubleMl(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: nuisance.map((_, index) => index + 2), model: configuration.kind === 'dml-plr' ? 'plr' : 'irm', att: configuration.kind === 'dml-irm' && configuration.att, seed: configuration.seed, groups })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'double-ml-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1558,7 +1585,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         <p className="m-0 max-w-[65ch] text-body text-muted">Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 
-      <section className={panel('p-4')} aria-labelledby="estimation-setup-title">
+      <section className={panel('p-(--panel-space)')} aria-labelledby="estimation-setup-title">
         <h3 id="estimation-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">{method.ok ? method.value.name : 'Estimator'}</h3>
         {identified.length === 0 ? (
           <Alert tone="info" live={false}>
@@ -1569,7 +1596,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <div className="grid grid-cols-1 gap-4">
               <label className="block">
                 <span className={fieldLabel}>Identified study</span>
-                <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => { const chosen = event.target.value === '' ? null : (event.target.value as IdentificationId); const chosenIdentification = identifications.find((candidate) => candidate.id === chosen) ?? null; const chosenStudy = studies.find((candidate) => candidate.id === chosenIdentification?.study) ?? null; dispatch({ type: 'identification-chosen', identification: chosen, estimator: defaultEstimatorFor(chosenIdentification?.result ?? null, prepared), configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, chosenStudy)])) as Record<EstimatorId, EstimatorConfiguration> }) }}>
+                <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => dispatch({ type: 'identification-chosen', selection: estimationSelection(identified.find((candidate) => candidate.id === event.target.value) ?? null, studies, prepared) })}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
                   return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} · ${bound.dagName}`}</option>

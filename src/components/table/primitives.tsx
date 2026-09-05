@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { literal, num, panel, pill, rowPadding, segment, tableFoot, th } from '@/components/ui/recipes'
+import { facet, literal, num, panel, rowPadding, segment, tableFoot, th } from '@/components/ui/recipes'
 import type { HistogramBins } from '@/domain/dataset'
 import type { TableDensity } from '@/domain/shellLayout'
 import { formatCount } from '@/lib/format/number'
@@ -72,7 +72,7 @@ export function TableShell({ title, titleId, toolbar, lead, count, foot, childre
             aria-controls={`${titleId}-body`}
             className="-mx-1 flex items-center gap-1.5 rounded px-1 text-title font-medium text-ink transition-colors hover:text-muted"
           >
-            <Icon name="expand_more" size={14} className={cn('shrink-0 transition-transform duration-150', open && 'rotate-180')} />
+            <Icon name="expand_more" size={14} className={cn('shrink-0 transition-transform duration-(--motion-fast)', open && 'rotate-180')} />
             <span id={titleId}>{title}</span>
           </button>
         ) : (
@@ -169,16 +169,16 @@ export interface Facet {
 export function FacetPills({ facets, onToggle, label: groupLabel }: { readonly facets: readonly Facet[]; readonly onToggle: (id: string) => void; readonly label: string }) {
   return (
     <div className="flex flex-wrap gap-1" role="group" aria-label={groupLabel}>
-      {facets.map((facet) => (
+      {facets.map((entry) => (
         <button
-          key={facet.id}
+          key={entry.id}
           type="button"
-          aria-pressed={facet.active}
-          disabled={facet.count === 0 && !facet.active}
-          onClick={() => onToggle(facet.id)}
-          className={pill(facet.active, 'min-h-6 px-2 py-0 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-8')}
+          aria-pressed={entry.active}
+          disabled={entry.count === 0 && !entry.active}
+          onClick={() => onToggle(entry.id)}
+          className={facet(entry.active, 'min-h-6 px-2 py-0 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-8')}
         >
-          {facet.text} <span className={num('text-faint')}>{facet.count}</span>
+          {entry.text} <span className={num('text-faint')}>{entry.count}</span>
         </button>
       ))}
     </div>

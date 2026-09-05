@@ -91,7 +91,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       </article>
 
       {manifest.warnings.length > 0 && (
-        <section className={panel('p-4')} aria-label="Unresolved requirements">
+        <section className={panel('p-(--panel-space)')} aria-label="Unresolved requirements">
           <h3 className="mb-2 mt-0 text-warn text-label font-medium">Requirements to review</h3>
           <ul className="m-0 space-y-1 pl-4 text-body text-muted">
             {manifest.warnings.map((warning) => <li key={warning}>{warning}</li>)}
@@ -219,7 +219,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         </label>
       </div>
       {otherManifest !== null && manifest !== null && (
-        <section className={panel('p-4')} aria-label="Differences">
+        <section className={panel('p-(--panel-space)')} aria-label="Differences">
           <h3 className="mb-2 mt-0 text-faint text-label font-medium">Differences · {differences.length}</h3>
           {differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : (
             <div className="figure-strip overflow-x-auto">
@@ -263,7 +263,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
               <tr key={candidate.id} className={tr(candidate.id === selected ? 'selected' : 'action')} onClick={() => setSelected(candidate.id)}>
                 <td className={td('text-ink')}>{study === undefined ? candidate.method : estimandSentence(study)}</td>
                 <td className={td('text-muted')}>{describeEstimator(candidate.configuration.kind)}</td>
-                <td className={td(num('whitespace-nowrap text-right text-ink'))}>{effect.kind === 'path' ? formatStatistic('raw', effect.aggregate.average).text : formatStatistic('raw', effect.value).text}</td>
+                <td className={td(num('whitespace-nowrap text-right text-ink'))}>{effect.kind === 'path' ? formatStatistic('raw', effect.aggregate.average).text : effect.kind === 'byGroup' ? formatStatistic('raw', effect.overall).text : formatStatistic('raw', effect.value).text}</td>
                 <td className={td('text-muted')}>{study?.dagName ?? '—'}</td>
                 <td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td>
               </tr>

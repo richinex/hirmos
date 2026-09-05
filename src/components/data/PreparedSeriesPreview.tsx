@@ -76,7 +76,7 @@ function DecompositionPlot({ series }: { readonly series: PreparedSeries & { rea
 
 function PreparedSeriesCell({ series }: { readonly series: PreparedSeries }) {
   return (
-    <li className={well('p-3')}>
+    <li className={well('p-(--panel-space)')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">{series.name}</span>
         <span className={caption()}>{series.transform}{series.decomposition !== null ? ' · STL-adjusted' : ''}</span>
@@ -147,7 +147,7 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
   useEffect(() => { void load() }, [load])
 
   return (
-    <section className={panel('mt-4 p-4')} aria-labelledby="prepared-preview-title">
+    <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="prepared-preview-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 id="prepared-preview-title" className="m-0 text-title font-medium text-ink">Prepared values</h3>
@@ -166,10 +166,10 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
             aria-expanded={open}
             className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
           >
-            <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+            <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-(--motion-fast) ${open ? 'rotate-180' : ''}`} />
             <span>Prepared series · {formatCount(job.rows, { noun: 'aligned rows' }).text}{job.leadingRowsRemoved > 0 ? ' · first source row removed for alignment' : ''}</span>
           </button>
-          <div className="grid transition-[grid-template-rows] duration-200" style={{ gridTemplateRows: open ? '1fr' : '0fr' }}>
+          <div className="grid transition-[grid-template-rows] duration-(--motion-base)" style={{ gridTemplateRows: open ? '1fr' : '0fr' }}>
             <div className="overflow-hidden">
               <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(28rem,100%),1fr))] gap-2 border-t border-hair p-2" aria-label="Prepared series plots">
                 {job.series.map((series) => <PreparedSeriesCell key={series.column} series={series} />)}

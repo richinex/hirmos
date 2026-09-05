@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { HirmosMark } from '@/components/HirmosMark'
 import { InternalLink } from '@/components/ui/InternalLink'
 import { choreographLanding } from './choreography'
@@ -8,6 +8,9 @@ import type { HirmosGraph } from './HirmosGraph'
 // its fallback for React's reveal window, and the fallback here is the same empty placeholder the
 // static shell in index.html already paints, so nothing may appear and move in between.
 const graphChunk = import('./HirmosGraph')
+
+/** The hero headline, one slot per word so the reveal is markup, not a script. */
+const HEADLINE = 'Hirmos offers a framework for causal inference.'.split(' ')
 
 const WORKFLOW = [
   { number: '01', title: 'Prepare', copy: 'Profile the source, define the observation structure, resolve missingness, and record transformations.' },
@@ -109,7 +112,12 @@ export function Landing() {
         <section className="landing-hero-copy" aria-labelledby="landing-title">
           <p className="landing-eyebrow">My causal inference workbench</p>
           <h1 id="landing-title" className="landing-headline">
-            Hirmos offers a framework for causal inference.
+            {HEADLINE.map((word, index) => (
+              <Fragment key={word}>
+                <span className="landing-slot" style={{ '--slot': index } as CSSProperties}><span className="landing-slot-word">{word}</span></span>
+                {index + 1 < HEADLINE.length ? ' ' : null}
+              </Fragment>
+            ))}
           </h1>
           <div className="landing-actions">
             <InternalLink className="landing-primary" href="/app">Start an analysis</InternalLink>

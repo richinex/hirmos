@@ -525,7 +525,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       </div>
 
       <div className="grid gap-4 @3xl/panel:grid-cols-2">
-        <section className={panel('@container/card p-4')} aria-labelledby="sampling-title">
+        <section className={panel('@container/card p-(--panel-space)')} aria-labelledby="sampling-title">
           <span className={label('text-faint')}>How rows are organised</span>
           <h3 id="sampling-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose the observation structure</h3>
           <RadioList frame="none"
@@ -588,7 +588,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           )}
         </section>
 
-        <section className={panel('@container/card p-4')} aria-labelledby="variables-title">
+        <section className={panel('@container/card p-(--panel-space)')} aria-labelledby="variables-title">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <span className={label('text-faint')}>Variables</span>
@@ -623,7 +623,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           </div>
         </section>
 
-        <section className={panel('@container/card p-4 @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
+        <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
           <span className={label('text-faint')}>Missing values</span>
           <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</h3>
           {draft.missingness.kind === 'not-present' ? (
@@ -738,7 +738,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </section>
 
         {(timeSeriesSelected || panelSelected) && (
-        <section className={panel('@container/card p-4 @3xl/panel:col-span-2')} aria-labelledby="transform-title">
+        <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="transform-title">
           <span className={label('text-faint')}>Time-series values</span>
           <h3 id="transform-title" className="mb-1 mt-1 text-title font-medium text-ink">Prepare the analysis scale</h3>
           {timeSeriesSelected ? (
@@ -915,7 +915,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
       {(preparedCurrent !== null || timeSeriesSelected) && (
-        <section className={panel('mt-4 p-4')} aria-labelledby="diagnostics-title">
+        <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 id="diagnostics-title" className="m-0 text-title font-medium text-ink">Diagnostics</h3>
@@ -995,7 +995,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               aria-expanded={stationarityOpen}
               className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
             >
-              <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-150 ${stationarityOpen ? 'rotate-180' : ''}`} />
+              <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-(--motion-fast) ${stationarityOpen ? 'rotate-180' : ''}`} />
               <span className="flex flex-wrap items-center gap-2">
                 <Icon name="check_circle" size={14} className="text-ok" />
                 Stationarity tests · {stationarityEvidence.variables.length} variables · {stationarityEvidence.observations.toLocaleString()} rows · {
@@ -1007,7 +1007,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 }
               </span>
             </button>
-            <div className="grid transition-[grid-template-rows] duration-200" style={{ gridTemplateRows: stationarityOpen ? '1fr' : '0fr' }}>
+            <div className="grid transition-[grid-template-rows] duration-(--motion-base)" style={{ gridTemplateRows: stationarityOpen ? '1fr' : '0fr' }}>
             <div className="overflow-hidden">
             <div className="border-t border-hair px-2.5 pb-3">
             <div className="figure-strip overflow-x-auto">

@@ -10,6 +10,14 @@ import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type Pan
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
+
+/** The groups a double machine learning run averages within, or none for the plain average. */
+export const dmlGroupsRequestSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({ kind: z.literal('levels'), column: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('quantiles'), column: z.number().int().nonnegative(), bins: z.number().int().min(2).max(10) }).strict(),
+])
+export type DmlGroupsRequest = z.infer<typeof dmlGroupsRequestSchema>
 import { assertNever, brand, err, ok, type Brand, type Result } from '@/domain/dop'
 import {
   dynotearsEvidenceSchema,
@@ -532,6 +540,7 @@ export type AnalysisWorkerCommand =
       readonly model: 'plr' | 'irm'
       readonly att: boolean
       readonly seed: number
+      readonly groups: DmlGroupsRequest
     }
   | {
       readonly kind: 'dml-refutation-batch'
@@ -1307,6 +1316,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     model: z.enum(['plr', 'irm']),
     att: z.boolean(),
     seed: z.number().int().nonnegative(),
+    groups: dmlGroupsRequestSchema,
   }).strict(),
   z.object({
     kind: z.literal('dml-refutation-batch'),

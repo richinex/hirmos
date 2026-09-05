@@ -39,6 +39,7 @@ import {
   type AnalysisProgress,
   type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
+  type DmlGroupsRequest,
   type TemporalSamples,
   type WorkerRequestId,
 } from '@/workers/analysisProtocol'
@@ -838,7 +839,7 @@ export interface DmlDesign {
   readonly seed: number
 }
 
-export function runDoubleMl(values: Float64Array, rows: number, columns: number, design: DmlDesign): Promise<DoubleMlOutcome> {
+export function runDoubleMl(values: Float64Array, rows: number, columns: number, design: DmlDesign & { readonly groups: DmlGroupsRequest }): Promise<DoubleMlOutcome> {
   const request = newWorkerRequestId()
   return post('double-ml-succeeded', { kind: 'double-ml', request, values, rows, columns, ...design }, values)
 }

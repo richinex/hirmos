@@ -1677,6 +1677,13 @@ const dmlCaveats = (model: 'plr' | 'irm'): NonEmptyArray<MethodCaveat> => [
     sources: [RUIZ_DE_VILLA_CH7('§7.4.3 positivity'), HERNAN_ROBINS],
   },
   {
+    id: caveatId(`dml-${model}-group-effects`),
+    category: 'functional-form',
+    requirement: 'For a conditional target the effect of the treatment is linear within each group of the effect modifier, and may differ between groups; the modifier is distinct from the treatment and joins the adjustment set as a nuisance input, as in DoubleML\'s own heterogeneous-effects data.',
+    consequenceIfUnmet: 'A group effect then averages over effects that vary inside the group, and the contrast between groups is not the heterogeneity it appears to be.',
+    sources: [RUIZ_DE_VILLA_CH8('§8.1.4 heterogeneous treatment effects, the conditional average treatment effect'), NESS_CH11('§11.4 conditional average treatment effect estimation'), BACH_DOUBLEML],
+  },
+  {
     id: caveatId(`dml-${model}-learner-settings`),
     category: 'computation',
     requirement: 'Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7, and the recorded fold seed.',

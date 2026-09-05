@@ -612,6 +612,8 @@ pub(crate) enum AnalysisCommand {
         att: bool,
         /// Seeds the fold stream; the learner seed is the worker's fixed 7.
         seed: u32,
+        /// Group effects over an effect modifier, or none for the plain average.
+        groups: DmlGroups,
     },
     DmlRefutationBatch {
         rows: usize,
@@ -1786,6 +1788,7 @@ pub(crate) enum AnalysisResult {
         standard_error: f64,
         interval: (f64, f64),
         level: f64,
+        groups: DmlGroupEvidence,
     },
     ArdlPss {
         observations: usize,
@@ -1995,6 +1998,61 @@ pub(crate) enum AnalysisResult {
 pub(crate) enum DmlModel {
     Plr,
     Irm,
+}
+
+/// How the effect modifier's column is cut into the groups DoubleML's `gate` receives.
+#[derive(Clone, Copy, serde::Deserialize, PartialEq, Debug)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DmlGroups {
+    None,
+    /// One group per distinct value of the column.
+    Levels { column: usize },
+    /// `bins` quantile groups of the column, right-inclusive as `pandas.qcut` cuts them.
+    Quantiles { column: usize, bins: usize },
+}
+
+#[derive(Clone, Copy, Serialize, PartialEq, Debug)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DmlGroupingEvidence {
+    Levels,
+    Quantiles { bins: usize },
+}
+
+#[derive(Clone, Serialize, PartialEq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DmlGroupEffectEvidence {
+    /// The group's bounds on the modifier: equal for a level, open at the outer quantile edges.
+    pub lower: Option<f64>,
+    pub upper: Option<f64>,
+    pub observations: usize,
+    pub effect: f64,
+    pub standard_error: f64,
+    pub interval: (f64, f64),
+    pub few_observations: bool,
+}
+
+#[derive(Clone, Serialize, PartialEq, Debug)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum DmlGroupEvidence {
+    None,
+    Grouped {
+        modifier: usize,
+        grouping: DmlGroupingEvidence,
+        level: f64,
+        groups: Vec<DmlGroupEffectEvidence>,
+    },
 }
 
 #[derive(Clone, Copy, Serialize, serde::Deserialize, PartialEq, Eq, Debug)]

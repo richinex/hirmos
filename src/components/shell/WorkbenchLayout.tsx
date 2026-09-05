@@ -24,7 +24,7 @@ function PaneHeader({ id, title, controls, collapse }: {
   readonly collapse?: { readonly collapsed: boolean; readonly onToggle: () => void; readonly icon: { readonly open: string; readonly closed: string } }
 }) {
   return (
-    <div className="flex h-9 shrink-0 items-center justify-between gap-2 border-b border-hair px-3">
+    <div className="flex h-9 shrink-0 select-none items-center justify-between gap-2 border-b border-hair px-3">
       <h2 id={id} className={cn('m-0 truncate', panelTitle)}>{title}</h2>
       <div className="flex items-center gap-1.5">
         {!collapse?.collapsed && controls}

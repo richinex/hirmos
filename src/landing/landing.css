@@ -11,6 +11,9 @@
 :root[data-surface="landing"],
 :root[data-surface="landing"] body,
 :root[data-surface="landing"] #root { height: auto; min-height: 100%; }
+/* The landing's own durations, in the house register beside --motion-fast and friends: one reveal, one
+   stroke draw-on, one stagger step. The choreography script reads these rather than restating them. */
+:root[data-surface="landing"] { --motion-reveal: 640ms; --motion-draw: 900ms; --motion-stagger: 70ms; }
 :root[data-surface="landing"] body { overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: auto; }
 :root[data-surface="landing"] #root { height: auto; }
 
@@ -65,18 +68,25 @@
   color: var(--color-bone);
   background: color-mix(in srgb, var(--color-panel) 78%, transparent);
   font-size: var(--text-body);
-  transition: color 150ms, border-color 150ms, background-color 150ms;
+  transition: color var(--motion-fast), border-color var(--motion-fast), background-color var(--motion-fast);
 }
 .landing-open:hover { color: var(--color-ink); background: var(--color-panel); }
 
 .landing-hero-copy { position: relative; z-index: 3; width: min(38rem, 46%); margin-block: auto; padding-block: 3rem 13rem; }
 .landing-eyebrow { margin: 0 0 1rem; color: var(--color-faint); font-size: var(--text-label); font-weight: 550; letter-spacing: .02em; }
 .landing-headline { max-width: 26ch; margin: 1.25rem 0 0; color: var(--color-ink); font-size: clamp(2.2rem, calc(3.565vw + 1.398rem), 4.25rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+/* The headline arrives one word at a time through a letterbox: each slot is one line tall and clips its
+   word, which rises into place on the house curve. Pure CSS, so the hero paints before any script runs;
+   the reduced-motion rule below collapses it to the final frame. The slot's bottom padding keeps
+   descenders inside the clip, and the negative margin gives that room back to the layout. */
+.landing-slot { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .12em; margin-bottom: -.12em; }
+.landing-slot-word { display: inline-block; transform: translateY(120%); animation: landing-slot-in var(--motion-reveal) cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--slot) * var(--motion-stagger)); }
+@keyframes landing-slot-in { to { transform: translateY(0); } }
 .landing-lede { max-width: 55ch; margin: 1.25rem 0 0; color: var(--color-muted); font-size: clamp(1rem, 1.25cqi, 1.1rem); line-height: 1.65; text-wrap: pretty; }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 2.25rem; }
-.landing-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; border-radius: .55rem; padding: .7rem 1.25rem; background: var(--color-signal); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 550; transition: filter 150ms, transform 150ms; }
+.landing-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; border-radius: .55rem; padding: .7rem 1.25rem; background: var(--color-signal); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 550; transition: filter var(--motion-fast), transform var(--motion-fast); }
 .landing-primary:hover { color: var(--color-signal-ink); filter: brightness(1.08); }
-.landing-secondary { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.8rem; padding: .7rem .5rem; color: var(--color-muted); font-size: var(--text-title); transition: color 150ms; }
+.landing-secondary { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.8rem; padding: .7rem .5rem; color: var(--color-muted); font-size: var(--text-title); transition: color var(--motion-fast); }
 .landing-secondary:hover { color: var(--color-ink); }
 /* These anchors are drawn as controls, not prose links, so they opt out of the base underline. */
 .landing-wordmark, .landing-open, .landing-primary, .landing-secondary { text-decoration: none; }

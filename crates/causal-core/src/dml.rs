@@ -16,6 +16,22 @@ pub struct DmlResult {
     /// sqrt(sigma2 * nu2) and its influence function, DoubleML's confounding bias bound.
     max_bias: f64,
     psi_max_bias: Vec<f64>,
+    /// What DoubleML's `gate` regresses on group dummies; absent for the ATTE score, which it refuses.
+    group_signal: Option<GroupSignal>,
+}
+
+/// The per-observation quantities behind DoubleML's best linear predictor of group effects: for
+/// IRM the orthogonal signal `psi_b` against a plain dummy basis, for PLR the partialled-out outcome
+/// against a dummy basis scaled by the partialled-out treatment.
+pub struct GroupSignal {
+    pub(crate) signal: Vec<f64>,
+    pub(crate) scale: Vec<f64>,
+}
+
+impl DmlResult {
+    pub(crate) fn group_signal(&self) -> Option<&GroupSignal> {
+        self.group_signal.as_ref()
+    }
 }
 
 pub struct SensitivityScenario {
@@ -272,6 +288,7 @@ fn solve_score(psi_a: &[f64], psi_b: &[f64]) -> DmlResult {
         scaled_psi: Vec::new(),
         max_bias: 0.0,
         psi_max_bias: Vec::new(),
+        group_signal: None,
     }
 }
 
@@ -330,6 +347,10 @@ pub fn dml_plr(
     let nu2 = 1.0 / (tr.iter().map(|v| v * v).sum::<f64>() / n);
     let psi_nu2: Vec<f64> = tr.iter().map(|v| nu2 - v * v * nu2 * nu2).collect();
     attach_sensitivity(&mut res, &psi_a, &psi_b, sigma2, &psi_sigma2, nu2, &psi_nu2);
+    res.group_signal = Some(GroupSignal {
+        signal: y.iter().zip(&l_hat).map(|(yi, li)| yi - li).collect(),
+        scale: tr,
+    });
     res
 }
 
@@ -439,5 +460,11 @@ pub fn dml_irm(
         nu2 = psi_nu2.iter().sum::<f64>() / nf;
     }
     attach_sensitivity(&mut res, &psi_a, &psi_b, sigma2, &psi_sigma2, nu2, &psi_nu2);
+    if !att {
+        res.group_signal = Some(GroupSignal {
+            signal: psi_b,
+            scale: vec![1.0; n],
+        });
+    }
     res
 }

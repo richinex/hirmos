@@ -383,7 +383,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
         <p className="m-0 max-w-[65ch] text-body text-muted">A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
 
-      <section className={panel('p-4')} aria-labelledby="sensitivity-setup-title">
+      <section className={panel('p-(--panel-space)')} aria-labelledby="sensitivity-setup-title">
         <h3 id="sensitivity-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">{describeProbe(state.probe)}</h3>
         {estimationRuns.length === 0 ? (
           <Alert tone="info" live={false}><p className="m-0">Run an estimate before choosing a sensitivity probe.</p></Alert>

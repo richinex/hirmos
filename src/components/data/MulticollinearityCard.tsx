@@ -146,7 +146,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
         <div className="mt-4 space-y-4">
           <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Icon name="check_circle" size={16} className="text-ok" /> {job.evidence.variables} variables · {job.evidence.observations.toLocaleString()} rows</p>
           <div className="grid gap-4 @3xl/panel:grid-cols-2">
-            <div className={well('p-3')}>
+            <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">Correlation groups</h5>
               <p className="mb-2 mt-1 text-label text-muted">Complete linkage over 1 − |r|. The deterministic recommendation retains the first selected variable in each group; review that representative before applying it.</p>
               <ul className="m-0 space-y-1 pl-5 text-body text-muted">
@@ -155,7 +155,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
               </ul>
               {job.evidence.correlationDrop.length > 0 && <button type="button" className={button('quiet', 'mt-3')} onClick={() => apply('correlation')}>Use correlation selection</button>}
             </div>
-            <div className={well('p-3')}>
+            <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">VIF elimination path</h5>
               <p className="mb-2 mt-1 text-label text-muted">At each step the variable with the largest VIF is removed; ties are resolved by the later selected column.</p>
               {job.evidence.vifHistory.length === 0

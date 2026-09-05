@@ -170,7 +170,7 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch
         aria-hidden
         onClick={(event) => { if (!slide.clickGuard(event)) onPhoneClose() }}
         style={drag === null ? undefined : { opacity: 1 + drag.offset / drag.span, transition: 'none' }}
-        className="absolute inset-0 z-(--z-overlay) touch-none bg-black/40 backdrop-blur-sm transition-opacity duration-200 starting:opacity-0 motion-reduce:transition-none"
+        className="absolute inset-0 z-(--z-overlay) touch-none bg-black/40 backdrop-blur-sm transition-opacity duration-(--motion-base) starting:opacity-0 motion-reduce:transition-none"
         {...panelHandlers}
       />
     )}
@@ -181,7 +181,7 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch
       style={drag === null ? undefined : { translate: `${drag.offset}px 0`, transition: 'none' }}
       onClickCapture={(event) => { slide.clickGuard(event) }}
       className={cn(
-        'flex shrink-0 flex-col gap-1 overflow-hidden border-r border-line bg-panel py-2 transition-[width,translate] duration-200 ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+        'flex shrink-0 flex-col gap-1 overflow-hidden border-r border-line bg-panel py-2 transition-[width,translate] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
         rail ? 'w-12 items-center' : 'w-60 px-2',
         '@max-md/shell:absolute @max-md/shell:inset-y-0 @max-md/shell:left-0 @max-md/shell:z-(--z-overlay) @max-md/shell:touch-pan-y @max-md/shell:will-change-transform',
         phoneOpen ? '@max-md/shell:translate-x-0' : '@max-md/shell:-translate-x-full',
@@ -207,7 +207,7 @@ export function ChapterNav({ chapters, active, collapsed, onNavigate, onPrefetch
                 onPointerEnter={locked ? undefined : () => onPrefetch(chapter.id)}
                 onFocus={locked ? undefined : () => onPrefetch(chapter.id)}
                 className={cn(
-                  'relative flex items-center gap-2 rounded-lg border text-left text-body transition-colors duration-150',
+                  'relative flex items-center gap-2 rounded-lg border text-left text-body transition-colors duration-(--motion-fast)',
                   rail ? 'grid h-9 w-9 place-items-center pointer-coarse:h-10 pointer-coarse:w-10' : 'w-full px-2.5 py-2',
                   isActive ? 'border-edge bg-raised text-ink' : 'border-transparent text-faint hover:text-ink',
                   locked && 'cursor-not-allowed text-dim hover:text-dim',

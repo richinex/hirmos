@@ -5,16 +5,16 @@ import { useId, useMemo, useReducer } from 'react'
 import type { RunActivity } from '@/domain/activity'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { Icon } from '@/components/Icon'
-import { MethodCaveats } from '@/components/MethodCaveats'
+import { literatureOf, MethodCaveats, RequirementsFold } from '@/components/MethodCaveats'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { LagGraphViews } from '@/components/discovery/LagGraphViews'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
 import { RadioList } from '@/components/ui/RadioList'
 import { Formula } from '@/components/ui/Formula'
-import { button, chip, field, fieldHint, fieldLabel, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chip, field, fieldLabel, label, literal, num, panel, well } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
-import { cn } from '@/lib/utils'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
@@ -23,7 +23,7 @@ import { assertNever } from '@/domain/dop'
 import { lagGraphFromDag } from '@/domain/lagGraph'
 import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID, IDENTIFICATION_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
-import { roleWord } from '@/domain/dagFlow'
+import { roleWord, type DagCausalRole } from '@/domain/dagFlow'
 import {
   backdoorIdentificationCommand,
   describeIdentificationFailure,
@@ -34,8 +34,9 @@ import {
   identifiedExpression,
   identifiedExpressionTex,
   CONSISTENCY_STATEMENT,
+  DESIGN_ASSUMPTIONS,
   NO_INTERFERENCE_STATEMENT,
-  ESTIMAND_DEFERRALS,
+  QUANTILE_GROUP_CHOICES,
   studyDesignCategory,
   dagBasisOf,
   describeAssignmentKind,
@@ -92,7 +93,28 @@ const ledgerLabel = (result: IdentificationArtifact['result']): string => {
 }
 
 const ASSIGNMENT_KINDS: readonly AssignmentMechanism['kind'][] = ['randomised', 'policy-change', 'observed-choice']
-const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated']
+const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'conditional-average-treatment-effect']
+
+const estimandLabel = (kind: Estimand['kind']): string => {
+  switch (kind) {
+    case 'average-treatment-effect': return 'All prepared rows (ATE)'
+    case 'average-treatment-effect-on-treated': return 'Treated rows (ATT)'
+    case 'conditional-average-treatment-effect': return 'Within groups of a variable (CATE)'
+    default: return assertNever(kind)
+  }
+}
+
+const estimandHint = (kind: Estimand['kind']): string => {
+  switch (kind) {
+    case 'average-treatment-effect': return 'Average the treatment contrast over the prepared population.'
+    case 'average-treatment-effect-on-treated': return 'Average the treatment contrast among rows with treatment = 1. Current ETT estimators require a binary treatment; eligibility also depends on the identifying strategy.'
+    case 'conditional-average-treatment-effect': return 'Average the treatment contrast within each group of an effect modifier, a variable the treatment does not reach. The double machine learning estimators report the group effects.'
+    default: return assertNever(kind)
+  }
+}
+
+/** Whether a variable may define the groups: anything measured that the treatment does not reach. */
+const modifierAllowed = (role: DagCausalRole | null): boolean => role === null || !(role.kind === 'mediator' || role.kind === 'collider' || role.kind === 'post-treatment')
 
 const isValidated = (document: DagDocument): boolean => document.current.validation.kind === 'structurally-valid'
 
@@ -328,6 +350,15 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
   const observedNodes = document?.current.graph.nodes.filter((node) => node.kind === 'observed') ?? []
   const readiness = useMemo(() => readyStudySpecification(state.draft, documents, prepared), [documents, prepared, state.draft])
   const preview = useMemo(() => previewStudyBinding(state.draft, documents, prepared), [documents, prepared, state.draft])
+  const modifierCandidates = useMemo(() => {
+    const roles = preview === null ? null : variableRoles(preview)
+    return observedNodes
+      .filter((node) => node.id !== state.draft.treatment && node.id !== state.draft.outcome)
+      .map((node) => {
+        const role = roles?.find((entry) => entry.node.node === node.id)?.role ?? null
+        return { node, role, allowed: modifierAllowed(role) }
+      })
+  }, [observedNodes, preview, state.draft.treatment, state.draft.outcome])
   const evidenceGraph = useMemo(() => (document === null ? null : lagGraphFromDag(document)), [document])
   const latestIdentified = [...identifications].reverse().find((identification) => identification.result.kind !== 'backdoor-not-identified') ?? null
   const newestRecorded = [...studies].reverse().flatMap((study) => {
@@ -394,7 +425,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
 
       <CausalHierarchy />
 
-      <section className={panel('p-4')} aria-labelledby="study-form-title">
+      <section className={panel('p-(--panel-space)')} aria-labelledby="study-form-title">
         <h3 id="study-form-title" className="mb-3 mt-0 text-title font-medium text-ink">Define the estimand and select a graph</h3>
         {documents.length === 0 && (
           <Alert tone="info" live={false}>
@@ -445,18 +476,43 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         <fieldset className="mt-4 min-w-0 border-t border-hair pt-4" aria-label="Design">
           <legend className="float-left m-0 w-full p-0 text-body font-medium text-ink">Design</legend>
           <div className="clear-both grid gap-x-4 gap-y-3 pt-3 @lg/panel:grid-cols-2">
-            <RadioList
-              legend="Target population"
-              value={state.draft.estimand}
-              onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
-              options={ESTIMAND_KINDS.map((kind) => ({
-                value: kind,
-                label: kind === 'average-treatment-effect' ? 'All prepared rows (ATE)' : 'Treated rows (ATT)',
-                hint: kind === 'average-treatment-effect'
-                  ? 'Average the treatment contrast over the prepared population.'
-                  : 'Average the treatment contrast among rows with treatment = 1. Current ETT estimators require a binary treatment; eligibility also depends on the identifying strategy.',
-              }))}
-            />
+            <div className="grid gap-3">
+              <RadioList
+                legend="Target population"
+                value={state.draft.estimand}
+                onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
+                options={ESTIMAND_KINDS.map((kind) => ({ value: kind, label: estimandLabel(kind), hint: estimandHint(kind) }))}
+              />
+              {state.draft.estimand === 'conditional-average-treatment-effect' && (
+                <div className="grid gap-3 @lg/panel:grid-cols-2">
+                  <label className="block">
+                    <span className={fieldLabel}>Effect modifier</span>
+                    <Select
+                      className={field('text', 'mt-1')}
+                      value={state.draft.modifier ?? ''}
+                      disabled={document === null}
+                      onChange={(event) => onDraftChanged({ ...draft, modifier: event.target.value === '' ? null : (event.target.value as DagNodeId) })}
+                    >
+                      <option value="">Choose a variable</option>
+                      {modifierCandidates.map(({ node, role, allowed }) => (
+                        <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : ` · ${roleWord(role)}`}</option>
+                      ))}
+                    </Select>
+                  </label>
+                  <label className="block">
+                    <span className={fieldLabel}>Groups</span>
+                    <Select
+                      className={field('text', 'mt-1')}
+                      value={state.draft.grouping.kind === 'levels' ? 'levels' : String(state.draft.grouping.bins)}
+                      onChange={(event) => onDraftChanged({ ...draft, grouping: event.target.value === 'levels' ? { kind: 'levels' } : { kind: 'quantiles', bins: Number(event.target.value) } })}
+                    >
+                      <option value="levels">Each value of the modifier</option>
+                      {QUANTILE_GROUP_CHOICES.map((bins) => <option key={bins} value={String(bins)}>{bins} quantile groups</option>)}
+                    </Select>
+                  </label>
+                </div>
+              )}
+            </div>
             <RadioList
               legend="Why the treatment varied"
               value={state.draft.assignment.kind}
@@ -476,25 +532,21 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
               />
             </label>
           </div>
+          {/* The statements and their literature sit in the side panel under Design assumptions; here the reader records the rationale. */}
           <div className="mt-3 grid gap-3 @lg/panel:grid-cols-2">
-            <div className="grid gap-y-1 @lg/panel:row-span-3 @lg/panel:grid-rows-subgrid">
-              <label htmlFor={`${rationaleId}-consistency`} className={fieldLabel}>Consistency rationale</label>
-              <p id={`${rationaleId}-consistency-hint`} className={cn(fieldHint, 'm-0 max-w-[65ch]')}>{CONSISTENCY_STATEMENT}</p>
-              <input id={`${rationaleId}-consistency`} type="text" aria-describedby={`${rationaleId}-consistency-hint`} className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.consistencyRationale} onChange={(event) => onDraftChanged({ ...draft, consistencyRationale: event.target.value })} />
+            <div className="grid gap-y-1">
+              <ParameterLabel className={fieldLabel} htmlFor={`${rationaleId}-consistency`} label="Consistency rationale" help={CONSISTENCY_STATEMENT} />
+              <input id={`${rationaleId}-consistency`} type="text" className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.consistencyRationale} onChange={(event) => onDraftChanged({ ...draft, consistencyRationale: event.target.value })} />
             </div>
-            <div className="grid gap-y-1 @lg/panel:row-span-3 @lg/panel:grid-rows-subgrid">
-              <label htmlFor={`${rationaleId}-interference`} className={fieldLabel}>No-interference rationale</label>
-              <p id={`${rationaleId}-interference-hint`} className={cn(fieldHint, 'm-0 max-w-[65ch]')}>{NO_INTERFERENCE_STATEMENT}</p>
-              <input id={`${rationaleId}-interference`} type="text" aria-describedby={`${rationaleId}-interference-hint`} className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.noInterferenceRationale} onChange={(event) => onDraftChanged({ ...draft, noInterferenceRationale: event.target.value })} />
+            <div className="grid gap-y-1">
+              <ParameterLabel className={fieldLabel} htmlFor={`${rationaleId}-interference`} label="No-interference rationale" help={NO_INTERFERENCE_STATEMENT} />
+              <input id={`${rationaleId}-interference`} type="text" className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.noInterferenceRationale} onChange={(event) => onDraftChanged({ ...draft, noInterferenceRationale: event.target.value })} />
             </div>
           </div>
-          <p className="mb-0 mt-3 text-label text-faint">Literature: VanderWeele, “Concerning the consistency assumption in causal inference” (2009), doi:10.1097/EDE.0b013e3181bd5638; Hernán and Robins, <i>Causal Inference: What If</i> (2020).</p>
         </fieldset>
         <dl className="mb-0 mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body" aria-label="Estimand and population">
           <dt className="text-faint">Estimand</dt>
           <dd className="m-0 text-ink">{preview === null ? 'Average treatment effect · additive scale · total effect, mediators included' : describeEstimand(preview)}</dd>
-          <dt className="text-faint">Other targets</dt>
-          <dd className="m-0 text-muted">{ESTIMAND_DEFERRALS.map((deferral) => `${deferral.name}: ${deferral.reason}`).join(' ')}</dd>
           <dt className="text-faint">Population</dt>
           <dd className={num('m-0 text-ink')}>All {formatCount(prepared.observations).text} rows</dd>
           <dt className="text-faint">Graph revision</dt>
@@ -564,6 +616,17 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       <MethodCaveats
         methods={IDENTIFICATION_METHODS}
         identification={latestIdentified?.result ?? null}
+        leading={(
+          <RequirementsFold name="Design assumptions" literature={literatureOf(DESIGN_ASSUMPTIONS.flatMap((assumption) => assumption.sources))}>
+            <ol className="m-0 list-none divide-y divide-line p-0">
+              {DESIGN_ASSUMPTIONS.map((assumption) => (
+                <li key={assumption.id} className="py-2 text-body">
+                  <p className="m-0 max-w-[65ch] text-muted">{assumption.statement}</p>
+                </li>
+              ))}
+            </ol>
+          </RequirementsFold>
+        )}
       />
     </div>
   )

@@ -2,12 +2,18 @@ import { animate, cubicBezier, stagger, utils } from 'animejs'
 
 /**
  * The landing page's motion, in the house register: one ease-out for everything, every reveal once,
- * nothing that loops except the dashed evidence links. The hero is not touched: it ships as static HTML
- * and has painted before this runs. Under reduced motion nothing here runs and the page shows its final
+ * nothing that loops except the dashed evidence links. Durations come from the landing's motion tokens in
+ * the stylesheet. The hero is not touched: its word reveal is CSS and has painted before this runs. Under reduced motion nothing here runs and the page shows its final
  * state, because the stylesheet never hides content on its own.
  */
 
 const EASE = cubicBezier(0.2, 0.7, 0.2, 1)
+
+/** A duration from the stylesheet's motion tokens, so the numbers live in one place. */
+const tokenMs = (name: string, fallback: number): number => {
+  const value = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name))
+  return Number.isFinite(value) ? value : fallback
+}
 
 const groups: readonly { readonly selector: string; readonly children: string }[] = [
   { selector: '.workflow-section .section-intro', children: ':scope > *' },
@@ -19,15 +25,18 @@ const groups: readonly { readonly selector: string; readonly children: string }[
   { selector: '.final-cta', children: ':scope > *' },
 ]
 
-const drawOn = (path: SVGPathElement, delay: number): void => {
+const drawOn = (path: SVGPathElement, duration: number, delay: number): void => {
   const length = path.getTotalLength()
   path.style.strokeDasharray = `${length}`
   path.style.strokeDashoffset = `${length}`
-  animate(path, { strokeDashoffset: 0, duration: 900, delay, ease: EASE })
+  animate(path, { strokeDashoffset: 0, duration, delay, ease: EASE })
 }
 
 export function choreographLanding(root: HTMLElement): () => void {
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return () => {}
+  const reveal = tokenMs('--motion-reveal', 640)
+  const draw = tokenMs('--motion-draw', 900)
+  const step = tokenMs('--motion-stagger', 70)
 
   const observer = new IntersectionObserver((entries) => {
     for (const entry of entries) {
@@ -35,8 +44,8 @@ export function choreographLanding(root: HTMLElement): () => void {
       observer.unobserve(entry.target)
       const group = entry.target as HTMLElement
       const children = Array.from(group.querySelectorAll<HTMLElement>(group.dataset['reveal'] ?? ':scope > *'))
-      animate(children, { opacity: 1, translateY: 0, duration: 640, delay: stagger(70), ease: EASE })
-      for (const path of group.querySelectorAll<SVGPathElement>('.backdoor-edge--signal, .dag-link--signal')) drawOn(path, 260)
+      animate(children, { opacity: 1, translateY: 0, duration: reveal, delay: stagger(step), ease: EASE })
+      for (const path of group.querySelectorAll<SVGPathElement>('.backdoor-edge--signal, .dag-link--signal')) drawOn(path, draw, 260)
     }
   }, { rootMargin: '0px 0px -12% 0px', threshold: 0.05 })
 

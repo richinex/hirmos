@@ -609,12 +609,12 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
             </div>
           </details>
           <div className="mt-3 grid gap-3 @sm/inspector:grid-cols-2">
-            <div className={well('p-3')}>
+            <div className={well('p-(--panel-space)')}>
               <span className="block text-label text-faint">Raw p-value distribution</span>
               <strong className="mt-1 block text-title font-medium tabular-nums text-ink">KS p = {evidence.uniformity.pValue.toPrecision(3)}</strong>
               <p className="mb-0 mt-1 text-label text-muted">{evidence.uniformity.pValue < evidence.significanceLevel ? 'The raw p-values are inconsistent with a uniform distribution under the graph.' : 'The test did not find evidence that the raw p-values differ from a uniform distribution under the graph.'} Treat this as a supplementary check because the implication tests can be dependent.</p>
             </div>
-            <div className={well('p-3')}>
+            <div className={well('p-(--panel-space)')}>
               {evidence.falsification.kind === 'completed' ? (
                 <>
                   <span className="block text-label text-faint">Relabeled-graph comparison</span>
@@ -811,7 +811,7 @@ export function DagWorkspace({
           <section aria-labelledby="dag-workspace-title">
             {header}
             {state.kind === 'creating' ? (
-              <section className={panel('p-4')} aria-labelledby="dag-origin-title">
+              <section className={panel('p-(--panel-space)')} aria-labelledby="dag-origin-title">
                 <h3 id="dag-origin-title" className="mb-2 mt-0 text-title font-medium text-ink">Graph basis</h3>
                 <div className="grid gap-3 @md/panel:grid-cols-3">
                   <OriginChoice active={state.origin.kind === 'domain-knowledge'} icon="psychology" title="Substantive knowledge" detail="Theory, prior studies, expert knowledge, institutions, and the treatment-assignment process." onClick={() => dispatch({ type: 'origin-selected', origin: 'domain-knowledge' })} />
