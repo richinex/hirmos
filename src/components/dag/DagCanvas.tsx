@@ -50,7 +50,8 @@ import { assertNever } from '@/domain/dop'
 import { layoutDagForCanvas, type DagLayoutOrientation } from './dagCanvasModel'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
 import type { InterventionOverlay } from '@/domain/intervention'
-import { useMediaQuery } from '@/lib/useMediaQuery'
+import { cn } from '@/lib/utils'
+import { useIsMobile, useMediaQuery } from '@/lib/useMediaQuery'
 import { dagPointerTarget, type ScreenTargetBox } from './dagPointerTarget'
 
 interface DagNodeData extends Record<string, unknown> {
@@ -457,10 +458,12 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
   readonly onToggleExpand: () => void
 }) {
   const { fitView, zoomIn, zoomOut } = useReactFlow<CanvasNode, CanvasEdge>()
+  const phone = useIsMobile()
   const control = iconControl('quiet', 'rounded-none border-0')
   return (
-    <Panel position="bottom-right" className="!m-2">
-      <div className="flex flex-col overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur">
+    // A column at the graph's right on a desktop; on a phone a centred row along its foot, where a column would sit over the nodes.
+    <Panel position={phone ? 'bottom-center' : 'bottom-right'} className="!m-2">
+      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', phone ? 'flex-row' : 'flex-col')}>
         <button type="button" className={control} title="Zoom in" aria-label="Zoom in" onClick={() => void zoomIn({ duration: 160 })}><Icon name="add" size={14} /></button>
         <button type="button" className={control} title="Zoom out" aria-label="Zoom out" onClick={() => void zoomOut({ duration: 160 })}><Icon name="remove" size={14} /></button>
         <button type="button" className={control} title="Fit graph" aria-label="Fit graph" onClick={() => void fitView({ ...FIT_VIEW, duration: 220 })}><Icon name="fit_screen" size={14} /></button>

@@ -2,7 +2,7 @@ import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { useReducer, useState } from 'react'
+import { useReducer, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { MethodCaveats } from '@/components/MethodCaveats'
@@ -514,6 +514,16 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     }
   }
 
+  const diagnosticOptions: readonly { readonly value: Diagnostic; readonly label: ReactNode }[] = [
+    { value: 'multicollinearity', label: <DiagnosticLabel text="Redundancy" done={multicollinearityChecked} /> },
+    ...(timeSeriesSelected || preparedTimeSeries !== null ? [
+      { value: 'stationarity' as const, label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
+      { value: 'structure' as const, label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
+      { value: 'granger' as const, label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
+      { value: 'count-series' as const, label: <DiagnosticLabel text="Count model" done={countSeriesModels.length > 0} /> },
+    ] : []),
+  ]
+
   return (
     <section aria-labelledby="preprocessing-title" className="@container/panel">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -921,21 +931,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               <h3 id="diagnostics-title" className="m-0 text-title font-medium text-ink">Diagnostics</h3>
               <p className="mb-0 mt-1 text-body text-faint">These tests do not change the prepared dataset.</p>
             </div>
-            <SegmentedControl
-              size="sm"
-              ariaLabel="Diagnostic"
-              value={diagnostic}
-              onChange={setDiagnostic}
-              options={[
-                { value: 'multicollinearity', label: <DiagnosticLabel text="Redundancy" done={multicollinearityChecked} /> },
-                ...(timeSeriesSelected || preparedTimeSeries !== null ? [
-                  { value: 'stationarity' as const, label: <DiagnosticLabel text="Stationarity" done={stationarityEvidence !== null} /> },
-                  { value: 'structure' as const, label: <DiagnosticLabel text="Breaks" done={structureChecked} /> },
-                  { value: 'granger' as const, label: <DiagnosticLabel text="Granger" done={grangerEvidence.length > 0} /> },
-                  { value: 'count-series' as const, label: <DiagnosticLabel text="Count model" done={countSeriesModels.length > 0} /> },
-                ] : []),
-              ]}
-            />
+            {/* A cross-section has one diagnostic, and one option is not a choice, so the switch appears only when there are several. */}
+            {diagnosticOptions.length > 1 && (
+              <SegmentedControl size="sm" ariaLabel="Diagnostic" value={diagnostic} onChange={setDiagnostic} options={diagnosticOptions} />
+            )}
           </div>
           {preparedCurrent === null && (
             <p role="status" className="mb-0 mt-3 text-body text-faint">Create a prepared dataset version to run these diagnostics.</p>
