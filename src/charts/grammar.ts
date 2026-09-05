@@ -162,3 +162,31 @@ export const escapeHtml = (value: string): string => value
   .replaceAll('>', '&gt;')
   .replaceAll('"', '&quot;')
   .replaceAll("'", '&#039;')
+
+/** A named value drawn as a reference rule across a chart: a mean, a median, a threshold, a date. */
+export interface ReferenceMark {
+  readonly name: string
+  readonly value: number
+}
+
+/**
+ * Range selection for a chart the reader scrubs: the zoom pair, plus a brush along x that the host
+ * turns into a zoom with a history. The brush draws in the signal colour because it is live state,
+ * never a category.
+ */
+export const rangeSelection = (theme: ChartTheme, xAxisIndex: number | readonly number[] = 0, { slider = true }: { readonly slider?: boolean } = {}) => ({
+  // A chart that follows another's window needs no slider of its own; the drag and the wheel remain.
+  dataZoom: slider ? zoomPair(theme, xAxisIndex) : [zoomPair(theme, xAxisIndex)[0]],
+  // The brush registers itself with the toolbox; the toolbox stays hidden and offers no buttons of its own.
+  toolbox: { show: false },
+  brush: {
+    toolbox: [],
+    xAxisIndex,
+    brushType: 'lineX' as const,
+    brushMode: 'single' as const,
+    transformable: false,
+    throttleType: 'debounce' as const,
+    throttleDelay: 100,
+    brushStyle: { borderWidth: 1, color: `${theme.signal}22`, borderColor: theme.signal },
+  },
+})

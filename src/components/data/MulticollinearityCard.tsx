@@ -101,8 +101,9 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
       scale: 'signed',
       quantity: 'Pearson r',
       relation: 'symmetric',
+      threshold: correlationThreshold,
     }, theme)
-    : null, [job, theme])
+    : null, [job, theme, correlationThreshold])
 
   const scatter = useMemo(() => {
     if (job.kind !== 'ready') return null

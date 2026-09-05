@@ -48,6 +48,7 @@ import {
   type OcseShuffles,
   type PcmciAlpha,
   type DiscoveryMethodChoice,
+  changedSettings,
   type DiscoveryMethodGroupId,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
@@ -1266,6 +1267,18 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
   }
 }
 
+/** How far the draft has moved from the method's defaults, and the way back; nothing when it has not moved. */
+function SettingsBadge({ configuration, onReset }: { readonly configuration: DiscoveryConfiguration; readonly onReset: () => void }) {
+  const changed = changedSettings(configuration)
+  if (changed.length === 0) return null
+  return (
+    <p className="mb-0 mt-3 flex flex-wrap items-center gap-2 text-body text-muted" data-testid="settings-changed">
+      <span>{changed.length} {changed.length === 1 ? 'setting' : 'settings'} changed from the defaults</span>
+      <button type="button" className={button('quiet')} onClick={onReset}>Reset to defaults</button>
+    </p>
+  )
+}
+
 export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, documents, draft, onEvent: dispatch, cancellation, onRun, onDeleteRun }: DiscoveryPanelProps) {
   const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
   const [deletionDialog, setDeletionDialog] = useState<DiscoveryDeletionDialog>({ kind: 'closed' })
@@ -1681,6 +1694,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
           {selectedMethodIsVisible && (
             <>
+          <SettingsBadge configuration={configuration} onReset={() => dispatch({ type: 'method-selected', method: configuration.kind })} />
           {(configuration.kind === 'pc-stable' || configuration.kind === 'fci') && (
             <ConstraintDiscoveryControls
               configuration={configuration}

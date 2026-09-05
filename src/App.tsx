@@ -26,6 +26,7 @@ import { decodeSourceFile, downloadText, encodeSourceFile } from '@/data/bundleF
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { InternalLink } from '@/components/ui/InternalLink'
 import { navigate, replace, useRoute } from '@/lib/router'
+import { ChartExportProvider } from '@/charts/exportContext'
 import {
   datasetProfileProblemDetail,
   describeDatasetProfileProblem,
@@ -550,355 +551,359 @@ function App() {
 
   const fullBleed = profiled !== null && ['data', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
+  // Every chart export names the project it came from.
+  const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
   return (
-    <AppShell
-      skipTarget="stage"
-      mode={fullBleed ? 'full' : 'reading'}
-      header={header}
-      nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} onPrefetch={prefetchChapter} phoneOpen={phoneNavOpen} onPhoneOpen={() => setPhoneNavOpen(true)} onPhoneClose={() => setPhoneNavOpen(false)} />}
-      stage={(
-        <>
-            {!route.ok && (
-              <p role="alert" className={well('mb-4 px-3 py-2 text-body text-muted')}>
-                {describeRouteProblem(route.error)}; showing {activeName}.
-              </p>
-            )}
-            {exampleNotice !== null && activeChapter === 'data' && (
-              <p role="status" className={well('mb-4 px-3 py-2 text-body text-muted')}>{exampleNotice}</p>
-            )}
-            {workflow.kind === 'awaiting-project' && (
-              <section className="rise my-auto w-full max-w-6xl" aria-labelledby="new-analysis-title">
-                <span className={label('text-faint')}>01 · Projects</span>
-                <h2 id="new-analysis-title" className="mb-6 mt-3 text-heading text-ink">Create an analysis</h2>
-                <form onSubmit={createProject} className="max-w-md space-y-3">
-                  <label className="block">
-                    <span className="mb-1.5 block text-body font-medium text-ink">Project name</span>
-                    <input
-                      autoFocus
-                      value={workflow.nameDraft}
-                      onChange={(event) => dispatch({ type: 'project-name-changed', value: event.target.value })}
-                      className={field('text')}
-                      placeholder="For example: minimum wage and employment"
-                    />
-                  </label>
-                  {workflow.problem && <p role="alert" className="text-body text-danger">{describeProjectNameProblem(workflow.problem)}</p>}
-                  {/* The two ways to get a project, side by side: make one, or open one exported earlier. */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button type="submit" className={button('signal')}>Create project</button>
-                    <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
-                    <button type="button" className={button('outline')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open an exported file</button>
-                  </div>
-                </form>
-                <section className="mt-8" aria-labelledby="projects-title">
-                  <h3 id="projects-title" className="mb-2 text-title font-medium text-ink">Your projects</h3>
-                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file.</p>
-                  {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
-                  {importProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{importProblem}</p>}
-                  {yours.length === 0
-                    ? <p className="m-0 text-body text-faint">None yet. Create one above, open an exported file, or start from an example below.</p>
-                    : (
-                      <ul className="m-0 list-none divide-y divide-hair rounded-lg border border-hair p-0" aria-label="Projects">
-                        {yours.map((entry) => (
-                          <li key={entry.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-well">
-                            <div className="min-w-0 flex-1">
-                              <span className="block truncate text-body text-ink">{entry.name}</span>
-                              <span className={num('block truncate text-label text-faint')}>
-                                {`${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`}
-                              </span>
-                            </div>
-                            <button type="button" className={button('outline')} onClick={() => void reopenProject(entry.id)}>Open</button>
-                            <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
-                            <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                </section>
-                <section className="mt-8" aria-labelledby="examples-title">
-                  <h3 id="examples-title" className="mb-2 text-title font-medium text-ink">Examples</h3>
-                  <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Complete walkthroughs, each with its data inside. Open one to read it, edit it freely, and reset it to get the shipped version back.</p>
-                  <ExampleLedger
-                    examples={SHIPPED_EXAMPLES}
-                    saved={saved}
-                    formatSaved={formatDay}
-                    onOpen={(example) => void openExample(example)}
-                    onReset={(example) => void openExample(example, true)}
-                    onExport={(id) => void exportSaved(id)}
-                    onDelete={(entry) => void removeProject(entry)}
-                  />
-                </section>
-              </section>
-            )}
-
-            {workflow.kind === 'awaiting-data' && (
-              <section className="rise my-auto max-w-2xl" aria-labelledby="load-data-title">
-                <span className={label('text-signal')}>02 · Data studio</span>
-                <h2 id="load-data-title" className="mb-3 mt-3 text-heading text-ink">{workflow.restore === null ? 'Choose a data file' : 'Choose the data file again'}</h2>
-                <p className="mb-6 text-body text-faint">
-                  {workflow.restore === null
-                    ? 'CSV, TSV, or Parquet'
-                    : `${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : ` · ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
+    <ChartExportProvider.Provider value={exportContext}>
+      <AppShell
+        skipTarget="stage"
+        mode={fullBleed ? 'full' : 'reading'}
+        header={header}
+        nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} onPrefetch={prefetchChapter} phoneOpen={phoneNavOpen} onPhoneOpen={() => setPhoneNavOpen(true)} onPhoneClose={() => setPhoneNavOpen(false)} />}
+        stage={(
+          <>
+              {!route.ok && (
+                <p role="alert" className={well('mb-4 px-3 py-2 text-body text-muted')}>
+                  {describeRouteProblem(route.error)}; showing {activeName}.
                 </p>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept=".csv,.tsv,.parquet,text/csv,text/tab-separated-values,application/vnd.apache.parquet"
-                  className="sr-only"
-                  onChange={(event) => chooseFile(event.target.files?.[0])}
-                />
-                <button type="button" className={button('signal', 'inline-flex items-center gap-2')} onClick={() => fileInput.current?.click()}>
-                  <Icon name="upload_file" size={16} />
-                  Choose data file
-                </button>
-                {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
-              </section>
-            )}
-
-            {workflow.kind === 'source-selected' && (
-              <section className="rise my-auto max-w-2xl" aria-labelledby="selected-source-title">
-                <span className={label('text-signal')}>02 · Data studio</span>
-                <h2 id="selected-source-title" className="mb-3 mt-3 text-heading text-ink">Source selected</h2>
-                <SourceSummary source={workflow.source} />
-                <div className="mt-4 flex gap-2">
-                  <button type="button" className={button('signal')} onClick={() => void inspectSource()}>
-                    Inspect data
-                  </button>
-                  <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
-                    Choose another file
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {workflow.kind === 'profiling' && (
-              <section className="rise my-auto max-w-2xl" aria-labelledby="profiling-title">
-                <span className={label('text-signal')}>02 · Data studio</span>
-                <h2 id="profiling-title" className="mb-3 mt-3 flex items-center gap-2 text-heading text-ink">
-                  <Icon name="progress_activity" size={18} className="animate-spin [animation-duration:0.9s] text-[var(--color-info)]" />
-                  Inspecting data
-                </h2>
-                <SourceSummary source={workflow.source} />
-              </section>
-            )}
-
-            {workflow.kind === 'import-failed' && (
-              <section className="rise my-auto max-w-2xl" aria-labelledby="import-failed-title">
-                <span className={label('text-danger')}>Import refused</span>
-                <h2 id="import-failed-title" className="mb-3 mt-3 text-heading text-ink">{describeDatasetProfileProblem(workflow.problem)}</h2>
-                <SourceSummary source={workflow.source} />
-                {datasetProfileProblemDetail(workflow.problem) && (
-                  <details className={well('mt-3 px-3 py-2 text-body text-muted')}>
-                    <summary>Technical detail</summary>
-                    <p className={literal('mb-0 mt-2 break-words text-faint')}>{datasetProfileProblemDetail(workflow.problem)}</p>
-                  </details>
-                )}
-                <div className="mt-4 flex gap-2">
-                  <button type="button" className={button('signal')} onClick={() => void inspectSource()}>Try again</button>
-                  <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
-                    Choose another file
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {workflow.kind === 'profiled' && (
-              <>
-                {activeChapter === 'data' && (
-                  <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}>
-                    <PreprocessingPanel
-                      key={workflow.profile.id}
-                      source={workflow.source}
-                      profile={workflow.profile}
-                      onPrepared={(artifact) => dispatch({ type: 'prepared-dataset-created', artifact })}
-                      onStationarityEvidence={(evidence) => dispatch({ type: 'stationarity-evidence-created', evidence })}
-                      stationarity={workflow.stationarity}
-                      preparedVersion={workflow.prepared}
-                      grangerEvidence={workflow.grangerEvidence}
-                      onGrangerEvidence={(evidence) => dispatch({ type: 'granger-evidence-created', evidence })}
-                      countSeriesModels={workflow.countSeriesModels}
-                      onCountSeriesModel={(artifact) => dispatch({ type: 'count-series-model-created', artifact })}
-                    />
-                  {workflow.prepared !== null && (
-                    <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
-                      <span className={label('text-faint')}>Continue</span>
-                      <h3 id="prepared-next-title" className="mb-1 mt-1 text-title font-medium text-ink">Build a DAG or run discovery</h3>
-                      <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>
-                      <div className="flex flex-wrap gap-2">
-                        <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
-                        <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Run discovery</button>
-                      </div>
-                    </section>
-                  )}
-                  <details className="group rounded-md border border-line bg-panel">
-                    <summary className="flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-label text-muted transition-colors marker:content-none hover:text-ink">
-                      <span>Source file · storage and export</span>
-                      <Icon name="expand_more" size={14} className="shrink-0 transition-transform group-open:rotate-180" />
-                    </summary>
-                    <div className="border-t border-hair px-2.5 py-3">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <SegmentedControl
-                          ariaLabel="Source file storage"
-                          value={workflow.profile.source.persistence.kind}
-                          onChange={(kind) => void changeSourcePersistence(kind)}
-                          options={[{ value: 'ephemeral', label: 'Not stored' }, { value: 'cached-locally', label: 'Cached locally', disabled: !sourceCacheAvailable(), title: sourceCacheAvailable() ? undefined : 'This browser does not offer a private file store.' }]}
-                        />
-                        <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
-                          Choose another file
-                        </button>
-                        <span className="h-[15px] w-px bg-hair" aria-hidden />
-                        <button type="button" className={button('outline')} onClick={() => void exportProject()}>Export project</button>
-                        <label className="flex items-center gap-1.5 text-body text-ink">
-                          <input type="checkbox" checked={includeSource} onChange={(event) => setIncludeSource(event.target.checked)} />
-                          Include the source file ({formatBytes(workflow.source.bytes)})
-                        </label>
-                      </div>
-                      <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">{workflow.profile.source.persistence.kind === 'cached-locally' ? 'Reopening this project reads the file from the browser store.' : 'Reopening this project asks for the file again.'}</p>
-                      {cacheProblem !== null && <p role="alert" className="mb-0 mt-1 text-body text-danger">{cacheProblem}</p>}
+              )}
+              {exampleNotice !== null && activeChapter === 'data' && (
+                <p role="status" className={well('mb-4 px-3 py-2 text-body text-muted')}>{exampleNotice}</p>
+              )}
+              {workflow.kind === 'awaiting-project' && (
+                <section className="rise my-auto w-full max-w-6xl" aria-labelledby="new-analysis-title">
+                  <span className={label('text-faint')}>01 · Projects</span>
+                  <h2 id="new-analysis-title" className="mb-6 mt-3 text-heading text-ink">Create an analysis</h2>
+                  <form onSubmit={createProject} className="max-w-md space-y-3">
+                    <label className="block">
+                      <span className="mb-1.5 block text-body font-medium text-ink">Project name</span>
+                      <input
+                        autoFocus
+                        value={workflow.nameDraft}
+                        onChange={(event) => dispatch({ type: 'project-name-changed', value: event.target.value })}
+                        className={field('text')}
+                        placeholder="For example: minimum wage and employment"
+                      />
+                    </label>
+                    {workflow.problem && <p role="alert" className="text-body text-danger">{describeProjectNameProblem(workflow.problem)}</p>}
+                    {/* The two ways to get a project, side by side: make one, or open one exported earlier. */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="submit" className={button('signal')}>Create project</button>
+                      <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
+                      <button type="button" className={button('outline')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open an exported file</button>
                     </div>
-                  </details>
-                  </DataStudio>
-                )}
-                {activeChapter === 'discovery' && workflow.prepared !== null && discoveryDraft !== null && (
-                  <DiscoveryPanel
-                    key={workflow.prepared.id}
-                    source={workflow.source}
-                    profile={workflow.profile}
-                    prepared={workflow.prepared}
-                    stationarity={workflow.stationarity}
-                    runs={workflow.discoveryRuns}
-                    documents={workflow.dagDocuments}
-                    draft={discoveryDraft}
-                    onEvent={reportDiscoveryEvent}
-                    cancellation={discoveryCancellation.current}
-                    onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
-                    onDeleteRun={(deletion) => dispatch({ type: 'discovery-run-deletion-committed', deletion })}
+                  </form>
+                  <section className="mt-8" aria-labelledby="projects-title">
+                    <h3 id="projects-title" className="mb-2 text-title font-medium text-ink">Your projects</h3>
+                    <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file.</p>
+                    {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
+                    {importProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{importProblem}</p>}
+                    {yours.length === 0
+                      ? <p className="m-0 text-body text-faint">None yet. Create one above, open an exported file, or start from an example below.</p>
+                      : (
+                        <ul className="m-0 list-none divide-y divide-hair rounded-lg border border-hair p-0" aria-label="Projects">
+                          {yours.map((entry) => (
+                            <li key={entry.id} className="flex items-center gap-3 px-3 py-2 transition-colors hover:bg-well">
+                              <div className="min-w-0 flex-1">
+                                <span className="block truncate text-body text-ink">{entry.name}</span>
+                                <span className={num('block truncate text-label text-faint')}>
+                                  {`${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`}
+                                </span>
+                              </div>
+                              <button type="button" className={button('outline')} onClick={() => void reopenProject(entry.id)}>Open</button>
+                              <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
+                              <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                  </section>
+                  <section className="mt-8" aria-labelledby="examples-title">
+                    <h3 id="examples-title" className="mb-2 text-title font-medium text-ink">Examples</h3>
+                    <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Complete walkthroughs, each with its data inside. Open one to read it, edit it freely, and reset it to get the shipped version back.</p>
+                    <ExampleLedger
+                      examples={SHIPPED_EXAMPLES}
+                      saved={saved}
+                      formatSaved={formatDay}
+                      onOpen={(example) => void openExample(example)}
+                      onReset={(example) => void openExample(example, true)}
+                      onExport={(id) => void exportSaved(id)}
+                      onDelete={(entry) => void removeProject(entry)}
+                    />
+                  </section>
+                </section>
+              )}
+  
+              {workflow.kind === 'awaiting-data' && (
+                <section className="rise my-auto max-w-2xl" aria-labelledby="load-data-title">
+                  <span className={label('text-signal')}>02 · Data studio</span>
+                  <h2 id="load-data-title" className="mb-3 mt-3 text-heading text-ink">{workflow.restore === null ? 'Choose a data file' : 'Choose the data file again'}</h2>
+                  <p className="mb-6 text-body text-faint">
+                    {workflow.restore === null
+                      ? 'CSV, TSV, or Parquet'
+                      : `${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : ` · ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
+                  </p>
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".csv,.tsv,.parquet,text/csv,text/tab-separated-values,application/vnd.apache.parquet"
+                    className="sr-only"
+                    onChange={(event) => chooseFile(event.target.files?.[0])}
                   />
-                )}
-                {activeChapter === 'dag' && workflow.prepared !== null && (
-                  <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<ChapterSkeleton label="Loading DAG editor…" />}>
-                    <DagWorkspace
-                      key={workflow.prepared.id}
-                      source={workflow.source}
-                      profile={workflow.profile}
-                      prepared={workflow.prepared}
-                      discoveryRuns={workflow.discoveryRuns}
-                      documents={workflow.dagDocuments}
-                      checks={workflow.dagChecks}
-                      interventionQueries={workflow.interventionQueries}
-                      onInterventionQuery={(query) => dispatch({ type: 'intervention-query-created', query })}
-                      onDocumentCreated={(document) => dispatch({ type: 'dag-document-created', document })}
-                      onDocumentRevised={(document) => dispatch({ type: 'dag-document-revised', document })}
-                      onCheck={(check) => dispatch({ type: 'dag-check-created', check })}
-                      onUseForStudy={() => navigateToChapter('study')}
-                      studyDraft={workflow.studyDraft}
-                      onStudyDraftChanged={(draft) => dispatch({ type: 'study-draft-changed', draft })}
-                    />
-                  </Suspense>
-                  </ChapterBoundary>
-                )}
-                {activeChapter === 'study' && workflow.prepared !== null && (
-                  <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<ChapterSkeleton label="Loading study design…" />}>
-                    <StudyDesignPanel
-                    onActivity={reportActivity.study}
-                      key={workflow.prepared.id}
-                      prepared={workflow.prepared}
-                      documents={workflow.dagDocuments}
-                      draft={workflow.studyDraft}
-                      onDraftChanged={(draft) => dispatch({ type: 'study-draft-changed', draft })}
-                      studies={workflow.studies}
-                      identifications={workflow.identifications}
-                      onIdentified={(study, identification) => dispatch({ type: 'study-identified', study, identification })}
-                      onContinue={() => navigateToChapter('estimation')}
-                      onOpenDag={() => navigateToChapter('dag')}
-                    />
-                  </Suspense>
-                  </ChapterBoundary>
-                )}
-                {activeChapter === 'estimation' && workflow.prepared !== null && (
-                  <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<ChapterSkeleton label="Loading estimation…" />}>
-                    <EstimationPanel
-                    onActivity={reportActivity.estimation}
+                  <button type="button" className={button('signal', 'inline-flex items-center gap-2')} onClick={() => fileInput.current?.click()}>
+                    <Icon name="upload_file" size={16} />
+                    Choose data file
+                  </button>
+                  {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
+                </section>
+              )}
+  
+              {workflow.kind === 'source-selected' && (
+                <section className="rise my-auto max-w-2xl" aria-labelledby="selected-source-title">
+                  <span className={label('text-signal')}>02 · Data studio</span>
+                  <h2 id="selected-source-title" className="mb-3 mt-3 text-heading text-ink">Source selected</h2>
+                  <SourceSummary source={workflow.source} />
+                  <div className="mt-4 flex gap-2">
+                    <button type="button" className={button('signal')} onClick={() => void inspectSource()}>
+                      Inspect data
+                    </button>
+                    <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
+                      Choose another file
+                    </button>
+                  </div>
+                </section>
+              )}
+  
+              {workflow.kind === 'profiling' && (
+                <section className="rise my-auto max-w-2xl" aria-labelledby="profiling-title">
+                  <span className={label('text-signal')}>02 · Data studio</span>
+                  <h2 id="profiling-title" className="mb-3 mt-3 flex items-center gap-2 text-heading text-ink">
+                    <Icon name="progress_activity" size={18} className="animate-spin [animation-duration:0.9s] text-[var(--color-info)]" />
+                    Inspecting data
+                  </h2>
+                  <SourceSummary source={workflow.source} />
+                </section>
+              )}
+  
+              {workflow.kind === 'import-failed' && (
+                <section className="rise my-auto max-w-2xl" aria-labelledby="import-failed-title">
+                  <span className={label('text-danger')}>Import refused</span>
+                  <h2 id="import-failed-title" className="mb-3 mt-3 text-heading text-ink">{describeDatasetProfileProblem(workflow.problem)}</h2>
+                  <SourceSummary source={workflow.source} />
+                  {datasetProfileProblemDetail(workflow.problem) && (
+                    <details className={well('mt-3 px-3 py-2 text-body text-muted')}>
+                      <summary>Technical detail</summary>
+                      <p className={literal('mb-0 mt-2 break-words text-faint')}>{datasetProfileProblemDetail(workflow.problem)}</p>
+                    </details>
+                  )}
+                  <div className="mt-4 flex gap-2">
+                    <button type="button" className={button('signal')} onClick={() => void inspectSource()}>Try again</button>
+                    <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
+                      Choose another file
+                    </button>
+                  </div>
+                </section>
+              )}
+  
+              {workflow.kind === 'profiled' && (
+                <>
+                  {activeChapter === 'data' && (
+                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}>
+                      <PreprocessingPanel
+                        key={workflow.profile.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        onPrepared={(artifact) => dispatch({ type: 'prepared-dataset-created', artifact })}
+                        onStationarityEvidence={(evidence) => dispatch({ type: 'stationarity-evidence-created', evidence })}
+                        stationarity={workflow.stationarity}
+                        preparedVersion={workflow.prepared}
+                        grangerEvidence={workflow.grangerEvidence}
+                        onGrangerEvidence={(evidence) => dispatch({ type: 'granger-evidence-created', evidence })}
+                        countSeriesModels={workflow.countSeriesModels}
+                        onCountSeriesModel={(artifact) => dispatch({ type: 'count-series-model-created', artifact })}
+                      />
+                    {workflow.prepared !== null && (
+                      <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
+                        <span className={label('text-faint')}>Continue</span>
+                        <h3 id="prepared-next-title" className="mb-1 mt-1 text-title font-medium text-ink">Build a DAG or run discovery</h3>
+                        <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
+                          <button type="button" className={button('quiet')} onClick={() => navigateToChapter('discovery')}>Run discovery</button>
+                        </div>
+                      </section>
+                    )}
+                    <details className="group rounded-md border border-line bg-panel">
+                      <summary className="flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-label text-muted transition-colors marker:content-none hover:text-ink">
+                        <span>Source file · storage and export</span>
+                        <Icon name="expand_more" size={14} className="shrink-0 transition-transform group-open:rotate-180" />
+                      </summary>
+                      <div className="border-t border-hair px-2.5 py-3">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <SegmentedControl
+                            ariaLabel="Source file storage"
+                            value={workflow.profile.source.persistence.kind}
+                            onChange={(kind) => void changeSourcePersistence(kind)}
+                            options={[{ value: 'ephemeral', label: 'Not stored' }, { value: 'cached-locally', label: 'Cached locally', disabled: !sourceCacheAvailable(), title: sourceCacheAvailable() ? undefined : 'This browser does not offer a private file store.' }]}
+                          />
+                          <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
+                            Choose another file
+                          </button>
+                          <span className="h-[15px] w-px bg-hair" aria-hidden />
+                          <button type="button" className={button('outline')} onClick={() => void exportProject()}>Export project</button>
+                          <label className="flex items-center gap-1.5 text-body text-ink">
+                            <input type="checkbox" checked={includeSource} onChange={(event) => setIncludeSource(event.target.checked)} />
+                            Include the source file ({formatBytes(workflow.source.bytes)})
+                          </label>
+                        </div>
+                        <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">{workflow.profile.source.persistence.kind === 'cached-locally' ? 'Reopening this project reads the file from the browser store.' : 'Reopening this project asks for the file again.'}</p>
+                        {cacheProblem !== null && <p role="alert" className="mb-0 mt-1 text-body text-danger">{cacheProblem}</p>}
+                      </div>
+                    </details>
+                    </DataStudio>
+                  )}
+                  {activeChapter === 'discovery' && workflow.prepared !== null && discoveryDraft !== null && (
+                    <DiscoveryPanel
                       key={workflow.prepared.id}
                       source={workflow.source}
                       profile={workflow.profile}
                       prepared={workflow.prepared}
                       stationarity={workflow.stationarity}
+                      runs={workflow.discoveryRuns}
                       documents={workflow.dagDocuments}
-                      studies={workflow.studies}
-                      identifications={workflow.identifications}
-                      runs={workflow.estimationRuns}
-                      sensitivityRuns={workflow.sensitivityRuns}
-                      onRun={(run) => dispatch({ type: 'estimation-run-created', run })}
-                      onDeleteRun={(run) => dispatch({ type: 'estimation-run-deleted', run })}
-                      onOpenStudy={() => navigateToChapter('study')}
+                      draft={discoveryDraft}
+                      onEvent={reportDiscoveryEvent}
+                      cancellation={discoveryCancellation.current}
+                      onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
+                      onDeleteRun={(deletion) => dispatch({ type: 'discovery-run-deletion-committed', deletion })}
                     />
-                  </Suspense>
-                  </ChapterBoundary>
-                )}
-                {activeChapter === 'sensitivity' && workflow.prepared !== null && (
-                  <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<ChapterSkeleton label="Loading sensitivity…" />}>
-                    <SensitivityPanel
-                    onActivity={reportActivity.sensitivity}
-                      key={workflow.prepared.id}
-                      source={workflow.source}
-                      profile={workflow.profile}
-                      prepared={workflow.prepared}
-                      studies={workflow.studies}
-                      estimationRuns={workflow.estimationRuns}
-                      runs={workflow.sensitivityRuns}
-                      onRun={(run) => dispatch({ type: 'sensitivity-run-created', run })}
-                      onDeleteRun={(run) => dispatch({ type: 'sensitivity-run-deleted', run })}
-                    />
-                  </Suspense>
-                  </ChapterBoundary>
-                )}
-                {activeChapter === 'counterfactual' && workflow.prepared !== null && (
-                  <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<ChapterSkeleton label="Loading counterfactuals…" />}>
-                    <CounterfactualPanel
-                    onActivity={reportActivity.counterfactual}
-                      key={workflow.prepared.id}
-                      source={workflow.source}
-                      profile={workflow.profile}
-                      prepared={workflow.prepared}
-                      documents={workflow.dagDocuments}
-                      studies={workflow.studies}
-                      identifications={workflow.identifications}
-                      runs={workflow.counterfactualRuns}
-                      onRun={(run) => dispatch({ type: 'counterfactual-run-created', run })}
-                      onDeleteRun={(run) => dispatch({ type: 'counterfactual-run-deleted', run })}
-                    />
-                  </Suspense>
-                  </ChapterBoundary>
-                )}
-                {activeChapter === 'results' && workflow.prepared !== null && (
-                  <ChapterBoundary key={activeChapter} chapter={activeName}>
-                  <Suspense fallback={<ChapterSkeleton label="Loading results…" />}>
-                    <ResultsPanel
-                      key={workflow.prepared.id}
-                      source={workflow.source}
-                      profile={workflow.profile}
-                      prepared={workflow.prepared}
-                      stationarity={workflow.stationarity}
-                      documents={workflow.dagDocuments}
-                      studies={workflow.studies}
-                      identifications={workflow.identifications}
-                      estimationRuns={workflow.estimationRuns}
-                      sensitivityRuns={workflow.sensitivityRuns}
-                      counterfactualRuns={workflow.counterfactualRuns}
-                    />
-                  </Suspense>
-                  </ChapterBoundary>
-                )}
-              </>
-            )}
-        </>
-      )}
-    />
+                  )}
+                  {activeChapter === 'dag' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading DAG editor…" />}>
+                      <DagWorkspace
+                        key={workflow.prepared.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        prepared={workflow.prepared}
+                        discoveryRuns={workflow.discoveryRuns}
+                        documents={workflow.dagDocuments}
+                        checks={workflow.dagChecks}
+                        interventionQueries={workflow.interventionQueries}
+                        onInterventionQuery={(query) => dispatch({ type: 'intervention-query-created', query })}
+                        onDocumentCreated={(document) => dispatch({ type: 'dag-document-created', document })}
+                        onDocumentRevised={(document) => dispatch({ type: 'dag-document-revised', document })}
+                        onCheck={(check) => dispatch({ type: 'dag-check-created', check })}
+                        onUseForStudy={() => navigateToChapter('study')}
+                        studyDraft={workflow.studyDraft}
+                        onStudyDraftChanged={(draft) => dispatch({ type: 'study-draft-changed', draft })}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'study' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading study design…" />}>
+                      <StudyDesignPanel
+                      onActivity={reportActivity.study}
+                        key={workflow.prepared.id}
+                        prepared={workflow.prepared}
+                        documents={workflow.dagDocuments}
+                        draft={workflow.studyDraft}
+                        onDraftChanged={(draft) => dispatch({ type: 'study-draft-changed', draft })}
+                        studies={workflow.studies}
+                        identifications={workflow.identifications}
+                        onIdentified={(study, identification) => dispatch({ type: 'study-identified', study, identification })}
+                        onContinue={() => navigateToChapter('estimation')}
+                        onOpenDag={() => navigateToChapter('dag')}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'estimation' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading estimation…" />}>
+                      <EstimationPanel
+                      onActivity={reportActivity.estimation}
+                        key={workflow.prepared.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        prepared={workflow.prepared}
+                        stationarity={workflow.stationarity}
+                        documents={workflow.dagDocuments}
+                        studies={workflow.studies}
+                        identifications={workflow.identifications}
+                        runs={workflow.estimationRuns}
+                        sensitivityRuns={workflow.sensitivityRuns}
+                        onRun={(run) => dispatch({ type: 'estimation-run-created', run })}
+                        onDeleteRun={(run) => dispatch({ type: 'estimation-run-deleted', run })}
+                        onOpenStudy={() => navigateToChapter('study')}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'sensitivity' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading sensitivity…" />}>
+                      <SensitivityPanel
+                      onActivity={reportActivity.sensitivity}
+                        key={workflow.prepared.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        prepared={workflow.prepared}
+                        studies={workflow.studies}
+                        estimationRuns={workflow.estimationRuns}
+                        runs={workflow.sensitivityRuns}
+                        onRun={(run) => dispatch({ type: 'sensitivity-run-created', run })}
+                        onDeleteRun={(run) => dispatch({ type: 'sensitivity-run-deleted', run })}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'counterfactual' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading counterfactuals…" />}>
+                      <CounterfactualPanel
+                      onActivity={reportActivity.counterfactual}
+                        key={workflow.prepared.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        prepared={workflow.prepared}
+                        documents={workflow.dagDocuments}
+                        studies={workflow.studies}
+                        identifications={workflow.identifications}
+                        runs={workflow.counterfactualRuns}
+                        onRun={(run) => dispatch({ type: 'counterfactual-run-created', run })}
+                        onDeleteRun={(run) => dispatch({ type: 'counterfactual-run-deleted', run })}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'results' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading results…" />}>
+                      <ResultsPanel
+                        key={workflow.prepared.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        prepared={workflow.prepared}
+                        stationarity={workflow.stationarity}
+                        documents={workflow.dagDocuments}
+                        studies={workflow.studies}
+                        identifications={workflow.identifications}
+                        estimationRuns={workflow.estimationRuns}
+                        sensitivityRuns={workflow.sensitivityRuns}
+                        counterfactualRuns={workflow.counterfactualRuns}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
+                </>
+              )}
+          </>
+        )}
+      />
+    </ChartExportProvider.Provider>
   )
 }
 

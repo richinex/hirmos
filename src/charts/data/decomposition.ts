@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, axisNameStyle, baseOption, tooltip, valueAxis, zoomPair } from '../grammar'
+import { axisLabelStyle, axisNameStyle, baseOption, tooltip, valueAxis, rangeSelection } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface StlChartView {
@@ -64,7 +64,7 @@ export function decompositionOption(view: StlChartView, theme: ChartTheme): ECha
     },
     xAxis: xAxes,
     yAxis: yAxes,
-    dataZoom: zoomPair(theme, [0, 1, 2, 3]),
+    ...rangeSelection(theme, [0, 1, 2, 3]),
     series: components.map(([name, values, colour], index) => ({
       type: 'line',
       name,

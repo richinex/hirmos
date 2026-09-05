@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
-import { IntervalFigure } from '@/components/ui/figures'
+import { EstimateHeadline } from '@/components/results/EstimateHeadline'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
 import { button, chip, label, literal, num, panel, statusText, table, td, th, tr } from '@/components/ui/recipes'
@@ -20,8 +20,6 @@ import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
-
-const scaleOf = (run: EstimationRunArtifact) => (run.estimate.effect.kind === 'incidenceRateRatio' ? { kind: 'ratio' as const, label: 'IRR' as const } : { kind: 'additive' as const, unit: '' })
 
 const Row = RecordRow
 
@@ -86,32 +84,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <button type="button" className={button('outline')} onClick={download}>Export the manifest</button>
         </div>
         <div className="mt-3">
-          {estimate.interval.kind !== 'none' && estimate.effect.kind !== 'path' ? (
-            <IntervalFigure
-              sentence={study === null ? run.method : estimandSentence(study)}
-              estimate={estimate.effect.value}
-              lower={estimate.interval.lower}
-              upper={estimate.interval.upper}
-              type={intervalTypeOf(estimate.interval)}
-              scale={scaleOf(run)}
-              standardError={estimate.standardError ?? undefined}
-              observations={estimate.sample.observations}
-              scaleLine={study === null ? (estimate.effect.kind === 'incidenceRateRatio' ? `incidence rate ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`) : resultScaleLine(run, study, stepLabel)}
-              accent
-              testId="result-figure"
-            />
-          ) : (
-            <figure className="m-0" data-testid="result-figure">
-              <figcaption className="text-title text-ink">{study === null ? run.method : estimandSentence(study)}</figcaption>
-              <p className={num('mb-0 mt-1 text-metric font-semibold text-signal')}>
-                {estimate.effect.kind === 'path' ? formatStatistic('raw', estimate.effect.aggregate.average).text : formatStatistic('raw', estimate.effect.value).text}
-              </p>
-              <p className="mb-0 mt-1 text-body text-muted">
-                {estimate.effect.kind === 'path' ? `average per ${stepLabel} over ${formatCount(estimate.effect.values.length).text} post-intervention ${stepLabel}s · ` : ''}
-                {estimate.interval.kind === 'none' ? estimate.interval.reason : ''}
-              </p>
-            </figure>
-          )}
+          <EstimateHeadline estimate={estimate} sentence={study === null ? run.method : estimandSentence(study)} scaleLine={study === null ? (estimate.effect.kind === 'incidenceRateRatio' ? `incidence rate ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`) : resultScaleLine(run, study, stepLabel)} stepLabel={stepLabel} accent testId="result-figure" />
         </div>
         {study !== null && <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />}
       </article>

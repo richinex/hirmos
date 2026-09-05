@@ -1,13 +1,18 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Rnd } from 'react-rnd'
-import type { EChartsCoreOption } from 'echarts/core'
+import type { EChartsCoreOption, EChartsType } from 'echarts/core'
+import type { VisibleWindow } from './window'
 import { EChart } from './EChart'
+import { CHART_EXPORTS, exportChart, type ChartExport } from './export'
+import { useChartExportContext } from './exportContext'
+import { useChartTheme } from './theme'
 import { Icon } from '@/components/Icon'
+import { downloadBlob } from '@/data/bundleFiles'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useFloatingRect } from '@/lib/floatingRect'
 import { useIsMobile } from '@/lib/useMediaQuery'
-import { panelTitle } from '@/components/ui/recipes'
+import { button, panelTitle } from '@/components/ui/recipes'
 
 /**
  * A diagnostic figure that can be lifted into a floating window.
@@ -15,21 +20,29 @@ import { panelTitle } from '@/components/ui/recipes'
  * A correlogram or decomposition is read at two scales: a glance inside the panel, and a close look
  * where one lag or time point matters. The lifted window is draggable by its header and resizable,
  * and carries no backdrop, so the table it is being compared against stays visible and clickable.
- * Its rect persists per figure. Builders that declare `dataZoom` gain wheel zoom and drag panning.
+ * Its rect persists per figure. Builders that declare `dataZoom` gain wheel zoom and drag panning,
+ * and the window's header exports the drawing or its numbers as they stand, zoom and all.
  *
  * The window is portalled to the body because the workbench panes declare `container-type: size`,
  * which makes them the containing block for fixed-position descendants: rendered in place it would
  * be inset from the pane and clipped by its neighbours rather than floating over the window.
  */
-export function ExpandableChart({ option, label, className = 'h-[260px]', testId, defaultWidth = 900, defaultHeight = 560 }: {
+export function ExpandableChart({ option, label, className = 'h-[260px]', testId, defaultWidth = 900, defaultHeight = 560, window: wanted, onWindow }: {
   readonly option: EChartsCoreOption
   readonly label: string
   readonly className?: string
   readonly testId?: string
   readonly defaultWidth?: number
   readonly defaultHeight?: number
+  /** A window to show and the window shown, for charts that share an axis and follow each other. */
+  readonly window?: VisibleWindow | null
+  readonly onWindow?: (window: VisibleWindow | null) => void
 }) {
   const [lifted, setLifted] = useState(false)
+  const [exportProblem, setExportProblem] = useState<string | null>(null)
+  const liftedChart = useRef<EChartsType | null>(null)
+  const theme = useChartTheme()
+  const { project } = useChartExportContext()
   const isMobile = useIsMobile()
   const layerId = `chart-${useId().replaceAll(':', '')}`
   const { position, size, onDragStop, onResizeStop } = useFloatingRect(`hirmos_panel_${label}`, () => ({
@@ -47,6 +60,18 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', testId
     return () => window.removeEventListener('keydown', key)
   }, [layerId, lifted])
 
+  const download = async (request: ChartExport) => {
+    const chart = liftedChart.current
+    if (chart === null) return
+    setExportProblem(null)
+    try {
+      const file = await exportChart(chart, option, { project, label }, request, theme.panel)
+      downloadBlob(file.name, file.body instanceof Blob ? file.body : new Blob([file.body], { type: file.mediaType }))
+    } catch {
+      setExportProblem('The export could not be produced.')
+    }
+  }
+
   const openButton = (
     <button
       type="button"
@@ -60,28 +85,41 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', testId
   )
 
   const header = (
-    <div className={`${layerId}-drag flex shrink-0 select-none items-center justify-between border-b border-hair px-3 py-2 ${isMobile ? '' : 'cursor-grab active:cursor-grabbing'}`}>
-      <span className={panelTitle}>{label}</span>
-      <button
-        type="button"
-        onPointerDown={(event) => event.stopPropagation()}
-        className="text-faint transition-colors hover:text-ink"
-        aria-label="Close the floating window"
-        title="Close (Esc)"
-        onClick={() => setLifted(false)}
-      >
-        <Icon name="close_fullscreen" size={14} />
-      </button>
+    <div className={`${layerId}-drag flex shrink-0 select-none items-center justify-between gap-3 border-b border-hair px-3 py-2 ${isMobile ? '' : 'cursor-grab active:cursor-grabbing'}`}>
+      <span className={`${panelTitle} min-w-0 truncate`}>{label}</span>
+      <div className="flex shrink-0 items-center gap-1.5" onPointerDown={(event) => event.stopPropagation()}>
+        {/* Exports are of what is on screen: the drawing at its size, the numbers at their zoomed range. */}
+        <span className="text-label text-faint">Export</span>
+        {CHART_EXPORTS.map((request) => (
+          <button key={request.kind} type="button" className={button('quiet', 'px-2 py-1 text-label')} aria-label={`Export ${label} as ${request.kind.toUpperCase()}`} onClick={() => void download(request)}>
+            {request.kind.toUpperCase()}
+          </button>
+        ))}
+        <button
+          type="button"
+          className="ml-1 text-faint transition-colors hover:text-ink"
+          aria-label="Close the floating window"
+          title="Close (Esc)"
+          onClick={() => setLifted(false)}
+        >
+          <Icon name="close_fullscreen" size={14} />
+        </button>
+      </div>
     </div>
   )
 
-  const body = <div className="min-h-0 flex-1 p-3"><EChart option={option} label={label} className="h-full" /></div>
+  const body = (
+    <div className="flex min-h-0 flex-1 flex-col p-3">
+      {exportProblem !== null && <p role="alert" className="mb-2 mt-0 text-body text-danger">{exportProblem}</p>}
+      <EChart option={option} label={label} className="min-h-0 flex-1" onReady={(chart) => { liftedChart.current = chart }} window={wanted} onWindow={onWindow} />
+    </div>
+  )
 
   return (
     <>
       <div className="relative">
         {!lifted && openButton}
-        <EChart option={option} label={label} className={className} testId={testId} />
+        <EChart option={option} label={label} className={className} testId={testId} window={wanted} onWindow={onWindow} />
       </div>
       {lifted && createPortal(
         // Drag and resize do not suit touch, so a phone gets a plain inset layer instead.

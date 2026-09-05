@@ -5,6 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Alert } from '@/components/ui/Alert'
 import { FigureParts } from '@/components/ui/figures'
 import { figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { ShareBar } from '@/components/table/primitives'
 import type { ColumnProfile, ColumnProfileProblem, DatasetProfile, PhysicalColumnProfile } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import { formatAbsent, formatCount, formatPercent, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
@@ -37,7 +38,13 @@ function StatList({ children }: { readonly children: React.ReactNode }) {
 
 function NumericSummary({ column, profile, rowCount }: { readonly column: PhysicalColumnProfile; readonly profile: Extract<ColumnProfile, { readonly kind: 'numeric-column-profile' }>; readonly rowCount: number }) {
   const theme = useChartTheme()
-  const option = useMemo(() => histogramOption({ name: column.name, edges: profile.histogram.edges, counts: profile.histogram.counts, nullCount: profile.nullCount }, theme), [column.name, profile, theme])
+  // The rules mark the mean and the median the list beside the chart prints, so the shape and the figures read together.
+  const option = useMemo(() => histogramOption({
+    name: column.name,
+    bins: profile.histogram,
+    nullCount: profile.nullCount,
+    marks: [{ name: 'mean', value: profile.mean }, { name: 'median', value: profile.quartiles.median }],
+  }, theme), [column.name, profile, theme])
   const missing = formatPercent(profile.nullCount / rowCount, { numerator: profile.nullCount, denominator: rowCount })
   return (
     <>
@@ -81,7 +88,7 @@ function CategoricalSummary({ profile, rowCount }: { readonly profile: Extract<C
             <li key={entry.value} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 text-body">
               <span className="truncate text-ink" title={entry.value}>{entry.value}</span>
               <span className={num('text-muted')}>{formatCount(entry.count).text}</span>
-              <span aria-hidden className="col-span-2 h-1 rounded-full bg-hair"><span className="block h-full rounded-full bg-bone" style={{ width: `${(entry.count / peak) * 100}%` }} /></span>
+              <ShareBar share={entry.count / peak} className="col-span-2" />
             </li>
           ))}
         </ol>

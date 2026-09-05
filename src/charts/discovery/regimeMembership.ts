@@ -1,5 +1,5 @@
 import type { EChartsCoreOption } from 'echarts/core'
-import { baseOption, gridAuto, legend, stepAxis, tooltip, valueAxis, zoomPair } from '../grammar'
+import { baseOption, gridAuto, legend, stepAxis, tooltip, valueAxis, rangeSelection } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface RegimeMembershipView {
@@ -16,7 +16,7 @@ export function regimeMembershipOption(view: RegimeMembershipView, theme: ChartT
     grid: gridAuto({ top: 30, bottom: 64 }),
     legend: { ...legend(theme, view.memberships.map((_, regime) => `Regime ${regime + 1}`)), bottom: 'auto', top: 0 },
     tooltip: tooltip(theme, 'axis'),
-    dataZoom: zoomPair(theme),
+    ...rangeSelection(theme),
     xAxis: stepAxis(theme, 'Observation'),
     yAxis: { ...valueAxis(theme, 'Membership'), min: 0, max: 1 },
     series: view.memberships.map((memberships, regime) => ({

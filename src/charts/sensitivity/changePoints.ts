@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { baseOption, gridAuto, responsive, tooltip, valueAxis, zoomPair } from '../grammar'
+import { baseOption, gridAuto, responsive, tooltip, valueAxis, rangeSelection } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface ChangePointsChartView {
@@ -46,7 +46,7 @@ export function changePointsOption(view: ChangePointsChartView, theme: ChartThem
       splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
-    ...(view.zoom === false ? {} : { dataZoom: zoomPair(theme) }),
+    ...(view.zoom === false ? {} : { ...rangeSelection(theme) }),
     series: [{
       type: 'line',
       name: view.name,

@@ -16,11 +16,16 @@ export function decodeSourceFile(data: Extract<BundleData, { kind: 'source-file'
   return new File([bytes], data.name, { type: data.mediaType, lastModified: data.lastModified })
 }
 
-export function downloadText(name: string, text: string, mediaType = 'application/json'): void {
-  const url = URL.createObjectURL(new Blob([text], { type: mediaType }))
+/** Hand the reader a file; the object URL lives just long enough for the browser to take it. */
+export function downloadBlob(name: string, blob: Blob): void {
+  const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url
   anchor.download = name
   anchor.click()
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+export function downloadText(name: string, text: string, mediaType = 'application/json'): void {
+  downloadBlob(name, new Blob([text], { type: mediaType }))
 }

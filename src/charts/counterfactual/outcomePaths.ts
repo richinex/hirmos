@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis, zoomPair } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis, rangeSelection } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface OutcomePathsView {
@@ -24,7 +24,7 @@ export function outcomePathsOption(view: OutcomePathsView, theme: ChartTheme): E
     ...baseOption(theme, description),
     grid: gridAuto({ top: 30, bottom: 40 }),
     legend: { ...legend(theme), bottom: 'auto', top: 0 },
-    dataZoom: zoomPair(theme),
+    ...rangeSelection(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
       axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } },

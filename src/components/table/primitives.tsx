@@ -330,3 +330,14 @@ export function countLine(shown: number, total: number, noun: string, extra?: st
 
 /** Mono type text for a header line. */
 export const typeText = (duckdbType: string): ReactNode => <span className={literal('text-micro text-faint')}>{duckdbType}</span>
+
+/** One proportion as a bar on a track, the same ink as the schema table's micro-figures; decoration beside a count that already says it. */
+export function ShareBar({ share, height = 4, className }: { readonly share: number; readonly height?: number; readonly className?: string }) {
+  const width = Math.max(0, Math.min(1, share)) * 100
+  return (
+    <svg aria-hidden viewBox="0 0 100 1" preserveAspectRatio="none" width="100%" height={height} className={cn('block rounded-full', className)}>
+      <rect x={0} y={0} width={100} height={1} fill="var(--color-hair)" />
+      <rect x={0} y={0} width={width} height={1} fill="var(--color-bone)" />
+    </svg>
+  )
+}

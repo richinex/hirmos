@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, axisNameStyle, baseOption, tooltip, valueAxis, zoomPair } from '../grammar'
+import { axisLabelStyle, axisNameStyle, baseOption, tooltip, valueAxis, rangeSelection } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface LagCorrelationView {
@@ -58,7 +58,7 @@ export function lagCorrelationOption(view: LagCorrelationView, theme: ChartTheme
         return `lag ${Number(Reflect.get(value, 'dataIndex'))}<br/>${String(Reflect.get(value, 'seriesName'))}: <strong>${formatStatistic('score', Number(Reflect.get(value, 'value'))).text}</strong>`
       },
     },
-    dataZoom: zoomPair(theme, [0, 1]),
+    ...rangeSelection(theme, [0, 1]),
     xAxis: xAxes,
     yAxis: yAxes,
     series,

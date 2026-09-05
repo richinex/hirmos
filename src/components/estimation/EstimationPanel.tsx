@@ -5,6 +5,7 @@ import { Select } from '@/components/ui/Select'
 import { LagListField } from '@/components/ui/LagListField'
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
+import { ExpandableChart } from '@/charts/ExpandableChart'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
 import { impactPathOption } from '@/charts/estimation/impactPath'
 import { posteriorDensityOption } from '@/charts/estimation/posteriorDensity'
@@ -17,7 +18,8 @@ import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Formula } from '@/components/ui/Formula'
 import { RunFold } from '@/components/ui/RunFold'
-import { FigureParts, IntervalFigure, MetricTile } from '@/components/ui/figures'
+import { FigureParts, MetricTile } from '@/components/ui/figures'
+import { EstimateHeadline, headlineFigure, IRR, scaleOf } from '@/components/results/EstimateHeadline'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -220,19 +222,6 @@ const step = (state: State, event: Event): State => {
   }
 }
 
-const IRR = { kind: 'ratio', label: 'IRR' } as const
-
-const scaleOf = (estimate: CausalEstimate) => (estimate.effect.kind === 'incidenceRateRatio' ? IRR : additive)
-
-/** The headline figure of any estimate, for ledgers and comparisons. */
-const headline = (estimate: CausalEstimate): Formatted => {
-  switch (estimate.effect.kind) {
-    case 'additive': return formatEstimate(estimate.effect.value, additive)
-    case 'incidenceRateRatio': return formatEstimate(estimate.effect.value, IRR)
-    case 'path': return formatEstimate(estimate.effect.aggregate.cumulative, additive)
-    default: return assertNever(estimate.effect)
-  }
-}
 
 const intervalText = (estimate: CausalEstimate): string => {
   if (estimate.interval.kind === 'none') return 'none'
@@ -587,15 +576,24 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   )
 }
 
-function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: () => void }) {
+function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: { readonly others?: readonly EstimationRunArtifact[]; readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: () => void }) {
   const theme = useChartTheme()
   const estimate = run.estimate
   const adjustmentVariables = useMemo(() => contemporaneousAdjustmentVariables(estimate.adjustment) ?? [], [estimate.adjustment])
   const sentence = estimandSentence(study)
   const scaleLine = resultScaleLine(run, study, stepLabel)
+  // Other path-valued runs of the same question can be drawn as a ghost behind this one.
+  const [ghostId, setGhostId] = useState('')
+  const ghosts = others.filter((other) => other.id !== run.id && other.estimate.effect.kind === 'path')
+  const ghostRun = ghosts.find((other) => String(other.id) === ghostId) ?? null
   const chart = useMemo(() => (estimate.effect.kind === 'path'
-    ? impactPathOption({ outcome: study.outcome.name, points: estimate.effect.values, stepLabel }, theme)
-    : null), [estimate.effect, stepLabel, study.outcome.name, theme])
+    ? impactPathOption({
+      outcome: study.outcome.name,
+      points: estimate.effect.values,
+      stepLabel,
+      ghost: ghostRun !== null && ghostRun.estimate.effect.kind === 'path' ? { name: `${describeEstimator(ghostRun.configuration.kind)} · ${formatTime(ghostRun.createdAt)}`, points: ghostRun.estimate.effect.values } : undefined,
+    }, theme)
+    : null), [estimate.effect, stepLabel, study.outcome.name, theme, ghostRun])
   // Runs recorded before the histogram was added carry no draws, so they keep the summary alone.
   const posterior = useMemo(() => (run.kind === 'bayesian-gaussian-run' && (run.evidence.histogramCounts ?? []).length > 0
     ? posteriorDensityOption({
@@ -627,41 +625,25 @@ function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run
   const body = (
     <>
       <div className="mt-3">
-        {estimate.interval.kind !== 'none' && estimate.effect.kind !== 'path' ? (
-          <IntervalFigure
-            sentence={sentence}
-            estimate={estimate.effect.value}
-            lower={estimate.interval.lower}
-            upper={estimate.interval.upper}
-            type={intervalTypeOf(estimate.interval)}
-            scale={scaleOf(estimate)}
-            standardError={estimate.standardError ?? undefined}
-            observations={estimate.sample.observations}
-            scaleLine={scaleLine}
-            accent={current}
-            testId="effect-estimate"
-          />
-        ) : (
-          <figure className="m-0" data-testid="effect-estimate">
-            <figcaption className="text-title text-ink">{sentence}</figcaption>
-            <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${current ? 'text-signal' : 'text-ink'}`)} title={headline(estimate).exact}><FigureParts value={headline(estimate)} /></p>
-            <p className={num('mb-0 mt-1 text-body text-bone')}>
-              {estimate.effect.kind === 'path' ? `cumulative over ${formatCount(estimate.effect.values.length).text} ${stepLabel}s · average ${formatStatistic('raw', estimate.effect.aggregate.average).text} per ${stepLabel} · ` : ''}
-              no interval · n = {formatCount(estimate.sample.observations).text}
-            </p>
-            <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.kind === 'none' ? estimate.interval.reason : ''}</p>
-            <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
-          </figure>
-        )}
+        <EstimateHeadline estimate={estimate} sentence={sentence} scaleLine={scaleLine} stepLabel={stepLabel} accent={current} testId="effect-estimate" />
       </div>
       {chart !== null && (
         <div className="mt-3">
-          <EChart option={chart} label={`${study.outcome.name} against its counterfactual after the intervention`} className="h-[260px]" testId="impact-path" />
+          {ghosts.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className={label('m-0 text-muted')}>Compare with</p>
+              <Select aria-label="Compare with" className={field('text', 'w-64')} value={ghostId} onChange={(event) => setGhostId(event.target.value)}>
+                <option value="">No other run</option>
+                {ghosts.map((other) => <option key={other.id} value={String(other.id)}>{describeEstimator(other.configuration.kind)} · {formatTime(other.createdAt)}</option>)}
+              </Select>
+            </div>
+          )}
+          <ExpandableChart option={chart} label={`${study.outcome.name} against its counterfactual after the intervention`} className="h-[260px]" testId="impact-path" />
         </div>
       )}
       {posterior !== null && (
         <div className="mt-3">
-          <EChart option={posterior} label={`Posterior density of the effect of ${study.treatment.name} on ${study.outcome.name}`} className="h-[220px]" testId="posterior-density" />
+          <ExpandableChart option={posterior} label={`Posterior density of the effect of ${study.treatment.name} on ${study.outcome.name}`} className="h-[220px]" testId="posterior-density" />
         </div>
       )}
       {curveChart !== null && (
@@ -672,7 +654,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run
               {curves.map((_, index) => <option key={index} value={index}>{adjustmentVariables[index]?.name ?? `covariate ${index + 1}`}</option>)}
             </Select>
           </div>
-          <EChart option={curveChart} label={`Expected ${study.outcome.name} across the chosen covariate under both interventions`} className="mt-2 h-[240px]" testId="counterfactual-curves" />
+          <div className="mt-2"><ExpandableChart option={curveChart} label={`Expected ${study.outcome.name} across the chosen covariate under both interventions`} className="h-[240px]" testId="counterfactual-curves" /></div>
         </div>
       )}
       {run.kind === 'backdoor-linear-run' && (
@@ -694,7 +676,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete }: { readonly run
   if (!current) {
     // History rows fold to one line in the runs drawer; only the current estimate keeps the stage.
     return (
-      <RunFold title={sentence} figure={headline(estimate).text} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
+      <RunFold title={sentence} figure={headlineFigure(estimate).text} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
         {body}
       </RunFold>
     )
@@ -1610,7 +1592,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           </div>
           {(() => {
             const bound = studies.find((candidate) => candidate.id === latestRun.study)
-            return bound === undefined ? null : <ResultCard run={latestRun} study={bound} current stepLabel={stepLabel} />
+            return bound === undefined ? null : <ResultCard run={latestRun} study={bound} current stepLabel={stepLabel} others={runs} />
           })()}
         </section>
       )}

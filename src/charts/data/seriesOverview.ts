@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, responsive, tooltip, valueAxis, zoomPair } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, responsive, tooltip, valueAxis, rangeSelection } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export interface SeriesOverviewView {
@@ -54,7 +54,7 @@ export function seriesOverviewOption(view: SeriesOverviewView, theme: ChartTheme
       splitLine: { show: false },
     },
     yAxis: { ...valueAxis(theme), scale: true },
-    dataZoom: zoomPair(theme),
+    ...rangeSelection(theme),
     series: [{
       type: 'line',
       name: view.name,

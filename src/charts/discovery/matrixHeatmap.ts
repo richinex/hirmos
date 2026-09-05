@@ -19,6 +19,8 @@ export interface MatrixHeatmapView {
   readonly relation?: 'directed' | 'symmetric'
   /** Text drawn in a cell instead of its number, for example a link mark. */
   readonly cellText?: (source: number, target: number) => string | null
+  /** Cells whose magnitude reaches this are outlined, so a threshold the reader set is visible where it bites. */
+  readonly threshold?: number
 }
 
 /**
@@ -37,9 +39,14 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
     }
   }))
   const magnitude = Math.max(peak, 1e-9)
+  // On a symmetric matrix the diagonal is a variable against itself, which no threshold is about.
+  const reaches = (x: number, y: number, value: number | null): boolean =>
+    view.threshold !== undefined && value !== null && Math.abs(value) >= view.threshold && !(view.relation === 'symmetric' && view.sources.length - 1 - y === x)
+  const flagged = cells.filter(([x, y, value]) => reaches(x, y, value)).length
+  const thresholdNote = view.threshold === undefined ? '' : ` ${flagged} cells reach the threshold of ${formatStatistic('score', view.threshold).text} and are outlined.`
   const description = view.relation === 'symmetric'
-    ? `${view.title}: ${view.sources.length} by ${view.targets.length}, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.`
-    : `${view.title}: ${view.sources.length} sources by ${view.targets.length} targets, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.`
+    ? `${view.title}: ${view.sources.length} by ${view.targets.length}, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.${thresholdNote}`
+    : `${view.title}: ${view.sources.length} sources by ${view.targets.length} targets, ${filled} cells with a ${view.quantity}; the largest magnitude is ${formatStatistic('score', peak).text}.${thresholdNote}`
   const showLabels = view.sources.length * view.targets.length <= 64
   // Neither axis is named. The row and column labels already carry the variables, an axis name at the
   // grid's end would sit under the button that lifts the figure into a floating window, and on a
@@ -101,7 +108,9 @@ export function matrixHeatmapOption(view: MatrixHeatmapView, theme: ChartTheme):
     series: [{
       type: 'heatmap',
       name: view.quantity,
-      data: cells.map(([x, y, value]) => (value === null ? { value: [x, y, null], itemStyle: { color: theme.line } } : [x, y, value])),
+      data: cells.map(([x, y, value]) => (value === null
+        ? { value: [x, y, null], itemStyle: { color: theme.line } }
+        : reaches(x, y, value) ? { value: [x, y, value], itemStyle: { borderColor: theme.ink, borderWidth: 2 } } : [x, y, value])),
       label: {
         show: showLabels,
         color: theme.ink,

@@ -8,6 +8,7 @@ import { ExpandableChart } from '@/charts/ExpandableChart'
 import { outcomePathsOption } from '@/charts/counterfactual/outcomePaths'
 import { counterfactualEffectPathOption } from '@/charts/counterfactual/effectPath'
 import { useChartTheme } from '@/charts/theme'
+import type { VisibleWindow } from '@/charts/window'
 import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
@@ -152,6 +153,8 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
   })()
   const uncertainty = run.kind === 'dynamic-linear-scm-run' && run.evidence.uncertainty.kind === 'blockBootstrap' ? run.evidence.uncertainty : null
   const [row, setRow] = useState(1)
+  // The two paths share a time axis, so a zoom on one is a zoom on both.
+  const [window, setWindow] = useState<VisibleWindow | null>(null)
   const index = Math.max(1, Math.min(view.plottedObservations, row)) - 1
   const option = useMemo(() => outcomePathsOption({
     outcome: study.outcome.name,
@@ -191,8 +194,8 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
         <MetricTile label="Equations" size="compact" frame="cell" value={formatCount(run.evidence.equations.length)} context={`order ${run.evidence.order.map((node) => run.nodes[node]?.name ?? node).join(' → ')}`} />
       </div>
       <ResultInterpretation interpretation={interpretCounterfactualResult(run, study, stepLabel)} className="mt-3" />
-      <ExpandableChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" />
-      {effectOption !== null && <ExpandableChart option={effectOption} label={`${study.outcome.name} counterfactual contrast with pointwise block-bootstrap interval`} className="mt-3 h-[240px]" testId="counterfactual-effect-interval" />}
+      <ExpandableChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" window={window} onWindow={setWindow} />
+      {effectOption !== null && <ExpandableChart window={window} onWindow={setWindow} option={effectOption} label={`${study.outcome.name} counterfactual contrast with pointwise block-bootstrap interval`} className="mt-3 h-[240px]" testId="counterfactual-effect-interval" />}
       <div className={well('mt-3 grid items-start gap-3 p-3 @md/panel:grid-cols-[auto_1fr]')}>
         <label className="block text-body text-ink"><span className={fieldLabel}>Inspect plotted point</span><input type="number" min={1} max={view.plottedObservations} aria-label="Inspect plotted point" className={field('text', 'mt-1 w-28')} value={row} onChange={(event) => setRow(Math.max(1, Math.min(view.plottedObservations, Math.floor(Number(event.target.value) || 1))))} /></label>
         <dl className="m-0 grid w-fit grid-cols-[auto_auto] gap-x-6 gap-y-1 text-body" aria-label={`${stepLabel} ${view.firstStep + index} counterfactual`}>

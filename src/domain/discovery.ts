@@ -1090,7 +1090,7 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
   }
 }
 
-function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfiguration {
+export function initialConfigurationFor(method: DiscoveryMethodChoice): DiscoveryConfiguration {
   switch (method) {
     case 'direct-lingam': return { kind: 'direct-lingam' }
     case 'pc-stable': return { kind: 'pc-stable', alpha: 0.05, maxDepth: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() }
@@ -1421,4 +1421,16 @@ export function describeDiscoveryRunProblem(problem: DiscoveryRunProblem): strin
     case 'execution-unavailable': return problem.detail
     default: return assertNever(problem)
   }
+}
+
+/**
+ * The settings a reader changed from the method's defaults, by field name. The method itself is not
+ * a setting, and background knowledge is a statement about the world rather than a knob, so neither
+ * counts.
+ */
+export const changedSettings = (configuration: DiscoveryConfiguration): readonly string[] => {
+  const defaults = initialConfigurationFor(configuration.kind) as unknown as Record<string, unknown>
+  return Object.keys(configuration)
+    .filter((key) => key !== 'kind' && key !== 'background')
+    .filter((key) => JSON.stringify(Reflect.get(configuration, key)) !== JSON.stringify(defaults[key]))
 }
