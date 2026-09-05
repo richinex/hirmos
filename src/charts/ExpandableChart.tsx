@@ -31,6 +31,7 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', testId
   readonly option: EChartsCoreOption
   readonly label: string
   readonly className?: string
+  /** The figure's short name: its test hook, and the stem of any file exported from it. */
   readonly testId?: string
   readonly defaultWidth?: number
   readonly defaultHeight?: number
@@ -65,7 +66,7 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', testId
     if (chart === null) return
     setExportProblem(null)
     try {
-      const file = await exportChart(chart, option, { project, label }, request, theme.panel)
+      const file = await exportChart(chart, option, { project, figure: testId ?? null, label }, request, theme.panel)
       downloadBlob(file.name, file.body instanceof Blob ? file.body : new Blob([file.body], { type: file.mediaType }))
     } catch {
       setExportProblem('The export could not be produced.')

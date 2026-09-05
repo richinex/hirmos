@@ -116,20 +116,24 @@ const csvCell = (value: string | number | null): string => {
 export const csvOf = (table: SeriesTable): string =>
   [table.columns.map(csvCell).join(','), ...table.rows.map((row) => row.map(csvCell).join(','))].join('\n') + '\n'
 
-/** What names an export: the project it belongs to, when one is open, and the chart's own label. */
+/**
+ * What names an export: the project it belongs to, when one is open, and the figure. A figure has a
+ * short name, the same one its test hook uses, and falls back to its reading label without one.
+ */
 export interface ExportName {
   readonly project: string | null
+  readonly figure: string | null
   readonly label: string
 }
 
 const slug = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
 /**
- * A file name a folder of downloads can still read: project, chart and the day, joined so each part
+ * A file name a folder of downloads can still read: project, figure and the day, joined so each part
  * stays a word. `seat-belt-law--impact-path--2026-09-05.csv`.
  */
 export const exportName = (name: ExportName, extension: string, day: Date = new Date()): string => {
-  const parts = [name.project === null ? null : slug(name.project), slug(name.label) || 'chart', day.toISOString().slice(0, 10)]
+  const parts = [name.project === null ? null : slug(name.project), slug(name.figure ?? name.label) || 'chart', day.toISOString().slice(0, 10)]
   return `${parts.filter((part): part is string => part !== null && part.length > 0).join('--')}.${extension}`
 }
 
