@@ -5,7 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import { Select } from '@/components/ui/Select'
-import { button, caption, field, label, num, panel, well } from '@/components/ui/recipes'
+import { button, caption, field, label, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { Alert } from '@/components/ui/Alert'
 import {
@@ -24,6 +24,7 @@ import type { SelectedSource } from '@/domain/workflow'
 import { formatTime } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import { cn } from '@/lib/utils'
 
 type Job =
   | { readonly kind: 'idle' }
@@ -148,8 +149,8 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
   const recorded = [...evidence].reverse()
   return (
     <section className={embedded ? undefined : panel('mt-4 p-(--panel-space)')} aria-labelledby="granger-title">
-      <h3 id="granger-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Granger predictive test</h3>
-      <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
+      <h3 id="granger-title" className={embedded ? 'm-0 text-body font-medium text-ink' : cn(sectionTitle, 'm-0')}>Granger predictive test</h3>
+      <p className={prose('mb-0 mt-1 text-faint')}>Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-body text-ink"><span className={label('block text-faint')}>Candidate cause</span>
           <Select aria-label="Candidate cause" className={field('text', 'mt-1 w-44')} value={columnOf(candidateCause) ?? ''} onChange={(event) => { setCandidateCause(event.target.value === '' ? null : (event.target.value as ColumnId)); setJob({ kind: 'idle' }) }}>
@@ -172,7 +173,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
           Run Granger test
         </button>
       </div>
-      {!readiness.ok && <p role="status" className="mb-0 mt-2 text-body text-faint">{describeGrangerReadiness(readiness.error)}</p>}
+      {!readiness.ok && <Alert tone="danger" className="mt-2">{describeGrangerReadiness(readiness.error)}</Alert>}
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
       {pair !== null && warning !== null && (
         <Alert tone="warn" live={false} className="mt-3">

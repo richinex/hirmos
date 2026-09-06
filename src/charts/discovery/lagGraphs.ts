@@ -9,6 +9,7 @@ import {
 } from '@/domain/lagGraph'
 import { assertNever } from '@/domain/dop'
 import { baseOption, escapeHtml, tooltip } from '../grammar'
+import { fontFor, textWidth } from '@/lib/textMetrics'
 import type { ChartTheme } from '../theme'
 
 /**
@@ -96,9 +97,10 @@ export const DEFAULT_LAG_GRID_METRICS: LagGridMetrics = { nodeSize: 22, dx: 104,
 const curvenessOf = (link: { readonly from: number; readonly to: number; readonly lag: number }): number =>
   link.from === link.to ? (link.lag <= 1 ? 0 : 0.45) : 0.18
 
-/** The left gutter sized to the widest row label (11px labels average about 0.58em a character), clamped to 72–160 so one long name cannot push the grid off the strip. */
+/** The left gutter sized to the widest row label, measured in the label face, clamped to 72–160 so one long name cannot push the grid off the strip. */
 export const lagGridMetrics = (graph: LagGraph, base: LagGridMetrics = DEFAULT_LAG_GRID_METRICS): LagGridMetrics => {
-  const widest = Math.max(0, ...graph.variables.map((variable) => variable.name.length))
+  const labelFont = fontFor('label')
+  const widest = Math.max(0, ...graph.variables.map((variable) => textWidth(variable.name, labelFont)))
   // A curve leaves its chord by about curveness × chord ÷ 2, and only a link touching the first row can
   // leave the frame at the top. Without this the arcs over the first row are drawn and then cut off.
   const overhang = Math.max(0, ...graph.links
@@ -106,7 +108,7 @@ export const lagGridMetrics = (graph: LagGraph, base: LagGridMetrics = DEFAULT_L
     .map((link) => curvenessOf(link) * Math.hypot(link.lag * base.dx, Math.abs(link.to - link.from) * base.dy) / 2))
   return {
     ...base,
-    left: Math.min(160, Math.max(72, Math.round(widest * 11 * 0.58) + base.nodeSize / 2 + 20)),
+    left: Math.min(160, Math.max(72, Math.round(widest) + base.nodeSize / 2 + 20)),
     top: base.top + Math.ceil(overhang),
   }
 }
@@ -220,8 +222,9 @@ export function summaryGraphOption(graph: SummaryGraph, theme: ChartTheme, metri
   const cx = metrics.width / 2
   const cy = metrics.height / 2
   // The circle leaves room for the widest node label beside the extreme nodes and one label line above and below.
-  const widest = Math.max(0, ...graph.variables.map((variable) => variable.name.length))
-  const labelHalf = Math.min(cx * 0.45, Math.max(metrics.nodeSize / 2, Math.round(widest * theme.labelSize * 0.58) / 2))
+  const labelFont = `${theme.labelSize}px ${theme.font}`
+  const widest = Math.max(0, ...graph.variables.map((variable) => textWidth(variable.name, labelFont)))
+  const labelHalf = Math.min(cx * 0.45, Math.max(metrics.nodeSize / 2, Math.round(widest) / 2))
   const rx = Math.max(48, cx - labelHalf - 6)
   const ry = Math.max(48, cy - metrics.nodeSize / 2 - (theme.labelSize * 1.4 + 10))
   const position = (k: number) => {
@@ -262,7 +265,7 @@ export function summaryGraphOption(graph: SummaryGraph, theme: ChartTheme, metri
       show: link.lags.length > 0,
       formatter: link.lags.join(','),
       color: theme.muted,
-      fontFamily: theme.mono,
+      fontFamily: theme.font,
       fontSize: theme.labelSize,
       backgroundColor: theme.panel,
       padding: [1, 3],

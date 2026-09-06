@@ -6,7 +6,7 @@ import { MethodCaveats } from '@/components/MethodCaveats'
 import { LagListField } from '@/components/ui/LagListField'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, label, num, well } from '@/components/ui/recipes'
+import { button, field, fieldLabel, label, num, prose, well } from '@/components/ui/recipes'
 import {
   describeCountSeriesReadiness,
   newCountSeriesModelId,
@@ -130,7 +130,7 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
   return (
     <section aria-labelledby="count-series-title">
       <h4 id="count-series-title" className="m-0 text-body font-medium text-ink">Count-series model and intervention scan</h4>
-      <p className="mb-0 mt-1 max-w-[72ch] text-body text-faint">Fit a negative-binomial INGARCH model, then scan a specified point, decaying, or persistent intervention shape over a candidate date range. This is model assessment and event detection, not causal effect estimation.</p>
+      <p className={prose('mb-0 mt-1 text-faint')}>Fit a negative-binomial INGARCH model, then scan a specified point, decaying, or persistent intervention shape over a candidate date range. This is model assessment and event detection, not causal effect estimation.</p>
       <div className="mt-3 grid items-start gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
         <label className="block"><span className={fieldLabel}>Count series</span><Select className={field('text', 'mt-1')} value={outcome ?? ''} onChange={(event) => setOutcome(event.target.value === '' ? null : event.target.value as ColumnId)}><option value="">Choose series</option>{columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}</Select></label>
         <div><span className={fieldLabel}>Mean link</span><SegmentedControl className="mt-1" ariaLabel="Count-series mean link" value={link} onChange={setLink} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>

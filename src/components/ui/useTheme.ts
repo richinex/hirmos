@@ -1,19 +1,19 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-export type ThemeName = 'dark' | 'operational' | 'light' | 'sketchbook' | 'sketchbook-white'
+export type ThemeName = 'dark' | 'light'
 
 /** What the user picked: a concrete theme, or 'system' (follow the OS, live). */
 export type ThemeChoice = ThemeName | 'system'
 
 const KEY = 'hirmos-theme'
-export const THEMES: readonly ThemeName[] = ['dark', 'operational', 'light', 'sketchbook', 'sketchbook-white']
+export const THEMES: readonly ThemeName[] = ['dark', 'light']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 
-/** The OS preference resolves to the two default faces; the boot script in index.html applies the same rule. */
+/** The OS preference resolves to one of the two faces; the boot script in index.html applies the same rule. */
 const systemTheme = (): ThemeName =>
-  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'sketchbook-white'
+  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 
 const subscribeOsTheme = (notify: () => void): (() => void) => {
   const query = window.matchMedia?.('(prefers-color-scheme: dark)')

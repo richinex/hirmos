@@ -3,7 +3,7 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { EstimateHeadline } from '@/components/results/EstimateHeadline'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
-import { button, chip, label, literal, num, panel, statusText, table, td, th, tr } from '@/components/ui/recipes'
+import { button, chapterIntro, chip, label, literal, num, panel, statusText, table, td, th, tr } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
@@ -200,7 +200,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
       <div>
         <span className={label('text-faint')}>09 · Results</span>
         <h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.</p>
+        <p className={chapterIntro}>A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.</p>
       </div>
       <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
         <label className="block">

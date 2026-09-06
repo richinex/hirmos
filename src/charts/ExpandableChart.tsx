@@ -13,6 +13,7 @@ import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useFloatingRect } from '@/lib/floatingRect'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { button, panelTitle } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
 
 /**
  * A diagnostic figure that can be lifted into a floating window.
@@ -87,7 +88,7 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', testId
 
   const header = (
     <div className={`${layerId}-drag flex shrink-0 select-none items-center justify-between gap-3 border-b border-hair px-3 py-2 ${isMobile ? '' : 'cursor-grab active:cursor-grabbing'}`}>
-      <span className={`${panelTitle} min-w-0 truncate`}>{label}</span>
+      <span className={cn(panelTitle, 'min-w-0 truncate text-nowrap')}>{label}</span>
       <div className="flex shrink-0 items-center gap-1.5" onPointerDown={(event) => event.stopPropagation()}>
         {/* Exports are of what is on screen: the drawing at its size, the numbers at their zoomed range. */}
         <span className="text-label text-faint">Export</span>

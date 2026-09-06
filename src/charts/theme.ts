@@ -19,7 +19,9 @@ export interface ChartTheme {
   readonly danger: string
   /** Okabe–Ito categorical ramp, colour-blind safe, for series that mean categories. */
   readonly categorical: readonly string[]
+  /** The figure face, read from `--font-sans`: what every label, axis and legend is set in. */
   readonly font: string
+  /** The code face, for a literal the reader may have to match character by character; never a figure. */
   readonly mono: string
   readonly labelSize: number
   readonly bodySize: number
@@ -30,25 +32,25 @@ export const CATEGORICAL_RAMP = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#5
 /** The same hues darkened in OKLCH until each reaches 3:1 on a white or paper panel; neighbours alternate light and dark. */
 export const LIGHT_CATEGORICAL_RAMP = ['#0072B2', '#CC8600', '#009E73', '#B0609A', '#3D9DD1', '#D55E00', '#A49600', '#949494'] as const
 
-const LIGHT_THEMES = new Set(['light', 'sketchbook', 'sketchbook-white'])
+const LIGHT_THEMES = new Set(['light'])
 
 const FALLBACK: ChartTheme = {
   name: 'dark',
-  ink: '#e6e3dc',
-  bone: '#b8b5ae',
-  muted: '#8c8a85',
-  faint: '#817f78',
-  hair: '#1e1e22',
-  line: '#17171a',
-  panel: '#0c0c0e',
-  well: '#101012',
-  signal: '#e4501f',
-  info: '#4fa3da',
-  ok: '#34d399',
-  warn: '#e0a63c',
-  danger: '#e5484d',
+  ink: '#f2f2f0',
+  bone: '#c9c6bf',
+  muted: '#a1a1a1',
+  faint: '#8f8f8f',
+  hair: '#262626',
+  line: '#1c1c1c',
+  panel: '#0a0a0a',
+  well: '#111111',
+  signal: '#bef264',
+  info: '#60a5fa',
+  ok: '#2dd4bf',
+  warn: '#fbbf24',
+  danger: '#f87171',
   categorical: CATEGORICAL_RAMP,
-  font: '"JetBrains Mono Variable", ui-monospace, Menlo, monospace',
+  font: 'Helvetica, Arial, Arimo, sans-serif',
   mono: '"JetBrains Mono Variable", ui-monospace, Menlo, monospace',
   labelSize: 11,
   bodySize: 12,
@@ -85,7 +87,7 @@ export function readChartTheme(): ChartTheme {
     danger: colour('--color-danger', FALLBACK.danger),
     categorical: LIGHT_THEMES.has(name) ? LIGHT_CATEGORICAL_RAMP : CATEGORICAL_RAMP,
     font: colour('--font-sans', FALLBACK.font),
-    mono: FALLBACK.mono,
+    mono: colour('--font-mono', FALLBACK.mono),
     labelSize: lengthPixels(root, '--text-label', FALLBACK.labelSize),
     bodySize: lengthPixels(root, '--text-body', FALLBACK.bodySize),
   }

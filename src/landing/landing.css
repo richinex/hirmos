@@ -1,12 +1,5 @@
-/* The workbench is a viewport-locked instrument; the landing page is a scrolling document. */
-@font-face {
-  font-family: 'JetBrains Mono Variable';
-  font-style: normal;
-  font-display: swap;
-  font-weight: 100 900;
-  src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2-variations');
-  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
-}
+/* The workbench is a viewport-locked instrument; the landing page is a scrolling document, set like the
+   workbench: headings and controls in the sans at the paper's bold, paragraphs in the serif from index.css. */
 
 :root[data-surface="landing"],
 :root[data-surface="landing"] body,
@@ -56,25 +49,14 @@
 .landing-hero-shell { min-height: calc(100svh - 3rem); display: flex; flex-direction: column; }
 .landing-header { position: relative; z-index: 5; background: var(--color-panel); border-bottom: 1px solid var(--color-line); }
 .landing-header__row { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 3rem; }
-.landing-wordmark { display: inline-flex; align-items: center; gap: .55rem; color: var(--color-ink); font-size: var(--text-body); font-weight: 550; letter-spacing: .1em; text-transform: uppercase; }
+.landing-wordmark { display: inline-flex; align-items: center; gap: .55rem; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .landing-wordmark:hover { color: var(--color-ink); opacity: .72; }
 .landing-mark { color: var(--color-signal); }
-.landing-open {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.25rem;
-  border-radius: .55rem;
-  padding: .45rem .8rem;
-  color: var(--color-bone);
-  background: color-mix(in srgb, var(--color-panel) 78%, transparent);
-  font-size: var(--text-body);
-  transition: color var(--motion-fast), border-color var(--motion-fast), background-color var(--motion-fast);
-}
-.landing-open:hover { color: var(--color-ink); background: var(--color-panel); }
 
 .landing-hero-copy { position: relative; z-index: 3; width: min(38rem, 46%); margin-block: auto; padding-block: 3rem 13rem; }
-.landing-eyebrow { margin: 0 0 1rem; color: var(--color-faint); font-size: var(--text-label); font-weight: 550; letter-spacing: .02em; }
-.landing-headline { max-width: 26ch; margin: 1.25rem 0 0; color: var(--color-ink); font-size: clamp(2.2rem, calc(3.565vw + 1.398rem), 4.25rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+/* A metadata line, not prose: sans, like the journal's running head. */
+.landing-eyebrow { margin: 0 0 1rem; color: var(--color-faint); font-family: var(--font-sans); font-size: var(--text-label); font-weight: 700; letter-spacing: .02em; }
+.landing-headline { max-width: 26ch; margin: 1.25rem 0 0; color: var(--color-ink); font-size: clamp(2.2rem, calc(3.565vw + 1.398rem), 4.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
 /* The headline arrives one word at a time through a letterbox: each slot is one line tall and clips its
    word, which rises into place on the house curve. Pure CSS, so the hero paints before any script runs;
    the reduced-motion rule below collapses it to the final frame. The slot's bottom padding keeps
@@ -84,17 +66,17 @@
 @keyframes landing-slot-in { to { transform: translateY(0); } }
 .landing-lede { max-width: 55ch; margin: 1.25rem 0 0; color: var(--color-muted); font-size: clamp(1rem, 1.25cqi, 1.1rem); line-height: 1.65; text-wrap: pretty; }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 2.25rem; }
-.landing-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; border-radius: .55rem; padding: .7rem 1.25rem; background: var(--color-signal); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 550; transition: filter var(--motion-fast), transform var(--motion-fast); }
+.landing-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; border-radius: 999px; padding: .7rem 1.5rem; background: var(--color-signal); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 700; transition: filter var(--motion-fast), transform var(--motion-fast); }
 .landing-primary:hover { color: var(--color-signal-ink); filter: brightness(1.08); }
 .landing-secondary { display: inline-flex; align-items: center; gap: .55rem; min-height: 2.8rem; padding: .7rem .5rem; color: var(--color-muted); font-size: var(--text-title); transition: color var(--motion-fast); }
 .landing-secondary:hover { color: var(--color-ink); }
 /* These anchors are drawn as controls, not prose links, so they opt out of the base underline. */
-.landing-wordmark, .landing-open, .landing-primary, .landing-secondary { text-decoration: none; }
+.landing-wordmark, .landing-primary, .landing-secondary { text-decoration: none; }
 
 .landing-content-veil { position: relative; z-index: 2; padding-top: 6rem; background: linear-gradient(180deg, transparent 0, color-mix(in srgb, var(--color-stage) 96%, transparent) 4rem, var(--color-stage) 15rem); }
 .workflow-section, .feature-section, .structures-section { padding-block: 8rem; border-top: 1px solid var(--color-line); scroll-margin-top: 2rem; }
 .section-intro { max-width: 48rem; }
-.section-intro h2, .feature-copy h2 { margin: 0; color: var(--color-ink); font-size: clamp(2rem, 3.8cqi, 3.35rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.06; text-wrap: balance; }
+.section-intro h2, .feature-copy h2 { margin: 0; color: var(--color-ink); font-size: clamp(2rem, 3.8cqi, 3.35rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.06; text-wrap: balance; }
 .section-intro > p:last-child, .feature-copy > p { max-width: 65ch; margin: 1.5rem 0 0; color: var(--color-muted); font-size: var(--text-title); line-height: 1.65; text-wrap: pretty; }
 
 .workflow-section { display: grid; grid-template-columns: minmax(18rem, .8fr) minmax(0, 1.2fr); align-items: start; gap: clamp(4rem, 8cqi, 8rem); }
@@ -103,7 +85,7 @@
 .workflow-list li { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 1.25rem; padding-block: 1.65rem; border-bottom: 1px solid var(--color-line); }
 .workflow-list li > span { padding-top: .2rem; color: var(--color-faint); font-family: var(--font-mono); font-size: var(--text-micro); }
 .workflow-list li > div { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1.25rem; align-items: start; }
-.workflow-list h3, .structure-grid h3 { margin: 0; font-size: var(--text-title); font-weight: 550; color: var(--color-ink); text-wrap: balance; }
+.workflow-list h3, .structure-grid h3 { margin: 0; font-size: var(--text-title); font-weight: 700; color: var(--color-ink); text-wrap: balance; }
 .workflow-list p { margin: 0; color: var(--color-muted); font-size: var(--text-body); line-height: 1.6; text-wrap: pretty; }
 .structure-grid p { margin: .75rem 0 0; color: var(--color-faint); font-size: var(--text-title); line-height: 1.6; }
 
@@ -111,7 +93,7 @@
 .feature-section--identify { grid-template-columns: minmax(30rem, 1.05fr) minmax(0, .95fr); }
 .feature-copy { max-width: 34rem; }
 .feature-points { display: grid; gap: .75rem; margin: 2.25rem 0 0; padding: 0; list-style: none; }
-.feature-points li { position: relative; padding-left: 1.4rem; color: var(--color-bone); font-size: var(--text-title); line-height: 1.55; }
+.feature-points li { position: relative; padding-left: 1.4rem; color: var(--color-bone); font-family: var(--font-serif); font-size: var(--text-title); line-height: 1.55; }
 .feature-points li::before { content: ''; position: absolute; top: .55rem; left: 0; width: .38rem; height: .38rem; border-radius: 50%; background: var(--color-signal); }
 
 .evidence-figure { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; min-height: 24rem; border: 1px solid var(--color-hair); border-radius: .8rem; background: color-mix(in srgb, var(--color-panel) 86%, transparent); overflow: hidden; }
@@ -157,7 +139,7 @@
 .structure-art--cross::after { inset: 18% 8% 26% 12%; border-bottom: 2px solid var(--color-signal); transform: rotate(-13deg); transform-origin: bottom left; }
 
 .final-cta { display: grid; justify-items: center; padding-block: 8rem; border-top: 1px solid var(--color-line); text-align: center; }
-.final-cta h2 { max-width: 48rem; margin: 1.5rem 0 0; color: var(--color-ink); font-size: clamp(2rem, 3.8cqi, 3.35rem); font-weight: 580; letter-spacing: -.025em; line-height: 1.12; }
+.final-cta h2 { max-width: 48rem; margin: 1.5rem 0 0; color: var(--color-ink); font-size: clamp(2rem, 3.8cqi, 3.35rem); font-weight: 700; letter-spacing: -.025em; line-height: 1.12; }
 .final-cta .landing-primary { margin-top: 2.25rem; }
 .landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 6rem; border-top: 1px solid var(--color-line); color: var(--color-faint); font-size: var(--text-label); }
 .landing-footer p { flex: 1; margin: 0; text-align: center; }

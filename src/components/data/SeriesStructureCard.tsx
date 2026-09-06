@@ -6,7 +6,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { MetricTile } from '@/components/ui/figures'
-import { button, field, figureGrid, label, num, panel, well } from '@/components/ui/recipes'
+import { button, field, figureGrid, label, num, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile, TimeAxis } from '@/domain/dataset'
 import { SERIES_STRUCTURE_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -16,6 +16,7 @@ import type { SelectedSource } from '@/domain/workflow'
 import { formatDay } from '@/lib/format/date'
 import { formatAbsent, formatCount, formatStatistic } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import { cn } from '@/lib/utils'
 
 interface SeriesFacts {
   readonly column: ColumnId
@@ -123,7 +124,7 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
     <section className={embedded ? undefined : panel('mt-4 p-(--panel-space)')} aria-labelledby="structure-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 id="structure-title" className={embedded ? 'm-0 text-body font-medium text-ink' : 'm-0 text-title font-medium text-ink'}>Temporal structure</h3>
+          <h3 id="structure-title" className={embedded ? 'm-0 text-body font-medium text-ink' : cn(sectionTitle, 'm-0')}>Temporal structure</h3>
           <p className="mb-0 mt-1 text-body text-faint">PELT estimates changes in the series mean. STL reports trend and seasonal strength{period === null ? ' (no seasonal period for yearly rows)' : ` at period ${period}`}. ACF and PACF show dependence across lags. This analysis does not change the prepared dataset.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">

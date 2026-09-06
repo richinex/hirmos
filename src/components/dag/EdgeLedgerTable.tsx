@@ -1,7 +1,7 @@
 import { useId, useMemo, useState } from 'react'
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
 import { cellPadding, countLine, FacetPills, FilterField, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
-import { num, table as tableCn, td, tr } from '@/components/ui/recipes'
+import { num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
 import type { DagDocument, DagEdgeId, DirectedDagEdge, EdgeSupport, EdgeTiming } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
 import { useOpenPane } from '@/components/shell/WorkbenchLayout'
@@ -127,7 +127,7 @@ export function EdgeLedgerTable({ document, selectedEdge, onSelectEdge }: {
                 {row.getVisibleCells().map((cell) => {
                   const align = (cell.column.columnDef.meta as { readonly align?: 'left' | 'right' } | undefined)?.align
                   return (
-                    <td key={cell.id} className={td(cn(padding, align === 'right' && num('whitespace-nowrap text-right'), cell.column.id === 'rationale' && 'max-w-[480px]'))} title={cell.column.id === 'rationale' ? row.original.rationale : undefined}>
+                    <td key={cell.id} className={cell.column.id === 'rationale' ? tdText(cn(padding, 'max-w-[560px]')) : td(cn(padding, align === 'right' && num('whitespace-nowrap text-right')))}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   )

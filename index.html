@@ -1,20 +1,20 @@
 <!doctype html>
-<html lang="en" data-theme="sketchbook-white">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <link rel="icon" type="image/svg+xml" href="/hirmos.svg" />
-    <link rel="preload" href="/fonts/jetbrains-mono-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <meta name="theme-color" content="#ffffff" />
+    <link rel="preload" href="/fonts/source-serif-4-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <meta name="theme-color" content="#000000" />
     <title>Hirmos · browser causal inference workbench</title>
     <meta name="description" content="Prepare data, examine discovery evidence, specify and validate a DAG, identify an effect, and compare causal estimates in one local-first browser workbench." />
     <script>
       document.documentElement.dataset.surface = location.pathname === '/' ? 'landing' : 'workbench'
       try {
         var t = localStorage.getItem('hirmos-theme')
-        var known = ['dark', 'operational', 'light', 'sketchbook', 'sketchbook-white']
+        var known = ['dark', 'light']
         if (known.indexOf(t) === -1) {
-          t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'sketchbook-white'
+          t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         }
         document.documentElement.dataset.theme = t
       } catch (e) {}
@@ -35,7 +35,6 @@
               </svg>
               <span>hirmos</span>
             </a>
-            <a class="landing-open" href="/app">Open the workbench</a>
           </div>
         </header>
         <div class="landing-width landing-hero-shell">

@@ -25,7 +25,7 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, field, fieldHint, fieldLabel, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldHint, fieldLabel, figureGrid, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -1309,7 +1309,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <label className="block"><ParameterLabel className={fieldLabel} label="Treatment value" help={ESTIMATION_PARAMETER_HELP.frontdoor.treatmentValue} /><input type="number" step="any" aria-label="Front-door treatment value" className={field('text', 'mt-1')} value={configuration.interventions[1]} onChange={(event) => configure({ ...configuration, interventions: [configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap resamples" help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapResamples} /><input type="number" min={20} max={5000} aria-label="Front-door bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.frontdoor.bootstrapSeed} /><input type="number" min={0} aria-label="Front-door bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The first regression estimates treatment → mediator. The second estimates mediator → outcome while adjusting for treatment. Their product gives the linear front-door contrast; the interval uses a seeded row bootstrap.</p>
+            <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>The first regression estimates treatment → mediator. The second estimates mediator → outcome while adjusting for treatment. Their product gives the linear front-door contrast; the interval uses a seeded row bootstrap.</p>
           </div>
         )
       case 'instrumental-variable':
@@ -1317,7 +1317,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap resamples" help={ESTIMATION_PARAMETER_HELP.instrumentalVariable.bootstrapResamples} /><input type="number" min={20} max={5000} aria-label="Instrumental-variable bootstrap resamples" className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.instrumentalVariable.bootstrapSeed} /><input type="number" min={0} aria-label="Instrumental-variable bootstrap seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The estimate is the ratio of the instrument’s effect on the outcome to its effect on the treatment: the Wald estimator for one binary instrument, a covariance ratio for one continuous instrument, and two-stage least squares otherwise. The effect is reported for the treatment set to 1 rather than 0; the interval uses a seeded row bootstrap.</p>
+            <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>The estimate is the ratio of the instrument’s effect on the outcome to its effect on the treatment: the Wald estimator for one binary instrument, a covariance ratio for one continuous instrument, and two-stage least squares otherwise. The effect is reported for the treatment set to 1 rather than 0; the interval uses a seeded row bootstrap.</p>
           </div>
         )
       case 'backdoor-linear-regression':
@@ -1340,14 +1340,14 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </div>
             )}
             <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={ESTIMATION_PARAMETER_HELP.dml.foldSeed} /><input type="number" min={0} aria-label="Fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity chapter repeats this fit at the same seed before its refuters.</p>
+            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity chapter repeats this fit at the same seed before its refuters.</p>
           </div>
         )
       case 't-learner':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <label className="block"><ParameterLabel className={fieldLabel} label="Learner seed" help={ESTIMATION_PARAMETER_HELP.tLearner.learnerSeed} /><input type="number" min={0} aria-label="Learner seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">One random forest per treatment arm on the adjustment variables, 200 trees, minimum leaf 5. Each row’s effect is the treated forest’s prediction minus the control forest’s at that row; no interval is reported.</p>
+            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>One random forest per treatment arm on the adjustment variables, 200 trees, minimum leaf 5. Each row’s effect is the treated forest’s prediction minus the control forest’s at that row; no interval is reported.</p>
           </div>
         )
       case 'ardl-pss':
@@ -1362,7 +1362,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <ParameterLabel className={fieldLabel} label="PSS case" help={ESTIMATION_PARAMETER_HELP.ardl.pssCase} />
               <SegmentedControl className="mt-1" fill ariaLabel="PSS case" value={String(configuration.case)} onChange={(chosen) => { const candidate = PSS_CASES[configuration.trend].find((item) => String(item) === chosen); if (candidate !== undefined) configure({ ...configuration, case: candidate }) }} options={PSS_CASES[configuration.trend].map((candidate) => ({ value: String(candidate), label: `Case ${candidate}` }))} />
             </div>
-            <p className="m-0 max-w-[65ch] self-end text-body text-faint">AIC lag search, error-correction fit, delta-method interval on the long-run effect, bounds test at the recorded case.</p>
+            <p className={prose('m-0 self-end text-faint')}>AIC lag search, error-correction fit, delta-method interval on the long-run effect, bounds test at the recorded case.</p>
           </div>
         )
       case 'vecm':
@@ -1423,7 +1423,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'panel-intervention':
         return (
           <div className="grid gap-2">
-            <p className="m-0 max-w-[72ch] text-body text-faint">
+            <p className={prose('m-0 text-faint')}>
               The primary estimator is predeclared as synthetic difference-in-differences. Conventional DID and synthetic control are reported as required comparisons; the primary result cannot be changed after viewing the estimates.
             </p>
             <div className="grid gap-3 @md/panel:grid-cols-2">
@@ -1457,7 +1457,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <label className="block"><ParameterLabel className={fieldLabel} label="State budget" help={ESTIMATION_PARAMETER_HELP.discreteBn.stateBudget} /><input type="number" min={2} max={10} aria-label="State budget" className={field('text', 'mt-1')} value={configuration.bins} onChange={(event) => configure({ ...configuration, bins: Math.max(2, Math.min(10, Math.floor(Number(event.target.value) || 2))) })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Equivalent sample size" help={ESTIMATION_PARAMETER_HELP.discreteBn.equivalentSampleSize} /><input type="number" min={0.1} step="any" aria-label="Equivalent sample size" className={field('text', 'mt-1')} value={configuration.equivalentSampleSize} onChange={(event) => configure({ ...configuration, equivalentSampleSize: Math.max(0.1, Number(event.target.value) || 0.1) })} /></label>
-            <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Observed binary and ordinal states are preserved when they fit the budget; higher-cardinality values are divided at quantiles. The BDeu prior smooths the conditional tables, and the effect contrasts the lowest and highest treatment states.</p>
+            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>Observed binary and ordinal states are preserved when they fit the budget; higher-cardinality values are divided at quantiles. The BDeu prior smooths the conditional tables, and the effect contrasts the lowest and highest treatment states.</p>
           </div>
         )
       case 'binary-ett-idc-star':
@@ -1476,7 +1476,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <label className="block"><ParameterLabel className={fieldLabel} label="Control value" help={ESTIMATION_PARAMETER_HELP.ingarch.controlValue} /><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.controlValue} onChange={(event) => configure({ ...configuration, controlValue: Number(event.target.value) || 0 })} /></label>
             <label className="block"><ParameterLabel className={fieldLabel} label="Treatment value" help={ESTIMATION_PARAMETER_HELP.ingarch.treatmentValue} /><input type="number" step="any" className={field('text', 'mt-1')} value={configuration.treatmentValue} onChange={(event) => configure({ ...configuration, treatmentValue: Number(event.target.value) || 0 })} /></label>
             {configuration.schedule.kind === 'decaying' && <label className="block"><ParameterLabel className={fieldLabel} label="Decay δ" help={ESTIMATION_PARAMETER_HELP.ingarch.decay} /><input type="number" min={0} max={1} step={0.05} className={field('text', 'mt-1')} value={configuration.schedule.delta} onChange={(event) => configure({ ...configuration, schedule: { kind: 'decaying', delta: Math.max(0, Math.min(1, Number(event.target.value) || 0)) } })} /></label>}
-            <p className="m-0 max-w-[72ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">The additive link expresses effects in expected counts and requires non-negative regressors. The multiplicative link expresses effects on the log expected count and permits signed regressors. Both use the treatment and identified same-period adjustment variables with the selected count and mean lags; no sampling interval is reported.</p>
+            <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>The additive link expresses effects in expected counts and requires non-negative regressors. The multiplicative link expresses effects on the log expected count and permits signed regressors. Both use the treatment and identified same-period adjustment variables with the selected count and mean lags; no sampling interval is reported.</p>
           </div>
         )
       case 'causal-effects-total': {
@@ -1501,7 +1501,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <label className="block"><ParameterLabel className={fieldLabel} label="Neighbours k" help={ESTIMATION_PARAMETER_HELP.causalEffects.neighbours} /><input type="number" min={1} max={100} className={field('text', 'mt-1')} value={configuration.estimator.k} onChange={(event) => setNeighbours(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></label>
             )}
             {configuration.estimator.kind === 'wrightParents' && (
-              <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Fits each node on its time-indexed parents, then sums products of coefficients along directed treatment-to-outcome paths. The result separates direct and indirect path contributions.</p>
+              <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>Fits each node on its time-indexed parents, then sums products of coefficients along directed treatment-to-outcome paths. The result separates direct and indirect path contributions.</p>
             )}
             {adjustedEstimator !== null && (
               <div className="@md/panel:col-span-2">
@@ -1583,7 +1583,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 {bootstrap.blockLength.kind === 'fixed' && <label className="block"><ParameterLabel className={fieldLabel} label="Observations per block" help={ESTIMATION_PARAMETER_HELP.causalEffects.observationsPerBlock} /><input type="number" min={1} aria-label="CausalEffects observations per block" className={field('text', 'mt-1')} value={bootstrap.blockLength.length} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: { kind: 'fixed', length: Math.max(1, Math.floor(Number(event.target.value) || 1)) } } })} /></label>}
                 <label className="block"><ParameterLabel className={fieldLabel} label="Confidence level" help={ESTIMATION_PARAMETER_HELP.causalEffects.confidenceLevel} /><input type="number" min={50} max={99.9} step={0.1} aria-label="CausalEffects confidence level" className={field('text', 'mt-1')} value={bootstrap.confidenceLevel * 100} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, confidenceLevel: Math.max(0.5, Math.min(0.999, (Number(event.target.value) || 90) / 100)) } })} /></label>
                 <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.causalEffects.bootstrapSeed} /><input type="number" min={0} aria-label="CausalEffects bootstrap seed" className={field('text', 'mt-1')} value={bootstrap.seed} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) } })} /></label>
-                <p className="m-0 max-w-[65ch] text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-4">Contiguous blocks preserve the lag alignment used by the fitted graph. Choose a block length that represents the series’ dependence; the cube-root option follows Tigramite’s built-in rule.</p>
+                <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>Contiguous blocks preserve the lag alignment used by the fitted graph. Choose a block length that represents the series’ dependence; the cube-root option follows Tigramite’s built-in rule.</p>
               </>
             )}
           </div>
@@ -1625,11 +1625,11 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       <div>
         <span className={label('text-faint')}>06 · Estimation</span>
         <h2 id="estimation-title" className="mb-2 mt-2 text-heading text-ink">Estimate the identified effect</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
+        <p className={chapterIntro}>Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="estimation-setup-title">
-        <h3 id="estimation-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">{method.ok ? method.value.name : 'Estimator'}</h3>
+        <h3 id="estimation-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{method.ok ? method.value.name : 'Estimator'}</h3>
         {identified.length === 0 ? (
           <Alert tone="info" live={false}>
             <p className="m-0"><button type="button" className="underline" onClick={onOpenStudy}>Open Study design</button> and identify a study first.</p>
@@ -1698,7 +1698,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       {latestRun !== null && (
         <section aria-labelledby="estimation-results-title" className="grid grid-cols-1 gap-4">
           <div>
-            <h2 id="estimation-results-title" className="m-0 text-title font-medium text-ink">Estimates</h2>
+            <h2 id="estimation-results-title" className={cn(sectionTitle, 'm-0')}>Estimates</h2>
           </div>
           {(() => {
             const bound = studies.find((candidate) => candidate.id === latestRun.study)

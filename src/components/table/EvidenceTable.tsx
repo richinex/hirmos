@@ -2,7 +2,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cellPadding, countLine, DensityToggle, FilterField, ROW_HEIGHT, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
-import { button, num, table as tableCn, td, tr } from '@/components/ui/recipes'
+import { button, num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
+import { fontFor, lineCountAt, lineHeightFor, useTextMetricsVersion } from '@/lib/textMetrics'
 import { toCsv } from '@/lib/csv'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +15,12 @@ import { cn } from '@/lib/utils'
  * Above `VIRTUALISE_ABOVE` rows the body renders a window instead of every row. A lag graph reports
  * one cell per ordered pair per lag, so a 32-variable run at maximum lag reaches 21,504 rows; below
  * the threshold the plain body keeps native table semantics for find-in-page and screen readers.
+ *
+ * Text columns wrap. A windowed body needs every row's height before the row exists, so the height
+ * is predicted: the wrapping columns' widths are read once per resize from the header cells, and each
+ * row's line count comes from pretext (lib/textMetrics.ts) at that width, arithmetic after one canvas
+ * measurement per word. No row is measured as it scrolls, which is what makes a windowed list of
+ * uneven rows jitter. Figures and marks keep one line.
  */
 
 /** Render every row up to this count; above it, render a scrolled window. */
@@ -32,6 +39,12 @@ export interface EvidenceColumn<Row> {
 }
 
 type CellMeta = { readonly align: 'left' | 'right'; readonly mono: boolean }
+
+/** A text column wraps; figures and marks are read on one line. */
+const wraps = (meta: CellMeta): boolean => meta.align !== 'right' && !meta.mono
+
+/** Horizontal padding of a body cell, `px-3.5` either side. */
+const CELL_INSET = 28
 
 export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel' }: {
   readonly title: string
@@ -87,13 +100,44 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
   const modelRows = table.getRowModel().rows
   const virtualised = modelRows.length > VIRTUALISE_ABOVE
   const rowHeight = ROW_HEIGHT[density]
+
+  // The wrapping columns' widths, read from the header cells once per resize of the table.
+  const tableRef = useRef<HTMLTableElement | null>(null)
+  const [columnWidths, setColumnWidths] = useState<readonly number[]>([])
+  useEffect(() => {
+    const element = tableRef.current
+    if (element === null || !virtualised) return undefined
+    const read = () => {
+      const next = [...element.querySelectorAll('thead th')].map((cell) => Math.floor(cell.getBoundingClientRect().width))
+      setColumnWidths((current) => (current.length === next.length && current.every((width, index) => width === next[index]) ? current : next))
+    }
+    read()
+    const observer = new ResizeObserver(read)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [virtualised])
+  const metricsVersion = useTextMetricsVersion()
+  const cellFont = useMemo(() => fontFor('body'), [metricsVersion]) // eslint-disable-line react-hooks/exhaustive-deps -- the version is the invalidation
+  const lineHeight = lineHeightFor('body', cellFont)
+  const wrapColumns = useMemo(() => columns.map((column, index) => ({ column, index })).filter(({ column }) => wraps({ align: column.align ?? 'left', mono: column.mono ?? false })), [columns])
+  const heightOf = useCallback((index: number): number => {
+    const row = modelRows[index]
+    if (row === undefined) return rowHeight
+    let lines = 1
+    for (const { column, index: columnIndex } of wrapColumns) {
+      const width = columnWidths[columnIndex]
+      if (width === undefined || width <= CELL_INSET) continue
+      lines = Math.max(lines, lineCountAt(String(column.value(row.original)), cellFont, width - CELL_INSET))
+    }
+    return rowHeight + (lines - 1) * lineHeight
+  }, [cellFont, columnWidths, lineHeight, modelRows, rowHeight, wrapColumns])
   const virtualizer = useVirtualizer({
     count: virtualised ? modelRows.length : 0,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => rowHeight,
+    estimateSize: heightOf,
     overscan: 12,
   })
-  useEffect(() => { if (virtualised) virtualizer.measure() }, [rowHeight, virtualised, virtualizer])
+  useEffect(() => { if (virtualised) virtualizer.measure() }, [heightOf, virtualised, virtualizer])
 
   // Recycling replaces the focused cell's element, so remember which cell held focus by its
   // row and column and restore it after the window repaints. The frame retry covers the paint
@@ -131,18 +175,21 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
   const leadHeight = items[0]?.start ?? 0
   const tailHeight = virtualizer.getTotalSize() - (items.at(-1)?.end ?? 0)
 
-  const renderRow = (row: (typeof modelRows)[number], rowIndex: number) => (
-    <tr key={row.id} className={tr('static')} style={virtualised ? { height: rowHeight } : undefined} aria-rowindex={virtualised ? rowIndex + 2 : undefined}>
+  const renderRow = (row: (typeof modelRows)[number], rowIndex: number, height?: number) => (
+    <tr key={row.id} className={tr('static')} style={height === undefined ? undefined : { height }} aria-rowindex={virtualised ? rowIndex + 2 : undefined}>
       {row.getVisibleCells().map((cell) => {
         const meta = cell.column.columnDef.meta as CellMeta
         const token = `${row.id}:${cell.column.id}`
+        const cellClass = wraps(meta)
+          ? tdText(cn(padding, 'text-ink'))
+          : td(cn(padding, meta.align === 'right' ? num('whitespace-nowrap text-right text-muted') : 'text-ink', meta.mono && 'font-mono text-muted'))
         return (
           <td
             key={cell.id}
             data-cell={token}
             tabIndex={virtualised ? -1 : undefined}
             onFocus={virtualised ? () => rememberFocus(token) : undefined}
-            className={td(cn(padding, meta.align === 'right' ? num('whitespace-nowrap text-right text-muted') : 'text-ink', meta.mono && 'font-mono text-muted'))}
+            className={cellClass}
           >
             {flexRender(cell.column.columnDef.cell, cell.getContext())}
           </td>
@@ -170,7 +217,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
       )}
       count={countLine(visible.length, total ?? rows.length, noun, sortText)}
     >
-      <table className={cn(tableCn, 'tabular-nums')} aria-rowcount={virtualised ? modelRows.length + 1 : undefined}>
+      <table ref={tableRef} className={cn(tableCn, 'tabular-nums')} aria-rowcount={virtualised ? modelRows.length + 1 : undefined}>
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>
@@ -196,7 +243,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
           )}
           {virtualised && items.map((item) => {
             const row = modelRows[item.index]
-            return row === undefined ? null : renderRow(row, item.index)
+            return row === undefined ? null : renderRow(row, item.index, item.size)
           })}
           {virtualised && tailHeight > 0 && (
             <tr role="presentation" aria-hidden><td role="presentation" colSpan={columns.length} style={{ height: tailHeight, padding: 0, border: 0 }} /></tr>

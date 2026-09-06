@@ -4,13 +4,14 @@ import { decompositionOption } from '@/charts/data/decomposition'
 import { changePointsOption } from '@/charts/sensitivity/changePoints'
 import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
-import { button, caption, label, panel, well } from '@/components/ui/recipes'
+import { button, caption, label, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount } from '@/lib/format/number'
+import { cn } from '@/lib/utils'
 
 interface PreparedStage {
   readonly label: string
@@ -150,7 +151,7 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
     <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="prepared-preview-title">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 id="prepared-preview-title" className="m-0 text-title font-medium text-ink">Prepared values</h3>
+          <h3 id="prepared-preview-title" className={cn(sectionTitle, 'm-0')}>Prepared values</h3>
           <p className="mb-0 mt-1 text-body text-faint">Inspect the exact values passed to diagnostics, discovery methods, and estimators. An adjusted column shows each station of its recipe.</p>
         </div>
         <button type="button" className={button('quiet')} aria-busy={busy} onClick={busy ? undefined : () => void load()}>

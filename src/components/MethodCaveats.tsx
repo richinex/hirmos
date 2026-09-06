@@ -5,6 +5,7 @@ import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
 import type { Identification } from '@/domain/study'
 import { IdentificationRecord } from '@/components/IdentificationRecord'
+import { prose } from '@/components/ui/recipes'
 
 interface MethodCaveatsProps {
   readonly methods: NonEmptyArray<MethodDefinition>
@@ -109,11 +110,11 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
           return (
             <RequirementsFold key={method.id} name={method.name} tally={evaluated ? tally(method, evaluations) : null} open={methods.length === 1} literature={literature(method)}>
               {!evaluated && (
-                <p className="mb-2 mt-0 max-w-[65ch] text-body text-muted">
+                <p className={prose('mb-2 mt-0 text-muted')}>
                   {[method.summary, ...method.caveats.flatMap((caveat) => (caveat.category === 'interpretation' ? [caveat.requirement] : [caveat.requirement, `If this is not met: ${caveat.consequenceIfUnmet}`]))].join(' ')}
                 </p>
               )}
-              {evaluated && <p className="mb-2 mt-0 max-w-[65ch] text-body text-muted">{method.summary}</p>}
+              {evaluated && <p className={prose('mb-2 mt-0 text-muted')}>{method.summary}</p>}
               {evaluated && <ol className="m-0 list-none divide-y divide-line p-0">
                 {[...conditions(method), ...readingRules(method)].map((caveat) => {
                   const reading = caveat.category === 'interpretation'

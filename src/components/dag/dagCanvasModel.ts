@@ -8,8 +8,18 @@ export interface DagNodePlacement {
   readonly y: number
 }
 
-const NODE_WIDTH = 164
-const NODE_HEIGHT = 58
+/** One card size for every node in a graph: the width the longest name needs, up to a cap, and the
+ *  height its lines need. Measured before layout (dagCardSize.ts) so dagre and the rails place cards
+ *  of the size that will be drawn, instead of a fixed box a long name is then clipped to. */
+export interface DagCardSize {
+  readonly width: number
+  readonly height: number
+  /** Lines the longest name takes at this width; every card leaves room for that many. */
+  readonly nameLines: number
+}
+
+export const DEFAULT_CARD_SIZE: DagCardSize = { width: 164, height: 58, nameLines: 1 }
+
 const COLUMN_GAP = 86
 const ROW_GAP = 46
 const MARGIN = 34
@@ -21,26 +31,26 @@ const MARGIN = 34
  */
 export type DagLayoutOrientation = 'across' | 'down'
 
-export function layoutEditableDag(graph: EditableDag, orientation: DagLayoutOrientation = 'across'): readonly DagNodePlacement[] {
+export function layoutEditableDag(graph: EditableDag, orientation: DagLayoutOrientation = 'across', size: DagCardSize = DEFAULT_CARD_SIZE): readonly DagNodePlacement[] {
   const layout = new dagre.graphlib.Graph()
   layout.setGraph({ rankdir: orientation === 'across' ? 'LR' : 'TB', nodesep: ROW_GAP, ranksep: COLUMN_GAP, marginx: MARGIN, marginy: MARGIN })
   layout.setDefaultEdgeLabel(() => ({}))
-  for (const node of graph.nodes) layout.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT })
+  for (const node of graph.nodes) layout.setNode(node.id, { width: size.width, height: size.height })
   for (const edge of graph.edges) {
     if (edge.cause !== edge.effect) layout.setEdge(edge.cause, edge.effect)
   }
   dagre.layout(layout)
   return graph.nodes.map((node) => {
     const placed = layout.node(node.id)
-    return { id: node.id, x: placed.x - NODE_WIDTH / 2, y: placed.y - NODE_HEIGHT / 2 }
+    return { id: node.id, x: placed.x - size.width / 2, y: placed.y - size.height / 2 }
   })
 }
 
 /** Column and row pitch of the rail layout: the dagre pitch across, more room down so diagonal arrows have length. */
-const RAIL_COLUMN = NODE_WIDTH + COLUMN_GAP
-const RAIL_ROW = NODE_HEIGHT + 72
+const railColumn = (size: DagCardSize): number => size.width + COLUMN_GAP
+const railRow = (size: DagCardSize): number => size.height + 72
 /** Two rails of the same role share a row when every card keeps this much clear of the others. */
-const RAIL_CLEARANCE = NODE_WIDTH + 28
+const railClearance = (size: DagCardSize): number => size.width + 28
 
 export interface DagBinding {
   readonly treatment: DagNodeId
@@ -69,7 +79,10 @@ interface RailMember { readonly id: string; readonly slot: number; readonly of: 
  * itself becomes the baseline, the way the books draw a bare chain flat. Contemporaneous arrows only;
  * lagged arrows are drawn wherever their ends land.
  */
-export function layoutBoundDag(graph: EditableDag, binding: DagBinding): readonly DagNodePlacement[] {
+export function layoutBoundDag(graph: EditableDag, binding: DagBinding, size: DagCardSize = DEFAULT_CARD_SIZE): readonly DagNodePlacement[] {
+  const RAIL_COLUMN = railColumn(size)
+  const RAIL_ROW = railRow(size)
+  const RAIL_CLEARANCE = railClearance(size)
   const X = binding.treatment
   const Y = binding.outcome
   const ids = graph.nodes.map((node) => node.id)
@@ -97,7 +110,7 @@ export function layoutBoundDag(graph: EditableDag, binding: DagBinding): readonl
 
   const columns = Math.max(1, ...paths.map((path) => path.nodes.length - 1))
   const span = columns * RAIL_COLUMN
-  const baseX = MARGIN + NODE_WIDTH / 2
+  const baseX = MARGIN + size.width / 2
 
   const placed = new Map<string, { readonly x: number; readonly y: number }>()
   placed.set(X, { x: baseX, y: 0 })
@@ -146,22 +159,22 @@ export function layoutBoundDag(graph: EditableDag, binding: DagBinding): readonl
   addRail(1, 'leftover', leftoverBelow.map((id, index) => ({ id, slot: index + 1, of: leftoverBelow.length + 1 })))
 
   const ys = [...placed.values()].map((point) => point.y)
-  const shiftY = MARGIN + NODE_HEIGHT / 2 - Math.min(...ys)
+  const shiftY = MARGIN + size.height / 2 - Math.min(...ys)
   return graph.nodes.map((node) => {
     const at = placed.get(node.id) ?? { x: baseX, y: 0 }
-    return { id: node.id, x: at.x - NODE_WIDTH / 2, y: at.y + shiftY - NODE_HEIGHT / 2 }
+    return { id: node.id, x: at.x - size.width / 2, y: at.y + shiftY - size.height / 2 }
   })
 }
 
 /** The rail layout once treatment and outcome are bound and both are in the graph; dagre until then. */
-export function layoutDagForCanvas(graph: EditableDag, binding: DagBinding | null, orientation: DagLayoutOrientation = 'across'): readonly DagNodePlacement[] {
+export function layoutDagForCanvas(graph: EditableDag, binding: DagBinding | null, orientation: DagLayoutOrientation = 'across', size: DagCardSize = DEFAULT_CARD_SIZE): readonly DagNodePlacement[] {
   const bound = binding !== null
     && binding.treatment !== binding.outcome
     && graph.nodes.some((node) => node.id === binding.treatment)
     && graph.nodes.some((node) => node.id === binding.outcome)
-  if (!bound) return layoutEditableDag(graph, orientation)
-  const across = layoutBoundDag(graph, binding)
-  return orientation === 'across' ? across : transposeRails(across)
+  if (!bound) return layoutEditableDag(graph, orientation, size)
+  const across = layoutBoundDag(graph, binding, size)
+  return orientation === 'across' ? across : transposeRails(across, size)
 }
 
 /**
@@ -169,11 +182,13 @@ export function layoutDagForCanvas(graph: EditableDag, binding: DagBinding | nul
  * treatment at the top and the outcome at the bottom, and the cards that shared a column sit side
  * by side, centred, so nothing is wider than two cards.
  */
-const DOWN_PITCH = NODE_WIDTH + 40
-const transposeRails = (placements: readonly DagNodePlacement[]): readonly DagNodePlacement[] => {
+const transposeRails = (placements: readonly DagNodePlacement[], size: DagCardSize): readonly DagNodePlacement[] => {
+  const DOWN_PITCH = size.width + 40
+  const RAIL_COLUMN = railColumn(size)
+  const RAIL_ROW = railRow(size)
   const columns = new Map<number, DagNodePlacement[]>()
   for (const placed of placements) {
-    const column = Math.round((placed.x + NODE_WIDTH / 2) / RAIL_COLUMN)
+    const column = Math.round((placed.x + size.width / 2) / RAIL_COLUMN)
     columns.set(column, [...(columns.get(column) ?? []), placed])
   }
   const ordered = [...columns.keys()].sort((a, b) => a - b)

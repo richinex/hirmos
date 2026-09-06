@@ -13,7 +13,7 @@ import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
 import { RadioList } from '@/components/ui/RadioList'
 import { Formula } from '@/components/ui/Formula'
-import { button, chip, field, fieldHint, fieldLabel, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chapterIntro, chip, field, fieldHint, fieldLabel, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
@@ -313,7 +313,7 @@ function AdjustmentSetChoicePanel({ study, evidence, onChoose }: {
   return (
     <section className="mt-4 border-t border-hair pt-4" aria-labelledby="adjustment-set-choice-title">
       <h4 id="adjustment-set-choice-title" className="m-0 text-body font-medium text-ink">Choose a valid adjustment set</h4>
-      <p className="mb-0 mt-1 max-w-[65ch] text-body text-muted">The graph has several minimal valid sets. Choose using measurement quality, observed support and the planned model—not the estimate, which has not been run.</p>
+      <p className={prose('mb-0 mt-1 text-muted')}>The graph has several minimal valid sets. Choose using measurement quality, observed support and the planned model—not the estimate, which has not been run.</p>
       <div className="mt-3 grid gap-2">
         {evidence.result.minimalSets.map((set, ordinal) => (
           <button key={set.join('|')} type="button" className={button('outline', 'justify-start text-left')} onClick={() => onChoose({ kind: 'minimal', ordinal })}>
@@ -423,13 +423,13 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       <div>
         <span className={label('text-faint')}>05 · Study design</span>
         <h2 id="study-title" className="mb-2 mt-2 text-heading text-ink">Define and identify the causal question</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. Bind the question to a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
+        <p className={chapterIntro}>A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. Bind the question to a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
       </div>
 
       <CausalHierarchy />
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="study-form-title">
-        <h3 id="study-form-title" className="mb-3 mt-0 text-title font-medium text-ink">Define the estimand and select a graph</h3>
+        <h3 id="study-form-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Define the estimand and select a graph</h3>
         {documents.length === 0 && (
           <Alert tone="info" live={false}>
             <p className="m-0">Draw and validate a causal graph in the DAG workspace first.</p>
@@ -575,7 +575,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
           <dt className="text-faint">Graph revision</dt>
           <dd className="m-0 text-ink">{document === null ? '—' : <><span className={literal()}>{document.current.id.slice(0, 8)}</span> · {document.current.graph.edges.length} arrows{preview !== null && preview.graph.laggedArrows > 0 ? `, ${preview.graph.laggedArrows} lagged` : ''}</>}</dd>
         </dl>
-        {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeStudyDesignProblem(readiness.error)}</p>}
+        {!readiness.ok && <Alert tone="danger" className="mt-3">{describeStudyDesignProblem(readiness.error)}</Alert>}
         {state.job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">Identification could not run: {state.job.detail}</p>}
         {adjustmentChoice !== null && <AdjustmentSetChoicePanel study={adjustmentChoice.study} evidence={adjustmentChoice.evidence} onChoose={(choice) => recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)} />}
         <button
@@ -592,7 +592,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       {newestRecorded !== null && (
         <section aria-labelledby="study-results-title" className="grid gap-4">
           <div>
-            <h2 id="study-results-title" className="m-0 text-title font-medium text-ink">Identified studies</h2>
+            <h2 id="study-results-title" className={cn(sectionTitle, 'm-0')}>Identified studies</h2>
           </div>
           <IdentificationCard
             key={newestRecorded.study.id}
@@ -644,7 +644,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
             <ol className="m-0 list-none divide-y divide-line p-0">
               {DESIGN_ASSUMPTIONS.map((assumption) => (
                 <li key={assumption.id} className="py-2 text-body">
-                  <p className="m-0 max-w-[65ch] text-muted">{assumption.statement}</p>
+                  <p className={prose('m-0 text-muted')}>{assumption.statement}</p>
                 </li>
               ))}
             </ol>

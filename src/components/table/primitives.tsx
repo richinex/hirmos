@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { facet, literal, num, panel, rowPadding, segment, tableFoot, th } from '@/components/ui/recipes'
+import { facet, literal, num, panel, rowPadding, sectionTitle, segment, tableFoot, th } from '@/components/ui/recipes'
 import type { HistogramBins } from '@/domain/dataset'
 import type { TableDensity } from '@/domain/shellLayout'
 import { formatCount } from '@/lib/format/number'
@@ -70,13 +70,13 @@ export function TableShell({ title, titleId, toolbar, lead, count, foot, childre
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
             aria-controls={`${titleId}-body`}
-            className="-mx-1 flex items-center gap-1.5 rounded px-1 text-title font-medium text-ink transition-colors hover:text-muted"
+            className={cn(sectionTitle, '-mx-1 flex items-center gap-1.5 rounded px-1 transition-colors hover:text-muted')}
           >
             <Icon name="expand_more" size={14} className={cn('shrink-0 transition-transform duration-(--motion-fast)', open && 'rotate-180')} />
             <span id={titleId}>{title}</span>
           </button>
         ) : (
-          <h3 id={titleId} className="m-0 text-title font-medium text-ink">{title}</h3>
+          <h3 id={titleId} className={cn(sectionTitle, 'm-0')}>{title}</h3>
         )}
         {toolbar && !folded && <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
       </div>

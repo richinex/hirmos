@@ -25,7 +25,11 @@ function PaneHeader({ id, title, controls, collapse }: {
 }) {
   return (
     <div className="flex h-9 shrink-0 select-none items-center justify-between gap-2 border-b border-hair px-3">
-      <h2 id={id} className={cn('m-0 truncate', panelTitle)}>{title}</h2>
+      {/* One line, whatever the pane width: the title clips rather than wrapping into the 36px header.
+          `text-nowrap` replaces the recipe's balanced wrapping, which would otherwise win over the clip,
+          because `text-wrap: balance` also sets the wrap mode back to wrapping. The real text stays in the
+          heading, so its accessible name and a test's text query both see it. */}
+      <h2 id={id} className={cn(panelTitle, 'm-0 min-w-0 truncate text-nowrap')} title={title}>{title}</h2>
       <div className="flex items-center gap-1.5">
         {!collapse?.collapsed && controls}
         {collapse && (

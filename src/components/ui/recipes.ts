@@ -11,7 +11,9 @@ import { cn } from '@/lib/utils'
  * too, so nothing here sets an outline; the `focus:border-*` tints complement that ring.
  */
 
-/** `signal` is the one affirmative action on a surface, so a panel never has two (index.css rule 2).
+/** `signal` is the one affirmative action on a surface, so a panel never has two (index.css rule 2), and
+ * it is the one pill-shaped button: the shape alone says "this is the thing to do next". Every other tone
+ * keeps the control radius, including `danger`, which is a destructive action and not the next step.
  * `soft` is the signal wash for a control that is live but not the primary action. `outline` is the
  * ordinary action, `quiet` the dismissive one, and `mono` the small-caps drafting-label register used by
  * the eval and compile chrome. */
@@ -30,7 +32,7 @@ const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-hi
 const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
-  signal: cn('bg-signal', FILLED),
+  signal: cn('rounded-full bg-signal px-4', FILLED),
   soft: SIGNAL_WASH,
   danger: cn('bg-danger', FILLED),
   outline: 'border border-hair text-ink hover:border-edge',
@@ -88,19 +90,22 @@ export const chromeAction = (tone: ChromeTone = 'quiet', extra?: string): string
 
 /** A filter facet. Until something is chosen its border is dashed, which says "nothing set here" without a
  * badge or a colour; chosen is the raised surface with a solid edge, the same selection the rest of the
- * chrome uses. Counts and words inside it stay in the label register. */
+ * chrome uses. Counts and words inside it stay in the label register. The control radius, like the
+ * segmented control: a choice among a few options has one shape, and the pill belongs to the primary
+ * action alone. */
 export const facet = (active: boolean, extra?: string): string =>
   cn(
-    'min-h-8 rounded-full border px-2.5 pointer-coarse:min-h-10 transition-colors',
+    'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-10 transition-colors',
     label(),
     active ? 'border-solid border-edge bg-raised text-ink' : 'border-dashed border-hair text-faint hover:border-edge hover:text-muted',
     extra,
   )
 
-/** A pill-shaped view switch. Selection is a surface, never a colour. */
+/** A view switch. Selection is a surface, never a colour, and the shape is the control radius, shared with
+ * the facet and the segmented control. */
 export const pill = (active: boolean, extra?: string): string =>
   cn(
-    'min-h-8 rounded-full border px-2.5 pointer-coarse:min-h-10 transition-colors',
+    'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-10 transition-colors',
     label(),
     active ? 'border-edge bg-raised text-ink' : 'border-hair text-faint hover:text-muted',
     extra,
@@ -122,24 +127,43 @@ export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string
 export const fieldLabel = 'block text-body font-medium text-ink'
 
 /** The help line below a field. Body size and the token's 1.5 line height, because the old
- *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. */
-export const fieldHint = 'mt-1 text-body text-faint text-pretty'
+ *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. Serif, because a
+ *  hint is a sentence, and named here because a hint is as often a span as a paragraph. */
+export const fieldHint = 'mt-1 font-serif text-body text-faint text-pretty'
 
 /**
- * Which typeface, and why.
+ * Which typeface, and why. The model is a journal page (index.css rule 5).
  *
- * Mono is a reading aid, not a house style. It buys a fixed pitch, so digits line up down a column, and
- * unambiguous shapes, so 1/l and 0/O stay apart in an id you may have to retype. It costs legibility in
- * running text, where every glyph takes the same width whether it needs it or not.
- *
- * So mono for what is read character by character: numbers, code, ids, locators, hashes. Sans for what is
- * read as words: labels, headings, buttons, status, narration, help text.
+ * Serif for what is read as prose: a paragraph, a caption, a narrative. Sans for what is scanned or
+ * compared: headings, labels, buttons, table cells and every number, in the face the paper prescribes for
+ * figures, Helvetica or Arial. Mono is a reading aid, not a house style: it buys a fixed pitch and
+ * unambiguous shapes, so 1/l and 0/O stay apart in an id you may have to retype, and it costs legibility
+ * in running text. So mono only for what is read character by character: code, ids, locators, hashes.
  */
 
+/** Running text: the paragraph under a chapter title, the explanation beside a method, the reading of a
+ *  result. The serif at the 13px prose tier on a 65-character measure, which is the paper's column
+ *  brought to the screen. Colour is the call site's: muted for a narrative, faint for an aside. A `p`
+ *  element already takes the serif from index.css; the face is named here so a span reads the same. */
+export const prose = (extra?: string): string => cn('max-w-[65ch] font-serif text-subtitle text-pretty', extra)
+
+/** The paragraph under a chapter title, set the way the page it is modelled on sets its body: two columns
+ *  that fill the stage. A column is at least 45 characters wide; the browser fits two when the width
+ *  holds two and shares the remaining width between them, one otherwise, and never three, which turns
+ *  a short paragraph into a row of fragments (Clarke, "Revisiting CSS Multi-Column Layout", 2025). On
+ *  a stage wider than two full measures the type grows with the container instead, so the columns keep
+ *  filling the width without the measure passing 75 characters; the line height is a ratio so it grows
+ *  with it. Below the tablet step the paragraph keeps the single-column measure. The columns balance,
+ *  words are never hyphenated, and a column keeps at least two lines of a sentence on each side of the
+ *  break. Only the chapter narrative takes this: a help line beside a field is one thought and stays one
+ *  column. */
+export const chapterIntro = prose('m-0 text-muted @3xl/panel:max-w-[calc(150ch+2rem)] @3xl/panel:text-[length:clamp(0.8125rem,0.4rem+0.6cqi,1.0625rem)] leading-[1.55] [columns:45ch_2] gap-x-8 hyphens-none [orphans:2] [widows:2]')
+
 /** Figures the reader compares down a column. `tabular-nums` fixes digit advance width, so a counter
- *  ticking 9 to 10 does not nudge what follows. Sans, because JetBrains Mono's tabular figures align without the
- *  typeface change. */
-export const num = (extra?: string): string => cn('tabular-nums', extra)
+ *  ticking 9 to 10 does not nudge what follows; kerning is off because Helvetica and Arial pull the pair
+ *  "11" together and that would undo it. The sans is named, not inherited, because a figure line is
+ *  often a paragraph element and a paragraph otherwise takes the serif: a figure is sans without exception. */
+export const num = (extra?: string): string => cn('font-sans tabular-nums [font-kerning:none]', extra)
 
 /** A literal the reader may have to type or match character by character: a node id, an API key, a hash.
  *  This is the only mono outside actual code. Filenames, model names and timestamps read as words. */
@@ -148,13 +172,13 @@ export const literal = (extra?: string): string => cn('font-mono', extra)
 /** A chrome label: the name of a slot, above or beside the value that fills it. The 11px label tier
  * remains readable in dense panels; the 10px micro tier is reserved for timings and keycaps. The size,
  * the weight and the muted colour do the "this is a label" work, so the words are set as words. */
-export const label = (extra?: string): string => cn('text-label font-medium', extra)
+export const label = (extra?: string): string => cn('font-sans text-label font-medium', extra)
 
 /** What a figure plots, under or above it.
  *
  * A caption is a phrase, not a slot name, so it is sentence case: `label()` stays for the short fixed
  * nouns that name a field. Same tier and colour, so the two still read as one register. */
-export const caption = (extra?: string): string => cn('text-label text-faint text-pretty', extra)
+export const caption = (extra?: string): string => cn('font-serif text-label text-faint text-pretty', extra)
 
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
@@ -187,6 +211,12 @@ export const figureGrid = (extra?: string): string => cn('grid gap-px overflow-h
 /** Text colour for a machine-state verdict, from the status ramp; muted for a state that is neither good nor bad. */
 export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 
+/** A section title inside a chapter: "Examples", "Discovery methods", "Diagnostics". The paper's section
+ *  head, bold sans in the muted grey with a square marker before it, in sentence case. The marker is
+ *  what makes it a section head rather than a name, so a heading that names a thing (a column, a run, a
+ *  document) does not take it. The chapter title above stays in ink and takes no marker. */
+export const sectionTitle = "text-title font-medium text-muted text-balance before:mr-2 before:inline-block before:align-[0.15em] before:text-[0.6em] before:content-['■']"
+
 /** The title of a floating surface: panel, drawer or sheet.
  *
  * A heading, so it is set in sentence case on the title tier, the ramp step named for a surface's
@@ -217,6 +247,13 @@ export const tr = (state: 'static' | 'action' | 'selected' = 'static', extra?: s
 /** A body cell. Text cells truncate with the full value in `title`; figure cells add `text-right`. */
 export const td = (extra?: string): string => cn('max-w-[300px] truncate px-3.5 align-top', rowPadding.comfortable, extra)
 
+/** A text cell that takes the lines it needs: a rationale, a conditioning set, an expression. `td` clips
+ *  at one line so a row keeps the density's pitch; this cell wraps, and a windowed table predicts the
+ *  height it will take before the row exists (lib/textMetrics.ts), so the window stays exact without
+ *  measuring rows as they scroll. Words break only where the browser would, which is what the
+ *  prediction models. */
+export const tdText = (extra?: string): string => cn('whitespace-normal px-3.5 align-top [overflow-wrap:break-word]', rowPadding.comfortable, extra)
+
 /** The row-count line under a table; `aria-live="polite"` so a sort or filter is announced.
  *  It reports a count, so it is sentence case: capitals are for a label naming a slot. */
-export const tableFoot = 'border-t border-hair px-3.5 py-1.5 text-label text-faint'
+export const tableFoot = 'border-t border-hair px-3.5 py-1.5 font-sans text-label text-faint'

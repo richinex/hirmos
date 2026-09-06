@@ -23,7 +23,7 @@ import {
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { CmlpLagPlot, NeuralSummaryPlot, OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
-import { button, field, figureGrid, iconControl, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, figureGrid, iconControl, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
 import type { DagDocument } from '@/domain/dag'
 import {
@@ -84,6 +84,7 @@ import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { describeAnalysisWorkerProblem, type AnalysisWorkerProblem, type TemporalSamples } from '@/workers/analysisProtocol'
 import type { PreparedMatrix, RoleAwarePreparedMatrix } from '@/data/prepared'
+import { cn } from '@/lib/utils'
 
 const DISCOVERY_GROUP_LABELS: Readonly<Record<DiscoveryMethodGroupId, string>> = {
   'cross-sectional-constraint': 'Constraint',
@@ -1663,12 +1664,12 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       <div>
         <span className={label('text-faint')}>03 · Discovery lab</span>
         <h2 id="discovery-title" className="mb-2 mt-2 text-heading text-ink">Examine candidate relationships</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">Causal discovery uses patterns in data to propose relations between variables, including same-period and lagged relations when time is part of the study. In this chapter, choose a method suited to the observation structure and compare the candidate relations it produces. The result depends on the method's assumptions and does not establish a causal graph on its own.</p>
+        <p className={chapterIntro}>Causal discovery uses patterns in data to propose relations between variables, including same-period and lagged relations when time is part of the study. In this chapter, choose a method suited to the observation structure and compare the candidate relations it produces. The result depends on the method's assumptions and does not establish a causal graph on its own.</p>
       </div>
 
       <div className="grid gap-4">
         <section className={panel('p-(--panel-space)')} aria-labelledby="discovery-method-title">
-          <h3 id="discovery-method-title" className="mb-3 mt-0 text-title font-medium text-ink">Discovery method</h3>
+          <h3 id="discovery-method-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Discovery method</h3>
           <SegmentedControl
             wrap
             size="sm"
@@ -1862,7 +1863,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
 
           <EligibilityView eligibility={eligibility} />
-          {!readiness.ok && <p role="status" className="mb-0 mt-3 text-body text-faint">{describeDiscoveryReadiness(readiness.error)}</p>}
+          {/* A refusal disables the run, so it is an alert in the danger tone: louder than the review note above it, which leaves the run available. */}
+          {!readiness.ok && <Alert tone="danger" className="mt-3">{describeDiscoveryReadiness(readiness.error)}</Alert>}
           {draft.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{describeDiscoveryRunProblem(draft.job.problem)}</p></Alert>}
           {draft.job.kind === 'running' && draft.job.progress !== null && (
             <div className="mt-3" role="status" aria-live="polite">
@@ -1895,7 +1897,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       <section aria-labelledby="discovery-runs-title">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
-            <h2 id="discovery-runs-title" className="m-0 text-title font-medium text-ink">Discovery runs</h2>
+            <h2 id="discovery-runs-title" className={cn(sectionTitle, 'm-0')}>Discovery runs</h2>
           </div>
           <div className="flex items-center gap-2">
             {runs.length > 1 && (

@@ -9,7 +9,7 @@ import type { SelectedSource } from '@/domain/workflow'
 import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
-import { button, field, iconControl, label, literal, panel, pill, segment, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, iconControl, label, literal, panel, pill, sectionTitle, segment, well } from '@/components/ui/recipes'
 import {
   createDagDocument,
   describeDagCreateProblem,
@@ -798,7 +798,7 @@ export function DagWorkspace({
       <div>
         <span className={label('text-faint')}>04 · DAG workspace</span>
         <h2 id="dag-workspace-title" className="mb-2 mt-2 text-heading text-ink">Represent the causal assumptions</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">A directed acyclic graph (DAG) represents a data-generating process: nodes are variables, and each arrow states a direct causal relationship. In this chapter, construct the graph for the causal question and record the basis for each arrow. Discovery results can contribute empirical evidence, but they do not determine the graph.</p>
+        <p className={chapterIntro}>A directed acyclic graph (DAG) represents a data-generating process: nodes are variables, and each arrow states a direct causal relationship. In this chapter, construct the graph for the causal question and record the basis for each arrow. Discovery results can contribute empirical evidence, but they do not determine the graph.</p>
       </div>
     </div>
   )
@@ -812,7 +812,7 @@ export function DagWorkspace({
             {header}
             {state.kind === 'creating' ? (
               <section className={panel('p-(--panel-space)')} aria-labelledby="dag-origin-title">
-                <h3 id="dag-origin-title" className="mb-2 mt-0 text-title font-medium text-ink">Graph basis</h3>
+                <h3 id="dag-origin-title" className={cn(sectionTitle, 'mb-2 mt-0')}>Graph basis</h3>
                 <div className="grid gap-3 @md/panel:grid-cols-3">
                   <OriginChoice active={state.origin.kind === 'domain-knowledge'} icon="psychology" title="Substantive knowledge" detail="Theory, prior studies, expert knowledge, institutions, and the treatment-assignment process." onClick={() => dispatch({ type: 'origin-selected', origin: 'domain-knowledge' })} />
                   <OriginChoice active={state.origin.kind === 'experimental-design'} icon="experiment" title="Experimental design" detail="The randomisation protocol, intervention timing, and measurement design." onClick={() => dispatch({ type: 'origin-selected', origin: 'experimental-design' })} />

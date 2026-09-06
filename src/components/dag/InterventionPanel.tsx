@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { Alert } from '@/components/ui/Alert'
 import { EChart } from '@/charts/EChart'
 import { interventionBarsOption } from '@/charts/dag/interventionBars'
 import { useChartTheme } from '@/charts/theme'
@@ -6,7 +7,7 @@ import { Icon } from '@/components/Icon'
 import { Formula } from '@/components/ui/Formula'
 import { MetricTile } from '@/components/ui/figures'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, figureGrid, num, well } from '@/components/ui/recipes'
+import { button, field, fieldLabel, figureGrid, num, prose, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DagDocument, DagNodeId } from '@/domain/dag'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
@@ -209,7 +210,7 @@ export function InterventionPanel({ document, source, profile, prepared, queries
   return (
     <section className="border-t border-hair pt-4" aria-labelledby="intervene-title">
       <h3 id="intervene-title" className="mb-1 mt-0 text-body font-medium text-ink">Intervene</h3>
-      <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Set one measured variable and read another. With unmeasured variables, Hirmos first determines whether the interventional distribution is identifiable from the observed data.</p>
+      <p className={prose('mb-3 mt-0 text-faint')}>Set one measured variable and read another. With unmeasured variables, Hirmos first determines whether the interventional distribution is identifiable from the observed data.</p>
       <div className="grid gap-2 @sm/inspector:grid-cols-2">
         <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>Set</span>
           <Select aria-label="Variable to set" className={field('text', 'mt-1')} value={set ?? ''} onChange={(event) => choose('set', event.target.value)}>
@@ -241,7 +242,7 @@ export function InterventionPanel({ document, source, profile, prepared, queries
         </label>}
       </div>
       <p className="mb-0 mt-2 text-label text-faint">Method: {identifiedRoute ? (condition.kind === 'selected' ? 'IDC expression' : 'ID expression') : 'fully observed Bayesian network'}</p>
-      {!readiness.ok && <p role="status" className="mb-0 mt-2 text-body text-faint">{describeInterventionReadiness(readiness.error)}</p>}
+      {!readiness.ok && <Alert tone="danger" className="mt-2">{describeInterventionReadiness(readiness.error)}</Alert>}
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
       <button type="button" className={button('signal', 'mt-3')} disabled={!readiness.ok} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Evaluate intervention</button>
       {recorded.length > 0 && <ul className="m-0 mt-4 list-none space-y-2 p-0" aria-label="Intervention queries">{recorded.map((query, index) => <QueryRecord key={query.id} query={query} document={document} open={index === 0} />)}</ul>}

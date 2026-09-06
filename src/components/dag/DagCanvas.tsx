@@ -47,7 +47,9 @@ import {
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
 import { affectedDagEdges } from '@/domain/dagValidation'
 import { assertNever } from '@/domain/dop'
-import { layoutDagForCanvas, type DagLayoutOrientation } from './dagCanvasModel'
+import { DEFAULT_CARD_SIZE, layoutDagForCanvas, type DagCardSize, type DagLayoutOrientation } from './dagCanvasModel'
+import { dagCardSize } from './dagCardSize'
+import { useTextMetricsVersion } from '@/lib/textMetrics'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
 import type { InterventionOverlay } from '@/domain/intervention'
 import { cn } from '@/lib/utils'
@@ -64,6 +66,8 @@ interface DagNodeData extends Record<string, unknown> {
   readonly droppable: boolean
   /** The node's part in the intervention being framed: set by do(), read as the answer, or neither. */
   readonly intervention: 'set' | 'read' | null
+  /** The size every card in this graph is drawn at, fitted to the longest name (dagCardSize.ts). */
+  readonly size: DagCardSize
 }
 
 type CanvasNode = Node<DagNodeData, 'dagVariable'>
@@ -135,8 +139,10 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
         : null
   return (
     <div
-      className="group relative flex h-[58px] w-[164px] flex-col justify-center rounded-lg border bg-panel px-3 text-center transition-shadow"
+      className="group relative flex flex-col justify-center rounded-lg border bg-panel px-3 text-center transition-shadow"
       style={{
+        width: data.size.width,
+        height: data.size.height,
         borderColor: refused
           ? 'var(--color-danger)'
           : isTarget
@@ -162,7 +168,7 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
         className="nodrag nopan"
         title={`Drag to draw an arrow from ${data.name}`}
       />
-      <span className={`${CARD_GRIP} relative z-10 cursor-grab truncate text-body font-medium text-ink active:cursor-grabbing`} title={`${data.name} · drag to move`}>{data.name}</span>
+      <span className={`${CARD_GRIP} relative z-10 line-clamp-3 cursor-grab whitespace-normal text-body font-medium text-ink [overflow-wrap:break-word] active:cursor-grabbing`} title={`${data.name} · drag to move`}>{data.name}</span>
       <span className={label(`mt-0.5 truncate ${data.intervention === 'set' ? 'text-signal' : data.intervention === 'read' ? 'text-[var(--color-info)]' : 'text-faint'}`)} title={data.role ?? undefined}>{data.role ?? (data.kind === 'latent' ? 'Unmeasured' : 'Observed')}</span>
       <Handle
         type="target"
@@ -180,9 +186,14 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
 
 const NODE_TYPES = { dagVariable: DagVariableCard }
 
+/** The size a card was given, for the moment before React Flow has measured it. */
+const cardSizeOf = (node: InternalNode): DagCardSize => (node.data as { readonly size?: DagCardSize }).size ?? DEFAULT_CARD_SIZE
+const cardWidth = (node: InternalNode): number => node.measured.width ?? cardSizeOf(node).width
+const cardHeight = (node: InternalNode): number => node.measured.height ?? cardSizeOf(node).height
+
 const centreOf = (node: InternalNode) => ({
-  x: node.internals.positionAbsolute.x + (node.measured.width ?? 164) / 2,
-  y: node.internals.positionAbsolute.y + (node.measured.height ?? 58) / 2,
+  x: node.internals.positionAbsolute.x + cardWidth(node) / 2,
+  y: node.internals.positionAbsolute.y + cardHeight(node) / 2,
 })
 
 /** An arrow ends this far outside the card border, so the head never touches the card. */
@@ -198,7 +209,7 @@ const LABEL_OFFSET = 11
 /** The point just above the card's top edge, where a self-loop leaves and re-enters. */
 const topPoint = (node: InternalNode) => {
   const centre = centreOf(node)
-  return { x: centre.x, y: centre.y - (node.measured.height ?? 58) / 2 - ANCHOR_CLEAR }
+  return { x: centre.x, y: centre.y - cardHeight(node) / 2 - ANCHOR_CLEAR }
 }
 /**
  * Where an arrow toward a point leaves the card: on the border, along the line from the card's centre,
@@ -208,8 +219,8 @@ const topPoint = (node: InternalNode) => {
  */
 const anchorPoint = (node: InternalNode, toward: { readonly x: number; readonly y: number }) => {
   const centre = centreOf(node)
-  const halfWidth = (node.measured.width ?? 164) / 2
-  const halfHeight = (node.measured.height ?? 58) / 2
+  const halfWidth = cardWidth(node) / 2
+  const halfHeight = cardHeight(node) / 2
   const dx = toward.x - centre.x
   const dy = toward.y - centre.y
   const length = Math.hypot(dx, dy)
@@ -231,8 +242,8 @@ const quadraticAt = (from: Point, control: Point, to: Point, t: number): Point =
 const crossesAny = (from: Point, control: Point, to: Point, obstacles: readonly InternalNode[]): boolean => {
   const boxes = obstacles.map((node) => {
     const centre = centreOf(node)
-    const halfWidth = (node.measured.width ?? 164) / 2 + OBSTACLE_PAD
-    const halfHeight = (node.measured.height ?? 58) / 2 + OBSTACLE_PAD
+    const halfWidth = cardWidth(node) / 2 + OBSTACLE_PAD
+    const halfHeight = cardHeight(node) / 2 + OBSTACLE_PAD
     return { left: centre.x - halfWidth, right: centre.x + halfWidth, top: centre.y - halfHeight, bottom: centre.y + halfHeight }
   })
   for (let step = 1; step < 40; step += 1) {
@@ -539,8 +550,11 @@ const IDLE_HINT = 'Drag from a card onto another card to draw an arrow; drag a c
 const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation): {
   readonly nodes: CanvasNode[]
   readonly edges: CanvasEdge[]
+  /** The size every card is drawn at; a change relays the whole drawing, since kept positions were fitted to the old size. */
+  readonly size: DagCardSize
 } => {
-  const placements = new Map(layoutDagForCanvas(document.current.graph, flow === null ? null : { treatment: flow.treatment, outcome: flow.outcome }, orientation).map((placed) => [placed.id, placed]))
+  const size = dagCardSize(document.current.graph.nodes.map((node) => node.name))
+  const placements = new Map(layoutDagForCanvas(document.current.graph, flow === null ? null : { treatment: flow.treatment, outcome: flow.outcome }, orientation, size).map((placed) => [placed.id, placed]))
   const highlighted = evidenceColumns(candidate)
   const validation = document.current.validation
   const problemEdges = new Set(validation.kind === 'invalid' ? validation.issues.flatMap(affectedDagEdges) : [])
@@ -590,6 +604,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
     }
   })
   return {
+    size,
     nodes: document.current.graph.nodes.map((node) => {
       const placed = placements.get(node.id) ?? { x: 34, y: 34 }
       const source = node.kind === 'observed' && highlighted?.source === node.column
@@ -610,6 +625,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
           evidenceRole,
           droppable: true,
           intervention: intervention === null ? null : node.id === intervention.set ? 'set' : node.id === intervention.read ? 'read' : null,
+          size,
         },
         ariaLabel: `${node.kind === 'latent' ? 'Unmeasured' : 'Observed'} variable: ${node.name}`,
       }
@@ -654,7 +670,10 @@ export function DagCanvas({
     observer.observe(host)
     return () => observer.disconnect()
   }, [])
-  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, orientation), [document, flow, intervention, orientation, selectedEvidence])
+  // The card size is measured from the names, so the model re-runs once the document's fonts have loaded.
+  const metricsVersion = useTextMetricsVersion()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- metricsVersion invalidates the measurements the model is built on
+  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, orientation), [document, flow, intervention, orientation, selectedEvidence, metricsVersion])
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(model.nodes)
   // The gesture is read in React Flow's callbacks, which fire from listeners bound at pointer-down, so a ref carries it as well as state.
   const [gesture, setGesture] = useState<Gesture | null>(null)
@@ -673,24 +692,25 @@ export function DagCanvas({
     setNodes((current) => {
       const occupied: { x: number; y: number }[] = []
       const overlaps = (position: { x: number; y: number }) =>
-        occupied.some((taken) => Math.abs(taken.x - position.x) < 164 + 12 && Math.abs(taken.y - position.y) < 58 + 12)
+        occupied.some((taken) => Math.abs(taken.x - position.x) < model.size.width + 12 && Math.abs(taken.y - position.y) < model.size.height + 12)
       return model.nodes.map((next) => {
         const existing = current.find((node) => node.id === next.id)
         let position = existing === undefined ? next.position : existing.position
         if (existing === undefined) {
-          while (overlaps(position)) position = { x: position.x, y: position.y + 58 + 46 }
+          while (overlaps(position)) position = { x: position.x, y: position.y + model.size.height + 46 }
         }
         occupied.push(position)
         return { ...next, position }
       })
     })
-  }, [model.nodes, setNodes])
+  }, [model.nodes, model.size, setNodes])
 
   const tidy = () => {
     setNodes(model.nodes)
   }
-  // Binding the study changes every card's role, and turning the layout changes every slot, so the drawing is laid out again.
-  const bindingKey = `${flow === null ? '' : `${flow.treatment}\u0000${flow.outcome}`}\u0000${orientation}`
+  // Binding the study changes every card's role, turning the layout changes every slot, and a new card size
+  // (a longer name arriving) outgrows the positions the cards were placed at, so the drawing is laid out again.
+  const bindingKey = `${flow === null ? '' : `${flow.treatment}\u0000${flow.outcome}`}\u0000${orientation}\u0000${model.size.width}x${model.size.height}`
   const previousBinding = useRef(bindingKey)
   useEffect(() => {
     if (previousBinding.current === bindingKey) return

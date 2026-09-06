@@ -104,7 +104,6 @@ export function Landing() {
             <HirmosMark className="landing-mark" />
             <span>hirmos</span>
           </InternalLink>
-          <InternalLink className="landing-open" href="/app">Open the workbench</InternalLink>
         </div>
       </header>
 

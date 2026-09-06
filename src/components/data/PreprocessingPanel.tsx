@@ -14,7 +14,7 @@ import { MulticollinearityCard } from './MulticollinearityCard'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { describeResolutionRecord, type MissingnessResolutionRecord } from '@/domain/missingness'
-import { button, field, fieldLabel, label, num, panel, table, td, th, tr, well } from '@/components/ui/recipes'
+import { button, field, fieldLabel, label, num, panel, prose, sectionTitle, table, td, th, tr, well } from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
 import { cn } from '@/lib/utils'
@@ -537,7 +537,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       <div className="grid gap-4 @3xl/panel:grid-cols-2">
         <section className={panel('@container/card p-(--panel-space)')} aria-labelledby="sampling-title">
           <span className={label('text-faint')}>How rows are organised</span>
-          <h3 id="sampling-title" className="mb-3 mt-1 text-title font-medium text-ink">Choose the observation structure</h3>
+          <h3 id="sampling-title" className={cn(sectionTitle, 'mb-3 mt-1')}>Choose the observation structure</h3>
           <RadioList frame="none"
             className="mb-3"
             legend="Observation structure"
@@ -602,7 +602,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
             <div>
               <span className={label('text-faint')}>Variables</span>
-              <h3 id="variables-title" className="mb-0 mt-1 text-title font-medium text-ink">Select analysis columns</h3>
+              <h3 id="variables-title" className={cn(sectionTitle, 'mb-0 mt-1')}>Select analysis columns</h3>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" className={button('quiet')} aria-label="Select all columns" title="Select all columns" onClick={() => numericColumns.forEach((column) => { if (column.id !== currentTime && column.id !== currentUnit && !selectedIds.includes(column.id)) dispatch({ type: 'variable-toggled', column: column.id }) })}>
@@ -635,7 +635,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
 
         <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
           <span className={label('text-faint')}>Missing values</span>
-          <h3 id="missingness-title" className="mb-3 mt-1 text-title font-medium text-ink">{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</h3>
+          <h3 id="missingness-title" className={cn(sectionTitle, 'mb-3 mt-1')}>{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</h3>
           {draft.missingness.kind === 'not-present' ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" /> No missing values detected.
@@ -750,10 +750,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         {(timeSeriesSelected || panelSelected) && (
         <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="transform-title">
           <span className={label('text-faint')}>Time-series values</span>
-          <h3 id="transform-title" className="mb-1 mt-1 text-title font-medium text-ink">Prepare the analysis scale</h3>
+          <h3 id="transform-title" className={cn(sectionTitle, 'mb-1 mt-1')}>Prepare the analysis scale</h3>
           {timeSeriesSelected ? (
             <>
-              <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">A transformation changes the values used by later analyses. Save a separate prepared version so results on levels and transformed values remain comparable. Missingness is resolved before calendar resampling, seasonal adjustment, and per-column transformations.</p>
+              <p className={prose('mb-0 mt-1 text-faint')}>A transformation changes the values used by later analyses. Save a separate prepared version so results on levels and transformed values remain comparable. Missingness is resolved before calendar resampling, seasonal adjustment, and per-column transformations.</p>
               <div className="mt-4 rounded-md border border-line p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -928,7 +928,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 id="diagnostics-title" className="m-0 text-title font-medium text-ink">Diagnostics</h3>
+              <h3 id="diagnostics-title" className={cn(sectionTitle, 'm-0')}>Diagnostics</h3>
               <p className="mb-0 mt-1 text-body text-faint">These tests do not change the prepared dataset.</p>
             </div>
             {/* A cross-section has one diagnostic, and one option is not a choice, so the switch appears only when there are several. */}
@@ -947,13 +947,13 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-            <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">A stationary process has stable probabilistic behavior over time after accounting for the deterministic terms in the test. ADF tests a unit root as its null; KPSS tests stationarity as its null. Hirmos reads them together because either test alone can be inconclusive. Zivot–Andrews allows one structural break.</p>
-            <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">Hirmos reports I(1) only when the values in levels support unit-root behavior and their first difference supports stationarity. The prepared data are not changed unless first differencing is saved as a transformation.</p>
+            <p className={prose('mb-0 mt-1 text-faint')}>A stationary process has stable probabilistic behavior over time after accounting for the deterministic terms in the test. ADF tests a unit root as its null; KPSS tests stationarity as its null. Hirmos reads them together because either test alone can be inconclusive. Zivot–Andrews allows one structural break.</p>
+            <p className={prose('mb-0 mt-1 text-faint')}>Hirmos reports I(1) only when the values in levels support unit-root behavior and their first difference supports stationarity. The prepared data are not changed unless first differencing is saved as a transformation.</p>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />
           <div className="mt-3">
             <span className={fieldLabel}>Run the tests on</span>
-            <p className="mb-0 mt-1 max-w-[75ch] text-body text-faint">This moves the reported statistics only. The verdict is read from the values in levels and their first difference either way, because integration order is a property of the series rather than of the scale it is inspected on.</p>
+            <p className={prose('mb-0 mt-1 text-faint')}>This moves the reported statistics only. The verdict is read from the values in levels and their first difference either way, because integration order is a property of the series rather than of the scale it is inspected on.</p>
             <RadioList frame="none"
               className="mt-2"
               legend="Run the stationarity tests on"

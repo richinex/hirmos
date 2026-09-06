@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
-/* Hirmos — "graphite instrument".
+/* Hirmos — lime on black, set like a paper.
    ------------------------------------------------------------------------
-   What this palette IS, and the reasoning behind it. Two experiments were tried and reverted; their
+   What this palette IS, and the reasoning behind it. Earlier experiments were tried and reverted; their
    reasons are recorded here because they are the useful part — without them the next person re-tries
    them and rediscovers the same result the hard way.
 
@@ -22,6 +22,10 @@
       The reason the rule exists at all still holds: when a categorical rainbow and the highlight share
       a colour space, you cannot tell "this is in the answer" from "this is an Entity". The group ramp
       is deliberately muted so the signal stays the loudest thing on the stage.
+      The signal is lime on the dark theme and the same hue darkened to an olive on the light one: a
+      tint that reads on black cannot also read on white, so the hue is kept and moved along it.
+      Because the signal is a green, `ok` is a teal on both themes, so a passed check is never mistaken
+      for the answer.
 
    3. STATUS IS ITS OWN RAMP. ok / info / warn / danger, for machine state only — never category, never
       the answer. Tokenised so each carries a per-theme variant and exactly one meaning.
@@ -37,17 +41,32 @@
       loop on its own curve — which is exactly how a vocabulary stops being one. If you need a new
       motion, first check whether one of these already means what you are trying to say.
 
-   Everything else is a graphite/bone neutral ramp. FIVE THEMES: dark (default), Operational,
-   light, and two paper sketchbook variants, switched by :root[data-theme=...] with a pre-paint boot script in index.html.
-   (An earlier version was dark-only on the grounds that emissive-on-black contrast could not survive a
-   paper stage. That turned out to be solvable — the paper themes drop emissive entirely and lean on
-   heavier strokes instead; see `pal.glow`.)
+   5. TYPE IS SET LIKE A JOURNAL PAGE. The model is Buriak, "Which Font Looks Best in a Figure?",
+      Chem. Mater. 2016, 28, 689: running prose in a serif; headings, chrome and every figure in a
+      sans; the paper's own rule for figures is "Arial or Helvetica, always". Measured from that page,
+      body 9 pt, section heads 10 pt bold sans in grey with a square marker, the title 18 pt bold sans,
+      captions 8 pt, metadata 7 pt. Here that is: `p` and `figcaption` (and `prose()`) in Source Serif 4
+      at the 13px prose tier; headings, labels, buttons, tables and numbers in Helvetica, Arial, or
+      Arimo where neither is installed; `sectionTitle` bold and muted with the marker; JetBrains Mono
+      only for what is read character by character (`literal()`, code). Helvetica and Arial carry two
+      weights, regular and bold, so `font-medium` is tokenised to 600 and resolves to bold on both; the
+      paper itself uses no third weight.
+
+   Everything else is a neutral ramp. TWO THEMES: dark (default, black ground) and light (paper
+   ground), switched by :root[data-theme=...] with a pre-paint boot script in index.html.
 
    Elevation is NOT drop shadows: `.lift` is an inset top-edge highlight, `.float` a theme-aware shadow
    for surfaces that leave the plane. Components carry no `shadow-*` utilities. */
 @theme {
-  --font-sans: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  /* The figure face, per the paper: Helvetica or Arial from the system, Arimo (Arial's metric twin,
+     self-hosted) only where neither exists. The prose face is self-hosted with its optical-size axis, so
+     13px text gets the small-size cut. Mono is for code alone. */
+  --font-sans: Helvetica, Arial, Arimo, sans-serif;
+  --font-serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, "Times New Roman", serif;
   --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Two weights, as on the page: regular and bold. `font-medium` lands on bold in Helvetica and Arial
+     (they have no 500), and on the serif's semibold. */
+  --font-weight-medium: 600;
 
   /* The house curve is the default for every transition utility, so a button's 150ms colour change
      rides the same ease-out as .pop and .rise instead of Tailwind's own curve. */
@@ -91,36 +110,56 @@
   --text-micro: 0.625rem;               /* 10px — the floor: timings, keycaps, terse execution metadata */
   --text-micro--line-height: 1rem;      /* 16px box */
 
-  --color-stage: #0A0A0B;        /* graph ground, app background */
-  --color-panel: #0C0C0E;        /* chrome: header, rail, composer bed */
-  --color-column: #0A0A0C;       /* conversation column */
-  --color-well: #101012;         /* inset control / input */
-  --color-raised: #141417;       /* active nav, selected tab */
+  --color-stage: #000000;        /* graph ground, app background: black */
+  --color-panel: #0A0A0A;        /* chrome: header, rail, composer bed */
+  --color-column: #050505;       /* conversation column */
+  --color-well: #111111;         /* inset control / input */
+  --color-raised: #1A1A1A;       /* active nav, selected tab */
 
-  --color-line: #17171A;         /* structural divider */
-  --color-hair: #1E1E22;         /* control border */
-  --color-edge: #26262A;         /* emphasised border (focus, panels) */
-  --color-control: #606065;      /* input boundary: 3:1 on the well (WCAG 1.4.11) */
+  --color-line: #1C1C1C;         /* structural divider */
+  --color-hair: #262626;         /* control border */
+  --color-edge: #3A3A3A;         /* emphasised border (focus, panels) */
+  --color-control: #6B6B6B;      /* input boundary: 3:1 on the well (WCAG 1.4.11) */
 
-  --color-ink: #E6E3DC;          /* primary text, selected node */
-  --color-bone: #B8B5AE;         /* graph node stroke, secondary text */
-  --color-muted: #8C8A85;        /* labels, inactive controls */
-  --color-faint: #817F78;        /* SMALLEST TEXT ALLOWED — ≥4.5:1 on every ground incl. raised */
-  --color-dim: #3A3936;          /* NON-TEXT ONLY: hairlines, dimmed plot, disabled fill */
+  --color-ink: #F2F2F0;          /* primary text, selected node */
+  --color-bone: #C9C6BF;         /* graph node stroke, secondary text */
+  --color-muted: #A1A1A1;        /* labels, section titles, inactive controls */
+  --color-faint: #8F8F8F;        /* SMALLEST TEXT ALLOWED — ≥4.5:1 on every ground incl. raised */
+  --color-dim: #333333;          /* NON-TEXT ONLY: hairlines, dimmed plot, disabled fill */
 
-  --color-signal: #E4501F;       /* "this is live": the answer, a running compile, links. Never a category. */
-  --color-signal-ink: #0A0A0B;   /* text on signal */
-  --color-signal-line: #4A2216;  /* signal at border strength */
+  --color-signal: #BEF264;       /* lime: "this is live": the answer, a running compile, links. Never a category. 16:1 on black. */
+  --color-signal-ink: #000000;   /* text on signal */
+  --color-signal-line: #4A5A2A;  /* signal at border strength */
 
   /* Status ramp — the ONLY other hues, and only for machine state, never category or the answer. Tokenised
      so they carry a light-mode variant and one meaning each, instead of scattered raw Tailwind classes. */
-  --color-ok: #34D399;           /* success / extracted / valid */
-  --color-info: #4FA3DA;         /* in-progress / running (muted sky, not the signal) */
-  --color-warn: #E0A63C;         /* caution / abstained */
-  --color-danger: #E5484D;       /* destructive / failed */
+  --color-ok: #2DD4BF;           /* success / extracted / valid: a teal, kept off the lime signal */
+  --color-info: #60A5FA;         /* in-progress / running (sky, not the signal) */
+  --color-warn: #FBBF24;         /* caution / abstained */
+  --color-danger: #F87171;       /* destructive / failed */
 
-  /* Elevation: a faint bone top-edge highlight lifts a surface off the stage (lit from above). */
-  --color-highlight: rgba(230, 227, 220, 0.05);
+  /* Elevation: a faint top-edge highlight lifts a surface off the stage (lit from above). */
+  --color-highlight: rgba(255, 255, 255, 0.06);
+}
+
+/* The prose face, self-hosted from @fontsource-variable/source-serif-4 5.3.0 (files copied into
+   public/fonts so index.html can preload the roman before the stylesheet asks for it). Both axes are in
+   the file: weight, and optical size, which the browser applies from the text's own size. */
+@font-face {
+  font-family: "Source Serif 4 Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 200 900;
+  src: url("/fonts/source-serif-4-latin-opsz-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Source Serif 4 Variable";
+  font-style: italic;
+  font-display: swap;
+  font-weight: 200 900;
+  src: url("/fonts/source-serif-4-latin-opsz-italic.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 /* 100dvh, not 100%/100vh: on iOS Safari the static units include the retracted toolbar, which parked
@@ -130,9 +169,12 @@
    of the system default: without this, Android renders a dark picker sheet over the paper themes. */
 :root { color-scheme: dark; }
 
-/* Radius: rounded-md for controls and fields, rounded-lg for rows and small cards, rounded-xl
-   for section cards, rounded-2xl for the palette, rounded-3xl for floating windows and sheets,
-   rounded-full for pills only. Anything else is drift. */
+/* Radius: rounded-md for controls, fields and every choice among a few options (segments, facets,
+   view switches), rounded-lg for rows and small cards, rounded-xl for section cards, rounded-2xl for
+   the palette, rounded-3xl for floating windows and sheets, rounded-full for the one primary action
+   on a surface (`button('signal')`) and for no other control, so the thing to do next is the only
+   pill-shaped button on the screen; progress tracks, drag handles and dots are shapes, not controls.
+   Anything else is drift. */
 
 /* The layering order, in one readable list. Increments of 10 leave room; nothing floats
    without a name here. */
@@ -149,35 +191,7 @@
   --z-toast: 100;
   --z-drag: 110;
 }
-:root[data-theme="light"], :root[data-theme="sketchbook"], :root[data-theme="sketchbook-white"] { color-scheme: light; }
-
-/* OPERATIONAL */
-:root[data-theme="operational"] {
-  --color-stage: #080A0B;
-  --color-panel: #101416;
-  --color-column: #0A0D0E;
-  --color-well: #101416;
-  --color-raised: #1D2425;
-
-  --color-line: rgba(241, 241, 236, 0.10);
-  --color-hair: rgba(241, 241, 236, 0.16);
-  --color-edge: rgba(241, 241, 236, 0.28);
-  --color-control: #92999C;
-
-  --color-ink: #F1F1EC;
-  --color-bone: #D6D8D6;
-  --color-muted: #92999C;
-  --color-faint: #9FA5A7;
-  --color-dim: rgba(241, 241, 236, 0.22);
-
-  --color-signal: #B7D8CD;
-  --color-signal-ink: #080A0B;
-  --color-signal-line: #45524F;
-
-  --color-highlight: rgba(241, 241, 236, 0.05);
-}
-
-:root[data-theme="operational"] body { background: #080A0B; }
+:root[data-theme="light"] { color-scheme: light; }
 
 html, body { height: 100%; margin: 0; }
 /* The root grows with the viewport above 1280px (16px there, 18px at 1920px) so every rem tier scales
@@ -250,8 +264,18 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
   }
 }
 
+/* The paper's split, on the elements that already mean it: a paragraph or a caption is read as prose
+   and takes the serif; a heading, a label, a cell, a button or a summary is chrome or a figure and keeps
+   the sans it inherits. In `base`, so a `font-sans` utility can take a paragraph back when it is a line
+   of chrome. `prose()` in recipes.ts carries the same face for text that is not a paragraph element. */
+@layer base {
+  p, figcaption { font-family: var(--font-serif); }
+}
+
 /* Figures in tables and definition lists align down a column without every cell opting in through
-   `num()`; JetBrains Mono's figures are already lining, so `lining-nums` only guards a fallback face. */
+   `num()`. Kerning stays on here: a text cell's height is predicted from a kerned measurement
+   (lib/textMetrics.ts), and only `num()` switches kerning off, for the pair "11" that Helvetica, Arial
+   and Arimo pull together. */
 @layer base {
   table, dl { font-variant-numeric: tabular-nums lining-nums; }
   /* A heading balances its lines so one word is never left alone on the last line. */
@@ -372,8 +396,7 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
   width: 14px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent));
 }
-:root[data-theme="light"] .bar-live::after,
-:root[data-theme="sketchbook-white"] .bar-live::after {
+:root[data-theme="light"] .bar-live::after {
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent), transparent);
 }
 @media (prefers-reduced-motion: reduce) { .bar-live::after { animation: none; opacity: 0; } }
@@ -397,145 +420,50 @@ button[aria-busy="true"]::after {
    shadow-2xl so panels visibly lift off the stage. */
 .lift { box-shadow: var(--shadow-lift); }
 :root { --shadow-lift: inset 0 1px 0 var(--color-highlight); }
-/* On the two white themes the highlight is white on a white panel and paints nothing, so a lifted surface
+/* On the light theme the highlight is white on a white panel and paints nothing, so a lifted surface
    sat flat on the stage. A hairline ring at five percent ink and a one-pixel shade give it an edge; it is
    still not a drop shadow. */
 :root[data-theme="light"] { --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.06); }
-:root[data-theme="sketchbook-white"] { --shadow-lift: 0 0 0 1px rgb(43 36 26 / 0.05), 0 1px 2px -1px rgb(43 36 26 / 0.06); }
 /* Non-interactive texture: a faint 45° hatch says "not usable here" as a pattern, not a colour. */
 .hatch { background-image: repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-muted) 14%, transparent) 0 2px, transparent 2px 9px); }
 :root { --shadow-float: 0 24px 50px -12px rgba(0, 0, 0, 0.55); }
-:root[data-theme="light"] { --shadow-float: 0 18px 48px rgba(47, 52, 55, 0.10); }
-:root[data-theme="sketchbook"] { --shadow-float: 0 18px 48px rgba(87, 62, 30, 0.16); }
-:root[data-theme="sketchbook-white"] { --shadow-float: 0 18px 48px rgba(87, 70, 40, 0.10); }
+:root[data-theme="light"] { --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.10); }
 .float { box-shadow: var(--shadow-float), inset 0 1px 0 var(--color-highlight); }
 
-/* LIGHT — premium utilitarian monochrome (the Notion/Linear register): warm-bone canvas, true-white
-   surfaces, hairline greys, charcoal ink. Colour is scarce: the one signal is the same red-ink accent
-   the sketchbook family uses, so every theme shares a single answer colour. */
+/* LIGHT — the same page on paper: a warm-white stage, true-white surfaces, black ink, neutral hairlines.
+   The signal is the lime darkened along its own hue to an olive that reads as text on white (5:1), so the
+   two themes share one answer colour rather than two. */
 :root[data-theme="light"] {
-  --color-stage: #F7F6F3;        /* warm bone canvas */
+  --color-stage: #F6F6F2;        /* paper canvas */
   --color-panel: #FFFFFF;        /* chrome and cards: true white */
-  --color-column: #FBFBFA;       /* conversation column */
+  --color-column: #FAFAF7;       /* conversation column */
   --color-well: #FFFFFF;         /* input / inset */
-  --color-raised: #EFEEEA;       /* active nav, selected tab */
+  --color-raised: #EBEBE5;       /* active nav, selected tab */
 
-  --color-line: #EAEAE8;         /* structural divider */
-  --color-hair: #E0DFDB;         /* control border */
-  --color-edge: #C9C7C1;         /* emphasised border */
-  --color-control: #96948F;      /* input boundary, 3:1 on the well */
+  --color-line: #E8E8E3;         /* structural divider */
+  --color-hair: #DCDCD5;         /* control border */
+  --color-edge: #C2C2BA;         /* emphasised border */
+  --color-control: #8E8E86;      /* input boundary, 3:1 on the well */
 
-  --color-ink: #363330;          /* warm charcoal, never absolute black */
-  --color-bone: #585450;         /* secondary text */
-  --color-muted: #676663;        /* labels — ≥4.5:1 on raised; darker than faint so a label outranks its hint */
-  --color-faint: #6B6A67;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
-  --color-dim: #D9D8D4;          /* NON-TEXT ONLY */
+  --color-ink: #0A0A0A;          /* black ink, as printed */
+  --color-bone: #3D3D3A;         /* secondary text */
+  --color-muted: #5F5F5B;        /* labels, section titles — ≥4.5:1 on raised; darker than faint so a label outranks its hint */
+  --color-faint: #6A6A66;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
+  --color-dim: #D6D6D0;          /* NON-TEXT ONLY */
 
-  --color-signal: #AE3B24;       /* the family's red-ink annotation. THE answer colour. */
+  --color-signal: #4D7C0F;       /* the lime, darkened to read on paper. THE answer colour. */
   --color-signal-ink: #FFFFFF;
-  --color-signal-line: #E5C4BA;
+  --color-signal-line: #C5E29A;
 
-  --color-ok: #346538;           /* desaturated semantic set (pale-pastel text weights) */
-  --color-info: #1F6C9F;
-  --color-warn: #845800;
-  --color-danger: #9F2F2D;
+  --color-ok: #0F766E;           /* teal, kept off the olive signal */
+  --color-info: #2160A6;
+  --color-warn: #8A5B00;
+  --color-danger: #B3312F;
 
   --color-highlight: rgba(255, 255, 255, 0.9);
 }
 
-/* A single soft top light on the bone canvas; no cream gradient, no warm cast. */
-:root[data-theme="light"] body {
-  background:
-    radial-gradient(100% 60% at 50% -8%, rgba(255, 255, 255, 0.8), transparent 55%),
-    #F7F6F3;
-}
-
-/* SKETCHBOOK — the aged-paper atelier palette, distilled from sketchbook-main (watercolour spreads,
-   Instrument Serif, brass loupe on a desk): sepia paper a full step deeper than the cream light theme,
-   sepia-black ink, and RED-INK ANNOTATION as the one signal colour. Same contract as the other themes:
-   one signal, one meaning; smallest text stays ≥4.5:1 on its ground. */
-:root[data-theme="sketchbook"] {
-  --color-stage: #EDE2CB;        /* aged paper ground */
-  --color-panel: #F4EBD6;        /* lighter leaf */
-  --color-column: #F0E6CF;       /* conversation column */
-  --color-well: #FAF3E1;         /* input / inset */
-  --color-raised: #E6D8BA;       /* active nav, selected tab */
-
-  --color-line: #DECDA9;         /* structural divider */
-  --color-hair: #CDB88D;         /* control border */
-  --color-edge: #B29B6E;         /* emphasised border */
-  --color-control: #A18A5D;      /* input boundary, 3:1 on the well */
-
-  --color-ink: #3B2F21;          /* sepia-black ink */
-  --color-bone: #55462F;         /* secondary text */
-  --color-muted: #685B44;        /* labels — ≥4.5:1 on raised; darker than faint so a label outranks its hint */
-  --color-faint: #6C5C43;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
-  --color-dim: #C7B28C;          /* NON-TEXT ONLY */
-
-  --color-signal: #AA3720;       /* red-ink annotation. THE answer colour, nothing else. 4.55:1 on raised. */
-  --color-signal-ink: #FFF8EC;
-  --color-signal-line: #DEB2A2;
-
-  --color-ok: #48603B;           /* moss ink — dark enough to read on the raised paper */
-  --color-info: #305577;         /* wash blue, ink weight */
-  --color-warn: #7E550A;
-  --color-danger: #A93226;
-
-  --color-highlight: rgba(255, 250, 235, 0.9);
-}
-
-/* Aged-paper ground: warm diagonal sheet + top light + a faint edge vignette, the desk-lamp-on-paper
-   depth of the sketchbook without shipping its texture images. */
-:root[data-theme="sketchbook"] body {
-  background:
-    radial-gradient(120% 90% at 50% 50%, transparent 62%, rgba(107, 84, 48, 0.10)),
-    radial-gradient(100% 60% at 50% -8%, rgba(255, 251, 238, 0.75), transparent 55%),
-    linear-gradient(150deg, #F0E5CC, #F4EBD6 45%, #E7D9B8);
-}
-
-/* SKETCHBOOK-WHITE — the fresh-sheet variant: TRUE white, no warm cast. Neutral paper-white grounds and
-   neutral grey structure; only the INK stays sepia and the signal stays red-ink, which is what keeps it
-   in the sketchbook family (ink on a white page) rather than a generic grey theme. */
-:root[data-theme="sketchbook-white"] {
-  --color-stage: #FFFFFF;        /* true white sheet */
-  --color-panel: #FFFFFF;
-  --color-column: #FCFCFB;       /* a hair off pure, so panels still separate */
-  --color-well: #FFFFFF;
-  --color-raised: #F1F1EF;
-
-  --color-line: #EAEAE7;         /* neutral structure — no yellow */
-  --color-hair: #DBDAD5;
-  --color-edge: #C0BFB8;
-  --color-control: #96958F;      /* input boundary, 3:1 on the well */
-
-  --color-ink: #2B241A;          /* the family's sepia ink */
-  --color-bone: #4C4130;
-  --color-muted: #6E6357;
-  --color-faint: #75695A;        /* SMALLEST TEXT — ≥4.5:1 on white; lighter than muted so a hint sits under its label */
-  --color-dim: #DEDDD8;          /* NON-TEXT ONLY */
-
-  --color-signal: #AE3B24;       /* the family's red-ink annotation, unchanged */
-  --color-signal-ink: #FFFFFF;
-  --color-signal-line: #E7C2B4;
-
-  --color-ok: #48603B;
-  --color-info: #3E6C8F;
-  --color-warn: #845800;
-  --color-danger: #A93226;
-
-  --color-highlight: rgba(255, 255, 255, 0.95);
-}
-:root[data-theme="sketchbook-white"] body {
-  background: #FFFFFF;   /* a flat white sheet — no wash, no tint */
-}
-
-/* The sketchbook family's display voice, now same-family emphasis (weight and tracking in the app face)
-   rather than a second typeface: one family per project, headings still read as headings. */
-:root[data-theme="sketchbook"] h2,
-:root[data-theme="sketchbook-white"] h2 {
-  font-weight: 550;
-  letter-spacing: -0.03em;
-}
+:root[data-theme="light"] body { background: #F6F6F2; }
 
 /* Reduced motion removes MOVEMENT, not feedback.
    WCAG 2.3.3 is about motion animation: things that travel, scale, spin or slide. A colour change on

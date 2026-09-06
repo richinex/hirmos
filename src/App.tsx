@@ -7,7 +7,7 @@ import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { button, chromeAction, field, iconControl, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chromeAction, field, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
 import { formatDay, formatTimestamp } from '@/lib/format/date'
 import { DataStudio } from '@/components/data/DataStudio'
@@ -45,6 +45,7 @@ import {
 } from '@/domain/discovery'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { assertNever } from '@/domain/dop'
+import { cn } from '@/lib/utils'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
 const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
@@ -98,10 +99,7 @@ const CHAPTERS: readonly Chapter[] = [
 /** The icon previews the next stop in the theme cycle, so the button reads as "switch to". */
 const THEME_ICON: Record<ThemeChoice, string> = {
   dark: 'dark_mode',
-  operational: 'grid_view',
   light: 'light_mode',
-  sketchbook: 'palette',
-  'sketchbook-white': 'contrast',
   system: 'brightness_auto',
 }
 
@@ -597,8 +595,7 @@ function App() {
                     </div>
                   </form>
                   <section className="mt-8" aria-labelledby="projects-title">
-                    <h3 id="projects-title" className="mb-2 text-title font-medium text-ink">Your projects</h3>
-                    <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Kept in this browser. Reopening asks for the data file again and checks it is the same file.</p>
+                    <h3 id="projects-title" className={cn(sectionTitle, 'mb-2')}>Your projects</h3>
                     {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
                     {importProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{importProblem}</p>}
                     {yours.length === 0
@@ -622,8 +619,8 @@ function App() {
                       )}
                   </section>
                   <section className="mt-8" aria-labelledby="examples-title">
-                    <h3 id="examples-title" className="mb-2 text-title font-medium text-ink">Examples</h3>
-                    <p className="mb-3 mt-0 max-w-[65ch] text-body text-faint">Complete walkthroughs, each with its data inside. Open one to read it, edit it freely, and reset it to get the shipped version back.</p>
+                    <h3 id="examples-title" className={cn(sectionTitle, 'mb-2')}>Examples</h3>
+                    <p className={prose('mb-3 mt-0 text-faint')}>Below is a list of sample walkthroughs. Feel free to edit and use the reset button to return the sample to its original state.</p>
                     <ExampleLedger
                       examples={SHIPPED_EXAMPLES}
                       saved={saved}
@@ -728,7 +725,7 @@ function App() {
                     {workflow.prepared !== null && (
                       <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
                         <span className={label('text-faint')}>Continue</span>
-                        <h3 id="prepared-next-title" className="mb-1 mt-1 text-title font-medium text-ink">Build a DAG or run discovery</h3>
+                        <h3 id="prepared-next-title" className={cn(sectionTitle, 'mb-1 mt-1')}>Build a DAG or run discovery</h3>
                         <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>
                         <div className="flex flex-wrap gap-2">
                           <button type="button" className={button('signal')} onClick={() => navigateToChapter('dag')}>Build a DAG</button>
@@ -759,7 +756,7 @@ function App() {
                             Include the source file ({formatBytes(workflow.source.bytes)})
                           </label>
                         </div>
-                        <p className="mb-0 mt-1 max-w-[65ch] text-body text-faint">{workflow.profile.source.persistence.kind === 'cached-locally' ? 'Reopening this project reads the file from the browser store.' : 'Reopening this project asks for the file again.'}</p>
+                        <p className={prose('mb-0 mt-1 text-faint')}>{workflow.profile.source.persistence.kind === 'cached-locally' ? 'Reopening this project reads the file from the browser store.' : 'Reopening this project asks for the file again.'}</p>
                         {cacheProblem !== null && <p role="alert" className="mb-0 mt-1 text-body text-danger">{cacheProblem}</p>}
                       </div>
                     </details>

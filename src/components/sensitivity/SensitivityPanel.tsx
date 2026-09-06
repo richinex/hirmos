@@ -15,7 +15,7 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, field, fieldLabel, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldLabel, figureGrid, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
@@ -47,6 +47,7 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretSensitivityResult } from '@/domain/resultInterpretation'
+import { cn } from '@/lib/utils'
 
 type Job = { readonly kind: 'idle' } | { readonly kind: 'running' } | { readonly kind: 'failed'; readonly detail: string }
 
@@ -246,7 +247,7 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
   const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · ${formatTime(run.createdAt)}`
   const record = (
     <>
-      <h3 className="mb-1 mt-2 text-title font-medium text-ink">Simulated unmeasured confounder</h3>
+      <h3 className={cn(sectionTitle, 'mb-1 mt-2')}>Simulated unmeasured confounder</h3>
       <p className="m-0 text-body text-muted">Rows vary the simulated effect on treatment assignment. Columns vary the simulated outcome shift. Each cell reports a refitted linear back-door estimate. Original estimate: <span className={num('text-ink')}>{formatStatistic('raw', evidence.originalEffect).text}</span>.</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
       {flat.length === 1 && <Alert tone="info" live={false} className="mt-3"><p className="m-0">The inferred strengths collapsed to one point because a single observed common cause bounds them. Set explicit ranges to sweep a grid.</p></Alert>}
@@ -380,11 +381,11 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       <div>
         <span className={label('text-faint')}>07 · Sensitivity</span>
         <h2 id="sensitivity-title" className="mb-2 mt-2 text-heading text-ink">Assess sensitivity to assumptions</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
+        <p className={chapterIntro}>A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="sensitivity-setup-title">
-        <h3 id="sensitivity-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">{describeProbe(state.probe)}</h3>
+        <h3 id="sensitivity-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{describeProbe(state.probe)}</h3>
         {estimationRuns.length === 0 ? (
           <Alert tone="info" live={false}><p className="m-0">Run an estimate before choosing a sensitivity probe.</p></Alert>
         ) : (
@@ -459,7 +460,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       {latest !== null ? (
         <section aria-labelledby="sensitivity-results-title" className="grid gap-4">
           <div>
-            <h2 id="sensitivity-results-title" className="m-0 text-title font-medium text-ink">Probes</h2>
+            <h2 id="sensitivity-results-title" className={cn(sectionTitle, 'm-0')}>Probes</h2>
           </div>
           {(() => {
             const target = estimationRuns.find((candidate) => candidate.id === latest.estimationRun)

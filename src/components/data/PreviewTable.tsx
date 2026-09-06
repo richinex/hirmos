@@ -12,6 +12,7 @@ import { formatAbsent, formatCount } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 import type { DatasetSummaryState } from './useDatasetSummary'
 import { usePreviewWindows } from './usePreviewWindows'
+import { fontFor, textWidth } from '@/lib/textMetrics'
 
 const locale = (): string => (typeof navigator === 'undefined' ? 'en-GB' : navigator.language || 'en-GB')
 
@@ -233,8 +234,8 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
     ? 'Loading rows…'
     : `rows ${formatCount(shownFrom).text} to ${formatCount(shownTo).text} of ${formatCount(total).text}${total !== profile.rowCount ? ` (${formatCount(profile.rowCount).text} in the file)` : ''}${clauses.length > 0 ? ` · ${clauses.join(' · ')}` : ''}`
 
-  // The column holds the grouped count in 12px tabular figures (about 7.2px a digit) inside 28px of padding.
-  const rowNumberWidth = Math.max(48, Math.ceil(formatCount(profile.rowCount).text.length * 7.2) + 28)
+  // The column holds the grouped count in tabular figures, measured in the body face, inside 28px of padding.
+  const rowNumberWidth = Math.max(48, Math.ceil(textWidth(formatCount(profile.rowCount).text, fontFor('body'))) + 28)
 
   return (
     <TableShell

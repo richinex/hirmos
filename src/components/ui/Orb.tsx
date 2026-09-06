@@ -8,10 +8,7 @@ const subscribeTheme = (notify: () => void): (() => void) => {
   return () => observer.disconnect()
 }
 
-const isDarkTheme = (): boolean => {
-  const theme = document.documentElement.dataset.theme
-  return theme === 'dark' || theme === 'operational'
-}
+const isDarkTheme = (): boolean => document.documentElement.dataset.theme !== 'light'
 
 export function Orb({ state, className, 'aria-label': ariaLabel }: {
   readonly state: OrbState

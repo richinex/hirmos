@@ -17,7 +17,7 @@ import { Formula } from '@/components/ui/Formula'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, field, fieldLabel, figureGrid, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldLabel, figureGrid, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { DEFAULT_DYNAMIC_LINEAR_SCM, DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualConfiguration, type CounterfactualRunArtifact, type DynamicCounterfactualUncertainty } from '@/domain/counterfactual'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -33,6 +33,7 @@ import { interpretCounterfactualResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime } from '@/lib/format/date'
 import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
+import { cn } from '@/lib/utils'
 
 type Job = { readonly kind: 'idle' } | { readonly kind: 'running'; readonly progress: AnalysisProgress | null } | { readonly kind: 'failed'; readonly detail: string }
 
@@ -390,10 +391,10 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
       <div>
         <span className={label('text-faint')}>08 · Counterfactuals</span>
         <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate counterfactual outcomes</h2>
-        <p className="m-0 max-w-[65ch] text-body text-muted">A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
+        <p className={chapterIntro}>A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
       </div>
       <section className={panel('p-(--panel-space)')} aria-labelledby="counterfactual-setup-title">
-        <h3 id="counterfactual-setup-title" className="mb-3 mt-0 text-title font-medium text-ink">Structural counterfactual</h3>
+        <h3 id="counterfactual-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Structural counterfactual</h3>
         {identified.length === 0 ? (
           <p className="m-0 text-body text-faint">Identify a study first.</p>
         ) : (
@@ -498,7 +499,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
                 )}
               </div>
             )}
-            {method.ok && <p className="mb-0 mt-3 max-w-[65ch] text-body text-faint">{method.value.summary}</p>}
+            {method.ok && <p className={prose('mb-0 mt-3 text-faint')}>{method.value.summary}</p>}
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The counterfactual could not run: {state.job.detail}</p></Alert>}
             <div className="mt-4 flex items-center gap-3">
@@ -520,7 +521,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
       {latest !== null && (
         <section aria-labelledby="counterfactual-results-title" className="grid gap-4">
           <div>
-            <h2 id="counterfactual-results-title" className="m-0 text-title font-medium text-ink">Counterfactuals</h2>
+            <h2 id="counterfactual-results-title" className={cn(sectionTitle, 'm-0')}>Counterfactuals</h2>
           </div>
           {(() => {
             const bound = studies.find((candidate) => candidate.id === latest.study)
