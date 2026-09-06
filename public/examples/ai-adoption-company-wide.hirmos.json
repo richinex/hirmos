@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T14:50:44.566Z",
+  "exportedAt": "2026-09-06T17:34:22.401Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,28 +9,28 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T14:50:44.561Z",
+    "savedAt": "2026-09-06T17:34:22.397Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "7c2f1b3e-5a64-4d1e-9b0a-2e6f8c1d4a71",
       "name": "AI adoption, company-wide",
-      "createdAt": "2026-09-04T14:50:38.786Z"
+      "createdAt": "2026-09-06T17:34:16.171Z"
     },
     "source": {
       "name": "company-wide-adoption.csv",
-      "bytes": 754,
+      "bytes": 1410,
       "mediaType": "text/csv",
-      "lastModified": 1788530633900,
+      "lastModified": 1788716012347,
       "format": "csv"
     },
     "profile": {
-      "id": "duckdb-wasm:1.30.0:14027906ef4dbf469453b94fd53f16749efb12091ab02cc5687641bc4cec5a05",
+      "id": "duckdb-wasm:1.30.0:e2f9e823fbdcba9c4c82f66211e489324507ea6e879d5e52f6fe0dfc1f7864ae",
       "source": {
-        "fingerprint": "14027906ef4dbf469453b94fd53f16749efb12091ab02cc5687641bc4cec5a05",
+        "fingerprint": "e2f9e823fbdcba9c4c82f66211e489324507ea6e879d5e52f6fe0dfc1f7864ae",
         "fileName": "company-wide-adoption.csv",
-        "bytes": 754,
+        "bytes": 1410,
         "format": "csv",
         "persistence": {
           "kind": "ephemeral"
@@ -41,7 +41,7 @@
         "packageVersion": "1.30.0",
         "engineVersion": "v1.3.2"
       },
-      "rowCount": 36,
+      "rowCount": 72,
       "columns": [
         {
           "id": "0:month",
@@ -84,11 +84,11 @@
           },
           {
             "kind": "number",
-            "value": 1.9845
+            "value": 1.961
           },
           {
             "kind": "number",
-            "value": 1.8757
+            "value": 1.981
           }
         ],
         [
@@ -102,11 +102,11 @@
           },
           {
             "kind": "number",
-            "value": 2.1537
+            "value": 1.8929
           },
           {
             "kind": "number",
-            "value": 2.2582
+            "value": 1.8179
           }
         ],
         [
@@ -120,11 +120,11 @@
           },
           {
             "kind": "number",
-            "value": 2.0764
+            "value": 1.8962
           },
           {
             "kind": "number",
-            "value": 1.9659
+            "value": 1.8871
           }
         ],
         [
@@ -138,11 +138,11 @@
           },
           {
             "kind": "number",
-            "value": 1.9702
+            "value": 1.9334
           },
           {
             "kind": "number",
-            "value": 1.8896
+            "value": 2.0104
           }
         ],
         [
@@ -156,11 +156,11 @@
           },
           {
             "kind": "number",
-            "value": 1.9855
+            "value": 1.9967
           },
           {
             "kind": "number",
-            "value": 1.8572
+            "value": 1.945
           }
         ],
         [
@@ -174,11 +174,11 @@
           },
           {
             "kind": "number",
-            "value": 1.8416
+            "value": 2.0282
           },
           {
             "kind": "number",
-            "value": 1.8152
+            "value": 1.9355
           }
         ],
         [
@@ -192,11 +192,11 @@
           },
           {
             "kind": "number",
-            "value": 1.8077
+            "value": 2.0775
           },
           {
             "kind": "number",
-            "value": 1.7973
+            "value": 2.0048
           }
         ],
         [
@@ -210,11 +210,11 @@
           },
           {
             "kind": "number",
-            "value": 1.7887
+            "value": 2.0549
           },
           {
             "kind": "number",
-            "value": 1.8047
+            "value": 2.0653
           }
         ],
         [
@@ -228,11 +228,11 @@
           },
           {
             "kind": "number",
-            "value": 1.8865
+            "value": 2.1436
           },
           {
             "kind": "number",
-            "value": 2.0369
+            "value": 2.0075
           }
         ],
         [
@@ -246,11 +246,11 @@
           },
           {
             "kind": "number",
-            "value": 2.003
+            "value": 2.1301
           },
           {
             "kind": "number",
-            "value": 1.9423
+            "value": 2.0903
           }
         ],
         [
@@ -264,11 +264,11 @@
           },
           {
             "kind": "number",
-            "value": 2.0521
+            "value": 1.9269
           },
           {
             "kind": "number",
-            "value": 2.0333
+            "value": 1.9497
           }
         ],
         [
@@ -282,20 +282,20 @@
           },
           {
             "kind": "number",
-            "value": 2.1456
+            "value": 1.854
           },
           {
             "kind": "number",
-            "value": 2.0478
+            "value": 1.8535
           }
         ]
       ]
     },
     "prepared": {
-      "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f",
-      "recipe": "822f0294-776a-4403-813f-f5ceeaf5440d",
-      "sourceProfile": "duckdb-wasm:1.30.0:14027906ef4dbf469453b94fd53f16749efb12091ab02cc5687641bc4cec5a05",
-      "observations": 36,
+      "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
+      "recipe": "5926f85f-d3dc-43d2-86a4-6e3754adcf33",
+      "sourceProfile": "duckdb-wasm:1.30.0:e2f9e823fbdcba9c4c82f66211e489324507ea6e879d5e52f6fe0dfc1f7864ae",
+      "observations": 72,
       "columns": [
         "1:ai_active",
         "2:legacy_bugs_per_kloc",
@@ -347,12 +347,12 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "549b015f-f049-4a4b-8a73-73cb46098711",
+        "id": "40acaaa6-b78b-4646-b2c1-996132446276",
         "name": "AI rollout and code quality",
-        "preparedDataset": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f",
+        "preparedDataset": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
         "dataset": {
           "kind": "time-series",
-          "observations": 36
+          "observations": 72
         },
         "origin": {
           "kind": "user-authored",
@@ -361,27 +361,27 @@
         "history": [
           {
             "kind": "draft",
-            "id": "f84287ca-5723-437b-ab5b-a970ee699be2",
+            "id": "34d49102-e01c-4225-9285-2834c76e95b9",
             "parent": null,
-            "createdAt": "2026-09-04T14:50:41.359Z",
+            "createdAt": "2026-09-06T17:34:19.021Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -399,27 +399,27 @@
           },
           {
             "kind": "draft",
-            "id": "5753ff15-db86-49bc-ac03-9815158422e5",
-            "parent": "f84287ca-5723-437b-ab5b-a970ee699be2",
-            "createdAt": "2026-09-04T14:50:41.618Z",
+            "id": "c111550f-3850-4258-b00f-a35b5066dbea",
+            "parent": "34d49102-e01c-4225-9285-2834c76e95b9",
+            "createdAt": "2026-09-06T17:34:19.303Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -427,9 +427,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-                  "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
-                  "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -450,27 +450,27 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "f84287ca-5723-437b-ab5b-a970ee699be2",
+            "id": "34d49102-e01c-4225-9285-2834c76e95b9",
             "parent": null,
-            "createdAt": "2026-09-04T14:50:41.359Z",
+            "createdAt": "2026-09-06T17:34:19.021Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -488,27 +488,27 @@
           },
           {
             "kind": "draft",
-            "id": "5753ff15-db86-49bc-ac03-9815158422e5",
-            "parent": "f84287ca-5723-437b-ab5b-a970ee699be2",
-            "createdAt": "2026-09-04T14:50:41.618Z",
+            "id": "c111550f-3850-4258-b00f-a35b5066dbea",
+            "parent": "34d49102-e01c-4225-9285-2834c76e95b9",
+            "createdAt": "2026-09-06T17:34:19.303Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -516,9 +516,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-                  "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
-                  "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -536,27 +536,27 @@
           },
           {
             "kind": "draft",
-            "id": "d8ebe684-aaa5-4118-81e2-4909ac1670ac",
-            "parent": "5753ff15-db86-49bc-ac03-9815158422e5",
-            "createdAt": "2026-09-04T14:50:41.801Z",
+            "id": "7340e521-ef97-456f-a1a7-0d06b8bdc00d",
+            "parent": "c111550f-3850-4258-b00f-a35b5066dbea",
+            "createdAt": "2026-09-06T17:34:19.511Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -564,9 +564,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-                  "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
-                  "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -578,9 +578,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-                  "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
-                  "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -599,27 +599,27 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "d8ebe684-aaa5-4118-81e2-4909ac1670ac",
-          "parent": "5753ff15-db86-49bc-ac03-9815158422e5",
-          "createdAt": "2026-09-04T14:50:41.801Z",
+          "id": "7340e521-ef97-456f-a1a7-0d06b8bdc00d",
+          "parent": "c111550f-3850-4258-b00f-a35b5066dbea",
+          "createdAt": "2026-09-06T17:34:19.511Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
                 "column": "1:ai_active",
                 "name": "ai_active"
               },
               {
                 "kind": "observed",
-                "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
                 "column": "2:legacy_bugs_per_kloc",
                 "name": "legacy_bugs_per_kloc"
               },
               {
                 "kind": "observed",
-                "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                 "column": "3:bugs_per_kloc",
                 "name": "bugs_per_kloc"
               }
@@ -627,9 +627,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-                "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
-                "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+                "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -641,9 +641,9 @@
               },
               {
                 "kind": "directed",
-                "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-                "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
-                "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+                "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -664,10 +664,16 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "549b015f-f049-4a4b-8a73-73cb46098711",
-      "treatment": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
-      "outcome": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+      "dagDocument": "40acaaa6-b78b-4646-b2c1-996132446276",
+      "treatment": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+      "outcome": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": "policy-change",
         "description": "Engineering leadership enabled the AI coding assistant for every product team in month 25."
@@ -678,23 +684,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "be30e84e-0128-4898-b947-be09ae359523",
-        "createdAt": "2026-09-04T14:50:42.951Z",
-        "preparedDataset": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f",
+        "id": "a78fdf8f-74f9-43e4-9d27-1da8f2510c4a",
+        "createdAt": "2026-09-06T17:34:20.645Z",
+        "preparedDataset": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
         "dataset": {
           "kind": "time-series",
-          "observations": 36
+          "observations": 72
         },
-        "dagDocument": "549b015f-f049-4a4b-8a73-73cb46098711",
-        "dagRevision": "d8ebe684-aaa5-4118-81e2-4909ac1670ac",
+        "dagDocument": "40acaaa6-b78b-4646-b2c1-996132446276",
+        "dagRevision": "7340e521-ef97-456f-a1a7-0d06b8bdc00d",
         "dagName": "AI rollout and code quality",
         "treatment": {
-          "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+          "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
           "column": "1:ai_active",
           "name": "ai_active"
         },
         "outcome": {
-          "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+          "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
           "column": "3:bugs_per_kloc",
           "name": "bugs_per_kloc"
         },
@@ -704,7 +710,7 @@
         },
         "population": {
           "kind": "all-prepared-rows",
-          "observations": 36
+          "observations": 72
         },
         "dagBasis": "domain-knowledge",
         "assignment": {
@@ -724,17 +730,17 @@
         "graph": {
           "nodes": [
             {
-              "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+              "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
               "name": "ai_active",
               "column": "1:ai_active"
             },
             {
-              "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+              "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
               "name": "legacy_bugs_per_kloc",
               "column": "2:legacy_bugs_per_kloc"
             },
             {
-              "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+              "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
               "name": "bugs_per_kloc",
               "column": "3:bugs_per_kloc"
             }
@@ -756,19 +762,19 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
               "column": "1:ai_active",
               "name": "ai_active"
             },
             {
               "kind": "observed",
-              "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
+              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
               "column": "2:legacy_bugs_per_kloc",
               "name": "legacy_bugs_per_kloc"
             },
             {
               "kind": "observed",
-              "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
               "column": "3:bugs_per_kloc",
               "name": "bugs_per_kloc"
             }
@@ -776,9 +782,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-              "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
-              "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+              "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+              "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -790,9 +796,9 @@
             },
             {
               "kind": "directed",
-              "id": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc->fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc@t",
-              "cause": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:2:legacy_bugs_per_kloc",
-              "effect": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
+              "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+              "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -809,9 +815,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "f7e83703-94d2-4690-8990-030016118fd0",
-        "study": "be30e84e-0128-4898-b947-be09ae359523",
-        "createdAt": "2026-09-04T14:50:43.079Z",
+        "id": "efd63a5b-1566-4f31-8786-eb5186983740",
+        "study": "a78fdf8f-74f9-43e4-9d27-1da8f2510c4a",
+        "createdAt": "2026-09-06T17:34:20.763Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -828,6 +834,9 @@
             "truncated": false
           },
           "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "instruments": {
             "kind": "notIdentified"
           },
           "graphicalIdentification": {
@@ -868,6 +877,9 @@
             ]
           },
           "mediators": [],
+          "instruments": {
+            "kind": "not-identified"
+          },
           "basis": [
             {
               "kind": "design-record",
@@ -877,7 +889,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “AI rollout and code quality” (revision d8ebe684) states the causes of ai_active and bugs_per_kloc; a missing arrow claims there is no direct cause."
+              "statement": "The graph “AI rollout and code quality” (revision 7340e521) states the causes of ai_active and bugs_per_kloc; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -907,11 +919,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "3ac669ab-ce83-4602-a55b-b43159930de9",
-        "study": "be30e84e-0128-4898-b947-be09ae359523",
-        "identification": "f7e83703-94d2-4690-8990-030016118fd0",
-        "preparedDataset": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f",
-        "createdAt": "2026-09-04T14:50:44.119Z",
+        "id": "b0f71460-1d81-4a08-a77d-981af73714e6",
+        "study": "a78fdf8f-74f9-43e4-9d27-1da8f2510c4a",
+        "identification": "efd63a5b-1566-4f31-8786-eb5186983740",
+        "preparedDataset": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
+        "createdAt": "2026-09-06T17:34:21.798Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -1039,78 +1051,114 @@
         },
         "evidence": {
           "kind": "causalImpact",
-          "observations": 36,
-          "nPre": 24,
-          "nPost": 12,
+          "observations": 72,
+          "nPre": 48,
+          "nPost": 24,
           "outcome": 1,
           "controls": [
             2
           ],
           "counterfactual": [
-            2.0838690796448716,
-            2.0616759647327743,
-            1.9853557505554273,
-            2.057960375358351,
-            1.9565348275700343,
-            1.9117469124080648,
-            1.9462918514567586,
-            1.9070271096892026,
-            1.8859386294559881,
-            1.8841310454359985,
-            1.9726022410810549,
-            1.9659744330077589
+            1.8798822826323829,
+            1.8582222066803036,
+            1.809002108714571,
+            1.8753562966125452,
+            1.9441351198782901,
+            1.855635928954682,
+            1.9696746124188016,
+            1.9880210200349284,
+            1.966684228798552,
+            2.064477855298612,
+            2.046131447682485,
+            2.005963321756427,
+            1.9584404685481336,
+            2.069892874286632,
+            1.9318503006815884,
+            2.005235931146096,
+            1.9637746663572277,
+            1.951489847160526,
+            2.0159851479432103,
+            1.8085980028199427,
+            1.8671933575410526,
+            1.8829534874315583,
+            1.9510857412658977,
+            1.9670075135142546
           ],
           "counterfactualSe": [
-            0.07903429355813484,
-            0.07903429371066976,
-            0.07903429386320468,
-            0.07903429401573961,
-            0.07903429416827452,
-            0.07903429432080944,
-            0.07903429447334437,
-            0.07903429462587928,
-            0.0790342947784142,
-            0.07903429493094913,
-            0.07903429508348404,
-            0.07903429523601896
+            0.0628822631107421,
+            0.06288226331401416,
+            0.0628822635172862,
+            0.06288226372055825,
+            0.06288226392383028,
+            0.06288226412710234,
+            0.06288226433037437,
+            0.06288226453364641,
+            0.06288226473691846,
+            0.0628822649401905,
+            0.06288226514346254,
+            0.06288226534673459,
+            0.06288226555000663,
+            0.06288226575327867,
+            0.0628822659565507,
+            0.06288226615982274,
+            0.06288226636309478,
+            0.06288226656636682,
+            0.06288226676963886,
+            0.0628822669729109,
+            0.06288226717618293,
+            0.06288226737945496,
+            0.062882267582727,
+            0.06288226778599904
           ],
           "pointwise": [
-            -0.5390690796448716,
-            -0.4994759647327742,
-            -0.39265575055542734,
-            -0.34046037535835105,
-            -0.38743482757003433,
-            -0.36794691240806476,
-            -0.4195918514567587,
-            -0.4600271096892026,
-            -0.31493862945598816,
-            -0.3542310454359985,
-            -0.39390224108105487,
-            -0.45277443300775877
+            -0.336582282632383,
+            -0.4478222066803035,
+            -0.3432021087145709,
+            -0.2826562966125452,
+            -0.4324351198782901,
+            -0.415835928954682,
+            -0.3910746124188016,
+            -0.3584210200349285,
+            -0.44998422879855204,
+            -0.32247785529861206,
+            -0.34993144768248485,
+            -0.4757633217564272,
+            -0.3729404685481337,
+            -0.34679287428663175,
+            -0.3466503006815884,
+            -0.2927359311460962,
+            -0.3361746663572278,
+            -0.45598984716052593,
+            -0.41318514794321026,
+            -0.4503980028199426,
+            -0.42759335754105265,
+            -0.25855348743155826,
+            -0.35598574126589777,
+            -0.3524075135142546
           ],
-          "cumulative": -4.922508220396287,
-          "average": -0.4102090183663572,
+          "cumulative": -9.015593768158702,
+          "average": -0.3756497403399459,
           "params": [
-            0.00599656257906201,
-            2.4110979580263097e-11,
-            1.004213344438779
+            0.003873481069742766,
+            2.5564412807874447e-11,
+            0.8082117892566943
           ],
-          "logLikelihood": 24.614418221645543
+          "logLikelihood": 61.880662285158195
         },
         "method": "causal-impact",
         "columns": [
           {
-            "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:1:ai_active",
+            "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
             "column": "1:ai_active",
             "name": "ai_active"
           },
           {
-            "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+            "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
             "column": "3:bugs_per_kloc",
             "name": "bugs_per_kloc"
           },
           {
-            "node": "fc8f9cb2-649f-4a9f-91e2-04b04dab188f:3:bugs_per_kloc",
+            "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
             "column": "2:legacy_bugs_per_kloc",
             "name": "legacy_bugs_per_kloc"
           }
@@ -1125,105 +1173,201 @@
             "kind": "path",
             "values": [
               {
-                "step": 25,
-                "actual": 1.5448,
-                "counterfactual": 2.0838690796448716,
-                "lower": 1.9289647107273613,
-                "upper": 2.238773448562382,
-                "effect": -0.5390690796448716
+                "step": 49,
+                "actual": 1.5433,
+                "counterfactual": 1.8798822826323829,
+                "lower": 1.7566353116689568,
+                "upper": 2.003129253595809,
+                "effect": -0.336582282632383
               },
               {
-                "step": 26,
-                "actual": 1.5622,
-                "counterfactual": 2.0616759647327743,
-                "lower": 1.906771595516301,
-                "upper": 2.2165803339492474,
-                "effect": -0.4994759647327742
+                "step": 50,
+                "actual": 1.4104,
+                "counterfactual": 1.8582222066803036,
+                "lower": 1.7349752353184715,
+                "upper": 1.9814691780421356,
+                "effect": -0.4478222066803035
               },
               {
-                "step": 27,
+                "step": 51,
+                "actual": 1.4658,
+                "counterfactual": 1.809002108714571,
+                "lower": 1.6857551369543329,
+                "upper": 1.932249080474809,
+                "effect": -0.3432021087145709
+              },
+              {
+                "step": 52,
                 "actual": 1.5927,
-                "counterfactual": 1.9853557505554273,
-                "lower": 1.8304513810399912,
-                "upper": 2.1402601200708635,
-                "effect": -0.39265575055542734
+                "counterfactual": 1.8753562966125452,
+                "lower": 1.7521093244539014,
+                "upper": 1.998603268771189,
+                "effect": -0.2826562966125452
               },
               {
-                "step": 28,
-                "actual": 1.7175,
-                "counterfactual": 2.057960375358351,
-                "lower": 1.9030560055439518,
-                "upper": 2.2128647451727503,
-                "effect": -0.34046037535835105
+                "step": 53,
+                "actual": 1.5117,
+                "counterfactual": 1.9441351198782901,
+                "lower": 1.8208881473212404,
+                "upper": 2.0673820924353397,
+                "effect": -0.4324351198782901
               },
               {
-                "step": 29,
-                "actual": 1.5691,
-                "counterfactual": 1.9565348275700343,
-                "lower": 1.8016304574566722,
-                "upper": 2.111439197683396,
-                "effect": -0.38743482757003433
+                "step": 54,
+                "actual": 1.4398,
+                "counterfactual": 1.855635928954682,
+                "lower": 1.7323889559992265,
+                "upper": 1.9788829019101375,
+                "effect": -0.415835928954682
               },
               {
-                "step": 30,
-                "actual": 1.5438,
-                "counterfactual": 1.9117469124080648,
-                "lower": 1.7568425419957399,
-                "upper": 2.06665128282039,
-                "effect": -0.36794691240806476
+                "step": 55,
+                "actual": 1.5786,
+                "counterfactual": 1.9696746124188016,
+                "lower": 1.8464276390649401,
+                "upper": 2.092921585772663,
+                "effect": -0.3910746124188016
               },
               {
-                "step": 31,
-                "actual": 1.5267,
-                "counterfactual": 1.9462918514567586,
-                "lower": 1.7913874807454706,
-                "upper": 2.1011962221680465,
-                "effect": -0.4195918514567587
+                "step": 56,
+                "actual": 1.6296,
+                "counterfactual": 1.9880210200349284,
+                "lower": 1.864774046282661,
+                "upper": 2.111267993787196,
+                "effect": -0.3584210200349285
               },
               {
-                "step": 32,
-                "actual": 1.447,
-                "counterfactual": 1.9070271096892026,
-                "lower": 1.7521227386789517,
-                "upper": 2.0619314806994535,
-                "effect": -0.4600271096892026
+                "step": 57,
+                "actual": 1.5167,
+                "counterfactual": 1.966684228798552,
+                "lower": 1.8434372546478788,
+                "upper": 2.0899312029492254,
+                "effect": -0.44998422879855204
               },
               {
-                "step": 33,
-                "actual": 1.571,
-                "counterfactual": 1.8859386294559881,
-                "lower": 1.7310342581467741,
-                "upper": 2.040843000765202,
-                "effect": -0.31493862945598816
+                "step": 58,
+                "actual": 1.742,
+                "counterfactual": 2.064477855298612,
+                "lower": 1.9412308807495329,
+                "upper": 2.1877248298476912,
+                "effect": -0.32247785529861206
               },
               {
-                "step": 34,
-                "actual": 1.5299,
-                "counterfactual": 1.8841310454359985,
-                "lower": 1.7292266738278217,
-                "upper": 2.0390354170441753,
-                "effect": -0.3542310454359985
+                "step": 59,
+                "actual": 1.6962,
+                "counterfactual": 2.046131447682485,
+                "lower": 1.9228844727349999,
+                "upper": 2.1693784226299697,
+                "effect": -0.34993144768248485
               },
               {
-                "step": 35,
-                "actual": 1.5787,
-                "counterfactual": 1.9726022410810549,
-                "lower": 1.817697869173915,
-                "upper": 2.1275066129881948,
-                "effect": -0.39390224108105487
+                "step": 60,
+                "actual": 1.5302,
+                "counterfactual": 2.005963321756427,
+                "lower": 1.8827163464105363,
+                "upper": 2.129210297102318,
+                "effect": -0.4757633217564272
               },
               {
-                "step": 36,
-                "actual": 1.5132,
-                "counterfactual": 1.9659744330077589,
-                "lower": 1.8110700608016561,
-                "upper": 2.1208788052138616,
-                "effect": -0.45277443300775877
+                "step": 61,
+                "actual": 1.5855,
+                "counterfactual": 1.9584404685481336,
+                "lower": 1.8351934928038367,
+                "upper": 2.0816874442924305,
+                "effect": -0.3729404685481337
+              },
+              {
+                "step": 62,
+                "actual": 1.7231,
+                "counterfactual": 2.069892874286632,
+                "lower": 1.9466458981439292,
+                "upper": 2.1931398504293345,
+                "effect": -0.34679287428663175
+              },
+              {
+                "step": 63,
+                "actual": 1.5852,
+                "counterfactual": 1.9318503006815884,
+                "lower": 1.8086033241404798,
+                "upper": 2.0550972772226967,
+                "effect": -0.3466503006815884
+              },
+              {
+                "step": 64,
+                "actual": 1.7125,
+                "counterfactual": 2.005235931146096,
+                "lower": 1.8819889542065817,
+                "upper": 2.1284829080856107,
+                "effect": -0.2927359311460962
+              },
+              {
+                "step": 65,
+                "actual": 1.6276,
+                "counterfactual": 1.9637746663572277,
+                "lower": 1.8405276890193074,
+                "upper": 2.087021643695148,
+                "effect": -0.3361746663572278
+              },
+              {
+                "step": 66,
+                "actual": 1.4955,
+                "counterfactual": 1.951489847160526,
+                "lower": 1.8282428694242,
+                "upper": 2.0747368248968523,
+                "effect": -0.45598984716052593
+              },
+              {
+                "step": 67,
+                "actual": 1.6028,
+                "counterfactual": 2.0159851479432103,
+                "lower": 1.8927381698084782,
+                "upper": 2.139232126077942,
+                "effect": -0.41318514794321026
+              },
+              {
+                "step": 68,
+                "actual": 1.3582,
+                "counterfactual": 1.8085980028199427,
+                "lower": 1.6853510242868048,
+                "upper": 1.9318449813530805,
+                "effect": -0.4503980028199426
+              },
+              {
+                "step": 69,
+                "actual": 1.4396,
+                "counterfactual": 1.8671933575410526,
+                "lower": 1.7439463786095089,
+                "upper": 1.9904403364725964,
+                "effect": -0.42759335754105265
+              },
+              {
+                "step": 70,
+                "actual": 1.6244,
+                "counterfactual": 1.8829534874315583,
+                "lower": 1.7597065081016088,
+                "upper": 2.006200466761508,
+                "effect": -0.25855348743155826
+              },
+              {
+                "step": 71,
+                "actual": 1.5951,
+                "counterfactual": 1.9510857412658977,
+                "lower": 1.8278387615375422,
+                "upper": 2.0743327209942533,
+                "effect": -0.35598574126589777
+              },
+              {
+                "step": 72,
+                "actual": 1.6146,
+                "counterfactual": 1.9670075135142546,
+                "lower": 1.8437605333874933,
+                "upper": 2.090254493641016,
+                "effect": -0.3524075135142546
               }
             ],
             "aggregate": {
-              "cumulative": -4.922508220396287,
-              "average": -0.4102090183663572
+              "cumulative": -9.015593768158702,
+              "average": -0.3756497403399459
             }
           },
           "interval": {
@@ -1235,7 +1379,7 @@
             "kind": "none"
           },
           "sample": {
-            "observations": 36,
+            "observations": 72,
             "parameters": 3,
             "degreesOfFreedom": null
           }
@@ -1249,8 +1393,8 @@
     "kind": "source-file",
     "name": "company-wide-adoption.csv",
     "mediaType": "text/csv",
-    "lastModified": 1788530633900,
-    "bytes": 754,
-    "base64": "bW9udGgsYWlfYWN0aXZlLGxlZ2FjeV9idWdzX3Blcl9rbG9jLGJ1Z3NfcGVyX2tsb2MNCjEsMCwxLjk4NDUsMS44NzU3DQoyLDAsMi4xNTM3LDIuMjU4Mg0KMywwLDIuMDc2NCwxLjk2NTkNCjQsMCwxLjk3MDIsMS44ODk2DQo1LDAsMS45ODU1LDEuODU3Mg0KNiwwLDEuODQxNiwxLjgxNTINCjcsMCwxLjgwNzcsMS43OTczDQo4LDAsMS43ODg3LDEuODA0Nw0KOSwwLDEuODg2NSwyLjAzNjkNCjEwLDAsMi4wMDMsMS45NDIzDQoxMSwwLDIuMDUyMSwyLjAzMzMNCjEyLDAsMi4xNDU2LDIuMDQ3OA0KMTMsMCwyLjIyNzksMi4yMTEyDQoxNCwwLDIuMDE1LDEuOTg4Ng0KMTUsMCwxLjg1NjYsMS44MjE4DQoxNiwwLDEuNzY4OCwxLjY4NDgNCjE3LDAsMS43MjU0LDEuNjY3NQ0KMTgsMCwyLjAwNzIsMi4xMTQ1DQoxOSwwLDIuMTQzNCwxLjk4MjUNCjIwLDAsMi4xMjY1LDIuMTQ0Mw0KMjEsMCwyLjA3LDIuMTE4DQoyMiwwLDIuMTc3MiwyLjEzODMNCjIzLDAsMi4xNjM2LDIuMTYwOQ0KMjQsMCwyLjA5MjMsMi4xNA0KMjUsMSwyLjEwNzMsMS41NDQ4DQoyNiwxLDIuMDg1MiwxLjU2MjINCjI3LDEsMi4wMDkyLDEuNTkyNw0KMjgsMSwyLjA4MTUsMS43MTc1DQoyOSwxLDEuOTgwNSwxLjU2OTENCjMwLDEsMS45MzU5LDEuNTQzOA0KMzEsMSwxLjk3MDMsMS41MjY3DQozMiwxLDEuOTMxMiwxLjQ0Nw0KMzMsMSwxLjkxMDIsMS41NzENCjM0LDEsMS45MDg0LDEuNTI5OQ0KMzUsMSwxLjk5NjUsMS41Nzg3DQozNiwxLDEuOTg5OSwxLjUxMzINCg=="
+    "lastModified": 1788716012347,
+    "bytes": 1410,
+    "base64": "bW9udGgsYWlfYWN0aXZlLGxlZ2FjeV9idWdzX3Blcl9rbG9jLGJ1Z3NfcGVyX2tsb2MKMSwwLDEuOTYxMCwxLjk4MTAKMiwwLDEuODkyOSwxLjgxNzkKMywwLDEuODk2MiwxLjg4NzEKNCwwLDEuOTMzNCwyLjAxMDQKNSwwLDEuOTk2NywxLjk0NTAKNiwwLDIuMDI4MiwxLjkzNTUKNywwLDIuMDc3NSwyLjAwNDgKOCwwLDIuMDU0OSwyLjA2NTMKOSwwLDIuMTQzNiwyLjAwNzUKMTAsMCwyLjEzMDEsMi4wOTAzCjExLDAsMS45MjY5LDEuOTQ5NwoxMiwwLDEuODU0MCwxLjg1MzUKMTMsMCwxLjg5MTAsMS44NjMxCjE0LDAsMi4wMzMxLDEuODkwNgoxNSwwLDIuMDc0NiwxLjk3NzUKMTYsMCwyLjA4NzksMS45NzYzCjE3LDAsMi4xMDg3LDIuMDg1MQoxOCwwLDEuOTgxOCwyLjAxODMKMTksMCwxLjk1NDAsMS44MTE1CjIwLDAsMS44MTQ2LDEuODM5OAoyMSwwLDEuODkwMSwxLjg2MTAKMjIsMCwxLjg4NDcsMS45NDAxCjIzLDAsMS43Mzc4LDEuNzYyNQoyNCwwLDEuODAyNCwxLjc1MTYKMjUsMCwxLjg0NTYsMS44MTU4CjI2LDAsMS44NjM2LDEuNzMyMQoyNywwLDEuODg2NiwxLjkzNTEKMjgsMCwxLjg2NDAsMS43NjEyCjI5LDAsMS45NTgxLDEuOTUzNwozMCwwLDEuOTE4NCwxLjg1NjIKMzEsMCwyLjA5MTgsMi4wODA3CjMyLDAsMi4xNTg2LDIuMjA4NQozMywwLDIuMDYyMCwxLjg4ODAKMzQsMCwyLjEwMTYsMi4wMzY5CjM1LDAsMi4wODE1LDIuMDQ1MAozNiwwLDIuMDAyOSwxLjg1NTMKMzcsMCwxLjg3OTEsMS44ODUzCjM4LDAsMS45Mjg1LDEuOTUyOQozOSwwLDEuODk1MywxLjc5MzMKNDAsMCwxLjkwMzMsMS45MTc3CjQxLDAsMS45NTIyLDEuOTI3Mwo0MiwwLDIuMDYxNCwxLjk4MDEKNDMsMCwyLjExNDQsMi4wNTEwCjQ0LDAsMi4wOTA5LDEuOTQ4OQo0NSwwLDEuOTk5NiwyLjAwMjIKNDYsMCwyLjAxMTksMS45MTQ3CjQ3LDAsMS45NDYxLDEuOTU4Mwo0OCwwLDEuOTMxMywxLjc4MzYKNDksMSwxLjkxMTgsMS41NDMzCjUwLDEsMS44ODUwLDEuNDEwNAo1MSwxLDEuODI0MSwxLjQ2NTgKNTIsMSwxLjkwNjIsMS41OTI3CjUzLDEsMS45OTEzLDEuNTExNwo1NCwxLDEuODgxOCwxLjQzOTgKNTUsMSwyLjAyMjksMS41Nzg2CjU2LDEsMi4wNDU2LDEuNjI5Ngo1NywxLDIuMDE5MiwxLjUxNjcKNTgsMSwyLjE0MDIsMS43NDIwCjU5LDEsMi4xMTc1LDEuNjk2Mgo2MCwxLDIuMDY3OCwxLjUzMDIKNjEsMSwyLjAwOTAsMS41ODU1CjYyLDEsMi4xNDY5LDEuNzIzMQo2MywxLDEuOTc2MSwxLjU4NTIKNjQsMSwyLjA2NjksMS43MTI1CjY1LDEsMi4wMTU2LDEuNjI3Ngo2NiwxLDIuMDAwNCwxLjQ5NTUKNjcsMSwyLjA4MDIsMS42MDI4CjY4LDEsMS44MjM2LDEuMzU4Mgo2OSwxLDEuODk2MSwxLjQzOTYKNzAsMSwxLjkxNTYsMS42MjQ0CjcxLDEsMS45OTk5LDEuNTk1MQo3MiwxLDIuMDE5NiwxLjYxNDYK"
   }
 }

@@ -4,7 +4,6 @@ import { CausalHierarchy } from './CausalHierarchy'
 import { useId, useMemo, useReducer } from 'react'
 import type { RunActivity } from '@/domain/activity'
 import { useRunActivity } from '@/lib/useRunActivity'
-import { Icon } from '@/components/Icon'
 import { literatureOf, MethodCaveats, RequirementsFold } from '@/components/MethodCaveats'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { LagGraphViews } from '@/components/discovery/LagGraphViews'
@@ -167,7 +166,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
       const selectedLabel = result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
       return (
         <Alert tone="ok" live={false} className="mt-3">
-          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by back-door adjustment</p>
+          <p className="m-0">Identified by back-door adjustment</p>
           <p className="mb-0 mt-1 text-muted">
             {result.adjustment.variables.length === 0
               ? 'No adjustment is needed: no back-door path is open.'
@@ -199,7 +198,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
     case 'graphically-identified':
       return (
         <Alert tone="ok" live={false} className="mt-3">
-          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by the general ID algorithm</p>
+          <p className="m-0">Identified by the general ID algorithm</p>
           <p className="mb-0 mt-1 text-muted">The graph has no measured back-door adjustment set, but the interventional distribution can be written using observed probabilities.</p>
           <figure className="mb-0 mt-2">
             <figcaption className={label('text-faint')}>Identified expression</figcaption>
@@ -215,7 +214,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
     case 'counterfactually-identified':
       return (
         <Alert tone="ok" live={false} className="mt-3">
-          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Identified by IDC*</p>
+          <p className="m-0">Identified by IDC*</p>
           <p className="mb-0 mt-1 text-muted">The effect on the treated is identified through two conditional counterfactual distributions.</p>
           <div className="mt-2 grid gap-2">
             <figure className="m-0">
@@ -233,7 +232,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
     case 'instrument-identified':
       return (
         <Alert tone="ok" live={false} className="mt-3">
-          <p className="m-0 flex items-center gap-2"><Icon name="check_circle" size={16} /> Instrumental variable estimand</p>
+          <p className="m-0">Instrumental variable estimand</p>
           <p className="mb-0 mt-1 text-muted">
             No measured back-door adjustment set and no observational expression were found, but the graph names {result.instruments.length === 1 ? 'an instrument' : 'instruments'}: {variableChips(result.instruments)}.
           </p>

@@ -177,7 +177,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
       {pair !== null && warning !== null && (
         <Alert tone="warn" live={false} className="mt-3">
-          <p className="m-0 flex items-center gap-2"><Icon name="warning" size={16} /> Stationarity not confirmed</p>
+          <p className="m-0">Stationarity not confirmed</p>
           <p className="mb-0 mt-1 text-muted">{warning}</p>
         </Alert>
       )}

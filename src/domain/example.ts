@@ -71,7 +71,7 @@ export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = 
     name: 'AI adoption, company-wide',
     sourceName: 'company-wide-adoption.csv',
     bundleUrl: '/examples/ai-adoption-company-wide.hirmos.json',
-    question: 'intervention', approach: 'Causal impact with a control series', shape: 'time series', size: '36 months', estimationRuns: 1, glyph: 'step', collection: 'ai-code-quality',
+    question: 'intervention', approach: 'Causal impact with a control series', shape: 'time series', size: '72 months', estimationRuns: 1, glyph: 'step', collection: 'ai-code-quality',
   },
   {
     id: id('a9e4c2d7-8b31-4f5e-b6c0-3d7a9e2f5b82'),
