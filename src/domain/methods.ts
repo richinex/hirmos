@@ -157,6 +157,7 @@ export const CAUSAL_EFFECTS_TOTAL_METHOD_ID = methodId('causal-effects-total')
 export const CAUSAL_IMPACT_METHOD_ID = methodId('causal-impact')
 export const DML_PLR_METHOD_ID = methodId('dml-plr')
 export const DML_IRM_METHOD_ID = methodId('dml-irm')
+export const T_LEARNER_METHOD_ID = methodId('t-learner')
 export const DML_REFUTATION_METHOD_ID = methodId('dml-refutation-batch')
 export const ARDL_PSS_METHOD_ID = methodId('ardl-pss')
 export const VECM_METHOD_ID = methodId('vecm')
@@ -188,6 +189,9 @@ const NESS_CH11 = (locator: string): MethodSource => paper('Causal AI (Ness, Man
 const NESS_CH10 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 10', locator)
 const NESS_CH13 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 13', locator)
 const MOLAK_CH6 = (locator: string): MethodSource => paper('Causal Inference and Discovery in Python (Molak, Packt), chapter 6', locator)
+const MOLAK_CH9 = (locator: string): MethodSource => paper('Causal Inference and Discovery in Python (Molak, Packt), chapter 9', locator)
+const KUNZEL_2019 = paper('Metalearners for estimating heterogeneous treatment effects using machine learning (Künzel, Sekhon, Bickel and Yu, 2019)', 'PNAS 116(10); the T-learner')
+const ECONML_TLEARNER = paper('EconML: a Python package for ML-based heterogeneous treatment effects estimation (Battocchi and others)', 'econml.metalearners.TLearner, version 0.17')
 const CIR_CH10 = (locator: string): MethodSource => paper('Causal Inference in R (Packt, 2024), chapter 10', locator)
 const SHPITSER_PEARL_ID = paper('Identification of joint interventional distributions in recursive semi-Markovian causal models (Shpitser and Pearl, 2006)', 'AAAI 2006, ID algorithm')
 const SHPITSER_PEARL_COUNTERFACTUAL = paper('Complete identification methods for the causal hierarchy (Shpitser and Pearl, 2008)', 'JMLR 9:1941–1979; ID* and IDC*')
@@ -1699,6 +1703,64 @@ const dmlCaveats = (model: 'plr' | 'irm'): NonEmptyArray<MethodCaveat> => [
   },
 ]
 
+const T_LEARNER: MethodDefinition = {
+  id: T_LEARNER_METHOD_ID,
+  name: 'T-learner',
+  family: 'estimation',
+  summary: 'One random forest per treatment arm on the adjustment variables; each row’s effect is the treated prediction minus the control prediction at that row.',
+  caveats: [
+    {
+      id: caveatId('t-learner-identified-adjustment'),
+      category: 'identification',
+      requirement: 'The two outcome forests see the identified adjustment set, which is also what each row’s effect is conditioned on; the learner removes no confounding of its own.',
+      consequenceIfUnmet: 'Every row’s effect is an adjusted association under a wrong set, so the whole distribution of effects is off, not one number.',
+      sources: [MOLAK_CH9('§ T-Learner: Together We Can Do More; DoWhy’s backdoor.econml.metalearners.TLearner'), KUNZEL_2019],
+    },
+    {
+      id: caveatId('t-learner-binary-treatment'),
+      category: 'functional-form',
+      requirement: 'The treatment is 0 or 1 with rows in both arms, since one outcome model is fitted per arm.',
+      consequenceIfUnmet: 'A continuous or one-armed treatment has no second arm to fit and the estimator refuses.',
+      sources: [ECONML_TLEARNER, KUNZEL_2019],
+    },
+    {
+      id: caveatId('t-learner-independent-rows'),
+      category: 'sampling-structure',
+      requirement: 'Rows are independent draws: each forest bootstraps rows as exchangeable.',
+      consequenceIfUnmet: 'On a series or a panel the forests treat dependent rows as separate evidence and the effects are read with more confidence than the data carry.',
+      sources: [KUNZEL_2019, hirmos('docs/DESIGN.md#10 time dependence is not cosmetic')],
+    },
+    {
+      id: caveatId('t-learner-overlap'),
+      category: 'identification',
+      requirement: 'Positivity holds at each row’s covariate values: both arms have rows nearby, so neither forest extrapolates.',
+      consequenceIfUnmet: 'Where one arm has no rows nearby, that arm’s prediction is an extrapolation and the row’s effect is unsupported.',
+      sources: [RUIZ_DE_VILLA_CH7('§7.4.3 positivity'), HERNAN_ROBINS],
+    },
+    {
+      id: caveatId('t-learner-row-effect-reading'),
+      category: 'interpretation',
+      requirement: 'A row’s effect is the average contrast for rows with its covariate values, not that row’s own counterfactual, which is never observed.',
+      consequenceIfUnmet: 'A per-row figure is read as what would have happened to that individual, a quantity no estimator can report.',
+      sources: [NESS_CH11('§11.4 conditional average treatment effect estimation; meta-learners such as the T-learner'), RUIZ_DE_VILLA_CH8('§8.1.4 heterogeneous treatment effects, the conditional average treatment effect')],
+    },
+    {
+      id: caveatId('t-learner-learner-settings'),
+      category: 'computation',
+      requirement: '200 random-forest trees, minimum leaf 5, and the recorded learner seed for both arms, as EconML clones one estimator per arm.',
+      consequenceIfUnmet: 'Changing the forest settings changes the estimator specification and every row’s effect.',
+      sources: [ECONML_TLEARNER, hirmos('crates/causal-core/src/tlearner.rs')],
+    },
+    {
+      id: caveatId('t-learner-no-interval'),
+      category: 'finite-sample',
+      requirement: 'EconML reports an interval for the T-learner only through bootstrap inference, which is not ported; the effects are points.',
+      consequenceIfUnmet: 'The spread between rows is read as heterogeneity when part of it is sampling noise in two forests.',
+      sources: [ECONML_TLEARNER, KUNZEL_2019],
+    },
+  ],
+}
+
 const DML_PLR: MethodDefinition = {
   id: DML_PLR_METHOD_ID,
   name: 'DML partially linear',
@@ -2264,6 +2326,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   CAUSAL_IMPACT,
   DML_PLR,
   DML_IRM,
+  T_LEARNER,
   DML_REFUTATION,
   ARDL_PSS,
   VECM,
@@ -2294,7 +2357,7 @@ export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_S
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
 export const COUNT_SERIES_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [COUNT_SERIES_INTERVENTION_SCAN]

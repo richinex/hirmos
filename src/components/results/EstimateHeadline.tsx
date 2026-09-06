@@ -1,7 +1,6 @@
 import { FigureParts, IntervalFigure } from '@/components/ui/figures'
 import { label, num, td, th } from '@/components/ui/recipes'
-import { additive, intervalTypeOf, type CausalEstimate } from '@/domain/estimation'
-import { assertNever } from '@/domain/dop'
+import { additive, headlineValue, intervalTypeOf, summariseRowEffects, type CausalEstimate } from '@/domain/estimation'
 import { formatCount, formatEstimate, formatPercent, formatStatistic, type EffectScale, type Formatted } from '@/lib/format/number'
 
 /** The scale an estimate's figures are printed on. */
@@ -10,14 +9,45 @@ export const IRR = { kind: 'ratio', label: 'IRR' } as const
 export const scaleOf = (estimate: CausalEstimate): EffectScale => (estimate.effect.kind === 'incidenceRateRatio' ? IRR : additive)
 
 /** The headline figure of any estimate, for ledgers and comparisons. */
-export const headlineFigure = (estimate: CausalEstimate): Formatted => {
-  switch (estimate.effect.kind) {
-    case 'additive': return formatEstimate(estimate.effect.value, additive)
-    case 'incidenceRateRatio': return formatEstimate(estimate.effect.value, IRR)
-    case 'path': return formatEstimate(estimate.effect.aggregate.cumulative, additive)
-    case 'byGroup': return formatEstimate(estimate.effect.overall, additive)
-    default: return assertNever(estimate.effect)
-  }
+export const headlineFigure = (estimate: CausalEstimate): Formatted => formatEstimate(headlineValue(estimate.effect), scaleOf(estimate))
+
+/** Where the per-row effects sit: the quartiles and extremes, then the average as the closing row. */
+function RowEffectTable({ effect }: { readonly effect: Extract<CausalEstimate['effect'], { kind: 'perRow' }> }) {
+  const summary = summariseRowEffects(effect.effects)
+  const figure = (value: number) => formatStatistic('raw', value).text
+  const rows: readonly (readonly [string, number])[] = [
+    ['Smallest row effect', summary.minimum],
+    ['Lower quartile', summary.lowerQuartile],
+    ['Median', summary.median],
+    ['Upper quartile', summary.upperQuartile],
+    ['Largest row effect', summary.maximum],
+  ]
+  return (
+    <table className="mt-2 w-full border-collapse text-body">
+      <thead>
+        <tr>
+          <th className={th()}>Across {formatCount(summary.rows).text} rows</th>
+          <th className={th('text-right')}>Effect</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([name, value]) => (
+          <tr key={name}>
+            <td className={td('text-ink')}>{name}</td>
+            <td className={td(num('text-right text-ink'))}>{figure(value)}</td>
+          </tr>
+        ))}
+        <tr>
+          <td className={td('text-muted')}>Rows with an effect above zero</td>
+          <td className={td(num('text-right text-muted'))}>{formatPercent(summary.positiveShare, { precision: 0 }).text}</td>
+        </tr>
+        <tr>
+          <td className={td('text-muted')}>Average over all rows</td>
+          <td className={td(num('text-right text-ink'))}>{figure(effect.overall)}</td>
+        </tr>
+      </tbody>
+    </table>
+  )
 }
 
 /** One effect per group of the modifier, with the whole-population average as the closing row. */
@@ -76,6 +106,16 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, stepLabel, acc
       <figure className="m-0" data-testid={testId}>
         <figcaption className="text-title text-ink">{sentence}</figcaption>
         <GroupEffectTable effect={estimate.effect} interval={estimate.interval} observations={estimate.sample.observations} />
+        <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
+      </figure>
+    )
+  }
+  if (estimate.effect.kind === 'perRow') {
+    return (
+      <figure className="m-0" data-testid={testId}>
+        <figcaption className="text-title text-ink">{sentence}</figcaption>
+        <RowEffectTable effect={estimate.effect} />
+        {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}
         <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
       </figure>
     )

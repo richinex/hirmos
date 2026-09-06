@@ -1,4 +1,5 @@
 import { Icon } from '@/components/Icon'
+import { SmartTruncate } from '@/components/ui/SmartTruncate'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
@@ -29,9 +30,9 @@ export function RequirementsFold({ name, tally: tallyText = null, open = false, 
 }) {
   return (
     <details className="group" open={open}>
-      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md py-2 text-body transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md py-2 text-body transition-colors [--smart-truncate-surface:var(--color-panel)] hover:bg-well hover:[--smart-truncate-surface:var(--color-well)] [&::-webkit-details-marker]:hidden">
         <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
-        <span className="min-w-0 font-medium text-ink">{name}</span>
+        <SmartTruncate text={name} className="min-w-0 flex-1 font-medium text-ink" />
         {tallyText !== null && <span className="ml-auto whitespace-nowrap text-label text-faint">{tallyText}</span>}
       </summary>
       {children}

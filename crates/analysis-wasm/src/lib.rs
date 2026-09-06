@@ -733,6 +733,14 @@ pub fn run_analysis(
             seed,
             groups,
         ),
+        AnalysisCommand::TLearner {
+            rows,
+            columns,
+            treatment,
+            outcome,
+            adjustment,
+            seed,
+        } => t_learner(values, rows, columns, treatment, outcome, &adjustment, seed),
         AnalysisCommand::DmlRefutationBatch {
             rows,
             columns,

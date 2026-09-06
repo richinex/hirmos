@@ -23,7 +23,7 @@ import type {
 import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, InstrumentalVariableEvidence, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, VecmEvidence } from '@/domain/estimation'
+import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, TLearnerEvidence, VecmEvidence } from '@/domain/estimation'
 import type { DmlRefutationEvidence } from '@/domain/sensitivity'
 import type { DynamicCounterfactualUncertainty, DynamicInterventionTiming, DynamicLinearScmEvidence, LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -78,6 +78,7 @@ type SeriesStructureOutcome = Result<SeriesStructureEvidence, AnalysisWorkerProb
 type MissingnessOutcome = Result<MissingnessResolvedEvidence, AnalysisWorkerProblem>
 type SeasonalOutcome = Result<SeasonalAdjustedEvidence, AnalysisWorkerProblem>
 type DoubleMlOutcome = Result<DoubleMlEvidence, AnalysisWorkerProblem>
+type TLearnerOutcome = Result<TLearnerEvidence, AnalysisWorkerProblem>
 type DmlRefutationOutcome = Result<DmlRefutationEvidence, AnalysisWorkerProblem>
 type ArdlOutcome = Result<ArdlEvidence, AnalysisWorkerProblem>
 type VecmOutcome = Result<VecmEvidence, AnalysisWorkerProblem>
@@ -842,6 +843,18 @@ export interface DmlDesign {
 export function runDoubleMl(values: Float64Array, rows: number, columns: number, design: DmlDesign & { readonly groups: DmlGroupsRequest }): Promise<DoubleMlOutcome> {
   const request = newWorkerRequestId()
   return post('double-ml-succeeded', { kind: 'double-ml', request, values, rows, columns, ...design }, values)
+}
+
+export interface TLearnerDesign {
+  readonly treatment: number
+  readonly outcome: number
+  readonly adjustment: readonly number[]
+  readonly seed: number
+}
+
+export function runTLearner(values: Float64Array, rows: number, columns: number, design: TLearnerDesign): Promise<TLearnerOutcome> {
+  const request = newWorkerRequestId()
+  return post('t-learner-succeeded', { kind: 't-learner', request, values, rows, columns, ...design }, values)
 }
 
 export function runDmlRefutationBatch(values: Float64Array, rows: number, columns: number, design: DmlDesign): Promise<DmlRefutationOutcome> {

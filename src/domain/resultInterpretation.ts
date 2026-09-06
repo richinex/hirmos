@@ -4,13 +4,16 @@ import { assertNever, type NonEmptyArray } from './dop'
 import {
   adjustmentLabels,
   boundsReading,
+  headlineValue,
   intervalTypeOf,
+  summariseRowEffects,
   type EstimateInterval,
   type EstimationRunArtifact,
 } from './estimation'
 import type { StudySpecification } from './study'
 import type { SensitivityRunArtifact } from './sensitivity'
 import {
+  formatCount,
   formatEstimate,
   formatInterval,
   formatPercent,
@@ -98,8 +101,7 @@ const ratioMeaning = (ratio: number, outcome: string): string => {
 const intervalDisplay = (run: EstimationRunArtifact, scale: EffectScale): string => {
   const { interval, effect } = run.estimate
   if (interval.kind === 'none' || effect.kind === 'path') return 'no interval'
-  const value = effect.kind === 'byGroup' ? effect.overall : effect.value
-  return formatInterval(value, interval.lower, interval.upper, intervalTypeOf(interval), scale).text
+  return formatInterval(headlineValue(effect), interval.lower, interval.upper, intervalTypeOf(interval), scale).text
 }
 
 /** The scale line shown under the figure. Method-specific standardisation belongs here, not in UI branches. */
@@ -109,6 +111,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
       ? `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}, within each group of ${run.estimate.effect.modifier}`
       : `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
+    case 't-learner-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0, one figure per row given its adjustment variables`
     case 'frontdoor-two-stage-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
     case 'instrumental-variable-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0`
     case 'count-glm-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1-unit increase in ${study.treatment.name}`
@@ -204,6 +207,21 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'magnitude', text: `${contrast} corresponds to ${change(effect, study.outcome.name)} ${targetPopulation(study)} after cross-fitted adjustment.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
         { kind: 'qualification', text: `The result targets ${run.evidence.att ? 'the average effect among treated rows' : 'the average effect over the prepared population'}. Cross-fitting reduces nuisance-model bias but does not replace the recorded identification and overlap assumptions.` },
+      ] }
+    }
+    case 't-learner-run': {
+      const perRow = estimate.effect.kind === 'perRow' ? estimate.effect : null
+      const rows = perRow === null ? null : summariseRowEffects(perRow.effects)
+      const adjustment = adjustedFor(run)
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: perRow === null || rows === null
+          ? `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(headlineValue(estimate.effect))} on average across rows, ${adjustment}.`
+          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(perRow.overall)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}.` },
+        { kind: 'comparison', text: rows === null
+          ? 'No row effects were recorded.'
+          : `${formatPercent(rows.positiveShare, { precision: 0 }).text} of rows have an effect above zero, and ${formatPercent(1 - rows.positiveShare, { precision: 0 }).text} at or below it.` },
+        noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No sampling interval is available.'),
+        { kind: 'qualification', text: `Each row’s effect is the treated forest’s prediction minus the control forest’s at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual.` },
       ] }
     }
     case 'ardl-run': {

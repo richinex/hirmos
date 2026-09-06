@@ -13,7 +13,8 @@ import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
 import { RadioList } from '@/components/ui/RadioList'
 import { Formula } from '@/components/ui/Formula'
-import { button, chip, field, fieldLabel, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { button, chip, field, fieldHint, fieldLabel, label, literal, num, panel, well } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
@@ -93,13 +94,14 @@ const ledgerLabel = (result: IdentificationArtifact['result']): string => {
 }
 
 const ASSIGNMENT_KINDS: readonly AssignmentMechanism['kind'][] = ['randomised', 'policy-change', 'observed-choice']
-const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'conditional-average-treatment-effect']
+const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'conditional-average-treatment-effect', 'conditional-average-treatment-effect-per-row']
 
 const estimandLabel = (kind: Estimand['kind']): string => {
   switch (kind) {
     case 'average-treatment-effect': return 'All prepared rows (ATE)'
     case 'average-treatment-effect-on-treated': return 'Treated rows (ATT)'
     case 'conditional-average-treatment-effect': return 'Within groups of a variable (CATE)'
+    case 'conditional-average-treatment-effect-per-row': return 'Each row, given its covariates (CATE per row)'
     default: return assertNever(kind)
   }
 }
@@ -109,6 +111,7 @@ const estimandHint = (kind: Estimand['kind']): string => {
     case 'average-treatment-effect': return 'Average the treatment contrast over the prepared population.'
     case 'average-treatment-effect-on-treated': return 'Average the treatment contrast among rows with treatment = 1. Current ETT estimators require a binary treatment; eligibility also depends on the identifying strategy.'
     case 'conditional-average-treatment-effect': return 'Average the treatment contrast within each group of an effect modifier, a variable the treatment does not reach. The double machine learning estimators report the group effects.'
+    case 'conditional-average-treatment-effect-per-row': return 'This is the ATE conditioned on specific values of covariates, reported for every prepared row (CATE per row) at that row’s own values of the adjustment variables and any effect modifiers you name.'
     default: return assertNever(kind)
   }
 }
@@ -511,6 +514,26 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                     </Select>
                   </label>
                 </div>
+              )}
+              {state.draft.estimand === 'conditional-average-treatment-effect-per-row' && (
+                <fieldset className="m-0 min-w-0 border-0 p-0" aria-label="Effect modifiers">
+                  <legend className={fieldLabel}>Effect modifiers</legend>
+                  <p className={cn(fieldHint, 'mt-1')}>Variables the effect may vary with, joined to the adjustment set as what each row’s effect is conditioned on.</p>
+                  <div className="mt-2 grid gap-1.5 @lg/panel:grid-cols-2">
+                    {modifierCandidates.map(({ node, role, allowed }) => (
+                      <label key={node.id} className={cn('flex items-center gap-2 text-body', allowed ? 'text-ink' : 'text-faint')}>
+                        <input
+                          type="checkbox"
+                          disabled={!allowed || document === null}
+                          checked={state.draft.modifiers.includes(node.id)}
+                          onChange={(event) => onDraftChanged({ ...draft, modifiers: event.target.checked ? [...draft.modifiers, node.id] : draft.modifiers.filter((id) => id !== node.id) })}
+                        />
+                        <span>{node.name}{role === null ? '' : <span className="text-faint"> · {roleWord(role)}</span>}</span>
+                      </label>
+                    ))}
+                    {modifierCandidates.length === 0 && <p className={cn(fieldHint, 'm-0')}>Choose a graph, treatment and outcome first.</p>}
+                  </div>
+                </fieldset>
               )}
             </div>
             <RadioList

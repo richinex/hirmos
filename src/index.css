@@ -561,6 +561,20 @@ button[aria-busy="true"]::after {
    "this scrolls" is visible before the first wheel. Same reasoning as .figure-strip, other axis. */
 /* Pane separators: the seam is a one-pixel hairline; an 8px hit area either side does the ergonomics.
    react-resizable-panels sets data-separator="active" while dragging. */
+/* A one-line label that fades where it would overflow, decided by layout rather than script: the real
+   text wraps inside a zero-width sensor column that is a size container, and the moment that column is
+   taller than one line the fade appears over the clipped single-line copy the reader sees. A row sets
+   `--smart-truncate-surface` to its own background so the fade matches it. */
+.smart-truncate { --smart-truncate-fade-width: 14px; --smart-truncate-surface: var(--color-panel); display: block; min-width: 0; max-width: 100%; }
+.smart-truncate__frame { display: block; min-width: 0; max-width: 100%; block-size: 1lh; overflow: hidden; }
+.smart-truncate__grid { display: grid; grid-template-columns: minmax(0, max-content) 0; align-items: start; min-width: 0; max-width: 100%; }
+.smart-truncate__layers { grid-column: 1; grid-row: 1; position: relative; display: block; min-width: 0; max-width: 100%; }
+.smart-truncate__layers::before { content: attr(data-text); position: absolute; inset: 0; display: block; min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: clip; pointer-events: none; }
+.smart-truncate__text { display: block; position: relative; z-index: 1; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.smart-truncate__sensor { grid-column: 2; grid-row: 1; inline-size: 0; block-size: 100%; container-type: size; container-name: smart-truncate; position: relative; pointer-events: none; }
+.smart-truncate__fade { position: absolute; top: 0; right: 0; inline-size: var(--smart-truncate-fade-width); block-size: 1lh; opacity: 0; background: linear-gradient(to right, color-mix(in srgb, var(--smart-truncate-surface) 0%, transparent), var(--smart-truncate-surface) 80%); transition: opacity var(--motion-fast); }
+@container smart-truncate (min-height: 1.5lh) { .smart-truncate__fade { opacity: 1; } }
+
 .seam { position: relative; background: var(--color-line); transition: background-color var(--motion-fast); }
 .seam::before { content: ''; position: absolute; inset: 0 -4px; }
 .seam-h::before { inset: -4px 0; }

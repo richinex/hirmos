@@ -7,7 +7,7 @@ import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/gran
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type PandasResamplingEvidence, type ResamplingAggregation } from '@/domain/resampling'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TLearnerEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
 
@@ -543,6 +543,17 @@ export type AnalysisWorkerCommand =
       readonly groups: DmlGroupsRequest
     }
   | {
+      readonly kind: 't-learner'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly seed: number
+    }
+  | {
       readonly kind: 'dml-refutation-batch'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -855,6 +866,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'series-structure-succeeded'; readonly request: WorkerRequestId; readonly result: SeriesStructureEvidence }
   | { readonly kind: 'seasonal-adjusted'; readonly request: WorkerRequestId; readonly result: SeasonalAdjustedEvidence }
   | { readonly kind: 'double-ml-succeeded'; readonly request: WorkerRequestId; readonly result: DoubleMlEvidence }
+  | { readonly kind: 't-learner-succeeded'; readonly request: WorkerRequestId; readonly result: TLearnerEvidence }
   | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
@@ -1319,6 +1331,17 @@ const commandSchema = z.discriminatedUnion('kind', [
     groups: dmlGroupsRequestSchema,
   }).strict(),
   z.object({
+    kind: z.literal('t-learner'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(3).max(64),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    adjustment: z.array(z.number().int().nonnegative()).min(1),
+    seed: z.number().int().nonnegative(),
+  }).strict(),
+  z.object({
     kind: z.literal('dml-refutation-batch'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -1630,6 +1653,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('series-structure-succeeded'), request: requestSchema, result: seriesStructureEvidenceSchema }).strict(),
   z.object({ kind: z.literal('seasonal-adjusted'), request: requestSchema, result: seasonalAdjustedEvidenceSchema }).strict(),
   z.object({ kind: z.literal('double-ml-succeeded'), request: requestSchema, result: doubleMlEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('t-learner-succeeded'), request: requestSchema, result: tLearnerEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
@@ -1891,6 +1915,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'double-ml-succeeded') {
     const result = doubleMlEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'double-ml-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 't-learner-succeeded') {
+    const result = tLearnerEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 't-learner-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'ardl-succeeded') {
     const result = ardlEvidenceSchema.safeParse(parsed.data.result)

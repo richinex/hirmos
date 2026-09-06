@@ -31,6 +31,9 @@ export type Estimand =
   | { readonly kind: 'average-treatment-effect-on-treated'; readonly scale: 'additive'; readonly treatedValue: 1 }
   /** The average effect within each group of an effect modifier: an ATE stratified by a variable other than the treatment. */
   | { readonly kind: 'conditional-average-treatment-effect'; readonly scale: 'additive'; readonly modifier: StudyVariable; readonly grouping: ModifierGrouping }
+  /** One effect per prepared row: the average treatment contrast conditioned on that row's values of the adjustment
+   *  variables and of any effect modifiers named here, variables the treatment does not reach that the effect may vary with. */
+  | { readonly kind: 'conditional-average-treatment-effect-per-row'; readonly scale: 'additive'; readonly modifiers: readonly StudyVariable[] }
 
 export const QUANTILE_GROUP_CHOICES: readonly number[] = [2, 3, 4, 5]
 
@@ -131,6 +134,8 @@ export interface StudyDesignDraft {
   /** The effect modifier a conditional effect is grouped by; read only for that target. */
   readonly modifier: DagNodeId | null
   readonly grouping: ModifierGrouping
+  /** The effect modifiers a per-row effect is conditioned on beside the adjustment set; read only for that target. */
+  readonly modifiers: readonly DagNodeId[]
   readonly assignment: { readonly kind: AssignmentMechanism['kind'] | null; readonly description: string }
   readonly consistencyRationale: string
   readonly noInterferenceRationale: string
@@ -154,7 +159,7 @@ export type StudyDesignProblem =
   | { readonly kind: 'modifier-is-endpoint'; readonly name: string }
   | { readonly kind: 'modifier-after-treatment'; readonly name: string; readonly role: string }
 
-export const EMPTY_STUDY_DRAFT: StudyDesignDraft = { dagDocument: null, treatment: null, outcome: null, estimand: 'average-treatment-effect', modifier: null, grouping: { kind: 'quantiles', bins: 3 }, assignment: { kind: null, description: '' }, consistencyRationale: '', noInterferenceRationale: '' }
+export const EMPTY_STUDY_DRAFT: StudyDesignDraft = { dagDocument: null, treatment: null, outcome: null, estimand: 'average-treatment-effect', modifier: null, grouping: { kind: 'quantiles', bins: 3 }, modifiers: [], assignment: { kind: null, description: '' }, consistencyRationale: '', noInterferenceRationale: '' }
 
 export const dagBasisOf = (document: DagDocument): DagOriginChoice => (document.origin.kind === 'user-authored' ? document.origin.basis : 'discovery-informed')
 
@@ -240,19 +245,35 @@ export function readyStudySpecification(
   })
 }
 
-/** The target from the draft; a conditional effect needs an observed modifier that the treatment does not reach. */
+/** An effect modifier from the graph: observed, neither endpoint, and not reached by the treatment. */
+function modifierVariable(document: DagDocument, treatment: DagNodeId, outcome: DagNodeId, id: DagNodeId): Result<StudyVariable, StudyDesignProblem> {
+  const node = document.current.graph.nodes.find((candidate) => candidate.id === id)
+  if (node === undefined || node.kind === 'latent' || node.column === null) return err({ kind: 'latent-modifier', name: node?.name ?? String(id) })
+  if (node.id === treatment || node.id === outcome) return err({ kind: 'modifier-is-endpoint', name: node.name })
+  const role = analyseDagCausalFlow(document.current.graph, treatment, outcome).roles.get(node.id) ?? { kind: 'unrelated' }
+  if (role.kind === 'mediator' || role.kind === 'collider' || role.kind === 'post-treatment') return err({ kind: 'modifier-after-treatment', name: node.name, role: describeDagCausalRole(role) })
+  return ok({ node: node.id, column: node.column, name: node.name })
+}
+
+/** The target from the draft; a conditional effect needs observed modifiers that the treatment does not reach. */
 function estimandOf(draft: StudyDesignDraft, document: DagDocument, treatment: DagNodeId, outcome: DagNodeId): Result<Estimand, StudyDesignProblem> {
   switch (draft.estimand) {
     case 'average-treatment-effect': return ok({ kind: 'average-treatment-effect', scale: 'additive' })
     case 'average-treatment-effect-on-treated': return ok({ kind: 'average-treatment-effect-on-treated', scale: 'additive', treatedValue: 1 })
     case 'conditional-average-treatment-effect': {
       if (draft.modifier === null) return err({ kind: 'modifier-required' })
-      const node = document.current.graph.nodes.find((candidate) => candidate.id === draft.modifier)
-      if (node === undefined || node.kind === 'latent' || node.column === null) return err({ kind: 'latent-modifier', name: node?.name ?? String(draft.modifier) })
-      if (node.id === treatment || node.id === outcome) return err({ kind: 'modifier-is-endpoint', name: node.name })
-      const role = analyseDagCausalFlow(document.current.graph, treatment, outcome).roles.get(node.id) ?? { kind: 'unrelated' }
-      if (role.kind === 'mediator' || role.kind === 'collider' || role.kind === 'post-treatment') return err({ kind: 'modifier-after-treatment', name: node.name, role: describeDagCausalRole(role) })
-      return ok({ kind: 'conditional-average-treatment-effect', scale: 'additive', modifier: { node: node.id, column: node.column, name: node.name }, grouping: draft.grouping })
+      const modifier = modifierVariable(document, treatment, outcome, draft.modifier)
+      if (!modifier.ok) return modifier
+      return ok({ kind: 'conditional-average-treatment-effect', scale: 'additive', modifier: modifier.value, grouping: draft.grouping })
+    }
+    case 'conditional-average-treatment-effect-per-row': {
+      const modifiers: StudyVariable[] = []
+      for (const id of draft.modifiers) {
+        const modifier = modifierVariable(document, treatment, outcome, id)
+        if (!modifier.ok) return modifier
+        modifiers.push(modifier.value)
+      }
+      return ok({ kind: 'conditional-average-treatment-effect-per-row', scale: 'additive', modifiers })
     }
     default: return assertNever(draft.estimand)
   }
@@ -275,6 +296,7 @@ export const estimandSentence = (study: StudySpecification): string => {
     case 'average-treatment-effect': return `Average effect of ${study.treatment.name} on ${study.outcome.name}`
     case 'average-treatment-effect-on-treated': return `Average effect of ${study.treatment.name} on ${study.outcome.name} among treated rows`
     case 'conditional-average-treatment-effect': return `Effect of ${study.treatment.name} on ${study.outcome.name} within groups of ${study.estimand.modifier.name}`
+    case 'conditional-average-treatment-effect-per-row': return `Effect of ${study.treatment.name} on ${study.outcome.name} for each row`
     default: return assertNever(study.estimand)
   }
 }
@@ -286,6 +308,11 @@ export const describeEstimand = (study: StudySpecification): string => {
     case 'average-treatment-effect': return `Average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over all ${study.population.observations} prepared rows.`
     case 'average-treatment-effect-on-treated': return `Average treatment effect on the treated of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over prepared rows with ${study.treatment.name} = 1.`
     case 'conditional-average-treatment-effect': return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged within each group of ${study.estimand.modifier.name} (${describeGrouping(study.estimand.grouping)}) over the ${study.population.observations} prepared rows.`
+    case 'conditional-average-treatment-effect-per-row': {
+      const modifiers = study.estimand.modifiers.map((variable) => variable.name)
+      const conditioned = modifiers.length === 0 ? 'the adjustment variables' : `the adjustment variables and ${modifiers.join(', ')}`
+      return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name} for each row: ${effect}, conditioned on the row's values of ${conditioned}, reported for every one of the ${study.population.observations} prepared rows.`
+    }
     default: return assertNever(study.estimand)
   }
 }
@@ -309,6 +336,12 @@ export function identifiedExpression(study: StudySpecification, adjustmentSet: r
       return adjustmentSet.length === 0
         ? `CATE(t₁,t₀ | ${m}=x) = E[${y} | ${t}=t₁, ${m}=x] − E[${y} | ${t}=t₀, ${m}=x]`
         : `CATE(t₁,t₀ | ${m}=x) = Σ_z {E[${y} | ${t}=t₁, Z=z, ${m}=x] − E[${y} | ${t}=t₀, Z=z, ${m}=x]} P(Z=z | ${m}=x), Z={${z}}`
+    }
+    case 'conditional-average-treatment-effect-per-row': {
+      const conditioned = [...adjustmentSet, ...study.estimand.modifiers.filter((modifier) => !adjustmentSet.some((variable) => variable.column === modifier.column))].map((variable) => variable.name).join(', ')
+      return conditioned.length === 0
+        ? `CATE(t₁,t₀) = E[${y} | ${t}=t₁] − E[${y} | ${t}=t₀], with no variable to condition on, so the same for every row`
+        : `CATE(t₁,t₀ | Z=z) = E[${y} | ${t}=t₁, Z=z] − E[${y} | ${t}=t₀, Z=z] at each row's z, Z={${conditioned}}`
     }
     default: return assertNever(study.estimand)
   }
@@ -337,6 +370,12 @@ export function identifiedExpressionTex(study: StudySpecification, adjustmentSet
       return adjustmentSet.length === 0
         ? String.raw`\mathrm{CATE}(t_1,t_0 \mid ${m}=x) = \mathbb{E}[${y} \mid ${t}=t_1, ${m}=x] - \mathbb{E}[${y} \mid ${t}=t_0, ${m}=x]`
         : String.raw`\mathrm{CATE}(t_1,t_0 \mid ${m}=x) = \sum_{z} \bigl\{\mathbb{E}[${y} \mid ${t}=t_1, Z=z, ${m}=x] - \mathbb{E}[${y} \mid ${t}=t_0, Z=z, ${m}=x]\bigr\}\, P(Z=z \mid ${m}=x),\allowbreak\quad Z=\{${z}\}`
+    }
+    case 'conditional-average-treatment-effect-per-row': {
+      const conditioned = [...adjustmentSet, ...study.estimand.modifiers.filter((modifier) => !adjustmentSet.some((variable) => variable.column === modifier.column))].map((variable) => texName(variable.name)).join(', ')
+      return conditioned.length === 0
+        ? String.raw`\mathrm{CATE}(t_1,t_0) = \mathbb{E}[${y} \mid ${t}=t_1] - \mathbb{E}[${y} \mid ${t}=t_0]`
+        : String.raw`\mathrm{CATE}(t_1,t_0 \mid Z=z) = \mathbb{E}[${y} \mid ${t}=t_1, Z=z] - \mathbb{E}[${y} \mid ${t}=t_0, Z=z],\allowbreak\quad Z=\{${conditioned}\}`
     }
     default: return assertNever(study.estimand)
   }

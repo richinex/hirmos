@@ -6,8 +6,8 @@ use hirmos_causal_core::frontdoor::{
     frontdoor_two_stage_with_progress, FrontdoorInput, FrontdoorOptions,
 };
 use hirmos_causal_core::{
-    group_effects, instrumental_variable_with_progress, DowhyBootstrap, IvEstimator, IvInput,
-    IvOptions,
+    fit_tlearner, group_effects, instrumental_variable_with_progress, DowhyBootstrap, IvEstimator,
+    IvInput, IvOptions,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -1359,6 +1359,45 @@ pub(crate) fn double_ml(
         interval: (fit.ci_low, fit.ci_high),
         level,
         groups,
+    })
+}
+
+/// The forest settings the worker uses for every random forest: 200 trees, minimum leaf 5.
+const FOREST_TREES: usize = 200;
+const FOREST_MIN_LEAF: usize = 5;
+
+/// EconML's T-learner on the adjustment columns, reporting the effect at every prepared row.
+pub(crate) fn t_learner(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    treatment: usize,
+    outcome: usize,
+    adjustment: &[usize],
+    seed: u32,
+) -> Result<AnalysisResult, String> {
+    let label = "T-learner";
+    let (data, _, y) = design_columns(label, values, rows, columns, treatment, outcome, adjustment)?;
+    if adjustment.is_empty() {
+        return Err(format!("{label} needs at least one adjustment column as the forests' inputs"));
+    }
+    let d: Vec<f64> = (0..rows).map(|row| data[(row, treatment)]).collect();
+    let x: Vec<Vec<f64>> = (0..rows)
+        .map(|row| adjustment.iter().map(|&column| data[(row, column)]).collect())
+        .collect();
+    let fit = fit_tlearner(&x, &y, &d, FOREST_TREES, FOREST_MIN_LEAF, seed)
+        .map_err(|error| format!("{label}: {error}"))?;
+    let effects = fit.effect(&x);
+    let average = effects.iter().sum::<f64>() / effects.len() as f64;
+    Ok(AnalysisResult::TLearner {
+        observations: rows,
+        control_rows: fit.control_rows,
+        treated_rows: fit.treated_rows,
+        seed,
+        trees: FOREST_TREES,
+        min_leaf: FOREST_MIN_LEAF,
+        effects,
+        average,
     })
 }
 

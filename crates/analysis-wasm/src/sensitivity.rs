@@ -468,6 +468,13 @@ mod tests {
             }
         ));
         assert!(double_ml(&values, rows, 4, 2, 1, &[0, 3], DmlModel::Irm, false, 7, DmlGroups::None).is_err());
+        // The T-learner reports one effect per row on the same binary treatment, and refuses a continuous one.
+        let per_row = serde_json::to_value(t_learner(&values, rows, 4, 0, 1, &[2, 3], 7).unwrap()).unwrap();
+        assert_eq!(per_row["kind"], "tLearner");
+        assert_eq!(per_row["effects"].as_array().unwrap().len(), rows);
+        assert_eq!(per_row["controlRows"].as_u64().unwrap() + per_row["treatedRows"].as_u64().unwrap(), rows as u64);
+        assert!(t_learner(&values, rows, 4, 2, 1, &[0, 3], 7).is_err());
+        assert!(t_learner(&values, rows, 4, 0, 1, &[], 7).is_err());
         assert!(double_ml(&values, rows, 4, 0, 1, &[], DmlModel::Plr, false, 7, DmlGroups::None).is_err());
 
         // Group effects over terciles of a covariate carry one row per group and cover every row.

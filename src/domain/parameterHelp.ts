@@ -82,6 +82,9 @@ export const ESTIMATION_PARAMETER_HELP = {
   dml: {
     foldSeed: 'Seed used to reproduce the shuffled cross-fitting folds.',
   },
+  tLearner: {
+    learnerSeed: 'Seed for both outcome forests; the reference clones one estimator per treatment arm, so the arms share it.',
+  },
   ardl: {
     maximumLag: 'Largest lag considered by the AIC order search.',
     deterministicTerms: 'Deterministic terms included in the model.',

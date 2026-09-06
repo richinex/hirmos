@@ -1641,6 +1641,7 @@ mod tests {
             | AnalysisCommand::SeriesStructure { .. }
             | AnalysisCommand::SeasonalAdjust { .. }
             | AnalysisCommand::DoubleMl { .. }
+            | AnalysisCommand::TLearner { .. }
             | AnalysisCommand::DmlRefutationBatch { .. }
             | AnalysisCommand::ArdlPss { .. }
             | AnalysisCommand::Vecm { .. }

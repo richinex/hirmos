@@ -75,6 +75,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'causal-impact',
     'dml-plr',
     'dml-irm',
+    't-learner',
     'dml-refutation-batch',
     'ardl-pss',
     'vecm',

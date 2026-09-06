@@ -9,7 +9,7 @@ import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
 import { describeDagBasis, describeDagValidation, type DagDocument } from '@/domain/dag'
 import type { DatasetProfile } from '@/domain/dataset'
-import { adjustmentLabels, describeEstimator, intervalTypeOf, type AppliedAdjustment, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
+import { adjustmentLabels, describeEstimator, headlineValue, intervalTypeOf, type AppliedAdjustment, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
@@ -263,7 +263,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
               <tr key={candidate.id} className={tr(candidate.id === selected ? 'selected' : 'action')} onClick={() => setSelected(candidate.id)}>
                 <td className={td('text-ink')}>{study === undefined ? candidate.method : estimandSentence(study)}</td>
                 <td className={td('text-muted')}>{describeEstimator(candidate.configuration.kind)}</td>
-                <td className={td(num('whitespace-nowrap text-right text-ink'))}>{effect.kind === 'path' ? formatStatistic('raw', effect.aggregate.average).text : effect.kind === 'byGroup' ? formatStatistic('raw', effect.overall).text : formatStatistic('raw', effect.value).text}</td>
+                <td className={td(num('whitespace-nowrap text-right text-ink'))}>{formatStatistic('raw', effect.kind === 'path' ? effect.aggregate.average : headlineValue(effect)).text}</td>
                 <td className={td('text-muted')}>{study?.dagName ?? '—'}</td>
                 <td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td>
               </tr>

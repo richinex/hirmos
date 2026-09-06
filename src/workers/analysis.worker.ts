@@ -26,7 +26,7 @@ import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { parsePandasResamplingEvidence } from '@/domain/resampling'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -334,6 +334,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'seasonalAdjust', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, adjust: command.adjust }
     case 'double-ml':
       return { kind: 'doubleMl', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed, groups: command.groups }
+    case 't-learner':
+      return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed }
     case 'ardl-pss':
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
     case 'vecm':
@@ -666,6 +668,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = doubleMlEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'double-ml-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 't-learner': {
+        const result = tLearnerEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 't-learner-succeeded', request: command.request, result: result.data })
         return
       }
       case 'ardl-pss': {

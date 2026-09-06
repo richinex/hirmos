@@ -14,6 +14,7 @@ import {
   BINARY_ETT_METHOD_ID,
   DML_IRM_METHOD_ID,
   DML_PLR_METHOD_ID,
+  T_LEARNER_METHOD_ID,
   BAYESIAN_GAUSSIAN_METHOD_ID,
   NEGBIN_NUTS_METHOD_ID,
   SYNTHETIC_CONTROL_METHOD_ID,
@@ -150,6 +151,12 @@ export interface DoubleMlConfiguration {
   readonly seed: number
 }
 
+export interface TLearnerConfiguration {
+  readonly kind: 't-learner'
+  /** Seeds both outcome forests, as EconML clones one estimator per arm. */
+  readonly seed: number
+}
+
 export interface ArdlConfiguration {
   readonly kind: 'ardl-pss'
   readonly maxLag: number
@@ -215,6 +222,7 @@ export type EstimatorConfiguration =
   | CountGlmConfiguration
   | NegativeBinomialIngarchConfiguration
   | DoubleMlConfiguration
+  | TLearnerConfiguration
   | ArdlConfiguration
   | VecmConfiguration
   | SyntheticControlConfiguration
@@ -242,7 +250,7 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
     id: 'adjusted-outcome',
     name: 'Covariate-adjusted outcome models',
     description: 'Regression, count-model and orthogonal-score estimators using an identified adjustment set.',
-    estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm'],
+    estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 't-learner'],
   },
   {
     id: 'identified-functional',
@@ -282,6 +290,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
     case 'negative-binomial-ingarch': return NEGATIVE_BINOMIAL_INGARCH_METHOD_ID
     case 'dml-plr': return DML_PLR_METHOD_ID
     case 'dml-irm': return DML_IRM_METHOD_ID
+    case 't-learner': return T_LEARNER_METHOD_ID
     case 'ardl-pss': return ARDL_PSS_METHOD_ID
     case 'vecm': return VECM_METHOD_ID
     case 'synthetic-control': return SYNTHETIC_CONTROL_METHOD_ID
@@ -306,6 +315,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'negative-binomial-ingarch': return { kind: estimator, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], horizon: 12, controlValue: 0, treatmentValue: 1, schedule: { kind: 'persistent' } }
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
     case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
+    case 't-learner': return { kind: estimator, seed: 7 }
     case 'ardl-pss': return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
     case 'vecm': return { kind: estimator, maxLags: 4, deterministic: 'co', significance: 95, breakIndex: null }
     case 'synthetic-control': {
@@ -532,6 +542,22 @@ export const doubleMlEvidenceSchema = z.object({
 }).strict()
 
 export type DoubleMlEvidence = z.infer<typeof doubleMlEvidenceSchema>
+
+export const tLearnerEvidenceSchema = z.object({
+  kind: z.literal('tLearner'),
+  observations: z.number().int().positive(),
+  controlRows: z.number().int().positive(),
+  treatedRows: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  trees: z.number().int().positive(),
+  minLeaf: z.number().int().positive(),
+  /** One effect per prepared row, in row order. */
+  effects: z.array(z.number().finite()).min(1),
+  /** The mean of the row effects, EconML's `ate`. */
+  average: z.number().finite(),
+}).strict()
+
+export type TLearnerEvidence = z.infer<typeof tLearnerEvidenceSchema>
 
 export const ardlEvidenceSchema = z.object({
   kind: z.literal('ardlPss'),
@@ -1079,6 +1105,67 @@ export type EffectEstimate =
   | { readonly kind: 'path'; readonly values: NonEmptyArray<TimeEffectPoint>; readonly aggregate: { readonly cumulative: number; readonly average: number } }
   /** One additive effect per group of an effect modifier, with the whole-population average beside them. */
   | { readonly kind: 'byGroup'; readonly modifier: string; readonly overall: number; readonly groups: NonEmptyArray<GroupEffectEstimate> }
+  /** One additive effect per prepared row, in row order, with their mean as the whole-population average. */
+  | { readonly kind: 'perRow'; readonly overall: number; readonly effects: NonEmptyArray<number> }
+
+/** The one figure an estimate is filed under: its value, its average, or its cumulative path total. */
+export const headlineValue = (effect: EffectEstimate): number => {
+  switch (effect.kind) {
+    case 'additive':
+    case 'incidenceRateRatio': return effect.value
+    case 'path': return effect.aggregate.cumulative
+    case 'byGroup':
+    case 'perRow': return effect.overall
+    default: return assertNever(effect)
+  }
+}
+
+/** What a reader can say about a set of per-row effects without an interval: where they sit and how many rows the treatment helps. */
+export interface RowEffectSummary {
+  readonly rows: number
+  readonly minimum: number
+  readonly lowerQuartile: number
+  readonly median: number
+  readonly upperQuartile: number
+  readonly maximum: number
+  /** The share of rows whose effect is above zero. */
+  readonly positiveShare: number
+  /** Equal-width bins over the effects, for the histogram; `counts.length + 1` edges. */
+  readonly bins: { readonly edges: readonly number[]; readonly counts: readonly number[] }
+}
+
+/** NumPy's default linear interpolation between order statistics, the same rule the core's quantile uses. */
+const orderQuantile = (sorted: readonly number[], probability: number): number => {
+  const position = probability * (sorted.length - 1)
+  const lower = Math.floor(position)
+  const upper = Math.ceil(position)
+  const weight = position - lower
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight
+}
+
+export function summariseRowEffects(effects: NonEmptyArray<number>, binCount = 20): RowEffectSummary {
+  const sorted = [...effects].sort((a, b) => a - b)
+  const minimum = sorted[0]
+  const maximum = sorted[sorted.length - 1]
+  const width = maximum > minimum ? (maximum - minimum) / binCount : 1
+  const edges = Array.from({ length: binCount + 1 }, (_, index) => minimum + index * width)
+  const counts = new Array<number>(binCount).fill(0)
+  for (const value of effects) {
+    // The last bin includes its upper edge, as the data studio's histogram does.
+    const bin = Math.min(binCount - 1, Math.max(0, Math.floor((value - minimum) / width)))
+    counts[bin] += 1
+  }
+  return {
+    rows: effects.length,
+    minimum,
+    lowerQuartile: orderQuantile(sorted, 0.25),
+    median: orderQuantile(sorted, 0.5),
+    upperQuartile: orderQuantile(sorted, 0.75),
+    maximum,
+    positiveShare: effects.filter((value) => value > 0).length / effects.length,
+    bins: { edges, counts },
+  }
+}
 
 export type EstimateInterval =
   | { readonly kind: 'confidence'; readonly level: number; readonly lower: number; readonly upper: number }
@@ -1172,6 +1259,7 @@ export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'count-glm-run'; readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
   | RunIdentity & { readonly kind: 'negative-binomial-ingarch-run'; readonly method: typeof NEGATIVE_BINOMIAL_INGARCH_METHOD_ID; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
   | RunIdentity & { readonly kind: 'double-ml-run'; readonly method: typeof DML_PLR_METHOD_ID | typeof DML_IRM_METHOD_ID; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
+  | RunIdentity & { readonly kind: 't-learner-run'; readonly method: typeof T_LEARNER_METHOD_ID; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence }
   | RunIdentity & { readonly kind: 'ardl-run'; readonly method: typeof ARDL_PSS_METHOD_ID; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
   | RunIdentity & { readonly kind: 'vecm-run'; readonly method: typeof VECM_METHOD_ID; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
   | RunIdentity & { readonly kind: 'synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
@@ -1324,6 +1412,12 @@ const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evide
 const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
 
 function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
+  // The T-learner reports one effect per row and no average target, so it is decided before the per-target rules.
+  if (configuration.kind === 't-learner') {
+    return estimand.kind === 'conditional-average-treatment-effect-per-row'
+      ? reported('Estimator and study both target the effect for each row.')
+      : notReported('The T-learner reports one effect per row, but the study records an average target.')
+  }
   switch (estimand.kind) {
     case 'average-treatment-effect':
       if (configuration.kind === 'binary-ett-idc-star') return notReported('The binary IDC* evaluator reports ETT/ATT, but this study records ATE.')
@@ -1338,6 +1432,8 @@ function targetCompatibility(estimand: Estimand, configuration: EstimatorConfigu
         return reported(`The estimator reports DoubleML group average treatment effects within groups of ${estimand.modifier.name} beside the overall average.`)
       }
       return notReported(`This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`)
+    case 'conditional-average-treatment-effect-per-row':
+      return notReported('This study targets the effect for each row. Only the T-learner reports per-row effects.')
     default: return assertNever(estimand)
   }
 }
@@ -1353,6 +1449,12 @@ const verdict = (satisfied: Satisfied[], unresolved: Unresolved[], violations: V
 export function dmlNuisanceInputs(adjustment: readonly StudyVariable[], estimand: Estimand | null): readonly StudyVariable[] {
   const modifier = estimand?.kind === 'conditional-average-treatment-effect' ? estimand.modifier : null
   return modifier === null || adjustment.some((variable) => variable.column === modifier.column) ? adjustment : [...adjustment, modifier]
+}
+
+/** What the T-learner's outcome forests see, and what each row's effect is conditioned on: the identified set, then the per-row target's modifiers not already in it. */
+export function tLearnerInputs(adjustment: readonly StudyVariable[], estimand: Estimand | null): readonly StudyVariable[] {
+  const modifiers = estimand?.kind === 'conditional-average-treatment-effect-per-row' ? estimand.modifiers : []
+  return [...adjustment, ...modifiers.filter((modifier) => !adjustment.some((variable) => variable.column === modifier.column))]
 }
 
 export function evaluateEstimatorEligibility(method: MethodDefinition, context: EligibilityContext): MethodEligibility {
@@ -1519,6 +1621,23 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       satisfy(`${prefix}-learner-settings`, `The run records 5 folds, 200 trees, minimum leaf 5, learner seed 7, and fold seed ${configuration.seed}.`)
       if (prepared.observations < 100) leave(`${prefix}-interval`, `${prepared.observations} rows is a small sample for random-forest nuisances; read the interval as approximate.`)
       else satisfy(`${prefix}-interval`, `${prepared.observations} rows for the sandwich interval.`)
+      break
+    }
+    case 't-learner': {
+      const inputs = identification.kind === 'identified' ? tLearnerInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
+      if (identification.kind !== 'identified') violate('t-learner-identified-adjustment', 'No measured back-door adjustment set was found, so there is no identified set for the outcome forests.')
+      else if (inputs.length === 0) violate('t-learner-identified-adjustment', 'The identified adjustment set is empty and the study names no effect modifier, so each row’s effect has nothing to be conditioned on. Name the modifiers in Study design.')
+      else satisfy('t-learner-identified-adjustment', `Both forests see ${inputs.map((variable) => variable.name).join(', ')}, and each row’s effect is conditioned on those values.`)
+      if (context.treatmentIsBinary === null) leave('t-learner-binary-treatment', 'The treatment column has not been read yet; it is checked when the run starts.')
+      else if (context.treatmentIsBinary) satisfy('t-learner-binary-treatment', 'Every treatment value is 0 or 1.')
+      else violate('t-learner-binary-treatment', 'The treatment holds values other than 0 and 1; one outcome model per arm needs a binary treatment.')
+      if (panel) leave('t-learner-independent-rows', 'Rows repeat within units; the forests treat them as independent draws.')
+      else if (timeSeries) leave('t-learner-independent-rows', 'The rows are a time series; the forests treat them as independent draws.')
+      else satisfy('t-learner-independent-rows', 'The prepared dataset holds independent rows.')
+      leave('t-learner-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio; a row with no nearby rows in one arm carries an extrapolated effect.')
+      leave('t-learner-row-effect-reading', 'Read each row’s effect as the average for rows with its covariate values, not as that row’s own counterfactual.')
+      satisfy('t-learner-learner-settings', `The run records 200 trees, minimum leaf 5, and learner seed ${configuration.seed} for both arms.`)
+      satisfy('t-learner-no-interval', 'The run reports each row’s effect as a point and no interval.')
       break
     }
     case 'ardl-pss': {
@@ -1742,6 +1861,7 @@ export function causalEstimateFrom(
     | { readonly kind: 'count-glm-run'; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
     | { readonly kind: 'negative-binomial-ingarch-run'; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
     | { readonly kind: 'double-ml-run'; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
+    | { readonly kind: 't-learner-run'; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence }
     | { readonly kind: 'ardl-run'; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
     | { readonly kind: 'vecm-run'; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
     | { readonly kind: 'synthetic-control-run'; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
@@ -1873,6 +1993,21 @@ export function causalEstimateFrom(
         standardError: evidence.standardError,
         adjustment,
         sample: { observations: evidence.observations, parameters: 1 + adjustmentSet.length, degreesOfFreedom: null },
+      }
+    }
+    case 't-learner-run': {
+      // The T-learner reports one effect per row and nothing else, so it binds only to the per-row target.
+      if (study.estimand.kind !== 'conditional-average-treatment-effect-per-row') return null
+      const { evidence } = run
+      if (!isNonEmpty(evidence.effects) || evidence.effects.length !== evidence.observations) return null
+      return {
+        kind: 'causal-estimate',
+        estimand: study.estimand,
+        effect: { kind: 'perRow', overall: evidence.average, effects: evidence.effects },
+        interval: { kind: 'none', reason: 'EconML reports an interval for the T-learner only through bootstrap inference, which is not ported; each row’s effect is a point.' },
+        standardError: null,
+        adjustment,
+        sample: { observations: evidence.observations, parameters: 0, degreesOfFreedom: null },
       }
     }
     case 'ardl-run': {
@@ -2045,6 +2180,8 @@ export function describeCovariance(choice: CovarianceChoice): string {
 export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorId {
   // A conditional target is reported only by the DML estimators; the partially linear one runs for any treatment.
   if (study?.estimand.kind === 'conditional-average-treatment-effect') return 'dml-plr'
+  // The per-row target is reported only by the T-learner.
+  if (study?.estimand.kind === 'conditional-average-treatment-effect-per-row') return 't-learner'
   const fallback: EstimatorId = prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
   if (identification === null) return fallback
   switch (identification.kind) {
@@ -2068,6 +2205,7 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'negative-binomial-ingarch': return 'Negative-binomial INGARCH'
     case 'dml-plr': return 'Double machine learning, partially linear'
     case 'dml-irm': return 'Double machine learning, interactive'
+    case 't-learner': return 'T-learner'
     case 'ardl-pss': return 'ARDL long run'
     case 'vecm': return 'VECM'
     case 'synthetic-control': return 'Synthetic control'

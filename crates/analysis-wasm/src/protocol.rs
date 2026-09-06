@@ -615,6 +615,17 @@ pub(crate) enum AnalysisCommand {
         /// Group effects over an effect modifier, or none for the plain average.
         groups: DmlGroups,
     },
+    /// EconML's T-learner: one random forest per treatment arm on the adjustment columns, and the
+    /// effect at every row as the treated prediction minus the control prediction.
+    TLearner {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        /// Seeds both forests, as the reference clones one estimator per arm.
+        seed: u32,
+    },
     DmlRefutationBatch {
         rows: usize,
         columns: usize,
@@ -1789,6 +1800,18 @@ pub(crate) enum AnalysisResult {
         interval: (f64, f64),
         level: f64,
         groups: DmlGroupEvidence,
+    },
+    TLearner {
+        observations: usize,
+        control_rows: usize,
+        treated_rows: usize,
+        seed: u32,
+        trees: usize,
+        min_leaf: usize,
+        /// One effect per row, in row order.
+        effects: Vec<f64>,
+        /// The mean of the row effects, EconML's `ate`.
+        average: f64,
     },
     ArdlPss {
         observations: usize,

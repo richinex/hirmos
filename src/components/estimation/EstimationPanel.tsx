@@ -6,6 +6,7 @@ import { LagListField } from '@/components/ui/LagListField'
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
+import { histogramOption } from '@/charts/data/histogram'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
 import { impactPathOption } from '@/charts/estimation/impactPath'
 import { posteriorDensityOption } from '@/charts/estimation/posteriorDensity'
@@ -44,11 +45,14 @@ import {
   ESTIMATOR_GROUPS,
   ESTIMATOR_IDS,
   evaluateEstimatorEligibility,
+  headlineValue,
   intervalTypeOf,
   interventionStartFromTreatment,
   methodIdOf,
   newEstimationRunId,
   stationaryMarksOf,
+  summariseRowEffects,
+  tLearnerInputs,
   type CausalEffectsAdjustment,
   type CausalEffectsAdjustmentProblem,
   type CausalEstimate,
@@ -69,7 +73,7 @@ import {
 } from '@/domain/panel'
 import { describeIdentificationStrategy, estimableIdentification, estimandSentence, identifiedInstruments, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatCount, formatEstimate, formatInterval, formatP, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
+import { formatCount, formatEstimate, formatInterval, formatP, formatPercent, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
@@ -240,8 +244,7 @@ const step = (state: State, event: Event): State => {
 
 const intervalText = (estimate: CausalEstimate): string => {
   if (estimate.interval.kind === 'none') return 'none'
-  const value = estimate.effect.kind === 'path' ? estimate.effect.aggregate.cumulative : estimate.effect.kind === 'byGroup' ? estimate.effect.overall : estimate.effect.value
-  const figure = formatInterval(value, estimate.interval.lower, estimate.interval.upper, intervalTypeOf(estimate.interval), scaleOf(estimate))
+  const figure = formatInterval(headlineValue(estimate.effect), estimate.interval.lower, estimate.interval.upper, intervalTypeOf(estimate.interval), scaleOf(estimate))
   return `[${figure.bounds.lower}, ${figure.bounds.upper}]`
 }
 
@@ -498,6 +501,16 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Largest SDID weights', value: formatWords(topWeights || 'none'), context: `noise level ${formatStatistic('raw', evidence.syntheticDid.noiseLevel).text}` },
         ]
       }
+      case 't-learner-run': {
+        const { evidence } = run
+        // The bound estimate carries the effects as a non-empty list; the raw evidence only promises a list.
+        const summary = run.estimate.effect.kind === 'perRow' ? summariseRowEffects(run.estimate.effect.effects) : null
+        return [
+          { label: 'Arms', value: formatWords(`${formatCount(evidence.controlRows).text} control · ${formatCount(evidence.treatedRows).text} treated`), context: 'one outcome forest each' },
+          { label: 'Row effects', value: formatWords(summary === null ? 'none' : `${formatStatistic('raw', summary.minimum).text} to ${formatStatistic('raw', summary.maximum).text}`), context: summary === null ? '' : `median ${formatStatistic('raw', summary.median).text} · ${formatPercent(summary.positiveShare, { precision: 0 }).text} above zero` },
+          { label: 'Forests', value: formatWords(`${formatCount(evidence.trees).text} trees`), context: `minimum leaf ${evidence.minLeaf} · learner seed ${evidence.seed}` },
+        ]
+      }
       case 'negbin-nuts-run': {
         const { evidence } = run
         return [
@@ -655,6 +668,12 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       { label: 'All rows', estimate: estimate.effect.overall, lower: estimate.interval.kind === 'none' ? null : estimate.interval.lower, upper: estimate.interval.kind === 'none' ? null : estimate.interval.upper, current },
     ], theme)
     : null), [estimate, current, theme])
+  // Per-row effects are drawn as their distribution, with the average marked, since a thousand points have no order to plot.
+  const rowChart = useMemo(() => {
+    if (estimate.effect.kind !== 'perRow') return null
+    const summary = summariseRowEffects(estimate.effect.effects)
+    return histogramOption({ name: `effect of ${study.treatment.name} on ${study.outcome.name}`, bins: summary.bins, nullCount: 0, marks: [{ name: 'average', value: estimate.effect.overall }, { name: 'median', value: summary.median }] }, theme)
+  }, [estimate, study.treatment.name, study.outcome.name, theme])
   const body = (
     <>
       <div className="mt-3">
@@ -663,6 +682,11 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       {groupChart !== null && estimate.effect.kind === 'byGroup' && (
         <div className="mt-3">
           <ExpandableChart option={groupChart} label={`Effect of ${study.treatment.name} on ${study.outcome.name} by group of ${estimate.effect.modifier}`} className="h-[220px]" testId="group-effects" />
+        </div>
+      )}
+      {rowChart !== null && (
+        <div className="mt-3">
+          <ExpandableChart option={rowChart} label={`Distribution of the per-row effect of ${study.treatment.name} on ${study.outcome.name}`} className="h-[220px]" testId="row-effects" />
         </div>
       )}
       {chart !== null && (
@@ -1035,6 +1059,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
           return
         }
+        case 't-learner': {
+          const inputs = tLearnerInputs(identification.result.adjustment.variables, study.estimand)
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...inputs]
+          const matrix = await materialise(columns)
+          if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the T-learner fits one outcome model per arm and needs a 0/1 treatment.` }); return }
+          const evidence = await analysis.runTLearner(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: inputs.map((_, index) => index + 2), seed: configuration.seed })
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+          const run = { kind: 't-learner-run', configuration, evidence: evidence.value } as const
+          const estimate = causalEstimateFrom(study, identification, run)
+          finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
+          return
+        }
         case 'ardl-pss': {
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome]
           const matrix = await materialise(columns)
@@ -1305,6 +1341,13 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             )}
             <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={ESTIMATION_PARAMETER_HELP.dml.foldSeed} /><input type="number" min={0} aria-label="Fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
             <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity chapter repeats this fit at the same seed before its refuters.</p>
+          </div>
+        )
+      case 't-learner':
+        return (
+          <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            <label className="block"><ParameterLabel className={fieldLabel} label="Learner seed" help={ESTIMATION_PARAMETER_HELP.tLearner.learnerSeed} /><input type="number" min={0} aria-label="Learner seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+            <p className="m-0 max-w-[65ch] self-end text-body text-faint @md/panel:col-span-2">One random forest per treatment arm on the adjustment variables, 200 trees, minimum leaf 5. Each row’s effect is the treated forest’s prediction minus the control forest’s at that row; no interval is reported.</p>
           </div>
         )
       case 'ardl-pss':

@@ -115,6 +115,7 @@ pub mod rpcmci;
 pub mod simplex;
 pub mod sklearn_linear;
 pub mod sktree;
+pub mod tlearner;
 pub mod stl;
 pub mod synthetic_control;
 pub mod ucm;
@@ -124,6 +125,7 @@ pub mod vecm;
 pub use coint::{coint, coint_johansen, CointResult, JohansenResult};
 pub use dml::{dml_irm, dml_plr, DmlResult, SensitivityResult, SensitivityScenario};
 pub use dml_groups::{group_effects, GroupEffect, GroupEffectError, GroupEffects};
+pub use tlearner::{fit_tlearner, TLearnerError, TLearnerFit};
 pub use do_calculus::{
     identify_conditional_outcomes, identify_outcomes, latent_projection, Admg,
     Expression as IdentifiedExpression, GraphError as AdmgError, Hedge, IdentificationError,
