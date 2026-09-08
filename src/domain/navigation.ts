@@ -15,6 +15,13 @@ export const CHAPTER_IDS = [
 
 export type ChapterId = (typeof CHAPTER_IDS)[number]
 
+/** The chapters in the three stretches of the workflow, as the rail groups them. */
+export const CHAPTER_SECTIONS: readonly { readonly title: string; readonly chapters: readonly ChapterId[] }[] = [
+  { title: 'Set up', chapters: ['projects', 'data'] },
+  { title: 'Model', chapters: ['discovery', 'dag', 'study'] },
+  { title: 'Estimate', chapters: ['estimation', 'sensitivity', 'counterfactual', 'results'] },
+]
+
 const chapterSchema = z.enum(CHAPTER_IDS)
 
 /** Every screen the shell can show. The public root is the landing page; workbench routes live under `/app`. */

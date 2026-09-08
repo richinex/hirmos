@@ -201,13 +201,32 @@ pub fn coint_johansen(endog: &[Vec<f64>], det_order: i32, k_ar_diff: usize) -> J
     let s00_inv = crate::linalg::inverse(&s00).expect("s00 is singular");
     let sig = &sk0 * s00_inv * sk0.transpose();
 
-    // Generalized symmetric-definite eigenproblem sig v = lambda skk v via Cholesky whitening.
-    let chol = skk.cholesky().expect("skk is not positive definite");
-    let l_inv = chol.l().try_inverse().expect("cholesky factor is singular");
-    let b = &l_inv * sig * l_inv.transpose();
-    let sym = nalgebra::SymmetricEigen::new((&b + &b.transpose()) * 0.5);
-    let mut eig: Vec<f64> = sym.eigenvalues.iter().copied().collect();
-    eig.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    // statsmodels uses np.linalg.eig(inv(skk) @ sig), then normalizes its
+    // right eigenvectors with inv(cholesky(du.T @ skk @ du)).
+    let tmp = crate::linalg::inverse(&skk).expect("skk is singular");
+    let decomposition = crate::linalg::eigen_general_right(&(tmp * sig))
+        .expect("Johansen general eigendecomposition failed");
+    assert!(
+        decomposition
+            .imaginary_values
+            .iter()
+            .all(|value| *value == 0.0),
+        "Johansen eigendecomposition produced complex roots"
+    );
+    let au: Vec<f64> = decomposition.real_values.iter().copied().collect();
+    let du = decomposition.right_vectors;
+    let lower = crate::linalg::cholesky_lower(&(du.transpose() * &skk * &du))
+        .expect("Johansen eigenvector normalization is not positive definite");
+    let temp = crate::linalg::inverse(&lower).expect("Johansen Cholesky factor is singular");
+    let dt = du * temp;
+
+    let mut aind = crate::numpy_argsort::argsort(&au);
+    aind.reverse();
+    let eig: Vec<f64> = aind.iter().map(|index| au[*index]).collect();
+    let mut _d = DMatrix::from_fn(neqs, neqs, |row, column| dt[(row, aind[column])]);
+    if let Some(first) = _d.as_slice().iter().copied().find(|value| *value != 0.0) {
+        _d *= first.signum();
+    }
 
     let mut lr1 = vec![0.0; neqs];
     let mut lr2 = vec![0.0; neqs];

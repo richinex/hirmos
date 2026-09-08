@@ -22,6 +22,7 @@ pub mod joint_samples;
 pub mod jpcmciplus;
 mod lapack_cholesky;
 mod lapack_dgelsd;
+mod lapack_dgeev;
 mod lapack_dgesdd;
 mod lapack_dsyevd;
 mod lapack_lu;

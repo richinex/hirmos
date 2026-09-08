@@ -9,13 +9,14 @@ same change has been moved into Hirmos, its focused Hirmos test passes where one
 whole causal-core crate compiles for WASM. It does not broaden the numerical operation beyond the
 one used by the pinned source.
 
-The five available numerical families are:
+The six available numerical families are:
 
 | Routine | Source-level operation it reproduces | Typical use |
 | --- | --- | --- |
 | DGELSD | `numpy.linalg.lstsq` / compatible SciPy least squares | Minimum-norm regression, including rank-deficient designs |
 | DGESDD | `numpy.linalg.svd` and SVD-backed `pinv` | Singular values and vectors, pseudoinverses and numerical rank |
 | DSYEVD | `numpy.linalg.eigh` / `eigvalsh` for real symmetric matrices | Covariance and kernel eigendecomposition |
+| DGEEV | `numpy.linalg.eig` for real general matrices | Nonsymmetric eigenvalues and left/right eigenvectors, including complex pairs |
 | DGETRF/DGETRS | Partial-pivot LU and a general linear solve | `solve`, inverse-by-solving and LU log determinants |
 | DPOTRF/DPOTRS | Cholesky factorization and positive-definite solve | Covariance, information and kernel systems known to be positive definite |
 
@@ -35,11 +36,12 @@ mathematically capable of producing an answer.
 | ARDL | `lstsq`, `pinv`, statsmodels OLS and `inv` | DGELSD, DGESDD and DGETRF/DGETRS | Completed |
 | VECM lag selection | `lstsq` + positive-definite covariance log determinant | DGELSD + DPOTRF | Completed |
 | VECM ML matrix square root and inverses | SciPy reduced SVD + NumPy `inv` | DGESDD + DGETRF/DGETRS | Completed |
-| VECM ML eigenproblem | NumPy general `eig` | Requires DGEEV | Not changed; see boundary below |
+| VECM ML eigenproblem | NumPy general `eig` | DGEEV + NumPy argsort ordering | Completed |
 | oCSE log determinant | NumPy `slogdet` / partial-pivot LU | DGETRF | Completed |
 | Causal Impact + LinearMediation | NumPy `pinv` | DGESDD | Completed |
 | PC/FCI Fisher-Z | NumPy `inv` | DGETRF/DGETRS | Completed |
 | ADF lag selection + Johansen preprocessing | statsmodels OLS / NumPy `pinv` + `inv` | DGESDD + DGETRF/DGETRS | Completed |
+| Johansen generalized eigenproblem and normalization | NumPy `eig` + lower `cholesky` + `inv` | DGEEV + DPOTRF + DGETRF/DGETRS | Completed |
 | Time-series diagnostics + VAR-LiNGAM | statsmodels OLS / `lstsq` + Cholesky | DGESDD + DGELSD + DPOTRF | Completed |
 | Poisson GLM IRLS | `lstsq(rcond=-1)` then final WLS `pinv` | DGELSD + DGESDD | Completed |
 | Poisson/negative-binomial optimizer systems | NumPy `solve` / `inv` | DGETRF/DGETRS | Completed |
@@ -47,7 +49,7 @@ mathematically capable of producing an answer.
 | IV2SLS + DYNOTEARS matrix exponential | NumPy `solve` | DGETRF/DGETRS | Completed |
 | Linear-SCM counterfactual abduction | NumPy `solve` / `inv` | DGETRF/DGETRS | Completed |
 
-The generated DGELSD, DGESDD and DSYEVD translations originally exported some identical internal
+The generated DGELSD, DGEEV, DGESDD and DSYEVD translations originally exported some identical internal
 Fortran symbol names. That was harmless while they lived in separate experiments, but unsafe once
 linked into one Hirmos crate and particularly unsafe beside Apple Accelerate. Their private support
 symbols are now namespaced by driver. Public adapter calls remain ordinary Rust calls, and an
@@ -184,7 +186,7 @@ branch preserves them rather than flattening them into one generic "SVD solve":
 Lagged designs are often nearly collinear, so this migration improves both source parity and the
 behavior of legitimate difficult inputs.
 
-## Partly completed at the source boundary: VECM
+## Completed: VECM and Johansen general eigenproblems
 
 [`vecm.rs`](../../crates/causal-core/src/vecm.rs) legitimately consumes almost the entire new
 foundation:
@@ -194,11 +196,16 @@ foundation:
 - DGETRF/DGETRS for general systems currently expressed as matrix inverses;
 - DPOTRF for the positive-definite residual-covariance log determinant.
 
-Those four mappings are migrated and the statsmodels VECM fixture still passes. The maximum-
-likelihood eigenproblem is deliberately excluded: statsmodels calls NumPy's general `eig`, so full
-backend parity there requires DGEEV rather than DSYEVD. Hirmos retains its existing symmetric-
-equivalent construction until that separate recipe is ported; the branch does not mislabel DSYEVD
-as the source operation.
+Those four mappings are migrated. The maximum-likelihood eigenproblem now follows statsmodels'
+fifth operation as well: DGEEV replaces the earlier symmetric-equivalent construction, its right
+eigenvectors are reordered with the translated NumPy argsort semantics, and the VECM fixture still
+passes.
+
+Johansen now follows the pinned sequence directly: form `inv(skk) @ sig`, call DGEEV, normalize the
+right eigenvectors through `inv(cholesky(du.T @ skk @ du))`, sort the roots descending, and apply
+statsmodels' first-nonzero sign convention. The lower Cholesky factor comes from DPOTRF and its
+inverse comes from DGETRF/DGETRS. The earlier Cholesky-whitened symmetric reformulation has been
+removed.
 
 ## Completed: oCSE
 
@@ -273,8 +280,8 @@ negative-binomial covariance uses the same general inverse as statsmodels.
 ADF automatic lag selection now fits each prefix through the same statsmodels pseudoinverse OLS
 path as `_autolag`; the earlier single-QR shortcut was algebraically efficient but not the source's
 operation. Johansen detrending and residualization now use DGESDD for the source's OLS/pseudoinverse
-steps, and its `S00` inverse uses DGETRF/DGETRS. The later general eigenproblem remains within the
-DGEEV boundary below.
+steps, and its `S00` inverse uses DGETRF/DGETRS. DGEEV then covers the source's later general
+eigenproblem and right-eigenvector output.
 
 ## Boundaries and exclusions
 
@@ -284,14 +291,6 @@ The causal-ts preparation and neural paths intentionally reproduce PyTorch `floa
 The new rewrites are double-precision routines. Using them would change the source semantics.
 Exact adoption there requires the corresponding SGELSD, SSYEVD, SGETRF/SGETRS and SPOTRF/SPOTRS
 routines.
-
-### Johansen cointegration needs a general eigen solver
-
-The pinned statsmodels `coint_johansen` implementation uses `numpy.linalg.eig` on a generally
-nonsymmetric matrix. Full source parity therefore needs DGEEV. DSYEVD is not a substitute merely
-because Hirmos currently constructs a symmetrized equivalent problem. DGESDD can still serve the
-source's `pinv` residualization and DPOTRF can serve its Cholesky step, but the whole routine should
-not be called source-identical until the general eigen route is covered.
 
 ### Synthetic control has a different solver contract
 
@@ -312,7 +311,7 @@ regressions are candidates for the existing DGELSD adapter.
 
 ### Generated internals are not shared public APIs
 
-DGESDD and DSYEVD contain internal QR, triangular and BLAS helpers. Other Hirmos algorithms should
+DGEEV, DGESDD and DSYEVD contain internal QR, triangular and BLAS helpers. Other Hirmos algorithms should
 not reach into those generated modules. If Hirmos needs source-compatible QR or triangular solves,
 port and expose the corresponding LAPACK driver deliberately rather than coupling a method to an
 implementation detail of another driver.
@@ -348,7 +347,7 @@ such union must remain exhaustively interpreted at the worker and UI boundaries.
 
 The branch was verified at three levels:
 
-1. The translated DGELSD, DGESDD, DSYEVD, DGETRF/DGETRS and DPOTRF/DPOTRS drivers passed their
+1. The translated DGELSD, DGEEV, DGESDD, DSYEVD, DGETRF/DGETRS and DPOTRF/DPOTRS drivers passed their
    source-oracle fixtures in `rust-causal-transpile`.
 2. Focused Hirmos tests passed for the migrated consumers, including statsmodels OLS,
    ParCorrMult, KCI, ARDL, VECM, oCSE, Causal Impact, LinearMediation, PC/FCI, time-series
@@ -358,15 +357,14 @@ The branch was verified at three levels:
    `cargo check --target wasm32-unknown-unknown`.
 
 The test evidence establishes source parity for the operations and fixtures listed above. It does
-not turn a deliberately excluded operation into a covered one: the general eigenproblems still
-need DGEEV, and the `f32` causal-ts paths still need the corresponding single-precision drivers.
+not turn a deliberately excluded operation into a covered one: the `f32` causal-ts paths still
+need the corresponding single-precision drivers.
 
 ## Deliberately separate follow-ups
 
-1. Port and verify DGEEV before claiming full numerical-backend parity for VECM ML and Johansen.
-2. Add runtime WASM numerical comparisons for completed consumers, not only raw driver tests; the
+1. Add runtime WASM numerical comparisons for completed consumers, not only raw driver tests; the
    entire Hirmos causal-core crate compiles for `wasm32-unknown-unknown` on this branch.
-3. Add source-backed rank-deficient and near-singular cases where a consumer's existing fixture is
+2. Add source-backed rank-deficient and near-singular cases where a consumer's existing fixture is
    currently full rank.
 
 For every migration, keep the current oracle fixture, add rank-deficient and near-singular cases,

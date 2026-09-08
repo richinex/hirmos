@@ -1,11 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '@/components/Icon'
-import { HirmosMark } from '@/components/HirmosMark'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
 import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
-import { useIsMobile } from '@/lib/useMediaQuery'
 import { useShellLayout } from '@/components/shell/useShellLayout'
 import { button, chromeAction, field, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
@@ -24,7 +22,6 @@ import { cacheSource, readCachedSource, removeCachedSource, sourceCacheAvailable
 import { buildBundle, bundleFileName, describeBundleProblem, parseBundle, serialiseBundle, type BundleData, type ProjectBundle } from '@/domain/bundle'
 import { decodeSourceFile, downloadText, encodeSourceFile } from '@/data/bundleFiles'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { InternalLink } from '@/components/ui/InternalLink'
 import { navigate, replace, useRoute } from '@/lib/router'
 import { ChartExportProvider } from '@/charts/exportContext'
 import {
@@ -132,6 +129,10 @@ function App() {
   const fileInput = useRef<HTMLInputElement>(null)
   const { location, route } = useRoute()
   const shell = useShellLayout()
+  /** Whether the rail's lobe is out over the stage; on a phone, whether the rail is slid in. Session state, never saved. */
+  const [navOpen, setNavOpen] = useState(false)
+  const openNav = useCallback(() => setNavOpen(true), [])
+  const closeNav = useCallback(() => setNavOpen(false), [])
   const theme = useTheme()
   const profiled = workflow.kind === 'profiled' ? workflow : null
   const currentPrepared = profiled?.prepared ?? null
@@ -164,12 +165,12 @@ function App() {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
         event.preventDefault()
-        shell.toggleNav()
+        setNavOpen((open) => !open)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [shell])
+  }, [])
 
   const createProject = (event: FormEvent) => {
     event.preventDefault()
@@ -484,36 +485,26 @@ function App() {
     else if (route.value.kind === 'chapter' && !isCanonicalLocation(location.pathname, location.search, route.value)) replace(canonical)
   }, [activeChapter, activeName, location.pathname, location.search, route])
 
-  const phone = useIsMobile()
-  const [phoneNavOpen, setPhoneNavOpen] = useState(false)
-  const navOpen = phone ? phoneNavOpen : !shell.navCollapsed
+  const railProject = project === null ? null : { name: project.name, detail: workflow.kind === 'profiled' ? workflow.source.file.name : 'No data file yet' }
 
   const header = (
     <>
-      <div className="flex min-w-0 items-center gap-3.5">
+      <div className="flex min-w-0 items-center">
+        {/* The round toggle sits in the corner above the rail: two bars that turn into a cross while the lobe is out. */}
         <button
           type="button"
-          className={iconControl('quiet', 'text-muted')}
+          data-rail-toggle
+          className={cn(
+            'relative h-10 w-10 shrink-0 rounded-full bg-rail transition-opacity hover:opacity-85',
+            'before:absolute before:left-3 before:h-[2px] before:w-4 before:rounded-full before:bg-rail-ink before:transition-[top,transform] before:duration-(--motion-base) before:content-[""]',
+            'after:absolute after:left-3 after:h-[2px] after:w-4 after:rounded-full after:bg-rail-ink after:transition-[top,transform] after:duration-(--motion-base) after:content-[""]',
+            navOpen ? 'before:top-[19px] before:rotate-[135deg] after:top-[19px] after:-rotate-[135deg]' : 'before:top-[15px] after:top-[23px]',
+          )}
           aria-label={navOpen ? 'Collapse chapter list' : 'Expand chapter list'}
           aria-expanded={navOpen}
           title={`${navOpen ? 'Collapse' : 'Expand'} chapter list (⌘B)`}
-          onClick={() => { if (phone) setPhoneNavOpen((open) => !open); else shell.toggleNav() }}
-        >
-          <Icon name={navOpen ? 'left_panel_close' : 'left_panel_open'} size={16} />
-        </button>
-        <h1 className="m-0">
-          {/* The wordmark is the one uppercase in the app; every label and caption is sentence case. */}
-          <InternalLink href="/" className="flex items-center gap-2 text-body font-medium uppercase tracking-[0.1em] text-ink no-underline transition-opacity hover:opacity-70" title="Hirmos home">
-            <HirmosMark className="text-signal" />
-            hirmos
-          </InternalLink>
-        </h1>
-        {project !== null && (
-          <>
-            <div className="h-[15px] w-px shrink-0 bg-hair" />
-            <span className="truncate text-body text-muted">{project.name}</span>
-          </>
-        )}
+          onClick={() => setNavOpen((open) => !open)}
+        />
       </div>
       <div className="flex min-w-0 items-center gap-1.5">
         {storageFailure !== null && (
@@ -558,7 +549,7 @@ function App() {
         skipTarget="stage"
         mode={fullBleed ? 'full' : 'reading'}
         header={header}
-        nav={<ChapterNav chapters={chapters} active={activeChapter} collapsed={shell.navCollapsed} onNavigate={navigateToChapter} onPrefetch={prefetchChapter} phoneOpen={phoneNavOpen} onPhoneOpen={() => setPhoneNavOpen(true)} onPhoneClose={() => setPhoneNavOpen(false)} />}
+        nav={<ChapterNav chapters={chapters} active={activeChapter} open={navOpen} onOpen={openNav} onClose={closeNav} onNavigate={navigateToChapter} onPrefetch={prefetchChapter} project={railProject} onExport={workflow.kind === 'profiled' ? () => void exportProject() : null} />}
         stage={(
           <>
               {!route.ok && (

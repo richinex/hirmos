@@ -6,7 +6,7 @@ import { z } from 'zod'
  */
 export const shellLayoutSchema = z.object({
   version: z.literal(1),
-  /** 'auto' follows the breakpoint; the user's toggle pins it. */
+  /** Kept so entries written before the rail replaced the list still parse; nothing reads it. */
   chapterNav: z.enum(['auto', 'expanded', 'collapsed']),
   /** Serialized pane layouts keyed by group id, in the resizable-panel library's own format. */
   panes: z.record(z.string(), z.string()),

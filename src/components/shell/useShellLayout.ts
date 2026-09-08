@@ -1,7 +1,6 @@
 import { useMemo, useSyncExternalStore } from 'react'
 import type { LayoutStorage } from 'react-resizable-panels'
 import { DEFAULT_SHELL_LAYOUT, parseShellLayout, type ShellLayout, type TableDensity } from '@/domain/shellLayout'
-import { useIsWide } from '@/lib/useMediaQuery'
 
 const KEY = 'hirmos.shell.v1'
 
@@ -30,8 +29,6 @@ const subscribe = (notify: () => void): (() => void) => {
 
 export interface ShellLayoutHandle {
   readonly layout: ShellLayout
-  readonly navCollapsed: boolean
-  readonly toggleNav: () => void
   /** Storage adapter for `useDefaultLayout`, so one store owns every pane. */
   readonly storage: LayoutStorage
   readonly tableDensity: TableDensity
@@ -40,16 +37,12 @@ export interface ShellLayoutHandle {
 
 export function useShellLayout(): ShellLayoutHandle {
   const current = useSyncExternalStore(subscribe, read, () => DEFAULT_SHELL_LAYOUT)
-  const wide = useIsWide()
-  const navCollapsed = current.chapterNav === 'auto' ? !wide : current.chapterNav === 'collapsed'
   const storage = useMemo<LayoutStorage>(() => ({
     getItem: (key) => read().panes[key] ?? null,
     setItem: (key, value) => { write({ ...read(), panes: { ...read().panes, [key]: value } }) },
   }), [])
   return {
     layout: current,
-    navCollapsed,
-    toggleNav: () => write({ ...read(), chapterNav: navCollapsed ? 'expanded' : 'collapsed' }),
     storage,
     tableDensity: current.tableDensity,
     setTableDensity: (density) => write({ ...read(), tableDensity: density }),

@@ -170,14 +170,22 @@ pub fn vecm_fit(
     let s01_s11_ = &s01 * &s11_;
     let s00_inv = linalg::inverse(&s00).expect("s00 singular");
     let m = s01_s11_.transpose() * &s00_inv * &s01_s11_;
-    let sym = nalgebra::SymmetricEigen::new((&m + &m.transpose()) * 0.5);
-    let mut order: Vec<usize> = (0..sym.eigenvalues.len()).collect();
-    order.sort_by(|&a, &b| sym.eigenvalues[b].partial_cmp(&sym.eigenvalues[a]).unwrap());
+    let decomposition =
+        linalg::eigen_general_right(&m).expect("VECM general eigendecomposition failed");
+    assert!(
+        decomposition
+            .imaginary_values
+            .iter()
+            .all(|value| *value == 0.0),
+        "VECM eigendecomposition produced complex roots"
+    );
+    let mut order = crate::numpy_argsort::argsort(decomposition.real_values.as_slice());
+    order.reverse();
     let dim = y_lag1.nrows();
     let mut v = DMatrix::<f64>::zeros(dim, r);
     for (c, &idx) in order.iter().take(r).enumerate() {
         for row in 0..dim {
-            v[(row, c)] = sym.eigenvectors[(row, idx)];
+            v[(row, c)] = decomposition.right_vectors[(row, idx)];
         }
     }
 

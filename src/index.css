@@ -140,6 +140,17 @@
 
   /* Elevation: a faint top-edge highlight lifts a surface off the stage (lit from above). */
   --color-highlight: rgba(255, 255, 255, 0.06);
+
+  /* The chapter rail is a solid dark shape in both themes, so its text and glyphs take the dark palette
+     whatever the page is; only the fill and the disabled tone change on paper. */
+  --color-rail: #1A1A1A;
+  --color-rail-ink: #F2F2F0;
+  --color-rail-faint: #8F8F8F;
+  --color-rail-dim: #444444;
+  --color-rail-signal: #BEF264;
+  --color-rail-ok: #2DD4BF;
+  --color-rail-info: #60A5FA;
+  --color-rail-danger: #F87171;
 }
 
 /* The prose face, self-hosted from @fontsource-variable/source-serif-4 5.3.0 (files copied into
@@ -461,6 +472,9 @@ button[aria-busy="true"]::after {
   --color-danger: #B3312F;
 
   --color-highlight: rgba(255, 255, 255, 0.9);
+
+  --color-rail: #0A0A0A;         /* ink on paper */
+  --color-rail-dim: #3A3A3A;
 }
 
 :root[data-theme="light"] body { background: #F6F6F2; }

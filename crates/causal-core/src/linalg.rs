@@ -6,6 +6,7 @@
 use nalgebra::{DMatrix, DVector};
 
 use crate::lapack_cholesky::{self, Triangle as CholeskyTriangle};
+use crate::lapack_dgeev::{self, Eigenvectors};
 use crate::lapack_dgesdd::{self, SvdJob};
 use crate::lapack_dsyevd::{self, EigenJob, Triangle};
 use crate::lapack_lu::{self, Transpose};
@@ -18,6 +19,7 @@ pub(crate) enum Error {
     DidNotConverge,
     InvalidStorage,
     NotPositiveDefinite,
+    GeneralEigen(crate::lapack_dgeev::DgeevError),
     Svd(crate::lapack_dgesdd::DgesddError),
 }
 
@@ -30,6 +32,13 @@ pub(crate) struct Svd {
 pub(crate) struct SymmetricEigen {
     pub values: DVector<f64>,
     pub vectors: DMatrix<f64>,
+}
+
+pub(crate) struct GeneralEigen {
+    pub real_values: DVector<f64>,
+    pub imaginary_values: DVector<f64>,
+    /// Right eigenvectors in LAPACK's real encoding for complex pairs.
+    pub right_vectors: DMatrix<f64>,
 }
 
 pub(crate) struct PseudoInverse {
@@ -84,6 +93,31 @@ pub(crate) fn solve(system: &DMatrix<f64>, right: &DMatrix<f64>) -> Result<DMatr
 /// Form a general inverse by solving against the identity with the same LU.
 pub(crate) fn inverse(matrix: &DMatrix<f64>) -> Result<DMatrix<f64>, Error> {
     solve(matrix, &DMatrix::identity(matrix.nrows(), matrix.nrows()))
+}
+
+/// `numpy.linalg.eig` for a real general matrix through DGEEV.
+pub(crate) fn eigen_general_right(matrix: &DMatrix<f64>) -> Result<GeneralEigen, Error> {
+    if matrix.nrows() != matrix.ncols() {
+        return Err(Error::NonSquare);
+    }
+    if matrix.iter().any(|value| !value.is_finite()) {
+        return Err(Error::NonFinite);
+    }
+
+    let order = matrix.nrows();
+    let mut values = matrix.as_slice().to_vec();
+    let (info, decomposition) =
+        lapack_dgeev::dgeev(Eigenvectors::Right, order, &mut values, order.max(1))
+            .map_err(Error::GeneralEigen)?;
+    if info != 0 {
+        return Err(Error::DidNotConverge);
+    }
+    let vectors = decomposition.right_vectors.ok_or(Error::InvalidStorage)?;
+    Ok(GeneralEigen {
+        real_values: DVector::from_vec(decomposition.real_eigenvalues),
+        imaginary_values: DVector::from_vec(decomposition.imaginary_eigenvalues),
+        right_vectors: DMatrix::from_column_slice(order, order, &vectors),
+    })
 }
 
 /// `numpy.linalg.pinv` through its economy DGESDD decomposition.
@@ -203,6 +237,30 @@ pub(crate) fn logdet_positive_definite_lower(matrix: &DMatrix<f64>) -> Result<f6
             .sum::<f64>())
 }
 
+/// `numpy.linalg.cholesky(matrix)`, returning its lower-triangular factor.
+pub(crate) fn cholesky_lower(matrix: &DMatrix<f64>) -> Result<DMatrix<f64>, Error> {
+    if matrix.nrows() != matrix.ncols() {
+        return Err(Error::NonSquare);
+    }
+    if matrix.iter().any(|value| !value.is_finite()) {
+        return Err(Error::NonFinite);
+    }
+
+    let order = matrix.nrows();
+    let mut factor = matrix.as_slice().to_vec();
+    let info = lapack_cholesky::dpotrf(CholeskyTriangle::Lower, order, &mut factor, order.max(1))
+        .map_err(|_| Error::InvalidStorage)?;
+    if info != 0 {
+        return Err(Error::NotPositiveDefinite);
+    }
+    for column in 0..order {
+        for row in 0..column {
+            factor[row + column * order] = 0.0;
+        }
+    }
+    Ok(DMatrix::from_column_slice(order, order, &factor))
+}
+
 /// R's `chol2inv(chol(matrix))` through the upper DPOTRF/DPOTRS path.
 pub(crate) fn inverse_positive_definite_upper(
     matrix: &DMatrix<f64>,
@@ -320,6 +378,27 @@ mod tests {
         let matrix = DMatrix::from_row_slice(2, 2, &[4.0, 999.0, 2.0, 3.0]);
         let logdet = logdet_positive_definite_lower(&matrix).expect("positive definite matrix");
         assert!((logdet - 8.0_f64.ln()).abs() < 1e-14);
+    }
+
+    #[test]
+    fn computes_the_numpy_lower_cholesky_factor() {
+        let matrix = DMatrix::from_row_slice(2, 2, &[4.0, 2.0, 2.0, 3.0]);
+        let factor = cholesky_lower(&matrix).expect("positive definite matrix");
+        let expected = DMatrix::from_row_slice(2, 2, &[2.0, 0.0, 1.0, 2.0_f64.sqrt()]);
+        assert!((&factor - expected).amax() < 1e-14);
+    }
+
+    #[test]
+    fn computes_general_complex_eigenpairs_in_lapack_encoding() {
+        let matrix = DMatrix::from_row_slice(2, 2, &[0.0, -2.0, 2.0, 0.0]);
+        let decomposition = eigen_general_right(&matrix).expect("general eigendecomposition");
+        assert!(decomposition.real_values.amax() < 1e-14);
+        assert!((decomposition.imaginary_values[0] - 2.0).abs() < 1e-14);
+        assert!((decomposition.imaginary_values[1] + 2.0).abs() < 1e-14);
+        let real = decomposition.right_vectors.column(0);
+        let imaginary = decomposition.right_vectors.column(1);
+        assert!((&matrix * real - (-2.0 * imaginary)).amax() < 1e-14);
+        assert!((&matrix * imaginary - (2.0 * real)).amax() < 1e-14);
     }
 
     #[test]
