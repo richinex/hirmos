@@ -4,7 +4,7 @@
 //! unconditional HSIC diagnostic, while this module supports both marginal and conditional
 //! independence and follows the KCI gamma approximation used by DoWhy's graph falsifier.
 
-use nalgebra::{DMatrix, SymmetricEigen};
+use nalgebra::DMatrix;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum KciError {
@@ -12,6 +12,7 @@ pub enum KciError {
     RowMismatch,
     NonFiniteValue,
     SingularRegression,
+    EigenDecomposition,
     InvalidGammaApproximation,
 }
 
@@ -237,8 +238,8 @@ pub fn causal_learn_kernel_conditional_independence(
             let kxr = &residualizer * kx * &residualizer;
             let kyr = &residualizer * ky * &residualizer;
             let statistic = kxr.component_mul(&kyr).sum();
-            let vx = retained_eigen_features(&kxr, 1e-5);
-            let vy = retained_eigen_features(&kyr, 1e-5);
+            let vx = retained_eigen_features(&kxr, 1e-5)?;
+            let vy = retained_eigen_features(&kyr, 1e-5)?;
             let size_u = vx.ncols() * vy.ncols();
             if size_u == 0 {
                 return Ok(KciResult {
@@ -278,29 +279,37 @@ fn symmetric_pseudo_inverse(
     matrix: DMatrix<f64>,
     tolerance: f64,
 ) -> Result<DMatrix<f64>, KciError> {
-    let svd = matrix.svd(true, true);
-    svd.pseudo_inverse(tolerance)
+    crate::linalg::pseudo_inverse(&matrix, tolerance)
+        .map(|decomposition| decomposition.matrix)
         .map_err(|_| KciError::SingularRegression)
 }
 
-fn retained_eigen_features(matrix: &DMatrix<f64>, threshold: f64) -> DMatrix<f64> {
+fn retained_eigen_features(
+    matrix: &DMatrix<f64>,
+    threshold: f64,
+) -> Result<DMatrix<f64>, KciError> {
     let symmetric = (matrix + matrix.transpose()) * 0.5;
-    let decomposition = SymmetricEigen::new(symmetric);
+    let decomposition = crate::linalg::eigen_symmetric_lower(&symmetric)
+        .map_err(|_| KciError::EigenDecomposition)?;
     let maximum = decomposition
-        .eigenvalues
+        .values
         .iter()
         .copied()
         .fold(f64::NEG_INFINITY, f64::max);
     let kept: Vec<usize> = decomposition
-        .eigenvalues
+        .values
         .iter()
         .enumerate()
         .filter_map(|(index, &value)| (value > maximum * threshold).then_some(index))
         .collect();
-    DMatrix::from_fn(matrix.nrows(), kept.len(), |row, column| {
-        let index = kept[column];
-        decomposition.eigenvectors[(row, index)] * decomposition.eigenvalues[index].sqrt()
-    })
+    Ok(DMatrix::from_fn(
+        matrix.nrows(),
+        kept.len(),
+        |row, column| {
+            let index = kept[column];
+            decomposition.vectors[(row, index)] * decomposition.values[index].sqrt()
+        },
+    ))
 }
 
 fn conditional(
@@ -331,8 +340,8 @@ fn conditional(
     let kyr = &residualizer * ky * &residualizer;
     let statistic = kxr.component_mul(&kyr).sum();
 
-    let vx = retained_eigen_features(&kxr, 1e-5);
-    let vy = retained_eigen_features(&kyr, 1e-5);
+    let vx = retained_eigen_features(&kxr, 1e-5)?;
+    let vy = retained_eigen_features(&kyr, 1e-5)?;
     let size_u = vx.ncols() * vy.ncols();
     if size_u == 0 {
         return Ok(KciResult {

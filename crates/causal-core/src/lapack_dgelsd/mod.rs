@@ -8,7 +8,7 @@
 
 mod blas;
 mod divide_conquer;
-mod reduction;
+pub(crate) mod reduction;
 
 mod driver;
 

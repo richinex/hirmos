@@ -639,10 +639,8 @@ fn intervention_score_statistic(
         .view((nuisance_count, 0), (1, nuisance_count))
         .into_owned();
     let g1_22 = corrected[(nuisance_count, nuisance_count)];
-    let g11_inverse = g11
-        .cholesky()
-        .ok_or(IngarchError::SingularDetectionInformation)?
-        .inverse();
+    let g11_inverse = crate::linalg::inverse_positive_definite_upper(&g11)
+        .map_err(|_| IngarchError::SingularDetectionInformation)?;
     let sigma =
         g1_22 - (&g21 * &g11_inverse * &g1_12)[(0, 0)] - (&g1_21 * &g11_inverse * &g12)[(0, 0)]
             + (&g21 * &g11_inverse * &g1_11 * &g11_inverse * &g12)[(0, 0)];

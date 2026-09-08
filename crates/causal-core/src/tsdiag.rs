@@ -2,6 +2,7 @@
 //! Ljung-Box whiteness test, an AR(1) prewhitening fit, Granger causality by the sum of
 //! squares F test, and a VAR with a constant for one step ahead forecasting.
 
+use crate::{least_squares, linalg, ols::Ols};
 use nalgebra::{DMatrix, DVector};
 
 /// Upper tail of the chi-square distribution, as `scipy.stats.chi2.sf`.
@@ -55,10 +56,13 @@ fn pacf_yw(x: &[f64], nlags: usize, adjusted: bool) -> Vec<f64> {
     for k in 1..=nlags {
         let toeplitz = DMatrix::from_fn(k, k, |i, j| r[i.abs_diff(j)]);
         let rhs = DVector::from_fn(k, |i, _| r[i + 1]);
-        let rho = toeplitz
-            .lu()
-            .solve(&rhs)
-            .expect("Yule-Walker system is solvable");
+        let right = DMatrix::from_column_slice(k, 1, rhs.as_slice());
+        let rho = linalg::solve(&toeplitz, &right).unwrap_or_else(|_| {
+            &linalg::pseudo_inverse(&toeplitz, 1e-15)
+                .expect("Yule-Walker pseudoinverse")
+                .matrix
+                * right
+        });
         out.push(rho[k - 1]);
     }
     out
@@ -120,14 +124,8 @@ pub fn ljung_box(x: &[f64], max_lag: usize) -> (Vec<f64>, Vec<f64>) {
 
 /// Ordinary least squares returning the coefficients, residuals and residual sum of squares.
 fn ols(design: &DMatrix<f64>, y: &DVector<f64>) -> (DVector<f64>, DVector<f64>, f64) {
-    let qr = design.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * y))
-        .expect("design is rank deficient");
-    let resid = y - design * &beta;
-    let ssr = resid.iter().map(|v| v * v).sum();
-    (beta, resid, ssr)
+    let fit = Ols::fit(design, y);
+    (fit.params, fit.resid, fit.ssr)
 }
 
 pub struct AutoRegFit {
@@ -146,22 +144,20 @@ pub fn autoreg1(x: &[f64]) -> AutoRegFit {
     let nobs = n - 1;
     let design = DMatrix::from_fn(nobs, 2, |r, c| if c == 0 { 1.0 } else { x[r] });
     let y = DVector::from_fn(nobs, |r, _| x[r + 1]);
-    let (beta, resid, ssr) = ols(&design, &y);
-    let sigma2 = ssr / nobs as f64;
-    let xtx_inv = (design.transpose() * &design)
-        .try_inverse()
-        .expect("design is singular");
+    let fit = Ols::fit(&design, &y);
+    let sigma2 = fit.ssr / nobs as f64;
+    let xtx_inv = fit.xtx_inverse();
     let pvalues = (0..2)
         .map(|i| {
             let se = (sigma2 * xtx_inv[(i, i)]).sqrt();
             // AutoReg reports normal p values: its results carry use_t = False.
-            libm::erfc((beta[i] / se).abs() / std::f64::consts::SQRT_2)
+            libm::erfc((fit.params[i] / se).abs() / std::f64::consts::SQRT_2)
         })
         .collect();
     AutoRegFit {
-        params: beta.iter().copied().collect(),
+        params: fit.params.iter().copied().collect(),
         pvalues,
-        resid: resid.iter().copied().collect(),
+        resid: fit.resid.iter().copied().collect(),
     }
 }
 
@@ -245,21 +241,14 @@ pub fn var_fit_trend_c(endog: &[Vec<f64>], lags: usize) -> VarFit {
         }
     });
     let y = DMatrix::from_fn(nobs, k, |r, j| endog[lags + r][j]);
-    let qr = design.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &y))
-        .expect("VAR design is rank deficient");
+    let beta = least_squares::solve(&design, &y, 1e-15)
+        .expect("DGELSD VAR fit")
+        .coefficients;
     let resid = &y - &design * &beta;
     let sigma_u_mle = resid.transpose() * &resid / nobs as f64;
 
-    let logdet = {
-        let chol = sigma_u_mle
-            .clone()
-            .cholesky()
-            .expect("residual covariance is definite");
-        2.0 * chol.l().diagonal().iter().map(|v| v.ln()).sum::<f64>()
-    };
+    let logdet = linalg::logdet_positive_definite_lower(&sigma_u_mle)
+        .expect("residual covariance is definite");
     let free_params = (lags * k * k + k) as f64;
     let aic = logdet + (2.0 / nobs as f64) * free_params;
     let bic = logdet + ((nobs as f64).ln() / nobs as f64) * free_params;

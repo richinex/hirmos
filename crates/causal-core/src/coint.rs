@@ -144,11 +144,9 @@ fn detrend(y: DMatrix<f64>, order: i32) -> DMatrix<f64> {
             design[(i, cell)] = x.powi(c as i32);
         }
     }
-    let qr = design.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &y))
-        .expect("detrend design is rank deficient");
+    let inverse =
+        crate::linalg::pseudo_inverse(&design, 1e-15).expect("detrend design pseudoinverse");
+    let beta = inverse.matrix * &y;
     y - design * beta
 }
 
@@ -157,11 +155,8 @@ fn resid_on(y: DMatrix<f64>, x: &DMatrix<f64>) -> DMatrix<f64> {
     if x.ncols() == 0 {
         return y;
     }
-    let qr = x.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &y))
-        .expect("regressors are rank deficient");
+    let inverse = crate::linalg::pseudo_inverse(x, 1e-15).expect("regressor pseudoinverse");
+    let beta = inverse.matrix * &y;
     y - x * beta
 }
 
@@ -203,7 +198,7 @@ pub fn coint_johansen(endog: &[Vec<f64>], det_order: i32, k_ar_diff: usize) -> J
     let skk = rkt.transpose() * &rkt / t;
     let sk0 = rkt.transpose() * &r0t / t;
     let s00 = r0t.transpose() * &r0t / t;
-    let s00_inv = s00.try_inverse().expect("s00 is singular");
+    let s00_inv = crate::linalg::inverse(&s00).expect("s00 is singular");
     let sig = &sk0 * s00_inv * sk0.transpose();
 
     // Generalized symmetric-definite eigenproblem sig v = lambda skk v via Cholesky whitening.

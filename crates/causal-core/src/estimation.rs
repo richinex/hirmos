@@ -17,21 +17,15 @@ pub struct HacOls {
     pub rsquared: f64,
 }
 
-fn lstsq(x: &DMatrix<f64>, y: &DVector<f64>) -> DVector<f64> {
-    let qr = x.clone().qr();
-    qr.r()
-        .solve_upper_triangular(&(qr.q().transpose() * y))
-        .expect("design is rank deficient")
-}
-
 /// OLS with cov_type="HAC": Bartlett weights, no small-sample correction, z-based inference.
 pub fn ols_hac(y: &[f64], x: &DMatrix<f64>, maxlags: usize) -> HacOls {
     let n = x.nrows();
     let k = x.ncols();
     let yv = DVector::from_column_slice(y);
-    let beta = lstsq(x, &yv);
-    let fitted = x * &beta;
-    let resid: Vec<f64> = (0..n).map(|i| y[i] - fitted[i]).collect();
+    let fit = crate::ols::Ols::fit(x, &yv);
+    let xtx_inv = fit.xtx_inverse();
+    let beta = fit.params;
+    let resid: Vec<f64> = fit.resid.iter().copied().collect();
 
     // xu rows: exog scaled by the residual.
     let mut xu = DMatrix::<f64>::zeros(n, k);
@@ -46,7 +40,6 @@ pub fn ols_hac(y: &[f64], x: &DMatrix<f64>, maxlags: usize) -> HacOls {
         let top = xu.rows(lag, n - lag).transpose() * xu.rows(0, n - lag);
         s += (&top + top.transpose()) * w;
     }
-    let xtx_inv = (x.transpose() * x).try_inverse().expect("X'X is singular");
     let cov = &xtx_inv * s * &xtx_inv;
 
     let bse: Vec<f64> = (0..k).map(|j| cov[(j, j)].sqrt()).collect();
@@ -89,14 +82,12 @@ pub fn wls(y: &[f64], x: &DMatrix<f64>, weights: &[f64]) -> WlsFit {
             xw[(i, j)] *= sw;
         }
     }
-    let beta = lstsq(&xw, &yw);
-    let fitted = &xw * &beta;
-    let ssr: f64 = (0..n).map(|i| (yw[i] - fitted[i]).powi(2)).sum();
-    let df = (n - k) as f64;
+    let fit = crate::ols::Ols::fit(&xw, &yw);
+    let xtx_inv = fit.xtx_inverse();
+    let beta = fit.params;
+    let ssr = fit.ssr;
+    let df = (n - fit.rank) as f64;
     let sigma2 = ssr / df;
-    let xtx_inv = (xw.transpose() * &xw)
-        .try_inverse()
-        .expect("X'X is singular");
     let pvalues: Vec<f64> = (0..k)
         .map(|j| {
             let t = beta[j] / (sigma2 * xtx_inv[(j, j)]).sqrt();

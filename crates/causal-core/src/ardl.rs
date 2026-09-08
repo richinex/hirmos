@@ -60,24 +60,28 @@ impl Ols {
 }
 
 fn ols(x: &DMatrix<f64>, y: &DVector<f64>) -> Ols {
-    let svd = x.clone().svd(true, true);
-    let eps = 1e-15 * svd.singular_values.max() * x.nrows().max(x.ncols()) as f64;
-    let params = svd.solve(y, eps).expect("ARDL design solve");
-    let resid = y - x * &params;
-    let nobs = x.nrows();
-    let df_model = x.ncols();
-    let ssr: f64 = resid.iter().map(|v| v * v).sum();
-    let scale = ssr / (nobs - df_model) as f64;
-    let xtx_inv = (x.transpose() * x)
-        .try_inverse()
-        .expect("ARDL design is singular");
+    let fit = crate::ols::Ols::fit(x, y);
+    let nobs = fit.nobs;
+    let df_model = fit.rank;
+    let scale = fit.ssr / (nobs - df_model) as f64;
+    let cov_params = fit.xtx_inverse() * scale;
     Ols {
-        params,
-        cov_params: xtx_inv * scale,
-        resid,
+        params: fit.params,
+        cov_params,
+        resid: fit.resid,
         nobs,
         df_model,
     }
+}
+
+fn numpy_lstsq(x: &DMatrix<f64>, y: &DVector<f64>) -> DVector<f64> {
+    let target = DMatrix::from_column_slice(y.len(), 1, y.as_slice());
+    let tolerance = f64::EPSILON * x.nrows().max(x.ncols()) as f64;
+    crate::least_squares::solve(x, &target, tolerance)
+        .expect("finite ARDL candidate least-squares inputs")
+        .coefficients
+        .column(0)
+        .into_owned()
 }
 
 /// Column `lag` of `lagmat(col, max_lag, original="in")`: NaN rows are simply not reachable
@@ -124,22 +128,19 @@ pub fn ardl_select_order(
     let mut blocks = [endog_block, exog_block];
     let always_df = always.ncols();
     if always_df > 0 {
-        let svd = always.clone().svd(true, true);
-        let eps = 1e-15 * svd.singular_values.max() * rows.max(always_df) as f64;
+        let pinv = crate::linalg::pseudo_inverse(&always, 1e-15)
+            .expect("ARDL deterministic projection")
+            .matrix;
         for block in blocks.iter_mut() {
-            let coef = svd.solve(&*block, eps).expect("deterministic projection");
-            *block -= &always * coef;
+            *block -= &always * (&pinv * &*block);
         }
-        let coef = svd.solve(&yv, eps).expect("deterministic projection");
-        yv -= &always * coef;
+        yv -= &always * (&pinv * &yv);
     }
     let [endog_block, exog_block] = blocks;
 
     let compute_ics = |x: &DMatrix<f64>| -> (f64, f64, f64) {
         let resid = if x.ncols() > 0 {
-            let svd = x.clone().svd(true, true);
-            let eps = 1e-15 * svd.singular_values.max() * x.nrows().max(x.ncols()) as f64;
-            &yv - x * svd.solve(&yv, eps).expect("candidate solve")
+            &yv - x * numpy_lstsq(x, &yv)
         } else {
             yv.clone()
         };
@@ -358,7 +359,9 @@ pub fn bounds_test(model: &Uecm, case: usize) -> BoundsTest {
     let r = rest.len();
     let vcv = DMatrix::from_fn(r, r, |i, j| model.fit.cov_params[(rest[i], rest[j])]);
     let coef = DVector::from_fn(r, |i, _| model.fit.params[rest[i]]);
-    let quad = (coef.transpose() * vcv.try_inverse().expect("restriction covariance") * &coef)[0];
+    let quad = (coef.transpose()
+        * crate::linalg::inverse(&vcv).expect("restriction covariance")
+        * &coef)[0];
     let stat = quad / r as f64;
 
     let k = nvar;

@@ -118,7 +118,7 @@ pub fn expm(a: &DMatrix<f64>) -> DMatrix<f64> {
 
     let p = &v + &u;
     let q = &v - &u;
-    let mut r = q.lu().solve(&p).expect("expm solve failed");
+    let mut r = crate::linalg::solve(&q, &p).expect("expm solve failed");
     for _ in 0..squarings {
         r = &r * &r;
     }

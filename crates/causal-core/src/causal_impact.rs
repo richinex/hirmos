@@ -9,6 +9,7 @@
 //! so Z = 1, T = 1, R = 1, regressors in the observation intercept. Approximate diffuse
 //! initialisation at variance 1e6, first observation dropped from the likelihood.
 
+use crate::linalg;
 use crate::ucm::hpfilter;
 use nalgebra::{DMatrix, DVector};
 
@@ -28,13 +29,8 @@ fn lstsq(exog: &[Vec<f64>], target: &[f64]) -> Vec<f64> {
     let k = exog[0].len();
     let a = DMatrix::from_fn(n, k, |r, c| exog[r][c]);
     let b = DVector::from_column_slice(target);
-    let svd = a.svd(true, true);
-    let eps = 1e-15 * svd.singular_values.max() * n.max(k) as f64;
-    svd.solve(&b, eps)
-        .expect("least squares solve")
-        .iter()
-        .copied()
-        .collect()
+    let inverse = linalg::pseudo_inverse(&a, 1e-15).expect("pseudo-inverse");
+    (&inverse.matrix * b).iter().copied().collect()
 }
 
 /// statsmodels' start parameters for the local level with regressors: one Hodrick-Prescott

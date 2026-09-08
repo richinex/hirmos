@@ -234,11 +234,9 @@ impl LinearMediationModel {
             matrix
         };
         let contemporaneous = DMatrix::<f64>::identity(variables, variables) - coefficient(0);
-        let decomposition = contemporaneous.svd(true, true);
-        let tolerance = decomposition.singular_values.max() * 1e-15;
-        let psi_zero = decomposition
-            .pseudo_inverse(tolerance)
-            .map_err(|_| LinearMediationError::SingularContemporaneousSystem)?;
+        let psi_zero = crate::linalg::pseudo_inverse(&contemporaneous, 1e-15)
+            .map_err(|_| LinearMediationError::SingularContemporaneousSystem)?
+            .matrix;
         let mut psi = vec![DMatrix::zeros(variables, variables); horizon];
         psi[0] = psi_zero.clone();
         for tau in 1..horizon {

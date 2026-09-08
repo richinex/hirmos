@@ -353,7 +353,7 @@ fn cross_product(left: &DMatrix<f64>, right: &DMatrix<f64>) -> DMatrix<f64> {
 }
 
 fn solve(system: DMatrix<f64>, right: DMatrix<f64>) -> Result<DMatrix<f64>, IvError> {
-    system.lu().solve(&right).ok_or(IvError::SingularSystem)
+    crate::linalg::solve(&system, &right).map_err(|_| IvError::SingularSystem)
 }
 
 /// `statsmodels.sandbox.regression.gmm.IV2SLS(endog, exog, instrument).fit().params`, on

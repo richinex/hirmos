@@ -5,6 +5,7 @@
 //! on the residuals, then adaptive-lasso pruning over contemporaneous and lagged blocks.
 
 use crate::lars::predict_adaptive_lasso;
+use crate::{least_squares, linalg};
 use nalgebra::DMatrix;
 
 pub struct VarLingamResult {
@@ -16,11 +17,7 @@ pub struct VarLingamResult {
 }
 
 fn logdet_symm(m: &DMatrix<f64>) -> f64 {
-    let chol = m
-        .clone()
-        .cholesky()
-        .expect("covariance not positive definite");
-    2.0 * chol.l().diagonal().iter().map(|v| v.ln()).sum::<f64>()
+    linalg::logdet_positive_definite_lower(m).expect("covariance not positive definite")
 }
 
 /// One statsmodels VAR fit with trend "n": returns (coefs per lag, residuals, bic).
@@ -38,11 +35,9 @@ fn var_fit(x: &DMatrix<f64>, lags: usize) -> (Vec<DMatrix<f64>>, DMatrix<f64>, f
         }
     }
     let y = x.rows(lags, nobs).into_owned();
-    let qr = z.clone().qr();
-    let params = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &y))
-        .expect("VAR design is rank deficient");
+    let params = least_squares::solve(&z, &y, 1e-15)
+        .expect("DGELSD VAR fit")
+        .coefficients;
     let resid = &y - &z * &params;
 
     let df_resid = (nobs - k * lags) as f64;

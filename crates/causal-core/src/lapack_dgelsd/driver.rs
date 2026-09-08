@@ -9,7 +9,7 @@
 use core::fmt;
 
 use super::blas::dlamch;
-use super::divide_conquer::{dlalsd_, dlascl_};
+use super::divide_conquer::{dgelsd_closure_dlalsd_, dgelsd_closure_dlascl_};
 use super::reduction::{dgebrd, dgelqf, dgeqrf, dormbr, dormlq, dormqr};
 
 const SMLSIZ: usize = 25;
@@ -245,7 +245,7 @@ fn call_dlascl(
     let mut lda = lda as core::ffi::c_long;
     let mut info = 0 as core::ffi::c_long;
     unsafe {
-        dlascl_(
+        dgelsd_closure_dlascl_(
             &mut kind,
             &mut kl,
             &mut ku,
@@ -304,7 +304,7 @@ fn call_dlalsd_with_smlsiz(
     let mut raw_rank = 0 as core::ffi::c_long;
     let mut info = 0 as core::ffi::c_long;
     unsafe {
-        dlalsd_(
+        dgelsd_closure_dlalsd_(
             &mut uplo,
             &mut smlsiz,
             &mut n,

@@ -85,13 +85,7 @@ pub fn cluster_redundant(
 fn rsquared(y: &DVector<f64>, x: &DMatrix<f64>) -> f64 {
     // statsmodels OLS uses its Moore-Penrose pseudo-inverse by default. This remains defined for
     // the exact-collinearity cases that VIF is specifically meant to expose.
-    let decomposition = x.clone().svd(true, true);
-    let cutoff = 1e-15 * decomposition.singular_values.max();
-    let beta = decomposition
-        .solve(y, cutoff)
-        .expect("VIF pseudo-inverse solve failed");
-    let fitted = x * beta;
-    let ssr: f64 = (y - fitted).iter().map(|v| v * v).sum();
+    let ssr = crate::ols::Ols::fit(x, y).ssr;
     let mean = y.iter().sum::<f64>() / y.len() as f64;
     let tss: f64 = y.iter().map(|v| (v - mean) * (v - mean)).sum();
     1.0 - ssr / tss

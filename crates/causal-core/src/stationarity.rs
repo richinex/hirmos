@@ -73,23 +73,13 @@ pub fn adfuller_maxlag(x: &[f64], regression: Regression, maxlag: Option<usize>)
     let schwert = (12.0 * (n as f64 / 100.0).powf(0.25)).ceil() as usize;
     let maxlag = maxlag.unwrap_or_else(|| schwert.min(n / 2 - trend - 1));
 
-    // Lag search: same trimmed sample for every candidate, trend prepended, prefix slices of the
-    // design so lag k uses [trend][level][first k diff lags]. Householder QR factors columns left
-    // to right, so ONE factorisation prices every prefix model: rss_k = y'y - sum(q'y[..k]^2).
+    // Lag search: statsmodels fits one default-pseudoinverse OLS model for every prefix.
     let startlag = trend + 1;
     let (full, y) = adf_design(x, maxlag, regression, true);
-    let rows = full.nrows() as f64;
-    let qty = full.clone().qr().q().transpose() * &y;
-    let mut rss = y.dot(&y);
-    let mut cut = 0;
     let mut best: Option<(f64, usize)> = None;
     for lag_columns in startlag..=startlag + maxlag {
-        while cut < lag_columns {
-            rss -= qty[cut] * qty[cut];
-            cut += 1;
-        }
-        let llf = -rows / 2.0 * ((2.0 * std::f64::consts::PI).ln() + (rss / rows).ln() + 1.0);
-        let aic = -2.0 * llf + 2.0 * lag_columns as f64;
+        let design = full.columns(0, lag_columns).into_owned();
+        let aic = Ols::fit(&design, &y).aic();
         if best.is_none_or(|(best_aic, _)| aic < best_aic) {
             best = Some((aic, lag_columns));
         }

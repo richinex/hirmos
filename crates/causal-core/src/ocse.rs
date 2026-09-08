@@ -21,15 +21,6 @@ extern "C" {
         c: *mut f64,
         ldc: i64,
     );
-    #[link_name = "dgetrf$NEWLAPACK$ILP64"]
-    fn dgetrf_ilp64(
-        m: *const i64,
-        n: *const i64,
-        a: *mut f64,
-        lda: *const i64,
-        ipiv: *mut i64,
-        info: *mut i64,
-    );
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -154,27 +145,21 @@ fn corrcoef(a: &DMatrix<f64>, adjustment: f64) -> DMatrix<f64> {
     c
 }
 
-/// LAPACK DGETRF2's recursive partial-pivot LU, which is the factorisation behind
-/// `numpy.linalg.slogdet`.  The recursive update order matters for singular correlation
-/// matrices: oCSE preserves NumPy's NaN/inf behaviour, and a scalar
-/// left-looking elimination takes a different rounding path through duplicated columns.
-#[cfg(target_os = "macos")]
+/// LAPACK DGETRF's partial-pivot LU, which is the factorization behind
+/// `numpy.linalg.slogdet`.
 fn slogdet(m: &DMatrix<f64>) -> (f64, f64) {
-    let n = m.nrows() as i64;
+    let n = m.nrows();
     let mut a = m.as_slice().to_vec();
-    let mut pivots = vec![0i64; n as usize];
-    let mut info = 0i64;
-    unsafe {
-        dgetrf_ilp64(&n, &n, a.as_mut_ptr(), &n, pivots.as_mut_ptr(), &mut info);
-    }
+    let mut pivots = vec![0usize; n];
+    let info = crate::lapack_lu::dgetrf(n, n, &mut a, n.max(1), &mut pivots)
+        .expect("square correlation matrix has valid LAPACK storage");
     if info > 0 {
         return (0.0, f64::NEG_INFINITY);
     }
-    assert_eq!(info, 0, "LAPACK dgetrf received an invalid argument");
     let mut sign = if pivots
         .iter()
         .enumerate()
-        .filter(|(i, pivot)| **pivot != *i as i64 + 1)
+        .filter(|(i, pivot)| **pivot != *i + 1)
         .count()
         % 2
         == 0
@@ -184,134 +169,8 @@ fn slogdet(m: &DMatrix<f64>) -> (f64, f64) {
         -1.0
     };
     let mut logdet = 0.0;
-    for index in 0..n as usize {
-        let diagonal = a[index + index * n as usize];
-        if diagonal == 0.0 {
-            return (0.0, f64::NEG_INFINITY);
-        }
-        sign *= diagonal.signum();
-        logdet += diagonal.abs().ln();
-    }
-    (sign, logdet)
-}
-
-#[cfg(not(target_os = "macos"))]
-fn slogdet(m: &DMatrix<f64>) -> (f64, f64) {
-    let mut a = m.clone();
-    let mut pivots = Vec::with_capacity(m.nrows());
-
-    fn factor(
-        a: &mut DMatrix<f64>,
-        row0: usize,
-        col0: usize,
-        rows: usize,
-        cols: usize,
-        pivots: &mut Vec<(usize, usize)>,
-    ) {
-        if rows == 0 || cols == 0 {
-            return;
-        }
-        if rows == 1 {
-            pivots.push((row0, row0));
-            return;
-        }
-        if cols == 1 {
-            let mut pivot = row0;
-            for row in row0 + 1..row0 + rows {
-                if a[(row, col0)].abs() > a[(pivot, col0)].abs() {
-                    pivot = row;
-                }
-            }
-            pivots.push((row0, pivot));
-            if a[(pivot, col0)] != 0.0 {
-                if pivot != row0 {
-                    a.swap((row0, col0), (pivot, col0));
-                }
-                let diagonal = a[(row0, col0)];
-                for row in row0 + 1..row0 + rows {
-                    a[(row, col0)] /= diagonal;
-                }
-            }
-            return;
-        }
-
-        let left_cols = rows.min(cols) / 2;
-        let right_cols = cols - left_cols;
-
-        let left_pivot_start = pivots.len();
-        factor(a, row0, col0, rows, left_cols, pivots);
-        let left_pivot_end = pivots.len();
-
-        // DLASWP: apply the first panel's row pivots to the right panel.
-        for pivot_index in left_pivot_start..left_pivot_end {
-            let (first, pivot) = pivots[pivot_index];
-            if first != pivot {
-                for column in col0 + left_cols..col0 + cols {
-                    a.swap((first, column), (pivot, column));
-                }
-            }
-        }
-
-        // DTRSM: solve L11 * U12 = A12 for unit-lower-triangular L11.
-        for column in col0 + left_cols..col0 + cols {
-            for i in 0..left_cols {
-                let mut value = a[(row0 + i, column)];
-                for k in 0..i {
-                    value -= a[(row0 + i, col0 + k)] * a[(row0 + k, column)];
-                }
-                a[(row0 + i, column)] = value;
-            }
-        }
-
-        // DGEMM: A22 -= L21 * U12.  Keep LAPACK's accumulation order; it is
-        // observable when identical self-lag columns make A exactly singular.
-        for column in col0 + left_cols..col0 + cols {
-            for row in row0 + left_cols..row0 + rows {
-                let mut value = a[(row, column)];
-                for k in 0..left_cols {
-                    value -= a[(row, col0 + k)] * a[(row0 + k, column)];
-                }
-                a[(row, column)] = value;
-            }
-        }
-
-        let right_pivot_start = pivots.len();
-        factor(
-            a,
-            row0 + left_cols,
-            col0 + left_cols,
-            rows - left_cols,
-            right_cols,
-            pivots,
-        );
-        let right_pivot_end = pivots.len();
-
-        // DLASWP: propagate the second panel's pivots back through the left panel.
-        for pivot_index in right_pivot_start..right_pivot_end {
-            let (first, pivot) = pivots[pivot_index];
-            if first != pivot {
-                for column in col0..col0 + left_cols {
-                    a.swap((first, column), (pivot, column));
-                }
-            }
-        }
-    }
-
-    let n = m.nrows();
-    factor(&mut a, 0, 0, n, n, &mut pivots);
-    let mut sign = if pivots
-        .iter()
-        .filter(|(first, pivot)| first != pivot)
-        .count()
-        % 2
-        == 0
-    {
-        1.0
-    } else {
-        -1.0
-    };
-    let mut logdet = 0.0;
-    for diagonal in (0..n).map(|i| a[(i, i)]) {
+    for index in 0..n {
+        let diagonal = a[index + index * n];
         if diagonal == 0.0 {
             return (0.0, f64::NEG_INFINITY);
         }

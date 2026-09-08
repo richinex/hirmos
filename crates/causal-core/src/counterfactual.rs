@@ -62,10 +62,9 @@ impl LinearScm {
         let (a, b) = self.affine_map();
         let y = DVector::from_column_slice(observed);
         let rhs = y - b;
-        let solved = a
-            .lu()
-            .solve(&rhs)
-            .expect("the affine map is triangular and invertible");
+        let rhs = DMatrix::from_column_slice(rhs.len(), 1, rhs.as_slice());
+        let solved =
+            crate::linalg::solve(&a, &rhs).expect("the affine map is triangular and invertible");
         solved.iter().copied().collect()
     }
 
@@ -79,9 +78,8 @@ impl LinearScm {
         let precision = DMatrix::identity(k, k) + a.transpose() * &a / s2;
         let y = DVector::from_column_slice(observed);
         let rhs = a.transpose() * (y - b) / s2;
-        let mean = precision
-            .lu()
-            .solve(&rhs)
+        let rhs = DMatrix::from_column_slice(rhs.len(), 1, rhs.as_slice());
+        let mean = crate::linalg::solve(&precision, &rhs)
             .expect("the posterior precision is positive definite");
         mean.iter().copied().collect()
     }

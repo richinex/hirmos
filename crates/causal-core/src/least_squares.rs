@@ -17,7 +17,9 @@ pub(crate) fn solve(
     if a.nrows() != b.nrows() || a.nrows() == 0 {
         return Err("least-squares row mismatch or empty samples");
     }
-    if !tolerance.is_finite() || tolerance < 0.0 || a.iter().chain(b.iter()).any(|v| !v.is_finite())
+    if !tolerance.is_finite()
+        || (tolerance < 0.0 && tolerance != -1.0)
+        || a.iter().chain(b.iter()).any(|v| !v.is_finite())
     {
         return Err("non-finite least-squares input or invalid tolerance");
     }
@@ -68,7 +70,12 @@ pub(crate) fn solve(
     .map_err(|_| "DGELSD failed to converge")?;
 
     let singular_values = DVector::from_vec(singular);
-    let cutoff = tolerance * if k == 0 { 0.0 } else { singular_values[0] };
+    let effective_tolerance = if tolerance < 0.0 {
+        f64::EPSILON
+    } else {
+        tolerance
+    };
+    let cutoff = effective_tolerance * if k == 0 { 0.0 } else { singular_values[0] };
     let coefficients = DMatrix::from_fn(n, nrhs, |row, column| targets[row + column * ldb]);
     Ok(Solution {
         coefficients,

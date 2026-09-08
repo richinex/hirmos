@@ -2,7 +2,6 @@
 //! Source: tigramite/independence_tests/parcorr_mult.py (GPL-3.0).
 
 use crate::parcorr::{analytic_pvalue, standardize};
-use faer::linalg::solvers::DenseSolveCore;
 use nalgebra::DMatrix;
 
 pub mod block_length;
@@ -510,22 +509,9 @@ pub fn wilks_lambda(
     for i in 0..cyy.nrows() {
         cyy[(i, i)] += 1e-10;
     }
-    // scipy.linalg.inv uses a partial-pivot LU factorization.  In particular,
-    // do not use nalgebra's fixed-size inverse path here: it loses substantial
-    // accuracy for the regularized, nearly singular covariance matrices that
-    // dummy/context variables can produce.
-    let invert = |matrix: &DMatrix<f64>| {
-        let faer_matrix = faer::Mat::from_fn(matrix.nrows(), matrix.ncols(), |i, j| matrix[(i, j)]);
-        let inverse = faer_matrix.partial_piv_lu().inverse();
-        let inverse = DMatrix::from_fn(matrix.nrows(), matrix.ncols(), |i, j| inverse[(i, j)]);
-        inverse
-            .iter()
-            .all(|value| value.is_finite())
-            .then_some(inverse)
-    };
-    let m = invert(&cxx).ok_or(SampleError::Covariance)?
+    let m = crate::linalg::inverse(&cxx).map_err(|_| SampleError::Covariance)?
         * &cxy
-        * invert(&cyy).ok_or(SampleError::Covariance)?
+        * crate::linalg::inverse(&cyy).map_err(|_| SampleError::Covariance)?
         * cxy.transpose();
     if m.iter().any(|v| !v.is_finite()) {
         return Err(SampleError::Covariance);
@@ -537,15 +523,11 @@ pub fn wilks_lambda(
             m[(j, i)]
         }
     });
-    let mut eigenvalues: Vec<_> = symmetric
-        .symmetric_eigen()
-        .eigenvalues
-        .iter()
-        .copied()
-        .collect();
-    eigenvalues.sort_by(|a, b| b.total_cmp(a));
+    let eigenvalues = crate::linalg::eigenvalues_symmetric_lower(&symmetric)
+        .map_err(|_| SampleError::Covariance)?;
     Ok(eigenvalues
         .iter()
+        .rev()
         .take(components.unwrap_or(eigenvalues.len()))
         .map(|v| 1.0 - v.max(0.0).abs())
         .product())

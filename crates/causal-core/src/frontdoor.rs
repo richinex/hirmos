@@ -330,10 +330,8 @@ fn response(values: &[f64], rows: Option<&[usize]>) -> DVector<f64> {
 
 /// Statsmodels OLS uses a Moore-Penrose pseudo-inverse with a `1e-15` singular-value cutoff.
 fn fit_ols(x: DMatrix<f64>, y: DVector<f64>) -> Result<Vec<f64>, FrontdoorError> {
-    let svd = x.svd(true, true);
-    let cutoff = 1e-15 * svd.singular_values.max();
-    svd.solve(&y, cutoff)
-        .map(|params| params.iter().copied().collect())
+    crate::ols::Ols::try_fit(&x, &y)
+        .map(|fit| fit.params.iter().copied().collect())
         .map_err(|_| FrontdoorError::LeastSquaresFailure)
 }
 

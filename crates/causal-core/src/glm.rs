@@ -1,6 +1,7 @@
 //! The two count estimators of 805 step 3f: `sm.GLM(family=Poisson()).fit()` by iteratively
 //! reweighted least squares, and `NegativeBinomialP(p=2).fit()` by BFGS.
 
+use crate::{least_squares, linalg};
 use nalgebra::{DMatrix, DVector};
 
 const FLOAT_EPS: f64 = f64::EPSILON;
@@ -22,25 +23,35 @@ fn lgamma(x: f64) -> f64 {
     spec_math::cephes64::lgam(x)
 }
 
-/// Weighted least squares through the normal equations, returning the parameters and
-/// `(X' W X)^-1`.
-fn wls(x: &DMatrix<f64>, y: &DVector<f64>, w: &[f64]) -> (DVector<f64>, DMatrix<f64>) {
-    let k = x.ncols();
-    let mut xtwx = DMatrix::<f64>::zeros(k, k);
-    let mut xtwy = DVector::<f64>::zeros(k);
-    for r in 0..x.nrows() {
-        for i in 0..k {
-            xtwy[i] += w[r] * x[(r, i)] * y[r];
-            for j in 0..k {
-                xtwx[(i, j)] += w[r] * x[(r, i)] * x[(r, j)];
-            }
-        }
-    }
-    let inv = xtwx
-        .clone()
-        .try_inverse()
-        .expect("weighted design is singular");
-    (&inv * xtwy, inv)
+fn weighted_design(
+    x: &DMatrix<f64>,
+    y: &DVector<f64>,
+    weights: &[f64],
+) -> (DMatrix<f64>, DMatrix<f64>) {
+    let design = DMatrix::from_fn(x.nrows(), x.ncols(), |row, column| {
+        weights[row].sqrt() * x[(row, column)]
+    });
+    let outcome = DMatrix::from_fn(y.len(), 1, |row, _| weights[row].sqrt() * y[row]);
+    (design, outcome)
+}
+
+/// `_MinimalWLS.fit(method="lstsq")`, used inside the GLM IRLS loop.
+fn wls_lstsq(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> DVector<f64> {
+    let (design, outcome) = weighted_design(x, y, weights);
+    least_squares::solve(&design, &outcome, -1.0)
+        .expect("DGELSD weighted least-squares fit")
+        .coefficients
+        .column(0)
+        .into_owned()
+}
+
+/// The final `WLS.fit(method="pinv")`, including its normalized covariance.
+fn wls_pinv(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> (DVector<f64>, DMatrix<f64>) {
+    let (design, outcome) = weighted_design(x, y, weights);
+    let inverse = linalg::pseudo_inverse(&design, 1e-15).expect("weighted pseudoinverse");
+    let params = (&inverse.matrix * outcome).column(0).into_owned();
+    let covariance = &inverse.matrix * inverse.matrix.transpose();
+    (params, covariance)
 }
 
 pub struct PoissonGlm {
@@ -91,7 +102,7 @@ pub fn poisson_glm(y: &[f64], x: &DMatrix<f64>) -> PoissonGlm {
             weights[i] = mu[i];
             wlsendog[i] = lin_pred[i] + (y[i] - mu[i]) / mu[i];
         }
-        params = wls(x, &wlsendog, &weights).0;
+        params = wls_lstsq(x, &wlsendog, &weights);
         for i in 0..n {
             lin_pred[i] = (0..x.ncols()).map(|j| x[(i, j)] * params[j]).sum();
             mu[i] = lin_pred[i].exp();
@@ -105,7 +116,7 @@ pub fn poisson_glm(y: &[f64], x: &DMatrix<f64>) -> PoissonGlm {
     }
 
     // statsmodels refits the final weighted problem to get the covariance.
-    let (_, xtwx_inv) = wls(x, &wlsendog, &weights);
+    let (_, xtwx_inv) = wls_pinv(x, &wlsendog, &weights);
     let scale = 1.0; // Poisson carries no dispersion parameter.
     let k = x.ncols();
     let bse: Vec<f64> = (0..k).map(|i| (scale * xtwx_inv[(i, i)]).sqrt()).collect();
@@ -151,11 +162,11 @@ pub fn poisson_mle(y: &[f64], x: &DMatrix<f64>) -> Vec<f64> {
                 }
             }
         }
-        let step = hess
-            .clone()
-            .try_inverse()
+        let score = DMatrix::from_column_slice(k, 1, score.as_slice());
+        let step = linalg::solve(&hess, &score)
             .expect("Poisson Hessian is singular")
-            * score;
+            .column(0)
+            .into_owned();
         let moved = step.amax();
         params -= step;
         if moved <= 1e-12 {
@@ -336,9 +347,8 @@ pub fn negative_binomial_p(
     );
 
     let params = res.x.clone();
-    let cov = (-model.hessian(&params))
-        .try_inverse()
-        .expect("negative binomial Hessian is singular");
+    let cov =
+        linalg::inverse(&(-model.hessian(&params))).expect("negative binomial Hessian is singular");
     let bse: Vec<f64> = (0..k + 1).map(|i| cov[(i, i)].sqrt()).collect();
     let tvalues: Vec<f64> = (0..k + 1).map(|i| params[i] / bse[i]).collect();
     let pvalues = tvalues

@@ -25,42 +25,45 @@ unsafe fn char_upper(p: *mut FChar) -> u8 {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn lsame_(a: *mut FChar, b: *mut FChar) -> FLogical {
+pub unsafe extern "C" fn dgelsd_closure_lsame_(a: *mut FChar, b: *mut FChar) -> FLogical {
     (char_upper(a) == char_upper(b)) as FLogical
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn xerbla_(_name: *mut FChar, _info: *mut FInt) -> core::ffi::c_int {
+pub unsafe extern "C" fn dgelsd_closure_xerbla_(
+    _name: *mut FChar,
+    _info: *mut FInt,
+) -> core::ffi::c_int {
     0
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dlamch_(cmach: *mut FChar) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_dlamch_(cmach: *mut FChar) -> FDouble {
     super::blas::dlamch(char_upper(cmach) as char)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn disnan_(x: *mut FDouble) -> FLogical {
+pub unsafe extern "C" fn dgelsd_closure_disnan_(x: *mut FDouble) -> FLogical {
     super::blas::disnan(*x) as FLogical
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dlamc3_(a: *mut FDouble, b: *mut FDouble) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_dlamc3_(a: *mut FDouble, b: *mut FDouble) -> FDouble {
     super::blas::dlamc3(core::ptr::read_volatile(a), core::ptr::read_volatile(b))
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dlapy2_(x: *mut FDouble, y: *mut FDouble) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_dlapy2_(x: *mut FDouble, y: *mut FDouble) -> FDouble {
     super::blas::dlapy2(*x, *y)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn d_sign(a: *mut FDouble, b: *mut FDouble) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_d_sign(a: *mut FDouble, b: *mut FDouble) -> FDouble {
     (*a).abs().copysign(*b)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pow_di(a: *mut FDouble, b: *mut FInt) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_pow_di(a: *mut FDouble, b: *mut FInt) -> FDouble {
     let mut x = *a;
     let mut n = *b;
     if n == 0 {
@@ -88,12 +91,12 @@ pub unsafe extern "C" fn pow_di(a: *mut FDouble, b: *mut FInt) -> FDouble {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pow_dd(a: *mut FDouble, b: *mut FDouble) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_pow_dd(a: *mut FDouble, b: *mut FDouble) -> FDouble {
     (*a).powf(*b)
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn pow_ii(a: *mut FInt, b: *mut FInt) -> FInt {
+pub unsafe extern "C" fn dgelsd_closure_pow_ii(a: *mut FInt, b: *mut FInt) -> FInt {
     let mut x = *a;
     let mut n = *b;
     if n < 0 {
@@ -139,7 +142,7 @@ unsafe fn step_ptr<T>(p: *mut T, i: FInt, inc: FInt) -> *mut T {
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_dcopy(
+pub unsafe extern "C" fn dgelsd_closure_f2c_dcopy(
     n: *mut FInt,
     x: *mut FDouble,
     incx: *mut FInt,
@@ -160,7 +163,7 @@ pub unsafe extern "C" fn f2c_dcopy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_dswap(
+pub unsafe extern "C" fn dgelsd_closure_f2c_dswap(
     n: *mut FInt,
     x: *mut FDouble,
     incx: *mut FInt,
@@ -181,7 +184,7 @@ pub unsafe extern "C" fn f2c_dswap(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_dscal(
+pub unsafe extern "C" fn dgelsd_closure_f2c_dscal(
     n: *mut FInt,
     alpha: *mut FDouble,
     x: *mut FDouble,
@@ -199,7 +202,7 @@ pub unsafe extern "C" fn f2c_dscal(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_drot(
+pub unsafe extern "C" fn dgelsd_closure_f2c_drot(
     n: *mut FInt,
     x: *mut FDouble,
     incx: *mut FInt,
@@ -225,7 +228,7 @@ pub unsafe extern "C" fn f2c_drot(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_ddot(
+pub unsafe extern "C" fn dgelsd_closure_f2c_ddot(
     n: *mut FInt,
     x: *mut FDouble,
     incx: *mut FInt,
@@ -248,7 +251,11 @@ pub unsafe extern "C" fn f2c_ddot(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_dnrm2(n: *mut FInt, x: *mut FDouble, incx: *mut FInt) -> FDouble {
+pub unsafe extern "C" fn dgelsd_closure_f2c_dnrm2(
+    n: *mut FInt,
+    x: *mut FDouble,
+    incx: *mut FInt,
+) -> FDouble {
     if *n < 1 || *incx < 1 {
         return 0.0;
     }
@@ -258,7 +265,11 @@ pub unsafe extern "C" fn f2c_dnrm2(n: *mut FInt, x: *mut FDouble, incx: *mut FIn
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_idamax(n: *mut FInt, x: *mut FDouble, incx: *mut FInt) -> FInt {
+pub unsafe extern "C" fn dgelsd_closure_f2c_idamax(
+    n: *mut FInt,
+    x: *mut FDouble,
+    incx: *mut FInt,
+) -> FInt {
     if *n < 1 || *incx <= 0 {
         return 0;
     }
@@ -268,7 +279,7 @@ pub unsafe extern "C" fn f2c_idamax(n: *mut FInt, x: *mut FDouble, incx: *mut FI
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_dgemv(
+pub unsafe extern "C" fn dgelsd_closure_f2c_dgemv(
     trans: *mut FChar,
     m: *mut FInt,
     n: *mut FInt,
@@ -328,7 +339,7 @@ pub unsafe extern "C" fn f2c_dgemv(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn f2c_dgemm(
+pub unsafe extern "C" fn dgelsd_closure_f2c_dgemm(
     ta: *mut FChar,
     tb: *mut FChar,
     m: *mut FInt,
@@ -396,7 +407,7 @@ pub unsafe extern "C" fn f2c_dgemm(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn dlacpy_(
+pub unsafe extern "C" fn dgelsd_closure_dlacpy_(
     uplo: *mut FChar,
     m: *mut FInt,
     n: *mut FInt,
@@ -408,7 +419,7 @@ pub unsafe extern "C" fn dlacpy_(
     let up = char_upper(uplo);
     for j in 0..*n {
         for i in 0..*m {
-            if up == b'A' || (up == b'U' && i <= j) || (up == b'L' && i >= j) {
+            if (up != b'U' && up != b'L') || (up == b'U' && i <= j) || (up == b'L' && i >= j) {
                 *b.offset((i + j * *ldb) as isize) = *a.offset((i + j * *lda) as isize);
             }
         }
@@ -416,8 +427,37 @@ pub unsafe extern "C" fn dlacpy_(
     0
 }
 
+#[cfg(test)]
+mod dlacpy_bridge_tests {
+    use super::dgelsd_closure_dlacpy_;
+
+    #[test]
+    fn full_selector_copies_every_logical_entry() {
+        let mut selector = b'F' as core::ffi::c_char;
+        let mut rows = 2;
+        let mut columns = 2;
+        let mut leading_dimension = 3;
+        let mut source = [1.0, 2.0, 99.0, 3.0, 4.0, 99.0];
+        let mut destination = [-1.0; 6];
+
+        unsafe {
+            dgelsd_closure_dlacpy_(
+                &mut selector,
+                &mut rows,
+                &mut columns,
+                source.as_mut_ptr(),
+                &mut leading_dimension,
+                destination.as_mut_ptr(),
+                &mut leading_dimension,
+            );
+        }
+
+        assert_eq!(destination, [1.0, 2.0, -1.0, 3.0, 4.0, -1.0]);
+    }
+}
+
 #[no_mangle]
-pub unsafe extern "C" fn dlassq_(
+pub unsafe extern "C" fn dgelsd_closure_dlassq_(
     n: *mut FInt,
     x: *mut FDouble,
     incx: *mut FInt,
@@ -440,7 +480,7 @@ pub unsafe extern "C" fn dlassq_(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ilaenv_(
+pub unsafe extern "C" fn dgelsd_closure_ilaenv_(
     ispec: *mut FInt,
     _name: *mut FChar,
     _opts: *mut FChar,
@@ -450,6 +490,10 @@ pub unsafe extern "C" fn ilaenv_(
     _n4: *mut FInt,
 ) -> FInt {
     match *ispec {
+        1 => 32,
+        2 => 2,
+        3 => 128,
+        9 => 25,
         10 | 11 => 1,
         _ => 1,
     }
@@ -475,7 +519,7 @@ pub mod raw_dbdsqr {
     static mut c_b49: doublereal = 1.0f64;
     static mut c_b72: doublereal = -1.0f64;
     #[no_mangle]
-    pub unsafe extern "C" fn dbdsqr_(
+    pub unsafe extern "C" fn dgelsd_closure_dbdsqr_(
         mut uplo: *mut ::core::ffi::c_char,
         mut n: *mut integer,
         mut ncvt: *mut integer,
@@ -506,11 +550,11 @@ pub mod raw_dbdsqr {
         let mut d__3: doublereal = 0.;
         let mut d__4: doublereal = 0.;
         extern "C" {
-            #[link_name = "pow_dd"]
+            #[link_name = "dgelsd_closure_pow_dd"]
             fn pow_dd_0(_: *mut doublereal, _: *mut doublereal) -> ::core::ffi::c_double;
         }
         extern "C" {
-            #[link_name = "d_sign"]
+            #[link_name = "dgelsd_closure_d_sign"]
             fn d_sign_0(_: *mut doublereal, _: *mut doublereal) -> ::core::ffi::c_double;
         }
         let mut f: doublereal = 0.;
@@ -545,7 +589,7 @@ pub mod raw_dbdsqr {
         let mut smax: doublereal = 0.;
         let mut sinr: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_drot"]
+            #[link_name = "dgelsd_closure_f2c_drot"]
             fn f2c_drot_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -557,7 +601,7 @@ pub mod raw_dbdsqr {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlas2_"]
+            #[link_name = "dgelsd_closure_dlas2_"]
             fn dlas2__0(
                 _: *mut doublereal,
                 _: *mut doublereal,
@@ -567,7 +611,7 @@ pub mod raw_dbdsqr {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "f2c_dscal"]
+            #[link_name = "dgelsd_closure_f2c_dscal"]
             fn f2c_dscal_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -576,12 +620,12 @@ pub mod raw_dbdsqr {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         let mut oldcs: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlasr_"]
+            #[link_name = "dgelsd_closure_dlasr_"]
             fn dlasr__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut ::core::ffi::c_char,
@@ -599,7 +643,7 @@ pub mod raw_dbdsqr {
         let mut sigmn: doublereal = 0.;
         let mut oldsn: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_dswap"]
+            #[link_name = "dgelsd_closure_f2c_dswap"]
             fn f2c_dswap_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -614,7 +658,7 @@ pub mod raw_dbdsqr {
         let mut sigmx: doublereal = 0.;
         let mut lower: logical = 0;
         extern "C" {
-            #[link_name = "dlasq1_"]
+            #[link_name = "dgelsd_closure_dlasq1_"]
             fn dlasq1__0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -624,7 +668,7 @@ pub mod raw_dbdsqr {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasv2_"]
+            #[link_name = "dgelsd_closure_dlasv2_"]
             fn dlasv2__0(
                 _: *mut doublereal,
                 _: *mut doublereal,
@@ -638,11 +682,11 @@ pub mod raw_dbdsqr {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlartg_"]
+            #[link_name = "dgelsd_closure_dlartg_"]
             fn dlartg__0(
                 _: *mut doublereal,
                 _: *mut doublereal,
@@ -652,7 +696,7 @@ pub mod raw_dbdsqr {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut sminoa: doublereal = 0.;
@@ -2067,7 +2111,7 @@ pub mod raw_dbdsqr {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dbdsqr::dbdsqr_;
+pub use raw_dbdsqr::dgelsd_closure_dbdsqr_;
 
 pub mod raw_dlalsd {
     #![allow(
@@ -2088,7 +2132,7 @@ pub mod raw_dlalsd {
     static mut c__0: integer = 0 as integer;
     static mut c_b11: doublereal = 1.0f64;
     #[no_mangle]
-    pub unsafe extern "C" fn dlalsd_(
+    pub unsafe extern "C" fn dgelsd_closure_dlalsd_(
         mut uplo: *mut ::core::ffi::c_char,
         mut smlsiz: *mut integer,
         mut n: *mut integer,
@@ -2109,7 +2153,7 @@ pub mod raw_dlalsd {
         let mut i__2: integer = 0;
         let mut d__1: doublereal = 0.;
         extern "C" {
-            #[link_name = "d_sign"]
+            #[link_name = "dgelsd_closure_d_sign"]
             fn d_sign_0(_: *mut doublereal, _: *mut doublereal) -> ::core::ffi::c_double;
         }
         let mut c__: integer = 0;
@@ -2136,7 +2180,7 @@ pub mod raw_dlalsd {
         let mut perm: integer = 0;
         let mut nsub: integer = 0;
         extern "C" {
-            #[link_name = "f2c_drot"]
+            #[link_name = "dgelsd_closure_f2c_drot"]
             fn f2c_drot_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -2151,7 +2195,7 @@ pub mod raw_dlalsd {
         let mut sqre: integer = 0;
         let mut bxst: integer = 0;
         extern "C" {
-            #[link_name = "f2c_dgemm"]
+            #[link_name = "dgelsd_closure_f2c_dgemm"]
             fn f2c_dgemm_0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut ::core::ffi::c_char,
@@ -2169,7 +2213,7 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -2185,11 +2229,11 @@ pub mod raw_dlalsd {
         let mut icmpq1: integer = 0;
         let mut icmpq2: integer = 0;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlasda_"]
+            #[link_name = "dgelsd_closure_dlasda_"]
             fn dlasda__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -2218,7 +2262,7 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlalsa_"]
+            #[link_name = "dgelsd_closure_dlalsa_"]
             fn dlalsa__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -2249,7 +2293,7 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlascl_"]
+            #[link_name = "dgelsd_closure_dlascl_"]
             fn dlascl__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -2264,11 +2308,11 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "f2c_idamax"]
+            #[link_name = "dgelsd_closure_f2c_idamax"]
             fn f2c_idamax_0(_: *mut integer, _: *mut doublereal, _: *mut integer) -> integer;
         }
         extern "C" {
-            #[link_name = "dlasdq_"]
+            #[link_name = "dgelsd_closure_dlasdq_"]
             fn dlasdq__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -2289,7 +2333,7 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlacpy_"]
+            #[link_name = "dgelsd_closure_dlacpy_"]
             fn dlacpy__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -2301,7 +2345,7 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlartg_"]
+            #[link_name = "dgelsd_closure_dlartg_"]
             fn dlartg__0(
                 _: *mut doublereal,
                 _: *mut doublereal,
@@ -2311,7 +2355,7 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlaset_"]
+            #[link_name = "dgelsd_closure_dlaset_"]
             fn dlaset__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -2323,12 +2367,12 @@ pub mod raw_dlalsd {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut givcol: integer = 0;
         extern "C" {
-            #[link_name = "dlanst_"]
+            #[link_name = "dgelsd_closure_dlanst_"]
             fn dlanst__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -2337,7 +2381,7 @@ pub mod raw_dlalsd {
             ) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlasrt_"]
+            #[link_name = "dgelsd_closure_dlasrt_"]
             fn dlasrt__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -3039,7 +3083,7 @@ pub mod raw_dlalsd {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlalsd::dlalsd_;
+pub use raw_dlalsd::dgelsd_closure_dlalsd_;
 
 pub mod raw_dlalsa {
     #![allow(
@@ -3056,7 +3100,7 @@ pub mod raw_dlalsa {
     static mut c_b8: doublereal = 0.0f64;
     static mut c__2: integer = 2 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlalsa_(
+    pub unsafe extern "C" fn dgelsd_closure_dlalsa_(
         mut icompq: *mut integer,
         mut smlsiz: *mut integer,
         mut n: *mut integer,
@@ -3109,7 +3153,7 @@ pub mod raw_dlalsa {
         let mut i__1: integer = 0;
         let mut i__2: integer = 0;
         extern "C" {
-            #[link_name = "pow_ii"]
+            #[link_name = "dgelsd_closure_pow_ii"]
             fn pow_ii_0(_: *mut integer, _: *mut integer) -> integer;
         }
         let mut i__: integer = 0;
@@ -3132,7 +3176,7 @@ pub mod raw_dlalsa {
         let mut nlvl: integer = 0;
         let mut sqre: integer = 0;
         extern "C" {
-            #[link_name = "f2c_dgemm"]
+            #[link_name = "dgelsd_closure_f2c_dgemm"]
             fn f2c_dgemm_0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut ::core::ffi::c_char,
@@ -3153,7 +3197,7 @@ pub mod raw_dlalsa {
         let mut ndiml: integer = 0;
         let mut ndimr: integer = 0;
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -3163,7 +3207,7 @@ pub mod raw_dlalsa {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlals0_"]
+            #[link_name = "dgelsd_closure_dlals0_"]
             fn dlals0__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -3192,7 +3236,7 @@ pub mod raw_dlalsa {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasdt_"]
+            #[link_name = "dgelsd_closure_dlasdt_"]
             fn dlasdt__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -3204,7 +3248,7 @@ pub mod raw_dlalsa {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         b_dim1 = *ldb;
@@ -3513,7 +3557,7 @@ pub mod raw_dlalsa {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlalsa::dlalsa_;
+pub use raw_dlalsa::dgelsd_closure_dlalsa_;
 
 pub mod raw_dlals0 {
     #![allow(
@@ -3532,7 +3576,7 @@ pub mod raw_dlals0 {
     static mut c_b13: doublereal = 0.0f64;
     static mut c__0: integer = 0 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlals0_(
+    pub unsafe extern "C" fn dgelsd_closure_dlals0_(
         mut icompq: *mut integer,
         mut nl: *mut integer,
         mut nr: *mut integer,
@@ -3581,7 +3625,7 @@ pub mod raw_dlals0 {
         let mut nlp1: integer = 0;
         let mut temp: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_drot"]
+            #[link_name = "dgelsd_closure_f2c_drot"]
             fn f2c_drot_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -3593,11 +3637,11 @@ pub mod raw_dlals0 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "f2c_dnrm2"]
+            #[link_name = "dgelsd_closure_f2c_dnrm2"]
             fn f2c_dnrm2_0(_: *mut integer, _: *mut doublereal, _: *mut integer) -> doublereal;
         }
         extern "C" {
-            #[link_name = "f2c_dscal"]
+            #[link_name = "dgelsd_closure_f2c_dscal"]
             fn f2c_dscal_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -3609,7 +3653,7 @@ pub mod raw_dlals0 {
         let mut difrj: doublereal = 0.;
         let mut dsigj: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_dgemv"]
+            #[link_name = "dgelsd_closure_f2c_dgemv"]
             fn f2c_dgemv_0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -3625,7 +3669,7 @@ pub mod raw_dlals0 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -3635,11 +3679,11 @@ pub mod raw_dlals0 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamc3_"]
+            #[link_name = "dgelsd_closure_dlamc3_"]
             fn dlamc3__0(_: *mut doublereal, _: *mut doublereal) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlascl_"]
+            #[link_name = "dgelsd_closure_dlascl_"]
             fn dlascl__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -3654,7 +3698,7 @@ pub mod raw_dlals0 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlacpy_"]
+            #[link_name = "dgelsd_closure_dlacpy_"]
             fn dlacpy__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -3666,7 +3710,7 @@ pub mod raw_dlals0 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut dsigjp: doublereal = 0.;
@@ -4081,7 +4125,7 @@ pub mod raw_dlals0 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlals0::dlals0_;
+pub use raw_dlals0::dgelsd_closure_dlals0_;
 
 pub mod raw_dlasda {
     #![allow(
@@ -4100,7 +4144,7 @@ pub mod raw_dlasda {
     static mut c__1: integer = 1 as integer;
     static mut c__2: integer = 2 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasda_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasda_(
         mut icompq: *mut integer,
         mut smlsiz: *mut integer,
         mut n: *mut integer,
@@ -4147,7 +4191,7 @@ pub mod raw_dlasda {
         let mut i__1: integer = 0;
         let mut i__2: integer = 0;
         extern "C" {
-            #[link_name = "pow_ii"]
+            #[link_name = "dgelsd_closure_pow_ii"]
             fn pow_ii_0(_: *mut integer, _: *mut integer) -> integer;
         }
         let mut i__: integer = 0;
@@ -4185,7 +4229,7 @@ pub mod raw_dlasda {
         let mut idxqi: integer = 0;
         let mut itemp: integer = 0;
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -4196,7 +4240,7 @@ pub mod raw_dlasda {
         }
         let mut sqrei: integer = 0;
         extern "C" {
-            #[link_name = "dlasd6_"]
+            #[link_name = "dgelsd_closure_dlasd6_"]
             fn dlasd6__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -4229,7 +4273,7 @@ pub mod raw_dlasda {
         let mut nwork1: integer = 0;
         let mut nwork2: integer = 0;
         extern "C" {
-            #[link_name = "dlasdq_"]
+            #[link_name = "dgelsd_closure_dlasdq_"]
             fn dlasdq__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -4250,7 +4294,7 @@ pub mod raw_dlasda {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasdt_"]
+            #[link_name = "dgelsd_closure_dlasdt_"]
             fn dlasdt__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -4262,7 +4306,7 @@ pub mod raw_dlasda {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlaset_"]
+            #[link_name = "dgelsd_closure_dlaset_"]
             fn dlaset__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -4274,7 +4318,7 @@ pub mod raw_dlasda {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut smlszp: integer = 0;
@@ -4743,7 +4787,7 @@ pub mod raw_dlasda {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasda::dlasda_;
+pub use raw_dlasda::dgelsd_closure_dlasda_;
 
 pub mod raw_dlasd4 {
     #![allow(
@@ -4763,7 +4807,7 @@ pub mod raw_dlasd4 {
     pub const TRUE_: ::core::ffi::c_int = 1 as ::core::ffi::c_int;
     pub const FALSE_: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasd4_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasd4_(
         mut n: *mut integer,
         mut i__: *mut integer,
         mut d__: *mut doublereal,
@@ -4811,7 +4855,7 @@ pub mod raw_dlasd4 {
         let mut swtch: logical = 0;
         let mut dtnsq: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlaed6_"]
+            #[link_name = "dgelsd_closure_dlaed6_"]
             fn dlaed6__0(
                 _: *mut integer,
                 _: *mut logical,
@@ -4824,7 +4868,7 @@ pub mod raw_dlasd4 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasd5_"]
+            #[link_name = "dgelsd_closure_dlasd5_"]
             fn dlasd5__0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -4839,7 +4883,7 @@ pub mod raw_dlasd4 {
         let mut dtnsq1: doublereal = 0.;
         let mut swtch3: logical = 0;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut orgati: logical = 0;
@@ -5938,7 +5982,7 @@ pub mod raw_dlasd4 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasd4::dlasd4_;
+pub use raw_dlasd4::dgelsd_closure_dlasd4_;
 
 pub mod raw_dlasd5 {
     #![allow(
@@ -5955,7 +5999,7 @@ pub mod raw_dlasd5 {
     pub type integer = ::core::ffi::c_long;
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasd5_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasd5_(
         mut i__: *mut integer,
         mut d__: *mut doublereal,
         mut z__: *mut doublereal,
@@ -6111,7 +6155,7 @@ pub mod raw_dlasd5 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasd5::dlasd5_;
+pub use raw_dlasd5::dgelsd_closure_dlasd5_;
 
 pub mod raw_dlasd6 {
     #![allow(
@@ -6129,7 +6173,7 @@ pub mod raw_dlasd6 {
     static mut c__1: integer = 1 as integer;
     static mut c_n1: integer = -(1 as ::core::ffi::c_int) as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasd6_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasd6_(
         mut icompq: *mut integer,
         mut nl: *mut integer,
         mut nr: *mut integer,
@@ -6178,7 +6222,7 @@ pub mod raw_dlasd6 {
         let mut ivfw: integer = 0;
         let mut ivlw: integer = 0;
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -6188,7 +6232,7 @@ pub mod raw_dlasd6 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasd7_"]
+            #[link_name = "dgelsd_closure_dlasd7_"]
             fn dlasd7__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -6220,7 +6264,7 @@ pub mod raw_dlasd6 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasd8_"]
+            #[link_name = "dgelsd_closure_dlasd8_"]
             fn dlasd8__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -6237,7 +6281,7 @@ pub mod raw_dlasd6 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlascl_"]
+            #[link_name = "dgelsd_closure_dlascl_"]
             fn dlascl__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -6252,7 +6296,7 @@ pub mod raw_dlasd6 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamrg_"]
+            #[link_name = "dgelsd_closure_dlamrg_"]
             fn dlamrg__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -6264,7 +6308,7 @@ pub mod raw_dlasd6 {
         }
         let mut isigma: integer = 0;
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut orgnrm: doublereal = 0.;
@@ -6456,7 +6500,7 @@ pub mod raw_dlasd6 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasd6::dlasd6_;
+pub use raw_dlasd6::dgelsd_closure_dlasd6_;
 
 pub mod raw_dlasd7 {
     #![allow(
@@ -6471,7 +6515,7 @@ pub mod raw_dlasd7 {
     pub type doublereal = ::core::ffi::c_double;
     static mut c__1: integer = 1 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasd7_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasd7_(
         mut icompq: *mut integer,
         mut nl: *mut integer,
         mut nr: *mut integer,
@@ -6523,7 +6567,7 @@ pub mod raw_dlasd7 {
         let mut idxi: integer = 0;
         let mut idxj: integer = 0;
         extern "C" {
-            #[link_name = "f2c_drot"]
+            #[link_name = "dgelsd_closure_f2c_drot"]
             fn f2c_drot_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -6536,7 +6580,7 @@ pub mod raw_dlasd7 {
         }
         let mut idxjp: integer = 0;
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -6547,15 +6591,15 @@ pub mod raw_dlasd7 {
         }
         let mut jprev: integer = 0;
         extern "C" {
-            #[link_name = "dlapy2_"]
+            #[link_name = "dgelsd_closure_dlapy2_"]
             fn dlapy2__0(_: *mut doublereal, _: *mut doublereal) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlamrg_"]
+            #[link_name = "dgelsd_closure_dlamrg_"]
             fn dlamrg__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -6566,7 +6610,7 @@ pub mod raw_dlasd7 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut hlftol: doublereal = 0.;
@@ -6944,7 +6988,7 @@ pub mod raw_dlasd7 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasd7::dlasd7_;
+pub use raw_dlasd7::dgelsd_closure_dlasd7_;
 
 pub mod raw_dlasd8 {
     #![allow(
@@ -6964,7 +7008,7 @@ pub mod raw_dlasd8 {
     static mut c__0: integer = 0 as integer;
     static mut c_b8: doublereal = 1.0f64;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasd8_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasd8_(
         mut icompq: *mut integer,
         mut k: *mut integer,
         mut d__: *mut doublereal,
@@ -6985,7 +7029,7 @@ pub mod raw_dlasd8 {
         let mut d__1: doublereal = 0.;
         let mut d__2: doublereal = 0.;
         extern "C" {
-            #[link_name = "d_sign"]
+            #[link_name = "dgelsd_closure_d_sign"]
             fn d_sign_0(_: *mut doublereal, _: *mut doublereal) -> ::core::ffi::c_double;
         }
         let mut i__: integer = 0;
@@ -6996,7 +7040,7 @@ pub mod raw_dlasd8 {
         let mut iwk2: integer = 0;
         let mut iwk3: integer = 0;
         extern "C" {
-            #[link_name = "f2c_ddot"]
+            #[link_name = "dgelsd_closure_f2c_ddot"]
             fn f2c_ddot_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -7007,7 +7051,7 @@ pub mod raw_dlasd8 {
         }
         let mut temp: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_dnrm2"]
+            #[link_name = "dgelsd_closure_f2c_dnrm2"]
             fn f2c_dnrm2_0(_: *mut integer, _: *mut doublereal, _: *mut integer) -> doublereal;
         }
         let mut iwk2i: integer = 0;
@@ -7016,7 +7060,7 @@ pub mod raw_dlasd8 {
         let mut difrj: doublereal = 0.;
         let mut dsigj: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -7026,11 +7070,11 @@ pub mod raw_dlasd8 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamc3_"]
+            #[link_name = "dgelsd_closure_dlamc3_"]
             fn dlamc3__0(_: *mut doublereal, _: *mut doublereal) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlasd4_"]
+            #[link_name = "dgelsd_closure_dlasd4_"]
             fn dlasd4__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -7044,7 +7088,7 @@ pub mod raw_dlasd8 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlascl_"]
+            #[link_name = "dgelsd_closure_dlascl_"]
             fn dlascl__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -7059,7 +7103,7 @@ pub mod raw_dlasd8 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlaset_"]
+            #[link_name = "dgelsd_closure_dlaset_"]
             fn dlaset__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -7071,7 +7115,7 @@ pub mod raw_dlasd8 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut dsigjp: doublereal = 0.;
@@ -7298,7 +7342,7 @@ pub mod raw_dlasd8 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasd8::dlasd8_;
+pub use raw_dlasd8::dgelsd_closure_dlasd8_;
 
 pub mod raw_dlaed6 {
     #![allow(
@@ -7319,7 +7363,7 @@ pub mod raw_dlaed6 {
     pub const TRUE_: ::core::ffi::c_int = 1 as ::core::ffi::c_int;
     pub const FALSE_: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
     #[no_mangle]
-    pub unsafe extern "C" fn dlaed6_(
+    pub unsafe extern "C" fn dgelsd_closure_dlaed6_(
         mut kniter: *mut integer,
         mut orgati: *mut logical,
         mut rho: *mut doublereal,
@@ -7336,7 +7380,7 @@ pub mod raw_dlaed6 {
         let mut d__3: doublereal = 0.;
         let mut d__4: doublereal = 0.;
         extern "C" {
-            #[link_name = "pow_di"]
+            #[link_name = "dgelsd_closure_pow_di"]
             fn pow_di_0(_: *mut doublereal, _: *mut integer) -> ::core::ffi::c_double;
         }
         let mut a: doublereal = 0.;
@@ -7365,7 +7409,7 @@ pub mod raw_dlaed6 {
         let mut sminv1: doublereal = 0.;
         let mut sminv2: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut dscale: [doublereal; 3] = [0.; 3];
@@ -7786,7 +7830,7 @@ pub mod raw_dlaed6 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlaed6::dlaed6_;
+pub use raw_dlaed6::dgelsd_closure_dlaed6_;
 
 pub mod raw_dlamrg {
     #![allow(
@@ -7800,7 +7844,7 @@ pub mod raw_dlamrg {
     pub type integer = ::core::ffi::c_long;
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlamrg_(
+    pub unsafe extern "C" fn dgelsd_closure_dlamrg_(
         mut n1: *mut integer,
         mut n2: *mut integer,
         mut a: *mut doublereal,
@@ -7864,7 +7908,7 @@ pub mod raw_dlamrg {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlamrg::dlamrg_;
+pub use raw_dlamrg::dgelsd_closure_dlamrg_;
 
 pub mod raw_dlanst {
     #![allow(
@@ -7883,7 +7927,7 @@ pub mod raw_dlanst {
     pub type logical = ::core::ffi::c_long;
     static mut c__1: integer = 1 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlanst_(
+    pub unsafe extern "C" fn dgelsd_closure_dlanst_(
         mut norm: *mut ::core::ffi::c_char,
         mut n: *mut integer,
         mut d__: *mut doublereal,
@@ -7900,12 +7944,12 @@ pub mod raw_dlanst {
         let mut sum: doublereal = 0.;
         let mut scale: doublereal = 0.;
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         let mut anorm: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlassq_"]
+            #[link_name = "dgelsd_closure_dlassq_"]
             fn dlassq__0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -8070,7 +8114,7 @@ pub mod raw_dlanst {
         return ret_val;
     }
 }
-pub use raw_dlanst::dlanst_;
+pub use raw_dlanst::dgelsd_closure_dlanst_;
 
 pub mod raw_dlas2 {
     #![allow(
@@ -8086,7 +8130,7 @@ pub mod raw_dlas2 {
     }
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlas2_(
+    pub unsafe extern "C" fn dgelsd_closure_dlas2_(
         mut f: *mut doublereal,
         mut g: *mut doublereal,
         mut h__: *mut doublereal,
@@ -8184,7 +8228,7 @@ pub mod raw_dlas2 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlas2::dlas2_;
+pub use raw_dlas2::dgelsd_closure_dlas2_;
 
 pub mod raw_dlascl {
     #![allow(
@@ -8201,7 +8245,7 @@ pub mod raw_dlascl {
     pub const TRUE_: ::core::ffi::c_int = 1 as ::core::ffi::c_int;
     pub const FALSE_: ::core::ffi::c_int = 0 as ::core::ffi::c_int;
     #[no_mangle]
-    pub unsafe extern "C" fn dlascl_(
+    pub unsafe extern "C" fn dgelsd_closure_dlascl_(
         mut type__: *mut ::core::ffi::c_char,
         mut kl: *mut integer,
         mut ku: *mut integer,
@@ -8231,22 +8275,22 @@ pub mod raw_dlascl {
         let mut done: logical = 0;
         let mut ctoc: doublereal = 0.;
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         let mut itype: integer = 0;
         let mut cfrom1: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut cfromc: doublereal = 0.;
         extern "C" {
-            #[link_name = "disnan_"]
+            #[link_name = "dgelsd_closure_disnan_"]
             fn disnan__0(_: *mut doublereal) -> logical;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut bignum: doublereal = 0.;
@@ -8552,7 +8596,7 @@ pub mod raw_dlascl {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlascl::dlascl_;
+pub use raw_dlascl::dgelsd_closure_dlascl_;
 
 pub mod raw_dlasdq {
     #![allow(
@@ -8568,7 +8612,7 @@ pub mod raw_dlasdq {
     pub type logical = ::core::ffi::c_long;
     static mut c__1: integer = 1 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasdq_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasdq_(
         mut uplo: *mut ::core::ffi::c_char,
         mut sqre: *mut integer,
         mut n: *mut integer,
@@ -8604,11 +8648,11 @@ pub mod raw_dlasdq {
         let mut smin: doublereal = 0.;
         let mut sqre1: integer = 0;
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         extern "C" {
-            #[link_name = "dlasr_"]
+            #[link_name = "dgelsd_closure_dlasr_"]
             fn dlasr__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut ::core::ffi::c_char,
@@ -8622,7 +8666,7 @@ pub mod raw_dlasdq {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "f2c_dswap"]
+            #[link_name = "dgelsd_closure_f2c_dswap"]
             fn f2c_dswap_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -8633,7 +8677,7 @@ pub mod raw_dlasdq {
         }
         let mut iuplo: integer = 0;
         extern "C" {
-            #[link_name = "dlartg_"]
+            #[link_name = "dgelsd_closure_dlartg_"]
             fn dlartg__0(
                 _: *mut doublereal,
                 _: *mut doublereal,
@@ -8643,11 +8687,11 @@ pub mod raw_dlasdq {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dbdsqr_"]
+            #[link_name = "dgelsd_closure_dbdsqr_"]
             fn dbdsqr__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -8979,7 +9023,7 @@ pub mod raw_dlasdq {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasdq::dlasdq_;
+pub use raw_dlasdq::dgelsd_closure_dlasdq_;
 
 pub mod raw_dlasdt {
     #![allow(
@@ -8996,7 +9040,7 @@ pub mod raw_dlasdt {
     pub type integer = ::core::ffi::c_long;
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasdt_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasdt_(
         mut n: *mut integer,
         mut lvl: *mut integer,
         mut nd: *mut integer,
@@ -9077,7 +9121,7 @@ pub mod raw_dlasdt {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasdt::dlasdt_;
+pub use raw_dlasdt::dgelsd_closure_dlasdt_;
 
 pub mod raw_dlaset {
     #![allow(
@@ -9092,7 +9136,7 @@ pub mod raw_dlaset {
     pub type doublereal = ::core::ffi::c_double;
     pub type logical = ::core::ffi::c_long;
     #[no_mangle]
-    pub unsafe extern "C" fn dlaset_(
+    pub unsafe extern "C" fn dgelsd_closure_dlaset_(
         mut uplo: *mut ::core::ffi::c_char,
         mut m: *mut integer,
         mut n: *mut integer,
@@ -9109,7 +9153,7 @@ pub mod raw_dlaset {
         let mut i__: integer = 0;
         let mut j: integer = 0;
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         a_dim1 = *lda;
@@ -9174,7 +9218,7 @@ pub mod raw_dlaset {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlaset::dlaset_;
+pub use raw_dlaset::dgelsd_closure_dlaset_;
 
 pub mod raw_dlasq1 {
     #![allow(
@@ -9194,7 +9238,7 @@ pub mod raw_dlasq1 {
     static mut c__2: integer = 2 as integer;
     static mut c__0: integer = 0 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasq1_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasq1_(
         mut n: *mut integer,
         mut d__: *mut doublereal,
         mut e: *mut doublereal,
@@ -9209,7 +9253,7 @@ pub mod raw_dlasq1 {
         let mut i__: integer = 0;
         let mut eps: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlas2_"]
+            #[link_name = "dgelsd_closure_dlas2_"]
             fn dlas2__0(
                 _: *mut doublereal,
                 _: *mut doublereal,
@@ -9222,7 +9266,7 @@ pub mod raw_dlasq1 {
         let mut iinfo: integer = 0;
         let mut sigmn: doublereal = 0.;
         extern "C" {
-            #[link_name = "f2c_dcopy"]
+            #[link_name = "dgelsd_closure_f2c_dcopy"]
             fn f2c_dcopy_0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -9233,7 +9277,7 @@ pub mod raw_dlasq1 {
         }
         let mut sigmx: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlasq2_"]
+            #[link_name = "dgelsd_closure_dlasq2_"]
             fn dlasq2__0(
                 _: *mut integer,
                 _: *mut doublereal,
@@ -9241,11 +9285,11 @@ pub mod raw_dlasq1 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         extern "C" {
-            #[link_name = "dlascl_"]
+            #[link_name = "dgelsd_closure_dlascl_"]
             fn dlascl__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -9261,11 +9305,11 @@ pub mod raw_dlasq1 {
         }
         let mut safmin: doublereal = 0.;
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasrt_"]
+            #[link_name = "dgelsd_closure_dlasrt_"]
             fn dlasrt__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -9435,7 +9479,7 @@ pub mod raw_dlasq1 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasq1::dlasq1_;
+pub use raw_dlasq1::dgelsd_closure_dlasq1_;
 
 pub mod raw_dlasq2 {
     #![allow(
@@ -9459,7 +9503,7 @@ pub mod raw_dlasq2 {
     static mut c__4: integer = 4 as integer;
     static mut c__11: integer = 11 as integer;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasq2_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasq2_(
         mut n: *mut integer,
         mut z__: *mut doublereal,
         mut info: *mut integer,
@@ -9511,7 +9555,7 @@ pub mod raw_dlasq2 {
         let mut iinfo: integer = 0;
         let mut ttype: integer = 0;
         extern "C" {
-            #[link_name = "dlasq3_"]
+            #[link_name = "dgelsd_closure_dlasq3_"]
             fn dlasq3__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -9536,7 +9580,7 @@ pub mod raw_dlasq2 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut deemin: doublereal = 0.;
@@ -9545,11 +9589,11 @@ pub mod raw_dlasq2 {
         let mut oldemn: doublereal = 0.;
         let mut safmin: doublereal = 0.;
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "ilaenv_"]
+            #[link_name = "dgelsd_closure_ilaenv_"]
             fn ilaenv__0(
                 _: *mut integer,
                 _: *mut ::core::ffi::c_char,
@@ -9561,7 +9605,7 @@ pub mod raw_dlasq2 {
             ) -> integer;
         }
         extern "C" {
-            #[link_name = "dlasrt_"]
+            #[link_name = "dgelsd_closure_dlasrt_"]
             fn dlasrt__0(
                 _: *mut ::core::ffi::c_char,
                 _: *mut integer,
@@ -10395,7 +10439,7 @@ pub mod raw_dlasq2 {
         };
     }
 }
-pub use raw_dlasq2::dlasq2_;
+pub use raw_dlasq2::dgelsd_closure_dlasq2_;
 
 pub mod raw_dlasq3 {
     #![allow(
@@ -10413,7 +10457,7 @@ pub mod raw_dlasq3 {
     pub type doublereal = ::core::ffi::c_double;
     pub type logical = ::core::ffi::c_long;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasq3_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasq3_(
         mut i0: *mut integer,
         mut n0: *mut integer,
         mut z__: *mut doublereal,
@@ -10450,7 +10494,7 @@ pub mod raw_dlasq3 {
         let mut tol2: doublereal = 0.;
         let mut temp: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlasq4_"]
+            #[link_name = "dgelsd_closure_dlasq4_"]
             fn dlasq4__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -10469,7 +10513,7 @@ pub mod raw_dlasq3 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasq5_"]
+            #[link_name = "dgelsd_closure_dlasq5_"]
             fn dlasq5__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -10486,7 +10530,7 @@ pub mod raw_dlasq3 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlasq6_"]
+            #[link_name = "dgelsd_closure_dlasq6_"]
             fn dlasq6__0(
                 _: *mut integer,
                 _: *mut integer,
@@ -10501,11 +10545,11 @@ pub mod raw_dlasq3 {
             ) -> ::core::ffi::c_int;
         }
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         extern "C" {
-            #[link_name = "disnan_"]
+            #[link_name = "dgelsd_closure_disnan_"]
             fn disnan__0(_: *mut doublereal) -> logical;
         }
         z__ = z__.wrapping_offset(-1);
@@ -10914,7 +10958,7 @@ pub mod raw_dlasq3 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasq3::dlasq3_;
+pub use raw_dlasq3::dgelsd_closure_dlasq3_;
 
 pub mod raw_dlasq4 {
     #![allow(
@@ -10931,7 +10975,7 @@ pub mod raw_dlasq4 {
     pub type integer = ::core::ffi::c_long;
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasq4_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasq4_(
         mut i0: *mut integer,
         mut n0: *mut integer,
         mut z__: *mut doublereal,
@@ -11349,7 +11393,7 @@ pub mod raw_dlasq4 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasq4::dlasq4_;
+pub use raw_dlasq4::dgelsd_closure_dlasq4_;
 
 pub mod raw_dlasq5 {
     #![allow(
@@ -11364,7 +11408,7 @@ pub mod raw_dlasq5 {
     pub type doublereal = ::core::ffi::c_double;
     pub type logical = ::core::ffi::c_long;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasq5_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasq5_(
         mut i0: *mut integer,
         mut n0: *mut integer,
         mut z__: *mut doublereal,
@@ -11623,7 +11667,7 @@ pub mod raw_dlasq5 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasq5::dlasq5_;
+pub use raw_dlasq5::dgelsd_closure_dlasq5_;
 
 pub mod raw_dlasq6 {
     #![allow(
@@ -11637,7 +11681,7 @@ pub mod raw_dlasq6 {
     pub type integer = ::core::ffi::c_long;
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasq6_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasq6_(
         mut i0: *mut integer,
         mut n0: *mut integer,
         mut z__: *mut doublereal,
@@ -11658,7 +11702,7 @@ pub mod raw_dlasq6 {
         let mut emin: doublereal = 0.;
         let mut temp: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut safmin: doublereal = 0.;
@@ -11865,7 +11909,7 @@ pub mod raw_dlasq6 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasq6::dlasq6_;
+pub use raw_dlasq6::dgelsd_closure_dlasq6_;
 
 pub mod raw_dlasr {
     #![allow(
@@ -11880,7 +11924,7 @@ pub mod raw_dlasr {
     pub type doublereal = ::core::ffi::c_double;
     pub type logical = ::core::ffi::c_long;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasr_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasr_(
         mut side: *mut ::core::ffi::c_char,
         mut pivot: *mut ::core::ffi::c_char,
         mut direct: *mut ::core::ffi::c_char,
@@ -11900,13 +11944,13 @@ pub mod raw_dlasr {
         let mut info: integer = 0;
         let mut temp: doublereal = 0.;
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         let mut ctemp: doublereal = 0.;
         let mut stemp: doublereal = 0.;
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         c__ = c__.wrapping_offset(-1);
@@ -12346,7 +12390,7 @@ pub mod raw_dlasr {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasr::dlasr_;
+pub use raw_dlasr::dgelsd_closure_dlasr_;
 
 pub mod raw_dlasrt {
     #![allow(
@@ -12361,7 +12405,7 @@ pub mod raw_dlasrt {
     pub type doublereal = ::core::ffi::c_double;
     pub type logical = ::core::ffi::c_long;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasrt_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasrt_(
         mut id: *mut ::core::ffi::c_char,
         mut n: *mut integer,
         mut d__: *mut doublereal,
@@ -12378,14 +12422,14 @@ pub mod raw_dlasrt {
         let mut tmp: doublereal = 0.;
         let mut endd: integer = 0;
         extern "C" {
-            #[link_name = "lsame_"]
+            #[link_name = "dgelsd_closure_lsame_"]
             fn lsame__0(_: *mut ::core::ffi::c_char, _: *mut ::core::ffi::c_char) -> logical;
         }
         let mut stack: [integer; 64] = [0; 64];
         let mut dmnmx: doublereal = 0.;
         let mut start: integer = 0;
         extern "C" {
-            #[link_name = "xerbla_"]
+            #[link_name = "dgelsd_closure_xerbla_"]
             fn xerbla__0(_: *mut ::core::ffi::c_char, _: *mut integer) -> ::core::ffi::c_int;
         }
         let mut stkpnt: integer = 0;
@@ -12613,7 +12657,7 @@ pub mod raw_dlasrt {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasrt::dlasrt_;
+pub use raw_dlasrt::dgelsd_closure_dlasrt_;
 
 pub mod raw_dlasv2 {
     #![allow(
@@ -12635,7 +12679,7 @@ pub mod raw_dlasv2 {
     static mut c_b3: doublereal = 2.0f64;
     static mut c_b4: doublereal = 1.0f64;
     #[no_mangle]
-    pub unsafe extern "C" fn dlasv2_(
+    pub unsafe extern "C" fn dgelsd_closure_dlasv2_(
         mut f: *mut doublereal,
         mut g: *mut doublereal,
         mut h__: *mut doublereal,
@@ -12648,7 +12692,7 @@ pub mod raw_dlasv2 {
     ) -> ::core::ffi::c_int {
         let mut d__1: doublereal = 0.;
         extern "C" {
-            #[link_name = "d_sign"]
+            #[link_name = "dgelsd_closure_d_sign"]
             fn d_sign_0(_: *mut doublereal, _: *mut doublereal) -> ::core::ffi::c_double;
         }
         let mut a: doublereal = 0.;
@@ -12675,7 +12719,7 @@ pub mod raw_dlasv2 {
         let mut swap: logical = 0;
         let mut tsign: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut gasmal: logical = 0;
@@ -12820,7 +12864,7 @@ pub mod raw_dlasv2 {
         return 0 as ::core::ffi::c_int;
     }
 }
-pub use raw_dlasv2::dlasv2_;
+pub use raw_dlasv2::dgelsd_closure_dlasv2_;
 
 pub mod raw_dlartg {
     #![allow(
@@ -12838,7 +12882,7 @@ pub mod raw_dlartg {
     pub type integer = ::core::ffi::c_long;
     pub type doublereal = ::core::ffi::c_double;
     #[no_mangle]
-    pub unsafe extern "C" fn dlartg_old_(
+    pub unsafe extern "C" fn dgelsd_closure_dlartg_old_(
         mut f: *mut doublereal,
         mut g: *mut doublereal,
         mut cs: *mut doublereal,
@@ -12849,7 +12893,7 @@ pub mod raw_dlartg {
         let mut d__1: doublereal = 0.;
         let mut d__2: doublereal = 0.;
         extern "C" {
-            #[link_name = "pow_di"]
+            #[link_name = "dgelsd_closure_pow_di"]
             fn pow_di_0(_: *mut doublereal, _: *mut integer) -> ::core::ffi::c_double;
         }
         let mut i__: integer = 0;
@@ -12861,7 +12905,7 @@ pub mod raw_dlartg {
         let mut safmn2: doublereal = 0.;
         let mut safmx2: doublereal = 0.;
         extern "C" {
-            #[link_name = "dlamch_"]
+            #[link_name = "dgelsd_closure_dlamch_"]
             fn dlamch__0(_: *mut ::core::ffi::c_char) -> doublereal;
         }
         let mut safmin: doublereal = 0.;
@@ -13005,15 +13049,15 @@ pub mod raw_dlartg {
     }
 }
 #[allow(unused_imports)]
-pub use raw_dlartg::dlartg_old_;
+pub use raw_dlartg::dgelsd_closure_dlartg_old_;
 
 /// LAPACK 3.12.1 `DLARTG` (February 2021 Anderson safe-scaling revision).
 ///
-/// CLAPACK's generated routine above is retained under `dlartg_old_` solely
+/// CLAPACK's generated routine above is retained under `dgelsd_closure_dlartg_old_` solely
 /// as a mechanical audit trail; all translated callers resolve this current
-/// source implementation through the `dlartg_` symbol.
+/// source implementation through the `dgelsd_closure_dlartg_` symbol.
 #[no_mangle]
-pub unsafe extern "C" fn dlartg_(
+pub unsafe extern "C" fn dgelsd_closure_dlartg_(
     f: *mut FDouble,
     g: *mut FDouble,
     c: *mut FDouble,
@@ -13067,7 +13111,7 @@ mod oracle_tests {
         );
     }
 
-    /// Fingerprints produced by the SciPy-bundled OpenBLAS `dlalsd_`.
+    /// Fingerprints produced by the SciPy-bundled OpenBLAS `dgelsd_closure_dlalsd_`.
     /// Inputs use ordinary base pointers, exactly as the DGELSD driver does.
     fn dlalsd_fingerprint(
         n0: usize,
@@ -13112,7 +13156,7 @@ mod oracle_tests {
         let mut rcond = -1.0;
         let mut uplo = if lower { b'L' as FChar } else { b'U' as FChar };
         unsafe {
-            dlalsd_(
+            dgelsd_closure_dlalsd_(
                 &mut uplo,
                 &mut smlsiz,
                 &mut n,
@@ -13339,7 +13383,7 @@ mod oracle_tests {
             let mut work = [0.0; 4];
             let mut info = 0 as FInt;
             unsafe {
-                dlasd4_(
+                dgelsd_closure_dlasd4_(
                     &mut n,
                     &mut i,
                     d.as_mut_ptr(),
@@ -13371,7 +13415,7 @@ mod oracle_tests {
         let mut work = [0.0; 12];
         let mut info = 0 as FInt;
         unsafe {
-            dlasd8_(
+            dgelsd_closure_dlasd8_(
                 &mut icompq,
                 &mut k,
                 d.as_mut_ptr(),

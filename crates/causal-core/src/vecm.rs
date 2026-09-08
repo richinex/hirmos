@@ -3,6 +3,7 @@
 //! relation, including the alpha inference the 805 workflow reads.
 
 use crate::coint::coint_johansen;
+use crate::{least_squares, linalg};
 use nalgebra::{DMatrix, DVector};
 
 fn norm_sf(x: f64) -> f64 {
@@ -10,9 +11,9 @@ fn norm_sf(x: f64) -> f64 {
 }
 
 fn min_norm_lstsq(a: &DMatrix<f64>, b: &DMatrix<f64>) -> DMatrix<f64> {
-    let svd = a.clone().svd(true, true);
-    let eps = 1e-15 * svd.singular_values.max();
-    svd.solve(b, eps).expect("svd solve failed")
+    least_squares::solve(a, b, 1e-15)
+        .expect("DGELSD least-squares solve failed")
+        .coefficients
 }
 
 /// vecm.select_order at the 805 call: returns the AIC-selected k_ar_diff.
@@ -55,10 +56,8 @@ pub fn vecm_select_order(endog: &[Vec<f64>], maxlags: usize, deterministic: &str
         let df_resid = (nobs - (k * p + 1 + n_exog)) as f64;
         let sse = resid.transpose() * &resid;
         let sigma_u_mle = sse / df_resid * (df_resid / nobs as f64);
-        let chol = sigma_u_mle
-            .cholesky()
+        let ld = linalg::logdet_positive_definite_lower(&sigma_u_mle)
             .expect("sigma_u not positive definite");
-        let ld = 2.0 * chol.l().diagonal().iter().map(|v| v.ln()).sum::<f64>();
         let free_params = (p * k * k + k * (1 + n_exog)) as f64;
         aics.push(ld + 2.0 / nobs as f64 * free_params);
     }
@@ -100,14 +99,16 @@ pub struct VecmResult {
 }
 
 fn mat_sqrt(m: &DMatrix<f64>) -> DMatrix<f64> {
-    let svd = m.clone().svd(true, true);
-    let u = svd.u.as_ref().unwrap();
-    let vt = svd.v_t.as_ref().unwrap();
-    let mut s = DMatrix::<f64>::zeros(u.ncols(), vt.nrows());
-    for i in 0..svd.singular_values.len() {
-        s[(i, i)] = svd.singular_values[i].sqrt();
-    }
-    u * s * vt
+    let decomposition = linalg::svd_some(m).expect("DGESDD matrix square root failed");
+    let scaled_right = DMatrix::from_fn(
+        decomposition.right_transposed.nrows(),
+        decomposition.right_transposed.ncols(),
+        |row, column| {
+            decomposition.singular_values[row].sqrt()
+                * decomposition.right_transposed[(row, column)]
+        },
+    );
+    decomposition.left * scaled_right
 }
 
 /// VECM(endog, k_ar_diff, coint_rank, deterministic).fit() by maximum likelihood.
@@ -155,10 +156,7 @@ pub fn vecm_fit(
 
     // Residualize on delta_x.
     let dx_dx = &delta_x * delta_x.transpose();
-    let dx_dx_inv = dx_dx
-        .clone()
-        .try_inverse()
-        .expect("delta_x'delta_x singular");
+    let dx_dx_inv = linalg::inverse(&dx_dx).expect("delta_x'delta_x singular");
     let residualize = |m: &DMatrix<f64>| -> DMatrix<f64> {
         m - &(m * delta_x.transpose()) * &dx_dx_inv * &delta_x
     };
@@ -168,9 +166,9 @@ pub fn vecm_fit(
     let s00 = &r0 * r0.transpose() / t as f64;
     let s01 = &r0 * r1.transpose() / t as f64;
     let s11 = &r1 * r1.transpose() / t as f64;
-    let s11_ = mat_sqrt(&s11).try_inverse().expect("sqrt(s11) singular");
+    let s11_ = linalg::inverse(&mat_sqrt(&s11)).expect("sqrt(s11) singular");
     let s01_s11_ = &s01 * &s11_;
-    let s00_inv = s00.clone().try_inverse().expect("s00 singular");
+    let s00_inv = linalg::inverse(&s00).expect("s00 singular");
     let m = s01_s11_.transpose() * &s00_inv * &s01_s11_;
     let sym = nalgebra::SymmetricEigen::new((&m + &m.transpose()) * 0.5);
     let mut order: Vec<usize> = (0..sym.eigenvalues.len()).collect();
@@ -184,14 +182,9 @@ pub fn vecm_fit(
     }
 
     let beta_raw = &s11_ * v;
-    let top = beta_raw
-        .rows(0, r)
-        .into_owned()
-        .try_inverse()
-        .expect("beta top block singular");
+    let top = linalg::inverse(&beta_raw.rows(0, r).into_owned()).expect("beta top block singular");
     let beta_full = beta_raw * top;
-    let bsb = (beta_full.transpose() * &s11 * &beta_full)
-        .try_inverse()
+    let bsb = linalg::inverse(&(beta_full.transpose() * &s11 * &beta_full))
         .expect("beta'S11 beta singular");
     let alpha = &s01 * &beta_full * bsb;
     let gamma = (&delta_y_1_t - &alpha * beta_full.transpose() * &y_lag1)
@@ -226,7 +219,7 @@ pub fn vecm_fit(
     omega
         .view_mut((r, r), (delta_x.nrows(), delta_x.nrows()))
         .copy_from(&omega22);
-    let mat1 = &b_id * omega.try_inverse().expect("omega singular") * b_id.transpose();
+    let mat1 = &b_id * linalg::inverse(&omega).expect("omega singular") * b_id.transpose();
 
     let mut pvalues_alpha = DMatrix::<f64>::zeros(k, r);
     for j in 0..r {
@@ -254,11 +247,11 @@ pub fn chow_break(y: &[f64], x: &[f64], k: usize) -> (f64, f64) {
         let m = ys.len();
         let design = DMatrix::from_fn(m, 2, |i, j| if j == 0 { 1.0 } else { xs[i] });
         let yv = DVector::from_column_slice(ys);
-        let qr = design.clone().qr();
-        let beta = qr
-            .r()
-            .solve_upper_triangular(&(qr.q().transpose() * &yv))
-            .expect("rank deficient");
+        let targets = DMatrix::from_column_slice(m, 1, yv.as_slice());
+        let tolerance = f64::EPSILON * m.max(2) as f64;
+        let beta = least_squares::solve(&design, &targets, tolerance)
+            .expect("DGELSD least-squares solve failed")
+            .coefficients;
         let fitted = design * beta;
         (0..m).map(|i| (ys[i] - fitted[i]).powi(2)).sum()
     };

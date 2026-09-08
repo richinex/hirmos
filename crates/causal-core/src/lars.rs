@@ -310,20 +310,15 @@ fn center_columns(x: &DMatrix<f64>) -> DMatrix<f64> {
     out
 }
 
-/// Least squares by QR: the coefficients sklearn's LinearRegression finds on full-rank data.
-fn lstsq(x: &DMatrix<f64>, y: &DVector<f64>) -> DVector<f64> {
-    let qr = x.clone().qr();
-    qr.r()
-        .solve_upper_triangular(&(qr.q().transpose() * y))
-        .expect("rank deficient regression")
-}
-
-/// LinearRegression with intercept: center both sides, then plain least squares.
+/// Scikit-learn `LinearRegression` with its fitted intercept and dense DGELSD path.
 fn lin_reg(x: &DMatrix<f64>, y: &DVector<f64>) -> DVector<f64> {
-    let xc = center_columns(x);
-    let ymean = y.iter().sum::<f64>() / y.len() as f64;
-    let yc = DVector::from_iterator(y.len(), y.iter().map(|v| v - ymean));
-    lstsq(&xc, &yc)
+    crate::sklearn_linear::fit_sklearn_linear_regression(
+        x,
+        y,
+        crate::sklearn_linear::SKLEARN_LINEAR_TOLERANCE,
+    )
+    .expect("scikit-learn linear regression")
+    .coefficients
 }
 
 /// LassoLarsIC(criterion="bic").fit(...).coef_ : the path point minimising sklearn's BIC.
@@ -336,7 +331,7 @@ pub fn lasso_lars_ic_bic(x: &DMatrix<f64>, y: &DVector<f64>) -> Vec<f64> {
     let (_alphas, coef_path) = lars_path_lasso_gram(&xc, &yc, 500);
 
     let p = x.ncols();
-    let ols = lstsq(&xc, &yc);
+    let ols = lin_reg(x, y);
     let fitted = &xc * &ols;
     let rss_ols: f64 = (0..n).map(|i| (yc[i] - fitted[i]).powi(2)).sum();
     let noise_variance = rss_ols / (n - p - 1) as f64;

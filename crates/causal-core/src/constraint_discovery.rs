@@ -469,11 +469,11 @@ impl<'a> CiEngine<'a> {
         let sub = DMatrix::from_fn(variables.len(), variables.len(), |row, column| {
             correlations[(variables[row], variables[column])]
         });
-        let inverse =
-            sub.try_inverse()
-                .ok_or_else(|| ConstraintDiscoveryError::SingularCorrelation {
-                    variables: variables.clone(),
-                })?;
+        let inverse = crate::linalg::inverse(&sub).map_err(|_| {
+            ConstraintDiscoveryError::SingularCorrelation {
+                variables: variables.clone(),
+            }
+        })?;
         let mut r = -inverse[(0, 1)] / (inverse[(0, 0)] * inverse[(1, 1)]).abs().sqrt();
         if r.abs() >= 1.0 {
             r = (1.0 - f64::EPSILON).copysign(r);

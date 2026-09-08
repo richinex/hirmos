@@ -290,12 +290,7 @@ pub fn backdoor_linear_ate(
         }
     }
     let y = DVector::from_iterator(n, (0..n).map(|i| data[(i, outcome)]));
-    let qr = design.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &y))
-        .expect("rank deficient");
-    beta[1]
+    crate::ols::Ols::fit(&design, &y).params[1]
 }
 
 use crate::nprandom::Mt19937;
