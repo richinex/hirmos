@@ -17,6 +17,7 @@ import type {
   CdnotsEvidence,
   CdnotsPlusEvidence,
   GraceEvidence,
+  JpcmciPlusEvidence,
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
@@ -48,6 +49,7 @@ type StationarityOutcome = Result<StationarityBattery, AnalysisWorkerProblem>
 type MulticollinearityOutcome = Result<MulticollinearityEvidence, AnalysisWorkerProblem>
 type PandasResamplingOutcome = Result<PandasResamplingEvidence, AnalysisWorkerProblem>
 type PcmciPlusOutcome = Result<PcmciPlusEvidence, AnalysisWorkerProblem>
+type JpcmciPlusOutcome = Result<JpcmciPlusEvidence, AnalysisWorkerProblem>
 type GrangerOutcome = Result<GrangerSsrEvidence, AnalysisWorkerProblem>
 type LpcmciOutcome = Result<LpcmciEvidence, AnalysisWorkerProblem>
 type RpcmciOutcome = Result<RpcmciEvidence, AnalysisWorkerProblem>
@@ -493,6 +495,46 @@ export function runPcmciPlus(
         kind: 'worker-unavailable',
         detail: cause instanceof Error ? cause.message : String(cause),
       }))
+    }
+  })
+}
+
+export function runJpcmciPlus(
+  values: Float64Array,
+  rows: number,
+  datasets: number,
+  periods: number,
+  classes: readonly ('system' | 'timeContext' | 'spaceContext')[],
+  configuration: {
+    readonly timeDummy: boolean
+    readonly spaceDummy: boolean
+    readonly tauMax: number
+    readonly pcAlpha: number
+  },
+): Promise<JpcmciPlusOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('jpcmci-plus-succeeded', resolve))
+    const command: AnalysisWorkerCommand = {
+      kind: 'jpcmci-plus',
+      request,
+      values,
+      rows,
+      datasets,
+      periods,
+      observedColumns: classes.length,
+      classes,
+      // Named, not spread: the ready specification carries the role assignments as well, and the command schema is strict.
+      timeDummy: configuration.timeDummy,
+      spaceDummy: configuration.spaceDummy,
+      tauMax: configuration.tauMax,
+      pcAlpha: configuration.pcAlpha,
+    }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }
   })
 }

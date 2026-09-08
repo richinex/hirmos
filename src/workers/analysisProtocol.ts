@@ -32,6 +32,7 @@ import {
   cdnotsEvidenceSchema,
   cdnotsPlusEvidenceSchema,
   graceEvidenceSchema,
+  jpcmciPlusEvidenceSchema,
   parseDynotearsEvidence,
   parseDirectLingamEvidence,
   parseFciEvidence,
@@ -44,6 +45,7 @@ import {
   parseCdnotsResult,
   parseCdnotsPlusResult,
   parseGraceEvidence,
+  parseJpcmciPlusEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
   pcmciPlusEvidenceSchema,
@@ -62,6 +64,7 @@ import {
   type CdnotsEvidence,
   type CdnotsPlusEvidence,
   type GraceEvidence,
+  type JpcmciPlusEvidence,
   type PcmciPlusEvidence,
   type VarLingamEvidence,
 } from '@/domain/discovery'
@@ -168,6 +171,20 @@ export type AnalysisWorkerCommand =
       readonly tauMax: number
       readonly pcAlpha: number
       readonly samples: TemporalSamples
+    }
+  | {
+      readonly kind: 'jpcmci-plus'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly datasets: number
+      readonly periods: number
+      readonly observedColumns: number
+      readonly classes: readonly ('system' | 'timeContext' | 'spaceContext')[]
+      readonly timeDummy: boolean
+      readonly spaceDummy: boolean
+      readonly tauMax: number
+      readonly pcAlpha: number
     }
   | {
       readonly kind: 'lpcmci'
@@ -802,6 +819,11 @@ export type AnalysisWorkerEvent =
       readonly result: PcmciPlusEvidence
     }
   | {
+      readonly kind: 'jpcmci-plus-succeeded'
+      readonly request: WorkerRequestId
+      readonly result: JpcmciPlusEvidence
+    }
+  | {
       readonly kind: 'lpcmci-succeeded'
       readonly request: WorkerRequestId
       readonly result: LpcmciEvidence
@@ -985,6 +1007,20 @@ const commandSchema = z.discriminatedUnion('kind', [
     tauMax: z.number().int().min(1).max(20),
     pcAlpha: z.number().finite().positive().max(1),
     samples: temporalSamplesSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('jpcmci-plus'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    datasets: z.number().int().min(2),
+    periods: z.number().int().min(2),
+    observedColumns: z.number().int().min(2).max(32),
+    classes: z.array(z.enum(['system', 'timeContext', 'spaceContext'])).min(2).max(32),
+    timeDummy: z.boolean(),
+    spaceDummy: z.boolean(),
+    tauMax: z.number().int().min(1).max(20),
+    pcAlpha: z.number().finite().positive().max(1),
   }).strict(),
   z.object({
     kind: z.literal('lpcmci'),
@@ -1589,6 +1625,11 @@ const eventSchema = z.discriminatedUnion('kind', [
     result: pcmciPlusEvidenceSchema,
   }).strict(),
   z.object({
+    kind: z.literal('jpcmci-plus-succeeded'),
+    request: requestSchema,
+    result: jpcmciPlusEvidenceSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('lpcmci-succeeded'),
     request: requestSchema,
     result: lpcmciEvidenceSchema,
@@ -1691,6 +1732,14 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   if (parsed.data.kind !== 'pandas-resample-daily' && 'columns' in parsed.data && parsed.data.values.length !== parsed.data.rows * parsed.data.columns) {
     return err({ kind: 'invalid-command', detail: 'The multivariate matrix dimensions do not match its numeric buffer.' })
   }
+  if (parsed.data.kind === 'jpcmci-plus' && (
+    parsed.data.rows !== parsed.data.datasets * parsed.data.periods
+    || parsed.data.values.length !== parsed.data.rows * parsed.data.observedColumns
+    || parsed.data.classes.length !== parsed.data.observedColumns
+    || parsed.data.classes.filter((role) => role === 'system').length < 2
+  )) {
+    return err({ kind: 'invalid-command', detail: 'J-PCMCI+ panel dimensions and observed-variable roles must describe one balanced joint matrix.' })
+  }
   if ((parsed.data.kind === 'pcmci-plus' || parsed.data.kind === 'lpcmci') && parsed.data.samples.kind === 'role-aware') {
     const cells = parsed.data.rows * parsed.data.columns
     if (parsed.data.samples.validity.length !== cells || parsed.data.samples.analysisMask.length !== cells) {
@@ -1764,6 +1813,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parsePcmciPlusEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'pcmci-plus-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'jpcmci-plus-succeeded') {
+    const result = parseJpcmciPlusEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'jpcmci-plus-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'lpcmci-succeeded') {

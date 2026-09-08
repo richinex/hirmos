@@ -50,8 +50,9 @@ import {
   type DiscoveryMethodChoice,
   changedSettings,
   type DiscoveryMethodGroupId,
+  type JpcmciObservedRole,
 } from '@/domain/discovery'
-import { assertNever } from '@/domain/dop'
+import { assertNever, isNonEmpty } from '@/domain/dop'
 import {
   assessDiscoveryRunDeletion,
   type DeletableDiscoveryRun,
@@ -71,6 +72,7 @@ import {
   CMLP_METHOD_ID,
   CLSTM_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
+  JPCMCI_PLUS_PAR_CORR_METHOD_ID,
   VAR_LINGAM_METHOD_ID,
   methodDefinition,
   type MethodDefinition,
@@ -147,6 +149,15 @@ const lagFromValue = (value: string): DiscoveryLag | null =>
 const alphaFromValue = (value: string): PcmciAlpha | null =>
   PCMCI_ALPHA_OPTIONS.find((candidate) => String(candidate) === value) ?? null
 
+const jpcmciRoleFromValue = (value: string): JpcmciObservedRole | null => {
+  switch (value) {
+    case 'system': return 'system'
+    case 'timeContext': return 'timeContext'
+    case 'spaceContext': return 'spaceContext'
+    default: return null
+  }
+}
+
 const penaltyFromValue = (value: string): DynotearsPenalty | null =>
   DYNOTEARS_PENALTY_OPTIONS.find((candidate) => String(candidate) === value) ?? null
 
@@ -221,6 +232,7 @@ const methodIdForChoice = (method: DiscoveryMethodChoice) => {
     case 'pc-stable': return PC_STABLE_METHOD_ID
     case 'fci': return FCI_METHOD_ID
     case 'pcmci-plus': return PCMCI_PLUS_PAR_CORR_METHOD_ID
+    case 'jpcmci-plus': return JPCMCI_PLUS_PAR_CORR_METHOD_ID
     case 'lpcmci': return LPCMCI_PAR_CORR_METHOD_ID
     case 'rpcmci': return RPCMCI_PAR_CORR_METHOD_ID
     case 'cdnots': return CDNOTS_PAR_CORR_METHOD_ID
@@ -267,6 +279,70 @@ const asNumber = (value: string | number): number => (typeof value === 'number' 
 
 type ConstraintConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'pc-stable' | 'fci' }>
 
+type JpcmciConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'jpcmci-plus' }>
+
+function JpcmciControls({ configuration, columns, onChange }: {
+  readonly configuration: JpcmciConfiguration
+  readonly columns: readonly { readonly id: DatasetProfile['columns'][number]['id']; readonly name: string }[]
+  readonly onChange: (configuration: JpcmciConfiguration) => void
+}) {
+  const roleFor = (column: DatasetProfile['columns'][number]['id']): JpcmciObservedRole =>
+    configuration.assignments.find((assignment) => assignment.column === column)?.role ?? 'system'
+  const setRole = (column: DatasetProfile['columns'][number]['id'], role: JpcmciObservedRole) => onChange({
+    ...configuration,
+    assignments: role === 'system'
+      ? configuration.assignments.filter((assignment) => assignment.column !== column)
+      : [...configuration.assignments.filter((assignment) => assignment.column !== column), { column, role }],
+  })
+  return (
+    <div className="mt-4 grid gap-4">
+      <div className="grid gap-3 @md/panel:grid-cols-2">
+        <div className="text-body text-ink">
+          <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.jpcmci.maximumLag} htmlFor="jpcmci-maximum-lag" />
+          <Select id="jpcmci-maximum-lag" className={field('text', 'mt-1')} value={configuration.tauMax} onChange={(event) => {
+            const value = lagFromValue(event.target.value)
+            if (value !== null) onChange({ ...configuration, tauMax: value })
+          }}>
+            {DISCOVERY_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </div>
+        <div className="text-body text-ink">
+          <ParameterLabel label="PC alpha" help={DISCOVERY_PARAMETER_HELP.jpcmci.pcAlpha} htmlFor="jpcmci-pc-alpha" />
+          <Select id="jpcmci-pc-alpha" className={field('text', 'mt-1')} value={configuration.pcAlpha} onChange={(event) => {
+            const value = alphaFromValue(event.target.value)
+            if (value !== null) onChange({ ...configuration, pcAlpha: value })
+          }}>
+            {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </div>
+      </div>
+      <div className={well('p-(--panel-space)')}>
+        <h4 className="m-0 text-body font-medium text-ink">Variable roles</h4>
+        <p className="mb-3 mt-1 text-label text-faint">System variables may change across units and periods. A time context is shared by all units at a period; a unit context stays fixed within one unit.</p>
+        <div className="grid gap-2 @2xl/panel:grid-cols-2">
+          {columns.map((column) => (
+            <label key={column.id} className="text-label text-ink">{column.name}
+              {/* The trigger is a button, which a wrapping label does not name, so the role control names itself. */}
+              <Select className={field('text', 'mt-1')} aria-label={`${column.name} role`} value={roleFor(column.id)} onChange={(event) => {
+                const role = jpcmciRoleFromValue(event.target.value)
+                if (role !== null) setRole(column.id, role)
+              }}>
+                <option value="system">System variable</option>
+                <option value="timeContext">Observed time context</option>
+                <option value="spaceContext">Observed unit context</option>
+              </Select>
+            </label>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-2 @md/panel:grid-cols-2">
+          <label className="flex items-center gap-2 text-label text-ink"><input type="checkbox" checked={configuration.timeDummy} onChange={(event) => onChange({ ...configuration, timeDummy: event.target.checked })} />Generate period context</label>
+          <label className="flex items-center gap-2 text-label text-ink"><input type="checkbox" checked={configuration.spaceDummy} onChange={(event) => onChange({ ...configuration, spaceDummy: event.target.checked })} />Generate unit context</label>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ConstraintDiscoveryControls({
   configuration,
   variableNames,
@@ -306,7 +382,7 @@ function ConstraintDiscoveryControls({
           </Select>
         </div>
         <div className="text-body text-ink">
-          <ParameterLabel label="CI test" help="Fisher Z tests zero partial correlation under a linear Gaussian model. KCI uses causal-learn's kernel conditional-independence test and costs substantially more." htmlFor="constraint-ci-test" />
+          <ParameterLabel label="CI test" help="Fisher Z tests zero partial correlation under a linear Gaussian model. KCI is a kernel conditional-independence test and costs substantially more." htmlFor="constraint-ci-test" />
           <Select id="constraint-ci-test" className={field('text', 'mt-1')} value={configuration.ciTest} onChange={(event) => onChange({ ...configuration, ciTest: event.target.value === 'kci' ? 'kci' : 'fisherZ' })}>
             <option value="fisherZ">Fisher Z</option>
             <option value="kci">KCI</option>
@@ -321,7 +397,7 @@ function ConstraintDiscoveryControls({
         </div>
         {configuration.kind === 'fci' && (
           <div className="text-body text-ink">
-            <ParameterLabel label="Maximum path length" help="Limits the discriminating and uncovered paths used by FCI orientation rules. Automatic follows causal-learn's default." htmlFor="fci-path-length" />
+            <ParameterLabel label="Maximum path length" help="Limits the discriminating and uncovered paths used by FCI orientation rules. Automatic sets no limit." htmlFor="fci-path-length" />
             <Select id="fci-path-length" className={field('text', 'mt-1')} value={configuration.maxPathLength ?? 'automatic'} onChange={(event) => onChange({ ...configuration, maxPathLength: event.target.value === 'automatic' ? null : Number(event.target.value) })}>
               <option value="automatic">Automatic</option>
               {[1, 2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
@@ -851,6 +927,61 @@ function TimeGraphResult({ run, open, current }: { readonly open: boolean; reado
   )
 }
 
+function JpcmciResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'jpcmci-plus-run' }> }) {
+  const names = useMemo(() => run.nodes.map((node) => node.kind === 'observed' ? node.column.name : node.name), [run.nodes])
+  const rows = useMemo(
+    () => run.result.graph.flatMap((targets, sourceIndex) => targets.flatMap((lags, targetIndex) => lags.map((mark, lag) => ({
+      key: `${sourceIndex}:${targetIndex}:${lag}`,
+      source: names[sourceIndex],
+      target: names[targetIndex],
+      lag,
+      mark,
+      p: run.result.pMatrix[sourceIndex][targetIndex][lag],
+      value: run.result.valMatrix[sourceIndex][targetIndex][lag],
+      sourceClass: run.result.classes[sourceIndex],
+      targetClass: run.result.classes[targetIndex],
+    })))),
+    [names, run.result],
+  )
+  const className = (value: string) => {
+    switch (value) {
+      case 'system': return 'System'
+      case 'timeContext': return 'Time context'
+      case 'spaceContext': return 'Unit context'
+      case 'timeDummy': return 'Generated time context'
+      case 'spaceDummy': return 'Generated unit context'
+      default: return value
+    }
+  }
+  return (
+    <ResultCard run={run} open={open} current={current} method="J-PCMCI+ · ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<>{run.result.datasets} units × {run.result.periods} periods · {run.result.observedVariables} observed variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
+      <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
+      <RunRecord run={run} />
+      <StructurePlot run={run} label="J-PCMCI+ joint structure" />
+      <p className="mb-3 mt-3 text-body text-muted">Generated period and unit contexts remain visible as auxiliary nodes. Only relations between observed columns can be taken into the editable DAG workspace.</p>
+      <EvidenceTable<typeof rows[number]>
+        frame="none"
+        title="J-PCMCI+ raw evidence"
+        rows={rows}
+        rowKey={(row) => row.key}
+        noun="cell"
+        empty="The run reported no cell."
+        exportName="jpcmciplus-evidence"
+        columns={[
+          { id: 'source', header: 'Source', value: (row) => row.source },
+          { id: 'sourceClass', header: 'Source role', value: (row) => className(row.sourceClass) },
+          { id: 'target', header: 'Target', value: (row) => row.target },
+          { id: 'targetClass', header: 'Target role', value: (row) => className(row.targetClass) },
+          { id: 'lag', header: 'Lag', align: 'right', value: (row) => row.lag },
+          { id: 'mark', header: 'Mark', mono: true, value: (row) => row.mark, format: (value) => (value === '' ? '—' : value) },
+          figureColumn<typeof rows[number]>('p', 'p', (row) => row.p, pValue),
+          figureColumn<typeof rows[number]>('value', 'ParCorrMult', (row) => row.value),
+        ]}
+      />
+    </ResultCard>
+  )
+}
+
 function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }> }) {
   const [regime, setRegime] = useState(0)
   const [selection, setSelection] = useState<EvidenceSelection>(NO_EVIDENCE_SELECTION)
@@ -1254,6 +1385,7 @@ function DiscoveryResult({ run, open, current }: { readonly open: boolean; reado
     case 'pc-stable-run': return <ConstraintDiscoveryResult run={run} open={open} current={current} />
     case 'fci-run': return <ConstraintDiscoveryResult run={run} open={open} current={current} />
     case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
+    case 'jpcmci-plus-run': return <JpcmciResult run={run} open={open} current={current} />
     case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
     case 'rpcmci-run': return <RpcmciResult run={run} open={open} current={current} />
     case 'cdnots-run': return <CdnotsResult run={run} open={open} current={current} />
@@ -1303,7 +1435,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     const candidateEligibility = evaluateDiscoveryEligibility(definition.value, prepared, stationarity)
     return [{
       value,
-      label: definition.value.name.replace(' with ParCorr', ''),
+      label: definition.value.name.replace(/ with ParCorr(?:Mult)?$/, ''),
       hint: eligibilityHint(candidateEligibility),
       disabled: draft.job.kind === 'running' || candidateEligibility.kind === 'refused',
       title: candidateEligibility.kind === 'refused'
@@ -1456,6 +1588,51 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           variables: matrix.columns,
           eligibility,
           result: result.value,
+        }
+        dispatch({ type: 'run-succeeded', artifact })
+        onRun(artifact)
+        return
+      }
+      case 'jpcmci-plus': {
+        if (prepared.kind !== 'prepared-panel') return
+        const configuration = specification.value
+        const [{ materializePanelKeysInWorker }, { orderJointPanelMatrix, describeJointPanelMatrixProblem, describePanelDataProblem }] = await Promise.all([
+          import('@/data/client'),
+          import('@/domain/panel'),
+        ])
+        const keys = await materializePanelKeysInWorker(source.file, profile, prepared.sampling.unitColumn, prepared.sampling.timeColumn)
+        if (!keys.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'materialization-refused', detail: describePanelDataProblem(keys.error) } })
+          return
+        }
+        const joint = orderJointPanelMatrix(matrix, keys.value)
+        if (!joint.ok) {
+          dispatch({ type: 'run-failed', problem: { kind: 'materialization-refused', detail: describeJointPanelMatrixProblem(joint.error) } })
+          return
+        }
+        const result = await analysis.runJpcmciPlus(
+          joint.value.values,
+          joint.value.rows,
+          joint.value.datasets,
+          joint.value.periods,
+          configuration.roles,
+          configuration,
+        )
+        if (!result.ok) {
+          dispatch(analysisFailureEvent(result.error))
+          return
+        }
+        const observedNodes = joint.value.columns.map((column, index) => ({ kind: 'observed' as const, column, role: configuration.roles[index] ?? 'system' }))
+        const nodes = [
+          ...observedNodes,
+          ...(configuration.timeDummy ? [{ kind: 'generated' as const, role: 'timeDummy' as const, name: 'Time context (generated)' as const }] : []),
+          ...(configuration.spaceDummy ? [{ kind: 'generated' as const, role: 'spaceDummy' as const, name: 'Unit context (generated)' as const }] : []),
+        ]
+        if (!isNonEmpty(nodes)) return
+        const artifact: DiscoveryRunArtifact = {
+          kind: 'jpcmci-plus-run', id: newDiscoveryRunId(), preparedDataset: prepared.id,
+          createdAt: new Date().toISOString(), method: JPCMCI_PLUS_PAR_CORR_METHOD_ID,
+          variables: joint.value.columns, nodes, eligibility, result: result.value,
         }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
@@ -1734,6 +1911,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
             </div>
+          )}
+
+          {configuration.kind === 'jpcmci-plus' && (
+            <JpcmciControls configuration={configuration} columns={preparedColumns} onChange={(next) => dispatch({ type: 'jpcmci-configured', configuration: next })} />
           )}
 
           {configuration.kind === 'rpcmci' && (

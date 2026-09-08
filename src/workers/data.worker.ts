@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { inspectPanelStructure, materializeNumericColumns, materializePanelLong, materializeTimeSeriesColumns, previewWindow, profileColumn, profileSource, summarizeColumns } from '@/data/duckdb'
+import { inspectPanelStructure, materializeNumericColumns, materializePanelKeys, materializePanelLong, materializeTimeSeriesColumns, previewWindow, profileColumn, profileSource, summarizeColumns } from '@/data/duckdb'
 import { assertNever } from '@/domain/dop'
 import { describeSourceSelectionProblem, selectSource } from '@/domain/workflow'
 import { parseDataWorkerCommand, type DataWorkerEvent } from './dataProtocol'
@@ -28,6 +28,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         case 'summarize-columns': emit({ kind: 'summary-failed', request: command.request, problem }); return
         case 'preview-window': emit({ kind: 'preview-window-failed', request: command.request, problem }); return
         case 'inspect-panel': emit({ kind: 'panel-data-failed', request: command.request, problem }); return
+        case 'materialize-panel-keys': emit({ kind: 'panel-data-failed', request: command.request, problem }); return
         case 'materialize-panel': emit({ kind: 'panel-data-failed', request: command.request, problem }); return
         default: return assertNever(command)
       }
@@ -94,6 +95,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = await materializePanelLong(source.value, command.profile, command.unitColumn, command.timeColumn, command.outcomeColumn, command.treatmentColumn)
         if (!result.ok) { emit({ kind: 'panel-data-failed', request: command.request, problem: result.error }); return }
         emit({ kind: 'panel-materialization-succeeded', request: command.request, matrix: result.value }, [result.value.values.buffer])
+        return
+      }
+      case 'materialize-panel-keys': {
+        const result = await materializePanelKeys(source.value, command.profile, command.unitColumn, command.timeColumn)
+        if (!result.ok) { emit({ kind: 'panel-data-failed', request: command.request, problem: result.error }); return }
+        emit({ kind: 'panel-keys-succeeded', request: command.request, matrix: result.value })
         return
       }
       default:

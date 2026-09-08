@@ -1,10 +1,10 @@
 //! Tigramite-compatible RPCMCI with seeded annealings over regime assignments, masked PCMCI per
 //! regime, the default standardized linear prediction model, and the GLOP regime LP.
 
+use crate::missing_data::TigramiteFrame;
 use crate::nprandom::NpRng;
 use crate::parcorr::{CiKind, Node, TimeSeries};
 use crate::pcmci::run_pcmci_filtered;
-use crate::preprocessing::TigramiteFrame;
 use crate::simplex::optimize_gamma;
 use crate::sklearn_linear::{fit_sklearn_linear_regression, SKLEARN_LINEAR_TOLERANCE};
 use nalgebra::{DMatrix, DVector};

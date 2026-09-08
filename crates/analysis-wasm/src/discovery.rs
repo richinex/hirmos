@@ -516,6 +516,205 @@ pub(crate) fn pcmci_plus(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn jpcmciplus_evidence(
+    values: &[f64],
+    rows: usize,
+    datasets: usize,
+    periods: usize,
+    observed_columns: usize,
+    classes: Vec<JpcmciNodeClass>,
+    time_dummy: bool,
+    space_dummy: bool,
+    tau_max: usize,
+    pc_alpha: f64,
+) -> Result<AnalysisResult, String> {
+    if datasets < 2 {
+        return Err("J-PCMCI+ requires at least two panel units (datasets)".to_owned());
+    }
+    if periods < 2 || rows != datasets.saturating_mul(periods) {
+        return Err(
+            "J-PCMCI+ requires one balanced period grid shared by every panel unit".to_owned(),
+        );
+    }
+    if !(2..=32).contains(&observed_columns) || classes.len() != observed_columns {
+        return Err(
+            "J-PCMCI+ requires 2 to 32 observed variables and one class for each".to_owned(),
+        );
+    }
+    if classes
+        .iter()
+        .filter(|class| matches!(class, JpcmciNodeClass::System))
+        .count()
+        < 2
+    {
+        return Err("J-PCMCI+ requires at least two system variables".to_owned());
+    }
+    if !(1..=20).contains(&tau_max) {
+        return Err("J-PCMCI+ tauMax must be between 1 and 20".to_owned());
+    }
+    if !pc_alpha.is_finite() || !(0.0..=1.0).contains(&pc_alpha) || pc_alpha == 0.0 {
+        return Err("J-PCMCI+ pcAlpha must be finite and in (0, 1]".to_owned());
+    }
+    if periods < (2 * tau_max + 16).max(24) {
+        return Err(
+            "J-PCMCI+ has too few periods per dataset for the selected maximum lag".to_owned(),
+        );
+    }
+    validate_dense_matrix("J-PCMCI+", values, rows, observed_columns)?;
+
+    for (column, class) in classes.iter().enumerate() {
+        match class {
+            JpcmciNodeClass::System => {}
+            JpcmciNodeClass::TimeContext => {
+                for period in 0..periods {
+                    let expected = values[column * rows + period];
+                    if (1..datasets).any(|dataset| {
+                        values[column * rows + dataset * periods + period] != expected
+                    }) {
+                        return Err(format!(
+                            "J-PCMCI+ time-context variable {} differs between panel units at period {}",
+                            column + 1,
+                            period + 1
+                        ));
+                    }
+                }
+            }
+            JpcmciNodeClass::SpaceContext => {
+                for dataset in 0..datasets {
+                    let start = dataset * periods;
+                    let expected = values[column * rows + start];
+                    if (1..periods).any(|period| values[column * rows + start + period] != expected)
+                    {
+                        return Err(format!(
+                            "J-PCMCI+ space-context variable {} changes within panel unit {}",
+                            column + 1,
+                            dataset + 1
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    let time_start = observed_columns;
+    let space_start = time_start + usize::from(time_dummy) * periods;
+    let components = space_start + usize::from(space_dummy) * datasets;
+    let mut joint = vec![vec![vec![0.0; components]; periods]; datasets];
+    for dataset in 0..datasets {
+        for period in 0..periods {
+            let row = dataset * periods + period;
+            for column in 0..observed_columns {
+                joint[dataset][period][column] = values[column * rows + row];
+            }
+            if time_dummy {
+                joint[dataset][period][time_start + period] = 1.0;
+            }
+            if space_dummy {
+                joint[dataset][period][space_start + dataset] = 1.0;
+            }
+        }
+    }
+
+    let mut vectors: Vec<Vec<(usize, i32)>> = (0..observed_columns)
+        .map(|column| vec![(column, 0)])
+        .collect();
+    let mut core_classes: Vec<CoreJpcmciNodeClass> = classes
+        .iter()
+        .map(|class| match class {
+            JpcmciNodeClass::System => CoreJpcmciNodeClass::System,
+            JpcmciNodeClass::TimeContext => CoreJpcmciNodeClass::TimeContext,
+            JpcmciNodeClass::SpaceContext => CoreJpcmciNodeClass::SpaceContext,
+        })
+        .collect();
+    let mut result_classes: Vec<&'static str> = classes
+        .iter()
+        .map(|class| match class {
+            JpcmciNodeClass::System => "system",
+            JpcmciNodeClass::TimeContext => "timeContext",
+            JpcmciNodeClass::SpaceContext => "spaceContext",
+        })
+        .collect();
+    if time_dummy {
+        vectors.push(
+            (0..periods)
+                .map(|period| (time_start + period, 0))
+                .collect(),
+        );
+        core_classes.push(CoreJpcmciNodeClass::TimeDummy);
+        result_classes.push("timeDummy");
+    }
+    if space_dummy {
+        vectors.push(
+            (0..datasets)
+                .map(|dataset| (space_start + dataset, 0))
+                .collect(),
+        );
+        core_classes.push(CoreJpcmciNodeClass::SpaceDummy);
+        result_classes.push("spaceDummy");
+    }
+
+    let data = JointData::new(joint, vectors)
+        .map_err(|problem| format!("J-PCMCI+ joint sample construction refused: {problem:?}"))?;
+    let ci = data.analytic(MultCorrelation::MaxCorrelation);
+    let result = jpcmciplus::run(&ci, &core_classes, tau_max, pc_alpha)
+        .map_err(|problem| format!("J-PCMCI+ discovery refused: {problem:?}"))?;
+    let node = |(variable, lag)| JpcmciNodeEvidence { variable, lag };
+    let separating_sets = result
+        .sepsets
+        .iter()
+        .enumerate()
+        .flat_map(|(source, targets)| {
+            targets.iter().enumerate().flat_map(move |(target, lags)| {
+                lags.iter().enumerate().filter_map(move |(lag, variables)| {
+                    (!variables.is_empty()).then(|| JpcmciSeparatingSetEvidence {
+                        source,
+                        target,
+                        lag,
+                        variables: variables.iter().copied().map(node).collect(),
+                    })
+                })
+            })
+        })
+        .collect();
+    let ambiguous_triples = result
+        .ambiguous_triples
+        .iter()
+        .map(|&(left, middle, right)| JpcmciAmbiguousTripleEvidence {
+            left: node(left),
+            middle,
+            right,
+        })
+        .collect();
+    let parent_rows = |parents: Vec<Vec<(usize, i32)>>| {
+        parents
+            .into_iter()
+            .map(|row| row.into_iter().map(node).collect())
+            .collect()
+    };
+    let variables = core_classes.len();
+    Ok(AnalysisResult::Jpcmciplus {
+        observations: rows,
+        datasets,
+        periods,
+        observed_variables: observed_columns,
+        variables,
+        classes: result_classes,
+        time_dummy,
+        space_dummy,
+        tau_max,
+        pc_alpha,
+        graph: result.graph,
+        p_matrix: result.p_matrix,
+        val_matrix: result.val_matrix,
+        separating_sets,
+        ambiguous_triples,
+        lagged_parents: parent_rows(result.lagged_parents),
+        context_parents: parent_rows(result.context_parents),
+        dummy_parents: parent_rows(result.dummy_parents),
+    })
+}
+
 pub(crate) fn lpcmci_evidence<F>(
     values: &[f64],
     validity: &[u8],
@@ -1612,6 +1811,7 @@ mod tests {
             AnalysisCommand::StationarityBattery
             | AnalysisCommand::Multicollinearity { .. }
             | AnalysisCommand::PandasResampleDaily { .. }
+            | AnalysisCommand::Jpcmciplus { .. }
             | AnalysisCommand::Lpcmci { .. }
             | AnalysisCommand::Rpcmci { .. }
             | AnalysisCommand::Cdnots { .. }
@@ -1658,6 +1858,112 @@ mod tests {
                 panic!("parsed the wrong command variant")
             }
         }
+    }
+
+    #[test]
+    fn jpcmciplus_accepts_balanced_dataset_major_panel_and_serializes_joint_evidence() {
+        let datasets = 3;
+        let periods = 36;
+        let rows = datasets * periods;
+        let mut values = vec![0.0; rows * 2];
+        for dataset in 0..datasets {
+            for period in 0..periods {
+                let row = dataset * periods + period;
+                let time = period as f64;
+                values[row] = (time / 3.0).sin() + dataset as f64 * 0.03;
+                values[rows + row] = if period == 0 {
+                    0.0
+                } else {
+                    0.7 * values[row - 1]
+                } + 0.05 * (time / 2.0).cos();
+            }
+        }
+
+        let result = jpcmciplus_evidence(
+            &values,
+            rows,
+            datasets,
+            periods,
+            2,
+            vec![JpcmciNodeClass::System, JpcmciNodeClass::System],
+            true,
+            true,
+            1,
+            0.05,
+        )
+        .expect("balanced panel should produce J-PCMCI+ evidence");
+        let value = serde_json::to_value(result).expect("valid result JSON");
+        assert_eq!(value["kind"], "jpcmciplus");
+        assert_eq!(value["observations"], rows);
+        assert_eq!(value["datasets"], datasets);
+        assert_eq!(value["periods"], periods);
+        assert_eq!(value["observedVariables"], 2);
+        assert_eq!(value["variables"], 4);
+        assert_eq!(
+            value["classes"],
+            serde_json::json!(["system", "system", "timeDummy", "spaceDummy"])
+        );
+        assert_eq!(value["graph"].as_array().unwrap().len(), 4);
+        assert_eq!(value["laggedParents"].as_array().unwrap().len(), 4);
+        assert_eq!(value["contextParents"].as_array().unwrap().len(), 4);
+        assert_eq!(value["dummyParents"].as_array().unwrap().len(), 4);
+    }
+
+    #[test]
+    fn jpcmciplus_refuses_context_roles_that_break_panel_invariance() {
+        let datasets = 2;
+        let periods = 24;
+        let rows = datasets * periods;
+        let mut values = vec![0.0; rows * 3];
+        for row in 0..rows {
+            values[row] = row as f64;
+            values[rows + row] = (row as f64 / 3.0).sin();
+            values[2 * rows + row] = row as f64;
+        }
+        let result = jpcmciplus_evidence(
+            &values,
+            rows,
+            datasets,
+            periods,
+            3,
+            vec![
+                JpcmciNodeClass::System,
+                JpcmciNodeClass::System,
+                JpcmciNodeClass::TimeContext,
+            ],
+            false,
+            false,
+            1,
+            0.05,
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn jpcmciplus_command_accepts_the_browser_contract() {
+        let command: AnalysisCommand = serde_json::from_str(
+            r#"{"kind":"jpcmciplus","rows":48,"datasets":2,"periods":24,"observedColumns":2,"classes":["system","system"],"timeDummy":true,"spaceDummy":true,"tauMax":1,"pcAlpha":0.05}"#,
+        )
+        .expect("browser command should parse");
+        let AnalysisCommand::Jpcmciplus {
+            rows,
+            datasets,
+            periods,
+            observed_columns,
+            classes,
+            time_dummy,
+            space_dummy,
+            tau_max,
+            pc_alpha,
+        } = command
+        else {
+            panic!("parsed the wrong command variant")
+        };
+        assert_eq!((rows, datasets, periods, observed_columns), (48, 2, 24, 2));
+        assert_eq!(classes.len(), 2);
+        assert!(time_dummy && space_dummy);
+        assert_eq!(tau_max, 1);
+        assert_eq!(pc_alpha, 0.05);
     }
 
     #[test]

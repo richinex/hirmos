@@ -89,7 +89,11 @@ pub fn resample_rows(rng: &mut Mt19937, rows: usize, sample_size: usize) -> Vec<
 /// DoWhy's basic bootstrap interval. It sorts each resampled estimate's deviation from the
 /// full-sample estimate, then reverses the selected tails around that estimate; this is not a
 /// percentile interval.
-pub fn basic_interval(estimate: f64, bootstrap_estimates: &[f64], confidence_level: f64) -> [f64; 2] {
+pub fn basic_interval(
+    estimate: f64,
+    bootstrap_estimates: &[f64],
+    confidence_level: f64,
+) -> [f64; 2] {
     let mut variations: Vec<f64> = bootstrap_estimates
         .iter()
         .map(|resampled| resampled - estimate)

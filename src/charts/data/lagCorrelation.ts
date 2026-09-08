@@ -47,7 +47,7 @@ export function lagCorrelationOption(view: LagCorrelationView, theme: ChartTheme
     ]
   })
   return {
-    ...baseOption(theme, `${view.name} autocorrelation and partial autocorrelation from lag 0 through lag ${lags.length - 1}. Shaded regions are statsmodels' approximate 95 percent reference bands. Values outside a band indicate temporal dependence at that lag under the plot's assumptions; they do not establish a causal relation.`),
+    ...baseOption(theme, `${view.name} autocorrelation and partial autocorrelation from lag 0 through lag ${lags.length - 1}. Shaded regions are approximate 95 percent reference bands. Values outside a band indicate temporal dependence at that lag under the plot's assumptions; they do not establish a causal relation.`),
     grid: grids,
     tooltip: {
       ...tooltip(theme, 'axis'),

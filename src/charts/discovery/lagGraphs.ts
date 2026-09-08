@@ -138,7 +138,7 @@ export function lagGridOption(graph: LagGraph, theme: ChartTheme, metrics: LagGr
   const columnLabels = Array.from({ length: positions }, (_, position) => ({
     id: `c-${position}`,
     name: position === graph.tauMax ? 't' : `t−${graph.tauMax - position}`,
-    value: [centre(0, position)[0], metrics.top - 26],
+    value: [centre(0, position)[0], metrics.top - metrics.nodeSize / 2 - 14],
     ...labelAnchor,
     label: { show: true, position: 'inside', color: theme.faint, fontFamily: theme.font, fontSize: theme.labelSize },
     tooltip: { show: false },

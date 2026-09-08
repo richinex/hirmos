@@ -1,6 +1,6 @@
 import type { DagDocument } from './dag'
 import type { DiscoveryRunArtifact } from './discovery'
-import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
+import { assertNever, isNonEmpty, mapNonEmpty, type NonEmptyArray } from './dop'
 
 /**
  * One method-agnostic projection of lag-resolved structure. Discovery evidence of every kind and an
@@ -36,7 +36,7 @@ export interface LagLink {
   readonly mark: string | null
 }
 
-export type LagGraphSemantics = 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'cpdag' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
+export type LagGraphSemantics = 'stationary-lag-graph' | 'joint-stationary-lag-graph' | 'nonstationary-lag-graph' | 'cpdag' | 'pag' | 'regime-specific-lag-graph' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'temporal-dag'
 
 export interface LagGraph {
   readonly variables: NonEmptyArray<LagVariable>
@@ -95,7 +95,7 @@ export const lagGraphFromMarkedMatrices = (
   graph: readonly (readonly (readonly string[])[])[],
   values: readonly (readonly (readonly number[])[])[] | null,
   tauMax: number,
-  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'cpdag' | 'pag' | 'regime-specific-lag-graph'>,
+  semantics: Extract<LagGraphSemantics, 'stationary-lag-graph' | 'joint-stationary-lag-graph' | 'nonstationary-lag-graph' | 'cpdag' | 'pag' | 'regime-specific-lag-graph'>,
 ): LagGraphProjection => {
   const links: LagLink[] = []
   const warnings: LagGraphWarning[] = []
@@ -153,6 +153,21 @@ export function lagGraphFromTimeGraphRun(
     run.result.valMatrix,
     run.result.tauMax,
     run.kind === 'lpcmci-run' ? 'pag' : 'stationary-lag-graph',
+  )
+}
+
+export function lagGraphFromJpcmciRun(
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'jpcmci-plus-run' }>,
+): LagGraphProjection {
+  const variables = mapNonEmpty(run.nodes, (node, index) => node.kind === 'observed'
+    ? { id: node.column.id, name: node.column.name, latent: false }
+    : { id: `jpcmci:${run.id}:${node.role}:${index}`, name: node.name, latent: false })
+  return lagGraphFromMarkedMatrices(
+    variables,
+    run.result.graph,
+    run.result.valMatrix,
+    run.result.tauMax,
+    'joint-stationary-lag-graph',
   )
 }
 
@@ -276,6 +291,7 @@ export function lagGraphFromRun(run: LagResolvedDiscoveryRun, regime = 0): LagGr
     case 'fci-run': return lagGraphFromConstraintRun(run)
     case 'pcmci-plus-run':
     case 'lpcmci-run': return lagGraphFromTimeGraphRun(run)
+    case 'jpcmci-plus-run': return lagGraphFromJpcmciRun(run)
     case 'rpcmci-run': return lagGraphFromRpcmciRun(run, regime)
     case 'cdnots-run':
     case 'cdnots-plus-run': return lagGraphFromCdnotsRun(run)

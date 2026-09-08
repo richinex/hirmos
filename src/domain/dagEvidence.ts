@@ -1,4 +1,4 @@
-import {assertNever, brand } from './dop'
+import { assertNever, brand } from './dop'
 import type { ColumnId, NumericColumnSelection } from './dataset'
 import type { DiscoveryCandidateId } from './dag'
 import type { DiscoveryRunArtifact, DiscoveryRunId } from './discovery'
@@ -41,7 +41,7 @@ export type DiscoveryCandidate =
     }
   | CandidateBase & {
       readonly kind: 'endpoint-marked'
-      readonly method: 'PCMCI+' | 'LPCMCI' | 'CD-NOTS' | 'CD-NOTS+'
+      readonly method: 'PCMCI+' | 'J-PCMCI+' | 'LPCMCI' | 'CD-NOTS' | 'CD-NOTS+'
       readonly lag: number
       readonly mark: string
       readonly pValue: number
@@ -84,8 +84,8 @@ export type DiscoveryCandidate =
 
 export interface DiscoveryEvidenceView {
   readonly run: DiscoveryRunArtifact
-  readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
-  readonly semantics: 'cpdag' | 'stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
+  readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'J-PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly semantics: 'cpdag' | 'stationary-lag-graph' | 'joint-stationary-lag-graph' | 'nonstationary-lag-graph' | 'pag' | 'regime-specific-lag-graphs' | 'weighted-directed-evidence' | 'lagged-information' | 'neural-lagged-granger' | 'neural-window-granger'
   readonly candidates: readonly DiscoveryCandidate[]
 }
 
@@ -135,6 +135,38 @@ const matrixCandidates = (
           id: candidateId(run.id, `${sourceIndex}:${targetIndex}:${lag}:${mark}`),
           run: run.id,
           method: run.kind === 'lpcmci-run' ? 'LPCMCI' : 'PCMCI+',
+          source,
+          target,
+          lag,
+          mark,
+          pValue: run.result.pMatrix[sourceIndex][targetIndex][lag],
+          statistic: run.result.valMatrix[sourceIndex][targetIndex][lag],
+          relationMatch: markedRelationMatch(source, target, lag, mark),
+        })
+      }
+    }
+  }
+  return candidates
+}
+
+const jpcmciCandidates = (
+  run: Extract<DiscoveryRunArtifact, { readonly kind: 'jpcmci-plus-run' }>,
+): readonly DiscoveryCandidate[] => {
+  const candidates: DiscoveryCandidate[] = []
+  // Generated context vectors are retained in the result graph, but they have no dataset column
+  // and therefore cannot become editable DAG evidence candidates.
+  for (let sourceIndex = 0; sourceIndex < run.variables.length; sourceIndex += 1) {
+    for (let targetIndex = 0; targetIndex < run.variables.length; targetIndex += 1) {
+      for (let lag = 0; lag <= run.result.tauMax; lag += 1) {
+        const mark = run.result.graph[sourceIndex][targetIndex][lag]
+        if (mark.length === 0 || (lag === 0 && sourceIndex > targetIndex)) continue
+        const source = variable(run.variables[sourceIndex])
+        const target = variable(run.variables[targetIndex])
+        candidates.push({
+          kind: 'endpoint-marked',
+          id: candidateId(run.id, `${sourceIndex}:${targetIndex}:${lag}:${mark}`),
+          run: run.id,
+          method: 'J-PCMCI+',
           source,
           target,
           lag,
@@ -398,6 +430,12 @@ export function discoveryEvidenceView(run: DiscoveryRunArtifact): DiscoveryEvide
       semantics: 'stationary-lag-graph',
       candidates: matrixCandidates(run),
     }
+    case 'jpcmci-plus-run': return {
+      run,
+      method: 'J-PCMCI+',
+      semantics: 'joint-stationary-lag-graph',
+      candidates: jpcmciCandidates(run),
+    }
     case 'lpcmci-run': return {
       run,
       method: 'LPCMCI',
@@ -486,6 +524,7 @@ export function describeEvidenceSemantics(view: DiscoveryEvidenceView): string {
   switch (view.semantics) {
     case 'cpdag': return 'Completed partially directed acyclic graph; undirected connections remain unresolved within the equivalence class'
     case 'stationary-lag-graph': return 'Conditional-dependence marks over lagged variables'
+    case 'joint-stationary-lag-graph': return 'Joint conditional-dependence marks over aligned panel units, with observed and generated context represented separately'
     case 'nonstationary-lag-graph': return 'Conditional-dependence marks over lagged variables with recorded time-context nodes'
     case 'pag': return 'Partial ancestral graph marks; circles and bidirected endpoints remain unresolved'
     case 'regime-specific-lag-graphs': return 'A separately estimated lag graph for each inferred regime'

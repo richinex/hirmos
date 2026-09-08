@@ -297,11 +297,15 @@ where
     }
     let data = DMatrix::from_column_slice(rows, columns, values);
     let column_matrix = |selected: &[usize]| {
-        DMatrix::from_fn(rows, selected.len(), |row, column| data[(row, selected[column])])
+        DMatrix::from_fn(rows, selected.len(), |row, column| {
+            data[(row, selected[column])]
+        })
     };
     let treatment_matrix = column_matrix(&[treatment]);
     let instrument_matrix = column_matrix(instruments);
-    let outcome_values = (0..rows).map(|row| data[(row, outcome)]).collect::<Vec<_>>();
+    let outcome_values = (0..rows)
+        .map(|row| data[(row, outcome)])
+        .collect::<Vec<_>>();
     let result = instrumental_variable_with_progress(
         IvInput {
             treatments: &treatment_matrix,
@@ -1291,15 +1295,29 @@ pub(crate) fn double_ml(
 ) -> Result<AnalysisResult, String> {
     let cut = match groups {
         DmlGroups::None => None,
-        DmlGroups::Levels { column } => Some(cut_modifier(values, rows, columns, column, treatment, outcome, None)?),
-        DmlGroups::Quantiles { column, bins } => Some(cut_modifier(values, rows, columns, column, treatment, outcome, Some(bins))?),
+        DmlGroups::Levels { column } => Some(cut_modifier(
+            values, rows, columns, column, treatment, outcome, None,
+        )?),
+        DmlGroups::Quantiles { column, bins } => Some(cut_modifier(
+            values,
+            rows,
+            columns,
+            column,
+            treatment,
+            outcome,
+            Some(bins),
+        )?),
     };
     // The modifier joins the nuisance inputs, as DoubleML's heterogeneous-effects data passes the
     // covariate that shapes the effect among `x_cols` before `gate` groups on it.
     let nuisance: Vec<usize> = adjustment
         .iter()
         .copied()
-        .chain(cut.as_ref().map(|cut| cut.column).filter(|column| !adjustment.contains(column)))
+        .chain(
+            cut.as_ref()
+                .map(|cut| cut.column)
+                .filter(|column| !adjustment.contains(column)),
+        )
         .collect();
     let (x, y, d, treat_binary) = dml_frame(
         "double machine learning",
@@ -1325,8 +1343,10 @@ pub(crate) fn double_ml(
     let groups = match cut {
         None => DmlGroupEvidence::None,
         Some(cut) => {
-            let effects = group_effects(&fit, &cut.labels, cut.bounds.len(), level)
-                .map_err(|error| format!("double machine learning group effects failed: {error}"))?;
+            let effects =
+                group_effects(&fit, &cut.labels, cut.bounds.len(), level).map_err(|error| {
+                    format!("double machine learning group effects failed: {error}")
+                })?;
             DmlGroupEvidence::Grouped {
                 modifier: cut.column,
                 grouping: cut.grouping,
@@ -1377,13 +1397,21 @@ pub(crate) fn t_learner(
     seed: u32,
 ) -> Result<AnalysisResult, String> {
     let label = "T-learner";
-    let (data, _, y) = design_columns(label, values, rows, columns, treatment, outcome, adjustment)?;
+    let (data, _, y) =
+        design_columns(label, values, rows, columns, treatment, outcome, adjustment)?;
     if adjustment.is_empty() {
-        return Err(format!("{label} needs at least one adjustment column as the forests' inputs"));
+        return Err(format!(
+            "{label} needs at least one adjustment column as the forests' inputs"
+        ));
     }
     let d: Vec<f64> = (0..rows).map(|row| data[(row, treatment)]).collect();
     let x: Vec<Vec<f64>> = (0..rows)
-        .map(|row| adjustment.iter().map(|&column| data[(row, column)]).collect())
+        .map(|row| {
+            adjustment
+                .iter()
+                .map(|&column| data[(row, column)])
+                .collect()
+        })
         .collect();
     let fit = fit_tlearner(&x, &y, &d, FOREST_TREES, FOREST_MIN_LEAF, seed)
         .map_err(|error| format!("{label}: {error}"))?;
@@ -1431,7 +1459,9 @@ fn cut_modifier(
     }
     let modifier: Vec<f64> = (0..rows).map(|row| values[column * rows + row]).collect();
     if let Some(row) = modifier.iter().position(|value| !value.is_finite()) {
-        return Err(format!("the effect modifier has a non-finite value at row {row}"));
+        return Err(format!(
+            "the effect modifier has a non-finite value at row {row}"
+        ));
     }
     let mut sorted = modifier.clone();
     sorted.sort_by(f64::total_cmp);
@@ -1447,13 +1477,21 @@ fn cut_modifier(
             }
             let labels = modifier
                 .iter()
-                .map(|value| levels.iter().position(|level| level == value).expect("level present"))
+                .map(|value| {
+                    levels
+                        .iter()
+                        .position(|level| level == value)
+                        .expect("level present")
+                })
                 .collect();
             Ok(ModifierCut {
                 column,
                 grouping: DmlGroupingEvidence::Levels,
                 labels,
-                bounds: levels.iter().map(|&level| (Some(level), Some(level))).collect(),
+                bounds: levels
+                    .iter()
+                    .map(|&level| (Some(level), Some(level)))
+                    .collect(),
             })
         }
         Some(bins) => {
@@ -1467,7 +1505,10 @@ fn cut_modifier(
             let edges: Vec<f64> = (1..bins)
                 .map(|k| numpy_percentile(&modifier, (k as f64 * step) * 100.0 / 100.0))
                 .collect();
-            if edges.windows(2).any(|pair| pair[0] >= pair[1]) || edges.first() == sorted.first() || edges.last() == sorted.last() {
+            if edges.windows(2).any(|pair| pair[0] >= pair[1])
+                || edges.first() == sorted.first()
+                || edges.last() == sorted.last()
+            {
                 return Err(format!(
                     "the effect modifier has too few distinct values for {bins} quantile groups; group by its levels instead"
                 ));
@@ -1477,10 +1518,12 @@ fn cut_modifier(
                 .map(|value| edges.iter().filter(|edge| value > edge).count())
                 .collect();
             let bounds = (0..bins)
-                .map(|group| (
-                    (group > 0).then(|| edges[group - 1]),
-                    (group + 1 < bins).then(|| edges[group]),
-                ))
+                .map(|group| {
+                    (
+                        (group > 0).then(|| edges[group - 1]),
+                        (group + 1 < bins).then(|| edges[group]),
+                    )
+                })
                 .collect();
             Ok(ModifierCut {
                 column,

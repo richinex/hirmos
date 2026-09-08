@@ -29,7 +29,7 @@ import {
   type ColumnId,
 } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
-import type { PanelDataProblem, PanelLongMatrix, PanelPeriod, PanelStructureEvidence } from '@/domain/panel'
+import type { PanelDataProblem, PanelKeyMatrix, PanelLongMatrix, PanelPeriod, PanelStructureEvidence } from '@/domain/panel'
 
 const DUCKDB_PACKAGE_VERSION = '1.30.0'
 const DUCKDB_ENGINE_VERSION = 'v1.3.2'
@@ -519,6 +519,77 @@ export async function inspectPanelStructure(
       duplicateKeys, missingUnitKeys, missingTimeKeys,
       balanced: duplicateKeys === 0 && missingUnitKeys === 0 && missingTimeKeys === 0 && observations === units * periods,
     })
+  } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
+    return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })
+  }
+  return outcome
+}
+
+/** Materialize only panel keys, so imputed analysis columns do not make structural ordering fail. */
+export async function materializePanelKeys(
+  source: SelectedSource,
+  profile: DatasetProfile,
+  unitColumnId: ColumnId,
+  timeColumnId: ColumnId,
+): Promise<Result<PanelKeyMatrix, PanelDataProblem>> {
+  if (unitColumnId === timeColumnId) return err({ kind: 'duplicate-column', id: unitColumnId })
+  const boundUnit = panelColumn(profile, unitColumnId)
+  if (!boundUnit.ok) return boundUnit
+  const boundTime = panelColumn(profile, timeColumnId)
+  if (!boundTime.ok) return boundTime
+  const unitColumn = boundUnit.value
+  const timeColumn = boundTime.value
+  const running = await verifiedPanelSource(source, profile)
+  if (!running.ok) return running
+  const registeredPath = `hirmos-${crypto.randomUUID()}.${source.format}`
+  try {
+    await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
+  } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
+  const relation = sourceRelation(source, registeredPath)
+  const unit = sqlIdentifier(unitColumn.name)
+  const time = sqlIdentifier(timeColumn.name)
+  let connection: duckdb.AsyncDuckDBConnection | null = null
+  let outcome: Result<PanelKeyMatrix, PanelDataProblem>
+  try {
+    connection = await running.value.db.connect()
+    // Source row order, as the value matrix is read: the rank window alone would return the rows sorted by time.
+    const table = await connection.query(`
+      WITH source AS (SELECT row_number() OVER () AS __row, ${unit} AS unit_value, ${time} AS time_value FROM ${relation})
+      SELECT CAST(unit_value AS VARCHAR) AS unit_label,
+             (dense_rank() OVER (ORDER BY time_value) - 1)::INTEGER AS time_code,
+             CAST(time_value AS VARCHAR) AS time_label
+      FROM source
+      ORDER BY __row
+    `)
+    const unitVector = table.getChild('unit_label')
+    const timeVector = table.getChild('time_code')
+    const timeLabelVector = table.getChild('time_label')
+    const units: string[] = []
+    const periodCodes: number[] = []
+    const periodsByCode = new Map<number, string>()
+    let problem: PanelDataProblem | null = null
+    for (let row = 0; row < table.numRows; row += 1) {
+      const unitValue = unitVector?.get(row)
+      const timeValue = timeVector?.get(row)
+      const timeLabel = timeLabelVector?.get(row)
+      if (unitValue === null || unitValue === undefined || String(unitValue) === '') { problem = { kind: 'missing-key', name: unitColumn.name, row }; break }
+      if (timeValue === null || timeValue === undefined || timeLabel === null || timeLabel === undefined) { problem = { kind: 'missing-key', name: timeColumn.name, row }; break }
+      const periodCode = scalarNumber(timeValue, 'panel time code')
+      const periodLabel = String(timeLabel)
+      const recordedLabel = periodsByCode.get(periodCode)
+      if (recordedLabel !== undefined && recordedLabel !== periodLabel) {
+        problem = { kind: 'panel-data-failed', detail: `Panel period code ${periodCode} is associated with both ${recordedLabel} and ${periodLabel}.` }
+        break
+      }
+      units.push(String(unitValue))
+      periodCodes.push(periodCode)
+      periodsByCode.set(periodCode, periodLabel)
+    }
+    const periods = [...periodsByCode].sort(([left], [right]) => left - right).map(([code, label]): PanelPeriod => ({ code, label }))
+    outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
+      ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel-key query returned no rows.' })
+      : ok({ kind: 'panel-key-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods })
   } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
   try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })

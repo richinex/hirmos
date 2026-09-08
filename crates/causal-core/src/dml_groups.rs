@@ -32,9 +32,17 @@ pub struct GroupEffects {
 pub enum GroupEffectError {
     /// The IRM effect-on-the-treated score has no group-effect signal in the reference.
     ScoreNotSupported,
-    LengthMismatch { expected: usize, actual: usize },
-    GroupOutOfRange { row: usize, group: usize },
-    EmptyGroup { group: usize },
+    LengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    GroupOutOfRange {
+        row: usize,
+        group: usize,
+    },
+    EmptyGroup {
+        group: usize,
+    },
     NoGroups,
     InvalidConfidenceLevel,
 }

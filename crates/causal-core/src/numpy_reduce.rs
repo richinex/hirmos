@@ -1,7 +1,7 @@
 //! NumPy's `add.reduce` order for contiguous float64 data: pairwise summation inside each
-//! 8,192-element buffer block, with the blocks accumulated in sequence from zero. `np.mean`,
-//! `pandas.Series.mean` and the centred product inside `np.cov` all reduce this way, so a port that
-//! has to match them to the last bit must sum in the same order rather than left to right.
+//! 8,192-element buffer block, with the blocks accumulated in sequence from zero.
+//! Use this for contiguous add reductions, including `np.mean`. Matrix products
+//! such as `np.cov`'s centered dot product follow their BLAS kernel instead.
 
 const BUFFER_BLOCK: usize = 8192;
 const PAIRWISE_BLOCK: usize = 128;
@@ -44,4 +44,11 @@ pub fn numpy_sum(values: &[f64]) -> f64 {
 /// `np.mean` over a contiguous float64 array; an empty input is NaN, as in NumPy.
 pub fn numpy_mean(values: &[f64]) -> f64 {
     numpy_sum(values) / values.len() as f64
+}
+
+/// Reduce contiguous inner rows in sequence, as NumPy's `(0, 2)` reduction
+/// does for one retained column of a C-order three-dimensional array.
+pub fn numpy_sum_rows<R: AsRef<[f64]>>(rows: impl IntoIterator<Item = R>) -> f64 {
+    rows.into_iter()
+        .fold(0.0, |total, row| total + numpy_sum(row.as_ref()))
 }

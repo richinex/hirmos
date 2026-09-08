@@ -49,6 +49,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'granger-ssr-f',
     'count-series-intervention-scan',
     'pcmci-plus-parcorr',
+    'jpcmciplus-parcorr-mult',
     'lpcmci-parcorr',
     'rpcmci-parcorr',
     'cdnots-parcorr',

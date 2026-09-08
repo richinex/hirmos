@@ -17,6 +17,7 @@ import {
   parseCdnotsResult,
   parseCdnotsPlusResult,
   parseGraceEvidence,
+  parseJpcmciPlusEvidence,
   parsePcmciPlusEvidence,
   parseVarLingamEvidence,
 } from '@/domain/discovery'
@@ -114,6 +115,19 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         tauMax: command.tauMax,
         pcAlpha: command.pcAlpha,
         samples: rustTemporalSamples(command.samples),
+      }
+    case 'jpcmci-plus':
+      return {
+        kind: 'jpcmciplus',
+        rows: command.rows,
+        datasets: command.datasets,
+        periods: command.periods,
+        observedColumns: command.observedColumns,
+        classes: command.classes,
+        timeDummy: command.timeDummy,
+        spaceDummy: command.spaceDummy,
+        tauMax: command.tauMax,
+        pcAlpha: command.pcAlpha,
       }
     case 'lpcmci':
       return {
@@ -449,6 +463,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'pcmci-plus-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'jpcmci-plus': {
+        const result = parseJpcmciPlusEvidence(decoded)
+        if (!result.ok) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail })
+          return
+        }
+        emit({ kind: 'jpcmci-plus-succeeded', request: command.request, result: result.value })
         return
       }
       case 'lpcmci': {

@@ -1,8 +1,8 @@
 //! LPCMCI ported 1:1 from tigramite/lpcmci.py at default parameters, ParCorr with analytic
 //! significance. Method names mirror the oracle for line-by-line auditing.
 
+use crate::missing_data::{PreprocessingError, TigramiteFrame};
 use crate::parcorr::{CiKind, Node, ParCorrCi, RoleAwareSamplePolicy, TimeSeries};
-use crate::preprocessing::{PreprocessingError, TigramiteFrame};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A link is three ASCII marks, or absent.

@@ -36,11 +36,16 @@ pub enum IvIdentificationError {
 impl Display for IvIdentificationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::EndpointOutOfRange => write!(f, "instrument search endpoints must be graph nodes"),
+            Self::EndpointOutOfRange => {
+                write!(f, "instrument search endpoints must be graph nodes")
+            }
             Self::NoTreatment => write!(f, "instrument search needs at least one treatment"),
             Self::NoOutcome => write!(f, "instrument search needs at least one outcome"),
             Self::SharedEndpoint => {
-                write!(f, "instrument search treatments and outcomes must be distinct")
+                write!(
+                    f,
+                    "instrument search treatments and outcomes must be distinct"
+                )
             }
         }
     }
@@ -66,15 +71,14 @@ pub fn identify_instrument_set(
     if outcomes.is_empty() {
         return Err(IvIdentificationError::NoOutcome);
     }
-    if treatments
-        .iter()
-        .chain(outcomes)
-        .any(|&node| node >= dag.n)
-    {
+    if treatments.iter().chain(outcomes).any(|&node| node >= dag.n) {
         return Err(IvIdentificationError::EndpointOutOfRange);
     }
     let treatment_set: BTreeSet<usize> = treatments.iter().copied().collect();
-    if outcomes.iter().any(|outcome| treatment_set.contains(outcome)) {
+    if outcomes
+        .iter()
+        .any(|outcome| treatment_set.contains(outcome))
+    {
         return Err(IvIdentificationError::SharedEndpoint);
     }
 
@@ -296,7 +300,9 @@ fn validate(input: IvInput<'_>, options: IvOptions) -> Result<(), IvError> {
 fn gather_column(values: &DMatrix<f64>, column: usize, rows: Option<&[usize]>) -> Vec<f64> {
     match rows {
         Some(rows) => rows.iter().map(|&row| values[(row, column)]).collect(),
-        None => (0..values.nrows()).map(|row| values[(row, column)]).collect(),
+        None => (0..values.nrows())
+            .map(|row| values[(row, column)])
+            .collect(),
     }
 }
 
@@ -388,7 +394,8 @@ fn estimate_once(
         let instrument = gather_column(input.instruments, 0, rows);
         let treatment = gather_column(input.treatments, 0, rows);
         if distinct_count(&instrument) <= 2 {
-            let numerator = group_mean(&outcome, &instrument, 1.0) - group_mean(&outcome, &instrument, 0.0);
+            let numerator =
+                group_mean(&outcome, &instrument, 1.0) - group_mean(&outcome, &instrument, 0.0);
             let denominator =
                 group_mean(&treatment, &instrument, 1.0) - group_mean(&treatment, &instrument, 0.0);
             let estimate = numerator / denominator;
@@ -408,7 +415,8 @@ fn estimate_once(
             let source = rows.map_or(row, |rows| rows[row]);
             input.instruments[(source, column)]
         });
-        let outcome = DVector::from_iterator(n, outcome.iter().map(|&value| single_precision(value)));
+        let outcome =
+            DVector::from_iterator(n, outcome.iter().map(|&value| single_precision(value)));
         let params = two_stage_least_squares(&treatments, &instruments, &outcome)?;
         let estimate = params.iter().fold(0.0, |total, param| total + param);
         (IvEstimator::TwoStageLeastSquares, estimate, params)

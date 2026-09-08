@@ -3,10 +3,14 @@
 //! Only modules adopted by the application live here. The browser-facing contract remains in the
 //! separate `hirmos-wasm` façade so scientific implementations do not acquire UI serialization.
 
+mod arm_pow;
+mod arm_pow_data;
 pub mod backdoor;
+pub mod bootstrap;
 pub mod causal_effects;
 pub mod causal_ts_preparation;
 pub mod cdnots;
+pub mod ci_samples;
 pub mod constraint_discovery;
 pub mod data_preparation;
 pub mod discrete_bn;
@@ -14,15 +18,21 @@ pub mod dowhy_bootstrap;
 pub mod estimation;
 pub mod frontdoor;
 pub mod iv;
+pub mod joint_samples;
+pub mod jpcmciplus;
+mod lapack_dgelsd;
+mod least_squares;
 pub mod mackinnon;
+pub mod missing_data;
 pub mod neural_granger;
+pub mod normality;
 pub mod ols;
 pub mod panel;
 pub mod parcorr;
 pub mod pc_stable;
 pub mod pcmci;
 pub mod pcmciplus;
-pub mod preprocessing;
+pub mod redundancy;
 pub mod stationarity;
 pub mod tsdiag;
 pub mod zivot_andrews;
@@ -31,20 +41,28 @@ pub use backdoor::{
     backdoor_adjustment, backdoor_linear_ate, backdoor_variables, refute_data_subset,
     refute_placebo, refute_random_common_cause, Dag,
 };
+pub use dowhy_bootstrap::{BootstrapError, DowhyBootstrap};
 pub use estimation::{durbin_watson, ols_hac, wls, HacOls, WlsFit};
 pub use frontdoor::{
     frontdoor_two_stage, frontdoor_two_stage_with_progress, identify_frontdoor_set,
     FrontdoorBootstrap, FrontdoorError, FrontdoorIdentificationError, FrontdoorInput,
     FrontdoorOptions, FrontdoorResult,
 };
-pub use dowhy_bootstrap::{BootstrapError, DowhyBootstrap};
 pub use iv::{
-    identify_instrument_set, instrumental_variable, instrumental_variable_with_progress,
-    IvEstimator, IvError, IvIdentificationError, IvInput, IvOptions, IvResult,
+    identify_instrument_set, instrumental_variable, instrumental_variable_with_progress, IvError,
+    IvEstimator, IvIdentificationError, IvInput, IvOptions, IvResult,
 };
 pub use numpy_reduce::{numpy_mean, numpy_sum};
 
+pub use ci_samples::{
+    construct_array_tracked, ConstructOptions, ConstructedArray, SampleExclusion,
+    SampleExclusionReason,
+};
 pub use mackinnon::Regression;
+pub use missing_data::{
+    forward_fill, linear_interpolate, longest_complete_interval, structural_zero, ImputationResult,
+    MaskType, PreprocessingError, TigramiteFrame,
+};
 pub use parcorr::{
     run_test as parcorr_test, CiKind, CiSampleAudit, ParCorrCi, RoleAwareSamplePolicy, TimeSeries,
 };
@@ -56,11 +74,6 @@ pub use pcmciplus::{
     fdr_bh, run_pcalg_standard, run_pcmciplus, run_pcmciplus_frame, run_sliding_window_pcmciplus,
     PcmciPlusResult,
 };
-pub use preprocessing::{
-    construct_array_tracked, forward_fill, linear_interpolate, longest_complete_interval,
-    structural_zero, ConstructOptions, ConstructedArray, ImputationResult, MaskType,
-    PreprocessingError, SampleExclusion, SampleExclusionReason, TigramiteFrame,
-};
 pub use stationarity::{adfuller, kpss, AdfResult, KpssResult};
 pub use zivot_andrews::{zivot_andrews, ZaModel, ZaResult};
 pub mod dynotears;
@@ -70,8 +83,10 @@ pub mod lars;
 pub mod lbfgsb;
 pub mod lpcmci;
 pub mod nprandom;
+pub mod numpy_argsort;
 pub mod numpy_reduce;
 pub mod ocse;
+pub mod parcorr_mult;
 pub mod var_lingam;
 pub mod ziggurat;
 
@@ -107,7 +122,6 @@ pub mod logistic;
 pub mod negbin_nuts;
 pub mod nuts;
 pub mod pelt;
-pub mod preprocess;
 pub mod pss_tables;
 pub mod refute_dml;
 pub mod resampling;
@@ -115,9 +129,9 @@ pub mod rpcmci;
 pub mod simplex;
 pub mod sklearn_linear;
 pub mod sktree;
-pub mod tlearner;
 pub mod stl;
 pub mod synthetic_control;
+pub mod tlearner;
 pub mod ucm;
 pub mod unobserved;
 pub mod vecm;
@@ -125,7 +139,6 @@ pub mod vecm;
 pub use coint::{coint, coint_johansen, CointResult, JohansenResult};
 pub use dml::{dml_irm, dml_plr, DmlResult, SensitivityResult, SensitivityScenario};
 pub use dml_groups::{group_effects, GroupEffect, GroupEffectError, GroupEffects};
-pub use tlearner::{fit_tlearner, TLearnerError, TLearnerFit};
 pub use do_calculus::{
     identify_conditional_outcomes, identify_outcomes, latent_projection, Admg,
     Expression as IdentifiedExpression, GraphError as AdmgError, Hedge, IdentificationError,
@@ -139,7 +152,8 @@ pub use kci::{
     causal_learn_kernel_conditional_independence, kernel_conditional_independence, KciError,
     KciResult,
 };
-pub use preprocess::{cluster_redundant, correlation_matrix, shapiro, vif_redundant};
+pub use normality::shapiro;
+pub use redundancy::{cluster_redundant, correlation_matrix, vif_redundant};
 pub use refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, RefutationOutcome,
     WorkerStudy,
@@ -149,6 +163,7 @@ pub use resampling::{
     ResampleFrequency, ResampleResult,
 };
 pub use rpcmci::{run_rpcmci, run_rpcmci_frame, run_rpcmci_with_progress, RpcmciResult};
+pub use tlearner::{fit_tlearner, TLearnerError, TLearnerFit};
 pub use unobserved::{infer_kappa_t, infer_kappa_y, unobserved_common_cause_grid};
 pub use vecm::{chow_break, select_coint_rank, vecm_fit, vecm_select_order, VecmResult};
 mod adjustment_sets;

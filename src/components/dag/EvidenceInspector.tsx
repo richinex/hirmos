@@ -19,6 +19,7 @@ const methodTitle = (run: DiscoveryRunArtifact): string => {
     case 'pc-stable-run': return 'PC-stable'
     case 'fci-run': return 'FCI'
     case 'pcmci-plus-run': return 'PCMCI+'
+    case 'jpcmci-plus-run': return 'J-PCMCI+'
     case 'lpcmci-run': return 'LPCMCI'
     case 'rpcmci-run': return 'RPCMCI'
     case 'cdnots-run': return 'CD-NOTS'
@@ -39,6 +40,7 @@ const variablesOf = (view: DiscoveryEvidenceView) => {
     case 'pc-stable-run':
     case 'fci-run':
     case 'pcmci-plus-run':
+    case 'jpcmci-plus-run':
     case 'lpcmci-run':
     case 'rpcmci-run':
     case 'cdnots-run':

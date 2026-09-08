@@ -66,6 +66,7 @@ export type DataWorkerCommand =
       readonly query: PreviewQuery
     }
   | { readonly kind: 'inspect-panel'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId }
+  | { readonly kind: 'materialize-panel-keys'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId }
   | { readonly kind: 'materialize-panel'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly outcomeColumn: ColumnId; readonly treatmentColumn: ColumnId }
 
 export type DataWorkerEvent =
@@ -81,6 +82,7 @@ export type DataWorkerEvent =
   | { readonly kind: 'preview-window-succeeded'; readonly request: ImportRequestId; readonly window: unknown }
   | { readonly kind: 'preview-window-failed'; readonly request: ImportRequestId; readonly problem: PreviewWindowProblem }
   | { readonly kind: 'panel-inspection-succeeded'; readonly request: ImportRequestId; readonly structure: unknown }
+  | { readonly kind: 'panel-keys-succeeded'; readonly request: ImportRequestId; readonly matrix: unknown }
   | { readonly kind: 'panel-materialization-succeeded'; readonly request: ImportRequestId; readonly matrix: unknown }
   | { readonly kind: 'panel-data-failed'; readonly request: ImportRequestId; readonly problem: PanelDataProblem }
   | { readonly kind: 'protocol-failed'; readonly detail: string }
@@ -133,6 +135,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     query: previewQuerySchema,
   }).strict(),
   z.object({ kind: z.literal('inspect-panel'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string() }).strict(),
+  z.object({ kind: z.literal('materialize-panel-keys'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string() }).strict(),
   z.object({ kind: z.literal('materialize-panel'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string(), outcomeColumn: z.string(), treatmentColumn: z.string() }).strict(),
 ])
 
@@ -214,6 +217,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('preview-window-succeeded'), request: requestSchema, window: z.unknown() }).strict(),
   z.object({ kind: z.literal('preview-window-failed'), request: requestSchema, problem: previewWindowProblemSchema }).strict(),
   z.object({ kind: z.literal('panel-inspection-succeeded'), request: requestSchema, structure: z.unknown() }).strict(),
+  z.object({ kind: z.literal('panel-keys-succeeded'), request: requestSchema, matrix: z.unknown() }).strict(),
   z.object({ kind: z.literal('panel-materialization-succeeded'), request: requestSchema, matrix: z.unknown() }).strict(),
   z.object({ kind: z.literal('panel-data-failed'), request: requestSchema, problem: panelDataProblemSchema }).strict(),
 ])
@@ -243,12 +247,12 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
     if (!isNonEmpty(columnIds)) return err({ kind: 'invalid-command', detail: 'At least one numeric column is required.' })
     return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, timeColumn, columnIds })
   }
-  if (data.kind === 'inspect-panel' || data.kind === 'materialize-panel') {
+  if (data.kind === 'inspect-panel' || data.kind === 'materialize-panel-keys' || data.kind === 'materialize-panel') {
     const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
     const unitColumn = known.get(data.unitColumn)
     const timeColumn = known.get(data.timeColumn)
     if (unitColumn === undefined || timeColumn === undefined) return err({ kind: 'invalid-command', detail: 'Panel keys are outside the supplied profile.' })
-    if (data.kind === 'inspect-panel') return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn })
+    if (data.kind === 'inspect-panel' || data.kind === 'materialize-panel-keys') return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn })
     const outcomeColumn = known.get(data.outcomeColumn)
     const treatmentColumn = known.get(data.treatmentColumn)
     if (outcomeColumn === undefined || treatmentColumn === undefined) return err({ kind: 'invalid-command', detail: 'Panel values are outside the supplied profile.' })
@@ -312,6 +316,7 @@ export function parseDataWorkerEvent(value: unknown): Result<DataWorkerEvent, Da
   }
   if (parsed.data.kind === 'panel-inspection-succeeded') return ok({ kind: parsed.data.kind, request: request.value, structure: parsed.data.structure })
   if (parsed.data.kind === 'panel-materialization-succeeded') return ok({ kind: parsed.data.kind, request: request.value, matrix: parsed.data.matrix })
+  if (parsed.data.kind === 'panel-keys-succeeded') return ok({ kind: parsed.data.kind, request: request.value, matrix: parsed.data.matrix })
   if (parsed.data.kind === 'profile-failed' || parsed.data.kind === 'materialization-failed' || parsed.data.kind === 'column-profile-failed') {
     return ok({ ...parsed.data, request: request.value })
   }

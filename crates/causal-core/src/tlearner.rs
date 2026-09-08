@@ -22,9 +22,13 @@ pub struct TLearnerFit {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TLearnerError {
     /// A treatment value other than 0 or 1; the reference accepts binary treatments only.
-    TreatmentNotBinary { row: usize },
+    TreatmentNotBinary {
+        row: usize,
+    },
     /// One arm has no rows, so its outcome model has nothing to fit.
-    ArmEmpty { treated: bool },
+    ArmEmpty {
+        treated: bool,
+    },
     LengthMismatch,
     NoRows,
 }
@@ -33,11 +37,20 @@ impl Display for TLearnerError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             TLearnerError::TreatmentNotBinary { row } => {
-                write!(f, "the treatment must be 0 or 1 in every row; row {row} is neither")
+                write!(
+                    f,
+                    "the treatment must be 0 or 1 in every row; row {row} is neither"
+                )
             }
-            TLearnerError::ArmEmpty { treated: true } => write!(f, "no treated rows to fit the treated outcome model"),
-            TLearnerError::ArmEmpty { treated: false } => write!(f, "no control rows to fit the control outcome model"),
-            TLearnerError::LengthMismatch => write!(f, "covariates, treatment and outcome differ in length"),
+            TLearnerError::ArmEmpty { treated: true } => {
+                write!(f, "no treated rows to fit the treated outcome model")
+            }
+            TLearnerError::ArmEmpty { treated: false } => {
+                write!(f, "no control rows to fit the control outcome model")
+            }
+            TLearnerError::LengthMismatch => {
+                write!(f, "covariates, treatment and outcome differ in length")
+            }
             TLearnerError::NoRows => write!(f, "no rows"),
         }
     }
@@ -66,8 +79,18 @@ pub fn fit_tlearner(
     }
     let arm = |treated: bool| -> (Vec<Vec<f64>>, Vec<f64>) {
         let wanted = if treated { 1.0 } else { 0.0 };
-        let rows: Vec<Vec<f64>> = x.iter().zip(t).filter(|(_, &value)| value == wanted).map(|(row, _)| row.clone()).collect();
-        let outcomes: Vec<f64> = y.iter().zip(t).filter(|(_, &value)| value == wanted).map(|(&value, _)| value).collect();
+        let rows: Vec<Vec<f64>> = x
+            .iter()
+            .zip(t)
+            .filter(|(_, &value)| value == wanted)
+            .map(|(row, _)| row.clone())
+            .collect();
+        let outcomes: Vec<f64> = y
+            .iter()
+            .zip(t)
+            .filter(|(_, &value)| value == wanted)
+            .map(|(&value, _)| value)
+            .collect();
         (rows, outcomes)
     };
     let (control_x, control_y) = arm(false);
@@ -79,8 +102,22 @@ pub fn fit_tlearner(
         return Err(TLearnerError::ArmEmpty { treated: true });
     }
     Ok(TLearnerFit {
-        control: fit_forest(&control_x, &control_y, n_estimators, min_samples_leaf, None, seed),
-        treated: fit_forest(&treated_x, &treated_y, n_estimators, min_samples_leaf, None, seed),
+        control: fit_forest(
+            &control_x,
+            &control_y,
+            n_estimators,
+            min_samples_leaf,
+            None,
+            seed,
+        ),
+        treated: fit_forest(
+            &treated_x,
+            &treated_y,
+            n_estimators,
+            min_samples_leaf,
+            None,
+            seed,
+        ),
         control_rows: control_x.len(),
         treated_rows: treated_x.len(),
     })

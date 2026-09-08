@@ -172,7 +172,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   // family, whose last method is RPCMCI.
   const discoveryFamilies = page.getByRole('radiogroup', { name: 'Discovery method family' })
   const discoveryMethods = page.getByRole('radiogroup', { name: 'Discovery method', exact: true })
-  const pcmci = discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })
+  const pcmci = discoveryMethods.getByRole('radio', { name: /^PCMCI\+/ })
   const lpcmci = discoveryMethods.getByRole('radio', { name: /LPCMCI/ })
   const rpcmci = discoveryMethods.getByRole('radio', { name: /RPCMCI/ })
   expect(await pcmci.evaluate((element) => element instanceof HTMLInputElement && element.type === 'radio')).toBe(true)
@@ -219,7 +219,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await expect(page.getByText('1 run')).toBeVisible()
   await expect(page.getByText('divided by its recorded population standard deviation')).toBeVisible()
   await discoveryFamilies.getByRole('radio', { name: 'PCMCI' }).click()
-  await discoveryMethods.getByRole('radio', { name: /PCMCI\+/ }).click()
+  await discoveryMethods.getByRole('radio', { name: /^PCMCI\+/ }).click()
 
   const pageWidth = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }))
   expect(pageWidth.document).toBeLessThanOrEqual(pageWidth.viewport)
@@ -277,7 +277,7 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await expect(page.getByRole('heading', { name: 'Partial ancestral graph' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('img', { name: 'FCI partial ancestral graph' })).toBeVisible()
   await discoveryFamilies.getByRole('radio', { name: 'PCMCI' }).click()
-  await expect(discoveryMethods.getByRole('radio', { name: /PCMCI\+/ })).toBeDisabled()
+  await expect(discoveryMethods.getByRole('radio', { name: /^PCMCI\+/ })).toBeDisabled()
   await discoveryFamilies.getByRole('radio', { name: 'LiNGAM' }).click()
   await page.getByRole('radio', { name: 'DirectLiNGAM' }).click()
   await discoveryFamilies.getByRole('radio', { name: 'Neural' }).click()
@@ -300,7 +300,7 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await page.getByLabel('DAG name').fill('DirectLiNGAM review')
   await page.getByRole('button', { name: 'Create DAG draft' }).click()
   await expect(page.getByRole('heading', { name: 'DirectLiNGAM', exact: true })).toBeVisible()
-  await expect(page.getByLabel('DirectLiNGAM evidence graph')).toBeVisible()
+  await expect(page.getByLabel('DirectLiNGAM evidence graph', { exact: true })).toBeVisible()
   await expect(page.getByLabel('Discovered relations').getByRole('button')).not.toHaveCount(0)
 })
 

@@ -153,7 +153,7 @@ export interface DoubleMlConfiguration {
 
 export interface TLearnerConfiguration {
   readonly kind: 't-learner'
-  /** Seeds both outcome forests, as EconML clones one estimator per arm. */
+  /** One seed for both outcome forests. */
   readonly seed: number
 }
 
@@ -1429,7 +1429,7 @@ function targetCompatibility(estimand: Estimand, configuration: EstimatorConfigu
       return notReported('This study targets ATT. DML interactive and the binary IDC* evaluator report ATT.')
     case 'conditional-average-treatment-effect':
       if (configuration.kind === 'dml-plr' || (configuration.kind === 'dml-irm' && !configuration.att)) {
-        return reported(`The estimator reports DoubleML group average treatment effects within groups of ${estimand.modifier.name} beside the overall average.`)
+        return reported('')
       }
       return notReported(`This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`)
     case 'conditional-average-treatment-effect-per-row':
@@ -1561,7 +1561,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         leave('panel-pre-fit', 'The run checks control variation before treatment and reports the fitted unit and time weights.')
       }
       if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controls.length > context.panelPreflight.layout.treated.length) {
-        satisfy('panel-no-interval', `${configuration.placeboReplications} seeded synthdid placebo refits will estimate the SC and SDID standard errors; the seed is ${configuration.seed}.`)
+        satisfy('panel-no-interval', '')
       } else {
         leave('panel-no-interval', 'Placebo standard errors need more controls than treated units. The point estimates remain runnable and the result records whether inference was available.')
       }
@@ -1645,7 +1645,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else if (prepared.observations < 6 * (configuration.maxLag + 1) + 10) violate('ardl-time-series', `${prepared.observations} rows is too few for a maximum lag of ${configuration.maxLag}.`)
       else satisfy('ardl-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series with ${prepared.observations} rows for a maximum lag of ${configuration.maxLag}.`)
       if (adjustment === null) violate('ardl-single-regressor', 'No measured back-door adjustment set was found for this study.')
-      else if (identification.kind === 'identified' && identification.adjustment.variables.length > 0) violate('ardl-single-regressor', `The identified adjustment set (${adjustment}) is not empty, and the port fits one exogenous variable.`)
+      else if (identification.kind === 'identified' && identification.adjustment.variables.length > 0) violate('ardl-single-regressor', `The identified adjustment set (${adjustment}) is not empty.`)
       else satisfy('ardl-single-regressor', 'No adjustment is needed, so the treatment is the single exogenous variable.')
       {
         const transformed = transformedStudyVariables(context)
@@ -1667,7 +1667,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       }
       leave('vecm-rank', 'The Johansen trace test decides the rank when the run starts; rank zero reports no effect.')
       leave('vecm-single-relation', 'A long-run effect is read only when the rank is one.')
-      leave('vecm-no-interval', 'The port reports the long-run vector without a standard error.')
+      leave('vecm-no-interval', '')
       break
     }
     case 'synthetic-control': {
@@ -1694,7 +1694,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     }
     case 'negbin-nuts': {
       if (adjustment === null) violate('nuts-model-shape', 'No measured back-door adjustment set was found, so this one-confounder model has no identified covariate.')
-      else if (identification.kind === 'identified' && identification.adjustment.variables.length !== 1) violate('nuts-model-shape', `The ported model takes exactly one confounder; the identified set holds ${identification.adjustment.variables.length}.`)
+      else if (identification.kind === 'identified' && identification.adjustment.variables.length !== 1) violate('nuts-model-shape', `The identified set holds ${identification.adjustment.variables.length}.`)
       else satisfy('nuts-model-shape', `One confounder, ${adjustment}, enters the linear predictor beside the treatment.`)
       if (context.outcomeIsCount === null) leave('nuts-count-outcome', 'The outcome column has not been read yet; it is checked when the run starts.')
       else if (context.outcomeIsCount) satisfy('nuts-count-outcome', 'Every outcome value is a non-negative integer.')
@@ -1779,7 +1779,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
           assertNever(configuration.estimator)
       }
       if (configuration.uncertainty.kind === 'none') leave('causal-effects-bootstrap', 'This run does not request a sampling interval.')
-      else satisfy('causal-effects-bootstrap', `Seeded Tigramite block bootstrap with ${configuration.uncertainty.samples} samples and ${configuration.uncertainty.blockLength.kind === 'fixed' ? `block length ${configuration.uncertainty.blockLength.length}` : 'cube-root block length'}.`)
+      else satisfy('causal-effects-bootstrap', '')
       break
     }
     case 'causal-impact': {
@@ -2004,7 +2004,7 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'perRow', overall: evidence.average, effects: evidence.effects },
-        interval: { kind: 'none', reason: 'EconML reports an interval for the T-learner only through bootstrap inference, which is not ported; each row’s effect is a point.' },
+        interval: { kind: 'none', reason: 'Each row’s effect is a point. No interval is reported: one would need the two forests refitted on resampled rows many times over, and that is not offered.' },
         standardError: null,
         adjustment,
         sample: { observations: evidence.observations, parameters: 0, degreesOfFreedom: null },
@@ -2029,7 +2029,7 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.longRunEffect, unit: '' },
-        interval: { kind: 'none', reason: 'The VECM port reports the outcome-normalised long-run vector without a standard error.' },
+        interval: { kind: 'none', reason: 'No standard error is reported for the long-run vector.' },
         standardError: null,
         adjustment,
         sample: { observations: evidence.observations, parameters: evidence.beta.length * evidence.rank, degreesOfFreedom: null },
@@ -2062,7 +2062,7 @@ export function causalEstimateFrom(
       return {
         kind: 'causal-estimate', estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.syntheticDid.estimate, unit: '' },
-        interval: { kind: 'none', reason: placeboStandardError === null ? 'The panel result has no sampling interval; the requirements panel records why placebo variance was unavailable.' : 'The run reports synthdid placebo standard errors and an in-time placebo, but does not convert the placebo standard error into a confidence interval.' },
+        interval: { kind: 'none', reason: placeboStandardError === null ? 'The panel result has no sampling interval; the requirements panel records why placebo variance was unavailable.' : 'The run reports placebo standard errors and an in-time placebo, but does not convert the placebo standard error into a confidence interval.' },
         standardError: placeboStandardError,
         adjustment: { kind: 'none' },
         sample: { observations: evidence.observations, parameters: evidence.syntheticDid.lambda.length + evidence.syntheticDid.omega.length, degreesOfFreedom: null },

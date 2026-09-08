@@ -1182,20 +1182,18 @@ struct TotalEffectDesign {
 fn linear_fit(predictors: &[Vec<f64>], targets: &[f64]) -> Fitted {
     let n = predictors.len();
     let k = predictors[0].len();
-    let mut means = vec![0.0; k];
-    for row in predictors {
-        for j in 0..k {
-            means[j] += row[j] / n as f64;
-        }
+    let design = DMatrix::from_fn(n, k, |row, column| predictors[row][column]);
+    let target = DVector::from_column_slice(targets);
+    let fit = crate::sklearn_linear::fit_sklearn_linear_regression(
+        &design,
+        &target,
+        crate::sklearn_linear::SKLEARN_LINEAR_TOLERANCE,
+    )
+    .expect("finite total-effect linear-regression inputs");
+    Fitted::Linear {
+        intercept: fit.intercept,
+        coef: fit.coefficients,
     }
-    let y_mean = targets.iter().sum::<f64>() / n as f64;
-    let xc = DMatrix::from_fn(n, k, |r, c| predictors[r][c] - means[c]);
-    let yc = DVector::from_fn(n, |r, _| targets[r] - y_mean);
-    let svd = xc.svd(true, true);
-    let eps = 1e-15 * svd.singular_values.max() * n.max(k) as f64;
-    let coef = svd.solve(&yc, eps).expect("total effect design solve");
-    let intercept = y_mean - (0..k).map(|j| coef[j] * means[j]).sum::<f64>();
-    Fitted::Linear { intercept, coef }
 }
 
 fn predict_one(fitted: &Fitted, row: &[f64]) -> f64 {

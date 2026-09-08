@@ -34,7 +34,10 @@ use hirmos_causal_core::ingarch::{
     detect_negative_binomial_intervention, fit_negative_binomial_ingarch, intervention_regressors,
     IngarchLink as CoreIngarchLink, IngarchSpecification, InterventionSchedule,
 };
+use hirmos_causal_core::joint_samples::JointData;
+use hirmos_causal_core::jpcmciplus::{self, NodeClass as CoreJpcmciNodeClass};
 use hirmos_causal_core::lpcmci::{run_lpcmci_frame_with_progress, run_lpcmci_with_progress};
+use hirmos_causal_core::missing_data::{MaskType, TigramiteFrame};
 use hirmos_causal_core::negbin_nuts::{irr_summary, quantile, PbcNegBinModel};
 use hirmos_causal_core::neural_granger::{
     fit_clstm_with, fit_cmlp_with, Activation as CoreNeuralActivation, ClstmConfig, CmlpConfig,
@@ -45,9 +48,9 @@ use hirmos_causal_core::nuts::NutsOptions;
 use hirmos_causal_core::ocse::{discover_network_with_progress, CmiMethod};
 use hirmos_causal_core::ols::Ols;
 use hirmos_causal_core::parcorr::{CiKind, CutOff, RoleAwareSamplePolicy, TimeSeries};
+use hirmos_causal_core::parcorr_mult::Correlation as MultCorrelation;
 use hirmos_causal_core::pcmciplus::{run_pcmciplus, run_pcmciplus_frame};
 use hirmos_causal_core::pelt::pelt_l2;
-use hirmos_causal_core::preprocessing::{MaskType, TigramiteFrame};
 use hirmos_causal_core::pss_tables::stat_star;
 use hirmos_causal_core::refute_dml::{
     placebo_refute, random_common_cause_refute, unobserved_refute, worker_fit, WorkerStudy,
@@ -71,9 +74,10 @@ use hirmos_causal_core::{
 };
 use hirmos_causal_core::{
     backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_conditional_outcomes,
-    identify_frontdoor_set, identify_instrument_set, identify_outcomes, infer_kappa_t, infer_kappa_y, latent_projection,
-    ols_hac, refute_data_subset, refute_placebo, refute_random_common_cause, shapiro,
-    unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag, IdentificationError,
+    identify_frontdoor_set, identify_instrument_set, identify_outcomes, infer_kappa_t,
+    infer_kappa_y, latent_projection, ols_hac, refute_data_subset, refute_placebo,
+    refute_random_common_cause, shapiro, unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag,
+    IdentificationError,
 };
 use hirmos_causal_core::{cluster_redundant, correlation_matrix, vif_redundant};
 use nalgebra::DMatrix;
@@ -228,6 +232,28 @@ pub fn run_analysis(
             tau_max,
             pc_alpha,
             samples,
+        ),
+        AnalysisCommand::Jpcmciplus {
+            rows,
+            datasets,
+            periods,
+            observed_columns,
+            classes,
+            time_dummy,
+            space_dummy,
+            tau_max,
+            pc_alpha,
+        } => jpcmciplus_evidence(
+            values,
+            rows,
+            datasets,
+            periods,
+            observed_columns,
+            classes,
+            time_dummy,
+            space_dummy,
+            tau_max,
+            pc_alpha,
         ),
         AnalysisCommand::Lpcmci {
             rows,

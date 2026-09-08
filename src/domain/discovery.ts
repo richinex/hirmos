@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { assertNever, brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import { columnNameOf, type NumericColumnSelection } from './dataset'
+import { columnNameOf, type ColumnId, type NumericColumnSelection } from './dataset'
 import {
   DYNOTEARS_METHOD_ID,
   DIRECT_LINGAM_METHOD_ID,
@@ -16,6 +16,7 @@ import {
   VAR_LINGAM_METHOD_ID,
   OCSE_METHOD_ID,
   PCMCI_PLUS_PAR_CORR_METHOD_ID,
+  JPCMCI_PLUS_PAR_CORR_METHOD_ID,
   type CaveatEvaluation,
   type MethodDefinition,
   type MethodEligibility,
@@ -39,6 +40,45 @@ export const pcmciPlusEvidenceSchema = z.object({
 }).strict()
 
 export type PcmciPlusEvidence = z.infer<typeof pcmciPlusEvidenceSchema>
+
+const jpcmciNodeSchema = z.object({
+  variable: z.number().int().nonnegative(),
+  lag: z.number().int(),
+}).strict()
+
+export const jpcmciPlusEvidenceSchema = z.object({
+  kind: z.literal('jpcmciplus'),
+  observations: z.number().int().positive(),
+  datasets: z.number().int().min(2),
+  periods: z.number().int().min(2),
+  observedVariables: z.number().int().min(2).max(32),
+  variables: z.number().int().min(2).max(34),
+  classes: z.array(z.enum(['system', 'timeContext', 'spaceContext', 'timeDummy', 'spaceDummy'])),
+  timeDummy: z.boolean(),
+  spaceDummy: z.boolean(),
+  tauMax: z.number().int().min(1).max(20),
+  pcAlpha: z.number().finite().positive().max(1),
+  graph: z.array(z.array(z.array(z.string().max(3)))),
+  // ParCorrMult's analytic p-value for a dummy block against a system variable exceeds 1 in the reference, so the bound is the reference's.
+  pMatrix: z.array(z.array(z.array(z.number().finite().min(0)))),
+  valMatrix: z.array(z.array(z.array(z.number().finite().min(-1).max(1)))),
+  separatingSets: z.array(z.object({
+    source: z.number().int().nonnegative(),
+    target: z.number().int().nonnegative(),
+    lag: z.number().int().nonnegative(),
+    variables: z.array(jpcmciNodeSchema),
+  }).strict()),
+  ambiguousTriples: z.array(z.object({
+    left: jpcmciNodeSchema,
+    middle: z.number().int().nonnegative(),
+    right: z.number().int().nonnegative(),
+  }).strict()),
+  laggedParents: z.array(z.array(jpcmciNodeSchema)),
+  contextParents: z.array(z.array(jpcmciNodeSchema)),
+  dummyParents: z.array(z.array(jpcmciNodeSchema)),
+}).strict()
+
+export type JpcmciPlusEvidence = z.infer<typeof jpcmciPlusEvidenceSchema>
 
 export const lpcmciEvidenceSchema = pcmciPlusEvidenceSchema.extend({
   kind: z.literal('lpcmci'),
@@ -286,7 +326,7 @@ export type PcmciPlusBoundaryProblem = {
 
 export type DiscoveryMatrixBoundaryProblem = {
   readonly kind: 'invalid-discovery-matrix-result'
-  readonly method: 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
+  readonly method: 'J-PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'
   readonly detail: string
 }
 
@@ -310,6 +350,38 @@ export function parsePcmciPlusEvidence(value: unknown): Result<PcmciPlusEvidence
     return err({ kind: 'invalid-pcmci-plus-result', detail: 'PCMCI+ evidence matrices have inconsistent dimensions.' })
   }
   return ok(parsed.data)
+}
+
+export function parseJpcmciPlusEvidence(value: unknown): Result<JpcmciPlusEvidence, DiscoveryMatrixBoundaryProblem> {
+  const parsed = jpcmciPlusEvidenceSchema.safeParse(value)
+  if (!parsed.success) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'J-PCMCI+', detail: z.prettifyError(parsed.error) })
+  }
+  const result = parsed.data
+  const lags = result.tauMax + 1
+  const nodeIsValid = (node: { readonly variable: number; readonly lag: number }) =>
+    node.variable < result.variables && node.lag <= 0 && node.lag >= -result.tauMax
+  const parentRows = [result.laggedParents, result.contextParents, result.dummyParents]
+  const expectedVariables = result.observedVariables + Number(result.timeDummy) + Number(result.spaceDummy)
+  const expectedClasses = [
+    ...result.classes.slice(0, result.observedVariables),
+    ...(result.timeDummy ? ['timeDummy'] as const : []),
+    ...(result.spaceDummy ? ['spaceDummy'] as const : []),
+  ]
+  if (result.observations !== result.datasets * result.periods
+    || result.variables !== expectedVariables
+    || result.classes.length !== result.variables
+    || result.classes.some((role, index) => role !== expectedClasses[index])
+    || result.classes.slice(0, result.observedVariables).some((role) => role === 'timeDummy' || role === 'spaceDummy')
+    || !hasMatrixShape(result.graph, result.variables, lags)
+    || !hasMatrixShape(result.pMatrix, result.variables, lags)
+    || !hasMatrixShape(result.valMatrix, result.variables, lags)
+    || parentRows.some((rows) => rows.length !== result.variables || rows.some((nodes) => nodes.some((node) => !nodeIsValid(node))))
+    || result.separatingSets.some((set) => set.source >= result.variables || set.target >= result.variables || set.lag > result.tauMax || set.variables.some((node) => !nodeIsValid(node)))
+    || result.ambiguousTriples.some((triple) => triple.middle >= result.variables || triple.right >= result.variables || !nodeIsValid(triple.left))) {
+    return err({ kind: 'invalid-discovery-matrix-result', method: 'J-PCMCI+', detail: 'J-PCMCI+ evidence dimensions, node classes, or indexed evidence are inconsistent.' })
+  }
+  return ok(result)
 }
 
 
@@ -558,7 +630,7 @@ export const OCSE_SHUFFLE_OPTIONS = [20, 50, 100, 200] as const
 export type OcseShuffles = (typeof OCSE_SHUFFLE_OPTIONS)[number]
 export type OcseInformationMethod = 'gaussian' | 'knn'
 
-export type DiscoveryMethodChoice = 'direct-lingam' | 'pc-stable' | 'fci' | 'pcmci-plus' | 'lpcmci' | 'rpcmci' | 'cdnots' | 'cdnots-plus' | 'grace' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
+export type DiscoveryMethodChoice = 'direct-lingam' | 'pc-stable' | 'fci' | 'pcmci-plus' | 'jpcmci-plus' | 'lpcmci' | 'rpcmci' | 'cdnots' | 'cdnots-plus' | 'grace' | 'dynotears' | 'var-lingam' | 'ocse' | 'cmlp' | 'clstm'
 export type AcceptedDiscoveryEligibility = Exclude<MethodEligibility, { readonly kind: 'refused' }>
 
 export type DiscoveryMethodGroupId = 'cross-sectional-constraint' | 'pcmci-family' | 'nonstationary-constraint' | 'lingam-family' | 'continuous-optimization' | 'causation-entropy' | 'neural-granger'
@@ -574,7 +646,7 @@ const PCMCI_FAMILY: DiscoveryMethodGroup = {
   id: 'pcmci-family',
   name: 'PCMCI family',
   description: 'Conditional-independence methods for time-indexed graphs; RPCMCI also estimates persistent regimes.',
-  methods: ['pcmci-plus', 'lpcmci', 'rpcmci'],
+  methods: ['pcmci-plus', 'jpcmci-plus', 'lpcmci', 'rpcmci'],
 }
 
 const CROSS_SECTIONAL_CONSTRAINT: DiscoveryMethodGroup = {
@@ -648,6 +720,7 @@ export function discoveryMethodGroupFor(method: DiscoveryMethodChoice): Discover
     case 'fci':
       return CROSS_SECTIONAL_CONSTRAINT
     case 'pcmci-plus':
+    case 'jpcmci-plus':
     case 'lpcmci':
     case 'rpcmci':
       return PCMCI_FAMILY
@@ -679,6 +752,18 @@ export interface ConstraintBackgroundKnowledge {
   readonly forbiddenWithinTiers: readonly number[]
 }
 
+export type JpcmciObservedRole = 'system' | 'timeContext' | 'spaceContext'
+
+export interface JpcmciRoleAssignment {
+  readonly column: ColumnId
+  readonly role: JpcmciObservedRole
+}
+
+export type JpcmciRunNode =
+  | { readonly kind: 'observed'; readonly column: NumericColumnSelection; readonly role: JpcmciObservedRole }
+  | { readonly kind: 'generated'; readonly role: 'timeDummy'; readonly name: 'Time context (generated)' }
+  | { readonly kind: 'generated'; readonly role: 'spaceDummy'; readonly name: 'Unit context (generated)' }
+
 export type DiscoveryConfiguration =
   | { readonly kind: 'direct-lingam' }
   | {
@@ -700,6 +785,14 @@ export type DiscoveryConfiguration =
       readonly kind: 'pcmci-plus'
       readonly tauMax: DiscoveryLag
       readonly pcAlpha: PcmciAlpha
+    }
+  | {
+      readonly kind: 'jpcmci-plus'
+      readonly tauMax: DiscoveryLag
+      readonly pcAlpha: PcmciAlpha
+      readonly assignments: readonly JpcmciRoleAssignment[]
+      readonly timeDummy: boolean
+      readonly spaceDummy: boolean
     }
   | {
       readonly kind: 'lpcmci'
@@ -822,6 +915,17 @@ export type DiscoveryRunArtifact =
       readonly variables: NonEmptyArray<NumericColumnSelection>
       readonly eligibility: AcceptedDiscoveryEligibility
       readonly result: PcmciPlusEvidence
+    }
+  | {
+      readonly kind: 'jpcmci-plus-run'
+      readonly id: DiscoveryRunId
+      readonly preparedDataset: PreparedDatasetVersionId
+      readonly createdAt: string
+      readonly method: typeof JPCMCI_PLUS_PAR_CORR_METHOD_ID
+      readonly variables: NonEmptyArray<NumericColumnSelection>
+      readonly nodes: NonEmptyArray<JpcmciRunNode>
+      readonly eligibility: AcceptedDiscoveryEligibility
+      readonly result: JpcmciPlusEvidence
     }
   | {
       readonly kind: 'lpcmci-run'
@@ -960,6 +1064,7 @@ export type DiscoveryEvent =
   | { readonly type: 'tau-max-selected'; readonly value: DiscoveryLag }
   | { readonly type: 'pc-alpha-selected'; readonly value: PcmciAlpha }
   | { readonly type: 'constraint-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'pc-stable' | 'fci' }> }
+  | { readonly type: 'jpcmci-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'jpcmci-plus' }> }
   | { readonly type: 'rpcmci-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }> }
   | { readonly type: 'cdnots-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'cdnots' | 'cdnots-plus' }> }
   | { readonly type: 'grace-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'grace' }> }
@@ -989,6 +1094,8 @@ export const INITIAL_DISCOVERY_DRAFT: DiscoveryDraft = {
 export const initialDiscoveryDraftFor = (prepared: PreparedDatasetArtifact): DiscoveryDraft => ({
   configuration: prepared.kind === 'prepared-cross-section'
     ? { kind: 'direct-lingam' }
+    : prepared.kind === 'prepared-panel'
+      ? initialConfigurationFor('jpcmci-plus')
     : INITIAL_DISCOVERY_DRAFT.configuration,
   job: { kind: 'idle' },
 })
@@ -1024,15 +1131,19 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
         job: { kind: 'idle' },
       }
     case 'tau-max-selected':
-      return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'lpcmci'
+      return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'jpcmci-plus' || state.configuration.kind === 'lpcmci'
         ? { configuration: { ...state.configuration, tauMax: event.value }, job: { kind: 'idle' } }
         : state
     case 'pc-alpha-selected':
-      return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'lpcmci'
+      return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'jpcmci-plus' || state.configuration.kind === 'lpcmci'
         ? { configuration: { ...state.configuration, pcAlpha: event.value }, job: { kind: 'idle' } }
         : state
     case 'constraint-configured':
       return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration, job: { kind: 'idle' } }
+        : state
+    case 'jpcmci-configured':
+      return state.job.kind !== 'running' && state.configuration.kind === 'jpcmci-plus'
         ? { configuration: event.configuration, job: { kind: 'idle' } }
         : state
     case 'rpcmci-configured':
@@ -1096,6 +1207,7 @@ export function initialConfigurationFor(method: DiscoveryMethodChoice): Discover
     case 'pc-stable': return { kind: 'pc-stable', alpha: 0.05, maxDepth: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() }
     case 'fci': return { kind: 'fci', alpha: 0.05, maxDepth: null, maxPathLength: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() }
     case 'pcmci-plus': return { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 }
+    case 'jpcmci-plus': return { kind: 'jpcmci-plus', tauMax: 2, pcAlpha: 0.05, assignments: [], timeDummy: true, spaceDummy: true }
     case 'lpcmci': return { kind: 'lpcmci', tauMax: 2, pcAlpha: 0.05 }
     case 'rpcmci': return { kind: 'rpcmci', numRegimes: 2, maxTransitions: 4, switchThres: 0.05, numIterations: 20, maxAnneal: 10, tauMin: 1, tauMax: 1, pcAlpha: 0.2, alphaLevel: 0.01, seed: 327 }
     case 'cdnots': return { kind: 'cdnots', maxLag: 2, alpha: 0.05, missing: 'pairwiseComplete', context: 'linear' }
@@ -1130,6 +1242,14 @@ export type ReadyDiscoverySpecification =
       readonly pcAlpha: PcmciAlpha
     }
   | {
+      readonly kind: 'jpcmci-plus'
+      readonly tauMax: DiscoveryLag
+      readonly pcAlpha: PcmciAlpha
+      readonly roles: NonEmptyArray<JpcmciObservedRole>
+      readonly timeDummy: boolean
+      readonly spaceDummy: boolean
+    }
+  | {
       readonly kind: 'lpcmci'
       readonly tauMax: DiscoveryLag
       readonly pcAlpha: PcmciAlpha
@@ -1159,18 +1279,45 @@ export type ReadyDiscoverySpecification =
 
 export type DiscoveryReadinessProblem =
   | { readonly kind: 'time-series-required' }
+  | { readonly kind: 'panel-required' }
   | { readonly kind: 'cross-section-required' }
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
+  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'J-PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
   | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP'; readonly maximum: number }
   | { readonly kind: 'transition-budget-too-large'; readonly available: number }
+  | { readonly kind: 'balanced-panel-required' }
+  | { readonly kind: 'at-least-two-panel-units-required'; readonly available: number }
+  | { readonly kind: 'at-least-two-system-variables-required'; readonly available: number }
+  | { readonly kind: 'duplicate-context-assignment'; readonly column: string }
+  | { readonly kind: 'unknown-context-assignment'; readonly column: string }
+  | { readonly kind: 'complete-interval-unsupported' }
 
 export function readyDiscoverySpecification(
   configuration: DiscoveryConfiguration,
   prepared: PreparedDatasetArtifact,
 ): Result<ReadyDiscoverySpecification, DiscoveryReadinessProblem> {
+  if (configuration.kind === 'jpcmci-plus') {
+    if (prepared.kind !== 'prepared-panel') return err({ kind: 'panel-required' })
+    if (!prepared.panel.balanced) return err({ kind: 'balanced-panel-required' })
+    if (prepared.resolution.kind === 'window') return err({ kind: 'complete-interval-unsupported' })
+    if (prepared.panel.units < 2) return err({ kind: 'at-least-two-panel-units-required', available: prepared.panel.units })
+    if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'J-PCMCI+', maximum: 32, available: prepared.columns.length })
+    const roles = new Map<string, JpcmciObservedRole>()
+    for (const assignment of configuration.assignments) {
+      if (!prepared.columns.some((column) => column === assignment.column)) return err({ kind: 'unknown-context-assignment', column: assignment.column })
+      if (roles.has(assignment.column)) return err({ kind: 'duplicate-context-assignment', column: assignment.column })
+      roles.set(assignment.column, assignment.role)
+    }
+    const orderedRoles = prepared.columns.map((column) => roles.get(column) ?? 'system')
+    if (!isNonEmpty(orderedRoles)) return err({ kind: 'at-least-two-variables-required' })
+    const systems = orderedRoles.filter((role) => role === 'system').length
+    if (systems < 2) return err({ kind: 'at-least-two-system-variables-required', available: systems })
+    const required = Math.max(2 * configuration.tauMax + 16, 24)
+    if (prepared.panel.periods < required) return err({ kind: 'too-few-observations', required, available: prepared.panel.periods })
+    return ok({ ...configuration, roles: orderedRoles })
+  }
   if (prepared.missingness.kind === 'lag-aware-exclusion'
     && configuration.kind !== 'pcmci-plus'
     && configuration.kind !== 'lpcmci'
@@ -1308,6 +1455,38 @@ export function evaluateDiscoveryEligibility(
       }],
     }
   }
+  if (method.id === JPCMCI_PLUS_PAR_CORR_METHOD_ID) {
+    if (prepared.kind !== 'prepared-panel' || !prepared.panel.balanced || prepared.panel.units < 2) {
+      const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat
+      return {
+        kind: 'refused',
+        satisfied: [],
+        unresolved: [],
+        violations: [{
+          kind: 'violated',
+          caveat: samplingCaveat,
+          evidence: prepared.kind !== 'prepared-panel'
+            ? 'J-PCMCI+ requires repeated observations arranged as a regular panel.'
+            : 'J-PCMCI+ requires at least two units and exactly one row for every shared unit-period cell.',
+        }],
+      }
+    }
+    const satisfied: Extract<CaveatEvaluation, { readonly kind: 'satisfied' }>[] = []
+    const unresolved: Extract<CaveatEvaluation, { readonly kind: 'unresolved' }>[] = []
+    for (const caveat of method.caveats) {
+      if (caveat.category === 'interpretation') continue
+      if (caveat.category === 'sampling-structure') {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: `Prepared as a balanced panel with ${prepared.panel.units} units and ${prepared.panel.periods} shared periods.` })
+      } else if (caveat.category === 'missingness' && prepared.missingness.kind === 'not-present') {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: 'The prepared dataset contains no missing values.' })
+      } else {
+        unresolved.push({ kind: 'unresolved', caveat, missingEvidence: '' })
+      }
+    }
+    return isNonEmpty(unresolved)
+      ? { kind: 'caution', satisfied, unresolved }
+      : { kind: 'eligible', satisfied }
+  }
   if (method.id === DIRECT_LINGAM_METHOD_ID || method.id === PC_STABLE_METHOD_ID || method.id === FCI_METHOD_ID) {
     if (prepared.kind !== 'prepared-cross-section') {
       const samplingCaveat = method.caveats.find((caveat) => caveat.category === 'sampling-structure') ?? firstCaveat
@@ -1402,6 +1581,7 @@ export const newDiscoveryRunId = (): DiscoveryRunId =>
 export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): string {
   switch (problem.kind) {
     case 'time-series-required': return 'Temporal discovery needs a regular time series. This prepared dataset has another observation structure.'
+    case 'panel-required': return 'J-PCMCI+ needs a balanced regular panel with repeated periods for at least two units.'
     case 'cross-section-required': return 'This method needs independent cross-sectional observations. Prepare this dataset as a cross-section.'
     case 'at-least-two-variables-required': return 'Select at least 2 variables.'
     case 'too-few-observations': return `This configuration needs at least ${problem.required} rows; ${problem.available} are available. Use more rows or choose a smaller configuration.`
@@ -1409,6 +1589,12 @@ export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): 
     case 'browser-variable-limit': return `${problem.method} accepts up to ${problem.maximum} variables in the browser; ${problem.available} are selected. Deselect ${problem.available - problem.maximum}.`
     case 'browser-lag-limit': return `${problem.method} accepts a maximum lag of ${problem.maximum} in the browser. Lower the maximum lag.`
     case 'transition-budget-too-large': return `The maximum transition count must be smaller than the ${problem.available} available observations.`
+    case 'balanced-panel-required': return 'J-PCMCI+ needs exactly one row for every unit-period cell. Repair duplicate or missing panel cells in Data studio.'
+    case 'at-least-two-panel-units-required': return `J-PCMCI+ needs at least two panel units; ${problem.available} is available.`
+    case 'at-least-two-system-variables-required': return `J-PCMCI+ needs at least two system variables; ${problem.available} remains after the context assignments.`
+    case 'duplicate-context-assignment': return `The J-PCMCI+ role for ${problem.column} is recorded more than once.`
+    case 'unknown-context-assignment': return `The J-PCMCI+ role assignment refers to ${problem.column}, which is not in this prepared version.`
+    case 'complete-interval-unsupported': return 'J-PCMCI+ cannot use a complete-row interval because that can remove different unit-period cells. Prepare the panel with complete data or a recorded row-preserving imputation.'
     default: return assertNever(problem)
   }
 }

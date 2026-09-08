@@ -1135,7 +1135,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         }
         case 'negbin-nuts': {
           const confounder = identification.result.adjustment.variables[0]
-          if (confounder === undefined || identification.result.adjustment.variables.length !== 1) { dispatch({ type: 'run-failed', detail: 'The ported model takes exactly one confounder.' }); return }
+          if (confounder === undefined || identification.result.adjustment.variables.length !== 1) { dispatch({ type: 'run-failed', detail: 'This model takes exactly one confounder.' }); return }
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, confounder]
           const matrix = await materialise(columns)
           const outcome = columnAt(matrix.values, matrix.rowCount, 1)
@@ -1325,7 +1325,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <div>
             <ParameterLabel className={fieldLabel} label="Interval" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.interval} />
             <SegmentedControl className="mt-1" ariaLabel="Interval covariance" value={configuration.covariance} onChange={(covariance) => configure({ ...configuration, covariance })} options={[{ value: 'hac', label: 'Newey–West HAC' }, { value: 'classical', label: 'Classical' }]} />
-            <p className={cn(fieldHint, 'max-w-[65ch]')}>95% confidence level. Heteroskedasticity and autocorrelation consistent (HAC) covariance uses a Bartlett kernel and the statsmodels default bandwidth. The classical interval assumes independent errors.</p>
+            <p className={cn(fieldHint, 'max-w-[65ch]')}>95% confidence level. Heteroskedasticity and autocorrelation consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of floor(4 (n/100)^(2/9)) lags. The classical interval assumes independent errors.</p>
           </div>
         )
       case 'dml-plr':
@@ -1583,7 +1583,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 {bootstrap.blockLength.kind === 'fixed' && <label className="block"><ParameterLabel className={fieldLabel} label="Observations per block" help={ESTIMATION_PARAMETER_HELP.causalEffects.observationsPerBlock} /><input type="number" min={1} aria-label="CausalEffects observations per block" className={field('text', 'mt-1')} value={bootstrap.blockLength.length} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, blockLength: { kind: 'fixed', length: Math.max(1, Math.floor(Number(event.target.value) || 1)) } } })} /></label>}
                 <label className="block"><ParameterLabel className={fieldLabel} label="Confidence level" help={ESTIMATION_PARAMETER_HELP.causalEffects.confidenceLevel} /><input type="number" min={50} max={99.9} step={0.1} aria-label="CausalEffects confidence level" className={field('text', 'mt-1')} value={bootstrap.confidenceLevel * 100} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, confidenceLevel: Math.max(0.5, Math.min(0.999, (Number(event.target.value) || 90) / 100)) } })} /></label>
                 <label className="block"><ParameterLabel className={fieldLabel} label="Bootstrap seed" help={ESTIMATION_PARAMETER_HELP.causalEffects.bootstrapSeed} /><input type="number" min={0} aria-label="CausalEffects bootstrap seed" className={field('text', 'mt-1')} value={bootstrap.seed} onChange={(event) => configure({ ...configuration, uncertainty: { ...bootstrap, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) } })} /></label>
-                <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>Contiguous blocks preserve the lag alignment used by the fitted graph. Choose a block length that represents the series’ dependence; the cube-root option follows Tigramite’s built-in rule.</p>
+                <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>Contiguous blocks preserve the lag alignment used by the fitted graph. Choose a block length that represents the series’ dependence; the cube-root option takes the cube root of the row count.</p>
               </>
             )}
           </div>

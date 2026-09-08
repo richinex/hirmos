@@ -21,7 +21,7 @@ pub struct SklearnLinearFit {
     /// Numerical rank of the centered predictor matrix.
     pub rank: usize,
     pub singular_values: DVector<f64>,
-    /// Absolute cutoff passed to nalgebra after converting scikit-learn's relative tolerance.
+    /// Absolute cutoff implied by scikit-learn's relative tolerance.
     pub singular_value_cutoff: f64,
 }
 
@@ -93,15 +93,15 @@ pub fn fit_sklearn_linear_regression(
     let (coefficients, rank, singular_values, singular_value_cutoff) = if predictors.ncols() == 0 {
         (DVector::zeros(0), 0, DVector::zeros(0), 0.0)
     } else {
-        let svd = centered_predictors.svd(true, true);
-        let largest = svd.singular_values.iter().copied().fold(0.0, f64::max);
-        let cutoff = tolerance * largest;
-        let rank = svd.rank(cutoff);
-        let singular_values = svd.singular_values.clone_owned();
-        let coefficients = svd
-            .solve(&centered_target, cutoff)
+        let targets = DMatrix::from_column_slice(observations, 1, centered_target.as_slice());
+        let solution = crate::least_squares::solve(&centered_predictors, &targets, tolerance)
             .map_err(|_| SklearnLinearError::SvdSolve)?;
-        (coefficients, rank, singular_values, cutoff)
+        (
+            solution.coefficients.column(0).into_owned(),
+            solution.rank,
+            solution.singular_values,
+            solution.cutoff,
+        )
     };
     let intercept = target_mean - predictor_means.dot(&coefficients);
     let predictions = predictors * &coefficients + DVector::from_element(observations, intercept);

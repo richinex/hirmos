@@ -24,7 +24,7 @@ import {
 import type { ImportRequestId } from '@/domain/workflow'
 import { newImportRequestId } from '@/domain/workflow'
 import { parseDataWorkerEvent, type DataWorkerCommand } from '@/workers/dataProtocol'
-import { parsePanelLongMatrix, parsePanelStructure, type PanelDataProblem, type PanelLongMatrix, type PanelStructureEvidence } from '@/domain/panel'
+import { parsePanelKeyMatrix, parsePanelLongMatrix, parsePanelStructure, type PanelDataProblem, type PanelKeyMatrix, type PanelLongMatrix, type PanelStructureEvidence } from '@/domain/panel'
 
 type ProfileOutcome = Result<DatasetProfile, DatasetProfileProblem>
 type MaterializationOutcome = Result<NullableNumericMatrix, NumericMaterializationProblem>
@@ -34,6 +34,7 @@ type SummaryOutcome = Result<DatasetSummary, DatasetSummaryProblem>
 type PreviewWindowOutcome = Result<PreviewWindow, PreviewWindowProblem>
 type PanelStructureOutcome = Result<PanelStructureEvidence, PanelDataProblem>
 type PanelMaterializationOutcome = Result<PanelLongMatrix, PanelDataProblem>
+type PanelKeyMaterializationOutcome = Result<PanelKeyMatrix, PanelDataProblem>
 type PendingRequest =
   | { readonly kind: 'profile'; readonly resolve: (outcome: ProfileOutcome) => void }
   | { readonly kind: 'summary'; readonly profile: DatasetProfile; readonly resolve: (outcome: SummaryOutcome) => void }
@@ -50,6 +51,7 @@ type PendingRequest =
     }
   | { readonly kind: 'time-series-materialization'; readonly profile: DatasetProfile; readonly resolve: (outcome: TimeSeriesMaterializationOutcome) => void }
   | { readonly kind: 'panel-inspection'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelStructureOutcome) => void }
+  | { readonly kind: 'panel-key-materialization'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelKeyMaterializationOutcome) => void }
   | { readonly kind: 'panel-materialization'; readonly profile: DatasetProfile; readonly resolve: (outcome: PanelMaterializationOutcome) => void }
 
 let worker: Worker | null = null
@@ -69,6 +71,7 @@ const stopAll = (problem: SharedWorkerProblem) => {
       case 'materialization': request.resolve(err(problem)); break
       case 'time-series-materialization': request.resolve(err(problem)); break
       case 'panel-inspection': request.resolve(err(problem)); break
+      case 'panel-key-materialization': request.resolve(err(problem)); break
       case 'panel-materialization': request.resolve(err(problem)); break
       default: assertNever(request)
     }
@@ -158,6 +161,14 @@ const dataWorker = (): Worker => {
       pending.delete(parsed.value.request)
       if (parsed.value.kind === 'panel-data-failed') { waiting.resolve({ ok: false, error: parsed.value.problem }); return }
       const checked = parsePanelStructure(parsed.value.structure, waiting.profile)
+      waiting.resolve(checked.ok ? checked : { ok: false, error: { kind: 'worker-protocol-failed', detail: checked.error.detail } })
+      return
+    }
+    if (waiting.kind === 'panel-key-materialization') {
+      if (parsed.value.kind !== 'panel-keys-succeeded' && parsed.value.kind !== 'panel-data-failed') { failAll('The data worker returned another response for a panel-key materialization.'); return }
+      pending.delete(parsed.value.request)
+      if (parsed.value.kind === 'panel-data-failed') { waiting.resolve({ ok: false, error: parsed.value.problem }); return }
+      const checked = parsePanelKeyMatrix(parsed.value.matrix, waiting.profile)
       waiting.resolve(checked.ok ? checked : { ok: false, error: { kind: 'worker-protocol-failed', detail: checked.error.detail } })
       return
     }
@@ -339,6 +350,17 @@ export function materializePanelInWorker(file: File, profile: DatasetProfile, co
   return new Promise((resolve) => {
     pending.set(request, { kind: 'panel-materialization', profile, resolve })
     const command: DataWorkerCommand = { kind: 'materialize-panel', request, file, profile, unitColumn: columns.unit, timeColumn: columns.time, outcomeColumn: columns.outcome, treatmentColumn: columns.treatment }
+    try { dataWorker().postMessage(command) } catch (cause: unknown) {
+      pending.delete(request); resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function materializePanelKeysInWorker(file: File, profile: DatasetProfile, unitColumn: ColumnId, timeColumn: ColumnId): Promise<PanelKeyMaterializationOutcome> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'panel-key-materialization', profile, resolve })
+    const command: DataWorkerCommand = { kind: 'materialize-panel-keys', request, file, profile, unitColumn, timeColumn }
     try { dataWorker().postMessage(command) } catch (cause: unknown) {
       pending.delete(request); resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }

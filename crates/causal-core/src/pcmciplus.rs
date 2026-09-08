@@ -2,11 +2,11 @@
 //! contemp_conds skeleton with MCI conditions, majority collider rule with conflict resolution,
 //! and the timeseries Meek rules. Also the fdr_bh correction of get_corrected_pvalues.
 
+use crate::missing_data::{PreprocessingError, TigramiteFrame};
 use crate::parcorr::{CiKind, Node, ParCorrCi, RoleAwareSamplePolicy, TimeSeries};
 use crate::pcmci::pc_stable_single;
-use crate::preprocessing::{PreprocessingError, TigramiteFrame};
 
-type Mark = Option<[u8; 3]>;
+pub(crate) type Mark = Option<[u8; 3]>;
 
 fn mk(s: &str) -> Mark {
     let b = s.as_bytes();
@@ -19,7 +19,7 @@ pub struct PcmciPlusResult {
     pub val_matrix: Vec<Vec<Vec<f64>>>,
 }
 
-fn combinations(pool: &[Node], k: usize) -> Vec<Vec<Node>> {
+pub(crate) fn combinations(pool: &[Node], k: usize) -> Vec<Vec<Node>> {
     let mut out = Vec::new();
     if k > pool.len() {
         return out;
@@ -47,7 +47,6 @@ fn combinations(pool: &[Node], k: usize) -> Vec<Vec<Node>> {
 struct Plus<'a> {
     data: &'a TimeSeries,
     ci: ParCorrCi,
-    n: usize,
     tau_max: usize,
     pc_alpha: f64,
     graph: Vec<Vec<Vec<Mark>>>,
@@ -92,18 +91,7 @@ impl<'a> Plus<'a> {
 
     /// Adjacencies of j from the graph in np.where order: i-major, tau ascending.
     fn adj(&self, j: usize, include_conflicts: bool) -> Vec<Node> {
-        let mut out = Vec::new();
-        for i in 0..self.n {
-            for tau in 0..=self.tau_max {
-                if let Some(mark) = self.graph[i][j][tau] {
-                    if !include_conflicts && (&mark == b"x-x" || &mark == b"x?x") {
-                        continue;
-                    }
-                    out.push((i, -(tau as i32)));
-                }
-            }
-        }
-        out
+        adjacencies(&self.graph, j, include_conflicts)
     }
 
     fn adj_contemp(&self, j: usize, include_conflicts: bool) -> Vec<Node> {
@@ -186,6 +174,7 @@ pub fn run_pcmciplus_windowed(
         .expect("dense PCMCI+ sample construction must succeed")
 }
 
+/// PCMCI+ over a nullable frame using Tigramite's role-aware sample construction.
 pub fn run_pcmciplus_frame(
     frame: TigramiteFrame,
     tau_max: usize,
@@ -247,7 +236,6 @@ fn run_pcmciplus_with_ci(
     let mut this = Plus {
         data,
         ci,
-        n,
         tau_max,
         pc_alpha,
         graph,
@@ -488,7 +476,7 @@ fn run_pcmciplus_with_ci(
     }
 
     // Phase 4: Meek rules until none fires, with conflict marking.
-    meek_rules(&mut this, &ambiguous);
+    meek_rules(&mut this.graph, &ambiguous);
 
     let graph_out = (0..n)
         .map(|i| {
@@ -517,8 +505,51 @@ fn run_pcmciplus_with_ci(
 }
 
 /// Meek rules until none fires, with conflict marking (tigramite _pcalg_rules_timeseries).
-fn meek_rules(this: &mut Plus, ambiguous: &[(Node, usize, usize)]) {
-    let n = this.n;
+pub(crate) fn adjacencies(
+    graph: &[Vec<Vec<Mark>>],
+    j: usize,
+    include_conflicts: bool,
+) -> Vec<Node> {
+    let mut out = Vec::new();
+    for (i, targets) in graph.iter().enumerate() {
+        for (tau, mark) in targets[j].iter().enumerate() {
+            if let Some(mark) = mark {
+                if !include_conflicts && (mark == b"x-x" || mark == b"x?x") {
+                    continue;
+                }
+                out.push((i, -(tau as i32)));
+            }
+        }
+    }
+    out
+}
+
+struct Orientation<'a> {
+    graph: &'a mut Vec<Vec<Vec<Mark>>>,
+}
+impl Orientation<'_> {
+    fn adj(&self, j: usize, conflicts: bool) -> Vec<Node> {
+        adjacencies(self.graph, j, conflicts)
+    }
+    fn adj_contemp(&self, j: usize, conflicts: bool) -> Vec<Node> {
+        self.adj(j, conflicts)
+            .into_iter()
+            .filter(|node| node.1 == 0)
+            .collect()
+    }
+}
+
+pub(crate) fn meek_rules(graph: &mut Vec<Vec<Vec<Mark>>>, ambiguous: &[(Node, usize, usize)]) {
+    meek_rules_with_conflicts(graph, ambiguous, true);
+}
+
+pub(crate) fn meek_rules_with_conflicts(
+    graph: &mut Vec<Vec<Vec<Mark>>>,
+    ambiguous: &[(Node, usize, usize)],
+    conflicts: bool,
+) {
+    let n = graph.len();
+    let this = Orientation { graph };
     let mut oriented: Vec<(usize, usize)> = Vec::new();
     loop {
         // Rule 1: i --> k o-o j with i,j non-adjacent: orient k --> j.
@@ -548,7 +579,7 @@ fn meek_rules(this: &mut Plus, ambiguous: &[(Node, usize, usize)]) {
                 this.graph[j][k][0] = mk("<--");
                 oriented.push((k, j));
             }
-            if oriented.contains(&(j, k)) {
+            if conflicts && oriented.contains(&(j, k)) {
                 this.graph[j][k][0] = mk("x-x");
                 this.graph[k][j][0] = mk("x-x");
             }
@@ -582,7 +613,7 @@ fn meek_rules(this: &mut Plus, ambiguous: &[(Node, usize, usize)]) {
                 this.graph[j][i][0] = mk("<--");
                 oriented.push((i, j));
             }
-            if oriented.contains(&(j, i)) {
+            if conflicts && oriented.contains(&(j, i)) {
                 this.graph[j][i][0] = mk("x-x");
                 this.graph[i][j][0] = mk("x-x");
             }
@@ -624,7 +655,7 @@ fn meek_rules(this: &mut Plus, ambiguous: &[(Node, usize, usize)]) {
                 this.graph[j][i][0] = mk("<--");
                 oriented.push((i, j));
             }
-            if oriented.contains(&(j, i)) {
+            if conflicts && oriented.contains(&(j, i)) {
                 this.graph[j][i][0] = mk("x-x");
                 this.graph[i][j][0] = mk("x-x");
             }
@@ -663,7 +694,6 @@ pub fn run_pcalg_standard(
     let mut this = Plus {
         data,
         ci,
-        n,
         tau_max,
         pc_alpha,
         graph,
@@ -879,7 +909,7 @@ pub fn run_pcalg_standard(
         }
     }
 
-    meek_rules(&mut this, &ambiguous);
+    meek_rules(&mut this.graph, &ambiguous);
 
     let graph_out = (0..n)
         .map(|i| {
@@ -926,6 +956,14 @@ pub fn fdr_bh(p_matrix: &[Vec<Vec<f64>>], exclude_contemporaneous: bool) -> Vec<
         .iter()
         .map(|&(i, j, tau)| p_matrix[i][j][tau])
         .collect();
+    let corrected = bh_values(&pvs);
+    for (&(i, j, tau), value) in cells.iter().zip(corrected) {
+        q[i][j][tau] = value;
+    }
+    q
+}
+
+pub(crate) fn bh_values(pvs: &[f64]) -> Vec<f64> {
     let mut order: Vec<usize> = (0..pvs.len()).collect();
     order.sort_by(|&a, &b| pvs[a].partial_cmp(&pvs[b]).unwrap());
     let nobs = pvs.len() as f64;
@@ -942,9 +980,9 @@ pub fn fdr_bh(p_matrix: &[Vec<Vec<f64>>], exclude_contemporaneous: bool) -> Vec<
             *v = 1.0;
         }
     }
+    let mut out = vec![0.0; pvs.len()];
     for (rank, &idx) in order.iter().enumerate() {
-        let (i, j, tau) = cells[idx];
-        q[i][j][tau] = corrected[rank];
+        out[idx] = corrected[rank];
     }
-    q
+    out
 }

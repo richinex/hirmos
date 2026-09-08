@@ -7,6 +7,10 @@ export const DISCOVERY_PARAMETER_HELP = {
     maximumLag: 'Largest time lag tested.',
     pcAlpha: 'Significance level used during condition selection.',
   },
+  jpcmci: {
+    maximumLag: 'Largest source lag tested within each aligned panel unit.',
+    pcAlpha: 'Significance level used during joint condition selection.',
+  },
   rpcmci: {
     regimes: 'Number of regimes to estimate.',
     maximumTransitions: 'Maximum membership changes permitted for each regime.',
@@ -83,7 +87,7 @@ export const ESTIMATION_PARAMETER_HELP = {
     foldSeed: 'Seed used to reproduce the shuffled cross-fitting folds.',
   },
   tLearner: {
-    learnerSeed: 'Seed for both outcome forests; the reference clones one estimator per treatment arm, so the arms share it.',
+    learnerSeed: 'One seed for both outcome forests.',
   },
   ardl: {
     maximumLag: 'Largest lag considered by the AIC order search.',

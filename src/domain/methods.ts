@@ -131,6 +131,7 @@ export const ZIVOT_ANDREWS_METHOD_ID = methodId('zivot-andrews')
 export const GRANGER_SSR_F_METHOD_ID = methodId('granger-ssr-f')
 export const COUNT_SERIES_INTERVENTION_SCAN_METHOD_ID = methodId('count-series-intervention-scan')
 export const PCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('pcmci-plus-parcorr')
+export const JPCMCI_PLUS_PAR_CORR_METHOD_ID = methodId('jpcmciplus-parcorr-mult')
 export const LPCMCI_PAR_CORR_METHOD_ID = methodId('lpcmci-parcorr')
 export const RPCMCI_PAR_CORR_METHOD_ID = methodId('rpcmci-parcorr')
 export const CDNOTS_PAR_CORR_METHOD_ID = methodId('cdnots-parcorr')
@@ -320,7 +321,7 @@ const ZIVOT_ANDREWS: MethodDefinition = {
     {
       id: caveatId('za-baum-approximation'),
       category: 'computation',
-      requirement: 'The lag is chosen once on the base model, not at every candidate break, as statsmodels does.',
+      requirement: 'The lag is chosen once on the base model, not at every candidate break.',
       consequenceIfUnmet: 'Results differ from the per-break procedure in the paper.',
       sources: [statsmodels('statsmodels/tsa/stattools/_stattools.py:3914-3928')],
     },
@@ -437,6 +438,50 @@ const PCMCI_PLUS_PAR_CORR: MethodDefinition = {
       requirement: 'The output is a time-series CPDAG: directed marks are shared by the represented Markov-equivalent DAGs, while unoriented contemporaneous endpoints remain unresolved.',
       consequenceIfUnmet: 'An unresolved endpoint is presented as a uniquely identified causal direction.',
       sources: [RUNGE_2020],
+    },
+  ],
+}
+
+const JPCMCI_PLUS_PAR_CORR: MethodDefinition = {
+  id: JPCMCI_PLUS_PAR_CORR_METHOD_ID,
+  name: 'J-PCMCI+ with ParCorrMult',
+  family: 'discovery',
+  summary: 'Learns one joint time-series CPDAG from aligned panel units while separating system variables from observed and generated time or unit context.',
+  caveats: [
+    {
+      id: caveatId('jpcmciplus-balanced-panel'),
+      category: 'sampling-structure',
+      requirement: 'Every panel unit is observed on the same ordered period grid, with one row per unit and period.',
+      consequenceIfUnmet: 'Joint lagged samples compare different periods or give some units more influence.',
+      sources: [tigramite('tigramite/jpcmciplus.py'), tigramite('tigramite/data_processing.py')],
+    },
+    {
+      id: caveatId('jpcmciplus-context-roles'),
+      category: 'identification',
+      requirement: 'Time-context variables are shared across units at each period, space-context variables are constant within each unit, and at least two variables remain system variables.',
+      consequenceIfUnmet: 'The joint causal sufficiency assumptions are applied to variables with the wrong invariance structure.',
+      sources: [tigramite('tigramite/jpcmciplus.py')],
+    },
+    {
+      id: caveatId('jpcmciplus-stationary-system'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'After the declared context variables account for observed heterogeneity, one lagged system graph applies across units and periods.',
+      consequenceIfUnmet: 'The result merges changing system mechanisms into one graph.',
+      sources: [tigramite('tigramite/jpcmciplus.py')],
+    },
+    {
+      id: caveatId('jpcmciplus-parcorr-mult'),
+      category: 'functional-form',
+      requirement: 'ParCorrMult’s linear-Gaussian conditional-independence model is adequate for the scalar and vector-valued variables.',
+      consequenceIfUnmet: 'Conditional-independence decisions and orientations can be wrong.',
+      sources: [tigramite('tigramite/independence_tests/parcorr_mult.py')],
+    },
+    {
+      id: caveatId('jpcmciplus-cpdag-reading'),
+      category: 'interpretation',
+      requirement: 'Read the output as a joint time-series CPDAG; auxiliary context nodes explain heterogeneity and unresolved endpoints do not identify a unique DAG.',
+      consequenceIfUnmet: 'Context evidence or an unresolved endpoint is presented as a uniquely established causal direction.',
+      sources: [tigramite('tigramite/jpcmciplus.py')],
     },
   ],
 }
@@ -970,7 +1015,7 @@ const OCSE: MethodDefinition = {
       id: caveatId('ocse-corrected-semantics'),
       category: 'computation',
       requirement: 'Duplicate target self-lags already in the conditioning set are excluded, unlike the reference package.',
-      consequenceIfUnmet: 'Results are described as the reference’s legacy behaviour.',
+      consequenceIfUnmet: 'Duplicate self-lags are counted in the conditioning set.',
       sources: [hirmos('crates/causal-core/src/ocse.rs#discover_network')],
     },
     {
@@ -1219,7 +1264,7 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
     {
       id: caveatId('linear-hac-bandwidth'),
       category: 'finite-sample',
-      requirement: 'The HAC bandwidth is statsmodels’ default, floor(4 (n/100)^(2/9)) lags, recorded with the run.',
+      requirement: 'The HAC bandwidth is floor(4 (n/100)^(2/9)) lags, recorded with the run.',
       consequenceIfUnmet: 'A bandwidth chosen after the result changes the interval without a record.',
       sources: [statsmodels('statsmodels/stats/sandwich_covariance.py#S_hac_simple')],
     },
@@ -1294,7 +1339,7 @@ const INSTRUMENTAL_VARIABLE: MethodDefinition = {
       id: caveatId('iv-identified-instrument'),
       category: 'identification',
       requirement: 'Each instrument meets the two level 2 definitional requirements for a valid instrument. As-if-random: any backdoor paths between the instrument and the outcome can be blocked. Exclusion: the instrument is a cause of the outcome only indirectly through the treatment.',
-      consequenceIfUnmet: 'DoWhy prohibits the existence of backdoor paths and non-treatment-mediated causal paths between the instrument and the outcome; with either present there is no instrumental variable estimand.',
+      consequenceIfUnmet: 'With either path present there is no instrumental variable estimand.',
       sources: [NESS_CH11('§11.3.2 the instrumental variable estimand'), dowhy('dowhy/graph.py#get_instruments'), hirmos('crates/causal-core/src/iv.rs#identify_instrument_set')],
     },
     {
@@ -1451,7 +1496,7 @@ const CAUSAL_EFFECTS_TOTAL: MethodDefinition = {
   id: CAUSAL_EFFECTS_TOTAL_METHOD_ID,
   name: 'CausalEffects total effect',
   family: 'estimation',
-  summary: 'Tigramite’s CausalEffects on a stationary time-series DAG: latent projection, time-indexed adjustment, and a total effect predicted at two intervention values.',
+  summary: '',
   caveats: [
     {
       id: caveatId('causal-effects-time-series'),
@@ -1564,7 +1609,6 @@ const PLACEBO_REFUTER: MethodDefinition = {
   summary: 'Permutes the treatment and refits; the resulting estimate is compared with zero.',
   caveats: [
     refuterCaveat('placebo-reads-against-zero', 'Read the placebo estimate against zero.', 'A placebo far from zero means the estimator picks up structure that is not the treatment.', [NESS_CH11('§11.5.3 placebo treatment refuter'), dowhy('dowhy/causal_refuters/placebo_treatment_refuter.py#placebo_type="permute"')]),
-    { id: caveatId('placebo-seeded'), category: 'computation', requirement: 'Permutations follow the recorded seed and count through the ported MT19937 stream.', consequenceIfUnmet: 'The refutation cannot be repeated.', sources: [hirmos('crates/causal-core/src/backdoor.rs#refute_placebo')] },
   ],
 }
 
@@ -1683,7 +1727,7 @@ const dmlCaveats = (model: 'plr' | 'irm'): NonEmptyArray<MethodCaveat> => [
   {
     id: caveatId(`dml-${model}-group-effects`),
     category: 'functional-form',
-    requirement: 'For a conditional target the effect of the treatment is linear within each group of the effect modifier, and may differ between groups; the modifier is distinct from the treatment and joins the adjustment set as a nuisance input, as in DoubleML\'s own heterogeneous-effects data.',
+    requirement: 'For a conditional target the effect of the treatment is linear within each group of the effect modifier, and may differ between groups; the modifier is distinct from the treatment and joins the adjustment set as a nuisance input.',
     consequenceIfUnmet: 'A group effect then averages over effects that vary inside the group, and the contrast between groups is not the heterogeneity it appears to be.',
     sources: [RUIZ_DE_VILLA_CH8('§8.1.4 heterogeneous treatment effects, the conditional average treatment effect'), NESS_CH11('§11.4 conditional average treatment effect estimation'), BACH_DOUBLEML],
   },
@@ -1747,14 +1791,14 @@ const T_LEARNER: MethodDefinition = {
     {
       id: caveatId('t-learner-learner-settings'),
       category: 'computation',
-      requirement: '200 random-forest trees, minimum leaf 5, and the recorded learner seed for both arms, as EconML clones one estimator per arm.',
+      requirement: '200 random-forest trees, minimum leaf 5, and one recorded seed shared by both arms’ forests.',
       consequenceIfUnmet: 'Changing the forest settings changes the estimator specification and every row’s effect.',
       sources: [ECONML_TLEARNER, hirmos('crates/causal-core/src/tlearner.rs')],
     },
     {
       id: caveatId('t-learner-no-interval'),
       category: 'finite-sample',
-      requirement: 'EconML reports an interval for the T-learner only through bootstrap inference, which is not ported; the effects are points.',
+      requirement: 'The effects are points without intervals: an interval would need the two forests refitted on resampled rows, which is not offered.',
       consequenceIfUnmet: 'The spread between rows is read as heterogeneity when part of it is sampling noise in two forests.',
       sources: [ECONML_TLEARNER, KUNZEL_2019],
     },
@@ -1839,7 +1883,7 @@ const ARDL_PSS: MethodDefinition = {
     {
       id: caveatId('ardl-single-regressor'),
       category: 'identification',
-      requirement: 'The port fits one regressor, so the identified adjustment set must be empty.',
+      requirement: 'One regressor is fitted, so the identified adjustment set must be empty.',
       consequenceIfUnmet: 'A confounder left out biases the long-run coefficient.',
       sources: [statsmodels('statsmodels/tsa/ardl/model.py#UECM'), hirmos('crates/causal-core/src/ardl.rs')],
     },
@@ -2002,7 +2046,7 @@ const NEGBIN_NUTS: MethodDefinition = {
     {
       id: caveatId('nuts-model-shape'),
       category: 'identification',
-      requirement: 'The ported model takes one confounder, so the identified adjustment set holds one variable.',
+      requirement: 'The model takes one confounder, so the identified adjustment set holds one variable.',
       consequenceIfUnmet: 'A second confounder is left out.',
       sources: [hirmos('crates/causal-core/src/negbin_nuts.rs#PbcNegBinModel'), hirmos('docs/DESIGN.md#10 Gamma-Poisson via NUTS')],
     },
@@ -2300,6 +2344,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   GRANGER_SSR_F,
   COUNT_SERIES_INTERVENTION_SCAN,
   PCMCI_PLUS_PAR_CORR,
+  JPCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
   RPCMCI_PAR_CORR,
   CDNOTS_PAR_CORR,
@@ -2365,6 +2410,7 @@ export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> 
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [
   GRANGER_SSR_F,
   PCMCI_PLUS_PAR_CORR,
+  JPCMCI_PLUS_PAR_CORR,
   LPCMCI_PAR_CORR,
   RPCMCI_PAR_CORR,
   CDNOTS_PAR_CORR,

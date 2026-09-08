@@ -111,10 +111,10 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
             <RequirementsFold key={method.id} name={method.name} tally={evaluated ? tally(method, evaluations) : null} open={methods.length === 1} literature={literature(method)}>
               {!evaluated && (
                 <p className={prose('mb-2 mt-0 text-muted')}>
-                  {[method.summary, ...method.caveats.flatMap((caveat) => (caveat.category === 'interpretation' ? [caveat.requirement] : [caveat.requirement, `If this is not met: ${caveat.consequenceIfUnmet}`]))].join(' ')}
+                  {[...(method.summary.length > 0 ? [method.summary] : []), ...method.caveats.flatMap((caveat) => (caveat.category === 'interpretation' ? [caveat.requirement] : [caveat.requirement, `If this is not met: ${caveat.consequenceIfUnmet}`]))].join(' ')}
                 </p>
               )}
-              {evaluated && <p className={prose('mb-2 mt-0 text-muted')}>{method.summary}</p>}
+              {evaluated && method.summary.length > 0 && <p className={prose('mb-2 mt-0 text-muted')}>{method.summary}</p>}
               {evaluated && <ol className="m-0 list-none divide-y divide-line p-0">
                 {[...conditions(method), ...readingRules(method)].map((caveat) => {
                   const reading = caveat.category === 'interpretation'

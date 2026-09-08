@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import type { EChartsCoreOption, EChartsType } from 'echarts/core'
 import { assertNever } from '@/domain/dop'
-import { useElementWidth } from '@/lib/useElementWidth'
+import { useElementSize } from '@/lib/useElementWidth'
 import { EChart } from '@/charts/EChart'
-import { lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discovery/lagGraphs'
+import { FloatingFigure } from '@/charts/FloatingFigure'
+import { useChartExport } from '@/charts/useChartExport'
+import { DEFAULT_LAG_GRID_METRICS, lagGridMetrics, lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discovery/lagGraphs'
 import { useChartTheme } from '@/charts/theme'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { summarizeLagGraph, type LagGraph, type LagGraphSemantics, type LagGraphWarning } from '@/domain/lagGraph'
 import { well } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
 
 interface MarkMeaning { readonly mark: string; readonly meaning: string }
 
@@ -31,6 +35,7 @@ const markMeanings = (semantics: LagGraphSemantics): readonly MarkMeaning[] => {
       { mark: 'x', meaning: 'ambiguous endpoint information' },
     ]
     case 'stationary-lag-graph':
+    case 'joint-stationary-lag-graph':
     case 'nonstationary-lag-graph':
     case 'regime-specific-lag-graph': return [
       { mark: '-->', meaning: 'directed; lagged links always point forward in time' },
@@ -74,6 +79,13 @@ function MarkSample({ mark }: { readonly mark: string }) {
   )
 }
 
+type LagGraphView = 'summary' | 'lag-grid'
+
+/**
+ * A lag graph as a summary graph or a lag grid, in place and in a floating window. The view is one
+ * state shared by both, so lifting the figure shows the view being read and switching it in the
+ * window switches it in the panel.
+ */
 export function LagGraphViews({ graph, warnings = [], label, highlighted = [], initial = 'summary', compact = false }: {
   readonly graph: LagGraph
   readonly warnings?: readonly LagGraphWarning[]
@@ -81,40 +93,86 @@ export function LagGraphViews({ graph, warnings = [], label, highlighted = [], i
   readonly label: string
   /** Variable ids to outline in the summary graph, for example the selected candidate's endpoints. */
   readonly highlighted?: readonly string[]
-  readonly initial?: 'summary' | 'lag-grid'
+  readonly initial?: LagGraphView
   readonly compact?: boolean
 }) {
-  const theme = useChartTheme()
-  const [view, setView] = useState<'summary' | 'lag-grid'>(initial)
-  const summary = useMemo(() => summarizeLagGraph(graph), [graph])
-  const [host, hostWidth] = useElementWidth<HTMLDivElement>()
-  const summaryMetrics = useMemo(
-    () => (compact
-      ? { width: Math.max(200, Math.min(hostWidth, 340)), height: 260, nodeSize: 40 }
-      : { width: Math.max(240, Math.min(hostWidth, 560)), height: Math.min(380, 200 + 36 * graph.variables.length), nodeSize: 46 }),
-    [compact, graph.variables.length, hostWidth],
+  const [view, setView] = useState<LagGraphView>(initial)
+  const exporter = useChartExport(label, 'lag-graph')
+  const figure = { graph, warnings, label, highlighted, view, onView: setView }
+  return (
+    <FloatingFigure
+      label={label}
+      defaultHeight={720}
+      actions={exporter.buttons}
+      notice={exporter.problem}
+      figure={<LagGraphFigure {...figure} fill onChart={exporter.register} />}
+    >
+      {(openButton) => <LagGraphFigure {...figure} compact={compact} openButton={openButton} testIds />}
+    </FloatingFigure>
   )
+}
+
+function LagGraphFigure({ graph, warnings, label, highlighted, view, onView, compact = false, fill = false, openButton = null, testIds = false, onChart }: {
+  readonly graph: LagGraph
+  readonly warnings: readonly LagGraphWarning[]
+  readonly label: string
+  readonly highlighted: readonly string[]
+  readonly view: LagGraphView
+  readonly onView: (view: LagGraphView) => void
+  readonly compact?: boolean
+  /** Fill the host, as in the floating window, instead of resting at the panel size. */
+  readonly fill?: boolean
+  readonly openButton?: ReactNode
+  readonly testIds?: boolean
+  /** The drawn chart and its option, for export. */
+  readonly onChart?: (chart: EChartsType, option: EChartsCoreOption) => void
+}) {
+  const theme = useChartTheme()
+  const summary = useMemo(() => summarizeLagGraph(graph), [graph])
+  const [host, hostWidth, hostHeight] = useElementSize<HTMLDivElement>()
+  const [chart, setChart] = useState<EChartsType | null>(null)
+  const summaryMetrics = useMemo(() => {
+    if (fill) return { width: Math.max(240, hostWidth), height: Math.max(240, hostHeight), nodeSize: Math.min(64, Math.max(46, Math.floor(Math.min(hostWidth, hostHeight) / 9))) }
+    return compact
+      ? { width: Math.max(200, Math.min(hostWidth, 340)), height: 260, nodeSize: 40 }
+      : { width: Math.max(240, Math.min(hostWidth, 560)), height: Math.min(380, 200 + 36 * graph.variables.length), nodeSize: 46 }
+  }, [compact, fill, graph.variables.length, hostHeight, hostWidth])
+  // The grid is always drawn at its own size: its axes are pixel-true, so a chart squeezed into a
+  // shorter box would slide the column labels into the nodes. In the window the spacing grows with
+  // the room there, up to about twice the resting size, and never below it; the nodes grow less, so
+  // the lines between them stay the point of the drawing. A window too small for the grid scrolls.
+  const gridMetrics = useMemo(() => {
+    if (!fill) return lagGridMetrics(graph)
+    const resting = lagGridSize(graph)
+    const factor = Math.min(2.2, Math.max(1, Math.min(hostWidth / resting.width, hostHeight / resting.height)))
+    const base = DEFAULT_LAG_GRID_METRICS
+    return lagGridMetrics(graph, { ...base, nodeSize: Math.round(base.nodeSize * Math.min(1.5, factor)), dx: Math.round(base.dx * factor), dy: Math.round(base.dy * factor) })
+  }, [fill, graph, hostHeight, hostWidth])
   const option = useMemo(
     () => (view === 'summary'
       ? summaryGraphOption(summary, theme, summaryMetrics, highlighted)
-      : lagGridOption(graph, theme)),
-    [graph, highlighted, summary, summaryMetrics, theme, view],
+      : lagGridOption(graph, theme, gridMetrics)),
+    [graph, gridMetrics, highlighted, summary, summaryMetrics, theme, view],
   )
-  const gridSize = lagGridSize(graph)
-  const height = view === 'summary' ? summaryMetrics.height : Math.min(gridSize.height, 520)
+  useEffect(() => { if (chart !== null) onChart?.(chart, option) }, [chart, onChart, option])
+  const gridSize = lagGridSize(graph, gridMetrics)
+  const height = view === 'summary' ? summaryMetrics.height : gridSize.height
   const meanings = markMeanings(graph.semantics)
   return (
-    <div className={well('p-2')}>
+    <div className={cn(well('p-2'), fill && 'flex min-h-0 flex-1 flex-col')}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
         {graph.tauMax > 0
-          ? <SegmentedControl size="sm" frame="none" ariaLabel="Structure view" value={view} onChange={setView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
+          ? <SegmentedControl size="sm" frame="none" ariaLabel="Structure view" value={view} onChange={onView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
           : <span className="text-micro text-faint">Directed structure</span>}
-        <span className="text-micro text-faint">{graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}</span>
+        <span className="flex items-center gap-2 text-micro text-faint">
+          {graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}
+          {openButton}
+        </span>
       </div>
-      <div ref={host} className={view === 'lag-grid' ? 'figure-strip overflow-x-auto' : 'flex justify-center'}>
+      <div ref={host} className={cn(view === 'lag-grid' ? 'figure-strip flex overflow-auto' : 'flex justify-center', view === 'lag-grid' && !fill && 'max-h-[520px]', fill && 'min-h-0 flex-1')}>
         {view === 'summary'
-          ? (hostWidth > 0 && <EChart key="summary" option={option} label={label} className="block" style={{ width: summaryMetrics.width, height }} testId="summary-graph" />)
-          : <EChart key="lag-grid" option={option} label={label} className="block" style={{ width: gridSize.width, height, minWidth: gridSize.width }} testId="lag-grid" />}
+          ? (hostWidth > 0 && <EChart key="summary" option={option} label={label} className="block" style={{ width: summaryMetrics.width, height }} testId={testIds ? 'summary-graph' : undefined} onReady={setChart} />)
+          : <EChart key="lag-grid" option={option} label={label} className="m-auto block shrink-0" style={{ width: gridSize.width, height }} testId={testIds ? 'lag-grid' : undefined} onReady={setChart} />}
       </div>
       {meanings.length > 0 && (
         <dl className="mb-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-1 text-label text-faint" aria-label="Link mark legend">

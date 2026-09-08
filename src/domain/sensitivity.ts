@@ -244,7 +244,7 @@ export function probeEligibility(probe: SensitivityProbe, run: EstimationRunArti
     case 'linear-refutation':
       return run.kind === 'backdoor-linear-run'
         ? { kind: 'eligible' }
-        : { kind: 'refused', reason: 'The DoWhy refuters refit the linear back-door estimate; choose an adjusted linear regression run.' }
+        : { kind: 'refused', reason: 'The refuters refit the linear back-door estimate; choose an adjusted linear regression run.' }
     case 'unobserved-confounding':
       if (run.kind !== 'backdoor-linear-run') return { kind: 'refused', reason: 'The simulated confounder refits the linear back-door estimate; choose an adjusted linear regression run.' }
       if ((contemporaneousAdjustmentVariables(run.estimate.adjustment)?.length ?? 0) === 0) return { kind: 'refused', reason: 'The simulated confounder is sized from the observed common causes, and this study adjusts for none.' }

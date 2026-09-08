@@ -70,6 +70,38 @@ pub(crate) enum ConstraintCiTest {
     Kci,
 }
 
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum JpcmciNodeClass {
+    System,
+    TimeContext,
+    SpaceContext,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JpcmciNodeEvidence {
+    pub(crate) variable: usize,
+    pub(crate) lag: i32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JpcmciSeparatingSetEvidence {
+    pub(crate) source: usize,
+    pub(crate) target: usize,
+    pub(crate) lag: usize,
+    pub(crate) variables: Vec<JpcmciNodeEvidence>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct JpcmciAmbiguousTripleEvidence {
+    pub(crate) left: JpcmciNodeEvidence,
+    pub(crate) middle: usize,
+    pub(crate) right: usize,
+}
+
 #[derive(serde::Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct BackgroundKnowledgeCommand {
@@ -324,6 +356,17 @@ pub(crate) enum AnalysisCommand {
         tau_max: usize,
         pc_alpha: f64,
         samples: TemporalSamples,
+    },
+    Jpcmciplus {
+        rows: usize,
+        datasets: usize,
+        periods: usize,
+        observed_columns: usize,
+        classes: Vec<JpcmciNodeClass>,
+        time_dummy: bool,
+        space_dummy: bool,
+        tau_max: usize,
+        pc_alpha: f64,
     },
     Lpcmci {
         rows: usize,
@@ -1420,6 +1463,26 @@ pub(crate) enum AnalysisResult {
         p_matrix: Vec<Vec<Vec<f64>>>,
         val_matrix: Vec<Vec<Vec<f64>>>,
     },
+    Jpcmciplus {
+        observations: usize,
+        datasets: usize,
+        periods: usize,
+        observed_variables: usize,
+        variables: usize,
+        classes: Vec<&'static str>,
+        time_dummy: bool,
+        space_dummy: bool,
+        tau_max: usize,
+        pc_alpha: f64,
+        graph: Vec<Vec<Vec<String>>>,
+        p_matrix: Vec<Vec<Vec<f64>>>,
+        val_matrix: Vec<Vec<Vec<f64>>>,
+        separating_sets: Vec<JpcmciSeparatingSetEvidence>,
+        ambiguous_triples: Vec<JpcmciAmbiguousTripleEvidence>,
+        lagged_parents: Vec<Vec<JpcmciNodeEvidence>>,
+        context_parents: Vec<Vec<JpcmciNodeEvidence>>,
+        dummy_parents: Vec<Vec<JpcmciNodeEvidence>>,
+    },
     Lpcmci {
         observations: usize,
         variables: usize,
@@ -2033,9 +2096,14 @@ pub(crate) enum DmlModel {
 pub(crate) enum DmlGroups {
     None,
     /// One group per distinct value of the column.
-    Levels { column: usize },
+    Levels {
+        column: usize,
+    },
     /// `bins` quantile groups of the column, right-inclusive as `pandas.qcut` cuts them.
-    Quantiles { column: usize, bins: usize },
+    Quantiles {
+        column: usize,
+        bins: usize,
+    },
 }
 
 #[derive(Clone, Copy, Serialize, PartialEq, Debug)]

@@ -199,7 +199,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
           { kind: 'comparison', text: groups.length === 1
             ? 'One group was formed, so no contrast between groups can be read.'
             : `The effect is largest where ${modifier} is ${largest.label} (${number(largest.value)}) and smallest where it is ${smallest.label} (${number(smallest.value)}); their ${formatPercent(largest.interval.level, { precision: 0 }).text} intervals ${overlap ? 'overlap, so the data do not separate the two' : 'do not overlap'}.` },
-          { kind: 'qualification', text: `Each group effect is the average treatment effect conditioned on ${modifier}, estimated by DoubleML’s group average treatment effect: the effect is linear in ${study.treatment.name} within a group and free to differ between groups. The recorded identification and overlap assumptions must hold within every group.` },
+          { kind: 'qualification', text: `Each group effect is the average treatment effect conditioned on ${modifier}, estimated as a group average treatment effect: the effect is linear in ${study.treatment.name} within a group and free to differ between groups. The recorded identification and overlap assumptions must hold within every group.` },
         ] }
       }
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
@@ -395,6 +395,14 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `${selected} source–target–lag gates meet the ${number(run.result.gateThreshold)} threshold after GRACE refined the CD-NOTS skeleton. Each displayed value is the fitted hard-concrete gate for that candidate relation.` },
         { kind: 'qualification', text: 'The initial skeleton and neural refinement depend on the selected lag window, conditional-independence test, nonstationarity context, regularisation and optimization. A retained gate is discovery evidence, not an intervention-effect estimate.' },
+      ] }
+    }
+    case 'jpcmci-plus-run': {
+      const links = run.result.graph.flatMap((targets) => targets.flatMap((lags) => lags)).filter((mark) => mark.length > 0).length
+      const contexts = run.nodes.filter((node) => node.kind === 'generated').length
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `The joint panel search reports ${links} marked source–target–lag cells across ${run.result.datasets} aligned units and ${run.result.periods} periods. ${contexts} generated context ${contexts === 1 ? 'node is' : 'nodes are'} retained in the graph.` },
+        { kind: 'qualification', text: 'J-PCMCI+ pools conditional-independence evidence under the declared system, time-context and unit-context roles. Its CPDAG is discovery evidence, not an intervention-effect estimate; unresolved endpoints and context relations must remain unresolved.' },
       ] }
     }
     case 'dynotears-run': return { kind: 'result-interpretation', statements: [

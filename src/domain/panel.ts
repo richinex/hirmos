@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { sourceFingerprint, type ColumnId, type DatasetProfile, type SourceFingerprint } from './dataset'
+import { sourceFingerprint, type ColumnId, type DatasetProfile, type NumericColumnSelection, type SourceFingerprint } from './dataset'
 import { assertNever, err, isNonEmpty, ok, type NonEmptyArray, type Result } from './dop'
 
 export interface PanelStructureEvidence {
@@ -29,12 +29,106 @@ export interface PanelLongMatrix {
   readonly values: Float64Array
 }
 
+/** Panel keys in source-row order, independent of whether any analysis value is missing. */
+export interface PanelKeyMatrix {
+  readonly kind: 'panel-key-matrix'
+  readonly sourceFingerprint: SourceFingerprint
+  readonly rowCount: number
+  readonly units: NonEmptyArray<string>
+  readonly periodCodes: NonEmptyArray<number>
+  readonly periods: NonEmptyArray<PanelPeriod>
+}
+
 /** One panel period in its computational and source-facing representations. */
 export interface PanelPeriod {
   /** Zero-based dense code used by the numerical kernel. */
   readonly code: number
   /** Original value from the selected time column, used in records and UI copy. */
   readonly label: string
+}
+
+/** Dense panel values ordered dataset-major, then period-major, with columns kept column-major. */
+export interface JointPanelMatrix {
+  readonly kind: 'joint-panel-matrix'
+  readonly rows: number
+  readonly datasets: number
+  readonly periods: number
+  readonly units: NonEmptyArray<string>
+  readonly periodCatalog: NonEmptyArray<PanelPeriod>
+  readonly columns: NonEmptyArray<NumericColumnSelection>
+  readonly values: Float64Array
+}
+
+export type JointPanelMatrixProblem =
+  | { readonly kind: 'row-count-mismatch'; readonly prepared: number; readonly panel: number }
+  | { readonly kind: 'duplicate-panel-cell'; readonly unit: string; readonly period: PanelPeriod }
+  | { readonly kind: 'missing-panel-cell'; readonly unit: string; readonly period: PanelPeriod }
+  | { readonly kind: 'incomplete-panel-key'; readonly row: number }
+
+export const describeJointPanelMatrixProblem = (problem: JointPanelMatrixProblem): string => {
+  switch (problem.kind) {
+    case 'row-count-mismatch': return `The prepared matrix has ${problem.prepared} rows but the panel keys describe ${problem.panel}. Recreate the prepared panel version.`
+    case 'duplicate-panel-cell': return `${problem.unit} has more than one row at period ${problem.period.label}. J-PCMCI+ requires one.`
+    case 'missing-panel-cell': return `${problem.unit} has no row at period ${problem.period.label}. J-PCMCI+ requires a balanced panel.`
+    case 'incomplete-panel-key': return `Panel row ${problem.row + 1} has no complete unit-period key.`
+    default: return assertNever(problem)
+  }
+}
+
+export function orderJointPanelMatrix(
+  prepared: {
+    readonly rowCount: number
+    readonly columns: NonEmptyArray<NumericColumnSelection>
+    readonly values: Float64Array
+  },
+  panel: PanelKeyMatrix | PanelLongMatrix,
+): Result<JointPanelMatrix, JointPanelMatrixProblem> {
+  if (prepared.rowCount !== panel.rowCount) {
+    return err({ kind: 'row-count-mismatch', prepared: prepared.rowCount, panel: panel.rowCount })
+  }
+  const units = [...new Set(panel.units)].sort((left, right) => left.localeCompare(right))
+  const periods = [...panel.periods].sort((left, right) => left.code - right.code)
+  if (!isNonEmpty(units) || !isNonEmpty(periods)) return err({ kind: 'incomplete-panel-key', row: 0 })
+
+  const rows = new Map<string, Map<number, number>>()
+  for (let row = 0; row < panel.rowCount; row += 1) {
+    const unit = panel.units[row]
+    const periodCode = panel.periodCodes[row]
+    if (unit === undefined || periodCode === undefined) return err({ kind: 'incomplete-panel-key', row })
+    const period = periods.find((candidate) => candidate.code === periodCode)
+    if (period === undefined) return err({ kind: 'incomplete-panel-key', row })
+    const unitRows = rows.get(unit) ?? new Map<number, number>()
+    if (unitRows.has(periodCode)) return err({ kind: 'duplicate-panel-cell', unit, period })
+    unitRows.set(periodCode, row)
+    rows.set(unit, unitRows)
+  }
+
+  const orderedRows: number[] = []
+  for (const unit of units) {
+    for (const period of periods) {
+      const row = rows.get(unit)?.get(period.code)
+      if (row === undefined) return err({ kind: 'missing-panel-cell', unit, period })
+      orderedRows.push(row)
+    }
+  }
+  const ordered = new Float64Array(prepared.values.length)
+  for (let column = 0; column < prepared.columns.length; column += 1) {
+    for (const [targetRow, sourceRow] of orderedRows.entries()) {
+      const value = prepared.values[column * prepared.rowCount + sourceRow]
+      if (value === undefined) return err({ kind: 'incomplete-panel-key', row: sourceRow })
+      ordered[column * orderedRows.length + targetRow] = value
+    }
+  }
+  return ok({
+    kind: 'joint-panel-matrix',
+    rows: orderedRows.length,
+    datasets: units.length,
+    periods: periods.length,
+    units,
+    periodCatalog: periods,
+    columns: prepared.columns,
+    values: ordered,
+  })
 }
 
 export interface PanelInterventionLayout {
@@ -254,6 +348,8 @@ const longMatrixSchema = z.object({
   values: z.instanceof(Float64Array),
 }).strict()
 
+const keyMatrixSchema = longMatrixSchema.omit({ values: true }).extend({ kind: z.literal('panel-key-matrix') }).strict()
+
 /** Rows are 0-based source indices; messages print them 1-based, as the preview table and the Rust façade do. */
 export const panelDataProblemSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('source-changed'), expected: z.string(), actual: z.string() }).strict(),
@@ -318,6 +414,9 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
   if (!isNonEmpty(parsed.data.units) || !isNonEmpty(parsed.data.periodCodes) || !isNonEmpty(parsed.data.periods)) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel buffers must contain at least one row.' })
   }
+  const units = parsed.data.units
+  const periodCodes = parsed.data.periodCodes
+  const periods = parsed.data.periods
   const labels = new Map<number, string>()
   for (const period of parsed.data.periods) {
     if (labels.has(period.code)) return err({ kind: 'invalid-panel-boundary', detail: `The long panel repeats period code ${period.code}.` })
@@ -330,9 +429,35 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
     kind: parsed.data.kind,
     sourceFingerprint: profile.source.fingerprint,
     rowCount: parsed.data.rowCount,
-    units: parsed.data.units,
-    periodCodes: parsed.data.periodCodes,
-    periods: parsed.data.periods,
+    units,
+    periodCodes,
+    periods,
     values: parsed.data.values,
   })
+}
+
+export function parsePanelKeyMatrix(value: unknown, profile: DatasetProfile): Result<PanelKeyMatrix, PanelBoundaryProblem> {
+  const parsed = keyMatrixSchema.safeParse(value)
+  if (!parsed.success) return err({ kind: 'invalid-panel-boundary', detail: z.prettifyError(parsed.error) })
+  if (parsed.data.sourceFingerprint !== profile.source.fingerprint || parsed.data.rowCount !== profile.rowCount) {
+    return err({ kind: 'invalid-panel-boundary', detail: 'The panel keys belong to another source or row count.' })
+  }
+  if (parsed.data.units.length !== parsed.data.rowCount || parsed.data.periodCodes.length !== parsed.data.rowCount) {
+    return err({ kind: 'invalid-panel-boundary', detail: 'The panel-key buffers do not match the row count.' })
+  }
+  if (!isNonEmpty(parsed.data.units) || !isNonEmpty(parsed.data.periodCodes) || !isNonEmpty(parsed.data.periods)) {
+    return err({ kind: 'invalid-panel-boundary', detail: 'The panel-key buffers must contain at least one row.' })
+  }
+  const units = parsed.data.units
+  const periodCodes = parsed.data.periodCodes
+  const periods = parsed.data.periods
+  const labels = new Map<number, string>()
+  for (const period of parsed.data.periods) {
+    if (labels.has(period.code)) return err({ kind: 'invalid-panel-boundary', detail: `The panel keys repeat period code ${period.code}.` })
+    labels.set(period.code, period.label)
+  }
+  if (parsed.data.periodCodes.some((code) => !labels.has(code)) || labels.size !== new Set(parsed.data.periodCodes).size) {
+    return err({ kind: 'invalid-panel-boundary', detail: 'The panel-key period catalog does not match its row codes.' })
+  }
+  return ok({ kind: 'panel-key-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: parsed.data.rowCount, units, periodCodes, periods })
 }

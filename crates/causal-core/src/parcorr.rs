@@ -3,9 +3,8 @@
 
 use nalgebra::{DMatrix, DVector};
 
-use crate::preprocessing::{
-    construct_array_tracked, ConstructOptions, PreprocessingError, SampleExclusion, TigramiteFrame,
-};
+use crate::ci_samples::{construct_array_tracked, ConstructOptions, SampleExclusion};
+use crate::missing_data::{MaskType, PreprocessingError, TigramiteFrame};
 
 /// (variable index, lag <= 0).
 pub type Node = (usize, i32);
@@ -122,20 +121,23 @@ pub fn construct_array_general(
     window: Option<(usize, usize)>,
     filter: Option<&[bool]>,
 ) -> ((Vec<Vec<f64>>, CleanedXyz), Vec<Node>) {
-    crate::preprocessing::construct_dense_compat(
+    crate::ci_samples::construct_dense_compat(
         data, x, y, z, extra_z, tau_max, cut_off, window, filter,
     )
 }
 
 /// In-place standardisation with ddof 0, skipping constant rows, exactly as the oracle mutates.
-fn standardize(array: &mut [Vec<f64>]) {
+pub(crate) fn standardize(array: &mut [Vec<f64>]) {
     for row in array.iter_mut() {
         let t = row.len() as f64;
-        let mean = row.iter().sum::<f64>() / t;
+        let mean = crate::numpy_mean(row);
         for v in row.iter_mut() {
             *v -= mean;
         }
-        let std = (row.iter().map(|v| v * v).sum::<f64>() / t).sqrt();
+        // np.std centers again when computing the variance of the shifted row.
+        let residual_mean = crate::numpy_mean(row);
+        let squares: Vec<_> = row.iter().map(|v| (v - residual_mean).powi(2)).collect();
+        let std = (crate::numpy_sum(&squares) / t).sqrt();
         if std != 0.0 {
             for v in row.iter_mut() {
                 *v /= std;
@@ -159,17 +161,24 @@ fn single_residuals(array: &mut [Vec<f64>], target: usize) -> Vec<f64> {
             design[(s, k)] = v;
         }
     }
-    let target_vec = DVector::from_column_slice(&y);
-    let qr = design.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &target_vec))
-        .expect("conditions are rank deficient");
+    let beta = lstsq(&design, &y);
     let fitted = design * beta;
     y.iter().zip(fitted.iter()).map(|(a, b)| a - b).collect()
 }
 
-fn pearson(a: &[f64], b: &[f64]) -> f64 {
+/// NumPy's `lstsq(..., rcond=None)` dense path uses DGELSD with a relative
+/// cutoff of machine precision times the larger matrix dimension.
+fn lstsq(design: &DMatrix<f64>, target: &[f64]) -> DVector<f64> {
+    let targets = DMatrix::from_column_slice(target.len(), 1, target);
+    let tolerance = f64::EPSILON * design.nrows().max(design.ncols()) as f64;
+    crate::least_squares::solve(design, &targets, tolerance)
+        .expect("finite conditional-independence least-squares inputs")
+        .coefficients
+        .column(0)
+        .into_owned()
+}
+
+pub(crate) fn pearson(a: &[f64], b: &[f64]) -> f64 {
     let n = a.len() as f64;
     let ma = a.iter().sum::<f64>() / n;
     let mb = b.iter().sum::<f64>() / n;
@@ -303,12 +312,7 @@ fn plain_residuals(array: &[Vec<f64>], target: usize) -> Vec<f64> {
             design[(s, k)] = v;
         }
     }
-    let target_vec = DVector::from_column_slice(&y);
-    let qr = design.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &target_vec))
-        .expect("conditions are rank deficient");
+    let beta = lstsq(&design, &y);
     let fitted = design * beta;
     y.iter().zip(fitted.iter()).map(|(a, b)| a - b).collect()
 }
@@ -343,12 +347,8 @@ fn wls_residuals(array: &[Vec<f64>], target: usize, stds: &[f64]) -> Vec<f64> {
             design_w[(s, k)] = v * w[s];
         }
     }
-    let yw = DVector::from_iterator(samples, y.iter().zip(&w).map(|(v, wi)| v * wi));
-    let qr = design_w.clone().qr();
-    let beta = qr
-        .r()
-        .solve_upper_triangular(&(qr.q().transpose() * &yw))
-        .expect("conditions are rank deficient");
+    let yw: Vec<f64> = y.iter().zip(&w).map(|(v, wi)| v * wi).collect();
+    let beta = lstsq(&design_w, &yw);
     (0..samples)
         .map(|s| {
             let mut mean = 0.0;
@@ -410,7 +410,7 @@ pub fn run_test(
 pub struct RoleAwareSamplePolicy {
     pub cut_off: CutOff,
     pub remove_missing_upto_maxlag: bool,
-    pub mask_type: crate::preprocessing::MaskType,
+    pub mask_type: MaskType,
 }
 
 #[derive(Clone, Debug)]
@@ -509,6 +509,7 @@ impl ParCorrCi {
                         window: self.window,
                         reference_points: None,
                         reference_filter: self.sample_filter.as_deref(),
+                        bootstrap: None,
                     },
                 ) {
                     Ok(constructed) => {

@@ -73,6 +73,7 @@ impl SeedSequence {
 }
 
 /// PCG64 (setseq 128 XSL-RR) exactly as numpy seeds and steps it, uint32 buffer included.
+#[derive(Clone, Debug)]
 pub struct NpRng {
     state: u128,
     inc: u128,
@@ -157,6 +158,12 @@ impl NpRng {
         }
     }
 
+    /// Legacy `RandomState.randint(high)` for a non-negative 32-bit range.
+    pub fn randint(&mut self, high: u32) -> u32 {
+        assert!(high > 0);
+        self.random_interval((high - 1) as u64) as u32
+    }
+
     /// `Generator.integers(0, high, dtype=int64)`: NumPy's Lemire bounded-integer path.
     /// This intentionally differs from the masked-rejection routine used by permutation.
     pub fn bounded_uint64(&mut self, high: u64) -> u64 {
@@ -181,6 +188,9 @@ impl NpRng {
                 }
                 return product >> 32;
             }
+        }
+        if inclusive_range == u64::MAX {
+            return self.next_u64();
         }
         let range_exclusive = inclusive_range + 1;
         loop {

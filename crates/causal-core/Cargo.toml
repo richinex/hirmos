@@ -14,7 +14,11 @@ chrono = { version = "0.4", default-features = false }
 getrandom = { version = "0.4", default-features = false, features = ["wasm_js"] }
 libm = "0.2"
 nalgebra = { version = "0.34", features = ["libm", "std"] }
+faer = { version = "=0.24.4", default-features = false, features = ["std", "linalg"] }
+levenberg-marquardt = { version = "=0.15.0", path = "reference/levenberg-marquardt-0.15.0", features = ["scipy-fma"] }
 regex = "1"
+rustfft = { version = "=6.4.1", default-features = false }
+sha1 = "=0.10.7"
 spec_math = "0.1.6"
 
 [dev-dependencies]
