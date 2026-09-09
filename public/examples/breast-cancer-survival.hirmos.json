@@ -23,7 +23,10 @@
       "bytes": 21345,
       "mediaType": "text/csv",
       "lastModified": 1788935490090,
-      "format": "csv"
+      "format": "csv",
+      "recipe": {
+        "kind": "uploaded-file"
+      }
     },
     "profile": {
       "id": "duckdb-wasm:1.30.0:ec3320a5677e45aa8b2d9bc0ddcbef9abac5439b07a74160b1e25e4bce38a161",
@@ -369,6 +372,9 @@
           "event": {
             "id": "0:censrec",
             "name": "censrec"
+          },
+          "rowFrequency": {
+            "kind": "one-observation-per-row"
           },
           "covariates": [],
           "family": "weibull",

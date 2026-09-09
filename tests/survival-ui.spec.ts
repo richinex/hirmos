@@ -156,7 +156,7 @@ test('runs right-censored flexsurv on the exact breast-cancer package data', asy
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
   await expect(page.getByRole('heading', { name: 'Weibull AFT' }).first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('686 rows · 299 events').first()).toBeVisible()
+  await expect(page.getByText('686 observations · 299 events').first()).toBeVisible()
   await expect(page.getByText('Survival runs · 1')).toBeVisible()
 
   await page
@@ -253,7 +253,7 @@ test('recovers the planted start-stop Weibull PH truth through the chapter', asy
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('36')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
   await expect(page.getByRole('heading', { name: 'Weibull PH' }).first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('455 rows · 132 events').first()).toBeVisible()
+  await expect(page.getByText('455 intervals · 132 events').first()).toBeVisible()
 
   const table = page.getByRole('region', { name: 'Fitted parameters' }).first()
   const cells = async (parameter: string) => (await table.getByRole('row', { name: new RegExp(`^${parameter}\\b`) }).first().innerText()).split('\t')

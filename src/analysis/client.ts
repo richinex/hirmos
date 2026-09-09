@@ -33,7 +33,7 @@ import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/r
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
-import type { ComparisonSurvivalEvidence, FlexSurvEvidence, MultiStateSurvivalEvidence, ParametricSurvivalFamily, ProportionalHazardsFamily } from '@/domain/survival'
+import type { ComparisonSurvivalEvidence, FlexSurvEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, ProportionalHazardsFamily } from '@/domain/survival'
 import {
   newWorkerRequestId,
   parseAnalysisWorkerEvent,
@@ -96,6 +96,7 @@ type BinaryEttOutcome = Result<BinaryEttEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type DynamicLinearScmOutcome = Result<DynamicLinearScmEvidence, AnalysisWorkerProblem>
 type FlexSurvOutcome = Result<FlexSurvEvidence, AnalysisWorkerProblem>
+type NonparametricSurvivalOutcome = Result<NonparametricSurvivalEvidence, AnalysisWorkerProblem>
 type ComparisonSurvivalOutcome = Result<ComparisonSurvivalEvidence, AnalysisWorkerProblem>
 type MultiStateSurvivalOutcome = Result<MultiStateSurvivalEvidence, AnalysisWorkerProblem>
 type SuccessfulAnalysisEvent = Extract<AnalysisWorkerEvent, { readonly result: unknown }>
@@ -813,6 +814,9 @@ export function runFlexSurv(values: Float64Array, rows: number, columns: number,
   readonly observation:
     | { readonly kind: 'rightCensored'; readonly duration: number; readonly event: number }
     | { readonly kind: 'startStop'; readonly start: number; readonly stop: number; readonly event: number }
+  readonly rowFrequency:
+    | { readonly kind: 'oneObservationPerRow' }
+    | { readonly kind: 'frequencyColumn'; readonly column: number }
   readonly covariates: readonly number[]
   readonly family: ParametricSurvivalFamily
   readonly predictionTimes: readonly number[]
@@ -831,6 +835,19 @@ export function runComparisonSurvival(values: Float64Array, rows: number, column
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<ComparisonSurvivalOutcome> {
   const request = newWorkerRequestId()
   return post('comparison-survival-succeeded', { kind: 'comparison-survival', request, values, rows, columns, ...design }, values, onProgress)
+}
+
+export function runNonparametricSurvival(values: Float64Array, rows: number, columns: number, design: {
+  readonly duration: number
+  readonly event: number
+  readonly rowFrequency:
+    | { readonly kind: 'oneObservationPerRow' }
+    | { readonly kind: 'frequencyColumn'; readonly column: number }
+  readonly predictionTimes: readonly number[]
+  readonly ties: 'discrete' | 'smoothed'
+}): Promise<NonparametricSurvivalOutcome> {
+  const request = newWorkerRequestId()
+  return post('nonparametric-survival-succeeded', { kind: 'nonparametric-survival', request, values, rows, columns, ...design }, values)
 }
 
 export function runMultiStateSurvival(values: Float64Array, rows: number, columns: number, design: {

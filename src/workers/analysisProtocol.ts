@@ -13,14 +13,17 @@ import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema,
 import {
   comparisonSurvivalEvidenceSchema,
   flexSurvEvidenceSchema,
+  nonparametricSurvivalEvidenceSchema,
   multiStateSurvivalEvidenceSchema,
   parametricSurvivalFamilySchema,
   proportionalHazardsFamilySchema,
   parseComparisonSurvivalEvidence,
   parseFlexSurvEvidence,
+  parseNonparametricSurvivalEvidence,
   parseMultiStateSurvivalEvidence,
   type ComparisonSurvivalEvidence,
   type FlexSurvEvidence,
+  type NonparametricSurvivalEvidence,
   type MultiStateSurvivalEvidence,
   type ParametricSurvivalFamily,
   type ProportionalHazardsFamily,
@@ -175,6 +178,9 @@ export type AnalysisWorkerCommand =
       readonly observation:
         | { readonly kind: 'rightCensored'; readonly duration: number; readonly event: number }
         | { readonly kind: 'startStop'; readonly start: number; readonly stop: number; readonly event: number }
+      readonly rowFrequency:
+        | { readonly kind: 'oneObservationPerRow' }
+        | { readonly kind: 'frequencyColumn'; readonly column: number }
       readonly covariates: readonly number[]
       readonly family: ParametricSurvivalFamily
       readonly predictionTimes: readonly number[]
@@ -191,6 +197,20 @@ export type AnalysisWorkerCommand =
       readonly truncationTime: number
       readonly permutations: number
       readonly seed: number
+    }
+  | {
+      readonly kind: 'nonparametric-survival'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly duration: number
+      readonly event: number
+      readonly rowFrequency:
+        | { readonly kind: 'oneObservationPerRow' }
+        | { readonly kind: 'frequencyColumn'; readonly column: number }
+      readonly predictionTimes: readonly number[]
+      readonly ties: 'discrete' | 'smoothed'
     }
   | {
       readonly kind: 'multi-state-survival'
@@ -880,6 +900,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'multicollinearity-succeeded'; readonly request: WorkerRequestId; readonly result: MulticollinearityEvidence }
   | { readonly kind: 'pandas-resampling-succeeded'; readonly request: WorkerRequestId; readonly result: PandasResamplingEvidence }
   | { readonly kind: 'flexsurv-succeeded'; readonly request: WorkerRequestId; readonly result: FlexSurvEvidence }
+  | { readonly kind: 'nonparametric-survival-succeeded'; readonly request: WorkerRequestId; readonly result: NonparametricSurvivalEvidence }
   | { readonly kind: 'comparison-survival-succeeded'; readonly request: WorkerRequestId; readonly result: ComparisonSurvivalEvidence }
   | { readonly kind: 'multi-state-survival-succeeded'; readonly request: WorkerRequestId; readonly result: MultiStateSurvivalEvidence }
   | {
@@ -1052,6 +1073,10 @@ const commandSchema = z.discriminatedUnion('kind', [
       z.object({ kind: z.literal('rightCensored'), duration: z.number().int().nonnegative(), event: z.number().int().nonnegative() }).strict(),
       z.object({ kind: z.literal('startStop'), start: z.number().int().nonnegative(), stop: z.number().int().nonnegative(), event: z.number().int().nonnegative() }).strict(),
     ]),
+    rowFrequency: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('oneObservationPerRow') }).strict(),
+      z.object({ kind: z.literal('frequencyColumn'), column: z.number().int().nonnegative() }).strict(),
+    ]),
     covariates: z.array(z.number().int().nonnegative()),
     family: parametricSurvivalFamilySchema,
     predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
@@ -1059,12 +1084,34 @@ const commandSchema = z.discriminatedUnion('kind', [
     const roles = value.observation.kind === 'rightCensored'
       ? [value.observation.duration, value.observation.event]
       : [value.observation.start, value.observation.stop, value.observation.event]
-    const selected = [...roles, ...value.covariates]
+    const frequency = value.rowFrequency.kind === 'frequencyColumn' ? [value.rowFrequency.column] : []
+    const selected = [...roles, ...frequency, ...value.covariates]
     if (new Set(roles).size !== roles.length || new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
       context.addIssue({ code: 'custom', message: 'Survival roles and covariates must be distinct columns inside the matrix.' })
     }
     if (value.observation.kind === 'startStop' && !proportionalHazardsFamilySchema.safeParse(value.family).success) {
       context.addIssue({ code: 'custom', message: 'Start-stop data requires a proportional-hazards family.' })
+    }
+  }),
+  z.object({
+    kind: z.literal('nonparametric-survival'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(2),
+    columns: z.number().int().min(2).max(3),
+    duration: z.number().int().nonnegative(),
+    event: z.number().int().nonnegative(),
+    rowFrequency: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('oneObservationPerRow') }).strict(),
+      z.object({ kind: z.literal('frequencyColumn'), column: z.number().int().nonnegative() }).strict(),
+    ]),
+    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+    ties: z.enum(['discrete', 'smoothed']),
+  }).strict().superRefine((value, context) => {
+    const frequency = value.rowFrequency.kind === 'frequencyColumn' ? [value.rowFrequency.column] : []
+    const roles = [value.duration, value.event, ...frequency]
+    if (new Set(roles).size !== roles.length || roles.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'Nonparametric survival roles must be distinct columns inside the matrix.' })
     }
   }),
   z.object({
@@ -1778,6 +1825,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('multicollinearity-succeeded'), request: requestSchema, result: multicollinearityEvidenceSchema }).strict(),
   z.object({ kind: z.literal('flexsurv-succeeded'), request: requestSchema, result: flexSurvEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('nonparametric-survival-succeeded'), request: requestSchema, result: nonparametricSurvivalEvidenceSchema }).strict(),
   z.object({ kind: z.literal('comparison-survival-succeeded'), request: requestSchema, result: comparisonSurvivalEvidenceSchema }).strict(),
   z.object({ kind: z.literal('multi-state-survival-succeeded'), request: requestSchema, result: multiStateSurvivalEvidenceSchema }).strict(),
   z.object({
@@ -1972,6 +2020,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'flexsurv-succeeded') {
     const result = parseFlexSurvEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'flexsurv-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'nonparametric-survival-succeeded') {
+    const result = parseNonparametricSurvivalEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'nonparametric-survival-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'comparison-survival-succeeded') {
     const result = parseComparisonSurvivalEvidence(parsed.data.result)

@@ -1,4 +1,4 @@
-import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
+import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import type { DagDocument } from './dag'
 import type { DagCheckArtifact } from './dagValidation'
@@ -15,6 +15,7 @@ import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, 
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { PersistedProject } from './persistence'
 import type { ProjectOrigin } from './projectOrigin'
+import type { SourceRecipe, SqlPreparationInput } from './sqlPreparation'
 
 export type ProjectId = Brand<string, 'ProjectId'>
 export type ProjectName = Brand<string, 'ProjectName'>
@@ -44,6 +45,7 @@ export interface SelectedSource {
   readonly mediaType: string
   readonly lastModified: number
   readonly format: 'csv' | 'tsv' | 'parquet'
+  readonly recipe: SourceRecipe
 }
 
 export type Workflow =
@@ -59,6 +61,13 @@ export type Workflow =
       readonly problem: SourceSelectionProblem | null
       /** A saved project waiting for its source file; the artifacts return once the file's fingerprint matches. */
       readonly restore: PersistedProject | null
+    }
+  | {
+      readonly kind: 'sql-inputs-chosen'
+      readonly project: Project
+      readonly origin: ProjectOrigin
+      /** The files the SQL console exposes as tables; a view becomes the source only once it materialises. */
+      readonly inputs: NonEmptyArray<SqlPreparationInput>
     }
   | { readonly kind: 'source-selected'; readonly project: Project; readonly origin: ProjectOrigin; readonly source: SelectedSource }
   | {
@@ -105,6 +114,8 @@ export type WorkflowEvent =
   | { readonly type: 'project-name-changed'; readonly value: string }
   | { readonly type: 'project-submitted' }
   | { readonly type: 'file-selected'; readonly file: File }
+  | { readonly type: 'sql-inputs-chosen'; readonly inputs: NonEmptyArray<SqlPreparationInput> }
+  | { readonly type: 'sql-source-created'; readonly source: SelectedSource }
   | { readonly type: 'profile-requested'; readonly request: ImportRequestId }
   | { readonly type: 'profile-succeeded'; readonly request: ImportRequestId; readonly profile: DatasetProfile }
   | { readonly type: 'profile-failed'; readonly request: ImportRequestId; readonly problem: DatasetProfileProblem }
@@ -188,7 +199,16 @@ export function selectSource(file: File): Result<SelectedSource, SourceSelection
     mediaType: file.type,
     lastModified: file.lastModified,
     format,
+    recipe: { kind: 'uploaded-file' },
   })
+}
+
+export function selectSqlDerivedSource(
+  file: File,
+  recipe: Extract<SourceRecipe, { readonly kind: 'sql-derived' }>,
+): Result<SelectedSource, SourceSelectionProblem> {
+  const selected = selectSource(file)
+  return selected.ok ? ok({ ...selected.value, recipe }) : selected
 }
 
 export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
@@ -215,11 +235,14 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         const parsed = selectSource(event.file)
         if (!parsed.ok) return { ...state, problem: parsed.error }
         const snapshot = state.restore
+        const source = snapshot.source === null
+          ? parsed.value
+          : { ...parsed.value, recipe: snapshot.source.recipe }
         return {
           kind: 'profiled',
           project: snapshot.project,
           origin: snapshot.origin,
-          source: parsed.value,
+          source,
           profile: snapshot.profile ?? (() => { throw new Error('unreachable') })(),
           prepared: snapshot.prepared,
           stationarity: snapshot.stationarity,
@@ -238,12 +261,21 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           survivalRuns: snapshot.survivalRuns,
         }
       }
+      if (event.type === 'sql-inputs-chosen' && state.restore === null) {
+        return { kind: 'sql-inputs-chosen', project: state.project, origin: state.origin, inputs: event.inputs }
+      }
       if (event.type !== 'file-selected' || state.restore !== null) return state
       const parsed = selectSource(event.file)
       return parsed.ok
         ? { kind: 'source-selected', project: state.project, origin: state.origin, source: parsed.value }
         : { ...state, problem: parsed.error }
     }
+    case 'sql-inputs-chosen':
+      if (event.type === 'sql-source-created') {
+        return { kind: 'source-selected', project: state.project, origin: state.origin, source: event.source }
+      }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
+      return state
     case 'source-selected':
       if (event.type === 'profile-requested') {
         return { kind: 'profiling', project: state.project, origin: state.origin, source: state.source, request: event.request }

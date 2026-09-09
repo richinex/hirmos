@@ -24,6 +24,10 @@ use hirmos_causal_core::survival::flexsurv::multistate::{
 use hirmos_causal_core::survival::flexsurv::observation::SurvivalObservation;
 use hirmos_causal_core::survival::flexsurv::predict::{Prediction, PredictionRequest};
 use hirmos_causal_core::survival::flexsurv::r_optim::ROptimControl;
+use hirmos_causal_core::survival::nonparametric::{
+    kaplan_meier, nelson_aalen, EventStatus as NonparametricEventStatus, NelsonAalenTies,
+    WeightedObservation,
+};
 use std::num::NonZeroUsize;
 
 fn fixed_point_scale(scale: FixedPointScale) -> FixedPointScaleEvidence {
@@ -105,11 +109,42 @@ fn family(value: SurvivalFamily) -> FlexSurvFamily {
     }
 }
 
+fn survival_row_weights(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    command: SurvivalRowFrequencyCommand,
+    reserved: &[usize],
+) -> Result<Vec<f64>, String> {
+    match command {
+        SurvivalRowFrequencyCommand::OneObservationPerRow => Ok(vec![1.0; rows]),
+        SurvivalRowFrequencyCommand::FrequencyColumn { column: index } => {
+            if reserved.contains(&index) {
+                return Err(
+                    "the survival frequency must use a column with no other analysis role"
+                        .to_owned(),
+                );
+            }
+            let values = column(values, rows, columns, index)?;
+            for (row, value) in values.iter().enumerate() {
+                if !value.is_finite() || *value <= 0.0 || value.fract() != 0.0 {
+                    return Err(format!(
+                        "invalid survival frequency at row {}: use a positive whole-number count",
+                        row + 1
+                    ));
+                }
+            }
+            Ok(values)
+        }
+    }
+}
+
 pub(crate) fn flexsurv_evidence(
     values: &[f64],
     rows: usize,
     columns: usize,
     observation: SurvivalObservationCommand,
+    row_frequency: SurvivalRowFrequencyCommand,
     covariates: &[usize],
     requested_family: SurvivalFamily,
     prediction_times: &[f64],
@@ -130,6 +165,13 @@ pub(crate) fn flexsurv_evidence(
         SurvivalObservationCommand::RightCensored { duration, event } => vec![duration, event],
         SurvivalObservationCommand::StartStop { start, stop, event } => vec![start, stop, event],
     };
+    let weights = survival_row_weights(
+        values,
+        rows,
+        columns,
+        row_frequency,
+        &[observation_columns.as_slice(), covariates].concat(),
+    )?;
     let observations = match observation {
         SurvivalObservationCommand::RightCensored { duration, event } => {
             let durations = column(values, rows, columns, duration)?;
@@ -189,8 +231,15 @@ pub(crate) fn flexsurv_evidence(
         return Err("survival covariates must not repeat".to_owned());
     }
 
-    let data = SurvivalDataset::new(observations.into_iter().map(SurvivalRecord::new).collect())
-        .map_err(|problem| format!("survival data refused: {problem:?}"))?;
+    let data = SurvivalDataset::new(
+        observations
+            .into_iter()
+            .zip(weights.iter().copied())
+            .map(|(observation, weight)| SurvivalRecord::weighted(observation, weight))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|problem| format!("survival weights refused: {problem:?}"))?,
+    )
+    .map_err(|problem| format!("survival data refused: {problem:?}"))?;
     let core_family = family(requested_family);
     let mut model = RegressionModel::new(core_family, rows)
         .map_err(|problem| format!("survival model refused: {problem:?}"))?;
@@ -204,9 +253,17 @@ pub(crate) fn flexsurv_evidence(
                 design.push(values[index * rows + row]);
             }
         }
+        let weight_total = weights.iter().sum::<f64>();
         for index in covariates {
             let values = column(values, rows, columns, *index)?;
-            profile.push(values.iter().sum::<f64>() / rows as f64);
+            profile.push(
+                values
+                    .iter()
+                    .zip(&weights)
+                    .map(|(value, weight)| value * weight)
+                    .sum::<f64>()
+                    / weight_total,
+            );
         }
         model = model
             .with_location_covariates(
@@ -261,7 +318,7 @@ pub(crate) fn flexsurv_evidence(
     };
     let baseline_count = core_family.parameters().len();
     Ok(AnalysisResult::FlexSurv {
-        observations: rows,
+        observations: weights.iter().sum::<f64>() as usize,
         events: fit
             .individual_log_likelihood
             .iter()
@@ -272,7 +329,8 @@ pub(crate) fn flexsurv_evidence(
                     values[event * rows + *row] == 1.0
                 }
             })
-            .count(),
+            .map(|(row, _)| weights[row] as usize)
+            .sum(),
         family: requested_family,
         natural_baseline: fit.natural_baseline,
         coefficients: fit.transformed_parameters[baseline_count..].to_vec(),
@@ -286,6 +344,106 @@ pub(crate) fn flexsurv_evidence(
         hazard,
         median,
         mean,
+    })
+}
+
+pub(crate) fn nonparametric_survival_evidence(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    duration: usize,
+    event: usize,
+    row_frequency: SurvivalRowFrequencyCommand,
+    prediction_times: &[f64],
+    ties: NelsonAalenTiesCommand,
+) -> Result<AnalysisResult, String> {
+    if rows < 2 || columns < 2 || values.len() != rows.saturating_mul(columns) {
+        return Err("nonparametric survival needs at least two complete rows".to_owned());
+    }
+    if duration == event || duration >= columns || event >= columns {
+        return Err("duration and event must be different columns inside the matrix".to_owned());
+    }
+    if prediction_times.is_empty()
+        || prediction_times.windows(2).any(|pair| pair[0] > pair[1])
+        || prediction_times
+            .iter()
+            .any(|time| !time.is_finite() || *time < 0.0)
+    {
+        return Err("nonparametric prediction times must be non-negative and ordered".to_owned());
+    }
+    let durations = column(values, rows, columns, duration)?;
+    let events = column(values, rows, columns, event)?;
+    let weights = survival_row_weights(values, rows, columns, row_frequency, &[duration, event])?;
+    let mut observations = Vec::with_capacity(rows);
+    for row in 0..rows {
+        observations.push(
+            WeightedObservation::new(
+                durations[row],
+                if event_indicator(&events, row)? {
+                    NonparametricEventStatus::Observed
+                } else {
+                    NonparametricEventStatus::Censored
+                },
+                weights[row],
+            )
+            .map_err(|problem| {
+                format!(
+                    "invalid nonparametric survival row {}: {problem:?}",
+                    row + 1
+                )
+            })?,
+        );
+    }
+    let survival = kaplan_meier(&observations, prediction_times, 0.05)
+        .map_err(|problem| format!("Kaplan-Meier failed: {problem:?}"))?;
+    let cumulative_hazard = nelson_aalen(
+        &observations,
+        prediction_times,
+        0.05,
+        match ties {
+            NelsonAalenTiesCommand::Discrete => NelsonAalenTies::Discrete,
+            NelsonAalenTiesCommand::Smoothed => NelsonAalenTies::Smoothed,
+        },
+    )
+    .map_err(|problem| format!("Nelson-Aalen failed: {problem:?}"))?;
+    let mut previous = 0.0;
+    let hazard_increment = cumulative_hazard
+        .iter()
+        .map(|estimate| {
+            let increment = estimate.cumulative_hazard - previous;
+            previous = estimate.cumulative_hazard;
+            increment.max(0.0)
+        })
+        .collect();
+    Ok(AnalysisResult::NonparametricSurvival {
+        observations: weights.iter().sum::<f64>() as usize,
+        events: events
+            .iter()
+            .zip(&weights)
+            .filter(|(event, _)| **event == 1.0)
+            .map(|(_, weight)| *weight as usize)
+            .sum(),
+        prediction_times: prediction_times.to_vec(),
+        survival: survival.iter().map(|estimate| estimate.survival).collect(),
+        survival_lower: survival.iter().map(|estimate| estimate.lower).collect(),
+        survival_upper: survival.iter().map(|estimate| estimate.upper).collect(),
+        cumulative_density: survival
+            .iter()
+            .map(|estimate| estimate.cumulative_density)
+            .collect(),
+        cumulative_hazard: cumulative_hazard
+            .iter()
+            .map(|estimate| estimate.cumulative_hazard)
+            .collect(),
+        cumulative_hazard_lower: cumulative_hazard
+            .iter()
+            .map(|estimate| estimate.lower)
+            .collect(),
+        cumulative_hazard_upper: cumulative_hazard
+            .iter()
+            .map(|estimate| estimate.upper)
+            .collect(),
+        hazard_increment,
     })
 }
 
@@ -914,6 +1072,7 @@ mod upstream_data_tests {
                 duration: 0,
                 event: 1,
             },
+            SurvivalRowFrequencyCommand::OneObservationPerRow,
             &[],
             SurvivalFamily::Weibull,
             &[0.0, 1.0, 3.0, 5.0],
@@ -935,6 +1094,63 @@ mod upstream_data_tests {
         assert_eq!(survival.len(), 4);
         assert!(survival.windows(2).all(|pair| pair[0] >= pair[1]));
         assert!(median.is_finite() && median > 0.0);
+    }
+
+    #[test]
+    fn grouped_nonparametric_rows_match_expanded_observations_at_the_browser_facade() {
+        let grouped_values = vec![1.0, 2.0, 3.0, 4.0, 1.0, 1.0, 0.0, 0.0, 2.0, 1.0, 3.0, 4.0];
+        let expanded_values = vec![
+            1.0, 1.0, 2.0, 3.0, 3.0, 3.0, 4.0, 4.0, 4.0, 4.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+        ];
+        let times = [0.0, 1.0, 2.0, 3.0, 4.0];
+        let grouped = nonparametric_survival_evidence(
+            &grouped_values,
+            4,
+            3,
+            0,
+            1,
+            SurvivalRowFrequencyCommand::FrequencyColumn { column: 2 },
+            &times,
+            NelsonAalenTiesCommand::Discrete,
+        )
+        .expect("grouped observations should be accepted");
+        let expanded = nonparametric_survival_evidence(
+            &expanded_values,
+            10,
+            2,
+            0,
+            1,
+            SurvivalRowFrequencyCommand::OneObservationPerRow,
+            &times,
+            NelsonAalenTiesCommand::Discrete,
+        )
+        .expect("expanded observations should be accepted");
+
+        let AnalysisResult::NonparametricSurvival {
+            observations: grouped_observations,
+            events: grouped_events,
+            survival: grouped_survival,
+            cumulative_hazard: grouped_hazard,
+            ..
+        } = grouped
+        else {
+            panic!("grouped command returned another result kind")
+        };
+        let AnalysisResult::NonparametricSurvival {
+            observations: expanded_observations,
+            events: expanded_events,
+            survival: expanded_survival,
+            cumulative_hazard: expanded_hazard,
+            ..
+        } = expanded
+        else {
+            panic!("expanded command returned another result kind")
+        };
+        assert_eq!(grouped_observations, expanded_observations);
+        assert_eq!(grouped_events, expanded_events);
+        assert_eq!(grouped_survival, expanded_survival);
+        assert_eq!(grouped_hazard, expanded_hazard);
     }
 
     #[test]
@@ -1027,6 +1243,7 @@ mod upstream_data_tests {
                 stop: 1,
                 event: 2,
             },
+            SurvivalRowFrequencyCommand::OneObservationPerRow,
             &[],
             SurvivalFamily::WeibullPh,
             &[0.0, 3.0, 6.0, 12.0],
@@ -1072,5 +1289,70 @@ mod upstream_data_tests {
         assert_eq!(transitions.len(), 3);
         assert_eq!(probabilities.len(), 4);
         assert!(probabilities.iter().all(|matrix| matrix.len() == 9));
+    }
+
+    #[test]
+    fn grouped_frequency_rows_match_the_equivalent_expanded_flexsurv_data() {
+        let grouped = vec![1.0, 2.0, 3.0, 4.0, 1.0, 1.0, 0.0, 0.0, 2.0, 3.0, 4.0, 1.0];
+        let expanded = vec![
+            1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0, 3.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 0.0,
+        ];
+        let grouped_result = flexsurv_evidence(
+            &grouped,
+            4,
+            3,
+            SurvivalObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+            },
+            SurvivalRowFrequencyCommand::FrequencyColumn { column: 2 },
+            &[],
+            SurvivalFamily::Weibull,
+            &[1.0, 2.0, 4.0],
+        )
+        .expect("positive integer frequency rows fit");
+        let expanded_result = flexsurv_evidence(
+            &expanded,
+            10,
+            2,
+            SurvivalObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+            },
+            SurvivalRowFrequencyCommand::OneObservationPerRow,
+            &[],
+            SurvivalFamily::Weibull,
+            &[1.0, 2.0, 4.0],
+        )
+        .expect("the expanded observations fit");
+        let (
+            AnalysisResult::FlexSurv {
+                observations: grouped_observations,
+                events: grouped_events,
+                natural_baseline: grouped_parameters,
+                log_likelihood: grouped_likelihood,
+                ..
+            },
+            AnalysisResult::FlexSurv {
+                observations: expanded_observations,
+                events: expanded_events,
+                natural_baseline: expanded_parameters,
+                log_likelihood: expanded_likelihood,
+                ..
+            },
+        ) = (grouped_result, expanded_result)
+        else {
+            panic!("flexsurv commands returned another result kind")
+        };
+        assert_eq!((grouped_observations, grouped_events), (10, 5));
+        assert_eq!(
+            (grouped_observations, grouped_events),
+            (expanded_observations, expanded_events)
+        );
+        assert!((grouped_likelihood - expanded_likelihood).abs() <= 1e-10);
+        for (grouped, expanded) in grouped_parameters.iter().zip(expanded_parameters) {
+            assert!((grouped - expanded).abs() <= 1e-9);
+        }
     }
 }

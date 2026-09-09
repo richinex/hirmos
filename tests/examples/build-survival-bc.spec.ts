@@ -21,7 +21,7 @@ test('build the breast cancer survival example bundle', async ({ page }) => {
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('7')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
   await expect(page.getByRole('heading', { name: 'Weibull AFT' }).first()).toBeVisible({ timeout: 300_000 })
-  await expect(page.getByText('686 rows · 299 events').first()).toBeVisible()
+  await expect(page.getByText('686 observations · 299 events').first()).toBeVisible()
 
   await exportBundle(page, example)
 })

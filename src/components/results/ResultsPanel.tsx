@@ -275,7 +275,10 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
       case 'survival': {
         const run = survivalRuns.find((candidate) => candidate.id === activeView.selected) ?? null
         return <>
-          <label className="block max-w-xl"><span className="block text-body font-medium text-ink">Survival run</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => setView({ ...activeView, selected: event.target.value === '' ? null : event.target.value as SurvivalRunId })}><option value="" disabled>Choose a run</option>{[...survivalRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{survivalRunLabel(candidate)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
+          <label className="block max-w-xl"><span className="block text-body font-medium text-ink">Survival run</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => {
+            const selected = survivalRuns.find((candidate) => candidate.id === event.target.value)?.id ?? null
+            setView({ ...activeView, selected })
+          }}><option value="" disabled>Choose a run</option>{[...survivalRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{survivalRunLabel(candidate)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
           {run === null ? <div className={well('px-4 py-6 text-center text-body text-faint')}>Choose a survival run to review.</div> : <SurvivalRunResult run={run} />}
         </>
       }
@@ -292,7 +295,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
       }
       case 'survival': return {
         title: `Survival runs · ${survivalRuns.length}`,
-        body: <div className="figure-strip overflow-x-auto"><table className={table} aria-label="Survival runs"><thead><tr><th className={th()}>Analysis</th><th className={th()}>Rows</th><th className={th()}>Created</th></tr></thead><tbody>{[...survivalRuns].reverse().map((candidate) => <tr key={candidate.id} className={tr(candidate.id === activeView.selected ? 'selected' : 'action')} onClick={() => setView({ ...activeView, selected: candidate.id })}><td className={td('text-ink')}>{survivalRunLabel(candidate)}</td><td className={td(num('text-muted'))}>{formatCount(candidate.evidence.observations).text}</td><td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td></tr>)}</tbody></table></div>,
+        body: <div className="figure-strip overflow-x-auto"><table className={table} aria-label="Survival runs"><thead><tr><th className={th()}>Analysis</th><th className={th()}>Records</th><th className={th()}>Created</th></tr></thead><tbody>{[...survivalRuns].reverse().map((candidate) => <tr key={candidate.id} className={tr(candidate.id === activeView.selected ? 'selected' : 'action')} onClick={() => setView({ ...activeView, selected: candidate.id })}><td className={td('text-ink')}>{survivalRunLabel(candidate)}</td><td className={td(num('text-muted'))}>{formatCount(candidate.evidence.observations).text}</td><td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td></tr>)}</tbody></table></div>,
         defaultSize: 180,
       }
       default: return assertNever(activeView)

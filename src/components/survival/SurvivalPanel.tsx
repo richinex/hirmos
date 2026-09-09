@@ -26,6 +26,7 @@ import {
   type ParametricSurvivalFamily,
   type ProportionalHazardsFamily,
   type MultiStateInputConfiguration,
+  type SurvivalRowFrequency,
   type SurvivalRunArtifact,
 } from '@/domain/survival'
 import type { SelectedSource } from '@/domain/workflow'
@@ -33,9 +34,14 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
+type RowFrequencyDraft =
+  | { readonly kind: 'one-observation-per-row' }
+  | { readonly kind: 'frequency-column'; readonly column: ColumnId | null }
+
 type Draft =
-  | { readonly kind: 'right-censored'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[]; readonly family: ParametricSurvivalFamily; readonly horizon: number }
-  | { readonly kind: 'start-stop'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[]; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+  | { readonly kind: 'right-censored'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly covariates: readonly ColumnId[]; readonly family: ParametricSurvivalFamily; readonly horizon: number }
+  | { readonly kind: 'nonparametric'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly horizon: number; readonly ties: 'discrete' | 'smoothed' }
+  | { readonly kind: 'start-stop'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly covariates: readonly ColumnId[]; readonly family: ProportionalHazardsFamily; readonly horizon: number }
   | { readonly kind: 'two-group'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly group: ColumnId | null; readonly truncationTime: number; readonly permutations: number; readonly seed: number }
   | { readonly kind: 'multi-state'; readonly input: MultiStateDraftInput; readonly family: ProportionalHazardsFamily; readonly horizon: number }
 
@@ -54,8 +60,9 @@ type MultiStateDraftInput =
     }
 
 type ReadyDraft =
-  | { readonly kind: 'right-censored'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ParametricSurvivalFamily; readonly horizon: number }
-  | { readonly kind: 'start-stop'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+  | { readonly kind: 'right-censored'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ParametricSurvivalFamily; readonly horizon: number }
+  | { readonly kind: 'nonparametric'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly columns: NonEmptyArray<ColumnId>; readonly horizon: number; readonly ties: 'discrete' | 'smoothed' }
+  | { readonly kind: 'start-stop'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ProportionalHazardsFamily; readonly horizon: number }
   | { readonly kind: 'two-group'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly group: NumericColumnSelection; readonly columns: NonEmptyArray<ColumnId>; readonly truncationTime: number; readonly permutations: number; readonly seed: number }
   | { readonly kind: 'multi-state'; readonly input: MultiStateReadyInput; readonly family: ProportionalHazardsFamily; readonly horizon: number }
 
@@ -118,8 +125,9 @@ const draftFor = (kind: Draft['kind'], columns: readonly NumericColumnSelection[
   const duration = columnLike(columns, /^(time|duration|years?|months?|recyrs)$/i)
   const event = columnLike(columns, /^(event|status|death|censrec)$/i)
   switch (kind) {
-    case 'right-censored': return { kind, duration, event, covariates: [], family: 'weibull', horizon: 10 }
-    case 'start-stop': return { kind, start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event, covariates: [], family: 'weibullPh', horizon: 10 }
+    case 'right-censored': return { kind, duration, event, rowFrequency: { kind: 'one-observation-per-row' }, covariates: [], family: 'weibull', horizon: 10 }
+    case 'nonparametric': return { kind, duration, event, rowFrequency: { kind: 'one-observation-per-row' }, horizon: 10, ties: 'discrete' }
+    case 'start-stop': return { kind, start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event, rowFrequency: { kind: 'one-observation-per-row' }, covariates: [], family: 'weibullPh', horizon: 10 }
     case 'two-group': return { kind, duration, event, group: columnLike(columns, /^(group|arm|treatment|treat)$/i), truncationTime: 10, permutations: 1_000, seed: 43 }
     case 'multi-state': return { kind, input: preparedMultiStateInput(columns), family: 'weibullPh', horizon: 10 }
     default: return assertNever(kind)
@@ -138,9 +146,11 @@ const draftFromRun = (run: SurvivalRunArtifact, columns: readonly NumericColumnS
   const configuration = run.configuration
   switch (configuration.kind) {
     case 'right-censored-parametric':
-      return { kind: 'right-censored', duration: present(configuration.duration), event: present(configuration.event), covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+      return { kind: 'right-censored', duration: present(configuration.duration), event: present(configuration.event), rowFrequency: configuration.rowFrequency.kind === 'one-observation-per-row' ? configuration.rowFrequency : { kind: 'frequency-column', column: present(configuration.rowFrequency.column) }, covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+    case 'right-censored-nonparametric':
+      return { kind: 'nonparametric', duration: present(configuration.duration), event: present(configuration.event), rowFrequency: configuration.rowFrequency.kind === 'one-observation-per-row' ? configuration.rowFrequency : { kind: 'frequency-column', column: present(configuration.rowFrequency.column) }, horizon: horizon(configuration.predictionTimes), ties: configuration.ties }
     case 'start-stop-proportional-hazards':
-      return { kind: 'start-stop', start: present(configuration.start), stop: present(configuration.stop), event: present(configuration.event), covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+      return { kind: 'start-stop', start: present(configuration.start), stop: present(configuration.stop), event: present(configuration.event), rowFrequency: configuration.rowFrequency.kind === 'one-observation-per-row' ? configuration.rowFrequency : { kind: 'frequency-column', column: present(configuration.rowFrequency.column) }, covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
     case 'two-group-comparison':
       return { kind: 'two-group', duration: present(configuration.duration), event: present(configuration.event), group: present(configuration.group), truncationTime: configuration.truncationTime, permutations: configuration.permutations, seed: configuration.seed }
     case 'multi-state-proportional-hazards': {
@@ -166,6 +176,11 @@ const draftFromRun = (run: SurvivalRunArtifact, columns: readonly NumericColumnS
 
 const predictionTimes = (horizon: number): NonEmptyArray<number> =>
   [0, ...Array.from({ length: 50 }, (_, index) => horizon * (index + 1) / 50)]
+
+const nonparametricTimes = (horizon: number): NonEmptyArray<number> =>
+  Number.isInteger(horizon) && horizon <= 499
+    ? [0, ...Array.from({ length: horizon }, (_, index) => index + 1)]
+    : predictionTimes(horizon)
 
 const selectColumn = (
   columns: readonly NumericColumnSelection[],
@@ -203,6 +218,23 @@ const validateDraft = (
     }
     return ok(transitions)
   }
+  const rowFrequencyOrProblem = (rowFrequency: RowFrequencyDraft): Result<{
+    readonly configuration: SurvivalRowFrequency
+    readonly columns: readonly ColumnId[]
+  }, DraftProblem> => {
+    switch (rowFrequency.kind) {
+      case 'one-observation-per-row':
+        return ok({ configuration: rowFrequency, columns: [] })
+      case 'frequency-column': {
+        if (rowFrequency.column === null) return invalid('Choose the frequency column.')
+        const column = selectColumn(columns, rowFrequency.column)
+        return column === null
+          ? invalid('The frequency column is no longer in the prepared dataset.')
+          : ok({ configuration: { kind: 'frequency-column', column }, columns: [column.id] })
+      }
+      default: return assertNever(rowFrequency)
+    }
+  }
 
   switch (draft.kind) {
     case 'right-censored': {
@@ -210,15 +242,34 @@ const validateDraft = (
       const eventId = draft.event
       if (durationId === null) return invalid('Choose the duration column.')
       if (eventId === null) return invalid('Choose the event column.')
-      if (new Set([durationId, eventId, ...draft.covariates]).size !== 2 + draft.covariates.length) {
-        return invalid('The duration, the event and each covariate must be different columns.')
+      const rowFrequency = rowFrequencyOrProblem(draft.rowFrequency)
+      if (!rowFrequency.ok) return rowFrequency
+      const ids: NonEmptyArray<ColumnId> = [durationId, eventId, ...rowFrequency.value.columns, ...draft.covariates]
+      if (new Set(ids).size !== ids.length) {
+        return invalid('The duration, event, frequency, and each covariate must use different columns.')
       }
-      const ids: NonEmptyArray<ColumnId> = [durationId, eventId, ...draft.covariates]
       const selected = selectedOrProblem(ids)
       if (!selected.ok) return selected
-      const [duration, event, ...covariates] = selected.value
+      const [duration, event] = selected.value
       if (duration === undefined || event === undefined) return invalid('Choose duration and event columns.')
-      return ok({ ...draft, duration, event, covariates, columns: ids })
+      const covariates = selectColumns(columns, draft.covariates)
+      if (covariates === null) return invalid('A selected covariate is no longer in the prepared dataset.')
+      return ok({ ...draft, duration, event, rowFrequency: rowFrequency.value.configuration, covariates, columns: ids })
+    }
+    case 'nonparametric': {
+      const durationId = draft.duration
+      const eventId = draft.event
+      if (durationId === null) return invalid('Choose the duration column.')
+      if (eventId === null) return invalid('Choose the event column.')
+      const rowFrequency = rowFrequencyOrProblem(draft.rowFrequency)
+      if (!rowFrequency.ok) return rowFrequency
+      const ids: NonEmptyArray<ColumnId> = [durationId, eventId, ...rowFrequency.value.columns]
+      if (new Set(ids).size !== ids.length) return invalid('Duration, event, and frequency must use different columns.')
+      const selected = selectedOrProblem(ids)
+      if (!selected.ok) return selected
+      const [duration, event] = selected.value
+      if (duration === undefined || event === undefined) return invalid('Choose duration and event columns.')
+      return ok({ ...draft, duration, event, rowFrequency: rowFrequency.value.configuration, columns: ids })
     }
     case 'start-stop': {
       const startId = draft.start
@@ -227,17 +278,21 @@ const validateDraft = (
       if (startId === null) return invalid('Choose the start time column.')
       if (stopId === null) return invalid('Choose the stop time column.')
       if (eventId === null) return invalid('Choose the event column.')
-      if (new Set([startId, stopId, eventId, ...draft.covariates]).size !== 3 + draft.covariates.length) {
-        return invalid('The start, the stop, the event and each covariate must be different columns.')
+      const rowFrequency = rowFrequencyOrProblem(draft.rowFrequency)
+      if (!rowFrequency.ok) return rowFrequency
+      const ids: NonEmptyArray<ColumnId> = [startId, stopId, eventId, ...rowFrequency.value.columns, ...draft.covariates]
+      if (new Set(ids).size !== ids.length) {
+        return invalid('The start, stop, event, frequency, and each covariate must use different columns.')
       }
-      const ids: NonEmptyArray<ColumnId> = [startId, stopId, eventId, ...draft.covariates]
       const selected = selectedOrProblem(ids)
       if (!selected.ok) return selected
-      const [start, stop, event, ...covariates] = selected.value
+      const [start, stop, event] = selected.value
       if (start === undefined || stop === undefined || event === undefined) {
         return invalid('Choose start, stop, and event columns.')
       }
-      return ok({ ...draft, start, stop, event, covariates, columns: ids })
+      const covariates = selectColumns(columns, draft.covariates)
+      if (covariates === null) return invalid('A selected covariate is no longer in the prepared dataset.')
+      return ok({ ...draft, start, stop, event, rowFrequency: rowFrequency.value.configuration, covariates, columns: ids })
     }
     case 'two-group': {
       const durationId = draft.duration
@@ -344,8 +399,9 @@ const validateDraft = (
 
 const observationColumns = (draft: Draft): readonly (ColumnId | null)[] => {
   switch (draft.kind) {
-    case 'right-censored': return [draft.duration, draft.event]
-    case 'start-stop': return [draft.start, draft.stop, draft.event]
+    case 'right-censored': return [draft.duration, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
+    case 'nonparametric': return [draft.duration, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
+    case 'start-stop': return [draft.start, draft.stop, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
     case 'two-group': return [draft.duration, draft.event, draft.group]
     case 'multi-state': {
       const input = draft.input
@@ -378,41 +434,51 @@ const analysisType = (kind: Draft['kind']): AnalysisType => {
   switch (kind) {
     case 'right-censored': return {
       name: 'Parametric survival',
-      summary: 'One duration and one event indicator per row. The chosen family gives the event-time distribution, and each covariate shifts it; the fitted curve, hazard and median follow from the parameters.',
+      summary: 'Fit a parametric distribution to the observed durations and event indicators. The result includes a survival curve, hazard curve and median survival time.',
       requirements: [
-        { holds: 'Each row is one observation, with its duration measured from its own time zero and an event flag of 1 for observed or 0 for censored.', otherwise: 'a row that is really several spells, or a flag coded the other way round, fits the wrong likelihood without any warning.' },
-        { holds: 'Censoring is unrelated to the event beyond the covariates in the model.', otherwise: 'rows that leave because they are about to fail make the fitted curve too optimistic.' },
-        { holds: 'The family describes how the hazard changes over follow-up.', otherwise: 'a constant-hazard family on a rising risk misplaces the median and the tail; compare AIC across families.' },
-        { holds: 'The intervals are for the parameters, not for the curve.', otherwise: 'the curve is read as more certain than it is; a band around it is not yet drawn.' },
+        { holds: 'Each row is one observation, with duration measured from that observation’s time zero and an event flag of 1 for observed or 0 for censored.', otherwise: 'the likelihood receives the wrong duration or event status.' },
+        { holds: 'Censoring is independent of the event after accounting for the model covariates.', otherwise: 'the estimated survival function can be biased.' },
+        { holds: 'The selected distribution describes how the hazard changes during follow-up.', otherwise: 'the estimated survival function, hazard and median can be biased; compare the fitted families and their AIC values.' },
+        { holds: 'The reported intervals apply to the fitted parameters.', otherwise: 'the parameter intervals are incorrectly interpreted as confidence bands for the survival or hazard curve.' },
+      ],
+    }
+    case 'nonparametric': return {
+      name: 'Kaplan–Meier and Nelson–Aalen',
+      summary: 'Estimate the survival function and cumulative hazard from the observed durations and event indicators, without choosing a parametric distribution.',
+      requirements: [
+        { holds: 'Each row is one observation, or a grouped row with a positive whole-number frequency.', otherwise: 'the risk set and event totals do not represent the observed population.' },
+        { holds: 'The event flag is 1 for an observed event and 0 when follow-up ended first.', otherwise: 'events and censoring are reversed.' },
+        { holds: 'Censoring is independent of the event process.', otherwise: 'the estimated survival function and cumulative hazard can be biased.' },
+        { holds: 'The chosen time grid uses the same units as duration.', otherwise: 'the increments describe the wrong reporting periods.' },
       ],
     }
     case 'start-stop': return {
       name: 'Start–stop survival',
-      summary: 'Each row covers one interval during which its covariates stay fixed, and the row had already survived to its start. A covariate that changes mid-spell becomes several rows. Covariates multiply the hazard.',
+      summary: 'Each row records one start–stop interval during which the covariates remain constant. An observation with a changing covariate requires multiple rows. The model uses a proportional-hazards parameterisation.',
       requirements: [
-        { holds: 'Each row is one interval of one observation, with start before stop, and the covariates constant inside it.', otherwise: 'the left-truncation term credits survival that did not happen, or a covariate is read at the wrong value.' },
+        { holds: 'Each row is one interval of one observation, with start before stop and constant covariates within the interval.', otherwise: 'the start–stop likelihood or the covariate value for that interval is incorrect.' },
         { holds: 'The intervals of one observation do not overlap and the event flag is 1 only on the interval where the event occurred.', otherwise: 'the observation is counted more than once and its event is double-counted or lost.' },
-        { holds: 'Covariates multiply the hazard, which is the proportional-hazards form; accelerated-time families are not offered on start–stop rows.', otherwise: 'a covariate that stretches time rather than scaling risk is misread as a hazard ratio.' },
-        { holds: 'Censoring is unrelated to the event beyond the covariates in the model.', otherwise: 'rows that leave because they are about to fail make the fitted curve too optimistic.' },
+        { holds: 'Covariates multiply the hazard. Accelerated failure-time families are not available for start–stop rows in this analysis.', otherwise: 'the covariate coefficient does not have the reported hazard-ratio interpretation.' },
+        { holds: 'Censoring is independent of the event after accounting for the model covariates.', otherwise: 'the estimated survival function can be biased.' },
       ],
     }
     case 'two-group': return {
       name: 'Two-group comparison',
       summary: 'The observed event-free curves of two groups, compared across follow-up with tests that stay valid when the curves cross, and the difference in average event-free time through a chosen horizon.',
       requirements: [
-        { holds: 'The group column holds 0 and 1 only, and each row is an independent observation.', otherwise: 'a third value or a repeated unit leaves the tests without their sampling model.' },
-        { holds: 'Censoring is comparable between the groups.', otherwise: 'a group that drops out earlier looks better or worse than it is.' },
-        { holds: 'The comparison time sits inside the follow-up both groups reach.', otherwise: 'the restricted mean is extrapolated past the last observed event.' },
-        { holds: 'The result describes two groups; it is an effect only when group assignment and the study design support that reading.', otherwise: 'a difference that comes from who ended up in each group is reported as if the group caused it.' },
+        { holds: 'The group column contains only 0 and 1, and each row is an independent observation.', otherwise: 'the two-independent-group sampling model does not apply.' },
+        { holds: 'Censoring is comparable between the groups.', otherwise: 'differential censoring can bias the group comparison.' },
+        { holds: 'The comparison time is within the follow-up supported by both groups.', otherwise: 'the restricted mean requires extrapolation beyond the observed event times.' },
+        { holds: 'Group assignment and the study design support a causal interpretation.', otherwise: 'the result is an observed group difference rather than an estimated effect of group assignment.' },
       ],
     }
     case 'multi-state': return {
       name: 'Multi-state survival',
-      summary: 'Each observed transition receives its own cause-specific proportional-hazards model, then the transition system is combined into the chance of occupying each state over follow-up.',
+      summary: 'Fit a cause-specific proportional-hazards model for each observed transition, then calculate the probability of occupying each state during follow-up.',
       requirements: [
         { holds: 'Every permitted move appears as a row with its origin and destination states, and the event flag is 1 only for the transition that happened.', otherwise: 'a move the data never records cannot be estimated and the occupancy curves omit it.' },
-        { holds: 'Future movement depends on the current state and the time since entry as the clock-forward Markov model specifies.', otherwise: 'a history the model cannot see shifts the estimated occupancy.' },
-        { holds: 'Transition hazards follow the chosen proportional-hazards family.', otherwise: 'a constant-hazard family on a rising transition risk misplaces the occupancy curves.' },
+        { holds: 'Future transitions depend on the current state and the time since entry, as required by the clock-forward Markov model.', otherwise: 'dependence on earlier states can bias the estimated state-occupancy probabilities.' },
+        { holds: 'Transition hazards follow the selected proportional-hazards distribution.', otherwise: 'misspecified transition hazards can bias the estimated state-occupancy probabilities.' },
       ],
     }
     default: return assertNever(kind)
@@ -428,6 +494,34 @@ function ColumnSelect({ title, value, columns, onChange }: { readonly title: str
         {columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
       </Select>
     </label>
+  )
+}
+
+function RowFrequencyControls({ value, columns, onChange }: {
+  readonly value: RowFrequencyDraft
+  readonly columns: readonly NumericColumnSelection[]
+  readonly onChange: (value: RowFrequencyDraft) => void
+}) {
+  const selectKind = (kind: RowFrequencyDraft['kind']) => {
+    switch (kind) {
+      case 'one-observation-per-row': onChange({ kind }); return
+      case 'frequency-column': onChange({ kind, column: columnLike(columns, /^(freq|frequency|count|weight)$/i) }); return
+      default: assertNever(kind)
+    }
+  }
+  return (
+    <div className="sm:col-span-2">
+      <ParameterLabel label="Rows represent" help="Choose grouped counts when one row summarizes several observations. The frequency must be a positive whole-number count." />
+      <SegmentedControl size="sm" ariaLabel="Survival row representation" value={value.kind} onChange={selectKind} options={[
+        { value: 'one-observation-per-row', label: 'One observation' },
+        { value: 'frequency-column', label: 'Grouped count' },
+      ]} />
+      {value.kind === 'frequency-column' && (
+        <div className="mt-3 max-w-sm">
+          <ColumnSelect title="Frequency" value={value.column} columns={columns} onChange={(column) => onChange({ kind: 'frequency-column', column })} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -530,19 +624,40 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           const draft = validated.value
           const matrix = await materialise(draft.columns); if (matrix === null) return
           const times = predictionTimes(draft.horizon)
-          const result = await analysis.runFlexSurv(matrix.values, matrix.rowCount, matrix.columns.length, { observation: { kind: 'rightCensored', duration: 0, event: 1 }, covariates: draft.covariates.map((_, index) => index + 2), family: draft.family, predictionTimes: times })
+          const grouped = draft.rowFrequency.kind === 'frequency-column'
+          const rowFrequency = grouped
+            ? { kind: 'frequencyColumn' as const, column: 2 }
+            : { kind: 'oneObservationPerRow' as const }
+          const result = await analysis.runFlexSurv(matrix.values, matrix.rowCount, matrix.columns.length, { observation: { kind: 'rightCensored', duration: 0, event: 1 }, rowFrequency, covariates: draft.covariates.map((_, index) => index + (grouped ? 3 : 2)), family: draft.family, predictionTimes: times })
           if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
-          const recorded = rightCensoredSurvivalRun(identity(matrix.columns), { kind: 'right-censored-parametric', duration: draft.duration, event: draft.event, covariates: draft.covariates, family: draft.family, predictionTimes: times }, result.value)
+          const recorded = rightCensoredSurvivalRun(identity(matrix.columns), { kind: 'right-censored-parametric', duration: draft.duration, event: draft.event, rowFrequency: draft.rowFrequency, covariates: draft.covariates, family: draft.family, predictionTimes: times }, result.value)
           if (!recorded.ok) { fail('The fitted family does not match the requested family.'); return }
           onRun(recorded.value); break
+        }
+        case 'nonparametric': {
+          const draft = validated.value
+          const matrix = await materialise(draft.columns); if (matrix === null) return
+          const grouped = draft.rowFrequency.kind === 'frequency-column'
+          const rowFrequency = grouped
+            ? { kind: 'frequencyColumn' as const, column: 2 }
+            : { kind: 'oneObservationPerRow' as const }
+          const times = nonparametricTimes(draft.horizon)
+          const result = await analysis.runNonparametricSurvival(matrix.values, matrix.rowCount, matrix.columns.length, { duration: 0, event: 1, rowFrequency, predictionTimes: times, ties: draft.ties })
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
+          onRun({ kind: 'nonparametric-survival-run', ...identity(matrix.columns), configuration: { kind: 'right-censored-nonparametric', duration: draft.duration, event: draft.event, rowFrequency: draft.rowFrequency, predictionTimes: times, ties: draft.ties }, evidence: result.value })
+          break
         }
         case 'start-stop': {
           const draft = validated.value
           const matrix = await materialise(draft.columns); if (matrix === null) return
           const times = predictionTimes(draft.horizon)
-          const result = await analysis.runFlexSurv(matrix.values, matrix.rowCount, matrix.columns.length, { observation: { kind: 'startStop', start: 0, stop: 1, event: 2 }, covariates: draft.covariates.map((_, index) => index + 3), family: draft.family, predictionTimes: times })
+          const grouped = draft.rowFrequency.kind === 'frequency-column'
+          const rowFrequency = grouped
+            ? { kind: 'frequencyColumn' as const, column: 3 }
+            : { kind: 'oneObservationPerRow' as const }
+          const result = await analysis.runFlexSurv(matrix.values, matrix.rowCount, matrix.columns.length, { observation: { kind: 'startStop', start: 0, stop: 1, event: 2 }, rowFrequency, covariates: draft.covariates.map((_, index) => index + (grouped ? 4 : 3)), family: draft.family, predictionTimes: times })
           if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
-          const recorded = startStopSurvivalRun(identity(matrix.columns), { kind: 'start-stop-proportional-hazards', start: draft.start, stop: draft.stop, event: draft.event, covariates: draft.covariates, family: draft.family, predictionTimes: times }, result.value)
+          const recorded = startStopSurvivalRun(identity(matrix.columns), { kind: 'start-stop-proportional-hazards', start: draft.start, stop: draft.stop, event: draft.event, rowFrequency: draft.rowFrequency, covariates: draft.covariates, family: draft.family, predictionTimes: times }, result.value)
           if (!recorded.ok) { fail('The fitted family does not match the requested family.'); return }
           onRun(recorded.value); break
         }
@@ -636,6 +751,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         return
       }
       case 'two-group': return
+      case 'nonparametric': return
       default: return assertNever(draft)
     }
   }
@@ -662,13 +778,25 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       case 'right-censored': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
         <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency, covariates: withoutCovariate(draft.covariates, rowFrequency.kind === 'frequency-column' ? rowFrequency.column : null) })} />
         {familyOptions(draft.family, ['exponential', 'weibull', 'weibullPh', 'logNormal', 'gamma', 'gompertz', 'logLogistic', 'generalizedGamma', 'generalizedF'])}
+        {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
+      </>
+      case 'nonparametric': return <>
+        <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration })} />
+        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
+        <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency })} />
+        <div>
+          <ParameterLabel label="Tied events" help="Use discrete handling when event times are recorded in discrete units such as years or minutes. Smoothed handling follows the lifelines NelsonAalenFitter default." />
+          <SegmentedControl size="sm" ariaLabel="Nelson-Aalen tied events" value={draft.ties} onChange={(ties) => configure({ ...draft, ties })} options={[{ value: 'discrete', label: 'Discrete' }, { value: 'smoothed', label: 'Smoothed' }]} />
+        </div>
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
       </>
       case 'start-stop': return <>
         <ColumnSelect title="Start time" value={draft.start} columns={columns} onChange={(start) => configure({ ...draft, start, covariates: withoutCovariate(draft.covariates, start) })} />
         <ColumnSelect title="Stop time" value={draft.stop} columns={columns} onChange={(stop) => configure({ ...draft, stop, covariates: withoutCovariate(draft.covariates, stop) })} />
         <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency, covariates: withoutCovariate(draft.covariates, rowFrequency.kind === 'frequency-column' ? rowFrequency.column : null) })} />
         {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
       </>
@@ -782,6 +910,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         )
       }
       case 'two-group':
+      case 'nonparametric':
       case 'multi-state': return null
       default: return assertNever(draft)
     }
@@ -793,14 +922,14 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       <div>
         <span className={label('text-faint')}>{chapterLabel('survival')}</span>
         <h2 id="survival-title" className="mb-2 mt-2 text-heading text-ink">Time until an event</h2>
-        <p className={chapterIntro}>Some outcomes are not a level but a wait: how long until a team drops a tool, a ticket closes, a customer leaves. In this chapter, fit the distribution of that time, compare two observed groups across follow-up, or estimate movement between states. Rows still waiting when the data ends are used as far as they go, never counted as failures. These analyses do not need a DAG and are not added to the causal-estimation ledger.</p>
+        <p className={chapterIntro}>Use survival analysis when the outcome is the time until an event. Fit an event-time distribution, compare two observed groups during follow-up, or estimate transitions between states. A row with no observed event by the end of follow-up is right-censored at its recorded duration. These analyses do not require a DAG and are not added to the causal-estimation ledger.</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="survival-setup-title">
         <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{type.name}</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <SegmentedControl wrap size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
+            <SegmentedControl wrap size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
             <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{type.summary}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">{draftControls}</div>

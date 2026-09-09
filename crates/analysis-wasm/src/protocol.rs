@@ -103,6 +103,25 @@ pub(crate) enum SurvivalObservationCommand {
     rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
+pub(crate) enum SurvivalRowFrequencyCommand {
+    OneObservationPerRow,
+    FrequencyColumn { column: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum NelsonAalenTiesCommand {
+    Discrete,
+    Smoothed,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
 pub(crate) enum WideStateColumnsCommand {
     NotApplicable,
     Recorded { time: usize, status: usize },
@@ -530,9 +549,19 @@ pub(crate) enum AnalysisCommand {
         rows: usize,
         columns: usize,
         observation: SurvivalObservationCommand,
+        row_frequency: SurvivalRowFrequencyCommand,
         covariates: Vec<usize>,
         family: SurvivalFamily,
         prediction_times: Vec<f64>,
+    },
+    NonparametricSurvival {
+        rows: usize,
+        columns: usize,
+        duration: usize,
+        event: usize,
+        row_frequency: SurvivalRowFrequencyCommand,
+        prediction_times: Vec<f64>,
+        ties: NelsonAalenTiesCommand,
     },
     ComparisonSurvival {
         rows: usize,
@@ -1671,6 +1700,19 @@ pub(crate) enum AnalysisResult {
         hazard: Vec<f64>,
         median: f64,
         mean: Option<f64>,
+    },
+    NonparametricSurvival {
+        observations: usize,
+        events: usize,
+        prediction_times: Vec<f64>,
+        survival: Vec<f64>,
+        survival_lower: Vec<f64>,
+        survival_upper: Vec<f64>,
+        cumulative_density: Vec<f64>,
+        cumulative_hazard: Vec<f64>,
+        cumulative_hazard_lower: Vec<f64>,
+        cumulative_hazard_upper: Vec<f64>,
+        hazard_increment: Vec<f64>,
     },
     ComparisonSurvival {
         observations: usize,

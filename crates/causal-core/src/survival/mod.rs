@@ -2,4 +2,5 @@
 
 pub mod comparison_surv;
 pub mod flexsurv;
+pub mod nonparametric;
 mod r_rng;

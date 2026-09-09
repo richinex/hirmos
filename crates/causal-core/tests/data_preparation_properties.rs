@@ -270,7 +270,7 @@ fn imputation_is_idempotent_and_preserves_original_values() {
     assert_eq!(
         projected.imputed,
         vec![vec![false, true, false, true, false]],
-        "projection carries transformation provenance"
+        "projection carries transformation details"
     );
 
     let forward = carry_forward_bounded(&dataset, gap);

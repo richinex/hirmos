@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { describeSurvivalRefusal, parseFlexSurvEvidence } from '../src/domain/survival'
+import { describeSurvivalRefusal, parseFlexSurvEvidence, parseNonparametricSurvivalEvidence } from '../src/domain/survival'
 
 // A family whose hazard rises without bound as time approaches zero reports no value there; the
 // evidence admits that one point and nothing else.
@@ -26,4 +26,33 @@ test('a kernel refusal over a zero duration names the row and the way out', () =
   expect(describeSurvivalRefusal('survival initialization refused: InitialValues(NonPositiveTransformedTime { row: 5 })'))
     .toBe('Row 6 of the data has a duration of zero or less. A parametric distribution needs every duration above zero; shift the times or use Compare groups, which accepts them.')
   expect(describeSurvivalRefusal('survival fit failed: Singular')).toBe('survival fit failed: Singular')
+})
+
+const nonparametric = () => ({
+  kind: 'nonparametricSurvival',
+  observations: 10,
+  events: 3,
+  predictionTimes: [0, 1, 2],
+  survival: [1, 0.8, 0.6],
+  survivalLower: [1, 0.7, 0.5],
+  survivalUpper: [1, 0.9, 0.7],
+  cumulativeDensity: [0, 0.2, 0.4],
+  cumulativeHazard: [0, 0.2, 0.45],
+  cumulativeHazardLower: [0, 0.1, 0.3],
+  cumulativeHazardUpper: [0, 0.3, 0.6],
+  hazardIncrement: [0, 0.2, 0.25],
+})
+
+test('nonparametric evidence admits internally consistent curves', () => {
+  expect(parseNonparametricSurvivalEvidence(nonparametric()).ok).toBe(true)
+})
+
+test('nonparametric evidence refuses intervals and increments that contradict the curves', () => {
+  const invalidInterval = nonparametric()
+  invalidInterval.survivalLower[1] = 0.85
+  expect(parseNonparametricSurvivalEvidence(invalidInterval).ok).toBe(false)
+
+  const invalidIncrement = nonparametric()
+  invalidIncrement.hazardIncrement[2] = 0.5
+  expect(parseNonparametricSurvivalEvidence(invalidIncrement).ok).toBe(false)
 })

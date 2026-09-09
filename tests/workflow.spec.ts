@@ -16,7 +16,7 @@ const createProject = async (page: Page) => {
   await page.goto('/app')
   await page.getByRole('textbox', { name: 'Project name' }).fill('Seat-belt law')
   await page.getByRole('button', { name: 'Create project' }).click()
-  await expect(page.getByRole('heading', { name: 'Choose a data file' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Choose data' })).toBeVisible()
 }
 
 test('validates project names at the form boundary', async ({ page }) => {

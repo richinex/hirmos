@@ -334,6 +334,24 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
 * { scrollbar-width: none; }
 ::-webkit-scrollbar { width: 0; height: 0; }
 
+/* The SQL console: the terminal paints its own viewport black under and beside the canvas, which would read
+   as a second box inside the window. Both take the window body's colour, so the console is one surface. */
+.sql-console .xterm,
+.sql-console .xterm .xterm-viewport { background-color: transparent; }
+
+/* The console window quotes macOS Terminal: its title bar, traffic lights and the "Basic" profile on paper,
+   the "Pro" profile in the dark. Apple's values, kept together here and in SqlPreparationWorkspace.tsx. */
+.mac-terminal { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.12); }
+.mac-terminal-bar { background: linear-gradient(#E8E8E8, #D4D4D4); border-bottom: 1px solid #B6B6B6; }
+.mac-terminal-title { color: #4D4D4D; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, Arial, sans-serif; }
+.mac-terminal-body { background: var(--color-stage); }
+:root[data-theme="dark"] .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
+:root[data-theme="dark"] .mac-terminal-title { color: #B4B4B4; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
+  :root:not([data-theme="light"]) .mac-terminal-title { color: #B4B4B4; }
+}
+
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 /* The house durations. Read by the classes below, by `duration-(--motion-*)` utilities, and by the
    landing choreography; nowhere else states a number. */

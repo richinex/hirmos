@@ -1076,7 +1076,7 @@ pub enum TotalEffectBootstrapError {
     SeedOverflow,
 }
 
-/// Fitted original and bootstrap models. `block_starts` is retained for exact-run provenance
+/// Fitted original and bootstrap models. `block_starts` is retained in the exact-run record.
 /// and makes Tigramite's resampling path directly testable.
 pub struct TotalEffectBootstrap {
     pub original_model: TotalEffectModel,

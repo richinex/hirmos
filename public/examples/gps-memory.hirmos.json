@@ -23,7 +23,10 @@
       "bytes": 40136,
       "mediaType": "text/csv",
       "lastModified": 1788533944233,
-      "format": "csv"
+      "format": "csv",
+      "recipe": {
+        "kind": "uploaded-file"
+      }
     },
     "profile": {
       "id": "duckdb-wasm:1.30.0:1c7f235a69e83e67a19762dba384813a7d5484c932464fdf284133f3e60503bc",

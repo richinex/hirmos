@@ -9,7 +9,7 @@ import { MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
 import { caption, label, num, prose, well } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
-import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, MultiStateSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
+import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
 import { formatCount, formatEstimate, formatP, formatPercent, formatStatistic } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
 
@@ -28,6 +28,7 @@ export const survivalFamilyLabel = (family: ParametricSurvivalFamily): string =>
 export const survivalRunLabel = (run: SurvivalRunArtifact): string => {
   switch (run.kind) {
     case 'right-censored-survival-run': return 'Parametric'
+    case 'nonparametric-survival-run': return 'Kaplan–Meier and Nelson–Aalen'
     case 'start-stop-survival-run': return 'Start–stop'
     case 'two-group-survival-run': return 'Two-group comparison'
     case 'multi-state-survival-run': return 'Multi-state'
@@ -40,6 +41,7 @@ export const survivalRunSummary = (run: SurvivalRunArtifact): { readonly method:
   switch (run.kind) {
     case 'right-censored-survival-run':
     case 'start-stop-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `median ${formatStatistic('raw', run.evidence.median).text}` }
+    case 'nonparametric-survival-run': return { method: survivalRunLabel(run), figure: `event-free ${formatPercent(run.evidence.survival.at(-1) ?? Number.NaN).text}` }
     case 'two-group-survival-run': return { method: survivalRunLabel(run), figure: `event-free time difference ${formatStatistic('raw', run.evidence.restrictedMeanDifference).text}` }
     case 'multi-state-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `${formatCount(run.evidence.states.length).text} states` }
     default: return assertNever(run)
@@ -76,6 +78,15 @@ interface ParameterRow {
   readonly interval: readonly [number, number] | null
   readonly ratio: number | null
   readonly profile: number | null
+}
+
+interface NonparametricRow {
+  readonly time: number
+  readonly survival: number
+  readonly survivalInterval: readonly [number, number]
+  readonly cumulativeHazard: number
+  readonly hazardInterval: readonly [number, number]
+  readonly hazardIncrement: number
 }
 
 const parameterColumns = (ratioLabel: string): readonly EvidenceColumn<ParameterRow>[] => [
@@ -316,7 +327,10 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
   const heading = (() => {
     switch (run.kind) {
       case 'right-censored-survival-run':
-      case 'start-stop-survival-run': return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} rows · ${formatCount(run.evidence.events).text} events` }
+        return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
+      case 'start-stop-survival-run':
+        return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} intervals · ${formatCount(run.evidence.events).text} events` }
+      case 'nonparametric-survival-run': return { title: 'Kaplan–Meier and Nelson–Aalen', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
       case 'two-group-survival-run': return { title: 'Group 1 compared with group 0', meta: `${formatCount(run.evidence.observations).text} rows · compared through time ${statistic(run.evidence.truncationTime)}` }
       case 'multi-state-survival-run': return { title: `${survivalFamilyLabel(run.evidence.family)} transition model`, meta: `${formatCount(run.evidence.observations).text} transition rows · ${formatCount(run.evidence.states.length).text} states` }
       default: return assertNever(run)
@@ -325,6 +339,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
   const method = (() => {
     switch (run.kind) {
       case 'right-censored-survival-run': return 'Parametric survival'
+      case 'nonparametric-survival-run': return 'Nonparametric survival'
       case 'start-stop-survival-run': return 'Start–stop survival'
       case 'two-group-survival-run': return 'Two-group survival comparison'
       case 'multi-state-survival-run': return 'Multi-state survival'
@@ -334,6 +349,59 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
 
   const body = (() => {
     switch (run.kind) {
+      case 'nonparametric-survival-run': {
+        const evidence: NonparametricSurvivalEvidence = run.evidence
+        const lastTime = evidence.predictionTimes.at(-1) ?? Number.NaN
+        const lastSurvival = evidence.survival.at(-1) ?? Number.NaN
+        const rows: NonparametricRow[] = evidence.predictionTimes.map((time, index) => ({
+          time,
+          survival: evidence.survival[index] ?? Number.NaN,
+          survivalInterval: [evidence.survivalLower[index] ?? Number.NaN, evidence.survivalUpper[index] ?? Number.NaN],
+          cumulativeHazard: evidence.cumulativeHazard[index] ?? Number.NaN,
+          hazardInterval: [evidence.cumulativeHazardLower[index] ?? Number.NaN, evidence.cumulativeHazardUpper[index] ?? Number.NaN],
+          hazardIncrement: evidence.hazardIncrement[index] ?? Number.NaN,
+        }))
+        return <>
+          <Tiles>
+            <MetricTile frame="cell" size="compact" label={`Event-free at ${statistic(lastTime)}`} value={formatPercent(lastSurvival)} />
+            <MetricTile frame="cell" size="compact" label="Events" value={formatCount(evidence.events)} context={`${formatCount(evidence.observations).text} observations`} />
+            <MetricTile frame="cell" size="compact" label="Cumulative hazard" value={formatStatistic('raw', evidence.cumulativeHazard.at(-1) ?? Number.NaN)} context={`through ${statistic(lastTime)}`} />
+          </Tiles>
+          <Interpretation
+            bottomLine={<>By follow-up time {statistic(lastTime)}, the Kaplan–Meier estimated survival function is {formatPercent(lastSurvival).text}. The Nelson–Aalen curve gives the estimated cumulative hazard over the same follow-up.</>}
+            uncertainty={<>The table reports pointwise 95% confidence intervals for the estimated survival function and cumulative hazard.</>}
+            mustBeTrue={<>An event indicator of 0 means the observation was right-censored at its recorded duration. These estimates describe the observed durations and events; they do not estimate a causal effect.</>}
+          />
+          <div className="mt-3">
+            <p className={label('m-0 mb-2 text-muted')}>Observed event-free probability</p>
+            <ExpandableChart className="h-[260px]" label="Kaplan–Meier event-free probability" testId="kaplan-meier-curve" option={survivalCurvesOption([{ name: 'Kaplan–Meier', points: evidence.predictionTimes.map((time, index) => [time, evidence.survival[index] ?? Number.NaN] as const) }], 'follow-up time', theme)} />
+          </div>
+          <div className="mt-3">
+            <p className={label('m-0 mb-2 text-muted')}>Estimated cumulative hazard</p>
+            <ExpandableChart className="h-[220px]" label="Nelson–Aalen cumulative hazard" testId="nelson-aalen-curve" option={comparisonMeasureOption([{ name: 'Nelson–Aalen', points: evidence.predictionTimes.map((time, index) => [time, evidence.cumulativeHazard[index] ?? Number.NaN] as const) }], 'cumulative hazard', theme, true)} />
+          </div>
+          <div className="mt-4">
+            <EvidenceTable<NonparametricRow>
+              frame="none"
+              title="Curve values and period increments"
+              rows={rows}
+              rowKey={(row) => String(row.time)}
+              noun="time"
+              empty="The run reported no curve values."
+              exportName="nonparametric-survival-curves"
+              columns={[
+                figureColumn<NonparametricRow>('time', 'Time', (row) => row.time),
+                { id: 'survival', header: 'Event-free', align: 'right', value: (row) => formatPercent(row.survival).text },
+                { id: 'survival-interval', header: '95% interval', align: 'right', value: (row) => `${formatPercent(row.survivalInterval[0]).text} to ${formatPercent(row.survivalInterval[1]).text}` },
+                figureColumn<NonparametricRow>('cumulative-hazard', 'Cumulative hazard', (row) => row.cumulativeHazard),
+                { id: 'hazard-interval', header: '95% hazard interval', align: 'right', value: (row) => `${statistic(row.hazardInterval[0])} to ${statistic(row.hazardInterval[1])}` },
+                figureColumn<NonparametricRow>('hazard-increment', 'Nelson–Aalen increment', (row) => row.hazardIncrement),
+              ]}
+            />
+            <p className={caption('mb-0 mt-2')}>The Nelson–Aalen increment is the increase in estimated cumulative hazard since the previous reported time. It is not an event probability.</p>
+          </div>
+        </>
+      }
       case 'right-censored-survival-run':
       case 'start-stop-survival-run': {
         const evidence = run.evidence
@@ -392,15 +460,15 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
         const fixedTime = recordedFixedTimeConversion(evidence)
         const peto = petoPValue(evidence)
         const tests = [
-          { key: 'two-stage', test: 'Two-stage', reads: 'overall, remains valid when the curves cross', p: evidence.twoStagePValue },
-          { key: 'log-rank', test: 'Log-rank', reads: 'overall, weights every time equally', p: evidence.logRankPValue },
-          { key: 'gehan', test: 'Gehan–Wilcoxon', reads: 'overall, weights early follow-up', p: evidence.gehanWilcoxonPValue },
-          ...(peto === null ? [] : [{ key: 'peto-peto', test: 'Peto–Peto modified Gehan–Wilcoxon', reads: 'overall, weights earlier event times by pooled survival', p: peto }]),
-          { key: 'tarone', test: 'Tarone–Ware', reads: 'overall, weights between the two above', p: evidence.taroneWarePValue },
-          { key: 'weighted-km', test: 'Weighted Kaplan–Meier', reads: 'overall, on the curves themselves', p: evidence.weightedKaplanMeierPValue },
-          { key: 'absolute', test: 'Absolute difference', reads: 'area between the curves', p: evidence.absoluteDifferencePValue },
-          { key: 'squared', test: 'Squared difference', reads: 'area between the curves, squared', p: evidence.squaredDifferencePValue },
-          { key: 'ph', test: 'Proportional hazards', reads: 'whether one hazard ratio fits at all', p: evidence.proportionalHazardsPValue },
+          { key: 'two-stage', test: 'Two-stage', reads: 'overall test designed for crossing survival curves', p: evidence.twoStagePValue },
+          { key: 'log-rank', test: 'Log-rank', reads: 'standard log-rank test', p: evidence.logRankPValue },
+          { key: 'gehan', test: 'Gehan–Wilcoxon', reads: 'weighted by the pooled number at risk', p: evidence.gehanWilcoxonPValue },
+          ...(peto === null ? [] : [{ key: 'peto-peto', test: 'Peto–Peto modified Gehan–Wilcoxon', reads: 'weighted by the pooled survival estimate', p: peto }]),
+          { key: 'tarone', test: 'Tarone–Ware', reads: 'weighted by the square root of the pooled number at risk', p: evidence.taroneWarePValue },
+          { key: 'weighted-km', test: 'Weighted Kaplan–Meier', reads: 'weighted Kaplan–Meier statistic', p: evidence.weightedKaplanMeierPValue },
+          { key: 'absolute', test: 'Absolute difference', reads: 'integrated absolute difference between the survival curves', p: evidence.absoluteDifferencePValue },
+          { key: 'squared', test: 'Squared difference', reads: 'integrated squared difference between the survival curves', p: evidence.squaredDifferencePValue },
+          { key: 'ph', test: 'Proportional hazards', reads: 'test of the proportional-hazards assumption', p: evidence.proportionalHazardsPValue },
         ]
         const conversions: ConversionRow[] = [
           ...(observed === null ? [] : [{ key: 'observed', measure: 'Observed conversion; follow-up time ignored', groupZero: conversionRate(observed.groupZeroRate), groupOne: conversionRate(observed.groupOneRate), difference: conversionDifference(observed.difference), pValue: observed.pValue }]),

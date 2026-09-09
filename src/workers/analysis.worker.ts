@@ -35,7 +35,7 @@ import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
-import { parseComparisonSurvivalEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence } from '@/domain/survival'
+import { parseComparisonSurvivalEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence, parseNonparametricSurvivalEvidence } from '@/domain/survival'
 import {
   analysisProgressSchema,
   parseAnalysisRefusal,
@@ -89,7 +89,9 @@ const sampleArrays = (command: AnalysisWorkerCommand): readonly [Uint8Array, Uin
 const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
     case 'flexsurv':
-      return { kind: 'flexSurv', rows: command.rows, columns: command.columns, observation: command.observation, covariates: command.covariates, family: command.family, predictionTimes: command.predictionTimes }
+      return { kind: 'flexSurv', rows: command.rows, columns: command.columns, observation: command.observation, rowFrequency: command.rowFrequency, covariates: command.covariates, family: command.family, predictionTimes: command.predictionTimes }
+    case 'nonparametric-survival':
+      return { kind: 'nonparametricSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, rowFrequency: command.rowFrequency, predictionTimes: command.predictionTimes, ties: command.ties }
     case 'comparison-survival':
       return { kind: 'comparisonSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, group: command.group, truncationTime: command.truncationTime, permutations: command.permutations, seed: command.seed }
     case 'multi-state-survival':
@@ -440,6 +442,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parseFlexSurvEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'flexsurv-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'nonparametric-survival': {
+        const result = parseNonparametricSurvivalEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'nonparametric-survival-succeeded', request: command.request, result: result.value })
         return
       }
       case 'comparison-survival': {

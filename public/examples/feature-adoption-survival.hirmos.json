@@ -23,7 +23,10 @@
       "bytes": 14971,
       "mediaType": "text/csv",
       "lastModified": 1788935490088,
-      "format": "csv"
+      "format": "csv",
+      "recipe": {
+        "kind": "uploaded-file"
+      }
     },
     "profile": {
       "id": "duckdb-wasm:1.30.0:ba446613750e90cc6ffad3601bf8a655a891506902d5c231905137d05b20148c",
@@ -558,6 +561,9 @@
           "event": {
             "id": "3:event",
             "name": "event"
+          },
+          "rowFrequency": {
+            "kind": "one-observation-per-row"
           },
           "covariates": [
             {

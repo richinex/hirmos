@@ -1,11 +1,12 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '@/components/Icon'
+import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
 import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { button, chromeAction, field, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
+import { button, chromeAction, field, fieldHint, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
 import { formatDay, formatTimestamp } from '@/lib/format/date'
 import { DataStudio } from '@/components/data/DataStudio'
@@ -51,6 +52,7 @@ const loadEstimationPanel = () => import('@/components/estimation/EstimationPane
 const loadSensitivityPanel = () => import('@/components/sensitivity/SensitivityPanel')
 const loadCounterfactualPanel = () => import('@/components/counterfactual/CounterfactualPanel')
 const loadResultsPanel = () => import('@/components/results/ResultsPanel')
+const loadSqlPreparationWorkspace = () => import('@/components/data/SqlPreparationWorkspace')
 
 /** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk `lazy` will ask for. */
 const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
@@ -83,6 +85,13 @@ const CounterfactualPanel = lazy(async () => ({ default: (await loadCounterfactu
 
 const ResultsPanel = lazy(async () => ({ default: (await loadResultsPanel()).ResultsPanel }))
 
+const SqlShell = lazy(async () => ({ default: (await loadSqlPreparationWorkspace()).SqlShell }))
+
+type SqlIntake =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'reading' }
+  | { readonly kind: 'failed'; readonly detail: string }
+
 type Chapter = Omit<ChapterEntry, 'status'>
 
 const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
@@ -101,6 +110,13 @@ const formatBytes = (bytes: number): string => {
 }
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
+  const sourceDetail = (() => {
+    switch (source.recipe.kind) {
+      case 'uploaded-file': return `${source.format} · ${formatBytes(source.bytes)}`
+      case 'sql-derived': return `prepared with SQL · ${source.recipe.outputView} · ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'} · ${formatBytes(source.bytes)}`
+      default: return assertNever(source.recipe)
+    }
+  })()
   return (
     <div className={panel('lift p-4')}>
       <div className="flex items-start gap-3">
@@ -110,7 +126,7 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
         <div className="min-w-0 flex-1">
           <p className="m-0 truncate text-title font-medium text-ink">{source.name}</p>
           <p className={num('mb-0 mt-1 text-body text-faint')}>
-            {source.format} · {formatBytes(source.bytes)}
+            {sourceDetail}
           </p>
         </div>
       </div>
@@ -121,6 +137,7 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
 function App() {
   const [workflow, dispatch] = useReducer(stepWorkflow, INITIAL_WORKFLOW)
   const fileInput = useRef<HTMLInputElement>(null)
+  const [dataEntryMode, setDataEntryMode] = useState<'file' | 'sql'>('file')
   const { location, route } = useRoute()
   const shell = useShellLayout()
   /** Whether the rail's lobe is out over the stage; on a phone, whether the rail is slid in. Session state, never saved. */
@@ -211,6 +228,17 @@ function App() {
   }
 
   const project = workflow.kind === 'awaiting-project' ? null : workflow.project
+  useEffect(() => { setDataEntryMode('file') }, [project?.id])
+  const [sqlIntake, setSqlIntake] = useState<SqlIntake>({ kind: 'idle' })
+  // The engine and the console load while the files are read, so the SQL step renders with both already loaded.
+  const chooseSqlInputs = async (files: readonly File[]) => {
+    setSqlIntake({ kind: 'reading' })
+    const [data] = await Promise.all([import('@/data/sqlPreparation'), loadSqlPreparationWorkspace()])
+    const prepared = await data.prepareSqlInputs(files)
+    if (!prepared.ok) { setSqlIntake({ kind: 'failed', detail: data.describeSqlPreparationProblem(prepared.error) }); return }
+    setSqlIntake({ kind: 'idle' })
+    dispatch({ type: 'sql-inputs-chosen', inputs: prepared.value })
+  }
   const [activity, setActivity] = useState<ChapterActivity>({})
   const reportActivity = useMemo(() => Object.fromEntries(CHAPTER_IDS.map((chapter) => [chapter, (run: RunActivity | null) => setActivity((current) => {
     if (run === null) { if (!(chapter in current)) return current; const { [chapter]: _ended, ...rest } = current; return rest }
@@ -625,29 +653,67 @@ function App() {
               )}
   
               {workflow.kind === 'awaiting-data' && (
-                <section className="rise my-auto max-w-2xl" aria-labelledby="load-data-title">
-                  <span className={label('text-signal')}>{chapterLabel('data')}</span>
-                  <h2 id="load-data-title" className="mb-3 mt-3 text-heading text-ink">{workflow.restore === null ? 'Choose a data file' : 'Choose the data file again'}</h2>
-                  <p className="mb-6 text-body text-faint">
-                    {workflow.restore === null
-                      ? 'CSV, TSV, or Parquet'
-                      : `${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : ` · ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
-                  </p>
-                  <input
-                    ref={fileInput}
-                    type="file"
-                    accept=".csv,.tsv,.parquet,text/csv,text/tab-separated-values,application/vnd.apache.parquet"
-                    className="sr-only"
-                    onChange={(event) => chooseFile(event.target.files?.[0])}
-                  />
-                  <button type="button" className={button('signal', 'inline-flex items-center gap-2')} onClick={() => fileInput.current?.click()}>
-                    <Icon name="upload_file" size={16} />
-                    Choose data file
-                  </button>
-                  {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
+                <section className="rise my-auto w-full max-w-6xl" aria-labelledby="load-data-title">
+                  <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
+                    <div className="min-w-0">
+                      <span className={label('text-signal')}>{chapterLabel('data')}</span>
+                      <h2 id="load-data-title" className="mb-3 mt-3 text-heading text-ink">{workflow.restore === null ? 'Choose data' : 'Choose the data file again'}</h2>
+                      {workflow.restore === null ? (
+                        <>
+                          <SegmentedControl
+                            fill
+                            ariaLabel="Data input method"
+                            value={dataEntryMode}
+                            onChange={setDataEntryMode}
+                            options={[{ value: 'file', label: 'Use one file' }, { value: 'sql', label: 'Prepare with SQL' }]}
+                          />
+                          <p className={cn(fieldHint, 'mt-3 min-h-[3lh]')}>
+                            {dataEntryMode === 'file'
+                              ? 'Choose one CSV, TSV or Parquet file. It becomes the source as it is.'
+                              : 'Choose one or more CSV, TSV or Parquet files. Each file becomes a table in a SQL console, and created views can be selected for further analysis.'}
+                          </p>
+                        </>
+                      ) : (
+                        <p className={cn(fieldHint, 'mt-0')}>
+                          {`${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : ` · ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
+                        </p>
+                      )}
+                      {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
+                      {sqlIntake.kind === 'failed' && <p role="alert" className="mt-3 text-body text-danger">{sqlIntake.detail}</p>}
+                    </div>
+                    {dataEntryMode === 'file' || workflow.restore !== null ? (
+                      <DataDropZone
+                        invitation="Drop a CSV, TSV or Parquet file here."
+                        action="Choose data file"
+                        onFiles={([file]) => chooseFile(file)}
+                      />
+                    ) : (
+                      <DataDropZone
+                        multiple
+                        invitation="Drop one or more CSV, TSV or Parquet files here."
+                        consequence="The console loads each file as a table with the file's name."
+                        action="Choose input files"
+                        busy={sqlIntake.kind === 'reading'}
+                        onFiles={(files) => void chooseSqlInputs(files)}
+                        onIntent={() => { void loadSqlPreparationWorkspace() }}
+                      />
+                    )}
+                  </div>
                 </section>
               )}
-  
+
+              {workflow.kind === 'sql-inputs-chosen' && (
+                <section className="rise w-full max-w-6xl" aria-label="Prepare with SQL">
+                  <Suspense fallback={<ChapterSkeleton label="Loading SQL preparation…" />}>
+                    <SqlShell
+                      inputs={workflow.inputs}
+                      onPrepared={(source) => dispatch({ type: 'sql-source-created', source })}
+                      onCleared={() => dispatch({ type: 'source-cleared' })}
+                    />
+                  </Suspense>
+                </section>
+              )}
+
               {workflow.kind === 'source-selected' && (
                 <section className="rise my-auto max-w-2xl" aria-labelledby="selected-source-title">
                   <span className={label('text-signal')}>{chapterLabel('data')}</span>

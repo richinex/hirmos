@@ -21,7 +21,7 @@ test('build the feature adoption survival example bundle', async ({ page }) => {
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('36')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
   await expect(page.getByRole('heading', { name: 'Weibull PH' }).first()).toBeVisible({ timeout: 300_000 })
-  await expect(page.getByText('455 rows · 132 events').first()).toBeVisible()
+  await expect(page.getByText('455 intervals · 132 events').first()).toBeVisible()
 
   await exportBundle(page, example)
 })

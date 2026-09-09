@@ -9,6 +9,7 @@
     "dev": "vite",
     "check": "tsc --noEmit",
     "build": "tsc && vite build",
+    "postinstall": "patch-package",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
     "preview": "vite preview"
@@ -17,6 +18,8 @@
     "@chenglou/pretext": "^0.0.8",
     "@dagrejs/dagre": "^3.1.1",
     "@duckdb/duckdb-wasm": "1.30.0",
+    "@duckdb/duckdb-wasm-shell": "1.30.0",
+    "xterm": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/source-serif-4": "^5.3.0",
     "@fontsource/arimo": "^5.3.0",
@@ -52,6 +55,7 @@
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.185.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "patch-package": "8.0.1",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"

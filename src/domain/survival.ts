@@ -47,12 +47,17 @@ export const proportionalHazardsFamilySchema = z.enum([
   'gompertz',
 ])
 
+export type SurvivalRowFrequency =
+  | { readonly kind: 'one-observation-per-row' }
+  | { readonly kind: 'frequency-column'; readonly column: NumericColumnSelection }
+
 export interface RightCensoredSurvivalConfiguration<
   Family extends ParametricSurvivalFamily = ParametricSurvivalFamily,
 > {
   readonly kind: 'right-censored-parametric'
   readonly duration: NumericColumnSelection
   readonly event: NumericColumnSelection
+  readonly rowFrequency: SurvivalRowFrequency
   readonly covariates: readonly NumericColumnSelection[]
   readonly family: Family
   readonly predictionTimes: NonEmptyArray<number>
@@ -65,9 +70,19 @@ export interface StartStopSurvivalConfiguration<
   readonly start: NumericColumnSelection
   readonly stop: NumericColumnSelection
   readonly event: NumericColumnSelection
+  readonly rowFrequency: SurvivalRowFrequency
   readonly covariates: readonly NumericColumnSelection[]
   readonly family: Family
   readonly predictionTimes: NonEmptyArray<number>
+}
+
+export interface NonparametricSurvivalConfiguration {
+  readonly kind: 'right-censored-nonparametric'
+  readonly duration: NumericColumnSelection
+  readonly event: NumericColumnSelection
+  readonly rowFrequency: SurvivalRowFrequency
+  readonly predictionTimes: NonEmptyArray<number>
+  readonly ties: 'discrete' | 'smoothed'
 }
 
 export interface TwoGroupSurvivalConfiguration {
@@ -118,6 +133,7 @@ export interface MultiStateSurvivalConfiguration {
 
 export type SurvivalConfiguration =
   | RightCensoredSurvivalConfiguration
+  | NonparametricSurvivalConfiguration
   | StartStopSurvivalConfiguration
   | TwoGroupSurvivalConfiguration
   | MultiStateSurvivalConfiguration
@@ -153,6 +169,23 @@ type ParsedFlexSurvEvidence = z.infer<typeof flexSurvEvidenceSchema>
 export type FlexSurvEvidence<
   Family extends ParametricSurvivalFamily = ParametricSurvivalFamily,
 > = Omit<ParsedFlexSurvEvidence, 'family'> & { readonly family: Family }
+
+export const nonparametricSurvivalEvidenceSchema = z.object({
+  kind: z.literal('nonparametricSurvival'),
+  observations: z.number().int().positive(),
+  events: z.number().int().nonnegative(),
+  predictionTimes: z.array(nonNegativeTime).min(1),
+  survival: z.array(probability).min(1),
+  survivalLower: z.array(probability).min(1),
+  survivalUpper: z.array(probability).min(1),
+  cumulativeDensity: z.array(probability).min(1),
+  cumulativeHazard: z.array(finiteNumber.nonnegative()).min(1),
+  cumulativeHazardLower: z.array(finiteNumber.nonnegative()).min(1),
+  cumulativeHazardUpper: z.array(finiteNumber.nonnegative()).min(1),
+  hazardIncrement: z.array(finiteNumber.nonnegative()).min(1),
+}).strict()
+
+export type NonparametricSurvivalEvidence = z.infer<typeof nonparametricSurvivalEvidenceSchema>
 
 const survivalCurvePointSchema = z.tuple([nonNegativeTime, probability])
 const nonNegativeCurvePointSchema = z.tuple([nonNegativeTime, finiteNumber.nonnegative()])
@@ -490,6 +523,53 @@ export function parseFlexSurvEvidence(
   return ok(evidence)
 }
 
+export function parseNonparametricSurvivalEvidence(
+  value: unknown,
+): Result<NonparametricSurvivalEvidence, SurvivalEvidenceProblem> {
+  const parsed = nonparametricSurvivalEvidenceSchema.safeParse(value)
+  if (!parsed.success) return invalidEvidence(z.prettifyError(parsed.error))
+  const evidence = parsed.data
+  const lengths = [
+    evidence.survival,
+    evidence.survivalLower,
+    evidence.survivalUpper,
+    evidence.cumulativeDensity,
+    evidence.cumulativeHazard,
+    evidence.cumulativeHazardLower,
+    evidence.cumulativeHazardUpper,
+    evidence.hazardIncrement,
+  ].map((values) => values.length)
+  if (lengths.some((length) => length !== evidence.predictionTimes.length)) {
+    return invalidEvidence('Every nonparametric curve must contain one value for each prediction time.')
+  }
+  if (evidence.events > evidence.observations) return invalidEvidence('The event count exceeds the observation count.')
+  if (evidence.predictionTimes.some((time, index) => index > 0 && evidence.predictionTimes[index - 1]! > time)) {
+    return invalidEvidence('Nonparametric prediction times must be ordered.')
+  }
+  if (evidence.survival.some((value, index) => index > 0 && evidence.survival[index - 1]! < value)) {
+    return invalidEvidence('The Kaplan–Meier curve must not increase over time.')
+  }
+  if (evidence.survival.some((value, index) => evidence.survivalLower[index]! > value || value > evidence.survivalUpper[index]!)) {
+    return invalidEvidence('Each Kaplan–Meier estimate must lie inside its confidence interval.')
+  }
+  if (evidence.cumulativeDensity.some((value, index) => Math.abs(value - (1 - evidence.survival[index]!)) > 1e-10)) {
+    return invalidEvidence('The cumulative density must equal one minus the Kaplan–Meier estimate.')
+  }
+  if (evidence.cumulativeHazard.some((value, index) => index > 0 && evidence.cumulativeHazard[index - 1]! > value)) {
+    return invalidEvidence('The Nelson–Aalen cumulative hazard must not decrease over time.')
+  }
+  if (evidence.cumulativeHazard.some((value, index) => evidence.cumulativeHazardLower[index]! > value || value > evidence.cumulativeHazardUpper[index]!)) {
+    return invalidEvidence('Each Nelson–Aalen estimate must lie inside its confidence interval.')
+  }
+  const incrementsReproduceCurve = evidence.cumulativeHazard.every((value, index) => {
+    const previous = index === 0 ? 0 : evidence.cumulativeHazard[index - 1]!
+    const scale = Math.max(1, Math.abs(value))
+    return Math.abs(value - previous - evidence.hazardIncrement[index]!) <= scale * 1e-10
+  })
+  if (!incrementsReproduceCurve) return invalidEvidence('The Nelson–Aalen increments do not reproduce the cumulative-hazard curve.')
+  return ok(evidence)
+}
+
 export function parseComparisonSurvivalEvidence(
   value: unknown,
 ): Result<ComparisonSurvivalEvidence, SurvivalEvidenceProblem> {
@@ -587,6 +667,11 @@ type StartStopSurvivalRun = {
 export type SurvivalRunArtifact =
   | RightCensoredSurvivalRun
   | StartStopSurvivalRun
+  | SurvivalRunIdentity & {
+      readonly kind: 'nonparametric-survival-run'
+      readonly configuration: NonparametricSurvivalConfiguration
+      readonly evidence: NonparametricSurvivalEvidence
+    }
   | SurvivalRunIdentity & {
       readonly kind: 'two-group-survival-run'
       readonly configuration: TwoGroupSurvivalConfiguration

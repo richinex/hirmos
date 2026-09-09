@@ -121,7 +121,7 @@ impl Expression {
         Self::ratio(expression, denominator)
     }
 
-    /// Stable y0-style text used in parity fixtures and provenance records.
+    /// Stable y0-style text used in parity fixtures and audit records.
     pub fn to_y0(&self) -> String {
         match self {
             Self::Probability { children, parents } => {

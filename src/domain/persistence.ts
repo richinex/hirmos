@@ -15,6 +15,7 @@ import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, 
 import type { ProjectOrigin } from './projectOrigin'
 import type { Project, SelectedSource, Workflow } from './workflow'
 import type { SurvivalRunArtifact } from './survival'
+import { parseSourceRecipe, type SourceRecipe } from './sqlPreparation'
 
 /**
  * What a project keeps between sessions: the manifest, the recorded artifacts and a description of the
@@ -28,6 +29,7 @@ export interface SourceDescriptor {
   readonly mediaType: string
   readonly lastModified: number
   readonly format: SelectedSource['format']
+  readonly recipe: SourceRecipe
 }
 
 export interface PersistedProject {
@@ -81,6 +83,7 @@ const describeSource = (source: SelectedSource): SourceDescriptor => ({
   mediaType: source.mediaType,
   lastModified: source.lastModified,
   format: source.format,
+  recipe: source.recipe,
 })
 
 /** The record to write for the workflow as it stands, or null when nothing durable exists yet or a restore is pending. */
@@ -93,6 +96,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         kind: 'hirmos-project', version: 1, savedAt, origin: workflow.origin, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
         grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [],
       }
+    case 'sql-inputs-chosen':
     case 'source-selected':
     case 'profiling':
     case 'import-failed':
@@ -163,6 +167,15 @@ const seriesTransformSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('linear-detrend') }).strict(),
 ])
 
+const sourceMetadataSchema = z.object({
+  name: z.string(),
+  bytes: z.number().int().nonnegative(),
+  mediaType: z.string(),
+  lastModified: z.number(),
+  format: z.enum(['csv', 'tsv', 'parquet']),
+})
+const currentSourceSchema = sourceMetadataSchema.extend({ recipe: z.unknown() }).strict()
+
 const envelopeSchema = z.object({
   kind: z.literal('hirmos-project'),
   version: z.number().int(),
@@ -173,7 +186,7 @@ const envelopeSchema = z.object({
     name: z.string().min(1),
     createdAt: z.string().min(1),
   }).strict(),
-  source: z.object({ name: z.string(), bytes: z.number().int().nonnegative(), mediaType: z.string(), lastModified: z.number(), format: z.enum(['csv', 'tsv', 'parquet']) }).nullable(),
+  source: currentSourceSchema.nullable(),
   profile: z.unknown().nullable(),
   prepared: artifact.nullable(),
   stationarity: artifact.nullable(),
@@ -382,6 +395,12 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const parsed = envelopeSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-snapshot', detail: z.prettifyError(parsed.error) })
   if (parsed.data.version !== 1) return err({ kind: 'unsupported-version', version: parsed.data.version })
+  let source: SourceDescriptor | null = null
+  if (parsed.data.source !== null) {
+    const recipe = parseSourceRecipe(parsed.data.source.recipe)
+    if (!recipe.ok) return err({ kind: 'invalid-snapshot', detail: recipe.error.detail })
+    source = { ...parsed.data.source, recipe: recipe.value }
+  }
   const prepared = upgradePreparedTransformRecord(parsed.data.prepared)
   if (!prepared.ok) return prepared
   const stationarity = upgradeStationarityTransformRecord(parsed.data.stationarity)
@@ -409,6 +428,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     version: 1,
     origin: parsed.data.origin as ProjectOrigin,
     project,
+    source,
     profile,
     prepared: prepared.value as PreparedDatasetArtifact | null,
     stationarity: stationarity.value as StationarityEvidenceArtifact | null,

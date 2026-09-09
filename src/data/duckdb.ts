@@ -43,12 +43,12 @@ const LOCAL_BUNDLES: duckdb.DuckDBBundles = {
   eh: { mainModule: engineBinary('duckdb-eh.wasm'), mainWorker: duckdbEhWorker },
 }
 
-interface Engine {
+export interface DuckDbEngine {
   readonly db: duckdb.AsyncDuckDB
   readonly version: string
 }
 
-let enginePromise: Promise<Engine> | null = null
+let enginePromise: Promise<DuckDbEngine> | null = null
 
 const localExtensionRepository = (): string =>
   new URL('/duckdb-extensions', self.location.origin).href.replace(/\/$/, '')
@@ -92,7 +92,7 @@ async function configureOfflineEngine(db: duckdb.AsyncDuckDB, version: string): 
   }
 }
 
-const startEngine = async (): Promise<Engine> => {
+const startEngine = async (): Promise<DuckDbEngine> => {
   const bundle = await duckdb.selectBundle(LOCAL_BUNDLES)
   if (!bundle.mainWorker) throw new Error('This browser did not select a DuckDB worker bundle.')
   const worker = new Worker(bundle.mainWorker)
@@ -113,13 +113,16 @@ const startEngine = async (): Promise<Engine> => {
   }
 }
 
-const engine = (): Promise<Engine> => {
+const engine = (): Promise<DuckDbEngine> => {
   enginePromise ??= startEngine().catch((cause) => {
     enginePromise = null
     throw cause
   })
   return enginePromise
 }
+
+/** A separate database for work whose catalog and registered files must end with that work. */
+export const isolatedDuckDbEngine = (): Promise<DuckDbEngine> => startEngine()
 
 const sqlString = (value: string): string => `'${value.replaceAll("'", "''")}'`
 const sqlIdentifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
@@ -246,7 +249,7 @@ export async function profileSource(source: SelectedSource): Promise<Result<Data
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return fingerprint
 
-  let running: Engine
+  let running: DuckDbEngine
   try {
     running = await engine()
   } catch (cause) {
@@ -450,7 +453,7 @@ const firstDuplicate = (requested: readonly ColumnId[]): ColumnId | null => {
 async function verifiedPanelSource(
   source: SelectedSource,
   profile: DatasetProfile,
-): Promise<Result<Engine, PanelDataProblem>> {
+): Promise<Result<DuckDbEngine, PanelDataProblem>> {
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return err({ kind: 'panel-data-failed', detail: fingerprint.error.detail })
   if (fingerprint.value !== profile.source.fingerprint) {
@@ -718,7 +721,7 @@ export async function profileColumn(
   const column = profile.columns.find((candidate) => candidate.id === requestedColumnId)
   if (!column) return err({ kind: 'column-not-found', id: requestedColumnId })
 
-  let running: Engine
+  let running: DuckDbEngine
   try {
     running = await engine()
   } catch (cause) {
@@ -866,7 +869,7 @@ async function withSource<Value, Problem>(
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return err(failure(fingerprint.error.detail))
   if (fingerprint.value !== profile.source.fingerprint) return err(changed(profile.source.fingerprint, fingerprint.value))
-  let running: Engine
+  let running: DuckDbEngine
   try {
     running = await engine()
   } catch (cause) {
