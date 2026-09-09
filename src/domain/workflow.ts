@@ -37,6 +37,8 @@ export type SourceSelectionProblem =
   /** The file chosen for a reopened project is not the one its artifacts were computed from. */
   | { readonly kind: 'source-mismatch'; readonly expected: string }
   | { readonly kind: 'fingerprint-failed'; readonly detail: string }
+  /** The SQL step of a reopened project could not be run again on the files chosen. */
+  | { readonly kind: 'replay-failed'; readonly detail: string }
 
 export interface SelectedSource {
   readonly file: File
@@ -450,6 +452,7 @@ export function describeSourceSelectionProblem(problem: SourceSelectionProblem):
     case 'empty-file': return 'The selected file is empty.'
     case 'source-mismatch': return `This is not the file the project was built from. Choose ${problem.expected}, unchanged, or start a new project.`
     case 'fingerprint-failed': return `The file could not be checked: ${problem.detail}`
+    case 'replay-failed': return `The SQL step could not be run again: ${problem.detail}`
     case 'unsupported-format':
       return problem.extension
         ? `.${problem.extension} is not supported yet. Choose CSV, TSV, or Parquet.`

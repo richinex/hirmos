@@ -99,7 +99,7 @@ test('runs ComparisonSurv on the exact crossing-curves package data and records 
 
   await expect(page.getByRole('heading', { name: 'Group 1 compared with group 0' }).first()).toBeVisible({ timeout: 120_000 })
   await expect(page.getByText('Two-group survival comparison').first()).toBeVisible()
-  await expect(page.getByText(/remains valid when the curves cross/i).first()).toBeVisible()
+  await expect(page.getByText(/designed for crossing survival curves/i).first()).toBeVisible()
   await expect(page.getByText('Conversion comparisons').first()).toBeVisible()
   await expect(page.getByText('Fixed-time interval calculations').first()).toBeVisible()
   await expect(page.getByText('Peto–Peto modified Gehan–Wilcoxon').first()).toBeVisible()

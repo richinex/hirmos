@@ -204,6 +204,19 @@ function App() {
     dispatch({ type: 'file-selected', file })
   }
 
+  // A source the SQL step built is rebuilt from its input files; the result then passes the same fingerprint check.
+  const restoreFromInputs = async (files: readonly File[]) => {
+    if (workflow.kind !== 'awaiting-data' || workflow.restore === null) return
+    const recipe = workflow.restore.source?.recipe
+    if (recipe === undefined || recipe.kind !== 'sql-derived') return
+    setSqlIntake({ kind: 'reading' })
+    const data = await import('@/data/sqlPreparation')
+    const replayed = await data.replaySqlRecipe(recipe, files)
+    setSqlIntake({ kind: 'idle' })
+    if (!replayed.ok) { dispatch({ type: 'restore-rejected', problem: { kind: 'replay-failed', detail: data.describeSqlPreparationProblem(replayed.error) } }); return }
+    chooseFile(replayed.value)
+  }
+
   const inspectSource = async () => {
     if (workflow.kind !== 'source-selected' && workflow.kind !== 'import-failed') return
     const source = workflow.source
@@ -673,6 +686,10 @@ function App() {
                               : 'Choose one or more CSV, TSV or Parquet files. Each file becomes a table in a SQL console, and created views can be selected for further analysis.'}
                           </p>
                         </>
+                      ) : workflow.restore.source?.recipe.kind === 'sql-derived' ? (
+                        <p className={cn(fieldHint, 'mt-0')}>
+                          {`${workflow.project.name} was built from ${workflow.restore.source.name}, which the SQL step created from ${workflow.restore.source.recipe.inputs.map((input) => `${input.fileName} (${formatBytes(input.bytes)})`).join(' and ')}. Choose those files again, unchanged. The recorded statement runs on them and the result is checked against the recorded fingerprint before the work returns.`}
+                        </p>
                       ) : (
                         <p className={cn(fieldHint, 'mt-0')}>
                           {`${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : ` · ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
@@ -681,7 +698,16 @@ function App() {
                       {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
                       {sqlIntake.kind === 'failed' && <p role="alert" className="mt-3 text-body text-danger">{sqlIntake.detail}</p>}
                     </div>
-                    {dataEntryMode === 'file' || workflow.restore !== null ? (
+                    {workflow.restore?.source?.recipe.kind === 'sql-derived' ? (
+                      <DataDropZone
+                        multiple
+                        invitation="Drop the input files here."
+                        consequence="The SQL step runs again on them."
+                        action="Choose input files"
+                        busy={sqlIntake.kind === 'reading'}
+                        onFiles={(files) => void restoreFromInputs(files)}
+                      />
+                    ) : dataEntryMode === 'file' || workflow.restore !== null ? (
                       <DataDropZone
                         invitation="Drop a CSV, TSV or Parquet file here."
                         action="Choose data file"

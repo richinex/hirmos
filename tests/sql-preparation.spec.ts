@@ -61,6 +61,30 @@ test('materializes a declared multi-file SQL view through the ordinary profile p
   expect(warnings).not.toContain('using deprecated parameters for the initialization function; pass a single object instead')
 })
 
+test('reopens a project built by the SQL step from its input files', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The replay check runs once')
+  await createSqlProject(page)
+  await selectTwoInputs(page)
+  await runSql(page, 'CREATE OR REPLACE VIEW hirmos_prepared AS SELECT m.id, m.value, g.group_name FROM measurements m JOIN groups g USING (id);')
+  await refreshViews(page, 'hirmos_prepared')
+  await page.getByRole('button', { name: 'Use selected view' }).click()
+  await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await page.waitForTimeout(1500)
+
+  await page.goto('/app')
+  await page.getByRole('list', { name: 'Projects' }).getByRole('button', { name: 'Open' }).first().click()
+  await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
+  await expect(page.getByText(/the SQL step created from measurements.csv/)).toBeVisible()
+  await page.locator('input[type="file"][multiple]').setInputFiles([
+    { name: 'measurements.csv', mimeType: 'text/csv', buffer: Buffer.from('id,value\n1,10\n2,20\n') },
+    { name: 'groups.csv', mimeType: 'text/csv', buffer: Buffer.from('id,group_name\n1,A\n2,B\n') },
+  ])
+  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('group_name')
+})
+
 test('opens the official SQL shell again after clearing a prepared source', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'The shell lifecycle test runs once')
   await createSqlProject(page)

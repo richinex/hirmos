@@ -25,6 +25,8 @@ export type SqlPreparationProblem =
   | { readonly kind: 'materialization-failed'; readonly detail: string }
   | { readonly kind: 'cancellation-failed'; readonly detail: string }
   | { readonly kind: 'session-close-failed'; readonly detail: string }
+  /** A replay was given files that do not include every input the recipe was built from, by fingerprint. */
+  | { readonly kind: 'replay-inputs-missing'; readonly fileNames: readonly string[] }
 
 export interface SqlPreparationSession {
   readonly shellDatabase: duckdb.AsyncDuckDB
@@ -282,6 +284,36 @@ export async function materializePreparedView(
     : materialized
 }
 
+/**
+ * Builds the recorded source again from the recipe: the same input files, matched by fingerprint and
+ * given the aliases the statement was written against, the recorded view definitions run on them, and
+ * the recorded output view materialised. The caller checks the result against the recorded source
+ * fingerprint, as it does for a file chosen by hand.
+ */
+export async function replaySqlRecipe(
+  recipe: Extract<SelectedSource['recipe'], { readonly kind: 'sql-derived' }>,
+  files: readonly File[],
+): Promise<Result<File, SqlPreparationProblem>> {
+  const offered = await prepareSqlInputs(files)
+  if (!offered.ok) return offered
+  const matched: SqlPreparationInput[] = []
+  const missing: string[] = []
+  for (const descriptor of recipe.inputs) {
+    const input = offered.value.find((candidate) => candidate.fingerprint === descriptor.fingerprint)
+    if (input === undefined) missing.push(descriptor.fileName)
+    else matched.push({ ...input, alias: descriptor.alias })
+  }
+  if (missing.length > 0 || !isNonEmpty(matched)) return err({ kind: 'replay-inputs-missing', fileNames: missing })
+  // The recorded statement is the view definitions DuckDB reported, one per line, in creation order.
+  const definitions: SqlViewDefinition[] = recipe.statement
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((statement) => ({ name: recipe.outputView, statement }))
+  const materialized = await verifyAndMaterialize(definitions, recipe.outputView, matched)
+  return materialized.ok ? ok(materialized.value.file) : materialized
+}
+
 export function describeSqlPreparationProblem(problem: SqlPreparationProblem): string {
   switch (problem.kind) {
     case 'no-input-files': return 'Choose at least one input file.'
@@ -296,6 +328,7 @@ export function describeSqlPreparationProblem(problem: SqlPreparationProblem): s
     case 'materialization-failed': return `The prepared view could not be materialized: ${problem.detail}`
     case 'cancellation-failed': return `The query could not be cancelled: ${problem.detail}`
     case 'session-close-failed': return `The SQL workspace could not release its database: ${problem.detail}`
+    case 'replay-inputs-missing': return `The files chosen do not include ${problem.fileNames.join(', ')}, unchanged. The SQL step needs every input it was built from.`
     default: { const exhaustive: never = problem; return exhaustive }
   }
 }
