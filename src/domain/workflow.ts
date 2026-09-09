@@ -10,6 +10,7 @@ import type { InterventionQueryArtifact } from './intervention'
 import type { EstimationRunArtifact, EstimationRunId } from './estimation'
 import type { SensitivityRunArtifact, SensitivityRunId } from './sensitivity'
 import type { CounterfactualRunArtifact, CounterfactualRunId } from './counterfactual'
+import type { SurvivalRunArtifact, SurvivalRunId } from './survival'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { PersistedProject } from './persistence'
@@ -96,6 +97,8 @@ export type Workflow =
       readonly estimationRuns: readonly EstimationRunArtifact[]
       readonly sensitivityRuns: readonly SensitivityRunArtifact[]
       readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
+      /** Standalone time-to-event analyses; these do not depend on a causal study or estimate. */
+      readonly survivalRuns: readonly SurvivalRunArtifact[]
     }
 
 export type WorkflowEvent =
@@ -123,6 +126,8 @@ export type WorkflowEvent =
   | { readonly type: 'estimation-run-deleted'; readonly run: EstimationRunId }
   | { readonly type: 'sensitivity-run-deleted'; readonly run: SensitivityRunId }
   | { readonly type: 'counterfactual-run-deleted'; readonly run: CounterfactualRunId }
+  | { readonly type: 'survival-run-created'; readonly run: SurvivalRunArtifact }
+  | { readonly type: 'survival-run-deleted'; readonly run: SurvivalRunId }
   | { readonly type: 'source-cleared' }
   | { readonly type: 'project-reopened'; readonly snapshot: PersistedProject }
   | { readonly type: 'project-restored'; readonly file: File }
@@ -230,6 +235,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           estimationRuns: snapshot.estimationRuns,
           sensitivityRuns: snapshot.sensitivityRuns,
           counterfactualRuns: snapshot.counterfactualRuns,
+          survivalRuns: snapshot.survivalRuns,
         }
       }
       if (event.type !== 'file-selected' || state.restore !== null) return state
@@ -266,6 +272,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           estimationRuns: [],
           sensitivityRuns: [],
           counterfactualRuns: [],
+          survivalRuns: [],
         }
       }
       if (event.type === 'profile-failed' && event.request === state.request) {
@@ -284,7 +291,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [] }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
@@ -383,6 +390,14 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'counterfactual-run-deleted') {
         return { ...state, counterfactualRuns: state.counterfactualRuns.filter((run) => run.id !== event.run) }
+      }
+      if (event.type === 'survival-run-created'
+        && state.prepared !== null
+        && event.run.preparedDataset === state.prepared.id) {
+        return { ...state, survivalRuns: [...state.survivalRuns, event.run] }
+      }
+      if (event.type === 'survival-run-deleted') {
+        return { ...state, survivalRuns: state.survivalRuns.filter((run) => run.id !== event.run) }
       }
       return state
     default:

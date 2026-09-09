@@ -14,6 +14,7 @@ import type { SensitivityRunArtifact } from './sensitivity'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { ProjectOrigin } from './projectOrigin'
 import type { Project, SelectedSource, Workflow } from './workflow'
+import type { SurvivalRunArtifact } from './survival'
 
 /**
  * What a project keeps between sessions: the manifest, the recorded artifacts and a description of the
@@ -51,6 +52,7 @@ export interface PersistedProject {
   readonly estimationRuns: readonly EstimationRunArtifact[]
   readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
+  readonly survivalRuns: readonly SurvivalRunArtifact[]
 }
 
 /** The lines a project list shows without opening the record. */
@@ -89,7 +91,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       if (workflow.restore !== null) return null
       return {
         kind: 'hirmos-project', version: 1, savedAt, origin: workflow.origin, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
-        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [],
+        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [],
       }
     case 'source-selected':
     case 'profiling':
@@ -118,6 +120,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         estimationRuns: workflow.estimationRuns,
         sensitivityRuns: workflow.sensitivityRuns,
         counterfactualRuns: workflow.counterfactualRuns,
+        survivalRuns: workflow.survivalRuns,
       }
     default: return null
   }
@@ -186,6 +189,7 @@ const envelopeSchema = z.object({
   estimationRuns: z.array(artifact),
   sensitivityRuns: z.array(artifact),
   counterfactualRuns: z.array(artifact),
+  survivalRuns: z.array(artifact).default([]),
 })
 type ParsedEnvelope = z.output<typeof envelopeSchema>
 
@@ -237,10 +241,21 @@ const upgradeStationarityTransformRecord = (value: ParsedEnvelope['stationarity'
 const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<string, unknown> => {
   const estimate = Reflect.get(value, 'estimate')
   let upgradedEstimate = estimate
-  if (typeof estimate === 'object' && estimate !== null && Reflect.get(estimate, 'adjustment') === undefined) {
-    const legacy = Reflect.get(estimate, 'adjustmentSet')
+
+  if (typeof upgradedEstimate === 'object' && upgradedEstimate !== null) {
+    const effect = Reflect.get(upgradedEstimate, 'effect')
+    if (typeof effect === 'object' && effect !== null && Reflect.get(effect, 'kind') === 'incidenceRateRatio') {
+      upgradedEstimate = {
+        ...upgradedEstimate,
+        effect: { ...effect, kind: 'expectedCountRatio' },
+      }
+    }
+  }
+
+  if (typeof upgradedEstimate === 'object' && upgradedEstimate !== null && Reflect.get(upgradedEstimate, 'adjustment') === undefined) {
+    const legacy = Reflect.get(upgradedEstimate, 'adjustmentSet')
     if (Array.isArray(legacy)) {
-      const { adjustmentSet: _legacyAdjustment, ...rest } = estimate as Record<string, unknown>
+      const { adjustmentSet: _legacyAdjustment, ...rest } = upgradedEstimate as Record<string, unknown>
       upgradedEstimate = {
         ...rest,
         adjustment: legacy.length === 0
@@ -322,6 +337,17 @@ const upgradeIdentificationRecord = (value: Record<string, unknown>): Record<str
   }
 }
 
+/** Preserve early survival runs while recording that their chart diagnostics were not stored. */
+const upgradeSurvivalRunRecord = (value: Record<string, unknown>): Record<string, unknown> => {
+  if (Reflect.get(value, 'kind') !== 'two-group-survival-run') return value
+  const evidence = Reflect.get(value, 'evidence')
+  if (typeof evidence !== 'object' || evidence === null || Reflect.get(evidence, 'diagnostics') !== undefined) return value
+  return {
+    ...value,
+    evidence: { ...(evidence as Record<string, unknown>), diagnostics: { kind: 'notRecorded' } },
+  }
+}
+
 export function parseSnapshotValue(value: unknown): Result<PersistedProject, SnapshotProblem> {
   const parsed = envelopeSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-snapshot', detail: z.prettifyError(parsed.error) })
@@ -341,6 +367,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
+  const survivalRuns = parsed.data.survivalRuns.map((run) => upgradeSurvivalRunRecord(run))
   const identifications = parsed.data.identifications.map((identification) => upgradeIdentificationRecord(identification))
   const project: Project = {
     id: brand<string, 'ProjectId'>(parsed.data.project.id),
@@ -359,6 +386,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     discoveryRuns: discoveryRuns as unknown as PersistedProject['discoveryRuns'],
     identifications: identifications as unknown as PersistedProject['identifications'],
     estimationRuns: estimationRuns as unknown as PersistedProject['estimationRuns'],
+    survivalRuns: survivalRuns as unknown as PersistedProject['survivalRuns'],
   })
 }
 

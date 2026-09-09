@@ -20,7 +20,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Formula } from '@/components/ui/Formula'
 import { RunFold } from '@/components/ui/RunFold'
 import { FigureParts, MetricTile } from '@/components/ui/figures'
-import { EstimateHeadline, headlineFigure, IRR, scaleOf } from '@/components/results/EstimateHeadline'
+import { EstimateHeadline, headlineFigure, scaleOf } from '@/components/results/EstimateHeadline'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
@@ -30,6 +30,7 @@ import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import {
   additive,
   adjustmentLabels,
@@ -63,7 +64,7 @@ import {
   type TotalEffectEstimator,
 } from '@/domain/estimation'
 import { ESTIMATION_METHODS, methodDefinition, type MethodEligibility } from '@/domain/methods'
-import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import { describeSeriesTransform, frequencyUnit, seriesTransformFor, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import {
   assessPanelInterventionLayout,
@@ -77,7 +78,7 @@ import { formatCount, formatEstimate, formatInterval, formatP, formatPercent, fo
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
-import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
+import { interpretEstimationResult, resultHeadline, resultSampleLine, resultScaleLine } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { describeAnalysisWorkerProblem, type AnalysisProgress, type DmlGroupsRequest } from '@/workers/analysisProtocol'
 import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
@@ -477,10 +478,10 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Pre-period loss', value: formatStatistic('raw', evidence.loss), context: `${formatCount(evidence.nPre).text} pre rows · ${formatCount(evidence.iterations).text} active-set steps` },
           { label: 'Average post gap', value: formatStatistic('raw', evidence.att), context: `over ${formatCount(evidence.nPost).text} post rows` },
           evidence.crossFit.kind === 'available'
-            ? { label: 'Cross-fitted effect', value: formatStatistic('raw', evidence.crossFit.att), context: `SE ${formatStatistic('raw', evidence.crossFit.standardError).text} · ${formatInterval(evidence.crossFit.att, evidence.crossFit.confidenceInterval[0], evidence.crossFit.confidenceInterval[1], { kind: 'confidence', level: 0.95 }, additive).text} · p ${formatP(evidence.crossFit.pValue, { withLabel: false }).text}` }
-            : { label: 'Cross-fitted effect', value: formatWords('unavailable'), context: evidence.crossFit.reason },
+            ? { label: 'Bias-corrected estimate', value: formatStatistic('raw', evidence.crossFit.att), context: `pre-period blocks left out in turn · SE ${formatStatistic('raw', evidence.crossFit.standardError).text} · ${formatInterval(evidence.crossFit.att, evidence.crossFit.confidenceInterval[0], evidence.crossFit.confidenceInterval[1], { kind: 'confidence', level: 0.95 }, additive).text} · p ${formatP(evidence.crossFit.pValue, { withLabel: false }).text}` }
+            : { label: 'Bias-corrected estimate', value: formatWords('unavailable'), context: evidence.crossFit.reason },
           evidence.donorPlacebo.kind === 'available'
-            ? { label: 'Donor placebo rank', value: formatP(evidence.donorPlacebo.pValue, { withLabel: false }), context: `treated post/pre MSPE ${evidence.donorPlacebo.treatedMspeRatio === null ? '∞' : formatStatistic('raw', evidence.donorPlacebo.treatedMspeRatio).text} · ${formatCount(evidence.donorPlacebo.nValidPlacebos).text} donor placebos` }
+            ? { label: 'Donor placebo rank', value: formatP(evidence.donorPlacebo.pValue, { withLabel: false }), context: `compared with ${formatCount(evidence.donorPlacebo.nValidPlacebos).text} donors treated in turn; smaller means fewer donors looked as unusual` }
             : { label: 'Donor placebo rank', value: formatWords('unavailable'), context: evidence.donorPlacebo.reason },
           evidence.conformalBand.kind === 'available'
             ? { label: 'Conformal band', value: formatStatistic('raw', evidence.conformalBand.halfWidth), context: `${Math.round((1 - evidence.conformalBand.alpha) * 100)}% fixed-weight prediction half-width` }
@@ -496,9 +497,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           .map(({ weight, unit }) => `${unit} ${formatStatistic('score', weight).text}`)
           .join(' · ')
         return [
-          { label: 'Estimator comparison', value: formatWords(`DID ${formatStatistic('raw', evidence.did.estimate).text} · SC ${formatStatistic('raw', evidence.syntheticControl.estimate).text} · SDID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: `${formatCount(evidence.nPost).text} post periods` },
-          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated · ${evidence.controlUnits} controls`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
-          { label: 'Largest SDID weights', value: formatWords(topWeights || 'none'), context: `noise level ${formatStatistic('raw', evidence.syntheticDid.noiseLevel).text}` },
+          { label: 'Method comparison', value: formatWords(`DID ${formatStatistic('raw', evidence.did.estimate).text} · synthetic control ${formatStatistic('raw', evidence.syntheticControl.estimate).text} · synthetic DID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: `synthetic DID chosen as the main result before fitting · ${formatCount(evidence.nPost).text} post periods` },
+          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated · ${evidence.controlUnits} comparison`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
+          { label: 'Most influential comparison units', value: formatWords(topWeights || 'none'), context: 'largest synthetic-DID unit weights' },
         ]
       }
       case 't-learner-run': {
@@ -588,7 +589,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       default: return assertNever(run)
     }
   })()
-  const adjustmentValue = formatWords(run.kind === 'frontdoor-two-stage-run'
+  const adjustmentValue = formatWords(run.kind === 'panel-intervention-run'
+    ? 'Unit and time weights'
+    : run.kind === 'frontdoor-two-stage-run'
     ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
     : run.kind === 'instrumental-variable-run'
       ? 'None; the estimator uses no covariates'
@@ -604,11 +607,11 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   return (
     <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
       <MetricTile
-        label={run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.kind === 'instrumental-variable-run' ? 'Covariates' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
+        label={run.kind === 'panel-intervention-run' ? 'Comparison design' : run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.kind === 'instrumental-variable-run' ? 'Covariates' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
         size="compact"
         frame="cell"
         value={adjustmentValue}
-        context={restated?.context}
+        context={run.kind === 'panel-intervention-run' ? 'This design does not use a DAG adjustment set.' : restated?.context}
       />
       {tiles.filter((tile) => tile !== restated).map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </div>
@@ -619,8 +622,9 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
   const theme = useChartTheme()
   const estimate = run.estimate
   const adjustmentVariables = useMemo(() => contemporaneousAdjustmentVariables(estimate.adjustment) ?? [], [estimate.adjustment])
-  const sentence = estimandSentence(study)
+  const sentence = resultHeadline(run, study)
   const scaleLine = resultScaleLine(run, study, stepLabel)
+  const sampleLine = resultSampleLine(run)
   // Other path-valued runs of the same question can be drawn as a ghost behind this one.
   const [ghostId, setGhostId] = useState('')
   const ghosts = others.filter((other) => other.id !== run.id && other.estimate.effect.kind === 'path')
@@ -677,7 +681,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
   const body = (
     <>
       <div className="mt-3">
-        <EstimateHeadline estimate={estimate} sentence={sentence} scaleLine={scaleLine} stepLabel={stepLabel} accent={current} testId="effect-estimate" />
+        <EstimateHeadline estimate={estimate} sentence={sentence} scaleLine={scaleLine} sampleLine={sampleLine} stepLabel={stepLabel} accent={current} testId="effect-estimate" />
       </div>
       {groupChart !== null && estimate.effect.kind === 'byGroup' && (
         <div className="mt-3">
@@ -700,7 +704,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
               </Select>
             </div>
           )}
-          <ExpandableChart option={chart} label={`${study.outcome.name} against its counterfactual after the intervention`} className="h-[260px]" testId="impact-path" />
+          <ExpandableChart option={chart} label={`Observed ${study.outcome.name.replaceAll('_', ' ')} and its estimated no-intervention path`} className="h-[260px]" testId="impact-path" />
         </div>
       )}
       {posterior !== null && (
@@ -792,7 +796,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const document = study === null ? null : documents.find((candidate) => candidate.id === study.dagDocument) ?? null
   const configuration = state.configurations[state.estimator]
   const method = methodDefinition(methodIdOf(state.estimator))
-  const stepLabel = prepared.kind === 'prepared-time-series' ? 'observation' : prepared.kind === 'prepared-panel' ? 'Panel' : 'row'
+  const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
   const panelBinding = useMemo<PanelBinding | null>(() => prepared.kind === 'prepared-panel' && study !== null
     ? { prepared: prepared.id, unit: prepared.sampling.unitColumn, time: prepared.sampling.timeColumn, outcome: study.outcome.column, treatment: study.treatment.column }
     : null, [prepared, study])
@@ -1424,7 +1428,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return (
           <div className="grid gap-2">
             <p className={prose('m-0 text-faint')}>
-              The primary estimator is predeclared as synthetic difference-in-differences. Conventional DID and synthetic control are reported as required comparisons; the primary result cannot be changed after viewing the estimates.
+              Hirmos uses synthetic difference-in-differences as the main result and shows conventional difference-in-differences and synthetic control beside it. The main method is fixed before the estimates appear.
             </p>
             <div className="grid gap-3 @md/panel:grid-cols-2">
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo replications" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboReplications} /><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
@@ -1464,7 +1468,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return <p className="m-0 text-body text-faint">The run evaluates the two recorded IDC* expressions against the empirical binary joint distribution. It applies no discretisation and reports no sampling interval.</p>
       case 'poisson-glm':
       case 'negative-binomial-p':
-        return <p className="m-0 text-body text-faint">Log link on the expected count of {study?.outcome.name ?? 'the outcome'}; the treatment coefficient exponentiates to an incidence rate ratio with a 95% normal interval.</p>
+        return <p className="m-0 text-body text-faint">Log link on the expected count of {study?.outcome.name ?? 'the outcome'}; exponentiating the treatment coefficient gives an expected-count ratio with a 95% normal interval.</p>
       case 'negative-binomial-ingarch':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
@@ -1623,7 +1627,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const stage = (
     <section aria-labelledby="estimation-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>06 · Estimation</span>
+        <span className={label('text-faint')}>{chapterLabel('estimation')}</span>
         <h2 id="estimation-title" className="mb-2 mt-2 text-heading text-ink">Estimate the identified effect</h2>
         <p className={chapterIntro}>Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>

@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { button, field, label, panel } from '@/components/ui/recipes'
 import type { DatasetProfile } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import {
   describeQuestionProblem,
   nameOfColumn,
@@ -23,7 +24,7 @@ export function QuestionView({ profile, state, dispatch }: {
       }
       return (
         <section className="rise my-auto w-full max-w-2xl" aria-labelledby="question-title">
-          <span className={label('text-faint')}>05 · Study design</span>
+          <span className={label('text-faint')}>{chapterLabel('study')}</span>
           <h2 id="question-title" className="mb-6 mt-3 text-heading text-ink">Frame the causal question</h2>
           <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
             <label className="block">
@@ -59,7 +60,7 @@ export function QuestionView({ profile, state, dispatch }: {
     case 'framed':
       return (
         <section className="rise my-auto w-full max-w-2xl" aria-labelledby="framed-question-title">
-          <span className={label('text-faint')}>05 · Study design</span>
+          <span className={label('text-faint')}>{chapterLabel('study')}</span>
           <h2 id="framed-question-title" className="mb-6 mt-3 text-heading text-ink">Causal question</h2>
           <div className={panel('lift flex items-center gap-3 px-4 py-5 text-title text-ink')}>
             <span>{nameOfColumn(profile, state.question.treatment)}</span>

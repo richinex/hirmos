@@ -1426,7 +1426,7 @@ const countCaveats = (prefix: 'poisson' | 'negbin', model: string): NonEmptyArra
     category: 'interpretation',
     requirement: prefix === 'poisson'
       ? 'exp(β) is the multiplicative change in the expected count per unit of treatment, covariates fixed.'
-      : 'exp(β) is a rate ratio, as for Poisson; alpha describes spread, not effect.',
+      : 'exp(β) is the multiplicative change in the expected count per unit of treatment, as for Poisson; alpha describes spread, not effect.',
     consequenceIfUnmet: 'A ratio is read as an additive difference.',
     sources: [CAMERON_TRIVEDI, hirmos('crates/analysis-wasm/src/lib.rs#count_glm')],
   },
@@ -1436,7 +1436,7 @@ const POISSON_GLM: MethodDefinition = {
   id: POISSON_GLM_METHOD_ID,
   name: 'Poisson GLM',
   family: 'estimation',
-  summary: 'Poisson family with log link by iteratively reweighted least squares; exp(β) is an incidence rate ratio.',
+  summary: 'Poisson family with log link by iteratively reweighted least squares; exp(β) is an expected-count ratio.',
   caveats: countCaveats('poisson', 'statsmodels/genmod/generalized_linear_model.py#GLM'),
 }
 
@@ -1994,9 +1994,9 @@ const SYNTHETIC_CONTROL: MethodDefinition = {
 
 const PANEL_INTERVENTION: MethodDefinition = {
   id: PANEL_INTERVENTION_METHOD_ID,
-  name: 'Panel DID / synthetic DID',
+  name: 'Panel difference-in-differences',
   family: 'estimation',
-  summary: 'Estimates a simultaneous-adoption panel intervention with conventional DID, synthetic control, and synthetic difference-in-differences on the same validated panel.',
+  summary: 'Compares treated and untreated units before and after a shared adoption date. Synthetic difference-in-differences is the main result; conventional difference-in-differences and synthetic control are shown beside it.',
   caveats: [
     {
       id: caveatId('panel-balanced-layout'), category: 'sampling-structure',
@@ -2030,8 +2030,8 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-no-interval'), category: 'finite-sample',
-      requirement: 'Placebo standard errors require more control units than treated units and a pre-treatment period long enough for the fitted weighting problem.',
-      consequenceIfUnmet: 'The point estimate has no placebo measure of sampling variability.',
+      requirement: 'The placebo standard-error calculation needs more comparison units than treated units and enough pre-treatment periods to fit the weights.',
+      consequenceIfUnmet: 'The point estimate remains available, but this uncertainty calculation is not.',
       sources: [ARKHANGELSKY_2021],
     },
   ],
@@ -2041,7 +2041,7 @@ const NEGBIN_NUTS: MethodDefinition = {
   id: NEGBIN_NUTS_METHOD_ID,
   name: 'Bayesian negative binomial',
   family: 'estimation',
-  summary: 'A negative binomial count model with one treatment and one confounder, sampled by the no-U-turn sampler (NUTS). The effect is the posterior incidence rate ratio.',
+  summary: 'A negative binomial count model with one treatment and one confounder, sampled by the no-U-turn sampler (NUTS). The effect is the posterior expected-count ratio.',
   caveats: [
     {
       id: caveatId('nuts-model-shape'),

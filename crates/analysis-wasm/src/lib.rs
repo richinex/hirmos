@@ -102,6 +102,7 @@ mod preparation;
 mod protocol;
 mod sensitivity;
 mod stationarity;
+mod survival;
 
 use counterfactual::*;
 use dag_check::*;
@@ -114,6 +115,7 @@ use preparation::*;
 use protocol::*;
 use sensitivity::*;
 use stationarity::*;
+use survival::*;
 
 /// Execute one validated analysis command over a transferred dense numeric column.
 #[wasm_bindgen(js_name = runAnalysis)]
@@ -217,6 +219,64 @@ pub fn run_analysis(
                 source_rows_dropped: result.source_rows_dropped,
             })
         }
+        AnalysisCommand::FlexSurv {
+            rows,
+            columns,
+            observation,
+            covariates,
+            family,
+            prediction_times,
+        } => flexsurv_evidence(
+            values,
+            rows,
+            columns,
+            observation,
+            &covariates,
+            family,
+            &prediction_times,
+        ),
+        AnalysisCommand::ComparisonSurvival {
+            rows,
+            columns,
+            duration,
+            event,
+            group,
+            truncation_time,
+            permutations,
+            seed,
+        } => comparison_survival_evidence(
+            values,
+            rows,
+            columns,
+            duration,
+            event,
+            group,
+            truncation_time,
+            permutations,
+            seed,
+        ),
+        AnalysisCommand::MultiStateSurvival {
+            rows,
+            columns,
+            start,
+            stop,
+            event,
+            from,
+            to,
+            family,
+            prediction_times,
+        } => multi_state_survival_evidence(
+            values,
+            rows,
+            columns,
+            start,
+            stop,
+            event,
+            from,
+            to,
+            family,
+            &prediction_times,
+        ),
         AnalysisCommand::PcmciPlus {
             rows,
             columns,

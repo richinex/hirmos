@@ -15,11 +15,18 @@ fn rows(root: &Value) -> (Vec<Vec<f64>>, Vec<f64>, Vec<f64>) {
 
 #[test]
 fn effects_match_econml() {
-    let root: Value = serde_json::from_str(include_str!("../oracle/fixtures/tlearner.json")).unwrap();
+    let root: Value =
+        serde_json::from_str(include_str!("../oracle/fixtures/tlearner.json")).unwrap();
     let (x, y, d) = rows(&root);
     let fitted = fit_tlearner(&x, &y, &d, 200, 5, 7).unwrap();
-    assert_eq!(fitted.control_rows, root["control_rows"].as_u64().unwrap() as usize);
-    assert_eq!(fitted.treated_rows, root["treated_rows"].as_u64().unwrap() as usize);
+    assert_eq!(
+        fitted.control_rows,
+        root["control_rows"].as_u64().unwrap() as usize
+    );
+    assert_eq!(
+        fitted.treated_rows,
+        root["treated_rows"].as_u64().unwrap() as usize
+    );
     let want: Vec<f64> = serde_json::from_value(root["effects"].clone()).unwrap();
     let got = fitted.effect(&x);
     let mut max_deviation = 0.0_f64;
@@ -34,7 +41,10 @@ fn effects_match_econml() {
     }
     let ate = got.iter().sum::<f64>() / got.len() as f64;
     let want_ate = root["ate"].as_f64().unwrap();
-    assert!((ate - want_ate).abs() <= 1e-3 * want_ate.abs().max(1.0), "ate got {ate}, oracle {want_ate}");
+    assert!(
+        (ate - want_ate).abs() <= 1e-3 * want_ate.abs().max(1.0),
+        "ate got {ate}, oracle {want_ate}"
+    );
     let query: Vec<Vec<f64>> = serde_json::from_value(root["query"].clone()).unwrap();
     let want_query: Vec<f64> = serde_json::from_value(root["query_effects"].clone()).unwrap();
     for (i, (&g, &w)) in fitted.effect(&query).iter().zip(&want_query).enumerate() {
@@ -46,7 +56,16 @@ fn effects_match_econml() {
 #[test]
 fn refuses_non_binary_and_empty_arms() {
     let x = vec![vec![0.0], vec![1.0], vec![2.0]];
-    assert_eq!(fit_tlearner(&x, &[1.0, 2.0, 3.0], &[0.0, 0.5, 1.0], 5, 1, 7).err(), Some(TLearnerError::TreatmentNotBinary { row: 1 }));
-    assert_eq!(fit_tlearner(&x, &[1.0, 2.0, 3.0], &[1.0, 1.0, 1.0], 5, 1, 7).err(), Some(TLearnerError::ArmEmpty { treated: false }));
-    assert_eq!(fit_tlearner(&x, &[1.0, 2.0], &[0.0, 1.0, 1.0], 5, 1, 7).err(), Some(TLearnerError::LengthMismatch));
+    assert_eq!(
+        fit_tlearner(&x, &[1.0, 2.0, 3.0], &[0.0, 0.5, 1.0], 5, 1, 7).err(),
+        Some(TLearnerError::TreatmentNotBinary { row: 1 })
+    );
+    assert_eq!(
+        fit_tlearner(&x, &[1.0, 2.0, 3.0], &[1.0, 1.0, 1.0], 5, 1, 7).err(),
+        Some(TLearnerError::ArmEmpty { treated: false })
+    );
+    assert_eq!(
+        fit_tlearner(&x, &[1.0, 2.0], &[0.0, 1.0, 1.0], 5, 1, 7).err(),
+        Some(TLearnerError::LengthMismatch)
+    );
 }

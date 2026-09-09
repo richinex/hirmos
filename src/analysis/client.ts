@@ -33,6 +33,7 @@ import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/r
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
+import type { ComparisonSurvivalEvidence, FlexSurvEvidence, MultiStateSurvivalEvidence, ParametricSurvivalFamily, ProportionalHazardsFamily } from '@/domain/survival'
 import {
   newWorkerRequestId,
   parseAnalysisWorkerEvent,
@@ -93,6 +94,9 @@ type IdentifiedDiscreteQueryOutcome = Result<IdentifiedDiscreteQueryEvidence, An
 type BinaryEttOutcome = Result<BinaryEttEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type DynamicLinearScmOutcome = Result<DynamicLinearScmEvidence, AnalysisWorkerProblem>
+type FlexSurvOutcome = Result<FlexSurvEvidence, AnalysisWorkerProblem>
+type ComparisonSurvivalOutcome = Result<ComparisonSurvivalEvidence, AnalysisWorkerProblem>
+type MultiStateSurvivalOutcome = Result<MultiStateSurvivalEvidence, AnalysisWorkerProblem>
 type SuccessfulAnalysisEvent = Extract<AnalysisWorkerEvent, { readonly result: unknown }>
 type SuccessfulAnalysisEventKind = SuccessfulAnalysisEvent['kind']
 type SuccessfulAnalysisResults = {
@@ -803,6 +807,43 @@ const postNullable = <Kind extends SuccessfulAnalysisEventKind>(
       }))
     }
   })
+
+export function runFlexSurv(values: Float64Array, rows: number, columns: number, design: {
+  readonly observation:
+    | { readonly kind: 'rightCensored'; readonly duration: number; readonly event: number }
+    | { readonly kind: 'startStop'; readonly start: number; readonly stop: number; readonly event: number }
+  readonly covariates: readonly number[]
+  readonly family: ParametricSurvivalFamily
+  readonly predictionTimes: readonly number[]
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<FlexSurvOutcome> {
+  const request = newWorkerRequestId()
+  return post('flexsurv-succeeded', { kind: 'flexsurv', request, values, rows, columns, ...design }, values, onProgress)
+}
+
+export function runComparisonSurvival(values: Float64Array, rows: number, columns: number, design: {
+  readonly duration: number
+  readonly event: number
+  readonly group: number
+  readonly truncationTime: number
+  readonly permutations: number
+  readonly seed: number
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<ComparisonSurvivalOutcome> {
+  const request = newWorkerRequestId()
+  return post('comparison-survival-succeeded', { kind: 'comparison-survival', request, values, rows, columns, ...design }, values, onProgress)
+}
+
+export function runMultiStateSurvival(values: Float64Array, rows: number, columns: number, design: {
+  readonly start: number
+  readonly stop: number
+  readonly event: number
+  readonly from: number
+  readonly to: number
+  readonly family: ProportionalHazardsFamily
+  readonly predictionTimes: readonly number[]
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<MultiStateSurvivalOutcome> {
+  const request = newWorkerRequestId()
+  return post('multi-state-survival-succeeded', { kind: 'multi-state-survival', request, values, rows, columns, ...design }, values, onProgress)
+}
 
 export function runCountGlm(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly family: 'poisson' | 'negativeBinomial' }): Promise<CountGlmOutcome> {
   const request = newWorkerRequestId()

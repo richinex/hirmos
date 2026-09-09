@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { isNumericDuckDbType } from '@/domain/dataset'
+import { chapterLabel } from '@/domain/navigation'
 import type { SelectedSource } from '@/domain/workflow'
 import { FigureParts } from '@/components/ui/figures'
 import { figureGrid, label, literal, num } from '@/components/ui/recipes'
@@ -32,7 +33,7 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
     <section className="rise @container/studio flex w-full flex-col gap-5" aria-labelledby="data-profile-title">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <span className={label('text-faint')}>02 · Data studio</span>
+          <span className={label('text-faint')}>{chapterLabel('data')}</span>
           <h2 id="data-profile-title" className="mb-0 mt-2 text-heading text-ink">Data profile</h2>
           <p className="mb-0 mt-1 text-body text-muted">{profile.source.fileName}</p>
         </div>

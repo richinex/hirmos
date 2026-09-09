@@ -1,9 +1,31 @@
 import type { ResultInterpretation as ResultInterpretationModel } from '@/domain/resultInterpretation'
-import { assertNever } from '@/domain/dop'
+import { assertNever, isNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { well } from './recipes'
 import { prose } from '@/components/ui/recipes'
 
-const statementClass = (kind: ResultInterpretationModel['statements'][number]['kind']): string => {
+type StatementKind = ResultInterpretationModel['statements'][number]['kind']
+type Statement = ResultInterpretationModel['statements'][number]
+
+interface InterpretationSection {
+  readonly kind: StatementKind
+  readonly statements: NonEmptyArray<Statement>
+}
+
+type InterpretationContext = 'result' | 'sensitivity-check' | 'discovery-run'
+
+const SECTION_ORDER: readonly StatementKind[] = ['magnitude', 'comparison', 'uncertainty', 'qualification']
+
+const sectionLabel = (kind: StatementKind): string => {
+  switch (kind) {
+    case 'magnitude': return 'Bottom line'
+    case 'comparison': return 'Checks and comparisons'
+    case 'uncertainty': return 'Uncertainty'
+    case 'qualification': return 'What must be true'
+    default: return assertNever(kind)
+  }
+}
+
+const sectionClass = (kind: StatementKind): string => {
   switch (kind) {
     case 'magnitude': return 'text-ink'
     case 'uncertainty':
@@ -13,17 +35,39 @@ const statementClass = (kind: ResultInterpretationModel['statements'][number]['k
   }
 }
 
+const interpretationTitle = (context: InterpretationContext): string => {
+  switch (context) {
+    case 'result': return 'What this result means'
+    case 'sensitivity-check': return 'What this check means'
+    case 'discovery-run': return 'What this discovery run means'
+    default: return assertNever(context)
+  }
+}
+
 /** The shared prose companion to a numerical result. Every sentence comes from recorded facts. */
-export function ResultInterpretation({ interpretation, className = '' }: {
+export function ResultInterpretation({ interpretation, className = '', context = 'result' }: {
   readonly interpretation: ResultInterpretationModel
   readonly className?: string
+  readonly context?: InterpretationContext
 }) {
+  const sections: readonly InterpretationSection[] = SECTION_ORDER.flatMap((kind) => {
+    const statements = interpretation.statements.filter((statement) => statement.kind === kind)
+    return isNonEmpty(statements) ? [{ kind, statements }] : []
+  })
+
   return (
     <section className={well(`px-3 py-3 ${className}`.trim())} aria-label="Interpretation">
-      <h4 className="m-0 text-faint text-label font-medium">What this result means</h4>
-      <div className="mt-2 space-y-1.5">
-        {interpretation.statements.map((statement, index) => (
-          <p key={`${statement.kind}-${index}`} className={prose(`m-0 ${statementClass(statement.kind)}`)}>{statement.text}</p>
+      <h4 className="m-0 text-faint text-label font-medium">{interpretationTitle(context)}</h4>
+      <div className="mt-3 space-y-3">
+        {sections.map((section, sectionIndex) => (
+          <section key={section.kind} className={sectionIndex === 0 ? '' : 'border-t border-hair pt-3'}>
+            <h5 className="m-0 text-label font-medium text-bone">{sectionLabel(section.kind)}</h5>
+            <div className="mt-1 space-y-1.5">
+              {section.statements.map((statement, statementIndex) => (
+                <p key={`${statement.kind}-${statementIndex}`} className={prose(`m-0 ${sectionClass(statement.kind)}`)}>{statement.text}</p>
+              ))}
+            </div>
+          </section>
         ))}
       </div>
     </section>

@@ -22,9 +22,10 @@ import { DEFAULT_DYNAMIC_LINEAR_SCM, DEFAULT_LINEAR_SCM, evaluateCounterfactualE
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import { COUNTERFACTUAL_METHODS, DYNAMIC_LINEAR_SCM_METHOD_ID, LINEAR_SCM_METHOD_ID, methodDefinition } from '@/domain/methods'
 import { stationaryMarksFromGraph } from '@/domain/estimation'
-import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
+import { frequencyUnit, type PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { estimandSentence, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatStatistic, formatWords } from '@/lib/format/number'
@@ -261,7 +262,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
   const dynamicBootstrap = dynamicConfiguration?.uncertainty.kind === 'blockBootstrap' ? dynamicConfiguration.uncertainty : null
   const methodId = state.configuration.kind === 'linear-scm' ? LINEAR_SCM_METHOD_ID : DYNAMIC_LINEAR_SCM_METHOD_ID
   const method = methodDefinition(methodId)
-  const stepLabel = prepared.kind === 'prepared-time-series' ? 'observation' : 'row'
+  const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
   const eligibility = useMemo(
     () => (identification === null || study === null || !method.ok ? null : evaluateCounterfactualEligibility(method.value, { study, identification: identification.result, prepared, configuration: state.configuration })),
     [identification, method, prepared, state.configuration, study],
@@ -389,7 +390,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
   const stage = (
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>08 · Counterfactuals</span>
+        <span className={label('text-faint')}>{chapterLabel('counterfactual')}</span>
         <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate counterfactual outcomes</h2>
         <p className={chapterIntro}>A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
       </div>

@@ -35,6 +35,7 @@ import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
+import { parseComparisonSurvivalEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence } from '@/domain/survival'
 import {
   analysisProgressSchema,
   parseAnalysisRefusal,
@@ -87,6 +88,12 @@ const sampleArrays = (command: AnalysisWorkerCommand): readonly [Uint8Array, Uin
 
 const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
+    case 'flexsurv':
+      return { kind: 'flexSurv', rows: command.rows, columns: command.columns, observation: command.observation, covariates: command.covariates, family: command.family, predictionTimes: command.predictionTimes }
+    case 'comparison-survival':
+      return { kind: 'comparisonSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, group: command.group, truncationTime: command.truncationTime, permutations: command.permutations, seed: command.seed }
+    case 'multi-state-survival':
+      return { kind: 'multiStateSurvival', rows: command.rows, columns: command.columns, start: command.start, stop: command.stop, event: command.event, from: command.from, to: command.to, family: command.family, predictionTimes: command.predictionTimes }
     case 'stationarity-battery':
       return { kind: 'stationarityBattery' }
     case 'multicollinearity':
@@ -429,6 +436,24 @@ self.onmessage = (message: MessageEvent<unknown>) => {
       return
     }
     switch (command.kind) {
+      case 'flexsurv': {
+        const result = parseFlexSurvEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'flexsurv-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'comparison-survival': {
+        const result = parseComparisonSurvivalEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'comparison-survival-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'multi-state-survival': {
+        const result = parseMultiStateSurvivalEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'multi-state-survival-succeeded', request: command.request, result: result.value })
+        return
+      }
       case 'stationarity-battery': {
         const result = parseStationarityBattery(decoded)
         if (!result.ok) {

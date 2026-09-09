@@ -1,7 +1,7 @@
 use hirmos_causal_core::nprandom::Mt19937;
 use hirmos_causal_core::{
     identify_instrument_set, instrumental_variable, instrumental_variable_with_progress, Dag,
-    DowhyBootstrap, IvEstimator, IvError, IvInput, IvOptions,
+    DowhyBootstrap, IvError, IvEstimator, IvInput, IvOptions,
 };
 use nalgebra::DMatrix;
 use serde_json::Value;
@@ -130,7 +130,10 @@ impl Dataset {
     }
 
     fn column_index(&self, name: &str) -> usize {
-        self.columns.iter().position(|column| column == name).unwrap()
+        self.columns
+            .iter()
+            .position(|column| column == name)
+            .unwrap()
     }
 }
 
@@ -188,14 +191,22 @@ struct LinearConfig {
 
 /// `dowhy.datasets.linear_dataset` for the settings the upstream test sweeps: no effect
 /// modifiers, no front-door variables, no discrete variables, `beta` recycled to every treatment.
-fn linear_dataset(stream: &mut LegacyStream, config: LinearConfig, rows: usize, beta: f64) -> Dataset {
+fn linear_dataset(
+    stream: &mut LegacyStream,
+    config: LinearConfig,
+    rows: usize,
+    beta: f64,
+) -> Dataset {
     let k = config.treatments;
     let betas = vec![beta; k];
     let mut common = Vec::new();
     let mut c1 = Vec::new();
     let mut c2 = Vec::new();
     if config.common_causes > 0 {
-        assert_eq!(config.common_causes, 1, "identity SVD only holds for one common cause");
+        assert_eq!(
+            config.common_causes, 1,
+            "identity SVD only holds for one common cause"
+        );
         let range = 0.5 + beta.abs() * 0.5;
         let means: Vec<f64> = (0..config.common_causes)
             .map(|_| stream.uniform(-1.0, 1.0))
@@ -241,7 +252,9 @@ fn linear_dataset(stream: &mut LegacyStream, config: LinearConfig, rows: usize, 
     if config.common_causes > 0 {
         for (row, w) in treatment.iter_mut().zip(&common) {
             for (j, value) in row.iter_mut().enumerate() {
-                let terms: Vec<(f64, f64)> = (0..config.common_causes).map(|c| (w[c], c1[c * k + j])).collect();
+                let terms: Vec<(f64, f64)> = (0..config.common_causes)
+                    .map(|c| (w[c], c1[c * k + j]))
+                    .collect();
                 *value += blas_dot(&terms);
             }
         }
@@ -249,7 +262,9 @@ fn linear_dataset(stream: &mut LegacyStream, config: LinearConfig, rows: usize, 
     if config.instruments > 0 {
         for (row, z) in treatment.iter_mut().zip(&instruments) {
             for (j, value) in row.iter_mut().enumerate() {
-                let terms: Vec<(f64, f64)> = (0..config.instruments).map(|i| (z[i], cz[i * k + j])).collect();
+                let terms: Vec<(f64, f64)> = (0..config.instruments)
+                    .map(|i| (z[i], cz[i * k + j]))
+                    .collect();
                 *value += blas_dot(&terms);
             }
         }
@@ -267,7 +282,8 @@ fn linear_dataset(stream: &mut LegacyStream, config: LinearConfig, rows: usize, 
         }
         if config.common_causes > 0 {
             for (row, w) in y.iter_mut().zip(&common) {
-                let terms: Vec<(f64, f64)> = (0..config.common_causes).map(|c| (w[c], c2[c])).collect();
+                let terms: Vec<(f64, f64)> =
+                    (0..config.common_causes).map(|c| (w[c], c2[c])).collect();
                 *row += blas_dot(&terms);
             }
         }
@@ -303,7 +319,9 @@ fn linear_dataset(stream: &mut LegacyStream, config: LinearConfig, rows: usize, 
         .collect();
     let graph = dowhy_graph(&columns);
     Dataset {
-        treatments: (0..k).map(|i| config.instruments + config.common_causes + i).collect(),
+        treatments: (0..k)
+            .map(|i| config.instruments + config.common_causes + i)
+            .collect(),
         instruments: (0..config.instruments).collect(),
         outcome: columns.len() - 1,
         columns,
@@ -314,7 +332,12 @@ fn linear_dataset(stream: &mut LegacyStream, config: LinearConfig, rows: usize, 
 }
 
 /// `dowhy.datasets.simple_iv_dataset`: one standard-normal instrument, one uniform common cause.
-fn simple_iv_dataset(stream: &mut LegacyStream, rows: usize, beta: f64, binary_treatment: bool) -> Dataset {
+fn simple_iv_dataset(
+    stream: &mut LegacyStream,
+    rows: usize,
+    beta: f64,
+    binary_treatment: bool,
+) -> Dataset {
     let c1 = stream.uniform(0.0, 1.0);
     let c2 = stream.uniform(0.0, 1.0);
     let range_cz = 1.0 + beta.abs();
@@ -363,13 +386,30 @@ fn dataset_matches_snapshot(dataset: &Dataset, record: &Value, label: &str) {
     }
     let sums = floats(&record["column_sums"]);
     for (column, want) in sums.iter().enumerate() {
-        let got = dataset.column(column).iter().fold(0.0, |total, value| total + value);
-        close(&format!("{label}: sum of column {column}"), got, *want, 1e-9 * want.abs().max(1.0));
+        let got = dataset
+            .column(column)
+            .iter()
+            .fold(0.0, |total, value| total + value);
+        close(
+            &format!("{label}: sum of column {column}"),
+            got,
+            *want,
+            1e-9 * want.abs().max(1.0),
+        );
     }
-    close(&format!("{label}: true ATE"), dataset.ate, record["true_ate"].as_f64().unwrap(), 1e-12);
+    close(
+        &format!("{label}: true ATE"),
+        dataset.ate,
+        record["true_ate"].as_f64().unwrap(),
+        1e-12,
+    );
     let instruments: Vec<String> = serde_json::from_value(record["instruments"].clone()).unwrap();
-    let want: Vec<usize> = instruments.iter().map(|name| dataset.column_index(name)).collect();
-    let got = identify_instrument_set(&dataset.graph, &dataset.treatments, &[dataset.outcome]).unwrap();
+    let want: Vec<usize> = instruments
+        .iter()
+        .map(|name| dataset.column_index(name))
+        .collect();
+    let got =
+        identify_instrument_set(&dataset.graph, &dataset.treatments, &[dataset.outcome]).unwrap();
     assert_eq!(got, want, "{label}: instruments");
 }
 
@@ -390,19 +430,31 @@ fn fixture() -> Value {
 fn instrument_search_matches_get_instruments_on_hand_built_graphs() {
     // Z -> X -> Y with a latent U into X and Y: Z is the instrument, U is not.
     let classic = Dag::new(4, &[(0, 1), (1, 2), (3, 1), (3, 2)]);
-    assert_eq!(identify_instrument_set(&classic, &[1], &[2]).unwrap(), vec![0]);
+    assert_eq!(
+        identify_instrument_set(&classic, &[1], &[2]).unwrap(),
+        vec![0]
+    );
 
     // A parent of X that also reaches Y directly fails exclusion.
     let direct = Dag::new(3, &[(0, 1), (1, 2), (0, 2)]);
-    assert_eq!(identify_instrument_set(&direct, &[1], &[2]).unwrap(), Vec::<usize>::new());
+    assert_eq!(
+        identify_instrument_set(&direct, &[1], &[2]).unwrap(),
+        Vec::<usize>::new()
+    );
 
     // A parent of X that descends from a cause of Y fails as-if-random.
     let confounded = Dag::new(4, &[(3, 0), (3, 2), (0, 1), (1, 2)]);
-    assert_eq!(identify_instrument_set(&confounded, &[1], &[2]).unwrap(), Vec::<usize>::new());
+    assert_eq!(
+        identify_instrument_set(&confounded, &[1], &[2]).unwrap(),
+        Vec::<usize>::new()
+    );
 
     // The reference returns every qualifying parent, observed or not.
     let latent_instrument = Dag::new(4, &[(0, 1), (3, 1), (1, 2)]);
-    assert_eq!(identify_instrument_set(&latent_instrument, &[1], &[2]).unwrap(), vec![0, 3]);
+    assert_eq!(
+        identify_instrument_set(&latent_instrument, &[1], &[2]).unwrap(),
+        vec![0, 3]
+    );
 
     assert!(identify_instrument_set(&classic, &[], &[2]).is_err());
     assert!(identify_instrument_set(&classic, &[1], &[1]).is_err());
@@ -460,7 +512,11 @@ fn upstream_dowhy_test_replays_at_its_seed_and_configuration_order() {
             "estimate" => {
                 assert_eq!(record["expected"], "estimate");
                 let got = result.expect(&label);
-                assert_eq!(got.estimator, estimator_named(expected["estimator"].as_str().unwrap()), "{label}");
+                assert_eq!(
+                    got.estimator,
+                    estimator_named(expected["estimator"].as_str().unwrap()),
+                    "{label}"
+                );
                 let want = expected["value"].as_f64().unwrap();
                 max_estimate_deviation = max_estimate_deviation.max((got.estimate - want).abs());
                 // Two-stage least squares accumulates its 100,000-term normal equations in
@@ -474,9 +530,24 @@ fn upstream_dowhy_test_replays_at_its_seed_and_configuration_order() {
                     IvEstimator::TwoStageLeastSquares => (1e-9, 1e-9),
                     IvEstimator::WaldRatio | IvEstimator::CovarianceRatio => (1e-12, 1e-12),
                 };
-                close(&format!("{label}: estimate"), got.estimate, want, estimate_tolerance);
-                for (i, (param, want)) in got.params.iter().zip(floats(&expected["params"])).enumerate() {
-                    close(&format!("{label}: parameter {i}"), *param, want, parameter_tolerance);
+                close(
+                    &format!("{label}: estimate"),
+                    got.estimate,
+                    want,
+                    estimate_tolerance,
+                );
+                for (i, (param, want)) in got
+                    .params
+                    .iter()
+                    .zip(floats(&expected["params"]))
+                    .enumerate()
+                {
+                    close(
+                        &format!("{label}: parameter {i}"),
+                        *param,
+                        want,
+                        parameter_tolerance,
+                    );
                 }
                 let parameter_deviation = got
                     .params
@@ -505,8 +576,12 @@ fn seeded_bootstrap_matches_dowhy_on_every_estimator_route() {
     let rows = fixture["upstream_test"]["rows"].as_u64().unwrap() as usize;
     let beta = fixture["upstream_test"]["beta"].as_f64().unwrap();
     let bootstrap = DowhyBootstrap {
-        simulations: fixture["reference"]["bootstrap_simulations"].as_u64().unwrap() as usize,
-        sample_size_fraction: fixture["reference"]["bootstrap_sample_fraction"].as_f64().unwrap(),
+        simulations: fixture["reference"]["bootstrap_simulations"]
+            .as_u64()
+            .unwrap() as usize,
+        sample_size_fraction: fixture["reference"]["bootstrap_sample_fraction"]
+            .as_f64()
+            .unwrap(),
         confidence_level: fixture["reference"]["confidence_level"].as_f64().unwrap(),
         seed: fixture["reference"]["bootstrap_seed"].as_u64().unwrap() as u32,
     };
@@ -519,14 +594,24 @@ fn seeded_bootstrap_matches_dowhy_on_every_estimator_route() {
                 &mut stream,
                 LinearConfig {
                     common_causes: 1,
-                    instruments: if name == "two-stage-least-squares" { 2 } else { 1 },
-                    treatments: if name == "two-stage-least-squares" { 2 } else { 1 },
+                    instruments: if name == "two-stage-least-squares" {
+                        2
+                    } else {
+                        1
+                    },
+                    treatments: if name == "two-stage-least-squares" {
+                        2
+                    } else {
+                        1
+                    },
                     binary_treatment: name == "wald-ratio",
                 },
                 rows,
                 beta,
             ),
-            "simple_iv_dataset" => simple_iv_dataset(&mut stream, rows, beta, name.ends_with("binary-treatment")),
+            "simple_iv_dataset" => {
+                simple_iv_dataset(&mut stream, rows, beta, name.ends_with("binary-treatment"))
+            }
             other => panic!("unknown generator {other}"),
         };
         dataset_matches_snapshot(&dataset, case, name);
@@ -548,20 +633,44 @@ fn seeded_bootstrap_matches_dowhy_on_every_estimator_route() {
         )
         .unwrap();
         let expected = &case["result"];
-        assert_eq!(got.estimator, estimator_named(expected["estimator"].as_str().unwrap()), "{name}");
-        close(&format!("{name}: estimate"), got.estimate, expected["value"].as_f64().unwrap(), 1e-9);
+        assert_eq!(
+            got.estimator,
+            estimator_named(expected["estimator"].as_str().unwrap()),
+            "{name}"
+        );
+        close(
+            &format!("{name}: estimate"),
+            got.estimate,
+            expected["value"].as_f64().unwrap(),
+            1e-9,
+        );
 
         let draws = floats(&expected["bootstrap_estimates"]);
         assert_eq!(got.bootstrap_estimates.len(), draws.len());
         let mut max_draw_deviation = 0.0_f64;
         for (index, (got, want)) in got.bootstrap_estimates.iter().zip(&draws).enumerate() {
             max_draw_deviation = max_draw_deviation.max((got - want).abs());
-            close(&format!("{name}: bootstrap estimate {index}"), *got, *want, 1e-8);
+            close(
+                &format!("{name}: bootstrap estimate {index}"),
+                *got,
+                *want,
+                1e-8,
+            );
         }
         let interval = got.confidence_interval.unwrap();
         let want_interval = floats(&expected["confidence_interval"]);
-        close(&format!("{name}: interval lower"), interval[0], want_interval[0], 1e-8);
-        close(&format!("{name}: interval upper"), interval[1], want_interval[1], 1e-8);
+        close(
+            &format!("{name}: interval lower"),
+            interval[0],
+            want_interval[0],
+            1e-8,
+        );
+        close(
+            &format!("{name}: interval upper"),
+            interval[1],
+            want_interval[1],
+            1e-8,
+        );
         close(
             &format!("{name}: standard error"),
             got.standard_error.unwrap(),
@@ -569,7 +678,10 @@ fn seeded_bootstrap_matches_dowhy_on_every_estimator_route() {
             1e-10,
         );
         assert_eq!(progress.first(), Some(&(0, bootstrap.simulations)));
-        assert_eq!(progress.last(), Some(&(bootstrap.simulations, bootstrap.simulations)));
+        assert_eq!(
+            progress.last(),
+            Some(&(bootstrap.simulations, bootstrap.simulations))
+        );
         assert_eq!(progress.len(), bootstrap.simulations + 1);
         println!(
             "{name}: estimate dev={:.3e}, bootstrap max dev={max_draw_deviation:.3e}, CI max dev={:.3e}, SE dev={:.3e}",
@@ -597,7 +709,8 @@ fn invalid_inputs_are_reported_at_the_boundary() {
     .unwrap_err();
     assert_eq!(error, IvError::NoInstruments);
 
-    let two_treatments = DMatrix::from_column_slice(4, 2, &[0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]);
+    let two_treatments =
+        DMatrix::from_column_slice(4, 2, &[0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0]);
     let error = instrumental_variable(
         IvInput {
             treatments: &two_treatments,

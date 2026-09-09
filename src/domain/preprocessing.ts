@@ -20,6 +20,18 @@ export type StationarityEvidenceId = Brand<string, 'StationarityEvidenceId'>
 
 export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
 
+/** The singular calendar unit represented by one row of a regular series. */
+export function frequencyUnit(frequency: Frequency): 'day' | 'week' | 'month' | 'quarter' | 'year' {
+  switch (frequency) {
+    case 'daily': return 'day'
+    case 'weekly': return 'week'
+    case 'monthly': return 'month'
+    case 'quarterly': return 'quarter'
+    case 'yearly': return 'year'
+    default: return assertNever(frequency)
+  }
+}
+
 export type SamplingDraft =
   | { readonly kind: 'unconfigured' }
   | { readonly kind: 'cross-sectional' }

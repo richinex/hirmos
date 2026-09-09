@@ -8,22 +8,22 @@ export interface ImpactPathView {
   readonly outcome: string
   readonly points: readonly TimeEffectPoint[]
   readonly stepLabel: string
-  /** Another run of the same question, drawn as a faint ghost so its counterfactual can be read against this one. */
+  /** Another run of the same question, drawn faintly so its estimated no-intervention path can be compared. */
   readonly ghost?: { readonly name: string; readonly points: readonly TimeEffectPoint[] }
 }
 
-/** The post-intervention window: the outcome as a hairline, its counterfactual as a dashed line inside its band. */
+/** The post-intervention window: the outcome as a hairline, its estimated no-intervention path dashed inside its band. */
 export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChartsCoreOption {
   const first = view.points[0]?.step ?? 1
   const last = view.points.at(-1)?.step ?? first
   const ghost = view.ghost ?? null
   const ghostAt = new Map(ghost?.points.map((point) => [point.step, point]) ?? [])
-  const description = `${view.outcome} against its counterfactual over ${formatCount(view.points.length).text} post-intervention ${view.stepLabel}s, ${view.stepLabel} ${first} to ${last}.${ghost === null ? '' : ` The counterfactual of ${ghost.name} is drawn as a ghost for comparison.`}`
+  const description = `${view.outcome} against its estimated no-intervention path over ${formatCount(view.points.length).text} post-intervention ${view.stepLabel}s, ${view.stepLabel} ${first} to ${last}.${ghost === null ? '' : ` The estimated no-intervention path from ${ghost.name} is drawn faintly for comparison.`}`
   return {
     ...baseOption(theme, description),
     // The slider sits under the axis name; the legend goes above the plot.
     grid: gridAuto({ top: 30, bottom: 64 }),
-    legend: { ...legend(theme, ghost === null ? ['counterfactual', 'observed'] : ['counterfactual', 'observed', ghost.name]), bottom: 'auto', top: 0 },
+    legend: { ...legend(theme, ghost === null ? ['estimated no intervention', 'observed'] : ['estimated no intervention', 'observed', ghost.name]), bottom: 'auto', top: 0 },
     ...rangeSelection(theme),
     tooltip: {
       ...tooltip(theme, 'axis'),
@@ -36,8 +36,8 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
         const point = view.points[index]
         if (point === undefined) return ''
         const other = ghostAt.get(point.step)
-        const comparison = ghost === null || other === undefined ? '' : `<br/>${ghost.name}: counterfactual ${formatStatistic('raw', other.counterfactual).text}, effect ${formatStatistic('raw', other.effect).text} (${formatStatistic('raw', point.effect - other.effect).text} apart)`
-        return `${view.stepLabel} ${point.step}<br/>observed <strong>${formatStatistic('raw', point.actual).text}</strong><br/>counterfactual ${formatStatistic('raw', point.counterfactual).text} [${formatStatistic('raw', point.lower).text}, ${formatStatistic('raw', point.upper).text}]<br/>effect <strong>${formatStatistic('raw', point.effect).text}</strong>${comparison}`
+        const comparison = ghost === null || other === undefined ? '' : `<br/>${ghost.name}: no-intervention estimate ${formatStatistic('raw', other.counterfactual).text}, difference ${formatStatistic('raw', other.effect).text} (${formatStatistic('raw', point.effect - other.effect).text} apart)`
+        return `${view.stepLabel} ${point.step}<br/>observed <strong>${formatStatistic('raw', point.actual).text}</strong><br/>estimated no intervention ${formatStatistic('raw', point.counterfactual).text} [${formatStatistic('raw', point.lower).text}, ${formatStatistic('raw', point.upper).text}]<br/>difference <strong>${formatStatistic('raw', point.effect).text}</strong>${comparison}`
       },
     },
     xAxis: {
@@ -57,7 +57,7 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
     },
     yAxis: { ...valueAxis(theme), scale: true },
     series: [
-      // The ghost is the other run's counterfactual: faint and dashed, behind everything this run draws.
+      // The ghost is the other run's no-intervention path: faint and dashed behind this run.
       ...(ghost === null ? [] : [{
         type: 'line',
         name: ghost.name,
@@ -90,7 +90,7 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
       },
       {
         type: 'line',
-        name: 'counterfactual',
+        name: 'estimated no intervention',
         data: view.points.map((point) => [point.step, point.counterfactual]),
         lineStyle: { color: theme.muted, width: 1.2, type: 'dashed' },
         symbol: 'none',

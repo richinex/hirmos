@@ -10,6 +10,21 @@ import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type Pan
 import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TLearnerEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
+import {
+  comparisonSurvivalEvidenceSchema,
+  flexSurvEvidenceSchema,
+  multiStateSurvivalEvidenceSchema,
+  parametricSurvivalFamilySchema,
+  proportionalHazardsFamilySchema,
+  parseComparisonSurvivalEvidence,
+  parseFlexSurvEvidence,
+  parseMultiStateSurvivalEvidence,
+  type ComparisonSurvivalEvidence,
+  type FlexSurvEvidence,
+  type MultiStateSurvivalEvidence,
+  type ParametricSurvivalFamily,
+  type ProportionalHazardsFamily,
+} from '@/domain/survival'
 
 /** The groups a double machine learning run averages within, or none for the plain average. */
 export const dmlGroupsRequestSchema = z.discriminatedUnion('kind', [
@@ -136,6 +151,46 @@ export type TemporalSamples =
     }
 
 export type AnalysisWorkerCommand =
+  | {
+      readonly kind: 'flexsurv'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly observation:
+        | { readonly kind: 'rightCensored'; readonly duration: number; readonly event: number }
+        | { readonly kind: 'startStop'; readonly start: number; readonly stop: number; readonly event: number }
+      readonly covariates: readonly number[]
+      readonly family: ParametricSurvivalFamily
+      readonly predictionTimes: readonly number[]
+    }
+  | {
+      readonly kind: 'comparison-survival'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly duration: number
+      readonly event: number
+      readonly group: number
+      readonly truncationTime: number
+      readonly permutations: number
+      readonly seed: number
+    }
+  | {
+      readonly kind: 'multi-state-survival'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly start: number
+      readonly stop: number
+      readonly event: number
+      readonly from: number
+      readonly to: number
+      readonly family: ProportionalHazardsFamily
+      readonly predictionTimes: readonly number[]
+    }
   | {
       readonly kind: 'stationarity-battery'
       readonly request: WorkerRequestId
@@ -813,6 +868,9 @@ export type AnalysisWorkerEvent =
     }
   | { readonly kind: 'multicollinearity-succeeded'; readonly request: WorkerRequestId; readonly result: MulticollinearityEvidence }
   | { readonly kind: 'pandas-resampling-succeeded'; readonly request: WorkerRequestId; readonly result: PandasResamplingEvidence }
+  | { readonly kind: 'flexsurv-succeeded'; readonly request: WorkerRequestId; readonly result: FlexSurvEvidence }
+  | { readonly kind: 'comparison-survival-succeeded'; readonly request: WorkerRequestId; readonly result: ComparisonSurvivalEvidence }
+  | { readonly kind: 'multi-state-survival-succeeded'; readonly request: WorkerRequestId; readonly result: MultiStateSurvivalEvidence }
   | {
       readonly kind: 'pcmci-plus-succeeded'
       readonly request: WorkerRequestId
@@ -973,6 +1031,71 @@ const constraintCommandBaseSchema = z.object({
 })
 
 const commandSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('flexsurv'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(2),
+    columns: z.number().int().min(2).max(256),
+    observation: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('rightCensored'), duration: z.number().int().nonnegative(), event: z.number().int().nonnegative() }).strict(),
+      z.object({ kind: z.literal('startStop'), start: z.number().int().nonnegative(), stop: z.number().int().nonnegative(), event: z.number().int().nonnegative() }).strict(),
+    ]),
+    covariates: z.array(z.number().int().nonnegative()),
+    family: parametricSurvivalFamilySchema,
+    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+  }).strict().superRefine((value, context) => {
+    const roles = value.observation.kind === 'rightCensored'
+      ? [value.observation.duration, value.observation.event]
+      : [value.observation.start, value.observation.stop, value.observation.event]
+    const selected = [...roles, ...value.covariates]
+    if (new Set(roles).size !== roles.length || new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'Survival roles and covariates must be distinct columns inside the matrix.' })
+    }
+    if (value.observation.kind === 'startStop' && !proportionalHazardsFamilySchema.safeParse(value.family).success) {
+      context.addIssue({ code: 'custom', message: 'Start-stop data requires a proportional-hazards family.' })
+    }
+  }),
+  z.object({
+    kind: z.literal('comparison-survival'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(4),
+    columns: z.number().int().min(3).max(256),
+    duration: z.number().int().nonnegative(),
+    event: z.number().int().nonnegative(),
+    group: z.number().int().nonnegative(),
+    truncationTime: z.number().finite().positive(),
+    permutations: z.number().int().min(1).max(100_000),
+    seed: z.number().int().nonnegative(),
+  }).strict().superRefine((value, context) => {
+    const selected = [value.duration, value.event, value.group]
+    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'Duration, event, and group must be three distinct columns inside the matrix.' })
+    }
+  }),
+  z.object({
+    kind: z.literal('multi-state-survival'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(2),
+    columns: z.number().int().min(5).max(256),
+    start: z.number().int().nonnegative(),
+    stop: z.number().int().nonnegative(),
+    event: z.number().int().nonnegative(),
+    from: z.number().int().nonnegative(),
+    to: z.number().int().nonnegative(),
+    family: proportionalHazardsFamilySchema,
+    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+  }).strict().superRefine((value, context) => {
+    const selected = [value.start, value.stop, value.event, value.from, value.to]
+    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'Multi-state roles must be five distinct columns inside the matrix.' })
+    }
+    if (value.predictionTimes.some((time, index) => index > 0 && value.predictionTimes[index - 1]! > time)) {
+      context.addIssue({ code: 'custom', message: 'Multi-state prediction times must be ordered.' })
+    }
+  }),
   z.object({
     kind: z.literal('stationarity-battery'),
     request: requestSchema,
@@ -1614,6 +1737,9 @@ const eventSchema = z.discriminatedUnion('kind', [
     result: stationarityBatterySchema,
   }).strict(),
   z.object({ kind: z.literal('multicollinearity-succeeded'), request: requestSchema, result: multicollinearityEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('flexsurv-succeeded'), request: requestSchema, result: flexSurvEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('comparison-survival-succeeded'), request: requestSchema, result: comparisonSurvivalEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('multi-state-survival-succeeded'), request: requestSchema, result: multiStateSurvivalEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('pandas-resampling-succeeded'),
     request: requestSchema,
@@ -1803,6 +1929,18 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (!request.ok) return err({ kind: 'invalid-event', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'analysis-failed') return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'analysis-progress') return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'flexsurv-succeeded') {
+    const result = parseFlexSurvEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'flexsurv-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'comparison-survival-succeeded') {
+    const result = parseComparisonSurvivalEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'comparison-survival-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'multi-state-survival-succeeded') {
+    const result = parseMultiStateSurvivalEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'multi-state-survival-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
   if (parsed.data.kind === 'multicollinearity-succeeded') {
     const result = parseMulticollinearityEvidence(parsed.data.result)
     return result.ok

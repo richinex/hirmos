@@ -1101,7 +1101,7 @@ export interface TimeEffectPoint {
 
 export type EffectEstimate =
   | { readonly kind: 'additive'; readonly value: number; readonly unit: string }
-  | { readonly kind: 'incidenceRateRatio'; readonly value: number }
+  | { readonly kind: 'expectedCountRatio'; readonly value: number }
   | { readonly kind: 'path'; readonly values: NonEmptyArray<TimeEffectPoint>; readonly aggregate: { readonly cumulative: number; readonly average: number } }
   /** One additive effect per group of an effect modifier, with the whole-population average beside them. */
   | { readonly kind: 'byGroup'; readonly modifier: string; readonly overall: number; readonly groups: NonEmptyArray<GroupEffectEstimate> }
@@ -1112,7 +1112,7 @@ export type EffectEstimate =
 export const headlineValue = (effect: EffectEstimate): number => {
   switch (effect.kind) {
     case 'additive':
-    case 'incidenceRateRatio': return effect.value
+    case 'expectedCountRatio': return effect.value
     case 'path': return effect.aggregate.cumulative
     case 'byGroup':
     case 'perRow': return effect.overall
@@ -1635,7 +1635,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else if (timeSeries) leave('t-learner-independent-rows', 'The rows are a time series; the forests treat them as independent draws.')
       else satisfy('t-learner-independent-rows', 'The prepared dataset holds independent rows.')
       leave('t-learner-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio; a row with no nearby rows in one arm carries an extrapolated effect.')
-      leave('t-learner-row-effect-reading', 'Read each row’s effect as the average for rows with its covariate values, not as that row’s own counterfactual.')
+      leave('t-learner-row-effect-reading', 'Each row’s effect is the average for rows with its covariate values; it is not that row’s own observed counterfactual.')
       satisfy('t-learner-learner-settings', `The run records 200 trees, minimum leaf 5, and learner seed ${configuration.seed} for both arms.`)
       satisfy('t-learner-no-interval', 'The run reports each row’s effect as a point and no interval.')
       break
@@ -1951,7 +1951,7 @@ export function causalEstimateFrom(
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'incidenceRateRatio', value: evidence.incidenceRateRatio },
+        effect: { kind: 'expectedCountRatio', value: evidence.incidenceRateRatio },
         interval: { kind: 'confidence', level: evidence.level, lower: evidence.incidenceRateRatioInterval[0], upper: evidence.incidenceRateRatioInterval[1] },
         standardError: evidence.standardError,
         adjustment,
@@ -2062,7 +2062,7 @@ export function causalEstimateFrom(
       return {
         kind: 'causal-estimate', estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.syntheticDid.estimate, unit: '' },
-        interval: { kind: 'none', reason: placeboStandardError === null ? 'The panel result has no sampling interval; the requirements panel records why placebo variance was unavailable.' : 'The run reports placebo standard errors and an in-time placebo, but does not convert the placebo standard error into a confidence interval.' },
+        interval: { kind: 'none', reason: 'No confidence interval is shown for this result.' },
         standardError: placeboStandardError,
         adjustment: { kind: 'none' },
         sample: { observations: evidence.observations, parameters: evidence.syntheticDid.lambda.length + evidence.syntheticDid.omega.length, degreesOfFreedom: null },
@@ -2073,7 +2073,7 @@ export function causalEstimateFrom(
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'incidenceRateRatio', value: evidence.irrMedian },
+        effect: { kind: 'expectedCountRatio', value: evidence.irrMedian },
         interval: { kind: 'credible', level: 0.95, summary: 'ETI', lower: evidence.irrLower, upper: evidence.irrUpper },
         standardError: null,
         adjustment,
@@ -2138,7 +2138,7 @@ export function causalEstimateFrom(
           : { kind: 'none', reason: 'This run did not request bootstrap uncertainty.' },
         standardError: null,
         adjustment: applied,
-        sample: { observations: evidence.observations, parameters, degreesOfFreedom: null },
+        sample: { observations: evidence.fittedObservations, parameters, degreesOfFreedom: null },
       }
     }
     case 'causal-impact-run': {
@@ -2157,7 +2157,7 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'path', values: points, aggregate: { cumulative: evidence.cumulative, average: evidence.average } },
-        interval: { kind: 'none', reason: 'The port forecasts a pointwise band from the state variance; no interval for the cumulative effect is reported.' },
+        interval: { kind: 'none', reason: 'The shaded range is a pointwise forecast band for each no-intervention period. It is not a confidence interval for the average or cumulative difference.' },
         standardError: null,
         adjustment: { kind: 'none' },
         sample: { observations: evidence.observations, parameters: evidence.params.length, degreesOfFreedom: null },
@@ -2209,7 +2209,7 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'ardl-pss': return 'ARDL long run'
     case 'vecm': return 'VECM'
     case 'synthetic-control': return 'Synthetic control'
-    case 'panel-intervention': return 'Panel DID / synthetic DID'
+    case 'panel-intervention': return 'Panel difference-in-differences'
     case 'negbin-nuts': return 'Bayesian negative binomial'
     case 'bayesian-gaussian': return 'Bayesian Gaussian regression'
     case 'discrete-bn-query': return 'Discrete BN do-query'

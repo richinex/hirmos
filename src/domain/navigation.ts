@@ -10,17 +10,48 @@ export const CHAPTER_IDS = [
   'estimation',
   'sensitivity',
   'counterfactual',
+  'survival',
   'results',
 ] as const
 
 export type ChapterId = (typeof CHAPTER_IDS)[number]
 
-/** The chapters in the three stretches of the workflow, as the rail groups them. */
-export const CHAPTER_SECTIONS: readonly { readonly title: string; readonly chapters: readonly ChapterId[] }[] = [
-  { title: 'Set up', chapters: ['projects', 'data'] },
-  { title: 'Model', chapters: ['discovery', 'dag', 'study'] },
-  { title: 'Estimate', chapters: ['estimation', 'sensitivity', 'counterfactual', 'results'] },
-]
+const CHAPTER_SECTION_TITLES = ['Set up', 'Model', 'Estimate', 'Time to event', 'Report'] as const
+type ChapterSectionTitle = (typeof CHAPTER_SECTION_TITLES)[number]
+
+export interface ChapterMetadata {
+  readonly name: string
+  readonly shortName: string
+  readonly icon: string
+  readonly section: ChapterSectionTitle
+}
+
+/** One catalog owns the text, icon, and section for every route in `CHAPTER_IDS`. */
+export const CHAPTER_METADATA = {
+  projects: { name: 'Projects', shortName: 'Projects', icon: 'folder_open', section: 'Set up' },
+  data: { name: 'Data studio', shortName: 'Data', icon: 'table_view', section: 'Set up' },
+  discovery: { name: 'Discovery lab', shortName: 'Discovery', icon: 'schema', section: 'Model' },
+  dag: { name: 'DAG workspace', shortName: 'DAG', icon: 'conversion_path', section: 'Model' },
+  study: { name: 'Study design', shortName: 'Study', icon: 'experiment', section: 'Model' },
+  estimation: { name: 'Estimation', shortName: 'Estimate', icon: 'query_stats', section: 'Estimate' },
+  sensitivity: { name: 'Sensitivity', shortName: 'Sensitivity', icon: 'fact_check', section: 'Estimate' },
+  counterfactual: { name: 'Counterfactuals', shortName: 'What if', icon: 'alt_route', section: 'Estimate' },
+  survival: { name: 'Survival analysis', shortName: 'Survival', icon: 'vital_signs', section: 'Time to event' },
+  results: { name: 'Results', shortName: 'Results', icon: 'monitoring', section: 'Report' },
+} as const satisfies Readonly<Record<ChapterId, ChapterMetadata>>
+
+/** Rail groups are derived from the catalog, so a chapter cannot drift into a second ordering table. */
+export const CHAPTER_SECTIONS: readonly { readonly title: ChapterSectionTitle; readonly chapters: readonly ChapterId[] }[] =
+  CHAPTER_SECTION_TITLES.map((title) => ({
+    title,
+    chapters: CHAPTER_IDS.filter((chapter) => CHAPTER_METADATA[chapter].section === title),
+  }))
+
+/** The numbered heading uses the same order and name as the navigation rail. */
+export const chapterLabel = (chapter: ChapterId): string => {
+  const position = CHAPTER_IDS.indexOf(chapter) + 1
+  return `${String(position).padStart(2, '0')} · ${CHAPTER_METADATA[chapter].name}`
+}
 
 const chapterSchema = z.enum(CHAPTER_IDS)
 

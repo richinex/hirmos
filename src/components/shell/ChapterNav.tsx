@@ -159,7 +159,7 @@ const CORNER = 'rounded-r-[26px]'
 
 /**
  * The chapter rail: a solid shape rising from the left edge under the round toggle, the mark at its
- * head, the nine chapters as icons in a lobe, and the project in a pill at its foot. Opening it sends
+ * head, the chapters as icons in a lobe, and the project in a pill at its foot. Opening it sends
  * the lobe and the pill out over the stage with the names, the numbers and the status glyphs; the
  * stage does not move. It closes on a choice, on Escape, and on a click anywhere else. When the shell
  * container is narrower than md the whole rail leaves the flow and slides in over a scrim; a swipe from
@@ -232,7 +232,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
         aria-label="Workspace chapters"
         inert={phone && !slidIn ? true : undefined}
         className={cn(
-          'panel-scroll absolute left-0 top-[84px] max-h-[calc(100%-84px-72px)] overflow-y-auto overflow-x-hidden bg-rail py-[18px] text-rail-ink transition-[width] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+          'absolute left-0 top-[84px] max-h-[calc(100%-84px-72px)] overflow-y-auto overflow-x-hidden bg-rail py-[18px] text-rail-ink transition-[width] duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
           CORNER,
           lobeOpen ? LOBE_OPEN : RAIL,
         )}

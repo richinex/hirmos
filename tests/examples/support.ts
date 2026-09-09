@@ -157,7 +157,8 @@ export const exportBundle = async (page: Page, example: ShippedExample): Promise
   if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) await panel.locator('summary').click()
   await page.getByRole('checkbox', { name: /Include the source file/ }).check()
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: /Export project/ }).click()
+  // The rail's pill offers the same export; the builder uses the one in the stage.
+  await page.locator('main').getByRole('button', { name: /Export project/ }).click()
   const target = bundleTarget(example)
   await (await download).saveAs(target)
   // The app recognises its saved copy of an example by this id, whichever build produced the bundle.

@@ -33,7 +33,7 @@ export type Precision =
 export type EffectScale =
   | { readonly kind: 'additive'; readonly unit: string }
   | { readonly kind: 'probabilityDifference' }
-  | { readonly kind: 'ratio'; readonly label: 'RR' | 'OR' | 'IRR' | 'HR' }
+  | { readonly kind: 'ratio'; readonly label: 'RR' | 'OR' | 'ECR' | 'IRR' | 'HR' }
   | { readonly kind: 'logRatio'; readonly label: 'log-odds' | 'log-RR' }
   | { readonly kind: 'elasticity' }
 
@@ -112,7 +112,7 @@ const scaleUnit = (scale: EffectScale): { readonly text: string; readonly attach
 
 const scalePrefix = (scale: EffectScale): string => {
   switch (scale.kind) {
-    case 'ratio': return { RR: 'risk ratio ', OR: 'odds ratio ', IRR: 'incidence rate ratio ', HR: 'hazard ratio ' }[scale.label]
+    case 'ratio': return { RR: 'risk ratio ', OR: 'odds ratio ', ECR: 'expected-count ratio ', IRR: 'incidence rate ratio ', HR: 'hazard ratio ' }[scale.label]
     case 'elasticity': return 'elasticity '
     case 'additive':
     case 'probabilityDifference':

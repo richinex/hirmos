@@ -2634,6 +2634,7 @@ dependencies = [
  "levenberg-marquardt",
  "libm",
  "nalgebra",
+ "puruspe",
  "regex",
  "rustfft",
  "sha1",
@@ -3002,6 +3003,16 @@ name = "khronos_api"
 version = "3.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
+
+[[package]]
+name = "lambert_w"
+version = "1.2.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f5f0846ee4f0299ca4c5b9ca06ff55cf88b3430a763bf591474cc734479c9b24"
+dependencies = [
+ "num-complex",
+ "num-traits",
+]
 
 [[package]]
 name = "lazy_static"
@@ -3913,6 +3924,16 @@ name = "pulp-wasm-simd-flag"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d8f70e07b9c3962945a74e59ca1c511bba65b6419468acc217c457d93f3c740"
+
+[[package]]
+name = "puruspe"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c9d62b4ad8b456f2ac8a171567bd475cae8cecd53ff5a46fce4f261eef17648"
+dependencies = [
+ "lambert_w",
+ "num-complex",
+]
 
 [[package]]
 name = "qd"

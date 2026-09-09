@@ -1,25 +1,29 @@
 import { useMemo, useState } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { EstimateHeadline } from '@/components/results/EstimateHeadline'
+import { SurvivalRunResult, survivalRunLabel } from '@/components/survival/SurvivalRunResult'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
-import { button, chapterIntro, chip, label, literal, num, panel, statusText, table, td, th, tr } from '@/components/ui/recipes'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
+import { button, chapterIntro, chip, label, literal, num, panel, statusText, table, td, th, tr, well } from '@/components/ui/recipes'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { Select } from '@/components/ui/Select'
 import type { CounterfactualRunArtifact } from '@/domain/counterfactual'
 import { describeDagBasis, describeDagValidation, type DagDocument } from '@/domain/dag'
 import type { DatasetProfile } from '@/domain/dataset'
 import { adjustmentLabels, describeEstimator, headlineValue, intervalTypeOf, type AppliedAdjustment, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
-import { describeSeriesTransform, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
+import { describeSeriesTransform, frequencyUnit, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import { buildResultManifest, compareResults, manifestFileName, manifestJson, type ResultManifest } from '@/domain/results'
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
+import type { SurvivalRunArtifact, SurvivalRunId } from '@/domain/survival'
 import { describeAssignmentKind, describeEstimand, describeStudyDesignCategory, estimandSentence, identifiedExpression, identifiedExpressionTex, studyDesignCategory, type IdentificationArtifact, type StudySpecification, type StudyVariable } from '@/domain/study'
 import { assertNever } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import { describeStationarityAssessment } from '@/domain/stationarityAssessment'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
-import { interpretEstimationResult, resultScaleLine } from '@/domain/resultInterpretation'
+import { interpretEstimationResult, resultHeadline, resultSampleLine, resultScaleLine } from '@/domain/resultInterpretation'
 
 const Row = RecordRow
 
@@ -85,7 +89,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <button type="button" className={button('outline')} onClick={download}>Export the manifest</button>
         </div>
         <div className="mt-3">
-          <EstimateHeadline estimate={estimate} sentence={study === null ? run.method : estimandSentence(study)} scaleLine={study === null ? (estimate.effect.kind === 'incidenceRateRatio' ? `incidence rate ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`) : resultScaleLine(run, study, stepLabel)} stepLabel={stepLabel} accent testId="result-figure" />
+          <EstimateHeadline estimate={estimate} sentence={study === null ? run.method : resultHeadline(run, study)} scaleLine={study === null ? (estimate.effect.kind === 'expectedCountRatio' ? `expected-count ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`) : resultScaleLine(run, study, stepLabel)} sampleLine={resultSampleLine(run)} stepLabel={stepLabel} accent testId="result-figure" />
         </div>
         {study !== null && <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />}
       </article>
@@ -172,7 +176,59 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
   )
 }
 
-export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns }: {
+type ResultView =
+  | { readonly kind: 'estimation'; readonly selected: EstimationRunId | null; readonly compareWith: EstimationRunId | null }
+  | { readonly kind: 'survival'; readonly selected: SurvivalRunId | null }
+
+const initialResultView = (
+  estimationRuns: readonly EstimationRunArtifact[],
+  survivalRuns: readonly SurvivalRunArtifact[],
+): ResultView => estimationRuns.length > 0
+  ? { kind: 'estimation', selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }
+  : { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null }
+
+const availableResultView = (
+  view: ResultView,
+  estimationRuns: readonly EstimationRunArtifact[],
+  survivalRuns: readonly SurvivalRunArtifact[],
+): ResultView => {
+  switch (view.kind) {
+    case 'estimation': {
+      if (estimationRuns.length === 0 && survivalRuns.length > 0) {
+        return { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null }
+      }
+      const selected = estimationRuns.some((run) => run.id === view.selected)
+        ? view.selected
+        : estimationRuns.at(-1)?.id ?? null
+      const compareWith = estimationRuns.some((run) => run.id === view.compareWith && run.id !== selected)
+        ? view.compareWith
+        : null
+      return { kind: view.kind, selected, compareWith }
+    }
+    case 'survival': {
+      if (survivalRuns.length === 0 && estimationRuns.length > 0) {
+        return { kind: 'estimation', selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }
+      }
+      return {
+        kind: view.kind,
+        selected: survivalRuns.some((run) => run.id === view.selected)
+          ? view.selected
+          : survivalRuns.at(-1)?.id ?? null,
+      }
+    }
+    default: return assertNever(view)
+  }
+}
+
+const resultIntroduction = (view: ResultView): string => {
+  switch (view.kind) {
+    case 'estimation': return 'A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.'
+    case 'survival': return 'Review the event definition, fitted curve or group comparison, uncertainty, and assumptions together. Survival results describe time until an event or movement between states; they are not causal effects unless a separate study design supports that interpretation.'
+    default: return assertNever(view)
+  }
+}
+
+export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -183,102 +239,69 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   readonly estimationRuns: readonly EstimationRunArtifact[]
   readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
+  readonly survivalRuns: readonly SurvivalRunArtifact[]
 }) {
-  const [selected, setSelected] = useState<EstimationRunId | null>(estimationRuns.at(-1)?.id ?? null)
-  const [compareWith, setCompareWith] = useState<EstimationRunId | null>(null)
-  const stepLabel = prepared.kind === 'prepared-time-series' ? 'observation' : 'row'
+  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns))
+  const activeView = availableResultView(view, estimationRuns, survivalRuns)
+  const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
   const inputs = useMemo(() => ({ source, profile, prepared, stationarity, documents, studies, identifications, sensitivityRuns, counterfactualRuns }), [counterfactualRuns, documents, identifications, prepared, profile, sensitivityRuns, source, stationarity, studies])
-  const run = estimationRuns.find((candidate) => candidate.id === selected) ?? null
-  const other = estimationRuns.find((candidate) => candidate.id === compareWith) ?? null
-  const manifest = useMemo(() => (run === null ? null : buildResultManifest(inputs, run, new Date().toISOString())), [inputs, run])
-  const otherManifest = useMemo(() => (other === null ? null : buildResultManifest(inputs, other, new Date().toISOString())), [inputs, other])
-  const differences = manifest !== null && otherManifest !== null ? compareResults(manifest, otherManifest) : []
   const studyOf = (candidate: EstimationRunArtifact) => studies.find((study) => study.id === candidate.study)
 
-  const stage = (
-    <section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5">
-      <div>
-        <span className={label('text-faint')}>09 · Results</span>
-        <h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2>
-        <p className={chapterIntro}>A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.</p>
-      </div>
-      <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
-        <label className="block">
-          <span className="block text-body font-medium text-ink">Estimate</span>
-          <Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={selected ?? ''} onChange={(event) => setSelected(event.target.value === '' ? null : (event.target.value as EstimationRunId))}>
-            <option value="" disabled>Choose a run</option>
-            {[...estimationRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} · {describeEstimator(candidate.configuration.kind)} · {formatTime(candidate.createdAt)}</option>)}
-          </Select>
-        </label>
-        <label className="block">
-          <span className="block text-body font-medium text-ink">Compare with</span>
-          <Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={compareWith ?? ''} onChange={(event) => setCompareWith(event.target.value === '' ? null : (event.target.value as EstimationRunId))}>
-            <option value="">None</option>
-            {[...estimationRuns].reverse().filter((candidate) => candidate.id !== selected).map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} · {describeEstimator(candidate.configuration.kind)} · {formatTime(candidate.createdAt)}</option>)}
-          </Select>
-        </label>
-      </div>
-      {otherManifest !== null && manifest !== null && (
-        <section className={panel('p-(--panel-space)')} aria-label="Differences">
-          <h3 className="mb-2 mt-0 text-faint text-label font-medium">Differences · {differences.length}</h3>
-          {differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : (
-            <div className="figure-strip overflow-x-auto">
-              <table className={table}>
-                <thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead>
-                <tbody>
-                  {differences.map((difference) => (
-                    <tr key={difference.field} className={tr()}>
-                      <td className={td('text-ink')}>{difference.field}</td>
-                      <td className={td('whitespace-normal text-muted')}>{difference.left}</td>
-                      <td className={td('whitespace-normal text-muted')}>{difference.right}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      )}
-      {manifest !== null && <Manifest manifest={manifest} stepLabel={stepLabel} />}
-    </section>
-  )
+  const selectFamily = (kind: ResultView['kind']) => {
+    switch (kind) {
+      case 'estimation': setView({ kind, selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }); return
+      case 'survival': setView({ kind, selected: survivalRuns.at(-1)?.id ?? null }); return
+      default: return assertNever(kind)
+    }
+  }
 
-  const ledger = (
-    <div className="figure-strip overflow-x-auto">
-      <table className={table} aria-label="Estimates">
-        <thead>
-          <tr>
-            <th className={th()}>Target</th>
-            <th className={th()}>Estimator</th>
-            <th className={th('text-right')}>Estimate</th>
-            <th className={th()}>Graph</th>
-            <th className={th()}>Created</th>
-          </tr>
-        </thead>
-        <tbody>
-          {[...estimationRuns].reverse().map((candidate) => {
-            const study = studyOf(candidate)
-            const effect = candidate.estimate.effect
-            return (
-              <tr key={candidate.id} className={tr(candidate.id === selected ? 'selected' : 'action')} onClick={() => setSelected(candidate.id)}>
-                <td className={td('text-ink')}>{study === undefined ? candidate.method : estimandSentence(study)}</td>
-                <td className={td('text-muted')}>{describeEstimator(candidate.configuration.kind)}</td>
-                <td className={td(num('whitespace-nowrap text-right text-ink'))}>{formatStatistic('raw', effect.kind === 'path' ? effect.aggregate.average : headlineValue(effect)).text}</td>
-                <td className={td('text-muted')}>{study?.dagName ?? '—'}</td>
-                <td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
+  const body = (() => {
+    switch (activeView.kind) {
+      case 'estimation': {
+        const run = estimationRuns.find((candidate) => candidate.id === activeView.selected) ?? null
+        const other = estimationRuns.find((candidate) => candidate.id === activeView.compareWith) ?? null
+        const manifest = run === null ? null : buildResultManifest(inputs, run, new Date().toISOString())
+        const otherManifest = other === null ? null : buildResultManifest(inputs, other, new Date().toISOString())
+        const differences = manifest !== null && otherManifest !== null ? compareResults(manifest, otherManifest) : []
+        return <>
+          <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
+            <label className="block"><span className="block text-body font-medium text-ink">Estimate</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => setView({ ...activeView, selected: event.target.value === '' ? null : event.target.value as EstimationRunId })}><option value="" disabled>Choose a run</option>{[...estimationRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} · {describeEstimator(candidate.configuration.kind)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
+            <label className="block"><span className="block text-body font-medium text-ink">Compare with</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.compareWith ?? ''} onChange={(event) => setView({ ...activeView, compareWith: event.target.value === '' ? null : event.target.value as EstimationRunId })}><option value="">None</option>{[...estimationRuns].reverse().filter((candidate) => candidate.id !== activeView.selected).map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} · {describeEstimator(candidate.configuration.kind)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
+          </div>
+          {otherManifest !== null && manifest !== null && <section className={panel('p-(--panel-space)')} aria-label="Differences"><h3 className="mb-2 mt-0 text-faint text-label font-medium">Differences · {differences.length}</h3>{differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : <div className="figure-strip overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead><tbody>{differences.map((difference) => <tr key={difference.field} className={tr()}><td className={td('text-ink')}>{difference.field}</td><td className={td('whitespace-normal text-muted')}>{difference.left}</td><td className={td('whitespace-normal text-muted')}>{difference.right}</td></tr>)}</tbody></table></div>}</section>}
+          {manifest !== null && <Manifest manifest={manifest} stepLabel={stepLabel} />}
+        </>
+      }
+      case 'survival': {
+        const run = survivalRuns.find((candidate) => candidate.id === activeView.selected) ?? null
+        return <>
+          <label className="block max-w-xl"><span className="block text-body font-medium text-ink">Survival run</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => setView({ ...activeView, selected: event.target.value === '' ? null : event.target.value as SurvivalRunId })}><option value="" disabled>Choose a run</option>{[...survivalRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{survivalRunLabel(candidate)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
+          {run === null ? <div className={well('px-4 py-6 text-center text-body text-faint')}>Choose a survival run to review.</div> : <SurvivalRunResult run={run} />}
+        </>
+      }
+      default: return assertNever(activeView)
+    }
+  })()
 
-  return (
-    <WorkbenchLayout
-      id="results"
-      stage={stage}
-      bottom={{ title: `Estimates · ${estimationRuns.length}`, body: ledger, defaultSize: 180 }}
-    />
-  )
+  const bottom = (() => {
+    switch (activeView.kind) {
+      case 'estimation': return {
+        title: `Estimates · ${estimationRuns.length}`,
+        body: <div className="figure-strip overflow-x-auto"><table className={table} aria-label="Estimates"><thead><tr><th className={th()}>Target</th><th className={th()}>Estimator</th><th className={th('text-right')}>Estimate</th><th className={th()}>Graph</th><th className={th()}>Created</th></tr></thead><tbody>{[...estimationRuns].reverse().map((candidate) => { const study = studyOf(candidate); const effect = candidate.estimate.effect; return <tr key={candidate.id} className={tr(candidate.id === activeView.selected ? 'selected' : 'action')} onClick={() => setView({ ...activeView, selected: candidate.id })}><td className={td('text-ink')}>{study === undefined ? candidate.method : estimandSentence(study)}</td><td className={td('text-muted')}>{describeEstimator(candidate.configuration.kind)}</td><td className={td(num('whitespace-nowrap text-right text-ink'))}>{formatStatistic('raw', effect.kind === 'path' ? effect.aggregate.average : headlineValue(effect)).text}</td><td className={td('text-muted')}>{study?.dagName ?? '—'}</td><td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td></tr> })}</tbody></table></div>,
+        defaultSize: 180,
+      }
+      case 'survival': return {
+        title: `Survival runs · ${survivalRuns.length}`,
+        body: <div className="figure-strip overflow-x-auto"><table className={table} aria-label="Survival runs"><thead><tr><th className={th()}>Analysis</th><th className={th()}>Rows</th><th className={th()}>Created</th></tr></thead><tbody>{[...survivalRuns].reverse().map((candidate) => <tr key={candidate.id} className={tr(candidate.id === activeView.selected ? 'selected' : 'action')} onClick={() => setView({ ...activeView, selected: candidate.id })}><td className={td('text-ink')}>{survivalRunLabel(candidate)}</td><td className={td(num('text-muted'))}>{formatCount(candidate.evidence.observations).text}</td><td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td></tr>)}</tbody></table></div>,
+        defaultSize: 180,
+      }
+      default: return assertNever(activeView)
+    }
+  })()
+
+  const familyControl = estimationRuns.length > 0 && survivalRuns.length > 0
+    ? <SegmentedControl size="sm" ariaLabel="Result family" value={activeView.kind} onChange={selectFamily} options={[{ value: 'estimation', label: 'Causal estimates' }, { value: 'survival', label: 'Survival' }]} />
+    : null
+
+  return <WorkbenchLayout id="results" stage={<section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5"><div><span className={label('text-faint')}>{chapterLabel('results')}</span><h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2><p className={chapterIntro}>{resultIntroduction(activeView)}</p></div>{familyControl}{body}</section>} bottom={bottom} />
 }

@@ -21,8 +21,8 @@ pub mod iv;
 pub mod joint_samples;
 pub mod jpcmciplus;
 mod lapack_cholesky;
-mod lapack_dgelsd;
 mod lapack_dgeev;
+mod lapack_dgelsd;
 mod lapack_dgesdd;
 mod lapack_dsyevd;
 mod lapack_lu;
@@ -40,6 +40,7 @@ pub mod pcmci;
 pub mod pcmciplus;
 pub mod redundancy;
 pub mod stationarity;
+pub mod survival;
 pub mod tsdiag;
 pub mod zivot_andrews;
 
@@ -93,6 +94,7 @@ pub mod numpy_argsort;
 pub mod numpy_reduce;
 pub mod ocse;
 pub mod parcorr_mult;
+mod r_zeroin;
 pub mod var_lingam;
 pub mod ziggurat;
 

@@ -11,7 +11,7 @@ import { formatDay, formatTimestamp } from '@/lib/format/date'
 import { DataStudio } from '@/components/data/DataStudio'
 import { PreprocessingPanel } from '@/components/data/PreprocessingPanel'
 import { DiscoveryPanel } from '@/components/discovery/DiscoveryPanel'
-import { chapterPath, CHAPTER_IDS, describeRouteProblem, isCanonicalLocation, type ChapterId } from '@/domain/navigation'
+import { chapterLabel, chapterPath, CHAPTER_IDS, CHAPTER_METADATA, describeRouteProblem, isCanonicalLocation, type ChapterId } from '@/domain/navigation'
 import type { ChapterActivity, RunActivity } from '@/domain/activity'
 import { describeSnapshotProblem, snapshotWorkflow, type PersistedProject, type SavedProjectHeader } from '@/domain/persistence'
 import { assessExampleCopy, isShippedExampleId, SHIPPED_EXAMPLES, stampExampleRelease, type ShippedExample } from '@/domain/example'
@@ -45,6 +45,7 @@ import { assertNever } from '@/domain/dop'
 import { cn } from '@/lib/utils'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
+const loadSurvivalPanel = () => import('@/components/survival/SurvivalPanel')
 const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
 const loadEstimationPanel = () => import('@/components/estimation/EstimationPanel')
 const loadSensitivityPanel = () => import('@/components/sensitivity/SensitivityPanel')
@@ -53,6 +54,7 @@ const loadResultsPanel = () => import('@/components/results/ResultsPanel')
 
 /** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk `lazy` will ask for. */
 const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
+  survival: loadSurvivalPanel,
   dag: loadDagWorkspace,
   study: loadStudyDesignPanel,
   estimation: loadEstimationPanel,
@@ -69,6 +71,8 @@ const prefetchChapter = (chapter: ChapterId): void => {
 
 const DagWorkspace = lazy(async () => ({ default: (await loadDagWorkspace()).DagWorkspace }))
 
+const SurvivalPanel = lazy(async () => ({ default: (await loadSurvivalPanel()).SurvivalPanel }))
+
 const StudyDesignPanel = lazy(async () => ({ default: (await loadStudyDesignPanel()).StudyDesignPanel }))
 
 const EstimationPanel = lazy(async () => ({ default: (await loadEstimationPanel()).EstimationPanel }))
@@ -81,17 +85,7 @@ const ResultsPanel = lazy(async () => ({ default: (await loadResultsPanel()).Res
 
 type Chapter = Omit<ChapterEntry, 'status'>
 
-const CHAPTERS: readonly Chapter[] = [
-  { id: 'projects', name: 'Projects', shortName: 'Projects', icon: 'folder_open' },
-  { id: 'data', name: 'Data studio', shortName: 'Data', icon: 'table_view' },
-  { id: 'discovery', name: 'Discovery lab', shortName: 'Discovery', icon: 'schema' },
-  { id: 'dag', name: 'DAG workspace', shortName: 'DAG', icon: 'conversion_path' },
-  { id: 'study', name: 'Study design', shortName: 'Study', icon: 'experiment' },
-  { id: 'estimation', name: 'Estimation', shortName: 'Estimate', icon: 'query_stats' },
-  { id: 'sensitivity', name: 'Sensitivity', shortName: 'Sensitivity', icon: 'fact_check' },
-  { id: 'counterfactual', name: 'Counterfactuals', shortName: 'What if', icon: 'alt_route' },
-  { id: 'results', name: 'Results', shortName: 'Results', icon: 'monitoring' },
-]
+const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
 
 /** The icon previews the next stop in the theme cycle, so the button reads as "switch to". */
 const THEME_ICON: Record<ThemeChoice, string> = {
@@ -385,13 +379,14 @@ function App() {
   const chapterIsAvailable = (chapter: ChapterId): boolean => {
     if (chapter === 'projects') return workflow.kind === 'awaiting-project'
     if (chapter === 'data') return project !== null
+    if (chapter === 'survival') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'discovery') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'study') return validatedDag
     if (chapter === 'estimation') return identifiedStudy
     if (chapter === 'sensitivity') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
-    if (chapter === 'results') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
+    if (chapter === 'results') return workflow.kind === 'profiled' && (workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0)
     return false
   }
 
@@ -400,6 +395,9 @@ function App() {
     switch (chapter) {
       case 'projects': return project === null ? 'not-started' : 'done'
       case 'data': return project === null ? 'locked' : prepared ? 'done' : 'in-progress'
+      case 'survival': return !prepared || workflow.kind !== 'profiled'
+        ? 'locked'
+        : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
       case 'discovery': return !prepared ? 'locked' : workflow.discoveryRuns.length > 0 ? 'done' : 'not-started'
       case 'dag': return !prepared
         ? 'locked'
@@ -418,7 +416,7 @@ function App() {
       case 'counterfactual': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
         ? 'locked'
         : workflow.counterfactualRuns.length > 0 ? 'done' : 'not-started'
-      case 'results': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0 ? 'locked' : 'done'
+      case 'results': return workflow.kind !== 'profiled' || (workflow.estimationRuns.length === 0 && workflow.survivalRuns.length === 0) ? 'locked' : 'done'
       default: return chapter
     }
   }
@@ -539,7 +537,7 @@ function App() {
     </>
   )
 
-  const fullBleed = profiled !== null && ['data', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
+  const fullBleed = profiled !== null && ['data', 'survival', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
   // Every chart export names the project it came from.
   const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
@@ -562,7 +560,7 @@ function App() {
               )}
               {workflow.kind === 'awaiting-project' && (
                 <section className="rise my-auto w-full max-w-6xl" aria-labelledby="new-analysis-title">
-                  <span className={label('text-faint')}>01 · Projects</span>
+                  <span className={label('text-faint')}>{chapterLabel('projects')}</span>
                   <h2 id="new-analysis-title" className="mb-6 mt-3 text-heading text-ink">Create an analysis</h2>
                   <form onSubmit={createProject} className="max-w-md space-y-3">
                     <label className="block">
@@ -627,7 +625,7 @@ function App() {
   
               {workflow.kind === 'awaiting-data' && (
                 <section className="rise my-auto max-w-2xl" aria-labelledby="load-data-title">
-                  <span className={label('text-signal')}>02 · Data studio</span>
+                  <span className={label('text-signal')}>{chapterLabel('data')}</span>
                   <h2 id="load-data-title" className="mb-3 mt-3 text-heading text-ink">{workflow.restore === null ? 'Choose a data file' : 'Choose the data file again'}</h2>
                   <p className="mb-6 text-body text-faint">
                     {workflow.restore === null
@@ -651,7 +649,7 @@ function App() {
   
               {workflow.kind === 'source-selected' && (
                 <section className="rise my-auto max-w-2xl" aria-labelledby="selected-source-title">
-                  <span className={label('text-signal')}>02 · Data studio</span>
+                  <span className={label('text-signal')}>{chapterLabel('data')}</span>
                   <h2 id="selected-source-title" className="mb-3 mt-3 text-heading text-ink">Source selected</h2>
                   <SourceSummary source={workflow.source} />
                   <div className="mt-4 flex gap-2">
@@ -667,7 +665,7 @@ function App() {
   
               {workflow.kind === 'profiling' && (
                 <section className="rise my-auto max-w-2xl" aria-labelledby="profiling-title">
-                  <span className={label('text-signal')}>02 · Data studio</span>
+                  <span className={label('text-signal')}>{chapterLabel('data')}</span>
                   <h2 id="profiling-title" className="mb-3 mt-3 flex items-center gap-2 text-heading text-ink">
                     <Icon name="progress_activity" size={18} className="animate-spin [animation-duration:0.9s] text-[var(--color-info)]" />
                     Inspecting data
@@ -870,6 +868,22 @@ function App() {
                     </Suspense>
                     </ChapterBoundary>
                   )}
+                  {activeChapter === 'survival' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                    <Suspense fallback={<ChapterSkeleton label="Loading survival analysis…" />}>
+                      <SurvivalPanel
+                        key={workflow.prepared.id}
+                        source={workflow.source}
+                        profile={workflow.profile}
+                        prepared={workflow.prepared}
+                        runs={workflow.survivalRuns}
+                        onRun={(run) => dispatch({ type: 'survival-run-created', run })}
+                        onDeleteRun={(run) => dispatch({ type: 'survival-run-deleted', run })}
+                        onActivity={reportActivity.survival}
+                      />
+                    </Suspense>
+                    </ChapterBoundary>
+                  )}
                   {activeChapter === 'results' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
                     <Suspense fallback={<ChapterSkeleton label="Loading results…" />}>
@@ -885,6 +899,7 @@ function App() {
                         estimationRuns={workflow.estimationRuns}
                         sensitivityRuns={workflow.sensitivityRuns}
                         counterfactualRuns={workflow.counterfactualRuns}
+                        survivalRuns={workflow.survivalRuns}
                       />
                     </Suspense>
                     </ChapterBoundary>

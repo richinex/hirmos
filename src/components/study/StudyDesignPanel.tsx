@@ -20,6 +20,7 @@ import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import type { DagDocument, DagDocumentId, DagNodeId } from '@/domain/dag'
 import { assertNever } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import { lagGraphFromDag } from '@/domain/lagGraph'
 import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID, IDENTIFICATION_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -420,7 +421,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
   const stage = (
     <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>05 · Study design</span>
+        <span className={label('text-faint')}>{chapterLabel('study')}</span>
         <h2 id="study-title" className="mb-2 mt-2 text-heading text-ink">Define and identify the causal question</h2>
         <p className={chapterIntro}>A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. Bind the question to a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
       </div>

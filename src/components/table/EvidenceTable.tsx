@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNod
 import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cellPadding, countLine, DensityToggle, FilterField, ROW_HEIGHT, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
+import { Icon } from '@/components/Icon'
 import { button, num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
 import { fontFor, lineCountAt, lineHeightFor, useTextMetricsVersion } from '@/lib/textMetrics'
 import { toCsv } from '@/lib/csv'
@@ -211,7 +212,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
           {textColumns.length > 0 && rows.length > 1 && <FilterField value={query} onChange={setQuery} placeholder="Search variables" label={`Search ${title.toLowerCase()}`} className="w-44" />}
           <DensityToggle density={density} onChange={setDensity} />
           {exportName !== undefined && modelRows.length > 0 && (
-            <button type="button" className={button('quiet')} onClick={download}>Export CSV</button>
+            <button type="button" className={button('quiet', 'gap-1', 'sm')} aria-label="Export CSV" title="Export the rows as CSV" onClick={download}><Icon name="download" size={13} />CSV</button>
           )}
         </>
       )}

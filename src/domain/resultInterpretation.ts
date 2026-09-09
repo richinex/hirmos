@@ -1,11 +1,10 @@
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DiscoveryRunArtifact } from './discovery'
-import { assertNever, type NonEmptyArray } from './dop'
+import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
 import {
   adjustmentLabels,
   boundsReading,
   headlineValue,
-  intervalTypeOf,
   summariseRowEffects,
   type EstimateInterval,
   type EstimationRunArtifact,
@@ -15,10 +14,8 @@ import type { SensitivityRunArtifact } from './sensitivity'
 import {
   formatCount,
   formatEstimate,
-  formatInterval,
   formatPercent,
   formatStatistic,
-  type EffectScale,
 } from '../lib/format/number'
 
 /**
@@ -37,97 +34,222 @@ export interface ResultInterpretation {
   readonly statements: NonEmptyArray<InterpretationStatement>
 }
 
-const additiveScale = { kind: 'additive', unit: '' } as const
-const irrScale = { kind: 'ratio', label: 'IRR' } as const
+const countRatioScale = { kind: 'ratio', label: 'ECR' } as const
 
 const number = (value: number): string => formatStatistic('raw', value).text
 const absolute = (value: number): string => number(Math.abs(value))
 
+const plainName = (name: string): string => name.replaceAll('_', ' ')
+
 const change = (value: number, outcome: string): string => {
-  if (value > 0) return `an estimated increase of ${absolute(value)} ${outcome} units`
-  if (value < 0) return `an estimated decrease of ${absolute(value)} ${outcome} units`
-  return `no estimated change in ${outcome}`
+  const name = plainName(outcome)
+  if (value > 0) return `an estimated increase of ${absolute(value)} in ${name}`
+  if (value < 0) return `an estimated decrease of ${absolute(value)} in ${name}`
+  return `no estimated change in ${name}`
 }
 
-const gap = (value: number, outcome: string): string => {
-  if (value > 0) return `${absolute(value)} ${outcome} units above`
-  if (value < 0) return `${absolute(value)} ${outcome} units below`
-  return `equal to`
+const gap = (value: number): string => {
+  if (value > 0) return `${absolute(value)} higher than`
+  if (value < 0) return `${absolute(value)} lower than`
+  return 'equal to'
 }
 
-const intervalRelation = (lower: number, upper: number, reference: number): 'above' | 'below' | 'includes' => {
+const directionalDifference = (value: number): string => {
+  if (value > 0) return `${absolute(value)} higher`
+  if (value < 0) return `${absolute(value)} lower`
+  return '0'
+}
+
+const outcomeDifference = (value: number, outcome: string): string => {
+  const name = plainName(outcome)
+  if (value > 0) return `${absolute(value)} more ${name}`
+  if (value < 0) return `${absolute(value)} fewer ${name}`
+  return `no difference in ${name}`
+}
+
+const relativeLevel = (value: number): string => {
+  if (value > 0) return `${absolute(value)} higher`
+  if (value < 0) return `${absolute(value)} lower`
+  return 'unchanged'
+}
+
+const timeBeforeOutcome = (lag: number, stepLabel: string): string => {
+  if (lag === 0) return `in the same ${stepLabel} as the outcome`
+  if (lag === 1) return `one ${stepLabel} before the outcome`
+  return `${lag} ${stepLabel}s before the outcome`
+}
+
+const timeIndexedAdjustment = (
+  run: Extract<EstimationRunArtifact, { readonly kind: 'causal-effects-run' }>,
+  stepLabel: string,
+): string => {
+  switch (run.estimate.adjustment.kind) {
+    case 'none':
+      return 'The recorded temporal graph did not require another measured variable for adjustment.'
+    case 'time-indexed': {
+      const variables = run.estimate.adjustment.variables.map(({ variable, lag }) => {
+        const timing = timeBeforeOutcome(Math.abs(lag), stepLabel)
+        return `${plainName(variable.name)} ${timing}`
+      })
+      return `The model accounts for ${variables.join(', ')}, which the recorded temporal graph selected to block non-causal paths.`
+    }
+    case 'structural-parent-model':
+      return 'The model fits each variable from its recorded causes at their stated times and combines the directed treatment-to-outcome paths.'
+    case 'contemporaneous':
+      return `The model accounts for ${run.estimate.adjustment.variables.map(({ name }) => plainName(name)).join(', ')} in the outcome period.`
+    default:
+      return assertNever(run.estimate.adjustment)
+  }
+}
+
+type IntervalRelation = 'above' | 'below' | 'includes'
+
+const intervalRelation = (lower: number, upper: number, reference: number): IntervalRelation => {
   if (lower > reference) return 'above'
   if (upper < reference) return 'below'
   return 'includes'
 }
 
+const additiveConfidenceMeaning = (relation: IntervalRelation): string => {
+  switch (relation) {
+    case 'above': return 'Because the whole range is above zero, the estimated change remains an increase after allowing for sampling uncertainty.'
+    case 'below': return 'Because the whole range is below zero, the estimated change remains a decrease after allowing for sampling uncertainty.'
+    case 'includes': return 'Because the range includes zero, these data are compatible with no change at this confidence level.'
+    default: return assertNever(relation)
+  }
+}
+
+const directionalConfidenceRange = (lower: number, upper: number, unit: string): string => {
+  const relation = intervalRelation(lower, upper, 0)
+  switch (relation) {
+    case 'above': return `is between ${absolute(lower)} and ${absolute(upper)} higher per ${unit}`
+    case 'below': return `is between ${absolute(upper)} and ${absolute(lower)} lower per ${unit}`
+    case 'includes': return `runs from ${absolute(lower)} lower to ${absolute(upper)} higher per ${unit}`
+    default: return assertNever(relation)
+  }
+}
+
+type IntervalReference =
+  | { readonly kind: 'additive' }
+  | { readonly kind: 'count-ratio' }
+
 const intervalStatement = (
   interval: Exclude<EstimateInterval, { readonly kind: 'none' }>,
-  reference: 0 | 1,
-  referenceName: 'no additive effect' | 'no multiplicative change',
+  reference: IntervalReference,
 ): InterpretationStatement => {
-  const relation = intervalRelation(interval.lower, interval.upper, reference)
+  const referenceValue = reference.kind === 'additive' ? 0 : 1
+  const relation = intervalRelation(interval.lower, interval.upper, referenceValue)
   const level = `${Math.round(interval.level * 100)}%`
-  if (interval.kind === 'confidence') {
-    if (relation === 'includes') {
-      return { kind: 'uncertainty', text: `The ${level} confidence interval includes ${reference}, the null value for ${referenceName}.` }
+  const range = `${number(interval.lower)} to ${number(interval.upper)}`
+  const confidenceReading = (() => {
+    if (reference.kind === 'additive') return additiveConfidenceMeaning(relation)
+    if (relation === 'above') return 'Because the whole range is above 1, every value in it indicates a higher expected count.'
+    if (relation === 'below') return 'Because the whole range is below 1, every value in it indicates a lower expected count.'
+    return 'Because the range includes 1, it includes no change in the expected count.'
+  })()
+  const posteriorReading = (() => {
+    if (reference.kind === 'additive') {
+      if (relation === 'above') return 'Under the fitted model and priors, every value in the reported range is an increase.'
+      if (relation === 'below') return 'Under the fitted model and priors, every value in the reported range is a decrease.'
+      return 'Under the fitted model and priors, the reported range includes no change.'
     }
-    return { kind: 'uncertainty', text: `The ${level} confidence interval lies entirely ${relation} ${reference}, the null value for ${referenceName}.` }
+    if (relation === 'above') return 'Under the fitted model and priors, every value in the reported range indicates a higher expected count.'
+    if (relation === 'below') return 'Under the fitted model and priors, every value in the reported range indicates a lower expected count.'
+    return 'Under the fitted model and priors, the reported range includes no change in the expected count.'
+  })()
+  if (interval.kind === 'confidence') {
+    return { kind: 'uncertainty', text: `The ${level} confidence interval is ${range}. ${confidenceReading}` }
   }
   const intervalName = interval.summary === 'HDI' ? 'highest-density interval' : 'credible interval'
-  if (relation === 'includes') {
-    return { kind: 'uncertainty', text: `The ${level} ${intervalName} includes ${reference}. Under the fitted model and priors, the reported posterior region therefore spans the null value for ${referenceName}.` }
-  }
-  return { kind: 'uncertainty', text: `The ${level} ${intervalName} lies entirely ${relation} ${reference}. Under the fitted model and priors, the reported posterior region stays on one side of the null value for ${referenceName}.` }
+  return { kind: 'uncertainty', text: `The ${level} ${intervalName} is ${range}. ${posteriorReading}` }
 }
 
 const noInterval = (reason: string): InterpretationStatement => ({ kind: 'uncertainty', text: reason })
 
+const additiveIntervalForOutcome = (interval: EstimateInterval, outcome: string): InterpretationStatement => {
+  switch (interval.kind) {
+    case 'none': return noInterval(interval.reason)
+    case 'credible': return intervalStatement(interval, { kind: 'additive' })
+    case 'confidence': {
+      const level = formatPercent(interval.level, { precision: 0 }).text
+      const relation = intervalRelation(interval.lower, interval.upper, 0)
+      switch (relation) {
+        case 'above': return { kind: 'uncertainty', text: `The ${level} confidence interval places the increase in ${plainName(outcome)} between ${absolute(interval.lower)} and ${absolute(interval.upper)}. The entire range points to an increase after allowing for sampling uncertainty.` }
+        case 'below': return { kind: 'uncertainty', text: `The ${level} confidence interval places the decrease in ${plainName(outcome)} between ${absolute(interval.upper)} and ${absolute(interval.lower)}. The entire range points to a decrease after allowing for sampling uncertainty.` }
+        case 'includes': return { kind: 'uncertainty', text: `The ${level} confidence interval runs from a decrease of ${absolute(interval.lower)} to an increase of ${absolute(interval.upper)} in ${plainName(outcome)}. Because the range includes no difference, the data are also compatible with no change at this confidence level.` }
+        default: return assertNever(relation)
+      }
+    }
+    default: return assertNever(interval)
+  }
+}
+
 const adjustedFor = (run: EstimationRunArtifact): string => adjustmentLabels(run.estimate.adjustment).length === 0
-  ? 'without measured adjustment variables'
-  : `after adjustment for ${adjustmentLabels(run.estimate.adjustment).join(', ')}`
+  ? 'without additional measured adjustment variables'
+  : `after adjustment for ${adjustmentLabels(run.estimate.adjustment).map(plainName).join(', ')}`
 
 const targetPopulation = (study: StudySpecification): string => study.estimand.kind === 'average-treatment-effect-on-treated'
-  ? 'among treated rows'
+  ? 'among rows that received treatment'
   : 'over the prepared study population'
 
 const ratioMeaning = (ratio: number, outcome: string): string => {
   const percent = formatPercent(Math.abs(ratio - 1), { precision: 1 }).text
-  if (ratio > 1) return `The expected ${outcome} count is ${percent} higher`
-  if (ratio < 1) return `The expected ${outcome} count is ${percent} lower`
-  return `The expected ${outcome} count is unchanged`
-}
-
-const intervalDisplay = (run: EstimationRunArtifact, scale: EffectScale): string => {
-  const { interval, effect } = run.estimate
-  if (interval.kind === 'none' || effect.kind === 'path') return 'no interval'
-  return formatInterval(headlineValue(effect), interval.lower, interval.upper, intervalTypeOf(interval), scale).text
+  const name = plainName(outcome)
+  if (ratio > 1) return `The expected ${name} count is ${percent} higher`
+  if (ratio < 1) return `The expected ${name} count is ${percent} lower`
+  return `The expected ${name} count is unchanged`
 }
 
 /** The scale line shown under the figure. Method-specific standardisation belongs here, not in UI branches. */
 export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecification, stepLabel: string): string {
+  const treatment = plainName(study.treatment.name)
+  const outcome = plainName(study.outcome.name)
   switch (run.kind) {
     case 'backdoor-linear-run':
     case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
-      ? `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}, within each group of ${run.estimate.effect.modifier}`
-      : `additive · ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
-    case 't-learner-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0, one figure per row given its adjustment variables`
-    case 'frontdoor-two-stage-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
-    case 'instrumental-variable-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0`
-    case 'count-glm-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1-unit increase in ${study.treatment.name}`
-    case 'negative-binomial-ingarch-run': return `additive forecast-path difference · expected ${study.outcome.name} count under ${study.treatment.name} = ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue} per ${stepLabel}`
-    case 'negbin-nuts-run': return `incidence rate ratio · expected ${study.outcome.name} count per 1 standard deviation increase in ${study.treatment.name}`
-    case 'bayesian-gaussian-run': return `additive · expected ${study.outcome.name} for ${study.treatment.name} set to 1 rather than 0`
-    case 'ardl-run': return `additive · long-run ${study.outcome.name} units per 1-unit increase in ${study.treatment.name}`
-    case 'vecm-run': return `outcome-normalised long-run relation · ${study.outcome.name} relative to ${study.treatment.name}`
+      ? `additive · ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group`
+      : `additive · ${outcome} per 1-unit increase in ${treatment}`
+    case 't-learner-run': return `additive · expected ${outcome} with ${treatment} set to 1 rather than 0, one estimate per row`
+    case 'frontdoor-two-stage-run': return `additive · expected ${outcome} with ${treatment} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
+    case 'instrumental-variable-run': return `additive · expected ${outcome} with ${treatment} set to 1 rather than 0`
+    case 'count-glm-run': return `expected-count ratio · expected ${outcome} per 1-unit increase in ${treatment}`
+    case 'negative-binomial-ingarch-run': return `additive forecast difference · expected ${outcome} count with ${treatment} at ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue} per ${stepLabel}`
+    case 'negbin-nuts-run': return `expected-count ratio · expected ${outcome} per 1-unit increase in ${treatment}`
+    case 'bayesian-gaussian-run': return `additive · expected ${outcome} with ${treatment} set to 1 rather than 0`
+    case 'ardl-run': return `additive · long-run ${outcome} per 1-unit increase in ${treatment}`
+    case 'vecm-run': return `long-run relation · ${outcome} relative to ${treatment}`
     case 'synthetic-control-run':
-    case 'causal-impact-run': return `additive · observed ${study.outcome.name} minus its counterfactual per ${stepLabel}`
-    case 'panel-intervention-run': return `additive · average post-adoption ${study.outcome.name} effect among treated units`
-    case 'discrete-bn-run': return `additive · expected ${study.outcome.name} in the high rather than low ${study.treatment.name} bin`
-    case 'binary-ett-run': return `additive · expected ${study.outcome.name}(1) minus ${study.outcome.name}(0) among rows with ${study.treatment.name} = 1`
-    case 'causal-effects-run': return `additive · total effect of setting ${study.treatment.name} from ${run.evidence.interventions[0]} to ${run.evidence.interventions[1]}`
+    case 'causal-impact-run': return `additive · observed ${outcome} minus its estimated no-intervention outcome per ${stepLabel}`
+    case 'panel-intervention-run': return `additive · average difference over treated units and post-adoption periods`
+    case 'discrete-bn-run': return `additive · expected ${outcome} in the high rather than low ${treatment} state`
+    case 'binary-ett-run': return `additive · expected ${outcome} under treatment minus no treatment among treated rows`
+    case 'causal-effects-run': {
+      const treatmentTime = run.configuration.treatmentLag === 0 ? 't' : `t−${run.configuration.treatmentLag}`
+      return `additive · expected ${outcome} at t after setting ${treatment} at ${treatmentTime} from ${run.evidence.interventions[0]} to ${run.evidence.interventions[1]}`
+    }
     default: return assertNever(run)
   }
+}
+
+/** The result headline may be narrower than the study's general estimand when a design has its own target. */
+export function resultHeadline(run: EstimationRunArtifact, study: StudySpecification): string {
+  if (run.kind === 'panel-intervention-run') return `Average post-adoption difference in ${plainName(study.outcome.name)}`
+  const treatment = plainName(study.treatment.name)
+  const outcome = plainName(study.outcome.name)
+  switch (study.estimand.kind) {
+    case 'average-treatment-effect': return `Effect of changing ${treatment} on ${outcome}`
+    case 'average-treatment-effect-on-treated': return `Effect of changing ${treatment} on ${outcome} among treated rows`
+    case 'conditional-average-treatment-effect': return `Effect of changing ${treatment} on ${outcome} within groups of ${plainName(study.estimand.modifier.name)}`
+    case 'conditional-average-treatment-effect-per-row': return `Effect of changing ${treatment} on ${outcome} for each row`
+    default: return assertNever(study.estimand)
+  }
+}
+
+/** Describe the evidence shape without presenting repeated panel cells as independent observations. */
+export function resultSampleLine(run: EstimationRunArtifact): string {
+  if (run.kind !== 'panel-intervention-run') return `n = ${formatCount(run.estimate.sample.observations).text}`
+  const treatedCells = run.evidence.treatedUnits * run.evidence.nPost
+  return `${run.evidence.units.length} units × ${run.evidence.times.length} periods · average over ${treatedCells} treated-unit periods after adoption`
 }
 
 /**
@@ -140,73 +262,78 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
   switch (run.kind) {
     case 'frontdoor-two-stage-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
-      const mediator = run.columns[run.evidence.mediator]?.name ?? 'the mediator'
+      const mediator = plainName(run.columns[run.evidence.mediator]?.name ?? 'the mediator')
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Under the fitted two-stage model, setting ${study.treatment.name} from ${number(run.evidence.controlValue)} to ${number(run.evidence.treatmentValue)} changes expected ${study.outcome.name} by ${number(effect)} through ${mediator}.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'qualification', text: `The estimate is the product of the fitted ${study.treatment.name} → ${mediator} and ${mediator} → ${study.outcome.name} coefficients. Its causal interpretation requires the recorded front-door conditions and adequate additive linear models for both stages.` },
+        { kind: 'magnitude', text: `If ${plainName(study.treatment.name)} were set to ${number(run.evidence.treatmentValue)} rather than ${number(run.evidence.controlValue)}, expected ${plainName(study.outcome.name)} would be ${relativeLevel(effect)} on average. The estimate uses ${mediator} as the intermediate step through which ${plainName(study.treatment.name)} affects ${plainName(study.outcome.name)}.` },
+        additiveIntervalForOutcome(estimate.interval, study.outcome.name),
+        { kind: 'qualification', text: `This should be interpreted as the total effect of ${plainName(study.treatment.name)} only if ${mediator} carries all of its effect on ${plainName(study.outcome.name)}. Nothing unaccounted for may jointly influence ${plainName(study.treatment.name)} and ${mediator}, and—after accounting for ${plainName(study.treatment.name)}—nothing unaccounted for may jointly influence ${mediator} and ${plainName(study.outcome.name)}. The two straight-line relationships and the row resampling must also suit the data.` },
       ] }
     }
     case 'instrumental-variable-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const instruments = run.evidence.instruments.map((index) => run.columns[index]?.name ?? 'the instrument').join(', ')
-      const route = run.evidence.route === 'waldRatio'
-        ? `the ratio of the ${study.outcome.name} difference to the ${study.treatment.name} difference between the two ${instruments} groups`
-        : run.evidence.route === 'covarianceRatio'
-          ? `the ratio of the covariance of ${study.outcome.name} with ${instruments} to the covariance of ${study.treatment.name} with ${instruments}`
-          : `two-stage least squares of ${study.outcome.name} on ${study.treatment.name} with ${instruments} as instruments`
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Under the linear instrumental-variable model, setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(effect)}.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'qualification', text: `The estimate is ${route}. Its causal interpretation requires the recorded as-if-random and exclusion conditions for ${instruments}, and the linearity assumption under which the ATE is a function of the coefficients of linear models of ${study.outcome.name} and ${study.treatment.name} given the instrument. The estimator uses no covariates.` },
+        { kind: 'magnitude', text: `Using ${plainName(instruments)} as the source of treatment variation, a 1-unit increase in ${plainName(study.treatment.name)} changes expected ${plainName(study.outcome.name)} by ${number(effect)} in the fitted model.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
+        { kind: 'qualification', text: `This can be interpreted as an effect only if ${plainName(instruments)} changes treatment, affects the outcome only through treatment, and is otherwise unrelated to causes of the outcome. The instrument must also provide enough treatment variation for a useful estimate, and the linear-effect model must fit.` },
       ] }
     }
     case 'backdoor-linear-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
+      const adjustment = adjustmentLabels(run.estimate.adjustment).map(plainName)
+      const opening = adjustment.length === 0
+        ? 'Without additional measured adjustment variables'
+        : `After accounting for ${adjustment.join(', ')}`
       const statements: NonEmptyArray<InterpretationStatement> = [
-        { kind: 'magnitude', text: `Under the fitted linear adjustment model, a 1-unit increase in ${study.treatment.name} corresponds to ${change(effect, study.outcome.name)} ${targetPopulation(study)}, ${adjustedFor(run)}.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'qualification', text: `This coefficient has a causal interpretation only under the recorded back-door, study-design and linear-model assumptions. The ${run.configuration.covariance === 'hac' ? 'HAC' : 'classical'} interval determines how sampling uncertainty is calculated.` },
+        { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}.` },
+        additiveIntervalForOutcome(estimate.interval, study.outcome.name),
+        { kind: 'qualification', text: 'This should be interpreted as a total effect only if the recorded adjustment variables account for the important common causes of treatment and outcome, while leaving out variables through which treatment works or variables that would create bias when controlled. Comparable treatment levels must exist among otherwise similar observations, and the straight-line model must suit the data.' },
       ]
       return { kind: 'result-interpretation', statements }
     }
     case 'count-glm-run': {
-      const ratio = estimate.effect.kind === 'incidenceRateRatio' ? estimate.effect.value : Number.NaN
+      const ratio = estimate.effect.kind === 'expectedCountRatio' ? estimate.effect.value : Number.NaN
+      const countAssumption = run.evidence.family === 'poisson'
+        ? 'The Poisson model also requires the count variance to be close to its mean.'
+        : 'The negative-binomial model allows extra count variation, but it does not account for serial dependence.'
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${ratioMeaning(ratio, study.outcome.name)} for each 1-unit increase in ${study.treatment.name}, ${adjustedFor(run)}. The incidence rate ratio is ${formatEstimate(ratio, irrScale).text}.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 1, 'no multiplicative change'),
-        { kind: 'qualification', text: `This is a conditional mean-rate comparison from the fitted ${run.evidence.family === 'poisson' ? 'Poisson' : 'negative-binomial'} model. It is not a ratio of observed totals.` },
+        { kind: 'magnitude', text: `${ratioMeaning(ratio, study.outcome.name)} for each 1-unit increase in ${plainName(study.treatment.name)}, ${adjustedFor(run)}. The fitted expected-count ratio is ${formatEstimate(ratio, countRatioScale).text}.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'count-ratio' }),
+        { kind: 'qualification', text: `This can be interpreted as an effect only if the adjustment variables block the non-causal treatment–outcome paths, the outcome is a genuine count, the fitted relationship is adequate, and rows are independent. ${countAssumption} The ratio compares modelled expected counts, not observed totals.` },
       ] }
     }
     case 'negative-binomial-ingarch-run': {
       const effect = estimate.effect.kind === 'path' ? estimate.effect : null
+      const schedule = (() => {
+        switch (run.evidence.schedule.kind) {
+          case 'point': return `were set to ${number(run.evidence.treatmentValue)} for the first forecast ${stepLabel} and then returned to the control path, instead of staying at ${number(run.evidence.controlValue)}`
+          case 'persistent': return `stayed at ${number(run.evidence.treatmentValue)} for the next ${run.evidence.horizon} ${stepLabel}s instead of ${number(run.evidence.controlValue)}`
+          case 'decaying': return `started at ${number(run.evidence.treatmentValue)} instead of ${number(run.evidence.controlValue)}, then the difference from the control path shrank by a factor of ${number(run.evidence.schedule.delta)} each ${stepLabel}`
+          default: return assertNever(run.evidence.schedule)
+        }
+      })()
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Across the ${run.evidence.horizon}-period forecast, the treatment schedule changes expected ${study.outcome.name} by ${number(effect?.aggregate.average ?? Number.NaN)} counts per ${stepLabel} on average; the cumulative conditional-mean difference is ${number(effect?.aggregate.cumulative ?? Number.NaN)}.` },
-        { kind: 'comparison', text: `The first forecast holds ${study.treatment.name} at ${number(run.evidence.controlValue)}. The second applies the recorded ${run.evidence.schedule.kind} schedule from ${number(run.evidence.treatmentValue)}.` },
-        noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No sampling interval is available.'),
-        { kind: 'qualification', text: `Both trajectories condition on the fitted ${run.evidence.link === 'identity' ? 'additive identity-link' : 'multiplicative log-link'} count recursion, the last observed history, and the future values held for the other regressors. Their causal interpretation requires the recorded adjustment and intervention assumptions.` },
+        { kind: 'magnitude', text: `If ${plainName(study.treatment.name)} ${schedule}, the model predicts ${outcomeDifference(effect?.aggregate.average ?? Number.NaN, study.outcome.name)} per ${stepLabel} on average. Across the ${run.evidence.horizon} forecast ${stepLabel}s, the predicted differences add up to ${outcomeDifference(effect?.aggregate.cumulative ?? Number.NaN, study.outcome.name)}.` },
+        noInterval('No confidence interval is available for these forecast differences.'),
+        { kind: 'qualification', text: `The forecast assumes that the way recent ${plainName(study.outcome.name)} counts predict later counts remains stable. It should be interpreted as an intervention effect only if the treatment setting is the only systematic difference between the two forecast paths and the recorded adjustment accounts for common causes.` },
       ] }
     }
     case 'double-ml-run': {
       const contrast = run.evidence.model === 'irm' ? `Changing ${study.treatment.name} from 0 to 1` : `A 1-unit increase in ${study.treatment.name}`
       if (estimate.effect.kind === 'byGroup') {
         const { groups, modifier, overall } = estimate.effect
-        const largest = groups.reduce((best, group) => (group.value > best.value ? group : best), groups[0])
-        const smallest = groups.reduce((best, group) => (group.value < best.value ? group : best), groups[0])
-        const overlap = largest.interval.lower <= smallest.interval.upper
+        const intervalLevel = formatPercent(groups[0].interval.level, { precision: 0 }).text
         return { kind: 'result-interpretation', statements: [
-          { kind: 'magnitude', text: `${contrast} corresponds to ${groups.map((group) => `${change(group.value, study.outcome.name)} where ${modifier} is ${group.label}`).join('; ')}, after cross-fitted adjustment. Over the whole population it is ${number(overall)}.` },
-          { kind: 'comparison', text: groups.length === 1
-            ? 'One group was formed, so no contrast between groups can be read.'
-            : `The effect is largest where ${modifier} is ${largest.label} (${number(largest.value)}) and smallest where it is ${smallest.label} (${number(smallest.value)}); their ${formatPercent(largest.interval.level, { precision: 0 }).text} intervals ${overlap ? 'overlap, so the data do not separate the two' : 'do not overlap'}.` },
-          { kind: 'qualification', text: `Each group effect is the average treatment effect conditioned on ${modifier}, estimated as a group average treatment effect: the effect is linear in ${study.treatment.name} within a group and free to differ between groups. The recorded identification and overlap assumptions must hold within every group.` },
+          { kind: 'magnitude', text: `${contrast} corresponds to ${groups.map((group) => `${change(group.value, study.outcome.name)} where ${plainName(modifier)} is ${group.label}`).join('; ')}. The average over the whole prepared population is ${number(overall)}.` },
+          { kind: 'uncertainty', text: `Each group has its own ${intervalLevel} confidence interval. These ranges describe uncertainty around each group estimate; they do not directly test whether the groups differ.` },
+          { kind: 'qualification', text: `These can be interpreted as group-specific effects only if the recorded adjustment variables account for the common causes and comparable treatment conditions exist within every group. Small groups give less certain estimates.` },
         ] }
       }
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${contrast} corresponds to ${change(effect, study.outcome.name)} ${targetPopulation(study)} after cross-fitted adjustment.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'qualification', text: `The result targets ${run.evidence.att ? 'the average effect among treated rows' : 'the average effect over the prepared population'}. Cross-fitting reduces nuisance-model bias but does not replace the recorded identification and overlap assumptions.` },
+        { kind: 'magnitude', text: `${contrast} corresponds to ${change(effect, study.outcome.name)} ${targetPopulation(study)} after accounting for the recorded adjustment variables.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
+        { kind: 'qualification', text: `This can be interpreted as ${run.evidence.att ? 'an effect among treated rows' : 'an effect over the prepared population'} only if the adjustment variables account for the common causes, comparable treatment conditions exist for similar rows, and rows are independent. Cross-fitting cannot correct for a missing common cause.` },
       ] }
     }
     case 't-learner-run': {
@@ -216,35 +343,48 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: perRow === null || rows === null
           ? `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(headlineValue(estimate.effect))} on average across rows, ${adjustment}.`
-          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(perRow.overall)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}.` },
-        { kind: 'comparison', text: rows === null
-          ? 'No row effects were recorded.'
-          : `${formatPercent(rows.positiveShare, { precision: 0 }).text} of rows have an effect above zero, and ${formatPercent(1 - rows.positiveShare, { precision: 0 }).text} at or below it.` },
+          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(perRow.overall)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}. ${formatPercent(rows.positiveShare, { precision: 0 }).text} are above zero.` },
         noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No sampling interval is available.'),
-        { kind: 'qualification', text: `Each row’s effect is the treated forest’s prediction minus the control forest’s at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual.` },
+        { kind: 'qualification', text: `Each row’s effect is the treated forest’s prediction minus the control forest’s at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual. The spread across rows shows variation in fitted predictions and can also contain fitting noise; it is not an uncertainty interval.` },
       ] }
     }
     case 'ardl-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const reading = boundsReading(run.evidence)
-      const bounds = reading === 'level-relation'
-        ? 'The bounds statistic is above the 5% upper bound, which supports a level relationship under the selected lag and deterministic specification.'
-        : reading === 'no-level-relation'
-          ? 'The bounds statistic is below the 5% lower bound, so this specification does not support a level relationship.'
-          : 'The bounds statistic lies between the 5% bounds, so the level-relationship test is inconclusive.'
+      const magnitude = (() => {
+        switch (reading) {
+          case 'level-relation': return `The results support a stable long-run relationship between ${plainName(study.treatment.name)} and ${plainName(study.outcome.name)}. In that relationship, a 1-unit higher ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)}.`
+          case 'no-level-relation': return `The results do not support a stable long-run relationship between ${plainName(study.treatment.name)} and ${plainName(study.outcome.name)}. The fitted long-run coefficient is ${number(effect)}, but it should not be interpreted as an established long-run effect.`
+          case 'inconclusive': return `The results do not settle whether ${plainName(study.treatment.name)} and ${plainName(study.outcome.name)} have a stable long-run relationship. The fitted long-run coefficient is ${number(effect)}, but the evidence is inconclusive.`
+          default: return assertNever(reading)
+        }
+      })()
+      const uncertainty = (() => {
+        switch (estimate.interval.kind) {
+          case 'none': return noInterval(estimate.interval.reason)
+          case 'confidence': return {
+            kind: 'uncertainty' as const,
+            text: `The ${formatPercent(estimate.interval.level, { precision: 0 }).text} confidence interval for the fitted coefficient is ${number(estimate.interval.lower)} to ${number(estimate.interval.upper)}. This range assumes the selected lag and trend settings are fixed.`,
+          }
+          case 'credible': {
+            const statement = intervalStatement(estimate.interval, { kind: 'additive' })
+            return { ...statement, text: `${statement.text} This range assumes the selected lag and trend settings are fixed.` }
+          }
+          default: return assertNever(estimate.interval)
+        }
+      })()
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `The estimated long-run coefficient associates a 1-unit higher level of ${study.treatment.name} with ${change(effect, study.outcome.name)} in the fitted equilibrium relation.` },
-        { kind: 'comparison', text: bounds },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'qualification', text: 'A bounds-test level relationship and a long-run coefficient do not by themselves establish causal direction.' },
+        { kind: 'magnitude', text: magnitude },
+        uncertainty,
+        { kind: 'qualification', text: 'The method requires each series to be stable either as recorded or after taking one change, but not two. The selected lag pattern and trend must be appropriate, and the relationship must remain stable. It should be interpreted causally only if the study design separately establishes the direction and accounts for common causes.' },
       ] }
     }
     case 'vecm-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `The outcome-normalised cointegrating vector implies ${change(effect, study.outcome.name)} for a 1-unit long-run change in ${study.treatment.name}.` },
-        noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : `Reported interval: ${intervalDisplay(run, additiveScale)}.`),
-        { kind: 'qualification', text: `The rank-${run.evidence.rank} cointegrating relation describes long-run co-movement. It does not by itself identify an intervention effect or its direction.` },
+        { kind: 'magnitude', text: `The series provide evidence of one long-run equilibrium relationship, even though each changes over time. In that relationship, ${plainName(study.treatment.name)} being 1 unit higher corresponds to ${plainName(study.outcome.name)} being ${relativeLevel(effect)}.` },
+        noInterval('No confidence interval is available for this long-run coefficient.'),
+        { kind: 'qualification', text: 'Each series must become stable after taking one change. The selected lag pattern, trend settings, and one-relationship structure must be appropriate, and the relationship must remain stable. This should be interpreted causally only if the study design separately establishes the direction and accounts for common causes.' },
       ] }
     }
     case 'synthetic-control-run': {
@@ -252,55 +392,44 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       const average = effect?.aggregate.average ?? Number.NaN
       const cumulative = effect?.aggregate.cumulative ?? Number.NaN
       const crossFit = run.evidence.crossFit.kind === 'available'
-        ? `The cross-fitted estimate is ${number(run.evidence.crossFit.att)} with standard error ${number(run.evidence.crossFit.standardError)} and 95% confidence limits ${number(run.evidence.crossFit.confidenceInterval[0])} to ${number(run.evidence.crossFit.confidenceInterval[1])}.`
-        : `Cross-fitted inference was unavailable: ${run.evidence.crossFit.reason}`
-      const placebo = run.evidence.donorPlacebo.kind === 'available'
-        ? `The donor-placebo post/pre-MSPE rank gives p = ${number(run.evidence.donorPlacebo.pValue)} across ${run.evidence.donorPlacebo.nValidPlacebos} donor placebos.`
-        : `Donor-placebo inference was unavailable: ${run.evidence.donorPlacebo.reason}`
+        ? `The main estimate is ${directionalDifference(average)} per ${stepLabel}. It does not have a confidence interval. An uncertainty calculation gives an average estimate of ${directionalDifference(run.evidence.crossFit.att)} per ${stepLabel}, with a 95% confidence interval that ${directionalConfidenceRange(run.evidence.crossFit.confidenceInterval[0], run.evidence.crossFit.confidenceInterval[1], stepLabel)}. This range applies to the second average, not the main average or the cumulative difference.`
+        : `The main estimate is ${directionalDifference(average)} per ${stepLabel}. It does not have a confidence interval. The additional uncertainty calculation was unavailable: ${run.evidence.crossFit.reason}`
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `After the intervention, observed ${study.outcome.name} averaged ${gap(average, study.outcome.name)} the synthetic-control counterfactual per ${stepLabel}. The cumulative gap is ${number(cumulative)} ${study.outcome.name} units.` },
+        { kind: 'magnitude', text: `Across the ${run.evidence.nPost} ${stepLabel}s after the intervention, observed ${plainName(study.outcome.name)} averaged ${gap(average)} its estimated no-intervention outcome per ${stepLabel}. That is the average gap for one ${stepLabel}. Together, the ${stepLabel}-by-${stepLabel} gaps add up to ${directionalDifference(cumulative)} across the full period.` },
         { kind: 'uncertainty', text: crossFit },
-        { kind: 'comparison', text: placebo },
-        { kind: 'qualification', text: `The comparison is credible only to the extent that the weighted donors reproduced the treated series before intervention and remained unaffected afterwards. The pre-period loss is a fit measure, not a causal test.` },
+        { kind: 'qualification', text: 'This can be interpreted as an intervention effect only if the weighted donors show what would have happened to the treated series without intervention, the donor relationship remains stable, and neither spillovers nor another change affects the comparison.' },
       ] }
     }
     case 'panel-intervention-run': {
       const primary = run.evidence.syntheticDid.estimate
-      const placebo = run.evidence.syntheticDidPlacebo.kind === 'available'
-        ? `The synthetic-DID placebo standard error is ${number(run.evidence.syntheticDidPlacebo.standardError)}, based on ${run.evidence.syntheticDidPlacebo.replications} seeded reassignments of control units.`
-        : `The synthetic-DID placebo standard error was unavailable: ${run.evidence.syntheticDidPlacebo.reason}`
-      const inTime = run.evidence.syntheticDidInTime.kind === 'available'
-        ? `The pre-treatment in-time placebo estimate is ${number(run.evidence.syntheticDidInTime.estimate)}.`
-        : `The in-time placebo was unavailable: ${run.evidence.syntheticDidInTime.reason}`
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Synthetic difference-in-differences estimates that treated units averaged ${gap(primary, study.outcome.name)} their weighted counterfactual after adoption.` },
-        { kind: 'comparison', text: `The same panel gives DID ${number(run.evidence.did.estimate)} and synthetic control ${number(run.evidence.syntheticControl.estimate)}; these are comparison estimates, while synthetic difference-in-differences is the predeclared primary result.` },
-        { kind: 'uncertainty', text: placebo },
-        { kind: 'comparison', text: inTime },
-        { kind: 'qualification', text: 'A causal reading depends on the recorded adoption pattern, comparison-unit validity and untreated potential-outcome assumptions. Agreement between the 3 estimators is not an identification test.' },
+        { kind: 'magnitude', text: `After adoption, ${plainName(study.outcome.name)} for the units that adopted averaged ${gap(primary)} the value estimated for them without adoption per ${stepLabel}.` },
+        noInterval('No confidence interval is shown for this result.'),
+        { kind: 'qualification', text: 'This can be interpreted as an adoption effect only if the comparison units show what would have happened to the treated units without adoption, no effect began early, and treatment of one unit did not affect another. Agreement among the three estimates does not establish those conditions.' },
       ] }
     }
     case 'negbin-nuts-run': {
-      const ratio = estimate.effect.kind === 'incidenceRateRatio' ? estimate.effect.value : Number.NaN
+      const ratio = estimate.effect.kind === 'expectedCountRatio' ? estimate.effect.value : Number.NaN
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${ratioMeaning(ratio, study.outcome.name)} for a 1 standard deviation increase in ${study.treatment.name}, conditional on the model's single standardised confounder. The posterior median incidence rate ratio is ${formatEstimate(ratio, irrScale).text}.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 1, 'no multiplicative change'),
-        { kind: 'qualification', text: 'The interval summarises posterior draws under the fitted Gamma–Poisson model and priors. It is not a frequentist confidence interval.' },
+        { kind: 'magnitude', text: `${ratioMeaning(ratio, study.outcome.name)} for a 1-unit increase in ${plainName(study.treatment.name)}, after accounting for the recorded common cause. The posterior median expected-count ratio is ${formatEstimate(ratio, countRatioScale).text}.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'count-ratio' }),
+        { kind: 'qualification', text: 'This can be interpreted as an effect only if the recorded common cause is enough to account for the treatment–outcome relationship, the count model fits, rows are independent, and the sampler represented the posterior reliably. The interval describes posterior draws under the fitted model and priors; it does not test whether the causal assumptions are true.' },
       ] }
     }
     case 'bayesian-gaussian-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Setting ${study.treatment.name} to 1 rather than 0 gives ${change(effect, study.outcome.name)} on average under the fitted Gaussian model, ${adjustedFor(run)}.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'comparison', text: `${formatPercent(run.evidence.probabilityPositive, { precision: 1 }).text} of retained posterior effect draws are above zero. This is a posterior probability under the specified model and priors, not the probability that the causal assumptions are true.` },
+        { kind: 'magnitude', text: `Setting ${plainName(study.treatment.name)} to 1 rather than 0 gives ${change(effect, study.outcome.name)} on average in the fitted model, ${adjustedFor(run)}.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
+        { kind: 'uncertainty', text: `${formatPercent(run.evidence.probabilityPositive, { precision: 1 }).text} of retained posterior effect draws are above zero. This is a probability under the specified model and priors, not the probability that the causal assumptions are true.` },
+        { kind: 'qualification', text: 'This can be interpreted as an effect only if the recorded adjustment variables account for the common causes, treatment is genuinely binary, the additive outcome model fits, rows are independent, and the priors suit the outcome scale.' },
       ] }
     }
     case 'discrete-bn-run': {
       const [low, high] = run.evidence.treatmentStates
       const [expectedLow, expectedHigh] = run.evidence.expectations
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Under the fitted interventional network, setting ${study.treatment.name} from ${low} to ${high} changes expected ${study.outcome.name} from ${number(expectedLow)} to ${number(expectedHigh)}, a difference of ${number(run.evidence.effect)}.` },
+        { kind: 'magnitude', text: `In the fitted network, setting ${plainName(study.treatment.name)} from its ${low} state to its ${high} state changes expected ${plainName(study.outcome.name)} from ${number(expectedLow)} to ${number(expectedHigh)}, a difference of ${number(run.evidence.effect)}.` },
         noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No uncertainty interval is available.'),
         { kind: 'qualification', text: 'For a continuous treatment, the contrast is between quantile states rather than a 1-unit change on the original scale. Observed low-cardinality treatment states are preserved. The causal interpretation depends on the graph, adjustment and state preparation.' },
       ] }
@@ -308,7 +437,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
     case 'binary-ett-run': {
       const { evidence } = run
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Among rows with ${study.treatment.name} = 1, the identified model gives mean ${study.outcome.name}(1) of ${number(evidence.treatedPotentialOutcomeMean)} and mean ${study.outcome.name}(0) of ${number(evidence.untreatedPotentialOutcomeMean)}. Their difference is ${number(evidence.effectOnTreated)}.` },
+        { kind: 'magnitude', text: `Among rows that actually received treatment, expected ${plainName(study.outcome.name)} is ${number(evidence.treatedPotentialOutcomeMean)} under treatment and ${number(evidence.untreatedPotentialOutcomeMean)} under the estimated no-treatment alternative. Their difference is ${number(evidence.effectOnTreated)}.` },
         noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No uncertainty interval is available.'),
         { kind: 'qualification', text: 'This is the binary effect on the treated under the recorded graph and empirical joint distribution. It is not an ATE, and no continuous variable was discretised automatically.' },
       ] }
@@ -320,26 +449,37 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         switch (run.evidence.fit.kind) {
           case 'unfitted': return 'No model was fitted.'
           case 'invalidAdjustment': return 'No model was fitted because the supplied adjustment set did not pass the graph criterion.'
-          case 'adjustedLinear': return 'A linear outcome regression uses the graph-derived time-indexed adjustment set.'
-          case 'adjustedKnn': return `A ${run.evidence.fit.k}-neighbour outcome regression uses the graph-derived time-indexed adjustment set.`
-          case 'wrightParents': return `Wright path tracing gives a direct contribution of ${number(run.evidence.fit.directEffect)} and an indirect contribution of ${number(run.evidence.fit.indirectEffect)} from linear regressions on each node’s time-indexed parents.`
+          case 'adjustedLinear': return 'The two settings are compared with a linear model for the outcome.'
+          case 'adjustedKnn': return `The two settings are compared with a local model using ${run.evidence.fit.k} neighbouring observations.`
+          case 'wrightParents': return `The fitted graph attributes ${number(run.evidence.fit.directEffect)} to direct paths and ${number(run.evidence.fit.indirectEffect)} to paths through other variables.`
           default: return assertNever(run.evidence.fit)
         }
       })()
+      const timing = timeBeforeOutcome(run.configuration.treatmentLag, stepLabel)
+      const adjustment = timeIndexedAdjustment(run, stepLabel)
+      const uncertainty = estimate.interval.kind === 'none'
+        ? noInterval(estimate.interval.reason)
+        : intervalStatement(estimate.interval, { kind: 'additive' })
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Setting ${study.treatment.name} from ${number(low)} to ${number(high)} changes predicted ${study.outcome.name} by ${number(effect)} on average under the fitted total-effect model.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, 0, 'no additive effect'),
-        { kind: 'qualification', text: `This is a total effect through the directed paths retained in the time-series graph. ${model}` },
+        { kind: 'magnitude', text: `If ${plainName(study.treatment.name)} were set to ${number(high)} ${timing}, rather than ${number(low)}, estimated ${plainName(study.outcome.name)} would be ${gap(effect)} under the lower setting on average. ${adjustment}` },
+        estimate.interval.kind === 'none'
+          ? uncertainty
+          : { ...uncertainty, text: `${uncertainty.text} It comes from repeatedly refitting blocks of adjacent periods. The calculation treats the recorded causes and their timing as fixed; it does not allow for uncertainty about whether the graph itself is right.` },
+        { kind: 'qualification', text: `This has a causal interpretation only if the recorded temporal graph correctly represents the relevant causes and their timing, those relationships remain stable over the study period, and the fitted outcome relationship is suitable. ${model}` },
       ] }
     }
     case 'causal-impact-run': {
       const effect = estimate.effect.kind === 'path' ? estimate.effect : null
       const average = effect?.aggregate.average ?? Number.NaN
       const cumulative = effect?.aggregate.cumulative ?? Number.NaN
+      const counterfactualAverage = run.evidence.counterfactual.reduce((sum, value) => sum + value, 0) / run.evidence.counterfactual.length
+      const baseline = counterfactualAverage > 0
+        ? ` The estimated no-intervention baseline averaged ${number(counterfactualAverage)} per ${stepLabel}, so the average difference is ${formatPercent(Math.abs(average / counterfactualAverage), { precision: 1 }).text} of that baseline.`
+        : ''
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `During the post-intervention period, observed ${study.outcome.name} averaged ${gap(average, study.outcome.name)} its state-space counterfactual per ${stepLabel}. The cumulative difference is ${number(cumulative)} ${study.outcome.name} units.` },
+        { kind: 'magnitude', text: `After the intervention, observed ${plainName(study.outcome.name)} averaged ${gap(average)} its estimated no-intervention outcome per ${stepLabel}. Across ${run.evidence.nPost} ${stepLabel}s, the differences sum to ${number(cumulative)}.${baseline}` },
         noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No interval for the aggregate effect is available.'),
-        { kind: 'qualification', text: 'The pointwise band describes counterfactual forecast uncertainty. It is not an interval for the average or cumulative effect, and the causal reading depends on stable, unaffected controls.' },
+        { kind: 'qualification', text: 'This can be interpreted as an intervention effect only if the selected control series show what would have happened to the outcome without intervention, their relationship with the outcome remains stable, the controls are not themselves affected, and no other outcome-specific change begins with the intervention.' },
       ] }
     }
     default: return assertNever(run)
@@ -352,31 +492,31 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
     case 'pc-stable-run': {
       const connections = run.result.graph.flatMap((targets, source) => targets.filter((lags, target) => source < target && (lags[0]?.length ?? 0) > 0)).length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `PC-stable retained ${connections} adjacencies after ${run.result.ciTests.length} conditional-independence tests. Directed endpoints are compelled by the fitted equivalence class; undirected endpoints remain unresolved.` },
+        { kind: 'magnitude', text: `The data retained ${connections} connections among the selected variables. Arrows show directions the method could settle; plain lines show directions that remain unresolved.` },
         { kind: 'qualification', text: 'The CPDAG relies on causal sufficiency, the Markov and faithfulness assumptions, the selected conditional-independence test, and any background constraints. It is structural evidence rather than an intervention-effect estimate.' },
       ] }
     }
     case 'fci-run': {
       const connections = run.result.graph.flatMap((targets, source) => targets.filter((lags, target) => source < target && (lags[0]?.length ?? 0) > 0)).length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `FCI retained ${connections} adjacencies after ${run.result.ciTests.length} conditional-independence tests. The displayed tails, arrowheads, and circles preserve the PAG returned by the orientation rules.` },
+        { kind: 'magnitude', text: `The data retained ${connections} connections among the selected variables. Arrowheads and tails show settled endpoint information; circles show what the method could not resolve.` },
         { kind: 'qualification', text: 'A PAG represents an equivalence class that can include latent confounding and selection. Circles are unresolved endpoints, and the graph must not be read as a fully directed causal DAG.' },
       ] }
     }
     case 'direct-lingam-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: `The reported order places the ${run.result.variables} variables in the sequence inferred from non-Gaussianity. Each nonzero weight is the fitted linear structural coefficient from its source to its target after adaptive-lasso pruning.` },
+      { kind: 'magnitude', text: `The method ordered ${run.result.variables} variables and drew the linear connections that remained after pruning. A positive or negative weight shows the fitted direction and size of each relationship.` },
       { kind: 'qualification', text: 'The order and weights identify a causal structure only under the linear, acyclic, causally sufficient model with mutually independent non-Gaussian disturbances. They are not intervention-effect estimates.' },
     ] }
     case 'pcmci-plus-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: `A marked cell records a conditional-dependence relation selected at alpha ${run.result.pcAlpha}. Its lag says how many time steps the source precedes the target; ParCorr gives the signed conditional association.` },
+      { kind: 'magnitude', text: 'A displayed connection means the source and target remained related after the method accounted for selected other values. Its lag says how many time steps the source comes before the target.' },
       { kind: 'qualification', text: 'Same-period o–o endpoints remain unoriented. The resulting time-series CPDAG represents an equivalence class, not a completed causal DAG or an intervention-effect estimate.' },
     ] }
     case 'lpcmci-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: `A marked cell records lagged or same-period graphical evidence selected at alpha ${run.result.pcAlpha}. Endpoint marks carry the orientation information; ParCorr gives the signed conditional association used by the test.` },
+      { kind: 'magnitude', text: 'A displayed connection means the source and target remained related after the method accounted for selected other values. Its lag gives the time gap, while circles preserve directions the data could not settle.' },
       { kind: 'qualification', text: 'Circles preserve unresolved endpoints and bidirected marks permit latent confounding. The PAG is evidence to review, not a fully oriented causal DAG or an intervention-effect estimate.' },
     ] }
     case 'rpcmci-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: `RPCMCI assigned each of the ${run.result.observations} time points to one of ${run.result.numRegimes} regimes and estimated a separate lag graph for each regime. ${run.result.errorFreeAnnealings} of ${run.result.maxAnneal} annealing runs completed without an optimisation error.` },
+      { kind: 'magnitude', text: `The method split ${run.result.observations} time points into ${run.result.numRegimes} recurring patterns and estimated a separate lag graph for each one. ${run.result.errorFreeAnnealings} of ${run.result.maxAnneal} searches completed without an optimisation error.` },
       { kind: 'qualification', text: 'The regime memberships and conditional-dependence graphs depend on the selected number of regimes, transition budget, linear partial-correlation test and assumption that each regime has a stationary causal structure. Regime labels have no ordering or substantive meaning by themselves.' },
     ] }
     case 'cdnots-run':
@@ -384,16 +524,16 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
       const method = run.kind === 'cdnots-run' ? 'CD-NOTS' : 'CD-NOTS+'
       const context = run.result.contextVariables.length === 0
         ? 'No time-context node was included.'
-        : `The graph includes ${run.result.contextVariables.join(' and ')} as generated time-context ${run.result.contextVariables.length === 1 ? 'node' : 'nodes'}.`
+        : `The graph includes ${run.result.contextVariables.join(' and ')} to represent changes over time.`
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${method} tested lagged and same-period conditional independences through lag ${run.result.maxLag}. ${context}` },
+        { kind: 'magnitude', text: `${method} searched for same-period and delayed connections up to ${run.result.maxLag} time steps apart. ${context}` },
         { kind: 'qualification', text: `The endpoint marks represent the graph orientations supported by the ${method} rules and the selected partial-correlation test. Causal interpretation requires the method's Markov, faithfulness, causal-sufficiency and time-context assumptions; the marks are not intervention-effect estimates.` },
       ] }
     }
     case 'grace-run': {
       const selected = run.result.graph.flatMap((targets) => targets.flatMap((lags) => lags)).filter(Boolean).length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${selected} source–target–lag gates meet the ${number(run.result.gateThreshold)} threshold after GRACE refined the CD-NOTS skeleton. Each displayed value is the fitted hard-concrete gate for that candidate relation.` },
+        { kind: 'magnitude', text: `${selected} candidate connections remained after the neural model refined the initial time-series graph. A larger gate value means the fitted model retained that connection more strongly.` },
         { kind: 'qualification', text: 'The initial skeleton and neural refinement depend on the selected lag window, conditional-independence test, nonstationarity context, regularisation and optimization. A retained gate is discovery evidence, not an intervention-effect estimate.' },
       ] }
     }
@@ -401,33 +541,33 @@ export function interpretDiscoveryResult(run: DiscoveryRunArtifact): ResultInter
       const links = run.result.graph.flatMap((targets) => targets.flatMap((lags) => lags)).filter((mark) => mark.length > 0).length
       const contexts = run.nodes.filter((node) => node.kind === 'generated').length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `The joint panel search reports ${links} marked source–target–lag cells across ${run.result.datasets} aligned units and ${run.result.periods} periods. ${contexts} generated context ${contexts === 1 ? 'node is' : 'nodes are'} retained in the graph.` },
+        { kind: 'magnitude', text: `The joint panel search found ${links} marked connections across ${run.result.datasets} aligned units and ${run.result.periods} periods. It retained ${contexts} generated context ${contexts === 1 ? 'variable' : 'variables'} for shared time or unit differences.` },
         { kind: 'qualification', text: 'J-PCMCI+ pools conditional-independence evidence under the declared system, time-context and unit-context roles. Its CPDAG is discovery evidence, not an intervention-effect estimate; unresolved endpoints and context relations must remain unresolved.' },
       ] }
     }
     case 'dynotears-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: 'Each nonzero weight is a fitted linear structural coefficient from source(t−lag) to target(t). Its sign gives the fitted direction of association; its magnitude depends on the variables’ scales and the selected penalties.' },
+      { kind: 'magnitude', text: 'Each displayed connection links an earlier or same-period source to a target. Its positive or negative weight gives the fitted direction and size of the linear relationship.' },
       { kind: 'qualification', text: 'DYNOTEARS supplies a sparse candidate structure under its model assumptions. The weights are not uncertainty intervals or identified intervention effects.' },
     ] }
     case 'var-lingam-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: `The selected lag is ${run.result.selectedLag}. Each displayed coefficient belongs to the fitted contemporaneous or lagged structural vector autoregression; the reported order is the instantaneous order inferred from non-Gaussian residuals.` },
+      { kind: 'magnitude', text: `The fitted graph uses up to ${run.result.selectedLag} previous time steps. Each weight shows the direction and size of a same-period or delayed linear relationship.` },
       { kind: 'qualification', text: 'The order and weights rely on linearity, non-Gaussian independent disturbances and the stated lag model. They remain structural evidence to review against domain knowledge.' },
     ] }
     case 'ocse-run': return { kind: 'result-interpretation', statements: [
-      { kind: 'magnitude', text: `${run.result.edges.length} lagged relations survived forward and backward conditional-information selection. CMI measures remaining conditional information; the permutation p-value compares it with shuffled data.` },
+      { kind: 'magnitude', text: `${run.result.edges.length} delayed connections remained after the method added useful predictors and removed redundant ones. The displayed score measures information left after accounting for the other selected histories.` },
       { kind: 'qualification', text: 'A selected relation is conditional-information evidence at the stated lag. It is not an estimate of the effect of intervening on the source.' },
     ] }
     case 'cmlp-run': {
       const selected = run.result.lagActive.flatMap((targets) => targets.flatMap((lags) => lags)).filter(Boolean).length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${selected} source–target–lag groups remain active after cMLP training. Each displayed score is the norm of the fitted input weights for that source, target and lag.` },
+        { kind: 'magnitude', text: `${selected} delayed source-to-target connections remained after training. A larger score means that source and lag contributed more strongly to predicting the target in the fitted network.` },
         { kind: 'qualification', text: 'An active group means the source history helps predict the target within the fitted component-wise MLP. Selection depends on the lag window, network, structured penalty, initialization and optimization; it is not an intervention-effect estimate.' },
       ] }
     }
     case 'clstm-run': {
       const selected = run.result.summaryActive.flatMap((targets) => targets).filter(Boolean).length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `${selected} source–target input groups remain active after cLSTM training. Each displayed score is the norm of the source input weights in the target’s component LSTM.` },
+        { kind: 'magnitude', text: `${selected} source-to-target history connections remained after training. A larger score means the source history contributed more strongly to predicting the target in the fitted network.` },
         { kind: 'qualification', text: 'An active group means the source history helps predict the target within the fitted recurrent model. cLSTM does not identify an individual lag, and the relation is not an intervention-effect estimate.' },
       ] }
     }
@@ -442,16 +582,18 @@ export function interpretCounterfactualResult(run: CounterfactualRunArtifact, st
       const { evidence } = run
       const positive = formatPercent(evidence.sharePositive, { precision: 1 }).text
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Across ${evidence.observations} ${stepLabel}s, setting ${study.treatment.name} from ${number(evidence.interventions[0])} to ${number(evidence.interventions[1])} gives ${change(evidence.averageEffect, study.outcome.name)} on average. ${positive} of the model-implied row effects are positive.` },
-        { kind: 'qualification', text: 'These are model-implied alternatives, not 2 outcomes observed for the same row. The calculation assumes the recorded DAG, linear additive equations, measured fitted nodes and invariant non-treatment mechanisms.' },
+        { kind: 'magnitude', text: `For each of the ${evidence.observations} ${stepLabel}s, Hirmos replays the fitted row with ${plainName(study.treatment.name)} set to ${number(evidence.interventions[1])} and to ${number(evidence.interventions[0])}, while keeping that row’s other recovered conditions fixed. The average difference is ${number(evidence.averageEffect)} in ${plainName(study.outcome.name)}; ${positive} of the fitted row differences are positive.` },
         { kind: 'uncertainty', text: evidence.observationNoise === null
           ? 'Exact disturbance-term abduction reproduces each fitted row but does not provide a sampling or posterior uncertainty interval.'
           : `The observation-noise scale is ${number(evidence.observationNoise)}. It changes disturbance-term abduction but is not a reported interval for the individual effects.` },
+        { kind: 'qualification', text: 'Each pair is a modelled replay of one observed row; only one of the two outcomes was observed. The comparison has a counterfactual meaning only if the recorded graph and linear equations are suitable, the relevant causes are measured, and changing treatment would leave the other causal mechanisms unchanged.' },
       ] }
     }
     case 'dynamic-linear-scm-run': {
       const { evidence } = run
-      const schedule = evidence.timing.kind === 'point' ? `once at row ${evidence.timing.time + 1}` : `from row ${evidence.timing.start + 1} onward`
+      const schedule = evidence.timing.kind === 'point'
+        ? `once in ${stepLabel} ${evidence.timing.time + 1}`
+        : `from ${stepLabel} ${evidence.timing.start + 1} onward`
       const uncertainty = (() => {
         switch (evidence.uncertainty.kind) {
           case 'none': return 'No sampling interval was requested; the path and horizon summaries are point estimates conditional on the fitted equations.'
@@ -463,9 +605,9 @@ export function interpretCounterfactualResult(run: CounterfactualRunArtifact, st
         }
       })()
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Setting ${study.treatment.name} from ${number(evidence.interventions[0])} to ${number(evidence.interventions[1])} ${schedule} changes predicted ${study.outcome.name} by ${number(evidence.averageEffect)} per time point on average over the ${evidence.effects.length}-point horizon. The summed horizon contrast is ${number(evidence.cumulativeEffect)}.` },
-        { kind: 'qualification', text: 'The replay uses the graph’s recorded lags, the observed pre-intervention history and the innovation recovered at each time point. It assumes linear time-invariant equations and that intervention changes only the treatment equation.' },
-        { kind: 'uncertainty', text: `${uncertainty} Resampling represents coefficient-estimation uncertainty under the recorded graph and stationary block-bootstrap assumptions; it does not cover graph choice, preprocessing choices, model misspecification or future innovations.` },
+        { kind: 'magnitude', text: `Hirmos replays ${evidence.effects.length} observed ${stepLabel}s with ${plainName(study.treatment.name)} set to ${number(evidence.interventions[1])} rather than ${number(evidence.interventions[0])} ${schedule}. While keeping each period’s recovered unexplained shock fixed, modelled ${plainName(study.outcome.name)} differs by ${number(evidence.averageEffect)} per ${stepLabel} on average, and the period-by-period differences sum to ${number(evidence.cumulativeEffect)}.` },
+        { kind: 'uncertainty', text: `${uncertainty} Resampling represents coefficient-estimation uncertainty under the recorded graph and stationary block-bootstrap assumptions; it does not cover graph choice, preprocessing, an unsuitable model, or uncertainty about the intervention schedule.` },
+        { kind: 'qualification', text: 'This is a retrospective replay of observed periods, not a forecast of new periods. It has a counterfactual meaning only if the recorded lagged graph and linear equations are suitable and changing treatment would leave every other equation and recovered period-specific shock unchanged.' },
       ] }
     }
     default: return assertNever(run)
@@ -480,24 +622,30 @@ export function interpretSensitivityResult(run: SensitivityRunArtifact): ResultI
       const subsetMovement = Math.abs(run.evidence.subsetEffect - run.evidence.estimate)
       const randomMovement = Math.abs(run.evidence.randomCommonCauseEffect - run.evidence.estimate)
       return { kind: 'result-interpretation', statements: [
-        { kind: 'comparison', text: `The permuted-treatment estimate is ${number(run.evidence.placeboEffect)} (${number(placeboDistance)} from zero). Keeping ${formatPercent(run.evidence.subsetFraction, { precision: 0 }).text} of rows moves the estimate by ${number(subsetMovement)}, and adding an independent random covariate moves it by ${number(randomMovement)}.` },
-        { kind: 'qualification', text: 'These are perturbation distances, not hypothesis-test p-values. Small movement under a chosen perturbation supports numerical stability to that perturbation only; it does not establish identification or rule out unmeasured confounding.' },
+        { kind: 'comparison', text: `After the treatment values were shuffled, the estimated effect was ${number(run.evidence.placeboEffect)}, which is ${number(placeboDistance)} from zero. A useful placebo result is close to zero.` },
+        { kind: 'comparison', text: `Refitting on ${formatPercent(run.evidence.subsetFraction, { precision: 0 }).text} of the rows changed the estimate by ${number(subsetMovement)}. A result that depends heavily on which rows are retained would move much more.` },
+        { kind: 'comparison', text: `Adding an independent noise variable changed the estimate by ${number(randomMovement)}. A variable generated at random should have little effect on the answer.` },
+        { kind: 'qualification', text: 'These checks test the estimate against three specific disturbances. Passing them does not validate the graph or rule out an unmeasured common cause.' },
       ] }
     }
     case 'dml-refutation-run': {
       const alpha = 0.05
+      const placeboDifferent = run.evidence.placebo.pValue < alpha
+      const randomDifferent = run.evidence.randomCommonCause.pValue < alpha
+      const randomMovement = run.evidence.randomCommonCause.refutedEffect - run.evidence.randomCommonCause.originalEffect
       return { kind: 'result-interpretation', statements: [
-        { kind: 'comparison', text: `The placebo mean-shift test ${run.evidence.placebo.pValue < alpha ? 'rejects' : 'does not reject'} a zero simulated mean (p = ${number(run.evidence.placebo.pValue)}). The random-common-cause test ${run.evidence.randomCommonCause.pValue < alpha ? 'rejects' : 'does not reject'} it (p = ${number(run.evidence.randomCommonCause.pValue)}).` },
-        { kind: 'magnitude', text: `The robustness value is ${number(run.evidence.sensitivity.robustnessValue)}: the equal confounding share required by this sensitivity model to move the point estimate to zero. The interval robustness value is ${number(run.evidence.sensitivity.robustnessValueCi)}.` },
-        { kind: 'qualification', text: 'The p-values refer to the simulated refuter distributions, not to the truth of the causal graph. Robustness values are calibrated to the stated confounding model and do not cover arbitrary violations.' },
+        { kind: 'comparison', text: `Shuffling the treatment produced an average placebo estimate of ${number(run.evidence.placebo.refutedEffect)} across eight lighter refits. Those estimates ${placeboDifferent ? 'differ from zero' : 'are not distinguishable from zero'} at the 5% level (p = ${number(run.evidence.placebo.pValue)}); a useful placebo result is close to zero.` },
+        { kind: 'comparison', text: `Adding independent noise variables changed the lighter-fit estimate by ${number(randomMovement)} on average across six refits. The shifts ${randomDifferent ? 'differ from zero' : 'are not distinguishable from zero'} at the 5% level (p = ${number(run.evidence.randomCommonCause.pValue)}).` },
+        { kind: 'magnitude', text: `Under the equal-strength confounding model, an unmeasured common cause would need to explain ${formatPercent(run.evidence.sensitivity.robustnessValue, { precision: 1 }).text} of the remaining variation in both treatment and outcome to move the estimate to zero. It would need ${formatPercent(run.evidence.sensitivity.robustnessValueCi, { precision: 1 }).text} to make the reported interval reach zero.` },
+        { kind: 'qualification', text: 'The p-values describe the simulated refits. They do not test whether the causal graph is true. The confounding percentages apply to the equal-strength model shown here and do not cover every possible missing variable.' },
       ] }
     }
     case 'unobserved-confounding-run': {
       const effects = run.evidence.effects.flat()
       const flips = effects.filter((value) => Math.sign(value) !== Math.sign(run.evidence.originalEffect)).length
       return { kind: 'result-interpretation', statements: [
-        { kind: 'comparison', text: `Across the specified ${run.evidence.kappaT.length} × ${run.evidence.kappaY.length} confounder grid, the refitted effect ranges from ${number(Math.min(...effects))} to ${number(Math.max(...effects))}; ${flips} of ${effects.length} scenarios change its sign.` },
-        { kind: 'qualification', text: 'This is a deterministic scenario analysis over the chosen treatment-flip and outcome-shift strengths. It assigns no probability to those scenarios and does not prove that unmeasured confounding is absent outside the grid.' },
+        { kind: 'comparison', text: `Across the ${run.evidence.kappaT.length} × ${run.evidence.kappaY.length} simulated scenarios, the refitted effect ranges from ${number(Math.min(...effects))} to ${number(Math.max(...effects))}. ${flips} of ${effects.length} scenarios reverse its sign.` },
+        { kind: 'qualification', text: 'Each scenario gives an unmeasured variable a chosen influence on treatment assignment and outcome, then refits the estimate. The grid does not say how likely any scenario is, and it says nothing about stronger or differently shaped confounding outside the values tested.' },
       ] }
     }
     default: return assertNever(run)

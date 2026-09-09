@@ -53,6 +53,7 @@ import {
   type JpcmciObservedRole,
 } from '@/domain/discovery'
 import { assertNever, isNonEmpty } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import {
   assessDiscoveryRunDeletion,
   type DeletableDiscoveryRun,
@@ -823,7 +824,7 @@ function ResultCard({ run, method, title, meta, open, current, children }: {
           </div>
         </summary>
         <div className="px-4 pb-4">
-          <ResultInterpretation interpretation={interpretDiscoveryResult(run)} className="mb-3" />
+          <ResultInterpretation interpretation={interpretDiscoveryResult(run)} context="discovery-run" className="mb-3" />
           {children}
         </div>
       </details>
@@ -1839,7 +1840,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const stage = (
     <section aria-labelledby="discovery-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>03 · Discovery lab</span>
+        <span className={label('text-faint')}>{chapterLabel('discovery')}</span>
         <h2 id="discovery-title" className="mb-2 mt-2 text-heading text-ink">Examine candidate relationships</h2>
         <p className={chapterIntro}>Causal discovery uses patterns in data to propose relations between variables, including same-period and lagged relations when time is part of the study. In this chapter, choose a method suited to the observation structure and compare the candidate relations it produces. The result depends on the method's assumptions and does not establish a causal graph on its own.</p>
       </div>

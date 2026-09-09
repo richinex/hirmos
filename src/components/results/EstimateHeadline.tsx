@@ -4,9 +4,9 @@ import { additive, headlineValue, intervalTypeOf, summariseRowEffects, type Caus
 import { formatCount, formatEstimate, formatPercent, formatStatistic, type EffectScale, type Formatted } from '@/lib/format/number'
 
 /** The scale an estimate's figures are printed on. */
-export const IRR = { kind: 'ratio', label: 'IRR' } as const
+export const EXPECTED_COUNT_RATIO = { kind: 'ratio', label: 'ECR' } as const
 
-export const scaleOf = (estimate: CausalEstimate): EffectScale => (estimate.effect.kind === 'incidenceRateRatio' ? IRR : additive)
+export const scaleOf = (estimate: CausalEstimate): EffectScale => (estimate.effect.kind === 'expectedCountRatio' ? EXPECTED_COUNT_RATIO : additive)
 
 /** The headline figure of any estimate, for ledgers and comparisons. */
 export const headlineFigure = (estimate: CausalEstimate): Formatted => formatEstimate(headlineValue(estimate.effect), scaleOf(estimate))
@@ -92,10 +92,11 @@ function GroupEffectTable({ effect, interval, observations }: {
  * what is known about its uncertainty, and the scale line. An estimate with an interval is the
  * interval figure; a path, or an estimate whose method reports no interval, says so in its place.
  */
-export function EstimateHeadline({ estimate, sentence, scaleLine, stepLabel, accent, testId }: {
+export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, stepLabel, accent, testId }: {
   readonly estimate: CausalEstimate
   readonly sentence: string
   readonly scaleLine: string
+  readonly sampleLine: string
   readonly stepLabel: string
   /** Only the study's current accepted answer takes the signal colour. */
   readonly accent: boolean
@@ -130,7 +131,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, stepLabel, acc
         type={intervalTypeOf(estimate.interval)}
         scale={scaleOf(estimate)}
         standardError={estimate.standardError ?? undefined}
-        observations={estimate.sample.observations}
+        sampleLine={sampleLine}
         scaleLine={scaleLine}
         accent={accent}
         testId={testId}
@@ -145,7 +146,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, stepLabel, acc
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title text-ink">{sentence}</figcaption>
       <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${accent ? 'text-signal' : 'text-ink'}`)} title={figure.exact}><FigureParts value={figure} /></p>
-      <p className={num('mb-0 mt-1 text-body text-bone')}>{span}no interval · n = {formatCount(estimate.sample.observations).text}</p>
+      <p className={num('mb-0 mt-1 text-body text-bone')}>{span}no interval · {sampleLine}</p>
       {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}
       <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
     </figure>

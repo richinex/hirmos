@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { label as labelCn, num, well } from './recipes'
-import { formatCount, formatEstimate, formatInterval, type EffectScale, type Formatted, type IntervalType } from '@/lib/format/number'
+import { formatEstimate, formatInterval, type EffectScale, type Formatted, type IntervalType } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
 
 /**
@@ -48,7 +48,7 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
 }
 
 /** The hero estimate: the estimand sentence, the figure, its named interval, and the scale line. */
-export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, standardError, observations, scaleLine, accent = false, testId }: {
+export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, standardError, sampleLine, scaleLine, accent = false, testId }: {
   readonly sentence: string
   readonly estimate: number
   readonly lower: number
@@ -56,7 +56,7 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
   readonly type: IntervalType
   readonly scale: EffectScale
   readonly standardError?: number
-  readonly observations: number
+  readonly sampleLine: string
   readonly scaleLine: string
   /** Only the study's current accepted answer takes the signal colour. */
   readonly accent?: boolean
@@ -79,7 +79,7 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
       <p aria-hidden className={num('mb-0 mt-1 text-body text-bone')}>
         [{figure.bounds.lower}, {figure.bounds.upper}] <span className="text-ink">{figure.typeLabel}</span>
         {se !== null && <> · SE {se}</>}
-        {' · '}n = {formatCount(observations).text}
+        {' · '}{sampleLine}
       </p>
       <p className={labelCn('mb-0 mt-2 text-muted')}>{scaleLine}</p>
     </figure>

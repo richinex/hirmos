@@ -18,6 +18,7 @@ import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { button, chapterIntro, field, fieldLabel, figureGrid, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
+import { chapterLabel } from '@/domain/navigation'
 import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import { DATA_SUBSET_REFUTER_METHOD_ID, LJUNG_BOX_METHOD_ID, PLACEBO_REFUTER_METHOD_ID, RANDOM_COMMON_CAUSE_REFUTER_METHOD_ID,
   DML_REFUTATION_METHOD_ID,
@@ -129,7 +130,7 @@ function DmlRefutationRecord({ run, study }: { readonly run: Extract<Sensitivity
     <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Double machine learning probe batch on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Main estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.mainEstimate).text}</span>. The placebo and random-common-cause probes use the same seeded stream in the recorded order.</p>
-      <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
+      <ResultInterpretation interpretation={interpretSensitivityResult(run)} context="sensitivity-check" className="mt-3" />
       <ul className="m-0 mt-3 list-none divide-y divide-hair border-y border-hair p-0" aria-label="Double machine learning probes">
         {run.refuters.map((fact) => (
           <li key={fact.id} className="py-2">
@@ -187,7 +188,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
     <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Perturbation probes on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Original linear back-door estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.estimate).text}</span>. Interpret each diagnostic according to its stated perturbation and reference value.</p>
-      <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
+      <ResultInterpretation interpretation={interpretSensitivityResult(run)} context="sensitivity-check" className="mt-3" />
       <ul className={figureGrid('m-0 mt-3 list-none p-0 @2xl/panel:grid-cols-3')} aria-label="Refuters">
         {run.refuters.map((fact) => (
           <li key={fact.id}>
@@ -249,7 +250,7 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
     <>
       <h3 className={cn(sectionTitle, 'mb-1 mt-2')}>Simulated unmeasured confounder</h3>
       <p className="m-0 text-body text-muted">Rows vary the simulated effect on treatment assignment. Columns vary the simulated outcome shift. Each cell reports a refitted linear back-door estimate. Original estimate: <span className={num('text-ink')}>{formatStatistic('raw', evidence.originalEffect).text}</span>.</p>
-      <ResultInterpretation interpretation={interpretSensitivityResult(run)} className="mt-3" />
+      <ResultInterpretation interpretation={interpretSensitivityResult(run)} context="sensitivity-check" className="mt-3" />
       {flat.length === 1 && <Alert tone="info" live={false} className="mt-3"><p className="m-0">The inferred strengths collapsed to one point because a single observed common cause bounds them. Set explicit ranges to sweep a grid.</p></Alert>}
       <div className={figureGrid('mt-3 @2xl/panel:grid-cols-3')} aria-label="Grid facts">
         <MetricTile label="Smallest effect" size="compact" frame="cell" value={formatStatistic('raw', least)} context="over the grid" />
@@ -379,7 +380,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   const stage = (
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>07 · Sensitivity</span>
+        <span className={label('text-faint')}>{chapterLabel('sensitivity')}</span>
         <h2 id="sensitivity-title" className="mb-2 mt-2 text-heading text-ink">Assess sensitivity to assumptions</h2>
         <p className={chapterIntro}>A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>

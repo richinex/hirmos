@@ -132,7 +132,7 @@ test('keeps the current stage usable on a phone', async ({ page }, testInfo) => 
   await expect(mobileNav.getByRole('button', { name: /Discovery lab/ })).toHaveAttribute('aria-disabled', 'true')
   await expect(mobileNav.getByRole('button', { name: /Study design/ })).toHaveAttribute('aria-disabled', 'true')
   await expect(mobileNav.getByRole('button', { name: /Counterfactuals/ })).toHaveAttribute('aria-disabled', 'true')
-  await expect(mobileNav.getByRole('button')).toHaveCount(9)
+  await expect(mobileNav.getByRole('button')).toHaveCount(10)
   await page.keyboard.press('Escape')
   await expect(mobileNav).toHaveAttribute('inert', '')
   await expect(page.getByRole('region', { name: 'Physical schema' }).getByRole('row').nth(1).getByRole('cell').nth(4)).not.toHaveText('…', { timeout: 30_000 })

@@ -1,0 +1,19 @@
+{
+ "seed": 20260908,
+ "n": 300,
+ "shape": 1.4,
+ "scale": 40.0,
+ "beta": {
+  "feature_active": -0.6,
+  "experience": -0.3,
+  "complexity": 0.4
+ },
+ "administrative_censoring": 36.0,
+ "dropout": "uniform(12, 60)",
+ "share_never_adopting": 0.3,
+ "events": 132,
+ "censored": 168,
+ "rows_panel": 455,
+ "rows_split6": 1431,
+ "hazard": "h(t | x) = (K / LAMBDA) (t / LAMBDA)^(K - 1) exp(beta . x); feature_active is piecewise constant, so H(t) composes over the intervals"
+}

@@ -49,6 +49,17 @@ function shape(kind: Kind) {
         </>
       )
     }
+    case 'survival': {
+      // Two event-free curves stepping down, one crossing the other, and the follow-up time they are compared through.
+      const steps = (points: readonly (readonly [number, number])[]) => points.flatMap(([x, y], i, all) => (i === 0 ? [[x, y] as const] : [[x, all[i - 1]![1]] as const, [x, y] as const]))
+      return (
+        <>
+          {marker(40)}
+          {series(steps([[4, 4], [10, 7], [16, 11], [22, 14], [30, 18], [38, 21], [46, 23], [52, 24]]))}
+          {series(steps([[4, 4], [8, 9], [14, 15], [20, 18], [28, 20], [36, 21], [44, 21], [52, 22]]), true)}
+        </>
+      )
+    }
     case 'step': {
       const pre = [16, 15, 17, 14, 16, 15, 17, 16, 15, 16]
       const post = [12, 11, 12, 10, 11, 12]

@@ -1811,6 +1811,9 @@ mod tests {
             AnalysisCommand::StationarityBattery
             | AnalysisCommand::Multicollinearity { .. }
             | AnalysisCommand::PandasResampleDaily { .. }
+            | AnalysisCommand::FlexSurv { .. }
+            | AnalysisCommand::ComparisonSurvival { .. }
+            | AnalysisCommand::MultiStateSurvival { .. }
             | AnalysisCommand::Jpcmciplus { .. }
             | AnalysisCommand::Lpcmci { .. }
             | AnalysisCommand::Rpcmci { .. }

@@ -9,7 +9,7 @@ import { assertNever, err, ok, type Result } from '@/domain/dop'
  * together for a purpose and can be removed as a unit.
  */
 
-export type ExampleQuestion = 'intervention' | 'effect' | 'discovery' | 'set'
+export type ExampleQuestion = 'intervention' | 'effect' | 'discovery' | 'set' | 'time'
 
 export interface ExampleQuestionEntry {
   readonly id: ExampleQuestion
@@ -23,6 +23,7 @@ export const EXAMPLE_QUESTIONS: readonly [ExampleQuestionEntry, ...ExampleQuesti
   { id: 'effect', title: 'Given a causal model, what is the effect of X on Y?', when: 'Use the model to identify an estimand, then estimate it from observed data under the stated assumptions.' },
   { id: 'discovery', title: 'What causal structures are compatible with the evidence?', when: 'Use discovery as exploratory evidence, then assess the result against domain knowledge, latent-variable assumptions, and method requirements.' },
   { id: 'set', title: 'What outcome distribution follows if we set X=x?', when: 'Use an explicit causal model to distinguish intervening with do(X=x) from merely observing X=x.' },
+  { id: 'time', title: 'How long until an event, and what changes it?', when: 'The outcome is a wait, not a level. Fit its distribution, compare two groups across follow-up, or model movement between states; rows still waiting when the data ends count as far as they go.' },
 ]
 
 export type ExampleCollectionId = 'ai-code-quality'
@@ -38,7 +39,7 @@ export const EXAMPLE_COLLECTIONS: readonly ExampleCollection[] = [
 ]
 
 /** The small drawing beside an example: one fixed picture per kind of study. */
-export type ExampleGlyph = 'dag' | 'step' | 'panel' | 'counts' | 'rct' | 'pag' | 'lag' | 'dose'
+export type ExampleGlyph = 'dag' | 'step' | 'panel' | 'counts' | 'rct' | 'pag' | 'lag' | 'dose' | 'survival'
 
 export interface ShippedExample {
   readonly id: SavedProjectHeader['id']
@@ -142,6 +143,27 @@ export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = 
     sourceName: 'confounded-dose.csv',
     bundleUrl: '/examples/confounded-dose.hirmos.json',
     question: 'set', approach: 'Intervention query in a discrete Bayesian network', shape: 'cross-section', size: '3,000 patients', estimationRuns: 0, glyph: 'dose', collection: null,
+  },
+  {
+    id: id('6a3f2c9e-7b14-4d58-a2e6-9c5d1f8b3e07'),
+    name: 'Feature adoption and abandonment',
+    sourceName: 'feature-adoption-spells.csv',
+    bundleUrl: '/examples/feature-adoption-survival.hirmos.json',
+    question: 'time', approach: 'Start–stop Weibull PH with a covariate that switches on mid-spell', shape: 'spells', size: '300 teams, 455 intervals', estimationRuns: 0, glyph: 'survival', collection: null,
+  },
+  {
+    id: id('b8d4e1a7-2c69-4f3b-8e15-4a7c9d2f6b31'),
+    name: 'Breast cancer survival, German study',
+    sourceName: 'flexsurv-bc.csv',
+    bundleUrl: '/examples/breast-cancer-survival.hirmos.json',
+    question: 'time', approach: 'Parametric survival, Weibull AFT on right-censored times', shape: 'spells', size: '686 patients, 299 deaths', estimationRuns: 0, glyph: 'survival', collection: null,
+  },
+  {
+    id: id('e2c7a5f1-9d38-4b6e-b7a4-1f6e8c3d5a92'),
+    name: 'Crossing survival curves',
+    sourceName: 'comparison-surv-crossdata.csv',
+    bundleUrl: '/examples/crossing-survival-curves.hirmos.json',
+    question: 'time', approach: 'Two-group comparison with tests that survive a crossing', shape: 'spells', size: '200 rows, 137 events', estimationRuns: 0, glyph: 'survival', collection: null,
   },
 ]
 

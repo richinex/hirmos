@@ -65,6 +65,63 @@ pub(crate) enum CdnotsContext {
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) enum SurvivalFamily {
+    Exponential,
+    Weibull,
+    WeibullPh,
+    LogNormal,
+    Gamma,
+    Gompertz,
+    LogLogistic,
+    GeneralizedGamma,
+    GeneralizedF,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum SurvivalObservationCommand {
+    RightCensored {
+        duration: usize,
+        event: usize,
+    },
+    StartStop {
+        start: usize,
+        stop: usize,
+        event: usize,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GroupSurvivalDiagnostics {
+    pub(crate) cumulative_hazard: Vec<[f64; 2]>,
+    pub(crate) smoothed_hazard: Vec<[f64; 2]>,
+    pub(crate) at_risk: Vec<[f64; 2]>,
+    pub(crate) censor_times: Vec<f64>,
+    pub(crate) restricted_mean: f64,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum ComparisonSurvivalDiagnostics {
+    Recorded {
+        group_zero: GroupSurvivalDiagnostics,
+        group_one: GroupSurvivalDiagnostics,
+        crossing_times: Vec<f64>,
+    },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) enum ConstraintCiTest {
     FisherZ,
     Kci,
@@ -349,6 +406,35 @@ pub(crate) enum AnalysisCommand {
         incomplete_bins: ResamplingIncompleteBins,
         aggregations: Vec<ResamplingAggregation>,
         imputed_cells: Vec<[usize; 2]>,
+    },
+    FlexSurv {
+        rows: usize,
+        columns: usize,
+        observation: SurvivalObservationCommand,
+        covariates: Vec<usize>,
+        family: SurvivalFamily,
+        prediction_times: Vec<f64>,
+    },
+    ComparisonSurvival {
+        rows: usize,
+        columns: usize,
+        duration: usize,
+        event: usize,
+        group: usize,
+        truncation_time: f64,
+        permutations: usize,
+        seed: u32,
+    },
+    MultiStateSurvival {
+        rows: usize,
+        columns: usize,
+        start: usize,
+        stop: usize,
+        event: usize,
+        from: usize,
+        to: usize,
+        family: SurvivalFamily,
+        prediction_times: Vec<f64>,
     },
     PcmciPlus {
         rows: usize,
@@ -1453,6 +1539,49 @@ pub(crate) enum AnalysisResult {
         incomplete_bins: usize,
         bins_dropped: usize,
         source_rows_dropped: usize,
+    },
+    FlexSurv {
+        observations: usize,
+        events: usize,
+        family: SurvivalFamily,
+        natural_baseline: Vec<f64>,
+        coefficients: Vec<f64>,
+        parameter_intervals: Vec<Option<[f64; 2]>>,
+        log_likelihood: f64,
+        aic: f64,
+        bic: f64,
+        profile: Vec<f64>,
+        prediction_times: Vec<f64>,
+        survival: Vec<f64>,
+        hazard: Vec<f64>,
+        median: f64,
+        mean: Option<f64>,
+    },
+    ComparisonSurvival {
+        observations: usize,
+        truncation_time: f64,
+        group_zero_curve: Vec<[f64; 2]>,
+        group_one_curve: Vec<[f64; 2]>,
+        diagnostics: ComparisonSurvivalDiagnostics,
+        proportional_hazards_p_value: f64,
+        log_rank_p_value: f64,
+        gehan_wilcoxon_p_value: f64,
+        tarone_ware_p_value: f64,
+        weighted_kaplan_meier_p_value: f64,
+        absolute_difference_p_value: f64,
+        two_stage_p_value: f64,
+        squared_difference_p_value: f64,
+        restricted_mean_difference: f64,
+        restricted_mean_interval: [f64; 2],
+    },
+    MultiStateSurvival {
+        observations: usize,
+        states: Vec<f64>,
+        transitions: Vec<[usize; 2]>,
+        family: SurvivalFamily,
+        prediction_times: Vec<f64>,
+        /// One row-major state-by-state probability matrix per prediction time.
+        probabilities: Vec<Vec<f64>>,
     },
     PcmciPlus {
         observations: usize,

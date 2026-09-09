@@ -1,0 +1,33 @@
+{
+ "team": {
+  "experience": 0.5,
+  "complexity": -0.2,
+  "rows": [
+   {
+    "start": 0.0,
+    "stop": 10.0,
+    "feature_active": 0
+   },
+   {
+    "start": 10.0,
+    "stop": 20.0,
+    "feature_active": 1
+   },
+   {
+    "start": 20.0,
+    "stop": 30.0,
+    "feature_active": 1
+   }
+  ]
+ },
+ "observed_to": 30.0,
+ "assumption": "feature_active stays 1 after month 30",
+ "conditional_survival_from_30": {
+  "33": 0.959245,
+  "36": 0.918732,
+  "42": 0.839133,
+  "48": 0.762344,
+  "60": 0.620175
+ },
+ "conditional_median_month": 71.5701
+}

@@ -37,7 +37,7 @@ export function useChartExport(label: string, figure: string | null = null): {
       <>
         <span className="text-label text-faint">Export</span>
         {CHART_EXPORTS.map((request) => (
-          <button key={request.kind} type="button" className={button('quiet', 'px-2 py-1 text-label')} aria-label={`Export ${label} as ${request.kind.toUpperCase()}`} onClick={() => void download(request)}>
+          <button key={request.kind} type="button" className={button('quiet', undefined, 'sm')} aria-label={`Export ${label} as ${request.kind.toUpperCase()}`} onClick={() => void download(request)}>
             {request.kind.toUpperCase()}
           </button>
         ))}
