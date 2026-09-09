@@ -58,39 +58,38 @@ const starterSql = (inputs: NonEmptyArray<SqlPreparationInput>): string => {
 
 const token = (name: string, fallback: string): string => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
 
-/** True when the page is on its dark theme: the explicit choice on the root element, or the system setting when there is none. */
-const pageIsDark = (): boolean => {
-  const chosen = document.documentElement.getAttribute('data-theme')
-  if (chosen === 'dark' || chosen === 'light') return chosen === 'dark'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-}
-
-/** Apple's ANSI palette and the light and dark macOS Terminal profile colours used by this console. */
-const APPLE_ANSI = {
-  black: '#000000', red: '#990000', green: '#00A600', yellow: '#999900', blue: '#0000B2', magenta: '#B200B2', cyan: '#00A6B2', white: '#BFBFBF',
-  brightBlack: '#666666', brightRed: '#E50000', brightGreen: '#00D900', brightYellow: '#E5E500', brightBlue: '#0000FF', brightMagenta: '#E500E5', brightCyan: '#00E5E5', brightWhite: '#E5E5E5',
-} as const
-
-const TERMINAL_PROFILES = {
-  basic: { background: '#FFFFFF', foreground: '#000000', cursor: '#7F7F7F', selectionBackground: '#B4D5FF' },
-  pro: { background: '#000000', foreground: '#F2F2F2', cursor: '#4D4D4D', selectionBackground: '#414141' },
-} as const
-
-const terminalProfile = () => (pageIsDark() ? TERMINAL_PROFILES.pro : TERMINAL_PROFILES.basic)
-
-/** Match the console background to the current page background. */
-const consoleGround = (): string => token('--color-stage', terminalProfile().background)
+/**
+ * The window quotes macOS Terminal in its chrome; its text takes the page's tokens, because Apple's
+ * palette fails 4.5:1 on our grounds (green, yellow and cyan on paper; red, blue and magenta on black)
+ * and every token clears it in both themes. The sixteen terminal colours the shell prints through map
+ * onto the page's own tones, so a keyword or an error reads as it would anywhere else on the page.
+ */
+const consoleGround = (): string => token('--color-stage', '#000000')
 
 const consoleTheme = (): ITheme => {
-  const profile = terminalProfile()
+  const stage = consoleGround()
+  const ink = token('--color-ink', '#F2F2F0')
+  const muted = token('--color-muted', '#A1A1A1')
+  const signal = token('--color-signal', '#BEF264')
+  const ok = token('--color-ok', signal)
+  const info = token('--color-info', muted)
+  const warn = token('--color-warn', signal)
+  const danger = token('--color-danger', ink)
   return {
-    background: consoleGround(),
-    foreground: profile.foreground,
-    cursor: profile.cursor,
-    cursorAccent: consoleGround(),
-    selectionBackground: profile.selectionBackground,
-    selectionForeground: profile.foreground,
-    ...APPLE_ANSI,
+    background: stage,
+    foreground: ink,
+    cursor: ink,
+    cursorAccent: stage,
+    selectionBackground: token('--color-raised', '#1A1A1A'),
+    selectionForeground: ink,
+    black: stage, brightBlack: muted,
+    red: danger, brightRed: danger,
+    green: ok, brightGreen: ok,
+    yellow: warn, brightYellow: warn,
+    blue: info, brightBlue: info,
+    magenta: signal, brightMagenta: signal,
+    cyan: ok, brightCyan: ok,
+    white: ink, brightWhite: ink,
   }
 }
 
@@ -115,6 +114,29 @@ const embedThemed = async (host: HTMLDivElement, resolveDatabase: () => Promise<
   }
   if (caught !== null) (caught as Terminal).options.theme = consoleTheme()
   return caught
+}
+
+/**
+ * The shell reads keystrokes only through xterm's custom key handler, which sees key names on keydown.
+ * A phone's soft keyboard delivers text through input and composition events, which xterm turns into
+ * data, and a paste arrives the same way; neither reaches the shell. The bridge replays that data to the
+ * shell as key events. A physical key the shell consumes never produces data, so nothing is replayed
+ * twice, and the flag guards the one path where it could.
+ */
+const bridgeSoftKeyboard = (terminal: Terminal): (() => void) => {
+  let replaying = false
+  const keyFor = (char: string): string => (char === '\r' || char === '\n' ? 'Enter' : char === '\x7f' || char === '\b' ? 'Backspace' : char)
+  const subscription = terminal.onData((data) => {
+    const textarea = terminal.textarea
+    if (replaying || textarea === undefined) return
+    replaying = true
+    try {
+      for (const char of data) textarea.dispatchEvent(new KeyboardEvent('keydown', { key: keyFor(char), bubbles: true, cancelable: true }))
+    } finally {
+      replaying = false
+    }
+  })
+  return () => subscription.dispose()
 }
 
 /** Subscribe to the page theme and the system theme used when the page has no explicit selection. */
@@ -152,6 +174,7 @@ export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
     let cancelled = false
     let observer: ResizeObserver | null = null
     let unwatchTheme: (() => void) | null = null
+    let unbridge: (() => void) | null = null
     let session: SqlPreparationSession | null = null
     const start = async () => {
       await Promise.resolve()
@@ -169,7 +192,10 @@ export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
         observer = new ResizeObserver(() => { host.dispatchEvent(new UIEvent('resize')); measure() })
         observer.observe(host)
         measure()
-        if (terminal !== null) unwatchTheme = onThemeChange(() => { terminal.options.theme = consoleTheme() })
+        if (terminal !== null) {
+          unwatchTheme = onThemeChange(() => { terminal.options.theme = consoleTheme() })
+          unbridge = bridgeSoftKeyboard(terminal)
+        }
         setState({ kind: 'ready', session: opened.value })
         await refreshViews(opened.value)
       } catch (cause) {
@@ -184,6 +210,7 @@ export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
       cancelled = true
       observer?.disconnect()
       unwatchTheme?.()
+      unbridge?.()
       // The shell appends its terminal to the host; a later embed into the same host must start empty.
       container.current?.replaceChildren()
       if (session !== null) {
