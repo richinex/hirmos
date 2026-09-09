@@ -19,11 +19,11 @@ export interface ExampleQuestionEntry {
 }
 
 export const EXAMPLE_QUESTIONS: readonly [ExampleQuestionEntry, ...ExampleQuestionEntry[]] = [
-  { id: 'intervention', title: 'What was the effect of a known intervention?', when: 'The intervention begins at a known time; estimate the post-intervention effect against a defensible no-intervention counterfactual.' },
+  { id: 'intervention', title: 'Did an intervention change the outcome?', when: 'Compare outcomes after the intervention with an estimate of what would have happened without it. That estimate may use earlier outcome patterns, unaffected comparison units, or both.' },
   { id: 'effect', title: 'Given a causal model, what is the effect of X on Y?', when: 'Use the model to identify an estimand, then estimate it from observed data under the stated assumptions.' },
   { id: 'discovery', title: 'What causal structures are compatible with the evidence?', when: 'Use discovery as exploratory evidence, then assess the result against domain knowledge, latent-variable assumptions, and method requirements.' },
   { id: 'set', title: 'What outcome distribution follows if we set X=x?', when: 'Use an explicit causal model to distinguish intervening with do(X=x) from merely observing X=x.' },
-  { id: 'time', title: 'How long until an event, and what changes it?', when: 'The outcome is a wait, not a level. Fit its distribution, compare two groups across follow-up, or model movement between states; rows still waiting when the data ends count as far as they go.' },
+  { id: 'time', title: 'When does an event occur?', when: 'Analyze the time from a defined start to an event. Estimate the distribution of event times, compare groups, measure associations with event timing, or model transitions between states. If follow-up ends before an event occurs, the observation is right-censored; the analysis uses the time observed before follow-up ended.' },
 ]
 
 export type ExampleCollectionId = 'ai-code-quality'
@@ -35,7 +35,7 @@ export interface ExampleCollection {
 }
 
 export const EXAMPLE_COLLECTIONS: readonly ExampleCollection[] = [
-  { id: 'ai-code-quality', title: 'How did AI coding tools affect code quality?', purpose: 'Three designs matched to a company-wide rollout, a cohort rollout, and differences in usage intensity.' },
+  { id: 'ai-code-quality', title: 'How did AI coding tools affect code quality?', purpose: 'These examples cover a company-wide rollout, a cohort rollout, and differences in how much teams used the tools. Each setting requires a different study design.' },
 ]
 
 /** The small drawing beside an example: one fixed picture per kind of study. */
