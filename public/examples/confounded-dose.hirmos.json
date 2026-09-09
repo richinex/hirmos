@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T15:02:24.731Z",
+  "exportedAt": "2026-09-09T12:34:15.670Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T15:02:24.725Z",
+    "savedAt": "2026-09-09T12:34:15.663Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "1b9e6c3d-8a52-4d17-b3e4-6c2f9a5d1e78",
       "name": "Severity, dose and recovery",
-      "createdAt": "2026-09-04T15:02:20.282Z"
+      "createdAt": "2026-09-09T12:34:11.414Z"
     },
     "source": {
       "name": "confounded-dose.csv",
@@ -237,8 +237,8 @@
       ]
     },
     "prepared": {
-      "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9",
-      "recipe": "482f28aa-8294-4992-bada-15574211ec6b",
+      "id": "206ed875-9343-43c7-a453-98232b95d689",
+      "recipe": "60e54405-0a44-4f8e-91a2-424285e2392a",
       "sourceProfile": "duckdb-wasm:1.30.0:160f3aab4f1cb222a3c8d968d4e88eda3bacac7f94608a9c8df0fa1db2ef1862",
       "observations": 3000,
       "columns": [
@@ -267,9 +267,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "119b12d0-c1ba-4b70-ae2c-c697b850ae5c",
+        "id": "67b326cb-b45c-4f64-a5fa-70347a5d06fd",
         "name": "Severity confounds dose",
-        "preparedDataset": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9",
+        "preparedDataset": "206ed875-9343-43c7-a453-98232b95d689",
         "dataset": {
           "kind": "cross-section",
           "observations": 3000
@@ -281,27 +281,27 @@
         "history": [
           {
             "kind": "draft",
-            "id": "d09c7d01-db83-45a9-a6b6-28028393005e",
+            "id": "e2e57f42-153e-442d-9cf3-b943f3740e66",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:23.007Z",
+            "createdAt": "2026-09-09T12:34:13.979Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -319,27 +319,27 @@
           },
           {
             "kind": "draft",
-            "id": "9b9cd5e8-d525-474b-a878-f7caf3a49a25",
-            "parent": "d09c7d01-db83-45a9-a6b6-28028393005e",
-            "createdAt": "2026-09-04T15:02:23.299Z",
+            "id": "88021055-fc79-4d03-83db-093ec9f7d746",
+            "parent": "e2e57f42-153e-442d-9cf3-b943f3740e66",
+            "createdAt": "2026-09-09T12:34:14.247Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -347,9 +347,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:1:dose@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -367,27 +367,27 @@
           },
           {
             "kind": "draft",
-            "id": "43691e2e-f4f1-4cd1-8952-7639f8935331",
-            "parent": "9b9cd5e8-d525-474b-a878-f7caf3a49a25",
-            "createdAt": "2026-09-04T15:02:23.490Z",
+            "id": "86b2264d-a2b6-4de9-a92e-2709ef9358a2",
+            "parent": "88021055-fc79-4d03-83db-093ec9f7d746",
+            "createdAt": "2026-09-09T12:34:14.429Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -395,9 +395,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:1:dose@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -409,9 +409,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:2:recovery@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -432,27 +432,27 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "d09c7d01-db83-45a9-a6b6-28028393005e",
+            "id": "e2e57f42-153e-442d-9cf3-b943f3740e66",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:23.007Z",
+            "createdAt": "2026-09-09T12:34:13.979Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -470,27 +470,27 @@
           },
           {
             "kind": "draft",
-            "id": "9b9cd5e8-d525-474b-a878-f7caf3a49a25",
-            "parent": "d09c7d01-db83-45a9-a6b6-28028393005e",
-            "createdAt": "2026-09-04T15:02:23.299Z",
+            "id": "88021055-fc79-4d03-83db-093ec9f7d746",
+            "parent": "e2e57f42-153e-442d-9cf3-b943f3740e66",
+            "createdAt": "2026-09-09T12:34:14.247Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -498,9 +498,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:1:dose@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -518,27 +518,27 @@
           },
           {
             "kind": "draft",
-            "id": "43691e2e-f4f1-4cd1-8952-7639f8935331",
-            "parent": "9b9cd5e8-d525-474b-a878-f7caf3a49a25",
-            "createdAt": "2026-09-04T15:02:23.490Z",
+            "id": "86b2264d-a2b6-4de9-a92e-2709ef9358a2",
+            "parent": "88021055-fc79-4d03-83db-093ec9f7d746",
+            "createdAt": "2026-09-09T12:34:14.429Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -546,9 +546,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:1:dose@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -560,9 +560,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:2:recovery@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -580,27 +580,27 @@
           },
           {
             "kind": "draft",
-            "id": "dd609e59-9f67-4481-940a-990dc6089d3a",
-            "parent": "43691e2e-f4f1-4cd1-8952-7639f8935331",
-            "createdAt": "2026-09-04T15:02:23.715Z",
+            "id": "e1b32d8d-7c3d-49c8-9273-6f44c59eebf2",
+            "parent": "86b2264d-a2b6-4de9-a92e-2709ef9358a2",
+            "createdAt": "2026-09-09T12:34:14.630Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                   "column": "0:severity",
                   "name": "severity"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "column": "1:dose",
                   "name": "dose"
                 },
                 {
                   "kind": "observed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "column": "2:recovery",
                   "name": "recovery"
                 }
@@ -608,9 +608,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:1:dose@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -622,9 +622,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:2:recovery@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -636,9 +636,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery@t",
-                  "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
-                  "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                  "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose->206ed875-9343-43c7-a453-98232b95d689:2:recovery@t",
+                  "cause": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
+                  "effect": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -657,27 +657,27 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "dd609e59-9f67-4481-940a-990dc6089d3a",
-          "parent": "43691e2e-f4f1-4cd1-8952-7639f8935331",
-          "createdAt": "2026-09-04T15:02:23.715Z",
+          "id": "e1b32d8d-7c3d-49c8-9273-6f44c59eebf2",
+          "parent": "86b2264d-a2b6-4de9-a92e-2709ef9358a2",
+          "createdAt": "2026-09-09T12:34:14.630Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
+                "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
                 "column": "0:severity",
                 "name": "severity"
               },
               {
                 "kind": "observed",
-                "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                 "column": "1:dose",
                 "name": "dose"
               },
               {
                 "kind": "observed",
-                "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                "id": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                 "column": "2:recovery",
                 "name": "recovery"
               }
@@ -685,9 +685,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose@t",
-                "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+                "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:1:dose@t",
+                "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                "effect": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -699,9 +699,9 @@
               },
               {
                 "kind": "directed",
-                "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery@t",
-                "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:0:severity",
-                "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                "id": "206ed875-9343-43c7-a453-98232b95d689:0:severity->206ed875-9343-43c7-a453-98232b95d689:2:recovery@t",
+                "cause": "206ed875-9343-43c7-a453-98232b95d689:0:severity",
+                "effect": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -713,9 +713,9 @@
               },
               {
                 "kind": "directed",
-                "id": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose->ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery@t",
-                "cause": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
-                "effect": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+                "id": "206ed875-9343-43c7-a453-98232b95d689:1:dose->206ed875-9343-43c7-a453-98232b95d689:2:recovery@t",
+                "cause": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
+                "effect": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -737,17 +737,17 @@
     "interventionQueries": [
       {
         "kind": "intervention-query",
-        "id": "e6e502b5-3b67-4205-8ae1-4b260e7804c4",
-        "dagDocument": "119b12d0-c1ba-4b70-ae2c-c697b850ae5c",
-        "dagRevision": "dd609e59-9f67-4481-940a-990dc6089d3a",
-        "preparedDataset": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9",
-        "createdAt": "2026-09-04T15:02:23.968Z",
+        "id": "95c7fc7b-d943-4fa2-b872-8aa2c1a91f74",
+        "dagDocument": "67b326cb-b45c-4f64-a5fa-70347a5d06fd",
+        "dagRevision": "e1b32d8d-7c3d-49c8-9273-6f44c59eebf2",
+        "preparedDataset": "206ed875-9343-43c7-a453-98232b95d689",
+        "createdAt": "2026-09-09T12:34:14.908Z",
         "set": {
-          "node": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+          "node": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
           "name": "dose"
         },
         "read": {
-          "node": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+          "node": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
           "name": "recovery"
         },
         "route": {
@@ -833,17 +833,17 @@
       },
       {
         "kind": "intervention-query",
-        "id": "e5f937f9-1a0b-4872-b4d9-c8836e8aa15d",
-        "dagDocument": "119b12d0-c1ba-4b70-ae2c-c697b850ae5c",
-        "dagRevision": "dd609e59-9f67-4481-940a-990dc6089d3a",
-        "preparedDataset": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9",
-        "createdAt": "2026-09-04T15:02:24.249Z",
+        "id": "23a5728a-f3b4-4bed-8979-580cf88c2b0e",
+        "dagDocument": "67b326cb-b45c-4f64-a5fa-70347a5d06fd",
+        "dagRevision": "e1b32d8d-7c3d-49c8-9273-6f44c59eebf2",
+        "preparedDataset": "206ed875-9343-43c7-a453-98232b95d689",
+        "createdAt": "2026-09-09T12:34:15.186Z",
         "set": {
-          "node": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:1:dose",
+          "node": "206ed875-9343-43c7-a453-98232b95d689:1:dose",
           "name": "dose"
         },
         "read": {
-          "node": "ea13b77e-a64a-43fb-addb-2f7ae2a062d9:2:recovery",
+          "node": "206ed875-9343-43c7-a453-98232b95d689:2:recovery",
           "name": "recovery"
         },
         "route": {
@@ -895,9 +895,9 @@
             ],
             "expectations": [
               -0.6626351625190267,
-              0.7445384354759955
+              0.7445384354759957
             ],
-            "effect": 1.4071735979950222,
+            "effect": 1.4071735979950224,
             "distributionLow": [
               [
                 "0",
@@ -919,19 +919,19 @@
             "distributionHigh": [
               [
                 "0",
-                0.1457372530815695
+                0.14573725308156954
               ],
               [
                 "1",
-                0.14925292946505977
+                0.1492529294650598
               ],
               [
                 "2",
-                0.2064594383765637
+                0.20645943837656375
               ],
               [
                 "3",
-                0.4985503790768069
+                0.498550379076807
               ]
             ],
             "minimalAdjustmentSet": [
@@ -949,6 +949,12 @@
       "treatment": null,
       "outcome": null,
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": null,
         "description": ""
@@ -960,7 +966,8 @@
     "identifications": [],
     "estimationRuns": [],
     "sensitivityRuns": [],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

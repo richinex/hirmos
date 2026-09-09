@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { NumericColumnSelection } from './dataset'
+import type { ColumnSelection, NumericColumnSelection } from './dataset'
 import {
   assertNever,
   brand,
@@ -12,6 +12,8 @@ import {
 import type { PreparedDatasetVersionId } from './preprocessing'
 
 export type SurvivalRunId = Brand<string, 'SurvivalRunId'>
+export type ConversionRate = Brand<number, 'ConversionRate'>
+export type ConversionDifference = Brand<number, 'ConversionDifference'>
 
 export const newSurvivalRunId = (): SurvivalRunId =>
   brand<string, 'SurvivalRunId'>(crypto.randomUUID())
@@ -78,13 +80,38 @@ export interface TwoGroupSurvivalConfiguration {
   readonly seed: number
 }
 
+export type MultiStateInputConfiguration =
+  | {
+      readonly kind: 'prepared-transition-rows'
+      readonly start: NumericColumnSelection
+      readonly stop: NumericColumnSelection
+      readonly event: NumericColumnSelection
+      readonly from: NumericColumnSelection
+      readonly to: NumericColumnSelection
+    }
+  | {
+      readonly kind: 'longitudinal-state-observations'
+      readonly subject: ColumnSelection
+      readonly time: NumericColumnSelection
+      readonly state: NumericColumnSelection
+      readonly stateCount: number
+      readonly transitions: NonEmptyArray<readonly [number, number]>
+    }
+  | {
+      readonly kind: 'wide-state-events'
+      readonly states: NonEmptyArray<
+        | { readonly kind: 'not-applicable' }
+        | { readonly kind: 'recorded'; readonly time: NumericColumnSelection; readonly status: NumericColumnSelection }
+      >
+      readonly transitions: NonEmptyArray<readonly [number, number]>
+      readonly entry:
+        | { readonly kind: 'shared'; readonly state: number; readonly time: number }
+        | { readonly kind: 'columns'; readonly state: NumericColumnSelection; readonly time: NumericColumnSelection }
+    }
+
 export interface MultiStateSurvivalConfiguration {
   readonly kind: 'multi-state-proportional-hazards'
-  readonly start: NumericColumnSelection
-  readonly stop: NumericColumnSelection
-  readonly event: NumericColumnSelection
-  readonly from: NumericColumnSelection
-  readonly to: NumericColumnSelection
+  readonly input: MultiStateInputConfiguration
   readonly family: ProportionalHazardsFamily
   readonly predictionTimes: NonEmptyArray<number>
 }
@@ -115,7 +142,8 @@ export const flexSurvEvidenceSchema = z.object({
   profile: z.array(finiteNumber),
   predictionTimes: z.array(nonNegativeTime).min(1),
   survival: z.array(probability).min(1),
-  hazard: z.array(finiteNumber.nonnegative()).min(1),
+  // A family whose hazard rises without bound as time approaches zero reports no value there.
+  hazard: z.array(z.union([finiteNumber.nonnegative(), z.null()])).min(1),
   median: nonNegativeTime,
   mean: z.union([nonNegativeTime, z.null()]),
 }).strict()
@@ -148,6 +176,76 @@ const comparisonSurvivalDiagnosticsSchema = z.discriminatedUnion('kind', [
   }).strict(),
 ])
 
+const unavailableSummarySchema = z.object({
+  kind: z.literal('unavailable'),
+  reason: z.string().min(1),
+}).strict()
+
+const notRecordedSummarySchema = z.object({ kind: z.literal('notRecorded') }).strict()
+const conversionRateSchema = probability.transform((value) => brand<number, 'ConversionRate'>(value))
+const conversionDifferenceSchema = finiteNumber.min(-1).max(1).transform((value) => brand<number, 'ConversionDifference'>(value))
+
+const observedConversionResultSchema = z.object({
+  groupZeroRate: conversionRateSchema,
+  groupOneRate: conversionRateSchema,
+  difference: conversionDifferenceSchema,
+  standardError: finiteNumber.positive(),
+  statistic: finiteNumber.nonnegative(),
+  pValue: probability,
+}).strict()
+
+const observedConversionSummarySchema = z.discriminatedUnion('kind', [
+  notRecordedSummarySchema,
+  unavailableSummarySchema,
+  z.object({ kind: z.literal('recorded'), result: observedConversionResultSchema }).strict(),
+])
+
+const fixedPointScaleSchema = z.enum([
+  'naive',
+  'log',
+  'complementaryLogLog',
+  'arcsineSquareRoot',
+  'logit',
+])
+
+const fixedPointTestSchema = z.object({
+  scale: fixedPointScaleSchema,
+  groupZeroInterval: z.tuple([probability, probability]),
+  groupOneInterval: z.tuple([probability, probability]),
+  statistic: finiteNumber.nonnegative(),
+  pValue: probability,
+}).strict()
+
+const fixedTimeConversionResultSchema = observedConversionResultSchema.extend({
+  time: nonNegativeTime,
+  interval: z.tuple([conversionDifferenceSchema, conversionDifferenceSchema]),
+  scaleTests: z.array(fixedPointTestSchema).length(5),
+}).strict()
+
+const fixedTimeConversionSummarySchema = z.discriminatedUnion('kind', [
+  notRecordedSummarySchema,
+  unavailableSummarySchema,
+  z.object({ kind: z.literal('recorded'), result: fixedTimeConversionResultSchema }).strict(),
+])
+
+const gRhoResultSchema = z.object({
+  rho: finiteNumber.nonnegative(),
+  observed: z.tuple([finiteNumber.nonnegative(), finiteNumber.nonnegative()]),
+  expected: z.tuple([finiteNumber.nonnegative(), finiteNumber.nonnegative()]),
+  variance: z.tuple([
+    z.tuple([finiteNumber, finiteNumber]),
+    z.tuple([finiteNumber, finiteNumber]),
+  ]),
+  statistic: finiteNumber.nonnegative(),
+  pValue: probability,
+}).strict()
+
+const gRhoSummarySchema = z.discriminatedUnion('kind', [
+  notRecordedSummarySchema,
+  unavailableSummarySchema,
+  z.object({ kind: z.literal('recorded'), result: gRhoResultSchema }).strict(),
+])
+
 export const comparisonSurvivalEvidenceSchema = z.object({
   kind: z.literal('comparisonSurvival'),
   observations: z.number().int().positive(),
@@ -155,6 +253,9 @@ export const comparisonSurvivalEvidenceSchema = z.object({
   groupZeroCurve: z.array(survivalCurvePointSchema).min(1),
   groupOneCurve: z.array(survivalCurvePointSchema).min(1),
   diagnostics: comparisonSurvivalDiagnosticsSchema,
+  observedConversion: observedConversionSummarySchema,
+  fixedTimeConversion: fixedTimeConversionSummarySchema,
+  petoPeto: gRhoSummarySchema,
   proportionalHazardsPValue: probability,
   logRankPValue: probability,
   gehanWilcoxonPValue: probability,
@@ -180,6 +281,11 @@ export const multiStateSurvivalEvidenceSchema = z.object({
     z.number().int().nonnegative(),
   ])).min(1),
   family: proportionalHazardsFamilySchema,
+  preparation: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('preparedRows') }).strict(),
+    z.object({ kind: z.literal('longitudinalStates'), sourceRows: z.number().int().positive(), transitionRows: z.number().int().positive(), notices: z.array(z.string()) }).strict(),
+    z.object({ kind: z.literal('wideEvents'), sourceRows: z.number().int().positive(), transitionRows: z.number().int().positive(), notices: z.array(z.string()) }).strict(),
+  ]),
   predictionTimes: z.array(nonNegativeTime).min(1),
   probabilities: z.array(z.array(finiteNumber)).min(1),
 }).strict()
@@ -286,6 +392,63 @@ function comparisonDiagnosticsProblem(
   }
 }
 
+function conversionDifferenceMatches(groupZero: number, groupOne: number, difference: number): boolean {
+  const expected = groupOne - groupZero
+  const scale = Math.max(1, Math.abs(expected), Math.abs(difference))
+  return Math.abs(expected - difference) <= scale * 1e-8
+}
+
+function comparisonSummaryProblem(evidence: ComparisonSurvivalEvidence): string | null {
+  switch (evidence.observedConversion.kind) {
+    case 'notRecorded':
+    case 'unavailable': break
+    case 'recorded': {
+      const result = evidence.observedConversion.result
+      if (!conversionDifferenceMatches(result.groupZeroRate, result.groupOneRate, result.difference)) {
+        return 'The observed conversion rates do not reproduce their reported difference.'
+      }
+      break
+    }
+    default: return assertNever(evidence.observedConversion)
+  }
+
+  switch (evidence.fixedTimeConversion.kind) {
+    case 'notRecorded':
+    case 'unavailable': break
+    case 'recorded': {
+      const result = evidence.fixedTimeConversion.result
+      if (result.time !== evidence.truncationTime) {
+        return 'The fixed-time conversion comparison does not use the recorded comparison time.'
+      }
+      if (!conversionDifferenceMatches(result.groupZeroRate, result.groupOneRate, result.difference)) {
+        return 'The fixed-time conversion rates do not reproduce their reported difference.'
+      }
+      if (result.interval[0] > result.interval[1]) {
+        return 'The fixed-time conversion interval has its bounds reversed.'
+      }
+      if (new Set(result.scaleTests.map((test) => test.scale)).size !== result.scaleTests.length) {
+        return 'The fixed-time comparison repeats a transformation scale.'
+      }
+      const intervalReversed = result.scaleTests.some((test) => (
+        test.groupZeroInterval[0] > test.groupZeroInterval[1]
+        || test.groupOneInterval[0] > test.groupOneInterval[1]
+      ))
+      if (intervalReversed) return 'A fixed-time conversion interval has its bounds reversed.'
+      break
+    }
+    default: return assertNever(evidence.fixedTimeConversion)
+  }
+
+  switch (evidence.petoPeto.kind) {
+    case 'notRecorded':
+    case 'unavailable': return null
+    case 'recorded': return evidence.petoPeto.result.rho === 1
+      ? null
+      : 'The Peto–Peto result must use rho = 1.'
+    default: return assertNever(evidence.petoPeto)
+  }
+}
+
 export function parseFlexSurvEvidence(
   value: unknown,
 ): Result<FlexSurvEvidence, SurvivalEvidenceProblem> {
@@ -321,6 +484,9 @@ export function parseFlexSurvEvidence(
   ) {
     return invalidEvidence('Prediction times, survival probabilities and hazards must have the same length.')
   }
+  if (evidence.hazard.some((value, index) => value === null && evidence.predictionTimes[index] !== 0)) {
+    return invalidEvidence('The hazard may be undefined only at time zero.')
+  }
   return ok(evidence)
 }
 
@@ -340,6 +506,8 @@ export function parseComparisonSurvivalEvidence(
   }
   const diagnosticsProblem = comparisonDiagnosticsProblem(evidence.diagnostics, evidence.restrictedMeanDifference)
   if (diagnosticsProblem !== null) return invalidEvidence(diagnosticsProblem)
+  const summaryProblem = comparisonSummaryProblem(evidence)
+  if (summaryProblem !== null) return invalidEvidence(summaryProblem)
   return ok(evidence)
 }
 
@@ -387,15 +555,15 @@ interface SurvivalRunIdentity {
   readonly id: SurvivalRunId
   readonly preparedDataset: PreparedDatasetVersionId
   readonly createdAt: string
-  /** Columns in the order used to materialise the numeric matrix. */
-  readonly columns: NonEmptyArray<NumericColumnSelection>
+  /** Source columns used to construct the analysis input, in their recorded role order. */
+  readonly columns: NonEmptyArray<ColumnSelection>
 }
 
 export interface NewSurvivalRunIdentity {
   readonly id: SurvivalRunId
   readonly preparedDataset: PreparedDatasetVersionId
   readonly createdAt: string
-  readonly columns: NonEmptyArray<NumericColumnSelection>
+  readonly columns: NonEmptyArray<ColumnSelection>
 }
 
 export type SurvivalRunProblem = { readonly kind: 'family-mismatch' }
@@ -457,4 +625,21 @@ export function multiStateSurvivalRun(
 ): Result<SurvivalRunArtifact, SurvivalRunProblem> {
   if (configuration.family !== evidence.family) return err({ kind: 'family-mismatch' })
   return ok({ ...identity, kind: 'multi-state-survival-run', configuration, evidence })
+}
+
+/**
+ * The survival kernels report a refusal as the Rust value that carried it. The reader gets the sentence
+ * behind the known ones; anything else passes through unchanged.
+ */
+export const describeSurvivalRefusal = (detail: string): string => {
+  const nonPositive = /NonPositiveTransformedTime \{ row: (\d+) \}/.exec(detail)
+  if (nonPositive !== null) {
+    return `Row ${Number(nonPositive[1]) + 1} of the data has a duration of zero or less. A parametric distribution needs every duration above zero; shift the times or use Compare groups, which accepts them.`
+  }
+  if (detail.includes('NoPositiveTimes')) return 'No duration in the data is above zero, so no parametric distribution can be fitted.'
+  if (detail.includes('DegenerateTimes')) return 'Every duration in the data is the same, so no parametric distribution can be fitted.'
+  if (detail.includes('FixedTimeOutsideEventRange')) return 'The comparison time falls outside the observed event times. Choose a time after the first event and before the last.'
+  if (detail.includes('ComparisonTimeTooEarly')) return 'The comparison time falls before the first observed event. Choose a later time.'
+  if (detail.includes('ComparisonTimeTooLate')) return 'The comparison time falls after the last observed event. Choose an earlier time.'
+  return detail
 }

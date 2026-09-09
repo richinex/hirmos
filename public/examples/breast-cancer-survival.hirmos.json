@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-09T06:33:31.459Z",
+  "exportedAt": "2026-09-09T12:45:41.162Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-09T06:33:31.456Z",
+    "savedAt": "2026-09-09T12:45:41.160Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "b8d4e1a7-2c69-4f3b-8e15-4a7c9d2f6b31",
       "name": "Breast cancer survival, German study",
-      "createdAt": "2026-09-09T06:33:28.029Z"
+      "createdAt": "2026-09-09T12:45:37.856Z"
     },
     "source": {
       "name": "flexsurv-bc.csv",
@@ -292,8 +292,8 @@
       ]
     },
     "prepared": {
-      "id": "978b97c7-e632-413b-a222-e54bdb282596",
-      "recipe": "c11e37cf-55e1-4182-a5ff-7ffbd8249a36",
+      "id": "cb283f0b-dc7b-40a8-aa85-2aabb18cd6fb",
+      "recipe": "a1f97b44-f0f5-4871-a75f-bd636904b35b",
       "sourceProfile": "duckdb-wasm:1.30.0:ec3320a5677e45aa8b2d9bc0ddcbef9abac5439b07a74160b1e25e4bce38a161",
       "observations": 686,
       "columns": [
@@ -346,9 +346,9 @@
     "counterfactualRuns": [],
     "survivalRuns": [
       {
-        "id": "9970988a-097d-477a-8108-159928872340",
-        "preparedDataset": "978b97c7-e632-413b-a222-e54bdb282596",
-        "createdAt": "2026-09-09T06:33:30.923Z",
+        "id": "8cd19888-b57a-4fab-8e2f-137efe950eac",
+        "preparedDataset": "cb283f0b-dc7b-40a8-aa85-2aabb18cd6fb",
+        "createdAt": "2026-09-09T12:45:40.634Z",
         "columns": [
           {
             "id": "3:recyrs",

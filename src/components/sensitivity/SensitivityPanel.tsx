@@ -299,12 +299,18 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   readonly onRun: (run: SensitivityRunArtifact) => void
   readonly onDeleteRun: (run: SensitivityRunArtifact['id']) => void
 }) {
-  const [state, dispatch] = useReducer(step, null, (): State => ({
-    estimationRun: [...estimationRuns].reverse().find((run) => run.kind === 'backdoor-linear-run')?.id ?? estimationRuns.at(-1)?.id ?? null,
-    probe: 'linear-refutation',
-    configurations: { 'linear-refutation': DEFAULT_REFUTATION, 'unobserved-confounding': DEFAULT_UNOBSERVED, 'dml-refutation': DEFAULT_DML_REFUTATION },
-    job: { kind: 'idle' },
-  }))
+  const [state, dispatch] = useReducer(step, null, (): State => {
+    // The controls open as the latest recorded probe set them, so a reopened project shows the check it holds.
+    const latest = runs.at(-1) ?? null
+    const probed = latest === null ? null : estimationRuns.find((run) => run.id === latest.estimationRun) ?? null
+    const defaults: State['configurations'] = { 'linear-refutation': DEFAULT_REFUTATION, 'unobserved-confounding': DEFAULT_UNOBSERVED, 'dml-refutation': DEFAULT_DML_REFUTATION }
+    return {
+      estimationRun: probed?.id ?? [...estimationRuns].reverse().find((run) => run.kind === 'backdoor-linear-run')?.id ?? estimationRuns.at(-1)?.id ?? null,
+      probe: latest !== null && probed !== null ? latest.configuration.kind : 'linear-refutation',
+      configurations: latest !== null && probed !== null ? { ...defaults, [latest.configuration.kind]: latest.configuration } : defaults,
+      job: { kind: 'idle' },
+    }
+  })
   const estimation = estimationRuns.find((run) => run.id === state.estimationRun) ?? null
   const study = estimation === null ? null : studies.find((candidate) => candidate.id === estimation.study) ?? null
   const configuration = state.configurations[state.probe]

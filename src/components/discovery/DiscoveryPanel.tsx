@@ -1516,7 +1516,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'direct-lingam') return
+        const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1538,7 +1539,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'pc-stable-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: PC_STABLE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'pc-stable') return
+        const artifact: DiscoveryRunArtifact = { kind: 'pc-stable-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: PC_STABLE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1561,7 +1563,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'fci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: FCI_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'fci') return
+        const artifact: DiscoveryRunArtifact = { kind: 'fci-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: FCI_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1580,8 +1583,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
+        if (configuration.kind !== 'pcmci-plus') return
         const artifact: DiscoveryRunArtifact = {
           kind: 'pcmci-plus-run',
+          configuration,
           id: newDiscoveryRunId(),
           preparedDataset: prepared.id,
           createdAt: new Date().toISOString(),
@@ -1629,9 +1634,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           ...(configuration.timeDummy ? [{ kind: 'generated' as const, role: 'timeDummy' as const, name: 'Time context (generated)' as const }] : []),
           ...(configuration.spaceDummy ? [{ kind: 'generated' as const, role: 'spaceDummy' as const, name: 'Unit context (generated)' as const }] : []),
         ]
-        if (!isNonEmpty(nodes)) return
+        if (!isNonEmpty(nodes) || draft.configuration.kind !== 'jpcmci-plus') return
         const artifact: DiscoveryRunArtifact = {
-          kind: 'jpcmci-plus-run', id: newDiscoveryRunId(), preparedDataset: prepared.id,
+          kind: 'jpcmci-plus-run', configuration: draft.configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id,
           createdAt: new Date().toISOString(), method: JPCMCI_PLUS_PAR_CORR_METHOD_ID,
           variables: joint.value.columns, nodes, eligibility, result: result.value,
         }
@@ -1646,7 +1651,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'lpcmci') return
+        const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1663,8 +1669,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
+        if (configuration.kind !== 'rpcmci') return
         const artifact: DiscoveryRunArtifact = {
           kind: 'rpcmci-run',
+          configuration,
           id: newDiscoveryRunId(),
           preparedDataset: prepared.id,
           createdAt: new Date().toISOString(),
@@ -1690,7 +1698,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'cdnots-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'cdnots') return
+        const artifact: DiscoveryRunArtifact = { kind: 'cdnots-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1708,7 +1717,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'cdnots-plus-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PLUS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'cdnots-plus') return
+        const artifact: DiscoveryRunArtifact = { kind: 'cdnots-plus-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PLUS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1726,7 +1736,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'grace-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: GRACE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'grace') return
+        const artifact: DiscoveryRunArtifact = { kind: 'grace-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: GRACE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1737,7 +1748,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'dynotears') return
+        const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1748,7 +1760,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'var-lingam') return
+        const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1759,7 +1772,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'ocse') return
+        const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1776,7 +1790,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'cmlp-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CMLP_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'cmlp') return
+        const artifact: DiscoveryRunArtifact = { kind: 'cmlp-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CMLP_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
@@ -1793,7 +1808,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           dispatch(analysisFailureEvent(result.error))
           return
         }
-        const artifact: DiscoveryRunArtifact = { kind: 'clstm-run', id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CLSTM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
+        if (configuration.kind !== 'clstm') return
+        const artifact: DiscoveryRunArtifact = { kind: 'clstm-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CLSTM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
         dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return

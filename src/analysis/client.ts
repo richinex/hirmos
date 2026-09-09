@@ -42,6 +42,7 @@ import {
   type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
   type DmlGroupsRequest,
+  type MultiStateWorkerInput,
   type TemporalSamples,
   type WorkerRequestId,
 } from '@/workers/analysisProtocol'
@@ -833,11 +834,7 @@ export function runComparisonSurvival(values: Float64Array, rows: number, column
 }
 
 export function runMultiStateSurvival(values: Float64Array, rows: number, columns: number, design: {
-  readonly start: number
-  readonly stop: number
-  readonly event: number
-  readonly from: number
-  readonly to: number
+  readonly input: MultiStateWorkerInput
   readonly family: ProportionalHazardsFamily
   readonly predictionTimes: readonly number[]
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<MultiStateSurvivalOutcome> {

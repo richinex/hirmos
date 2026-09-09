@@ -875,10 +875,16 @@ export type DiscoveryConfiguration =
       readonly seed: number
     }
 
+type ConfigurationWithKind<C, K> = C extends { readonly kind: infer CK } ? (K extends CK ? C : never) : never
+/** The configuration member whose kind covers K, so a run carries exactly the settings of its own method. */
+export type DiscoveryConfigurationOf<K extends DiscoveryConfiguration['kind']> = ConfigurationWithKind<DiscoveryConfiguration, K>
+
 export type DiscoveryRunArtifact =
   | {
       readonly kind: 'direct-lingam-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'direct-lingam'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof DIRECT_LINGAM_METHOD_ID
@@ -889,6 +895,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'pc-stable-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'pc-stable'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof PC_STABLE_METHOD_ID
@@ -899,6 +907,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'fci-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'fci'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof FCI_METHOD_ID
@@ -909,6 +919,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'pcmci-plus-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'pcmci-plus'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof PCMCI_PLUS_PAR_CORR_METHOD_ID
@@ -919,6 +931,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'jpcmci-plus-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'jpcmci-plus'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof JPCMCI_PLUS_PAR_CORR_METHOD_ID
@@ -930,6 +944,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'lpcmci-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'lpcmci'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof LPCMCI_PAR_CORR_METHOD_ID
@@ -940,6 +956,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'rpcmci-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'rpcmci'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof RPCMCI_PAR_CORR_METHOD_ID
@@ -950,6 +968,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'cdnots-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'cdnots'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof CDNOTS_PAR_CORR_METHOD_ID
@@ -960,6 +980,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'cdnots-plus-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'cdnots-plus'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof CDNOTS_PLUS_PAR_CORR_METHOD_ID
@@ -970,6 +992,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'grace-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'grace'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof GRACE_METHOD_ID
@@ -980,6 +1004,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'dynotears-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'dynotears'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof DYNOTEARS_METHOD_ID
@@ -990,6 +1016,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'var-lingam-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'var-lingam'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof VAR_LINGAM_METHOD_ID
@@ -1000,6 +1028,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'ocse-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'ocse'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof OCSE_METHOD_ID
@@ -1010,6 +1040,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'cmlp-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'cmlp'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof CMLP_METHOD_ID
@@ -1020,6 +1052,8 @@ export type DiscoveryRunArtifact =
   | {
       readonly kind: 'clstm-run'
       readonly id: DiscoveryRunId
+      /** The settings the run was made with, so a bundle replays the chapter exactly as its author left it. */
+      readonly configuration: DiscoveryConfigurationOf<'clstm'>
       readonly preparedDataset: PreparedDatasetVersionId
       readonly createdAt: string
       readonly method: typeof CLSTM_METHOD_ID
@@ -1083,7 +1117,7 @@ export type DiscoveryEvent =
   | { readonly type: 'run-succeeded'; readonly artifact: DiscoveryRunArtifact }
 
 export type DiscoverySessionEvent =
-  | { readonly type: 'prepared-dataset-changed'; readonly prepared: PreparedDatasetArtifact | null }
+  | { readonly type: 'prepared-dataset-changed'; readonly prepared: PreparedDatasetArtifact | null; readonly recorded?: DiscoveryRunArtifact | null }
   | { readonly type: 'discovery-event-received'; readonly event: DiscoveryEvent }
 
 export const INITIAL_DISCOVERY_DRAFT: DiscoveryDraft = {
@@ -1091,22 +1125,65 @@ export const INITIAL_DISCOVERY_DRAFT: DiscoveryDraft = {
   job: { kind: 'idle' },
 }
 
-export const initialDiscoveryDraftFor = (prepared: PreparedDatasetArtifact): DiscoveryDraft => ({
-  configuration: prepared.kind === 'prepared-cross-section'
-    ? { kind: 'direct-lingam' }
-    : prepared.kind === 'prepared-panel'
-      ? initialConfigurationFor('jpcmci-plus')
-    : INITIAL_DISCOVERY_DRAFT.configuration,
+/**
+ * A run as saved before runs carried their configuration, completed from what the method reported
+ * back: the lags, the alphas and the J-PCMCI+ roles. What a method did not report stays at its
+ * default. A run that already carries its configuration is returned as it is. The saved artifact is
+ * left alone, so reopening a project does not rewrite it.
+ */
+export function withRecordedConfiguration(run: DiscoveryRunArtifact): DiscoveryRunArtifact {
+  if (run.configuration !== undefined) return run
+  // The controls offer a fixed list of lags and alphas; a recorded value off the list keeps the default.
+  const lag = (value: number, fallback: DiscoveryLag): DiscoveryLag => DISCOVERY_LAG_OPTIONS.find((option) => option === value) ?? fallback
+  const alpha = (value: number, fallback: PcmciAlpha): PcmciAlpha => PCMCI_ALPHA_OPTIONS.find((option) => option === value) ?? fallback
+  switch (run.kind) {
+    case 'direct-lingam-run': return { ...run, configuration: { kind: 'direct-lingam' } }
+    case 'pc-stable-run': return { ...run, configuration: { kind: 'pc-stable', alpha: alpha(run.result.alpha, 0.05), maxDepth: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() } }
+    case 'fci-run': return { ...run, configuration: { kind: 'fci', alpha: alpha(run.result.alpha, 0.05), maxDepth: null, maxPathLength: null, ciTest: 'fisherZ', background: emptyConstraintBackgroundKnowledge() } }
+    case 'pcmci-plus-run': return { ...run, configuration: { kind: 'pcmci-plus', tauMax: lag(run.result.tauMax, 2), pcAlpha: alpha(run.result.pcAlpha, 0.05) } }
+    case 'jpcmci-plus-run': return {
+      ...run,
+      configuration: {
+        kind: 'jpcmci-plus',
+        tauMax: lag(run.result.tauMax, 2),
+        pcAlpha: alpha(run.result.pcAlpha, 0.05),
+        assignments: run.nodes.flatMap((node) => node.kind === 'observed' && node.role !== 'system' ? [{ column: node.column.id, role: node.role }] : []),
+        timeDummy: run.nodes.some((node) => node.kind === 'generated' && node.role === 'timeDummy'),
+        spaceDummy: run.nodes.some((node) => node.kind === 'generated' && node.role === 'spaceDummy'),
+      },
+    }
+    case 'lpcmci-run': return { ...run, configuration: { kind: 'lpcmci', tauMax: lag(run.result.tauMax, 2), pcAlpha: alpha(run.result.pcAlpha, 0.05) } }
+    case 'rpcmci-run': return { ...run, configuration: { kind: 'rpcmci', numRegimes: 2, maxTransitions: 4, switchThres: 0.05, numIterations: 20, maxAnneal: 10, tauMin: 1, tauMax: lag(run.result.tauMax, 1), pcAlpha: alpha(run.result.pcAlpha, 0.2), alphaLevel: alpha(run.result.alphaLevel, 0.01), seed: 327 } }
+    case 'cdnots-run': return { ...run, configuration: { kind: 'cdnots', maxLag: lag(run.result.maxLag, 2), alpha: alpha(run.result.alpha, 0.05), missing: 'pairwiseComplete', context: 'linear' } }
+    case 'cdnots-plus-run': return { ...run, configuration: { kind: 'cdnots-plus', maxLag: lag(run.result.maxLag, 2), alpha: alpha(run.result.alpha, 0.01), missing: 'pairwiseComplete', context: 'linear' } }
+    case 'grace-run': return { ...run, configuration: { kind: 'grace', maxLag: lag(run.result.maxLag, 2), alpha: alpha(run.result.alpha, 0.05), context: 'linear', gateThreshold: 0.5, epochs: 150, patience: 20, seed: 0 } }
+    case 'dynotears-run': return { ...run, configuration: { kind: 'dynotears', maxLag: lag(run.result.maxLag, 2), lambdaW: 0.1, lambdaA: 0.1 } }
+    case 'var-lingam-run': return { ...run, configuration: { kind: 'var-lingam', maxLag: 2, prune: true } }
+    case 'ocse-run': return { ...run, configuration: { kind: 'ocse', maxLag: lag(run.result.maxLag, 2), alpha: alpha(run.result.alpha, 0.05), nShuffles: 50, method: run.result.method, k: 5 } }
+    case 'cmlp-run': return { ...run, configuration: { kind: 'cmlp', lag: 3, hidden: [100], activation: 'relu', penalty: 'hierarchical', lambda: 0.1, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 50_000, checkEvery: 100, lookback: 5, seed: 0 } }
+    case 'clstm-run': return { ...run, configuration: { kind: 'clstm', context: 10, hidden: 100, lambda: 0.1, ridgeLambda: 0.01, learningRate: 0.01, maxIter: 20_000, checkEvery: 50, lookback: 5, seed: 0 } }
+    default: return assertNever(run)
+  }
+}
+
+export const initialDiscoveryDraftFor = (prepared: PreparedDatasetArtifact, recorded: DiscoveryRunArtifact | null = null): DiscoveryDraft => ({
+  configuration: recorded !== null && recorded.preparedDataset === prepared.id
+    ? withRecordedConfiguration(recorded).configuration
+    : prepared.kind === 'prepared-cross-section'
+      ? { kind: 'direct-lingam' }
+      : prepared.kind === 'prepared-panel'
+        ? initialConfigurationFor('jpcmci-plus')
+        : INITIAL_DISCOVERY_DRAFT.configuration,
   job: { kind: 'idle' },
 })
 
-export const initialDiscoverySessionFor = (prepared: PreparedDatasetArtifact | null): DiscoverySession =>
+export const initialDiscoverySessionFor = (prepared: PreparedDatasetArtifact | null, recorded: DiscoveryRunArtifact | null = null): DiscoverySession =>
   prepared === null
     ? { kind: 'without-prepared-dataset' }
     : {
         kind: 'with-prepared-dataset',
         preparedDataset: prepared.id,
-        draft: initialDiscoveryDraftFor(prepared),
+        draft: initialDiscoveryDraftFor(prepared, recorded),
       }
 
 export function stepDiscoverySession(state: DiscoverySession, event: DiscoverySessionEvent): DiscoverySession {
@@ -1114,7 +1191,7 @@ export function stepDiscoverySession(state: DiscoverySession, event: DiscoverySe
     case 'prepared-dataset-changed':
       if (event.prepared === null) return { kind: 'without-prepared-dataset' }
       if (state.kind === 'with-prepared-dataset' && state.preparedDataset === event.prepared.id) return state
-      return initialDiscoverySessionFor(event.prepared)
+      return initialDiscoverySessionFor(event.prepared, event.recorded ?? null)
     case 'discovery-event-received':
       return state.kind === 'with-prepared-dataset'
         ? { ...state, draft: stepDiscovery(state.draft, event.event) }

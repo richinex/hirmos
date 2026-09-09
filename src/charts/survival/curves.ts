@@ -218,14 +218,15 @@ export function comparisonMeasureOption(
 /** The fitted hazard over follow-up time: how event risk changes with age, which the family's shape decides. */
 export function hazardCurveOption(
   times: readonly number[],
-  hazard: readonly number[],
+  hazard: readonly (number | null)[],
   timeLabel: string,
   theme: ChartTheme,
 ): EChartsCoreOption {
   return {
     ...baseOption(theme, `Fitted hazard over ${timeLabel}: the instantaneous event rate among those still event-free.`),
-    grid: gridAuto({ top: 16, bottom: 64 }),
-    ...rangeSelection(theme),
+    // Follows the event-free chart's window: the drag and the wheel stay, the slider is the other chart's.
+    grid: gridAuto({ top: 16, bottom: 30 }),
+    ...rangeSelection(theme, 0, { slider: false }),
     tooltip: {
       ...tooltip(theme, 'axis'),
       axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } },

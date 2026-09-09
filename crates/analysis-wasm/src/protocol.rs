@@ -96,6 +96,58 @@ pub(crate) enum SurvivalObservationCommand {
     },
 }
 
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum WideStateColumnsCommand {
+    NotApplicable,
+    Recorded { time: usize, status: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum WideEntryCommand {
+    Shared { state: usize, time: f64 },
+    Columns { state: usize, time: usize },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum MultiStateInputCommand {
+    PreparedRows {
+        start: usize,
+        stop: usize,
+        event: usize,
+        from: usize,
+        to: usize,
+    },
+    LongitudinalStates {
+        subject: usize,
+        time: usize,
+        state: usize,
+        allowed: Vec<Vec<bool>>,
+    },
+    WideEvents {
+        states: Vec<WideStateColumnsCommand>,
+        transitions: Vec<Vec<Option<usize>>>,
+        entry: WideEntryCommand,
+    },
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GroupSurvivalDiagnostics {
@@ -118,6 +170,73 @@ pub(crate) enum ComparisonSurvivalDiagnostics {
         group_one: GroupSurvivalDiagnostics,
         crossing_times: Vec<f64>,
     },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum SurvivalSummary<T: Serialize> {
+    Recorded { result: T },
+    Unavailable { reason: String },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ObservedConversionEvidence {
+    pub(crate) group_zero_rate: f64,
+    pub(crate) group_one_rate: f64,
+    pub(crate) difference: f64,
+    pub(crate) standard_error: f64,
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum FixedPointScaleEvidence {
+    Naive,
+    Log,
+    ComplementaryLogLog,
+    ArcsineSquareRoot,
+    Logit,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FixedPointTestEvidence {
+    pub(crate) scale: FixedPointScaleEvidence,
+    pub(crate) group_zero_interval: [f64; 2],
+    pub(crate) group_one_interval: [f64; 2],
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct FixedTimeConversionEvidence {
+    pub(crate) time: f64,
+    pub(crate) group_zero_rate: f64,
+    pub(crate) group_one_rate: f64,
+    pub(crate) difference: f64,
+    pub(crate) standard_error: f64,
+    pub(crate) interval: [f64; 2],
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
+    pub(crate) scale_tests: Vec<FixedPointTestEvidence>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GRhoEvidence {
+    pub(crate) rho: f64,
+    pub(crate) observed: [f64; 2],
+    pub(crate) expected: [f64; 2],
+    pub(crate) variance: [[f64; 2]; 2],
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -428,11 +547,7 @@ pub(crate) enum AnalysisCommand {
     MultiStateSurvival {
         rows: usize,
         columns: usize,
-        start: usize,
-        stop: usize,
-        event: usize,
-        from: usize,
-        to: usize,
+        input: MultiStateInputCommand,
         family: SurvivalFamily,
         prediction_times: Vec<f64>,
     },
@@ -1563,6 +1678,9 @@ pub(crate) enum AnalysisResult {
         group_zero_curve: Vec<[f64; 2]>,
         group_one_curve: Vec<[f64; 2]>,
         diagnostics: ComparisonSurvivalDiagnostics,
+        observed_conversion: SurvivalSummary<ObservedConversionEvidence>,
+        fixed_time_conversion: SurvivalSummary<FixedTimeConversionEvidence>,
+        peto_peto: SurvivalSummary<GRhoEvidence>,
         proportional_hazards_p_value: f64,
         log_rank_p_value: f64,
         gehan_wilcoxon_p_value: f64,
@@ -1579,6 +1697,7 @@ pub(crate) enum AnalysisResult {
         states: Vec<f64>,
         transitions: Vec<[usize; 2]>,
         family: SurvivalFamily,
+        preparation: MultiStatePreparationEvidence,
         prediction_times: Vec<f64>,
         /// One row-major state-by-state probability matrix per prediction time.
         probabilities: Vec<Vec<f64>>,
@@ -2205,6 +2324,26 @@ pub(crate) enum AnalysisResult {
         columns: usize,
         resolution: MissingnessResolution,
         outcome: MissingnessExecution,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum MultiStatePreparationEvidence {
+    PreparedRows,
+    LongitudinalStates {
+        source_rows: usize,
+        transition_rows: usize,
+        notices: Vec<String>,
+    },
+    WideEvents {
+        source_rows: usize,
+        transition_rows: usize,
+        notices: Vec<String>,
     },
 }
 

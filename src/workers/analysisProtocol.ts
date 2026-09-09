@@ -150,6 +150,21 @@ export type TemporalSamples =
       readonly maskType: 'none' | 'x' | 'y' | 'z' | 'xy' | 'xz' | 'yz' | 'xyz'
     }
 
+export type MultiStateWorkerInput =
+  | { readonly kind: 'preparedRows'; readonly start: number; readonly stop: number; readonly event: number; readonly from: number; readonly to: number }
+  | { readonly kind: 'longitudinalStates'; readonly subject: number; readonly time: number; readonly state: number; readonly allowed: readonly (readonly boolean[])[] }
+  | {
+      readonly kind: 'wideEvents'
+      readonly states: readonly (
+        | { readonly kind: 'notApplicable' }
+        | { readonly kind: 'recorded'; readonly time: number; readonly status: number }
+      )[]
+      readonly transitions: readonly (readonly (number | null)[])[]
+      readonly entry:
+        | { readonly kind: 'shared'; readonly state: number; readonly time: number }
+        | { readonly kind: 'columns'; readonly state: number; readonly time: number }
+    }
+
 export type AnalysisWorkerCommand =
   | {
       readonly kind: 'flexsurv'
@@ -183,11 +198,7 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly rows: number
       readonly columns: number
-      readonly start: number
-      readonly stop: number
-      readonly event: number
-      readonly from: number
-      readonly to: number
+      readonly input: MultiStateWorkerInput
       readonly family: ProportionalHazardsFamily
       readonly predictionTimes: readonly number[]
     }
@@ -1079,18 +1090,47 @@ const commandSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     values: z.instanceof(Float64Array),
     rows: z.number().int().min(2),
-    columns: z.number().int().min(5).max(256),
-    start: z.number().int().nonnegative(),
-    stop: z.number().int().nonnegative(),
-    event: z.number().int().nonnegative(),
-    from: z.number().int().nonnegative(),
-    to: z.number().int().nonnegative(),
+    columns: z.number().int().min(2).max(256),
+    input: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('preparedRows'), start: z.number().int().nonnegative(), stop: z.number().int().nonnegative(), event: z.number().int().nonnegative(), from: z.number().int().nonnegative(), to: z.number().int().nonnegative() }).strict(),
+      z.object({ kind: z.literal('longitudinalStates'), subject: z.number().int().nonnegative(), time: z.number().int().nonnegative(), state: z.number().int().nonnegative(), allowed: z.array(z.array(z.boolean()).min(1)).min(2) }).strict(),
+      z.object({
+        kind: z.literal('wideEvents'),
+        states: z.array(z.discriminatedUnion('kind', [
+          z.object({ kind: z.literal('notApplicable') }).strict(),
+          z.object({ kind: z.literal('recorded'), time: z.number().int().nonnegative(), status: z.number().int().nonnegative() }).strict(),
+        ])).min(2),
+        transitions: z.array(z.array(z.number().int().positive().nullable()).min(1)).min(2),
+        entry: z.discriminatedUnion('kind', [
+          z.object({ kind: z.literal('shared'), state: z.number().int().positive(), time: z.number().finite() }).strict(),
+          z.object({ kind: z.literal('columns'), state: z.number().int().nonnegative(), time: z.number().int().nonnegative() }).strict(),
+        ]),
+      }).strict(),
+    ]),
     family: proportionalHazardsFamilySchema,
     predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
   }).strict().superRefine((value, context) => {
-    const selected = [value.start, value.stop, value.event, value.from, value.to]
-    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
-      context.addIssue({ code: 'custom', message: 'Multi-state roles must be five distinct columns inside the matrix.' })
+    const input = value.input
+    const selected = input.kind === 'preparedRows'
+      ? [input.start, input.stop, input.event, input.from, input.to]
+      : input.kind === 'longitudinalStates'
+        ? [input.subject, input.time, input.state]
+        : [
+            ...input.states.flatMap((state) => state.kind === 'recorded' ? [state.time, state.status] : []),
+            ...(input.entry.kind === 'columns' ? [input.entry.state, input.entry.time] : []),
+          ]
+    const requiresDistinctRoles = input.kind !== 'wideEvents'
+    if ((requiresDistinctRoles && new Set(selected).size !== selected.length) || selected.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'Multi-state input roles must be valid columns, and prepared or longitudinal roles must be distinct.' })
+    }
+    if (input.kind === 'wideEvents' && input.states.some((state) => state.kind === 'recorded' && state.time === state.status)) {
+      context.addIssue({ code: 'custom', message: 'Each wide state needs different time and status columns.' })
+    }
+    if (input.kind === 'longitudinalStates' && input.allowed.some((row) => row.length !== input.allowed.length)) {
+      context.addIssue({ code: 'custom', message: 'The allowed-transition matrix must be square.' })
+    }
+    if (input.kind === 'wideEvents' && (input.transitions.length !== input.states.length || input.transitions.some((row) => row.length !== input.states.length))) {
+      context.addIssue({ code: 'custom', message: 'The numbered transition matrix must be square and match the number of states.' })
     }
     if (value.predictionTimes.some((time, index) => index > 0 && value.predictionTimes[index - 1]! > time)) {
       context.addIssue({ code: 'custom', message: 'Multi-state prediction times must be ordered.' })

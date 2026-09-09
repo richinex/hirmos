@@ -7,6 +7,9 @@ test.describe.configure({ timeout: 180_000 })
 const upstreamData = (name: string): string =>
   fileURLToPath(new URL(`../public/examples/data/survival/${name}`, import.meta.url))
 
+const testData = (name: string): string =>
+  fileURLToPath(new URL(`fixtures/${name}`, import.meta.url))
+
 const openExample = async (page: Page, name: string): Promise<void> => {
   const title = page.getByText(name, { exact: true })
   const entry = title.locator('xpath=ancestor::*[.//button[normalize-space()="Open"]][1]')
@@ -26,7 +29,17 @@ const chooseColumn = async (page: Page, label: string, option: string): Promise<
   await page.getByRole('option', { name: option, exact: true }).click()
 }
 
-const createPreparedProject = async (
+const chooseColumnWithin = async (
+  page: Page,
+  scope: ReturnType<Page['getByRole']>,
+  label: string,
+  option: string,
+): Promise<void> => {
+  await scope.getByRole('combobox', { name: label }).click()
+  await page.getByRole('option', { name: option, exact: true }).click()
+}
+
+const createPreparedProjectFrom = async (
   page: Page,
   name: string,
   source: string,
@@ -35,12 +48,19 @@ const createPreparedProject = async (
   await page.goto('/app')
   await page.getByRole('textbox', { name: 'Project name' }).fill(name)
   await page.getByRole('button', { name: 'Create project' }).click()
-  await page.locator('input[type="file"]').setInputFiles(upstreamData(source))
+  await page.locator('input[type="file"]').setInputFiles(source)
   await page.getByRole('button', { name: /Inspect data/ }).click()
   await expect(page.getByText('Choose the observation structure')).toBeVisible({ timeout: 90_000 })
   await prepare(page, { structure: 'cross-section', columns })
   await openSurvivalChapter(page, false)
 }
+
+const createPreparedProject = async (
+  page: Page,
+  name: string,
+  source: string,
+  columns: readonly string[],
+): Promise<void> => createPreparedProjectFrom(page, name, upstreamData(source), columns)
 
 test('the standalone survival chapter renders in desktop and phone workbenches', async ({ page }, testInfo) => {
   const phone = testInfo.project.name === 'mobile-chromium'
@@ -79,7 +99,11 @@ test('runs ComparisonSurv on the exact crossing-curves package data and records 
 
   await expect(page.getByRole('heading', { name: 'Group 1 compared with group 0' }).first()).toBeVisible({ timeout: 120_000 })
   await expect(page.getByText('Two-group survival comparison').first()).toBeVisible()
-  await expect(page.getByText(/when they cross/i).first()).toBeVisible()
+  await expect(page.getByText(/remains valid when the curves cross/i).first()).toBeVisible()
+  await expect(page.getByText('Conversion comparisons').first()).toBeVisible()
+  await expect(page.getByText('Fixed-time interval calculations').first()).toBeVisible()
+  await expect(page.getByText('Peto–Peto modified Gehan–Wilcoxon').first()).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Interpretation' }).first()).toContainText('a difference of −8.64 pp')
   await expect(page.getByText('Survival runs · 1')).toBeVisible()
   await expect(page.getByRole('table', { name: 'Number at risk' })).toBeVisible()
 
@@ -92,6 +116,34 @@ test('runs ComparisonSurv on the exact crossing-curves package data and records 
 
   await page.getByRole('radio', { name: 'Smoothed hazard' }).click()
   await expect(page.getByTestId('smoothed-hazard-groups')).toBeVisible()
+})
+
+test('reproduces the three survival comparisons from the A/B article', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once; phone layout is covered separately.')
+  await createPreparedProjectFrom(page, 'A/B survival comparison', testData('ab-survival.csv'), ['tstatus', 'status', 'group'])
+
+  await page.getByRole('radio', { name: 'Compare groups' }).click()
+  await chooseColumn(page, 'Duration', 'tstatus')
+  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
+  await chooseColumn(page, 'Group · 0 or 1', 'group')
+  await page.getByRole('spinbutton', { name: 'Compare through time' }).fill('7')
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Group 1 compared with group 0' }).first()).toBeVisible({ timeout: 120_000 })
+  const conversions = page.getByRole('region', { name: /Conversion comparisons/ }).first()
+  await expect(conversions).toContainText('Observed conversion; follow-up time ignored')
+  await expect(conversions).toContainText('23.0%')
+  await expect(conversions).toContainText('25.3%')
+  await expect(conversions).toContainText('2.30 pp')
+  await expect(conversions).toContainText('0.089')
+  await expect(conversions).toContainText('Conversion by time 7.00; Kaplan–Meier')
+  await expect(conversions).toContainText('21.1%')
+  await expect(conversions).toContainText('22.7%')
+  await expect(conversions).toContainText('1.62 pp')
+  await expect(conversions).toContainText('0.224')
+  const tests = page.getByRole('region', { name: /Comparison tests/ }).first()
+  await expect(tests).toContainText('Peto–Peto modified Gehan–Wilcoxon')
+  await expect(tests).toContainText('0.040')
 })
 
 test('runs right-censored flexsurv on the exact breast-cancer package data', async ({ page }, testInfo) => {
@@ -147,6 +199,41 @@ test('runs start-stop and multi-state flexsurv on the exact bosms3 package data'
   await expect(page.getByTestId('transition-probability-matrix')).toBeVisible()
 })
 
+test('converts longitudinal state observations before fitting the multi-state model', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once.')
+  await createPreparedProject(page, 'Longitudinal state observations', 'longitudinal-states.csv', ['time', 'state'])
+
+  await page.getByRole('radio', { name: 'Multi-state' }).click()
+  await page.getByRole('radio', { name: 'State observations' }).click()
+  await chooseColumn(page, 'Subject', 'subject')
+  await chooseColumn(page, 'Observation time', 'time')
+  await chooseColumn(page, 'Observed state', 'state')
+  await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('10')
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+
+  await expect(page.getByText('Multi-state survival').first()).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText(/converted 28 exact state observations into 28 transition-risk rows/i).first()).toBeVisible()
+})
+
+test('converts the exact mstate wide illness-death data before fitting', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once.')
+  await createPreparedProject(page, 'mstate wide illness-death', 'mstate_illness_death.csv', ['time2', 'status2', 'time3', 'status3'])
+
+  await page.getByRole('radio', { name: 'Multi-state' }).click()
+  await page.getByRole('radio', { name: 'Wide event history' }).click()
+  const stateTwo = page.getByRole('group', { name: 'State 2' })
+  const stateThree = page.getByRole('group', { name: 'State 3' })
+  await chooseColumnWithin(page, stateTwo, 'Time reached or last followed', 'time2')
+  await chooseColumnWithin(page, stateTwo, 'Reached · 1 yes, 0 censored', 'status2')
+  await chooseColumnWithin(page, stateThree, 'Time reached or last followed', 'time3')
+  await chooseColumnWithin(page, stateThree, 'Reached · 1 yes, 0 censored', 'status3')
+  await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('12')
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+
+  await expect(page.getByText('Multi-state survival').first()).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText(/converted 6 subject records into 16 transition-risk rows/i).first()).toBeVisible()
+})
+
 // The generated panel in tests/fixtures/survival: Weibull proportional hazards with shape 1.4 and
 // coefficients −0.6, −0.3 and 0.4, drawn exactly from the piecewise cumulative hazard (truth.json).
 // The fit through the chapter must land on those, with each 95% interval covering the truth.
@@ -182,4 +269,11 @@ test('recovers the planted start-stop Weibull PH truth through the chapter', asy
   await expectRow('feature_active', -0.6, 0.15)
   await expectRow('experience', -0.3, 0.1)
   await expectRow('complexity', 0.4, 0.1)
+
+  // Leaving and returning shows the controls as the recorded run set them, not the defaults.
+  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Data studio/ }).click()
+  await openSurvivalChapter(page, false)
+  await expect(page.getByRole('radio', { name: 'Start–stop' })).toBeChecked()
+  for (const covariate of ['feature_active', 'experience', 'complexity']) await expect(page.getByRole('checkbox', { name: covariate, exact: true })).toBeChecked()
+  await expect(page.getByRole('spinbutton', { name: 'Prediction horizon' })).toHaveValue('36')
 })

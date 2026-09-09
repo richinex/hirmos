@@ -66,6 +66,8 @@ test('estimator chips use the prepared treatment and outcome before a run', asyn
   await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByRole('button', { name: 'Checking treatment and outcome…' })).toBeHidden({ timeout: 30_000 })
+  // The chapter opens on the family of the example's latest run; the chips under test are in the adjustment family.
+  await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio').first().click()
   await expect(page.getByRole('radio', { name: /Bayesian negative binomial.*review/i })).toBeVisible()
   await expect(page.getByRole('radio', { name: /Bayesian Gaussian regression.*unavailable/i })).toBeVisible()
   // The do-query belongs to the identified-function family, and a family shows only its own methods.

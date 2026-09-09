@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T15:02:34.564Z",
+  "exportedAt": "2026-09-09T12:35:01.911Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T15:02:34.557Z",
+    "savedAt": "2026-09-09T12:35:01.904Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "6a3e1d9f-5b47-4c82-8d1e-3f7a2b9c5e06",
       "name": "GPS use and spatial memory",
-      "createdAt": "2026-09-04T15:02:28.226Z"
+      "createdAt": "2026-09-09T12:34:55.597Z"
     },
     "source": {
       "name": "gps-memory.csv",
@@ -237,8 +237,8 @@
       ]
     },
     "prepared": {
-      "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d",
-      "recipe": "7cd50c6c-98ff-41a2-b2b3-010542c16ea3",
+      "id": "8c157231-84c9-4516-a08c-df40f1d65dd6",
+      "recipe": "696c9b3c-acc7-4818-9dd9-38bc17bf9d1d",
       "sourceProfile": "duckdb-wasm:1.30.0:1c7f235a69e83e67a19762dba384813a7d5484c932464fdf284133f3e60503bc",
       "observations": 1000,
       "columns": [
@@ -267,9 +267,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9",
+        "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d",
         "name": "GPS use, hippocampal volume and spatial memory",
-        "preparedDataset": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d",
+        "preparedDataset": "8c157231-84c9-4516-a08c-df40f1d65dd6",
         "dataset": {
           "kind": "cross-section",
           "observations": 1000
@@ -281,27 +281,27 @@
         "history": [
           {
             "kind": "draft",
-            "id": "662566c0-d3be-4216-a3a1-9a649dbceb40",
+            "id": "f6f7d111-fb09-41bc-9ea4-31c7bf8df869",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:30.857Z",
+            "createdAt": "2026-09-09T12:34:58.236Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 }
@@ -319,33 +319,33 @@
           },
           {
             "kind": "draft",
-            "id": "2d77049d-c481-40a8-9611-08b5082fc0fe",
-            "parent": "662566c0-d3be-4216-a3a1-9a649dbceb40",
-            "createdAt": "2026-09-04T15:02:31.016Z",
+            "id": "d0a81800-587f-4824-9f6d-c71873d0423e",
+            "parent": "f6f7d111-fb09-41bc-9ea4-31c7bf8df869",
+            "createdAt": "2026-09-09T12:34:58.396Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
@@ -362,42 +362,42 @@
           },
           {
             "kind": "draft",
-            "id": "68c52763-97a5-4416-a3e2-9e260825c2de",
-            "parent": "2d77049d-c481-40a8-9611-08b5082fc0fe",
-            "createdAt": "2026-09-04T15:02:31.207Z",
+            "id": "ddbf058d-24a7-475f-b182-171b9f7ae9af",
+            "parent": "d0a81800-587f-4824-9f6d-c71873d0423e",
+            "createdAt": "2026-09-09T12:34:58.596Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -415,42 +415,42 @@
           },
           {
             "kind": "draft",
-            "id": "b783f735-59a3-4f68-96a0-d6cc1bd61f9b",
-            "parent": "68c52763-97a5-4416-a3e2-9e260825c2de",
-            "createdAt": "2026-09-04T15:02:31.425Z",
+            "id": "3e11c15e-c75c-4d6e-b0f0-5298fae137fc",
+            "parent": "ddbf058d-24a7-475f-b182-171b9f7ae9af",
+            "createdAt": "2026-09-09T12:34:58.795Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -462,9 +462,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -482,42 +482,42 @@
           },
           {
             "kind": "draft",
-            "id": "7801759b-e8be-46e6-a4d3-342b6f168f6a",
-            "parent": "b783f735-59a3-4f68-96a0-d6cc1bd61f9b",
-            "createdAt": "2026-09-04T15:02:31.623Z",
+            "id": "badac54d-252e-44bc-8d0a-b48b8632354e",
+            "parent": "3e11c15e-c75c-4d6e-b0f0-5298fae137fc",
+            "createdAt": "2026-09-09T12:34:58.995Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -529,9 +529,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -543,9 +543,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X@t",
-                  "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:0:X@t",
+                  "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -566,27 +566,27 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "662566c0-d3be-4216-a3a1-9a649dbceb40",
+            "id": "f6f7d111-fb09-41bc-9ea4-31c7bf8df869",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:30.857Z",
+            "createdAt": "2026-09-09T12:34:58.236Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 }
@@ -604,33 +604,33 @@
           },
           {
             "kind": "draft",
-            "id": "2d77049d-c481-40a8-9611-08b5082fc0fe",
-            "parent": "662566c0-d3be-4216-a3a1-9a649dbceb40",
-            "createdAt": "2026-09-04T15:02:31.016Z",
+            "id": "d0a81800-587f-4824-9f6d-c71873d0423e",
+            "parent": "f6f7d111-fb09-41bc-9ea4-31c7bf8df869",
+            "createdAt": "2026-09-09T12:34:58.396Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
@@ -647,42 +647,42 @@
           },
           {
             "kind": "draft",
-            "id": "68c52763-97a5-4416-a3e2-9e260825c2de",
-            "parent": "2d77049d-c481-40a8-9611-08b5082fc0fe",
-            "createdAt": "2026-09-04T15:02:31.207Z",
+            "id": "ddbf058d-24a7-475f-b182-171b9f7ae9af",
+            "parent": "d0a81800-587f-4824-9f6d-c71873d0423e",
+            "createdAt": "2026-09-09T12:34:58.596Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -700,42 +700,42 @@
           },
           {
             "kind": "draft",
-            "id": "b783f735-59a3-4f68-96a0-d6cc1bd61f9b",
-            "parent": "68c52763-97a5-4416-a3e2-9e260825c2de",
-            "createdAt": "2026-09-04T15:02:31.425Z",
+            "id": "3e11c15e-c75c-4d6e-b0f0-5298fae137fc",
+            "parent": "ddbf058d-24a7-475f-b182-171b9f7ae9af",
+            "createdAt": "2026-09-09T12:34:58.795Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -747,9 +747,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -767,42 +767,42 @@
           },
           {
             "kind": "draft",
-            "id": "7801759b-e8be-46e6-a4d3-342b6f168f6a",
-            "parent": "b783f735-59a3-4f68-96a0-d6cc1bd61f9b",
-            "createdAt": "2026-09-04T15:02:31.623Z",
+            "id": "badac54d-252e-44bc-8d0a-b48b8632354e",
+            "parent": "3e11c15e-c75c-4d6e-b0f0-5298fae137fc",
+            "createdAt": "2026-09-09T12:34:58.995Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -814,9 +814,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -828,9 +828,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X@t",
-                  "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:0:X@t",
+                  "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -848,42 +848,42 @@
           },
           {
             "kind": "draft",
-            "id": "22789070-db6c-4b3e-af3d-ca12c516cbe1",
-            "parent": "7801759b-e8be-46e6-a4d3-342b6f168f6a",
-            "createdAt": "2026-09-04T15:02:31.793Z",
+            "id": "78400528-babd-4102-82b5-a4058df9a2be",
+            "parent": "badac54d-252e-44bc-8d0a-b48b8632354e",
+            "createdAt": "2026-09-09T12:34:59.154Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "column": "0:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "column": "1:Z",
                   "name": "Z"
                 },
                 {
                   "kind": "observed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "column": "2:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "latent",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                   "name": "U"
                 }
               ],
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -895,9 +895,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                  "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                  "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -909,9 +909,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X@t",
-                  "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:0:X@t",
+                  "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -923,9 +923,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                  "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-                  "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                  "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                  "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+                  "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -944,42 +944,42 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "22789070-db6c-4b3e-af3d-ca12c516cbe1",
-          "parent": "7801759b-e8be-46e6-a4d3-342b6f168f6a",
-          "createdAt": "2026-09-04T15:02:31.793Z",
+          "id": "78400528-babd-4102-82b5-a4058df9a2be",
+          "parent": "badac54d-252e-44bc-8d0a-b48b8632354e",
+          "createdAt": "2026-09-09T12:34:59.154Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                 "column": "0:X",
                 "name": "X"
               },
               {
                 "kind": "observed",
-                "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                 "column": "1:Z",
                 "name": "Z"
               },
               {
                 "kind": "observed",
-                "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                 "column": "2:Y",
                 "name": "Y"
               },
               {
                 "kind": "latent",
-                "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+                "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
                 "name": "U"
               }
             ],
             "edges": [
               {
                 "kind": "directed",
-                "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-                "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-                "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+                "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+                "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -991,9 +991,9 @@
               },
               {
                 "kind": "directed",
-                "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-                "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+                "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1005,9 +1005,9 @@
               },
               {
                 "kind": "directed",
-                "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X@t",
-                "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-                "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+                "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:0:X@t",
+                "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+                "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1019,9 +1019,9 @@
               },
               {
                 "kind": "directed",
-                "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-                "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-                "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+                "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+                "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+                "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1042,10 +1042,16 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9",
-      "treatment": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-      "outcome": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+      "dagDocument": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d",
+      "treatment": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+      "outcome": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": "observed-choice",
         "description": "Participants chose how much to rely on satellite navigation; no protocol assigned it."
@@ -1056,23 +1062,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "648ba596-abe1-4a0b-ac4d-4ecededf9b0f",
-        "createdAt": "2026-09-04T15:02:32.932Z",
-        "preparedDataset": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d",
+        "id": "1367f15b-6662-4e08-aa38-5c4c9b6708a4",
+        "createdAt": "2026-09-09T12:35:00.305Z",
+        "preparedDataset": "8c157231-84c9-4516-a08c-df40f1d65dd6",
         "dataset": {
           "kind": "cross-section",
           "observations": 1000
         },
-        "dagDocument": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9",
-        "dagRevision": "22789070-db6c-4b3e-af3d-ca12c516cbe1",
+        "dagDocument": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d",
+        "dagRevision": "78400528-babd-4102-82b5-a4058df9a2be",
         "dagName": "GPS use, hippocampal volume and spatial memory",
         "treatment": {
-          "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+          "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
           "column": "0:X",
           "name": "X"
         },
         "outcome": {
-          "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+          "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
           "column": "2:Y",
           "name": "Y"
         },
@@ -1102,22 +1108,22 @@
         "graph": {
           "nodes": [
             {
-              "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+              "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
               "name": "X",
               "column": "0:X"
             },
             {
-              "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+              "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
               "name": "Z",
               "column": "1:Z"
             },
             {
-              "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+              "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
               "name": "Y",
               "column": "2:Y"
             },
             {
-              "node": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+              "node": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
               "name": "U",
               "column": null
             }
@@ -1147,34 +1153,34 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+              "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
               "column": "0:X",
               "name": "X"
             },
             {
               "kind": "observed",
-              "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+              "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
               "column": "1:Z",
               "name": "Z"
             },
             {
               "kind": "observed",
-              "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+              "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
               "column": "2:Y",
               "name": "Y"
             },
             {
               "kind": "latent",
-              "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
+              "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
               "name": "U"
             }
           ],
           "edges": [
             {
               "kind": "directed",
-              "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z@t",
-              "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
-              "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+              "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X->8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z@t",
+              "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
+              "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -1186,9 +1192,9 @@
             },
             {
               "kind": "directed",
-              "id": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-              "cause": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
-              "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+              "id": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+              "cause": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
+              "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -1200,9 +1206,9 @@
             },
             {
               "kind": "directed",
-              "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X@t",
-              "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-              "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+              "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:0:X@t",
+              "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+              "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -1214,9 +1220,9 @@
             },
             {
               "kind": "directed",
-              "id": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947->d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y@t",
-              "cause": "61c8b8c8-9a2a-4ee1-bd47-ec579bbc87c9:latent:d2166d42-1653-4dec-b131-e34e03286947",
-              "effect": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+              "id": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f->8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y@t",
+              "cause": "b5e9c6fb-ea8f-4cfb-892b-ea91df937f0d:latent:951285a0-35dc-4e19-9db5-b143b246163f",
+              "effect": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -1233,9 +1239,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "3e37e60d-6cb3-4a4c-955a-f4ffa2b86d98",
-        "study": "648ba596-abe1-4a0b-ac4d-4ecededf9b0f",
-        "createdAt": "2026-09-04T15:02:33.049Z",
+        "id": "3633c789-1fc6-48bb-bb7c-db8dcacb1530",
+        "study": "1367f15b-6662-4e08-aa38-5c4c9b6708a4",
+        "createdAt": "2026-09-09T12:35:00.427Z",
         "method": "graphical-identification-id",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -1253,6 +1259,9 @@
             "mediators": [
               1
             ]
+          },
+          "instruments": {
+            "kind": "notIdentified"
           },
           "graphicalIdentification": {
             "kind": "identified",
@@ -1308,11 +1317,14 @@
             "kind": "identified",
             "mediators": [
               {
-                "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+                "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
                 "column": "1:Z",
                 "name": "Z"
               }
             ]
+          },
+          "instruments": {
+            "kind": "not-identified"
           },
           "basis": [
             {
@@ -1336,11 +1348,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "a426d99b-cd44-44b8-b483-3d73de84e7da",
-        "study": "648ba596-abe1-4a0b-ac4d-4ecededf9b0f",
-        "identification": "3e37e60d-6cb3-4a4c-955a-f4ffa2b86d98",
-        "preparedDataset": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d",
-        "createdAt": "2026-09-04T15:02:34.009Z",
+        "id": "ce5fba76-edb4-47cf-88f9-efa1823c7d9d",
+        "study": "1367f15b-6662-4e08-aa38-5c4c9b6708a4",
+        "identification": "3633c789-1fc6-48bb-bb7c-db8dcacb1530",
+        "preparedDataset": "8c157231-84c9-4516-a08c-df40f1d65dd6",
+        "createdAt": "2026-09-09T12:35:01.374Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -1468,17 +1480,17 @@
           "controlValue": 0,
           "treatmentValue": 1,
           "firstStageParams": [
-            0.005495681576241057,
-            -0.5960773396322411
+            0.005495681576242759,
+            -0.5960773396322405
           ],
           "secondStageParams": [
-            -0.03438170804062829,
-            0.7399907994293726,
-            0.40438045593902483
+            -0.03438170804062838,
+            0.7399907994293716,
+            0.40438045593902455
           ],
-          "firstStageEffect": -0.5960773396322411,
-          "secondStageEffect": 0.7399907994293726,
-          "estimate": -0.44109174707619575,
+          "firstStageEffect": -0.5960773396322405,
+          "secondStageEffect": 0.7399907994293716,
+          "estimate": -0.44109174707619475,
           "uncertainty": {
             "kind": "bootstrap",
             "simulations": 399,
@@ -1486,25 +1498,25 @@
             "confidenceLevel": 0.95,
             "seed": 0,
             "interval": [
-              -0.48847108700470104,
-              -0.39461764760646517
+              -0.4884710870046988,
+              -0.39461764760646373
             ]
           }
         },
         "method": "frontdoor-two-stage",
         "columns": [
           {
-            "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:0:X",
+            "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:0:X",
             "column": "0:X",
             "name": "X"
           },
           {
-            "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:1:Z",
+            "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:1:Z",
             "column": "1:Z",
             "name": "Z"
           },
           {
-            "node": "d5bbf549-ad05-48a3-b01c-42d6b1bb907d:2:Y",
+            "node": "8c157231-84c9-4516-a08c-df40f1d65dd6:2:Y",
             "column": "2:Y",
             "name": "Y"
           }
@@ -1517,14 +1529,14 @@
           },
           "effect": {
             "kind": "additive",
-            "value": -0.44109174707619575,
+            "value": -0.44109174707619475,
             "unit": ""
           },
           "interval": {
             "kind": "confidence",
             "level": 0.95,
-            "lower": -0.48847108700470104,
-            "upper": -0.39461764760646517
+            "lower": -0.4884710870046988,
+            "upper": -0.39461764760646373
           },
           "standardError": null,
           "adjustment": {
@@ -1539,7 +1551,8 @@
       }
     ],
     "sensitivityRuns": [],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

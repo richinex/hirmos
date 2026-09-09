@@ -12,6 +12,7 @@
 mod missingness;
 mod model;
 mod projection;
+mod survival;
 
 pub use missingness::{
     carry_forward_bounded, fill_confirmed_structural_zero, interpolate_bounded_linear,
@@ -26,3 +27,9 @@ pub use model::{
     SampleDecision,
 };
 pub use projection::project_lagged;
+pub use survival::{
+    prepare_longitudinal_states, prepare_wide_events, EventStatus, LongitudinalObservation,
+    LongitudinalStateHistory, PreparedMultiStateData, PreparedTransitionRow, StateId,
+    StateObservation, SubjectId, SurvivalPreparationError, SurvivalPreparationNotice, TransitionId,
+    TransitionMatrix, WideEventHistory, WideSubject,
+};

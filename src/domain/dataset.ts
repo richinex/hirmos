@@ -6,10 +6,13 @@ export type SourceFingerprint = Brand<string, 'SourceFingerprint'>
 export type DatasetProfileId = Brand<string, 'DatasetProfileId'>
 export type ColumnId = Brand<string, 'ColumnId'>
 
-export interface NumericColumnSelection {
+export interface ColumnSelection {
   readonly id: ColumnId
   readonly name: string
 }
+
+/** A source column that has been verified as numeric before it enters a numerical matrix. */
+export interface NumericColumnSelection extends ColumnSelection {}
 
 /** A nullable, column-major scientific matrix. Invalid cells contain NaN as a fail-safe and their
  * logical state is carried by the bit-packed validity map; consumers must never infer validity

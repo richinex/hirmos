@@ -93,7 +93,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'comparison-survival':
       return { kind: 'comparisonSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, group: command.group, truncationTime: command.truncationTime, permutations: command.permutations, seed: command.seed }
     case 'multi-state-survival':
-      return { kind: 'multiStateSurvival', rows: command.rows, columns: command.columns, start: command.start, stop: command.stop, event: command.event, from: command.from, to: command.to, family: command.family, predictionTimes: command.predictionTimes }
+      return { kind: 'multiStateSurvival', rows: command.rows, columns: command.columns, input: command.input, family: command.family, predictionTimes: command.predictionTimes }
     case 'stationarity-battery':
       return { kind: 'stationarityBattery' }
     case 'multicollinearity':

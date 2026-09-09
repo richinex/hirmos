@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T15:02:50.387Z",
+  "exportedAt": "2026-09-09T12:35:29.848Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T15:02:50.383Z",
+    "savedAt": "2026-09-09T12:35:29.844Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "5b2e8d4a-7c19-4f36-b8e2-1d9a3c6e4f57",
       "name": "Proposition 99 and cigarette sales",
-      "createdAt": "2026-09-04T15:02:44.130Z"
+      "createdAt": "2026-09-09T12:35:23.131Z"
     },
     "source": {
       "name": "prop99-wide.csv",
@@ -2327,8 +2327,8 @@
       ]
     },
     "prepared": {
-      "id": "6b9d0506-28b1-4385-8ea0-027791ac2879",
-      "recipe": "434ecc52-ab15-47b5-9fa6-95b2c21ebbf4",
+      "id": "eb462587-4fda-4a88-b607-92aebd6e437c",
+      "recipe": "49044132-dc3c-407b-898b-80ece561c616",
       "sourceProfile": "duckdb-wasm:1.30.0:54d585287c71e7c9272e5acf2679e4b8846ce4fe91b77ea7654eb4de792eda8f",
       "observations": 31,
       "columns": [
@@ -2641,9 +2641,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "ee11ac1b-789c-4b9f-8ff5-575f90435ac2",
+        "id": "16001331-7aad-461b-85fe-f768f01ffeba",
         "name": "Proposition 99 and cigarette sales",
-        "preparedDataset": "6b9d0506-28b1-4385-8ea0-027791ac2879",
+        "preparedDataset": "eb462587-4fda-4a88-b607-92aebd6e437c",
         "dataset": {
           "kind": "time-series",
           "observations": 31
@@ -2655,249 +2655,249 @@
         "history": [
           {
             "kind": "draft",
-            "id": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
+            "id": "18d133c3-c15e-4f48-8e4b-5daf49164676",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:46.936Z",
+            "createdAt": "2026-09-09T12:35:25.912Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
                   "column": "1:prop99",
                   "name": "prop99"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
                   "column": "2:California",
                   "name": "California"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:3:Alabama",
                   "column": "3:Alabama",
                   "name": "Alabama"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:4:Arkansas",
                   "column": "4:Arkansas",
                   "name": "Arkansas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:5:Colorado",
                   "column": "5:Colorado",
                   "name": "Colorado"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:6:Connecticut",
                   "column": "6:Connecticut",
                   "name": "Connecticut"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:7:Delaware",
                   "column": "7:Delaware",
                   "name": "Delaware"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:8:Georgia",
                   "column": "8:Georgia",
                   "name": "Georgia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:9:Idaho",
                   "column": "9:Idaho",
                   "name": "Idaho"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:10:Illinois",
                   "column": "10:Illinois",
                   "name": "Illinois"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:11:Indiana",
                   "column": "11:Indiana",
                   "name": "Indiana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:12:Iowa",
                   "column": "12:Iowa",
                   "name": "Iowa"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:13:Kansas",
                   "column": "13:Kansas",
                   "name": "Kansas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:14:Kentucky",
                   "column": "14:Kentucky",
                   "name": "Kentucky"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:15:Louisiana",
                   "column": "15:Louisiana",
                   "name": "Louisiana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:16:Maine",
                   "column": "16:Maine",
                   "name": "Maine"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:17:Minnesota",
                   "column": "17:Minnesota",
                   "name": "Minnesota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:18:Mississippi",
                   "column": "18:Mississippi",
                   "name": "Mississippi"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:19:Missouri",
                   "column": "19:Missouri",
                   "name": "Missouri"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:20:Montana",
                   "column": "20:Montana",
                   "name": "Montana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:21:Nebraska",
                   "column": "21:Nebraska",
                   "name": "Nebraska"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:22:Nevada",
                   "column": "22:Nevada",
                   "name": "Nevada"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:23:NewHampshire",
                   "column": "23:NewHampshire",
                   "name": "NewHampshire"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:24:NewMexico",
                   "column": "24:NewMexico",
                   "name": "NewMexico"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:25:NorthCarolina",
                   "column": "25:NorthCarolina",
                   "name": "NorthCarolina"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:26:NorthDakota",
                   "column": "26:NorthDakota",
                   "name": "NorthDakota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:27:Ohio",
                   "column": "27:Ohio",
                   "name": "Ohio"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:28:Oklahoma",
                   "column": "28:Oklahoma",
                   "name": "Oklahoma"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:29:Pennsylvania",
                   "column": "29:Pennsylvania",
                   "name": "Pennsylvania"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:30:RhodeIsland",
                   "column": "30:RhodeIsland",
                   "name": "RhodeIsland"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:31:SouthCarolina",
                   "column": "31:SouthCarolina",
                   "name": "SouthCarolina"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:32:SouthDakota",
                   "column": "32:SouthDakota",
                   "name": "SouthDakota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:33:Tennessee",
                   "column": "33:Tennessee",
                   "name": "Tennessee"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:34:Texas",
                   "column": "34:Texas",
                   "name": "Texas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:35:Utah",
                   "column": "35:Utah",
                   "name": "Utah"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:36:Vermont",
                   "column": "36:Vermont",
                   "name": "Vermont"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:37:Virginia",
                   "column": "37:Virginia",
                   "name": "Virginia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:38:WestVirginia",
                   "column": "38:WestVirginia",
                   "name": "WestVirginia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:39:Wisconsin",
                   "column": "39:Wisconsin",
                   "name": "Wisconsin"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:40:Wyoming",
                   "column": "40:Wyoming",
                   "name": "Wyoming"
                 }
@@ -2918,249 +2918,249 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
+            "id": "18d133c3-c15e-4f48-8e4b-5daf49164676",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:46.936Z",
+            "createdAt": "2026-09-09T12:35:25.912Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
                   "column": "1:prop99",
                   "name": "prop99"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
                   "column": "2:California",
                   "name": "California"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:3:Alabama",
                   "column": "3:Alabama",
                   "name": "Alabama"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:4:Arkansas",
                   "column": "4:Arkansas",
                   "name": "Arkansas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:5:Colorado",
                   "column": "5:Colorado",
                   "name": "Colorado"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:6:Connecticut",
                   "column": "6:Connecticut",
                   "name": "Connecticut"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:7:Delaware",
                   "column": "7:Delaware",
                   "name": "Delaware"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:8:Georgia",
                   "column": "8:Georgia",
                   "name": "Georgia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:9:Idaho",
                   "column": "9:Idaho",
                   "name": "Idaho"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:10:Illinois",
                   "column": "10:Illinois",
                   "name": "Illinois"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:11:Indiana",
                   "column": "11:Indiana",
                   "name": "Indiana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:12:Iowa",
                   "column": "12:Iowa",
                   "name": "Iowa"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:13:Kansas",
                   "column": "13:Kansas",
                   "name": "Kansas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:14:Kentucky",
                   "column": "14:Kentucky",
                   "name": "Kentucky"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:15:Louisiana",
                   "column": "15:Louisiana",
                   "name": "Louisiana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:16:Maine",
                   "column": "16:Maine",
                   "name": "Maine"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:17:Minnesota",
                   "column": "17:Minnesota",
                   "name": "Minnesota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:18:Mississippi",
                   "column": "18:Mississippi",
                   "name": "Mississippi"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:19:Missouri",
                   "column": "19:Missouri",
                   "name": "Missouri"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:20:Montana",
                   "column": "20:Montana",
                   "name": "Montana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:21:Nebraska",
                   "column": "21:Nebraska",
                   "name": "Nebraska"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:22:Nevada",
                   "column": "22:Nevada",
                   "name": "Nevada"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:23:NewHampshire",
                   "column": "23:NewHampshire",
                   "name": "NewHampshire"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:24:NewMexico",
                   "column": "24:NewMexico",
                   "name": "NewMexico"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:25:NorthCarolina",
                   "column": "25:NorthCarolina",
                   "name": "NorthCarolina"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:26:NorthDakota",
                   "column": "26:NorthDakota",
                   "name": "NorthDakota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:27:Ohio",
                   "column": "27:Ohio",
                   "name": "Ohio"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:28:Oklahoma",
                   "column": "28:Oklahoma",
                   "name": "Oklahoma"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:29:Pennsylvania",
                   "column": "29:Pennsylvania",
                   "name": "Pennsylvania"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:30:RhodeIsland",
                   "column": "30:RhodeIsland",
                   "name": "RhodeIsland"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:31:SouthCarolina",
                   "column": "31:SouthCarolina",
                   "name": "SouthCarolina"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:32:SouthDakota",
                   "column": "32:SouthDakota",
                   "name": "SouthDakota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:33:Tennessee",
                   "column": "33:Tennessee",
                   "name": "Tennessee"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:34:Texas",
                   "column": "34:Texas",
                   "name": "Texas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:35:Utah",
                   "column": "35:Utah",
                   "name": "Utah"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:36:Vermont",
                   "column": "36:Vermont",
                   "name": "Vermont"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:37:Virginia",
                   "column": "37:Virginia",
                   "name": "Virginia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:38:WestVirginia",
                   "column": "38:WestVirginia",
                   "name": "WestVirginia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:39:Wisconsin",
                   "column": "39:Wisconsin",
                   "name": "Wisconsin"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:40:Wyoming",
                   "column": "40:Wyoming",
                   "name": "Wyoming"
                 }
@@ -3178,249 +3178,249 @@
           },
           {
             "kind": "draft",
-            "id": "88b67676-ae6d-4fc8-b3dc-99f8ba1e267e",
-            "parent": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
-            "createdAt": "2026-09-04T15:02:47.398Z",
+            "id": "12b627c6-7ee4-48fa-a738-74665549fc3d",
+            "parent": "18d133c3-c15e-4f48-8e4b-5daf49164676",
+            "createdAt": "2026-09-09T12:35:26.280Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
                   "column": "1:prop99",
                   "name": "prop99"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
                   "column": "2:California",
                   "name": "California"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:3:Alabama",
                   "column": "3:Alabama",
                   "name": "Alabama"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:4:Arkansas",
                   "column": "4:Arkansas",
                   "name": "Arkansas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:5:Colorado",
                   "column": "5:Colorado",
                   "name": "Colorado"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:6:Connecticut",
                   "column": "6:Connecticut",
                   "name": "Connecticut"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:7:Delaware",
                   "column": "7:Delaware",
                   "name": "Delaware"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:8:Georgia",
                   "column": "8:Georgia",
                   "name": "Georgia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:9:Idaho",
                   "column": "9:Idaho",
                   "name": "Idaho"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:10:Illinois",
                   "column": "10:Illinois",
                   "name": "Illinois"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:11:Indiana",
                   "column": "11:Indiana",
                   "name": "Indiana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:12:Iowa",
                   "column": "12:Iowa",
                   "name": "Iowa"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:13:Kansas",
                   "column": "13:Kansas",
                   "name": "Kansas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:14:Kentucky",
                   "column": "14:Kentucky",
                   "name": "Kentucky"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:15:Louisiana",
                   "column": "15:Louisiana",
                   "name": "Louisiana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:16:Maine",
                   "column": "16:Maine",
                   "name": "Maine"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:17:Minnesota",
                   "column": "17:Minnesota",
                   "name": "Minnesota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:18:Mississippi",
                   "column": "18:Mississippi",
                   "name": "Mississippi"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:19:Missouri",
                   "column": "19:Missouri",
                   "name": "Missouri"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:20:Montana",
                   "column": "20:Montana",
                   "name": "Montana"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:21:Nebraska",
                   "column": "21:Nebraska",
                   "name": "Nebraska"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:22:Nevada",
                   "column": "22:Nevada",
                   "name": "Nevada"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:23:NewHampshire",
                   "column": "23:NewHampshire",
                   "name": "NewHampshire"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:24:NewMexico",
                   "column": "24:NewMexico",
                   "name": "NewMexico"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:25:NorthCarolina",
                   "column": "25:NorthCarolina",
                   "name": "NorthCarolina"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:26:NorthDakota",
                   "column": "26:NorthDakota",
                   "name": "NorthDakota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:27:Ohio",
                   "column": "27:Ohio",
                   "name": "Ohio"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:28:Oklahoma",
                   "column": "28:Oklahoma",
                   "name": "Oklahoma"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:29:Pennsylvania",
                   "column": "29:Pennsylvania",
                   "name": "Pennsylvania"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:30:RhodeIsland",
                   "column": "30:RhodeIsland",
                   "name": "RhodeIsland"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:31:SouthCarolina",
                   "column": "31:SouthCarolina",
                   "name": "SouthCarolina"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:32:SouthDakota",
                   "column": "32:SouthDakota",
                   "name": "SouthDakota"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:33:Tennessee",
                   "column": "33:Tennessee",
                   "name": "Tennessee"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:34:Texas",
                   "column": "34:Texas",
                   "name": "Texas"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:35:Utah",
                   "column": "35:Utah",
                   "name": "Utah"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:36:Vermont",
                   "column": "36:Vermont",
                   "name": "Vermont"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:37:Virginia",
                   "column": "37:Virginia",
                   "name": "Virginia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:38:WestVirginia",
                   "column": "38:WestVirginia",
                   "name": "WestVirginia"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:39:Wisconsin",
                   "column": "39:Wisconsin",
                   "name": "Wisconsin"
                 },
                 {
                   "kind": "observed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:40:Wyoming",
                   "column": "40:Wyoming",
                   "name": "Wyoming"
                 }
@@ -3428,9 +3428,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99->6b9d0506-28b1-4385-8ea0-027791ac2879:2:California@t",
-                  "cause": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
-                  "effect": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                  "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99->eb462587-4fda-4a88-b607-92aebd6e437c:2:California@t",
+                  "cause": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
+                  "effect": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3449,249 +3449,249 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "88b67676-ae6d-4fc8-b3dc-99f8ba1e267e",
-          "parent": "c9fb269d-2d20-4312-9f43-a6aa124947eb",
-          "createdAt": "2026-09-04T15:02:47.398Z",
+          "id": "12b627c6-7ee4-48fa-a738-74665549fc3d",
+          "parent": "18d133c3-c15e-4f48-8e4b-5daf49164676",
+          "createdAt": "2026-09-09T12:35:26.280Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
                 "column": "1:prop99",
                 "name": "prop99"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
                 "column": "2:California",
                 "name": "California"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:3:Alabama",
                 "column": "3:Alabama",
                 "name": "Alabama"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:4:Arkansas",
                 "column": "4:Arkansas",
                 "name": "Arkansas"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:5:Colorado",
                 "column": "5:Colorado",
                 "name": "Colorado"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:6:Connecticut",
                 "column": "6:Connecticut",
                 "name": "Connecticut"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:7:Delaware",
                 "column": "7:Delaware",
                 "name": "Delaware"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:8:Georgia",
                 "column": "8:Georgia",
                 "name": "Georgia"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:9:Idaho",
                 "column": "9:Idaho",
                 "name": "Idaho"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:10:Illinois",
                 "column": "10:Illinois",
                 "name": "Illinois"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:11:Indiana",
                 "column": "11:Indiana",
                 "name": "Indiana"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:12:Iowa",
                 "column": "12:Iowa",
                 "name": "Iowa"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:13:Kansas",
                 "column": "13:Kansas",
                 "name": "Kansas"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:14:Kentucky",
                 "column": "14:Kentucky",
                 "name": "Kentucky"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:15:Louisiana",
                 "column": "15:Louisiana",
                 "name": "Louisiana"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:16:Maine",
                 "column": "16:Maine",
                 "name": "Maine"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:17:Minnesota",
                 "column": "17:Minnesota",
                 "name": "Minnesota"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:18:Mississippi",
                 "column": "18:Mississippi",
                 "name": "Mississippi"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:19:Missouri",
                 "column": "19:Missouri",
                 "name": "Missouri"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:20:Montana",
                 "column": "20:Montana",
                 "name": "Montana"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:21:Nebraska",
                 "column": "21:Nebraska",
                 "name": "Nebraska"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:22:Nevada",
                 "column": "22:Nevada",
                 "name": "Nevada"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:23:NewHampshire",
                 "column": "23:NewHampshire",
                 "name": "NewHampshire"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:24:NewMexico",
                 "column": "24:NewMexico",
                 "name": "NewMexico"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:25:NorthCarolina",
                 "column": "25:NorthCarolina",
                 "name": "NorthCarolina"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:26:NorthDakota",
                 "column": "26:NorthDakota",
                 "name": "NorthDakota"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:27:Ohio",
                 "column": "27:Ohio",
                 "name": "Ohio"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:28:Oklahoma",
                 "column": "28:Oklahoma",
                 "name": "Oklahoma"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:29:Pennsylvania",
                 "column": "29:Pennsylvania",
                 "name": "Pennsylvania"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:30:RhodeIsland",
                 "column": "30:RhodeIsland",
                 "name": "RhodeIsland"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:31:SouthCarolina",
                 "column": "31:SouthCarolina",
                 "name": "SouthCarolina"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:32:SouthDakota",
                 "column": "32:SouthDakota",
                 "name": "SouthDakota"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:33:Tennessee",
                 "column": "33:Tennessee",
                 "name": "Tennessee"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:34:Texas",
                 "column": "34:Texas",
                 "name": "Texas"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:35:Utah",
                 "column": "35:Utah",
                 "name": "Utah"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:36:Vermont",
                 "column": "36:Vermont",
                 "name": "Vermont"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:37:Virginia",
                 "column": "37:Virginia",
                 "name": "Virginia"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:38:WestVirginia",
                 "column": "38:WestVirginia",
                 "name": "WestVirginia"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:39:Wisconsin",
                 "column": "39:Wisconsin",
                 "name": "Wisconsin"
               },
               {
                 "kind": "observed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:40:Wyoming",
                 "column": "40:Wyoming",
                 "name": "Wyoming"
               }
@@ -3699,9 +3699,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99->6b9d0506-28b1-4385-8ea0-027791ac2879:2:California@t",
-                "cause": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
-                "effect": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+                "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99->eb462587-4fda-4a88-b607-92aebd6e437c:2:California@t",
+                "cause": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
+                "effect": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -3722,10 +3722,16 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "ee11ac1b-789c-4b9f-8ff5-575f90435ac2",
-      "treatment": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
-      "outcome": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+      "dagDocument": "16001331-7aad-461b-85fe-f768f01ffeba",
+      "treatment": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
+      "outcome": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": "policy-change",
         "description": "Proposition 99 took effect in California from 1989; the other states did not adopt it."
@@ -3736,23 +3742,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "f72da682-4fe2-4852-b48c-70e74f59b39d",
-        "createdAt": "2026-09-04T15:02:48.736Z",
-        "preparedDataset": "6b9d0506-28b1-4385-8ea0-027791ac2879",
+        "id": "94c84149-8b0a-4b1d-bf64-b76a70f5c901",
+        "createdAt": "2026-09-09T12:35:27.688Z",
+        "preparedDataset": "eb462587-4fda-4a88-b607-92aebd6e437c",
         "dataset": {
           "kind": "time-series",
           "observations": 31
         },
-        "dagDocument": "ee11ac1b-789c-4b9f-8ff5-575f90435ac2",
-        "dagRevision": "88b67676-ae6d-4fc8-b3dc-99f8ba1e267e",
+        "dagDocument": "16001331-7aad-461b-85fe-f768f01ffeba",
+        "dagRevision": "12b627c6-7ee4-48fa-a738-74665549fc3d",
         "dagName": "Proposition 99 and cigarette sales",
         "treatment": {
-          "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+          "node": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
           "column": "1:prop99",
           "name": "prop99"
         },
         "outcome": {
-          "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+          "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
           "column": "2:California",
           "name": "California"
         },
@@ -3782,202 +3788,202 @@
         "graph": {
           "nodes": [
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
               "name": "prop99",
               "column": "1:prop99"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
               "name": "California",
               "column": "2:California"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:3:Alabama",
               "name": "Alabama",
               "column": "3:Alabama"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:4:Arkansas",
               "name": "Arkansas",
               "column": "4:Arkansas"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:5:Colorado",
               "name": "Colorado",
               "column": "5:Colorado"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:6:Connecticut",
               "name": "Connecticut",
               "column": "6:Connecticut"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:7:Delaware",
               "name": "Delaware",
               "column": "7:Delaware"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:8:Georgia",
               "name": "Georgia",
               "column": "8:Georgia"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:9:Idaho",
               "name": "Idaho",
               "column": "9:Idaho"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:10:Illinois",
               "name": "Illinois",
               "column": "10:Illinois"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:11:Indiana",
               "name": "Indiana",
               "column": "11:Indiana"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:12:Iowa",
               "name": "Iowa",
               "column": "12:Iowa"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:13:Kansas",
               "name": "Kansas",
               "column": "13:Kansas"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:14:Kentucky",
               "name": "Kentucky",
               "column": "14:Kentucky"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:15:Louisiana",
               "name": "Louisiana",
               "column": "15:Louisiana"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:16:Maine",
               "name": "Maine",
               "column": "16:Maine"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:17:Minnesota",
               "name": "Minnesota",
               "column": "17:Minnesota"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:18:Mississippi",
               "name": "Mississippi",
               "column": "18:Mississippi"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:19:Missouri",
               "name": "Missouri",
               "column": "19:Missouri"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:20:Montana",
               "name": "Montana",
               "column": "20:Montana"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:21:Nebraska",
               "name": "Nebraska",
               "column": "21:Nebraska"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:22:Nevada",
               "name": "Nevada",
               "column": "22:Nevada"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:23:NewHampshire",
               "name": "NewHampshire",
               "column": "23:NewHampshire"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:24:NewMexico",
               "name": "NewMexico",
               "column": "24:NewMexico"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:25:NorthCarolina",
               "name": "NorthCarolina",
               "column": "25:NorthCarolina"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:26:NorthDakota",
               "name": "NorthDakota",
               "column": "26:NorthDakota"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:27:Ohio",
               "name": "Ohio",
               "column": "27:Ohio"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:28:Oklahoma",
               "name": "Oklahoma",
               "column": "28:Oklahoma"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:29:Pennsylvania",
               "name": "Pennsylvania",
               "column": "29:Pennsylvania"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:30:RhodeIsland",
               "name": "RhodeIsland",
               "column": "30:RhodeIsland"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:31:SouthCarolina",
               "name": "SouthCarolina",
               "column": "31:SouthCarolina"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:32:SouthDakota",
               "name": "SouthDakota",
               "column": "32:SouthDakota"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:33:Tennessee",
               "name": "Tennessee",
               "column": "33:Tennessee"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:34:Texas",
               "name": "Texas",
               "column": "34:Texas"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:35:Utah",
               "name": "Utah",
               "column": "35:Utah"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:36:Vermont",
               "name": "Vermont",
               "column": "36:Vermont"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:37:Virginia",
               "name": "Virginia",
               "column": "37:Virginia"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:38:WestVirginia",
               "name": "WestVirginia",
               "column": "38:WestVirginia"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:39:Wisconsin",
               "name": "Wisconsin",
               "column": "39:Wisconsin"
             },
             {
-              "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+              "node": "eb462587-4fda-4a88-b607-92aebd6e437c:40:Wyoming",
               "name": "Wyoming",
               "column": "40:Wyoming"
             }
@@ -3995,241 +4001,241 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
               "column": "1:prop99",
               "name": "prop99"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
               "column": "2:California",
               "name": "California"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:3:Alabama",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:3:Alabama",
               "column": "3:Alabama",
               "name": "Alabama"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:4:Arkansas",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:4:Arkansas",
               "column": "4:Arkansas",
               "name": "Arkansas"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:5:Colorado",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:5:Colorado",
               "column": "5:Colorado",
               "name": "Colorado"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:6:Connecticut",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:6:Connecticut",
               "column": "6:Connecticut",
               "name": "Connecticut"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:7:Delaware",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:7:Delaware",
               "column": "7:Delaware",
               "name": "Delaware"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:8:Georgia",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:8:Georgia",
               "column": "8:Georgia",
               "name": "Georgia"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:9:Idaho",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:9:Idaho",
               "column": "9:Idaho",
               "name": "Idaho"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:10:Illinois",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:10:Illinois",
               "column": "10:Illinois",
               "name": "Illinois"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:11:Indiana",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:11:Indiana",
               "column": "11:Indiana",
               "name": "Indiana"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:12:Iowa",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:12:Iowa",
               "column": "12:Iowa",
               "name": "Iowa"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:13:Kansas",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:13:Kansas",
               "column": "13:Kansas",
               "name": "Kansas"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:14:Kentucky",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:14:Kentucky",
               "column": "14:Kentucky",
               "name": "Kentucky"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:15:Louisiana",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:15:Louisiana",
               "column": "15:Louisiana",
               "name": "Louisiana"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:16:Maine",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:16:Maine",
               "column": "16:Maine",
               "name": "Maine"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:17:Minnesota",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:17:Minnesota",
               "column": "17:Minnesota",
               "name": "Minnesota"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:18:Mississippi",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:18:Mississippi",
               "column": "18:Mississippi",
               "name": "Mississippi"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:19:Missouri",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:19:Missouri",
               "column": "19:Missouri",
               "name": "Missouri"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:20:Montana",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:20:Montana",
               "column": "20:Montana",
               "name": "Montana"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:21:Nebraska",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:21:Nebraska",
               "column": "21:Nebraska",
               "name": "Nebraska"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:22:Nevada",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:22:Nevada",
               "column": "22:Nevada",
               "name": "Nevada"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:23:NewHampshire",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:23:NewHampshire",
               "column": "23:NewHampshire",
               "name": "NewHampshire"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:24:NewMexico",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:24:NewMexico",
               "column": "24:NewMexico",
               "name": "NewMexico"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:25:NorthCarolina",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:25:NorthCarolina",
               "column": "25:NorthCarolina",
               "name": "NorthCarolina"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:26:NorthDakota",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:26:NorthDakota",
               "column": "26:NorthDakota",
               "name": "NorthDakota"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:27:Ohio",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:27:Ohio",
               "column": "27:Ohio",
               "name": "Ohio"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:28:Oklahoma",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:28:Oklahoma",
               "column": "28:Oklahoma",
               "name": "Oklahoma"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:29:Pennsylvania",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:29:Pennsylvania",
               "column": "29:Pennsylvania",
               "name": "Pennsylvania"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:30:RhodeIsland",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:30:RhodeIsland",
               "column": "30:RhodeIsland",
               "name": "RhodeIsland"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:31:SouthCarolina",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:31:SouthCarolina",
               "column": "31:SouthCarolina",
               "name": "SouthCarolina"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:32:SouthDakota",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:32:SouthDakota",
               "column": "32:SouthDakota",
               "name": "SouthDakota"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:33:Tennessee",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:33:Tennessee",
               "column": "33:Tennessee",
               "name": "Tennessee"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:34:Texas",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:34:Texas",
               "column": "34:Texas",
               "name": "Texas"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:35:Utah",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:35:Utah",
               "column": "35:Utah",
               "name": "Utah"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:36:Vermont",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:36:Vermont",
               "column": "36:Vermont",
               "name": "Vermont"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:37:Virginia",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:37:Virginia",
               "column": "37:Virginia",
               "name": "Virginia"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:38:WestVirginia",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:38:WestVirginia",
               "column": "38:WestVirginia",
               "name": "WestVirginia"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:39:Wisconsin",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:39:Wisconsin",
               "column": "39:Wisconsin",
               "name": "Wisconsin"
             },
             {
               "kind": "observed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:40:Wyoming",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:40:Wyoming",
               "column": "40:Wyoming",
               "name": "Wyoming"
             }
@@ -4237,9 +4243,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99->6b9d0506-28b1-4385-8ea0-027791ac2879:2:California@t",
-              "cause": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
-              "effect": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+              "id": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99->eb462587-4fda-4a88-b607-92aebd6e437c:2:California@t",
+              "cause": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
+              "effect": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -4256,9 +4262,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "e6c4bb1e-dbce-44de-861a-8746d351b10b",
-        "study": "f72da682-4fe2-4852-b48c-70e74f59b39d",
-        "createdAt": "2026-09-04T15:02:48.861Z",
+        "id": "30b56068-3a38-4f93-91ea-8faa87c62503",
+        "study": "94c84149-8b0a-4b1d-bf64-b76a70f5c901",
+        "createdAt": "2026-09-09T12:35:27.826Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -4275,6 +4281,9 @@
             "truncated": false
           },
           "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "instruments": {
             "kind": "notIdentified"
           },
           "graphicalIdentification": {
@@ -4311,6 +4320,9 @@
             ]
           },
           "mediators": [],
+          "instruments": {
+            "kind": "not-identified"
+          },
           "basis": [
             {
               "kind": "design-record",
@@ -4320,7 +4332,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “Proposition 99 and cigarette sales” (revision 88b67676) states the causes of prop99 and California; a missing arrow claims there is no direct cause."
+              "statement": "The graph “Proposition 99 and cigarette sales” (revision 12b627c6) states the causes of prop99 and California; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -4350,11 +4362,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "d00eae5f-6171-491c-9266-e4d2dfee8039",
-        "study": "f72da682-4fe2-4852-b48c-70e74f59b39d",
-        "identification": "e6c4bb1e-dbce-44de-861a-8746d351b10b",
-        "preparedDataset": "6b9d0506-28b1-4385-8ea0-027791ac2879",
-        "createdAt": "2026-09-04T15:02:49.447Z",
+        "id": "33517bcb-a558-4280-8be0-f8fb340cdfac",
+        "study": "94c84149-8b0a-4b1d-bf64-b76a70f5c901",
+        "identification": "30b56068-3a38-4f93-91ea-8faa87c62503",
+        "preparedDataset": "eb462587-4fda-4a88-b607-92aebd6e437c",
+        "createdAt": "2026-09-09T12:35:28.863Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -5361,202 +5373,202 @@
         "method": "synthetic-control",
         "columns": [
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:1:prop99",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:1:prop99",
             "column": "1:prop99",
             "name": "prop99"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "2:California",
             "name": "California"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "3:Alabama",
             "name": "Alabama"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "4:Arkansas",
             "name": "Arkansas"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "5:Colorado",
             "name": "Colorado"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "6:Connecticut",
             "name": "Connecticut"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "7:Delaware",
             "name": "Delaware"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "8:Georgia",
             "name": "Georgia"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "9:Idaho",
             "name": "Idaho"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "10:Illinois",
             "name": "Illinois"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "11:Indiana",
             "name": "Indiana"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "12:Iowa",
             "name": "Iowa"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "13:Kansas",
             "name": "Kansas"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "14:Kentucky",
             "name": "Kentucky"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "15:Louisiana",
             "name": "Louisiana"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "16:Maine",
             "name": "Maine"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "17:Minnesota",
             "name": "Minnesota"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "18:Mississippi",
             "name": "Mississippi"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "19:Missouri",
             "name": "Missouri"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "20:Montana",
             "name": "Montana"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "21:Nebraska",
             "name": "Nebraska"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "22:Nevada",
             "name": "Nevada"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "23:NewHampshire",
             "name": "NewHampshire"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "24:NewMexico",
             "name": "NewMexico"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "25:NorthCarolina",
             "name": "NorthCarolina"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "26:NorthDakota",
             "name": "NorthDakota"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "27:Ohio",
             "name": "Ohio"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "28:Oklahoma",
             "name": "Oklahoma"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "29:Pennsylvania",
             "name": "Pennsylvania"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "30:RhodeIsland",
             "name": "RhodeIsland"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "31:SouthCarolina",
             "name": "SouthCarolina"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "32:SouthDakota",
             "name": "SouthDakota"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "33:Tennessee",
             "name": "Tennessee"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "34:Texas",
             "name": "Texas"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "35:Utah",
             "name": "Utah"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "36:Vermont",
             "name": "Vermont"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "37:Virginia",
             "name": "Virginia"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "38:WestVirginia",
             "name": "WestVirginia"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "39:Wisconsin",
             "name": "Wisconsin"
           },
           {
-            "node": "6b9d0506-28b1-4385-8ea0-027791ac2879:2:California",
+            "node": "eb462587-4fda-4a88-b607-92aebd6e437c:2:California",
             "column": "40:Wyoming",
             "name": "Wyoming"
           }
@@ -5689,7 +5701,8 @@
       }
     ],
     "sensitivityRuns": [],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

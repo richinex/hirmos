@@ -778,12 +778,19 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const chartTheme = useChartTheme()
   const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
   const [adjustmentDraft, setAdjustmentDraft] = useState<ExplicitAdjustmentMemberDraft>(CLOSED_ADJUSTMENT_DRAFT)
-  const [state, dispatch] = useReducer(step, null, (): State => ({
-    ...estimationSelection(identified.at(-1) ?? null, studies, prepared),
-    job: { kind: 'idle' },
-    panelPreflight: { kind: 'not-required' },
-    studyDataPreflight: { kind: 'not-required' },
-  }))
+  const [state, dispatch] = useReducer(step, null, (): State => {
+    // The controls open as the latest recorded run set them, so a reopened project shows the analysis it holds.
+    const latest = runs.at(-1) ?? null
+    const recorded = latest === null ? null : identified.find((candidate) => candidate.id === latest.identification) ?? null
+    const selection = estimationSelection(recorded ?? identified.at(-1) ?? null, studies, prepared)
+    return {
+      ...selection,
+      ...(latest !== null && recorded !== null ? { estimator: latest.configuration.kind, configurations: { ...selection.configurations, [latest.configuration.kind]: latest.configuration } } : {}),
+      job: { kind: 'idle' },
+      panelPreflight: { kind: 'not-required' },
+      studyDataPreflight: { kind: 'not-required' },
+    }
+  })
   const [visibleEstimatorGroup, setVisibleEstimatorGroup] = useState<EstimatorGroupId>(() => estimatorGroupFor(state.estimator).id)
   useEffect(() => setVisibleEstimatorGroup(estimatorGroupFor(state.estimator).id), [state.estimator])
   const visibleGroup = ESTIMATOR_GROUPS.find((group) => group.id === visibleEstimatorGroup) ?? ESTIMATOR_GROUPS[0]

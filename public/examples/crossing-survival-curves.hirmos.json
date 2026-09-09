@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-09T06:33:35.964Z",
+  "exportedAt": "2026-09-09T12:45:46.634Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-09T06:33:35.959Z",
+    "savedAt": "2026-09-09T12:45:46.629Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "e2c7a5f1-9d38-4b6e-b7a4-1f6e8c3d5a92",
       "name": "Crossing survival curves",
-      "createdAt": "2026-09-09T06:33:32.145Z"
+      "createdAt": "2026-09-09T12:45:42.963Z"
     },
     "source": {
       "name": "comparison-surv-crossdata.csv",
@@ -237,8 +237,8 @@
       ]
     },
     "prepared": {
-      "id": "4d7ec8eb-a51b-4607-a73b-f81d8644738a",
-      "recipe": "f3190de0-fdac-4cce-a0ba-3458f47cdf59",
+      "id": "200577e5-0a43-47a7-96ef-566ac72e13da",
+      "recipe": "45697bf7-0647-4e27-acfb-263cb2682aab",
       "sourceProfile": "duckdb-wasm:1.30.0:91423c8a594247008853e7173e8cef91ca71de8a06126a464e40708d3751035c",
       "observations": 200,
       "columns": [
@@ -293,9 +293,9 @@
     "survivalRuns": [
       {
         "kind": "two-group-survival-run",
-        "id": "fa19b7d7-8396-4574-9bbf-c0b90ea7c050",
-        "preparedDataset": "4d7ec8eb-a51b-4607-a73b-f81d8644738a",
-        "createdAt": "2026-09-09T06:33:35.367Z",
+        "id": "3f5fb70d-d176-43cf-89bb-eda24db1975a",
+        "preparedDataset": "200577e5-0a43-47a7-96ef-566ac72e13da",
+        "createdAt": "2026-09-09T12:45:46.088Z",
         "columns": [
           {
             "id": "0:time",

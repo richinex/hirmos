@@ -339,13 +339,43 @@ const upgradeIdentificationRecord = (value: Record<string, unknown>): Record<str
 
 /** Preserve early survival runs while recording that their chart diagnostics were not stored. */
 const upgradeSurvivalRunRecord = (value: Record<string, unknown>): Record<string, unknown> => {
-  if (Reflect.get(value, 'kind') !== 'two-group-survival-run') return value
-  const evidence = Reflect.get(value, 'evidence')
-  if (typeof evidence !== 'object' || evidence === null || Reflect.get(evidence, 'diagnostics') !== undefined) return value
-  return {
-    ...value,
-    evidence: { ...(evidence as Record<string, unknown>), diagnostics: { kind: 'notRecorded' } },
+  const kind = Reflect.get(value, 'kind')
+  if (kind === 'two-group-survival-run') {
+    const evidence = Reflect.get(value, 'evidence')
+    if (typeof evidence !== 'object' || evidence === null) return value
+    const additions = {
+      ...(Reflect.get(evidence, 'diagnostics') === undefined ? { diagnostics: { kind: 'notRecorded' } } : {}),
+      ...(Reflect.get(evidence, 'observedConversion') === undefined ? { observedConversion: { kind: 'notRecorded' } } : {}),
+      ...(Reflect.get(evidence, 'fixedTimeConversion') === undefined ? { fixedTimeConversion: { kind: 'notRecorded' } } : {}),
+      ...(Reflect.get(evidence, 'petoPeto') === undefined ? { petoPeto: { kind: 'notRecorded' } } : {}),
+    }
+    if (Object.keys(additions).length === 0) return value
+    return {
+      ...value,
+      evidence: { ...(evidence as Record<string, unknown>), ...additions },
+    }
   }
+  if (kind !== 'multi-state-survival-run') return value
+  const configuration = Reflect.get(value, 'configuration')
+  const evidence = Reflect.get(value, 'evidence')
+  if (typeof configuration !== 'object' || configuration === null || typeof evidence !== 'object' || evidence === null) return value
+  const preparedConfiguration = Reflect.get(configuration, 'input') === undefined
+    ? {
+        ...(configuration as Record<string, unknown>),
+        input: {
+          kind: 'prepared-transition-rows',
+          start: Reflect.get(configuration, 'start'),
+          stop: Reflect.get(configuration, 'stop'),
+          event: Reflect.get(configuration, 'event'),
+          from: Reflect.get(configuration, 'from'),
+          to: Reflect.get(configuration, 'to'),
+        },
+      }
+    : configuration
+  const preparedEvidence = Reflect.get(evidence, 'preparation') === undefined
+    ? { ...(evidence as Record<string, unknown>), preparation: { kind: 'preparedRows' } }
+    : evidence
+  return { ...value, configuration: preparedConfiguration, evidence: preparedEvidence }
 }
 
 export function parseSnapshotValue(value: unknown): Result<PersistedProject, SnapshotProblem> {

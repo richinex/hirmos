@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T14:50:38.174Z",
+  "exportedAt": "2026-09-09T13:27:02.064Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T14:50:38.168Z",
+    "savedAt": "2026-09-09T13:27:02.058Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "a9e4c2d7-8b31-4f5e-b6c0-3d7a9e2f5b82",
       "name": "AI adoption, March cohort",
-      "createdAt": "2026-09-04T14:50:32.445Z"
+      "createdAt": "2026-09-09T13:26:56.124Z"
     },
     "source": {
       "name": "cohort-march.csv",
@@ -292,8 +292,8 @@
       ]
     },
     "prepared": {
-      "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a",
-      "recipe": "72e22673-282f-4fd1-8ad6-00ae81986ffa",
+      "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a",
+      "recipe": "abe2984c-557a-4ce4-a345-7ad6851b8b33",
       "sourceProfile": "duckdb-wasm:1.30.0:865d481b5697d4fed5b5a279db606668d7460bf174430c785e5b0506301d3cf6",
       "observations": 144,
       "columns": [
@@ -337,9 +337,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "4b5ad2eb-db12-4e26-a436-df32e4ca677e",
+        "id": "1ccb4e1b-0638-4193-97dd-f12ee0865a46",
         "name": "March cohort adoption",
-        "preparedDataset": "1f768d83-c160-4ec9-aa21-93cf635ab92a",
+        "preparedDataset": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a",
         "dataset": {
           "kind": "panel",
           "observations": 144
@@ -351,21 +351,21 @@
         "history": [
           {
             "kind": "draft",
-            "id": "4c7377f0-bc9a-440b-9de8-47076f5165ad",
+            "id": "8ae8c4f7-59d2-47d9-8694-9590246ebc1d",
             "parent": null,
-            "createdAt": "2026-09-04T14:50:35.218Z",
+            "createdAt": "2026-09-09T13:26:58.987Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
                   "column": "2:adopted",
                   "name": "adopted"
                 },
                 {
                   "kind": "observed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -386,21 +386,21 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "4c7377f0-bc9a-440b-9de8-47076f5165ad",
+            "id": "8ae8c4f7-59d2-47d9-8694-9590246ebc1d",
             "parent": null,
-            "createdAt": "2026-09-04T14:50:35.218Z",
+            "createdAt": "2026-09-09T13:26:58.987Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
                   "column": "2:adopted",
                   "name": "adopted"
                 },
                 {
                   "kind": "observed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -418,21 +418,21 @@
           },
           {
             "kind": "draft",
-            "id": "76e82b87-d0c7-461d-8bba-00f05ba3d742",
-            "parent": "4c7377f0-bc9a-440b-9de8-47076f5165ad",
-            "createdAt": "2026-09-04T14:50:35.468Z",
+            "id": "cdae657e-3638-435d-8112-aa30a5bffb03",
+            "parent": "8ae8c4f7-59d2-47d9-8694-9590246ebc1d",
+            "createdAt": "2026-09-09T13:26:59.262Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
                   "column": "2:adopted",
                   "name": "adopted"
                 },
                 {
                   "kind": "observed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -440,9 +440,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted->1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc@t",
-                  "cause": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
-                  "effect": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+                  "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted->bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc@t",
+                  "cause": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
+                  "effect": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -461,21 +461,21 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "76e82b87-d0c7-461d-8bba-00f05ba3d742",
-          "parent": "4c7377f0-bc9a-440b-9de8-47076f5165ad",
-          "createdAt": "2026-09-04T14:50:35.468Z",
+          "id": "cdae657e-3638-435d-8112-aa30a5bffb03",
+          "parent": "8ae8c4f7-59d2-47d9-8694-9590246ebc1d",
+          "createdAt": "2026-09-09T13:26:59.262Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+                "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
                 "column": "2:adopted",
                 "name": "adopted"
               },
               {
                 "kind": "observed",
-                "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+                "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
                 "column": "3:bugs_per_kloc",
                 "name": "bugs_per_kloc"
               }
@@ -483,9 +483,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted->1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc@t",
-                "cause": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
-                "effect": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+                "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted->bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc@t",
+                "cause": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
+                "effect": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -506,10 +506,16 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "4b5ad2eb-db12-4e26-a436-df32e4ca677e",
-      "treatment": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
-      "outcome": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+      "dagDocument": "1ccb4e1b-0638-4193-97dd-f12ee0865a46",
+      "treatment": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
+      "outcome": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": "policy-change",
         "description": "Teams A, B and C switched the AI assistant on in month 13; teams F, G and H never did."
@@ -520,23 +526,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "e9bebd0f-1d4e-4bfe-bbbc-2eb1b87aa2f5",
-        "createdAt": "2026-09-04T14:50:36.609Z",
-        "preparedDataset": "1f768d83-c160-4ec9-aa21-93cf635ab92a",
+        "id": "c682809f-36ea-4c01-b286-4c3687286b82",
+        "createdAt": "2026-09-09T13:27:00.428Z",
+        "preparedDataset": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a",
         "dataset": {
           "kind": "panel",
           "observations": 144
         },
-        "dagDocument": "4b5ad2eb-db12-4e26-a436-df32e4ca677e",
-        "dagRevision": "76e82b87-d0c7-461d-8bba-00f05ba3d742",
+        "dagDocument": "1ccb4e1b-0638-4193-97dd-f12ee0865a46",
+        "dagRevision": "cdae657e-3638-435d-8112-aa30a5bffb03",
         "dagName": "March cohort adoption",
         "treatment": {
-          "node": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+          "node": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
           "column": "2:adopted",
           "name": "adopted"
         },
         "outcome": {
-          "node": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+          "node": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
           "column": "3:bugs_per_kloc",
           "name": "bugs_per_kloc"
         },
@@ -566,12 +572,12 @@
         "graph": {
           "nodes": [
             {
-              "node": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+              "node": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
               "name": "adopted",
               "column": "2:adopted"
             },
             {
-              "node": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+              "node": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
               "name": "bugs_per_kloc",
               "column": "3:bugs_per_kloc"
             }
@@ -589,13 +595,13 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+              "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
               "column": "2:adopted",
               "name": "adopted"
             },
             {
               "kind": "observed",
-              "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+              "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
               "column": "3:bugs_per_kloc",
               "name": "bugs_per_kloc"
             }
@@ -603,9 +609,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted->1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc@t",
-              "cause": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
-              "effect": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+              "id": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted->bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc@t",
+              "cause": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
+              "effect": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -622,9 +628,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "21e35c71-5b46-4f82-a762-3d5780ab4c58",
-        "study": "e9bebd0f-1d4e-4bfe-bbbc-2eb1b87aa2f5",
-        "createdAt": "2026-09-04T14:50:36.729Z",
+        "id": "29c60fe1-484d-4075-be05-ae8a76ce7f4c",
+        "study": "c682809f-36ea-4c01-b286-4c3687286b82",
+        "createdAt": "2026-09-09T13:27:00.551Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -641,6 +647,9 @@
             "truncated": false
           },
           "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "instruments": {
             "kind": "notIdentified"
           },
           "graphicalIdentification": {
@@ -677,6 +686,9 @@
             ]
           },
           "mediators": [],
+          "instruments": {
+            "kind": "not-identified"
+          },
           "basis": [
             {
               "kind": "design-record",
@@ -686,7 +698,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “March cohort adoption” (revision 76e82b87) states the causes of adopted and bugs_per_kloc; a missing arrow claims there is no direct cause."
+              "statement": "The graph “March cohort adoption” (revision cdae657e) states the causes of adopted and bugs_per_kloc; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -716,11 +728,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "62b8f235-f766-4e4b-9cca-793c934ce567",
-        "study": "e9bebd0f-1d4e-4bfe-bbbc-2eb1b87aa2f5",
-        "identification": "21e35c71-5b46-4f82-a762-3d5780ab4c58",
-        "preparedDataset": "1f768d83-c160-4ec9-aa21-93cf635ab92a",
-        "createdAt": "2026-09-04T14:50:37.737Z",
+        "id": "6c40630a-8f58-401e-908d-4e6d9c91bcde",
+        "study": "c682809f-36ea-4c01-b286-4c3687286b82",
+        "identification": "29c60fe1-484d-4075-be05-ae8a76ce7f4c",
+        "preparedDataset": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a",
+        "createdAt": "2026-09-09T13:27:01.520Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -860,8 +872,8 @@
               "caveat": {
                 "id": "panel-no-interval",
                 "category": "finite-sample",
-                "requirement": "Placebo standard errors require more control units than treated units and a pre-treatment period long enough for the fitted weighting problem.",
-                "consequenceIfUnmet": "The point estimate has no placebo measure of sampling variability.",
+                "requirement": "The placebo standard-error calculation needs more comparison units than treated units and enough pre-treatment periods to fit the weights.",
+                "consequenceIfUnmet": "The point estimate remains available, but this uncertainty calculation is not.",
                 "sources": [
                   {
                     "kind": "paper",
@@ -1127,12 +1139,12 @@
         "method": "panel-intervention",
         "columns": [
           {
-            "node": "1f768d83-c160-4ec9-aa21-93cf635ab92a:3:bugs_per_kloc",
+            "node": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:3:bugs_per_kloc",
             "column": "3:bugs_per_kloc",
             "name": "bugs_per_kloc"
           },
           {
-            "node": "1f768d83-c160-4ec9-aa21-93cf635ab92a:2:adopted",
+            "node": "bf7aa4e6-c77a-4650-84c3-eddbc386bf2a:2:adopted",
             "column": "2:adopted",
             "name": "adopted"
           }
@@ -1150,7 +1162,7 @@
           },
           "interval": {
             "kind": "none",
-            "reason": "The panel result has no sampling interval; the requirements panel records why placebo variance was unavailable."
+            "reason": "No confidence interval is shown for this result."
           },
           "standardError": null,
           "adjustment": {
@@ -1165,7 +1177,8 @@
       }
     ],
     "sensitivityRuns": [],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

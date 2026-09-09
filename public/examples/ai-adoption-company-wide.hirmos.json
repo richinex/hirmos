@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-06T17:34:22.401Z",
+  "exportedAt": "2026-09-09T12:33:51.586Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-06T17:34:22.397Z",
+    "savedAt": "2026-09-09T12:33:51.581Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "7c2f1b3e-5a64-4d1e-9b0a-2e6f8c1d4a71",
       "name": "AI adoption, company-wide",
-      "createdAt": "2026-09-06T17:34:16.171Z"
+      "createdAt": "2026-09-09T12:33:45.431Z"
     },
     "source": {
       "name": "company-wide-adoption.csv",
@@ -292,8 +292,8 @@
       ]
     },
     "prepared": {
-      "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
-      "recipe": "5926f85f-d3dc-43d2-86a4-6e3754adcf33",
+      "id": "5852daa1-8699-4363-a29e-9aac1de3825a",
+      "recipe": "1a6ab6de-7a81-4e93-b97d-68beedd2206d",
       "sourceProfile": "duckdb-wasm:1.30.0:e2f9e823fbdcba9c4c82f66211e489324507ea6e879d5e52f6fe0dfc1f7864ae",
       "observations": 72,
       "columns": [
@@ -347,9 +347,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "40acaaa6-b78b-4646-b2c1-996132446276",
+        "id": "5c3d875b-336d-4f2b-a998-e07f2bfc5543",
         "name": "AI rollout and code quality",
-        "preparedDataset": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
+        "preparedDataset": "5852daa1-8699-4363-a29e-9aac1de3825a",
         "dataset": {
           "kind": "time-series",
           "observations": 72
@@ -361,27 +361,27 @@
         "history": [
           {
             "kind": "draft",
-            "id": "34d49102-e01c-4225-9285-2834c76e95b9",
+            "id": "f7891b6d-2e3e-44b2-bdd7-a1a08f652b55",
             "parent": null,
-            "createdAt": "2026-09-06T17:34:19.021Z",
+            "createdAt": "2026-09-09T12:33:48.246Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -399,27 +399,27 @@
           },
           {
             "kind": "draft",
-            "id": "c111550f-3850-4258-b00f-a35b5066dbea",
-            "parent": "34d49102-e01c-4225-9285-2834c76e95b9",
-            "createdAt": "2026-09-06T17:34:19.303Z",
+            "id": "79e67fa6-7c05-49e1-aa8e-bb88d438c49b",
+            "parent": "f7891b6d-2e3e-44b2-bdd7-a1a08f652b55",
+            "createdAt": "2026-09-09T12:33:48.503Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -427,9 +427,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
-                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+                  "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
+                  "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -450,27 +450,27 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "34d49102-e01c-4225-9285-2834c76e95b9",
+            "id": "f7891b6d-2e3e-44b2-bdd7-a1a08f652b55",
             "parent": null,
-            "createdAt": "2026-09-06T17:34:19.021Z",
+            "createdAt": "2026-09-09T12:33:48.246Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -488,27 +488,27 @@
           },
           {
             "kind": "draft",
-            "id": "c111550f-3850-4258-b00f-a35b5066dbea",
-            "parent": "34d49102-e01c-4225-9285-2834c76e95b9",
-            "createdAt": "2026-09-06T17:34:19.303Z",
+            "id": "79e67fa6-7c05-49e1-aa8e-bb88d438c49b",
+            "parent": "f7891b6d-2e3e-44b2-bdd7-a1a08f652b55",
+            "createdAt": "2026-09-09T12:33:48.503Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -516,9 +516,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
-                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+                  "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
+                  "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -536,27 +536,27 @@
           },
           {
             "kind": "draft",
-            "id": "7340e521-ef97-456f-a1a7-0d06b8bdc00d",
-            "parent": "c111550f-3850-4258-b00f-a35b5066dbea",
-            "createdAt": "2026-09-06T17:34:19.511Z",
+            "id": "e66491ca-0fed-417f-a9aa-060f0fe5e7f4",
+            "parent": "79e67fa6-7c05-49e1-aa8e-bb88d438c49b",
+            "createdAt": "2026-09-09T12:33:48.679Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
                   "column": "1:ai_active",
                   "name": "ai_active"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
                   "column": "2:legacy_bugs_per_kloc",
                   "name": "legacy_bugs_per_kloc"
                 },
                 {
                   "kind": "observed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "column": "3:bugs_per_kloc",
                   "name": "bugs_per_kloc"
                 }
@@ -564,9 +564,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
-                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+                  "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
+                  "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -578,9 +578,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-                  "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
-                  "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                  "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+                  "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
+                  "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -599,27 +599,27 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "7340e521-ef97-456f-a1a7-0d06b8bdc00d",
-          "parent": "c111550f-3850-4258-b00f-a35b5066dbea",
-          "createdAt": "2026-09-06T17:34:19.511Z",
+          "id": "e66491ca-0fed-417f-a9aa-060f0fe5e7f4",
+          "parent": "79e67fa6-7c05-49e1-aa8e-bb88d438c49b",
+          "createdAt": "2026-09-09T12:33:48.679Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+                "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
                 "column": "1:ai_active",
                 "name": "ai_active"
               },
               {
                 "kind": "observed",
-                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+                "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
                 "column": "2:legacy_bugs_per_kloc",
                 "name": "legacy_bugs_per_kloc"
               },
               {
                 "kind": "observed",
-                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                 "column": "3:bugs_per_kloc",
                 "name": "bugs_per_kloc"
               }
@@ -627,9 +627,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-                "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
-                "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+                "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
+                "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -641,9 +641,9 @@
               },
               {
                 "kind": "directed",
-                "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-                "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
-                "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+                "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+                "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
+                "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -664,9 +664,9 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "40acaaa6-b78b-4646-b2c1-996132446276",
-      "treatment": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
-      "outcome": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+      "dagDocument": "5c3d875b-336d-4f2b-a998-e07f2bfc5543",
+      "treatment": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
+      "outcome": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
       "estimand": "average-treatment-effect",
       "modifier": null,
       "grouping": {
@@ -684,23 +684,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "a78fdf8f-74f9-43e4-9d27-1da8f2510c4a",
-        "createdAt": "2026-09-06T17:34:20.645Z",
-        "preparedDataset": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
+        "id": "1a709775-270f-4d7a-bfec-7d1cefce6b37",
+        "createdAt": "2026-09-09T12:33:49.828Z",
+        "preparedDataset": "5852daa1-8699-4363-a29e-9aac1de3825a",
         "dataset": {
           "kind": "time-series",
           "observations": 72
         },
-        "dagDocument": "40acaaa6-b78b-4646-b2c1-996132446276",
-        "dagRevision": "7340e521-ef97-456f-a1a7-0d06b8bdc00d",
+        "dagDocument": "5c3d875b-336d-4f2b-a998-e07f2bfc5543",
+        "dagRevision": "e66491ca-0fed-417f-a9aa-060f0fe5e7f4",
         "dagName": "AI rollout and code quality",
         "treatment": {
-          "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+          "node": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
           "column": "1:ai_active",
           "name": "ai_active"
         },
         "outcome": {
-          "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+          "node": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
           "column": "3:bugs_per_kloc",
           "name": "bugs_per_kloc"
         },
@@ -730,17 +730,17 @@
         "graph": {
           "nodes": [
             {
-              "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+              "node": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
               "name": "ai_active",
               "column": "1:ai_active"
             },
             {
-              "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+              "node": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
               "name": "legacy_bugs_per_kloc",
               "column": "2:legacy_bugs_per_kloc"
             },
             {
-              "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+              "node": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
               "name": "bugs_per_kloc",
               "column": "3:bugs_per_kloc"
             }
@@ -762,19 +762,19 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+              "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
               "column": "1:ai_active",
               "name": "ai_active"
             },
             {
               "kind": "observed",
-              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
+              "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
               "column": "2:legacy_bugs_per_kloc",
               "name": "legacy_bugs_per_kloc"
             },
             {
               "kind": "observed",
-              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+              "id": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
               "column": "3:bugs_per_kloc",
               "name": "bugs_per_kloc"
             }
@@ -782,9 +782,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-              "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
-              "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+              "id": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+              "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
+              "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -796,9 +796,9 @@
             },
             {
               "kind": "directed",
-              "id": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc->42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc@t",
-              "cause": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:2:legacy_bugs_per_kloc",
-              "effect": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+              "id": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc->5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc@t",
+              "cause": "5852daa1-8699-4363-a29e-9aac1de3825a:2:legacy_bugs_per_kloc",
+              "effect": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -815,9 +815,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "efd63a5b-1566-4f31-8786-eb5186983740",
-        "study": "a78fdf8f-74f9-43e4-9d27-1da8f2510c4a",
-        "createdAt": "2026-09-06T17:34:20.763Z",
+        "id": "b9c34340-341b-48aa-9be4-1992d82f9464",
+        "study": "1a709775-270f-4d7a-bfec-7d1cefce6b37",
+        "createdAt": "2026-09-09T12:33:49.951Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -889,7 +889,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “AI rollout and code quality” (revision 7340e521) states the causes of ai_active and bugs_per_kloc; a missing arrow claims there is no direct cause."
+              "statement": "The graph “AI rollout and code quality” (revision e66491ca) states the causes of ai_active and bugs_per_kloc; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -919,11 +919,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "b0f71460-1d81-4a08-a77d-981af73714e6",
-        "study": "a78fdf8f-74f9-43e4-9d27-1da8f2510c4a",
-        "identification": "efd63a5b-1566-4f31-8786-eb5186983740",
-        "preparedDataset": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f",
-        "createdAt": "2026-09-06T17:34:21.798Z",
+        "id": "b5e737be-8160-460f-b1f7-8c9106689dbd",
+        "study": "1a709775-270f-4d7a-bfec-7d1cefce6b37",
+        "identification": "b9c34340-341b-48aa-9be4-1992d82f9464",
+        "preparedDataset": "5852daa1-8699-4363-a29e-9aac1de3825a",
+        "createdAt": "2026-09-09T12:33:50.967Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -1059,106 +1059,106 @@
             2
           ],
           "counterfactual": [
-            1.8798822826323829,
-            1.8582222066803036,
-            1.809002108714571,
-            1.8753562966125452,
-            1.9441351198782901,
-            1.855635928954682,
-            1.9696746124188016,
-            1.9880210200349284,
-            1.966684228798552,
-            2.064477855298612,
-            2.046131447682485,
-            2.005963321756427,
-            1.9584404685481336,
-            2.069892874286632,
-            1.9318503006815884,
-            2.005235931146096,
-            1.9637746663572277,
-            1.951489847160526,
-            2.0159851479432103,
-            1.8085980028199427,
-            1.8671933575410526,
-            1.8829534874315583,
-            1.9510857412658977,
-            1.9670075135142546
+            1.879882282640116,
+            1.8582222066992893,
+            1.8090021087591266,
+            1.87535629662263,
+            1.944135119852644,
+            1.855635928975011,
+            1.9696746123798876,
+            1.9880210199864834,
+            1.9666842287611912,
+            2.0644778552104475,
+            2.0461314476038512,
+            2.005963321698661,
+            1.9584404685150556,
+            2.069892874195654,
+            1.9318503006623242,
+            2.005235931088708,
+            1.9637746663213789,
+            1.951489847131059,
+            2.0159851478802375,
+            1.808598002864708,
+            1.867193357555378,
+            1.882953487437696,
+            1.9510857412366405,
+            1.9670075134767262
           ],
           "counterfactualSe": [
-            0.0628822631107421,
-            0.06288226331401416,
-            0.0628822635172862,
-            0.06288226372055825,
-            0.06288226392383028,
-            0.06288226412710234,
-            0.06288226433037437,
-            0.06288226453364641,
-            0.06288226473691846,
-            0.0628822649401905,
-            0.06288226514346254,
-            0.06288226534673459,
-            0.06288226555000663,
-            0.06288226575327867,
-            0.0628822659565507,
-            0.06288226615982274,
-            0.06288226636309478,
-            0.06288226656636682,
-            0.06288226676963886,
-            0.0628822669729109,
-            0.06288226717618293,
-            0.06288226737945496,
-            0.062882267582727,
-            0.06288226778599904
+            0.06288226266572619,
+            0.06288226286899685,
+            0.06288226307226752,
+            0.06288226327553818,
+            0.06288226347880885,
+            0.06288226368207951,
+            0.06288226388535018,
+            0.06288226408862085,
+            0.06288226429189152,
+            0.06288226449516218,
+            0.06288226469843285,
+            0.0628822649017035,
+            0.06288226510497416,
+            0.06288226530824483,
+            0.06288226551151548,
+            0.06288226571478614,
+            0.0628822659180568,
+            0.06288226612132745,
+            0.06288226632459812,
+            0.06288226652786877,
+            0.06288226673113943,
+            0.06288226693441008,
+            0.06288226713768073,
+            0.0628822673409514
           ],
           "pointwise": [
-            -0.336582282632383,
-            -0.4478222066803035,
-            -0.3432021087145709,
-            -0.2826562966125452,
-            -0.4324351198782901,
-            -0.415835928954682,
-            -0.3910746124188016,
-            -0.3584210200349285,
-            -0.44998422879855204,
-            -0.32247785529861206,
-            -0.34993144768248485,
-            -0.4757633217564272,
-            -0.3729404685481337,
-            -0.34679287428663175,
-            -0.3466503006815884,
-            -0.2927359311460962,
-            -0.3361746663572278,
-            -0.45598984716052593,
-            -0.41318514794321026,
-            -0.4503980028199426,
-            -0.42759335754105265,
-            -0.25855348743155826,
-            -0.35598574126589777,
-            -0.3524075135142546
+            -0.33658228264011614,
+            -0.4478222066992892,
+            -0.3432021087591266,
+            -0.28265629662263003,
+            -0.43243511985264393,
+            -0.4158359289750111,
+            -0.3910746123798876,
+            -0.35842101998648346,
+            -0.44998422876119126,
+            -0.3224778552104475,
+            -0.3499314476038513,
+            -0.475763321698661,
+            -0.3729404685150557,
+            -0.34679287419565386,
+            -0.3466503006623243,
+            -0.2927359310887079,
+            -0.33617466632137893,
+            -0.45598984713105906,
+            -0.4131851478802375,
+            -0.4503980028647079,
+            -0.4275933575553781,
+            -0.258553487437696,
+            -0.3559857412366405,
+            -0.35240751347672616
           ],
-          "cumulative": -9.015593768158702,
-          "average": -0.3756497403399459,
+          "cumulative": -9.015593767554904,
+          "average": -0.37564974031478765,
           "params": [
-            0.003873481069742766,
-            2.5564412807874447e-11,
-            0.8082117892566943
+            0.0038734810148972273,
+            2.5564239161033216e-11,
+            0.8082117888368263
           ],
-          "logLikelihood": 61.880662285158195
+          "logLikelihood": 61.88066228506317
         },
         "method": "causal-impact",
         "columns": [
           {
-            "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:1:ai_active",
+            "node": "5852daa1-8699-4363-a29e-9aac1de3825a:1:ai_active",
             "column": "1:ai_active",
             "name": "ai_active"
           },
           {
-            "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+            "node": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
             "column": "3:bugs_per_kloc",
             "name": "bugs_per_kloc"
           },
           {
-            "node": "42bdfc7f-9f5d-4b51-8ca7-fadb3bd0428f:3:bugs_per_kloc",
+            "node": "5852daa1-8699-4363-a29e-9aac1de3825a:3:bugs_per_kloc",
             "column": "2:legacy_bugs_per_kloc",
             "name": "legacy_bugs_per_kloc"
           }
@@ -1175,204 +1175,204 @@
               {
                 "step": 49,
                 "actual": 1.5433,
-                "counterfactual": 1.8798822826323829,
-                "lower": 1.7566353116689568,
-                "upper": 2.003129253595809,
-                "effect": -0.336582282632383
+                "counterfactual": 1.879882282640116,
+                "lower": 1.7566353125489051,
+                "upper": 2.003129252731327,
+                "effect": -0.33658228264011614
               },
               {
                 "step": 50,
                 "actual": 1.4104,
-                "counterfactual": 1.8582222066803036,
-                "lower": 1.7349752353184715,
-                "upper": 1.9814691780421356,
-                "effect": -0.4478222066803035
+                "counterfactual": 1.8582222066992893,
+                "lower": 1.734975236209675,
+                "upper": 1.9814691771889035,
+                "effect": -0.4478222066992892
               },
               {
                 "step": 51,
                 "actual": 1.4658,
-                "counterfactual": 1.809002108714571,
-                "lower": 1.6857551369543329,
-                "upper": 1.932249080474809,
-                "effect": -0.3432021087145709
+                "counterfactual": 1.8090021087591266,
+                "lower": 1.6857551378711093,
+                "upper": 1.9322490796471439,
+                "effect": -0.3432021087591266
               },
               {
                 "step": 52,
                 "actual": 1.5927,
-                "counterfactual": 1.8753562966125452,
-                "lower": 1.7521093244539014,
-                "upper": 1.998603268771189,
-                "effect": -0.2826562966125452
+                "counterfactual": 1.87535629662263,
+                "lower": 1.7521093253362094,
+                "upper": 1.9986032679090506,
+                "effect": -0.28265629662263003
               },
               {
                 "step": 53,
                 "actual": 1.5117,
-                "counterfactual": 1.9441351198782901,
-                "lower": 1.8208881473212404,
-                "upper": 2.0673820924353397,
-                "effect": -0.4324351198782901
+                "counterfactual": 1.944135119852644,
+                "lower": 1.8208881481678203,
+                "upper": 2.0673820915374677,
+                "effect": -0.43243511985264393
               },
               {
                 "step": 54,
                 "actual": 1.4398,
-                "counterfactual": 1.855635928954682,
-                "lower": 1.7323889559992265,
-                "upper": 1.9788829019101375,
-                "effect": -0.415835928954682
+                "counterfactual": 1.855635928975011,
+                "lower": 1.732388956891784,
+                "upper": 1.978882901058238,
+                "effect": -0.4158359289750111
               },
               {
                 "step": 55,
                 "actual": 1.5786,
-                "counterfactual": 1.9696746124188016,
-                "lower": 1.8464276390649401,
-                "upper": 2.092921585772663,
-                "effect": -0.3910746124188016
+                "counterfactual": 1.9696746123798876,
+                "lower": 1.8464276398982575,
+                "upper": 2.0929215848615175,
+                "effect": -0.3910746123798876
               },
               {
                 "step": 56,
                 "actual": 1.6296,
-                "counterfactual": 1.9880210200349284,
-                "lower": 1.864774046282661,
-                "upper": 2.111267993787196,
-                "effect": -0.3584210200349285
+                "counterfactual": 1.9880210199864834,
+                "lower": 1.86477404710645,
+                "upper": 2.111267992866517,
+                "effect": -0.35842101998648346
               },
               {
                 "step": 57,
                 "actual": 1.5167,
-                "counterfactual": 1.966684228798552,
-                "lower": 1.8434372546478788,
-                "upper": 2.0899312029492254,
-                "effect": -0.44998422879855204
+                "counterfactual": 1.9666842287611912,
+                "lower": 1.8434372554827547,
+                "upper": 2.0899312020396277,
+                "effect": -0.44998422876119126
               },
               {
                 "step": 58,
                 "actual": 1.742,
-                "counterfactual": 2.064477855298612,
-                "lower": 1.9412308807495329,
-                "upper": 2.1877248298476912,
-                "effect": -0.32247785529861206
+                "counterfactual": 2.0644778552104475,
+                "lower": 1.941230881533608,
+                "upper": 2.187724828887287,
+                "effect": -0.3224778552104475
               },
               {
                 "step": 59,
                 "actual": 1.6962,
-                "counterfactual": 2.046131447682485,
-                "lower": 1.9228844727349999,
-                "upper": 2.1693784226299697,
-                "effect": -0.34993144768248485
+                "counterfactual": 2.0461314476038512,
+                "lower": 1.9228844735286084,
+                "upper": 2.169378421679094,
+                "effect": -0.3499314476038513
               },
               {
                 "step": 60,
                 "actual": 1.5302,
-                "counterfactual": 2.005963321756427,
-                "lower": 1.8827163464105363,
-                "upper": 2.129210297102318,
-                "effect": -0.4757633217564272
+                "counterfactual": 2.005963321698661,
+                "lower": 1.882716347225015,
+                "upper": 2.129210296172307,
+                "effect": -0.475763321698661
               },
               {
                 "step": 61,
                 "actual": 1.5855,
-                "counterfactual": 1.9584404685481336,
-                "lower": 1.8351934928038367,
-                "upper": 2.0816874442924305,
-                "effect": -0.3729404685481337
+                "counterfactual": 1.9584404685150556,
+                "lower": 1.8351934936430065,
+                "upper": 2.081687443387105,
+                "effect": -0.3729404685150557
               },
               {
                 "step": 62,
                 "actual": 1.7231,
-                "counterfactual": 2.069892874286632,
-                "lower": 1.9466458981439292,
-                "upper": 2.1931398504293345,
-                "effect": -0.34679287428663175
+                "counterfactual": 2.069892874195654,
+                "lower": 1.9466458989252016,
+                "upper": 2.1931398494661063,
+                "effect": -0.34679287419565386
               },
               {
                 "step": 63,
                 "actual": 1.5852,
-                "counterfactual": 1.9318503006815884,
-                "lower": 1.8086033241404798,
-                "upper": 2.0550972772226967,
-                "effect": -0.3466503006815884
+                "counterfactual": 1.9318503006623242,
+                "lower": 1.8086033249934688,
+                "upper": 2.0550972763311797,
+                "effect": -0.3466503006623243
               },
               {
                 "step": 64,
                 "actual": 1.7125,
-                "counterfactual": 2.005235931146096,
-                "lower": 1.8819889542065817,
-                "upper": 2.1284829080856107,
-                "effect": -0.2927359311460962
+                "counterfactual": 2.005235931088708,
+                "lower": 1.881988955021449,
+                "upper": 2.1284829071559663,
+                "effect": -0.2927359310887079
               },
               {
                 "step": 65,
                 "actual": 1.6276,
-                "counterfactual": 1.9637746663572277,
-                "lower": 1.8405276890193074,
-                "upper": 2.087021643695148,
-                "effect": -0.3361746663572278
+                "counterfactual": 1.9637746663213789,
+                "lower": 1.840527689855717,
+                "upper": 2.0870216427870405,
+                "effect": -0.33617466632137893
               },
               {
                 "step": 66,
                 "actual": 1.4955,
-                "counterfactual": 1.951489847160526,
-                "lower": 1.8282428694242,
-                "upper": 2.0747368248968523,
-                "effect": -0.45598984716052593
+                "counterfactual": 1.951489847131059,
+                "lower": 1.8282428702669942,
+                "upper": 2.0747368239951243,
+                "effect": -0.45598984713105906
               },
               {
                 "step": 67,
                 "actual": 1.6028,
-                "counterfactual": 2.0159851479432103,
-                "lower": 1.8927381698084782,
-                "upper": 2.139232126077942,
-                "effect": -0.41318514794321026
+                "counterfactual": 2.0159851478802375,
+                "lower": 1.8927381706177693,
+                "upper": 2.1392321251427058,
+                "effect": -0.4131851478802375
               },
               {
                 "step": 68,
                 "actual": 1.3582,
-                "counterfactual": 1.8085980028199427,
-                "lower": 1.6853510242868048,
-                "upper": 1.9318449813530805,
-                "effect": -0.4503980028199426
+                "counterfactual": 1.808598002864708,
+                "lower": 1.6853510252038366,
+                "upper": 1.9318449805255793,
+                "effect": -0.4503980028647079
               },
               {
                 "step": 69,
                 "actual": 1.4396,
-                "counterfactual": 1.8671933575410526,
-                "lower": 1.7439463786095089,
-                "upper": 1.9904403364725964,
-                "effect": -0.42759335754105265
+                "counterfactual": 1.867193357555378,
+                "lower": 1.7439463794961036,
+                "upper": 1.9904403356146525,
+                "effect": -0.4275933575553781
               },
               {
                 "step": 70,
                 "actual": 1.6244,
-                "counterfactual": 1.8829534874315583,
-                "lower": 1.7597065081016088,
-                "upper": 2.006200466761508,
-                "effect": -0.25855348743155826
+                "counterfactual": 1.882953487437696,
+                "lower": 1.7597065089800183,
+                "upper": 2.0062004658953736,
+                "effect": -0.258553487437696
               },
               {
                 "step": 71,
                 "actual": 1.5951,
-                "counterfactual": 1.9510857412658977,
-                "lower": 1.8278387615375422,
-                "upper": 2.0743327209942533,
-                "effect": -0.35598574126589777
+                "counterfactual": 1.9510857412366405,
+                "lower": 1.8278387623805596,
+                "upper": 2.0743327200927215,
+                "effect": -0.3559857412366405
               },
               {
                 "step": 72,
                 "actual": 1.6146,
-                "counterfactual": 1.9670075135142546,
-                "lower": 1.8437605333874933,
-                "upper": 2.090254493641016,
-                "effect": -0.3524075135142546
+                "counterfactual": 1.9670075134767262,
+                "lower": 1.8437605342222423,
+                "upper": 2.0902544927312103,
+                "effect": -0.35240751347672616
               }
             ],
             "aggregate": {
-              "cumulative": -9.015593768158702,
-              "average": -0.3756497403399459
+              "cumulative": -9.015593767554904,
+              "average": -0.37564974031478765
             }
           },
           "interval": {
             "kind": "none",
-            "reason": "The port forecasts a pointwise band from the state variance; no interval for the cumulative effect is reported."
+            "reason": "The shaded range is a pointwise forecast band for each no-intervention period. It is not a confidence interval for the average or cumulative difference."
           },
           "standardError": null,
           "adjustment": {
@@ -1387,7 +1387,8 @@
       }
     ],
     "sensitivityRuns": [],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

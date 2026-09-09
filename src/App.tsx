@@ -130,10 +130,11 @@ function App() {
   const theme = useTheme()
   const profiled = workflow.kind === 'profiled' ? workflow : null
   const currentPrepared = profiled?.prepared ?? null
+  const latestDiscoveryRun = profiled?.discoveryRuns.at(-1) ?? null
   const [discoverySession, dispatchDiscoverySession] = useReducer(
     stepDiscoverySession,
-    currentPrepared,
-    initialDiscoverySessionFor,
+    null,
+    () => initialDiscoverySessionFor(currentPrepared, latestDiscoveryRun),
   )
   const discoveryCancellation = useRef({ requested: false })
 
@@ -148,8 +149,8 @@ function App() {
       discoveryCancellation.current.requested = true
       void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns())
     }
-    dispatchDiscoverySession({ type: 'prepared-dataset-changed', prepared: currentPrepared })
-  }, [currentPrepared, discoverySession])
+    dispatchDiscoverySession({ type: 'prepared-dataset-changed', prepared: currentPrepared, recorded: latestDiscoveryRun })
+  }, [currentPrepared, discoverySession, latestDiscoveryRun])
 
   const reportDiscoveryEvent = useCallback((event: DiscoveryEvent) => {
     dispatchDiscoverySession({ type: 'discovery-event-received', event })

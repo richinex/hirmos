@@ -2,14 +2,15 @@ import { useState, type ReactNode } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { comparisonMeasureOption, hazardCurveOption, observedSurvivalOption, restrictedMeanOption, stateOccupancyOption, survivalCurvesOption, transitionMapOption, transitionMatrixOption } from '@/charts/survival/curves'
 import { useChartTheme } from '@/charts/theme'
+import type { VisibleWindow } from '@/charts/window'
 import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
 import { MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
 import { caption, label, num, prose, well } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
-import type { ComparisonSurvivalEvidence, MultiStateSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
-import { formatCount, formatP, formatPercent, formatStatistic } from '@/lib/format/number'
+import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, MultiStateSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
+import { formatCount, formatEstimate, formatP, formatPercent, formatStatistic } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
 
 export const survivalFamilyLabel = (family: ParametricSurvivalFamily): string => ({
@@ -113,6 +114,70 @@ const atRiskAt = (points: readonly (readonly [number, number])[], time: number):
   points.find(([observedTime]) => observedTime >= time)?.[1] ?? 0
 
 type RecordedComparisonDiagnostics = Extract<ComparisonSurvivalEvidence['diagnostics'], { readonly kind: 'recorded' }>
+type RecordedObservedConversion = Extract<ComparisonSurvivalEvidence['observedConversion'], { readonly kind: 'recorded' }>['result']
+type RecordedFixedTimeConversion = Extract<ComparisonSurvivalEvidence['fixedTimeConversion'], { readonly kind: 'recorded' }>['result']
+
+interface ConversionRow {
+  readonly key: string
+  readonly measure: string
+  readonly groupZero: ConversionRateFigure
+  readonly groupOne: ConversionRateFigure
+  readonly difference: ConversionDifferenceFigure
+  readonly pValue: number
+}
+
+type ConversionRateFigure = { readonly kind: 'rate'; readonly value: number }
+type ConversionDifferenceFigure = { readonly kind: 'difference'; readonly value: number }
+type ConversionFigure = ConversionRateFigure | ConversionDifferenceFigure
+
+const conversionRate = (value: ConversionRate): ConversionRateFigure => ({ kind: 'rate', value })
+const conversionDifference = (value: ConversionDifference): ConversionDifferenceFigure => ({ kind: 'difference', value })
+
+const formatConversion = (figure: ConversionFigure) => {
+  switch (figure.kind) {
+    case 'rate': return formatPercent(figure.value, { precision: 1 })
+    case 'difference': return formatEstimate(figure.value, { kind: 'probabilityDifference' })
+    default: return assertNever(figure)
+  }
+}
+
+const fixedPointScaleLabel = (scale: RecordedFixedTimeConversion['scaleTests'][number]['scale']): string => {
+  switch (scale) {
+    case 'naive': return 'Untransformed'
+    case 'log': return 'Log'
+    case 'complementaryLogLog': return 'Complementary log-log'
+    case 'arcsineSquareRoot': return 'Arcsine square root'
+    case 'logit': return 'Logit'
+    default: return assertNever(scale)
+  }
+}
+
+const recordedObservedConversion = (evidence: ComparisonSurvivalEvidence): RecordedObservedConversion | null => {
+  switch (evidence.observedConversion.kind) {
+    case 'recorded': return evidence.observedConversion.result
+    case 'notRecorded':
+    case 'unavailable': return null
+    default: return assertNever(evidence.observedConversion)
+  }
+}
+
+const recordedFixedTimeConversion = (evidence: ComparisonSurvivalEvidence): RecordedFixedTimeConversion | null => {
+  switch (evidence.fixedTimeConversion.kind) {
+    case 'recorded': return evidence.fixedTimeConversion.result
+    case 'notRecorded':
+    case 'unavailable': return null
+    default: return assertNever(evidence.fixedTimeConversion)
+  }
+}
+
+const petoPValue = (evidence: ComparisonSurvivalEvidence): number | null => {
+  switch (evidence.petoPeto.kind) {
+    case 'recorded': return evidence.petoPeto.result.pValue
+    case 'notRecorded':
+    case 'unavailable': return null
+    default: return assertNever(evidence.petoPeto)
+  }
+}
 
 function AtRiskTable({ diagnostics, truncationTime }: { readonly diagnostics: RecordedComparisonDiagnostics; readonly truncationTime: number }) {
   const times = Array.from({ length: 5 }, (_, index) => truncationTime * index / 4)
@@ -245,6 +310,8 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
   readonly onDelete?: () => void
 }) {
   const theme = useChartTheme()
+  // The event-free chart carries the slider; the hazard chart follows its window.
+  const [window, setWindow] = useState<VisibleWindow | null>(null)
   const summary = survivalRunSummary(run)
   const heading = (() => {
     switch (run.kind) {
@@ -310,38 +377,94 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           </div>
           <div className="mt-3">
             <p className={label('m-0 mb-2 text-muted')}>Event-free probability</p>
-            <ExpandableChart className="h-[260px]" label="Fitted event-free probability" testId="survival-curve" option={survivalCurvesOption([{ name: 'fitted profile', points: evidence.predictionTimes.map((time, index) => [time, evidence.survival[index] ?? Number.NaN] as const) }], 'follow-up time', theme, { marks: Number.isFinite(evidence.median) && evidence.median <= lastTime ? [{ name: 'median', value: evidence.median }] : [] })} />
+            <ExpandableChart className="h-[260px]" label="Fitted event-free probability" testId="survival-curve" window={window} onWindow={setWindow} option={survivalCurvesOption([{ name: 'fitted profile', points: evidence.predictionTimes.map((time, index) => [time, evidence.survival[index] ?? Number.NaN] as const) }], 'follow-up time', theme, { marks: Number.isFinite(evidence.median) && evidence.median <= lastTime ? [{ name: 'median', value: evidence.median }] : [] })} />
           </div>
           <div className="mt-3">
             <p className={label('m-0 mb-2 text-muted')}>Hazard over follow-up</p>
-            <ExpandableChart className="h-[220px]" label="Fitted hazard" testId="hazard-curve" option={hazardCurveOption(evidence.predictionTimes, evidence.hazard, 'follow-up time', theme)} />
+            <ExpandableChart className="h-[220px]" label="Fitted hazard" testId="hazard-curve" window={window} onWindow={setWindow} option={hazardCurveOption(evidence.predictionTimes, evidence.hazard, 'follow-up time', theme)} />
           </div>
         </>
       }
       case 'two-group-survival-run': {
         const evidence = run.evidence
         const direction = evidence.restrictedMeanDifference < 0 ? 'less' : 'more'
+        const observed = recordedObservedConversion(evidence)
+        const fixedTime = recordedFixedTimeConversion(evidence)
+        const peto = petoPValue(evidence)
         const tests = [
           { key: 'two-stage', test: 'Two-stage', reads: 'overall, remains valid when the curves cross', p: evidence.twoStagePValue },
           { key: 'log-rank', test: 'Log-rank', reads: 'overall, weights every time equally', p: evidence.logRankPValue },
           { key: 'gehan', test: 'Gehan–Wilcoxon', reads: 'overall, weights early follow-up', p: evidence.gehanWilcoxonPValue },
+          ...(peto === null ? [] : [{ key: 'peto-peto', test: 'Peto–Peto modified Gehan–Wilcoxon', reads: 'overall, weights earlier event times by pooled survival', p: peto }]),
           { key: 'tarone', test: 'Tarone–Ware', reads: 'overall, weights between the two above', p: evidence.taroneWarePValue },
           { key: 'weighted-km', test: 'Weighted Kaplan–Meier', reads: 'overall, on the curves themselves', p: evidence.weightedKaplanMeierPValue },
           { key: 'absolute', test: 'Absolute difference', reads: 'area between the curves', p: evidence.absoluteDifferencePValue },
           { key: 'squared', test: 'Squared difference', reads: 'area between the curves, squared', p: evidence.squaredDifferencePValue },
           { key: 'ph', test: 'Proportional hazards', reads: 'whether one hazard ratio fits at all', p: evidence.proportionalHazardsPValue },
         ]
+        const conversions: ConversionRow[] = [
+          ...(observed === null ? [] : [{ key: 'observed', measure: 'Observed conversion; follow-up time ignored', groupZero: conversionRate(observed.groupZeroRate), groupOne: conversionRate(observed.groupOneRate), difference: conversionDifference(observed.difference), pValue: observed.pValue }]),
+          ...(fixedTime === null ? [] : [{ key: 'fixed-time', measure: `Conversion by time ${statistic(fixedTime.time)}; Kaplan–Meier`, groupZero: conversionRate(fixedTime.groupZeroRate), groupOne: conversionRate(fixedTime.groupOneRate), difference: conversionDifference(fixedTime.difference), pValue: fixedTime.pValue }]),
+        ]
         return <>
-          <Tiles>
-            <MetricTile frame="cell" size="compact" label="Event-free time difference" value={formatStatistic('raw', evidence.restrictedMeanDifference)} context={`through time ${statistic(evidence.truncationTime)}`} />
-            <MetricTile frame="cell" size="compact" label="95% interval" value={formatStatistic('raw', evidence.restrictedMeanInterval[0])} context={`to ${statistic(evidence.restrictedMeanInterval[1])}`} />
-            <MetricTile frame="cell" size="compact" label="Overall test p" value={formatP(evidence.twoStagePValue, { withLabel: false })} context="two-stage" />
-          </Tiles>
-          <Interpretation
-            bottomLine={<>Up to follow-up time {statistic(evidence.truncationTime)}, group 1 accumulated {statistic(Math.abs(evidence.restrictedMeanDifference))} {direction} event-free time than group 0 on average.</>}
-            uncertainty={<>The 95% interval runs from {statistic(evidence.restrictedMeanInterval[0])} to {statistic(evidence.restrictedMeanInterval[1])}. The overall test also compares the full curves and remains useful when they cross.</>}
-            mustBeTrue={<>Censoring must be comparable between groups, and each row must represent an independent observation. This is a group comparison, not a causal effect, unless group assignment and the study design support that interpretation.</>}
-          />
+          {fixedTime === null ? <>
+            <Tiles>
+              <MetricTile frame="cell" size="compact" label="Event-free time difference" value={formatStatistic('raw', evidence.restrictedMeanDifference)} context={`through time ${statistic(evidence.truncationTime)}`} />
+              <MetricTile frame="cell" size="compact" label="95% interval" value={formatStatistic('raw', evidence.restrictedMeanInterval[0])} context={`to ${statistic(evidence.restrictedMeanInterval[1])}`} />
+              <MetricTile frame="cell" size="compact" label="Overall test p" value={formatP(evidence.twoStagePValue, { withLabel: false })} context="two-stage" />
+            </Tiles>
+            <Interpretation
+              bottomLine={<>Up to follow-up time {statistic(evidence.truncationTime)}, group 1 accumulated {statistic(Math.abs(evidence.restrictedMeanDifference))} {direction} event-free time than group 0 on average.</>}
+              uncertainty={<>The 95% interval runs from {statistic(evidence.restrictedMeanInterval[0])} to {statistic(evidence.restrictedMeanInterval[1])}. The overall test also compares the full curves and remains useful when they cross.</>}
+              mustBeTrue={<>Censoring must be comparable between groups, and each row must represent an independent observation. This is a group comparison, not a causal effect, unless group assignment and the study design support that interpretation.</>}
+            />
+          </> : <>
+            <Tiles>
+              <MetricTile frame="cell" size="compact" label="Group 0 conversion" value={formatConversion(conversionRate(fixedTime.groupZeroRate))} context={`by time ${statistic(fixedTime.time)}`} />
+              <MetricTile frame="cell" size="compact" label="Group 1 conversion" value={formatConversion(conversionRate(fixedTime.groupOneRate))} context={`by time ${statistic(fixedTime.time)}`} />
+              <MetricTile frame="cell" size="compact" label="Difference" value={formatConversion(conversionDifference(fixedTime.difference))} context="group 1 minus group 0" />
+            </Tiles>
+            <Interpretation
+              bottomLine={<>By follow-up time {statistic(fixedTime.time)}, estimated conversion was {formatConversion(conversionRate(fixedTime.groupZeroRate)).text} in group 0 and {formatConversion(conversionRate(fixedTime.groupOneRate)).text} in group 1, a difference of {formatConversion(conversionDifference(fixedTime.difference)).text}.</>}
+              uncertainty={<>The 95% interval for the conversion difference runs from {formatConversion(conversionDifference(fixedTime.interval[0])).text} to {formatConversion(conversionDifference(fixedTime.interval[1])).text}. The data are compatible with no difference when this interval includes 0.</>}
+              mustBeTrue={<>People who have not converted by the end of follow-up must be represented as censored, and censoring must be comparable between groups. This is a group comparison, not a causal effect, unless assignment and the study design support that interpretation.</>}
+            />
+          </>}
+          {conversions.length > 0 && <div className="mt-4">
+            <EvidenceTable<ConversionRow>
+              frame="none"
+              title="Conversion comparisons"
+              rows={conversions}
+              rowKey={(row) => row.key}
+              noun="comparison"
+              empty="The run reported no conversion comparison."
+              exportName="survival-conversion-comparisons"
+              columns={[
+                { id: 'measure', header: 'Measure', value: (row) => row.measure },
+                { id: 'group-zero', header: 'Group 0', align: 'right', value: (row) => formatConversion(row.groupZero).text },
+                { id: 'group-one', header: 'Group 1', align: 'right', value: (row) => formatConversion(row.groupOne).text },
+                { id: 'difference', header: 'Difference', align: 'right', value: (row) => formatConversion(row.difference).text },
+                figureColumn<ConversionRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+              ]}
+            />
+          </div>}
+          {fixedTime !== null && <div className="mt-4">
+            <EvidenceTable<RecordedFixedTimeConversion['scaleTests'][number]>
+              frame="none"
+              title="Fixed-time interval calculations"
+              rows={fixedTime.scaleTests}
+              rowKey={(row) => row.scale}
+              noun="calculation"
+              empty="The run reported no fixed-time calculation."
+              exportName="survival-fixed-time-calculations"
+              columns={[
+                { id: 'scale', header: 'Scale', value: (row) => fixedPointScaleLabel(row.scale) },
+                { id: 'group-zero', header: 'Group 0 interval', align: 'right', value: (row) => `${formatPercent(row.groupZeroInterval[0], { precision: 1 }).text} to ${formatPercent(row.groupZeroInterval[1], { precision: 1 }).text}` },
+                { id: 'group-one', header: 'Group 1 interval', align: 'right', value: (row) => `${formatPercent(row.groupOneInterval[0], { precision: 1 }).text} to ${formatPercent(row.groupOneInterval[1], { precision: 1 }).text}` },
+                figureColumn<RecordedFixedTimeConversion['scaleTests'][number]>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+              ]}
+            />
+          </div>}
           <div className="mt-4">
             <EvidenceTable<typeof tests[number]>
               frame="none"
@@ -367,6 +490,14 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
         const final = evidence.probabilities.at(-1) ?? []
         const row = final.slice(0, evidence.states.length)
         const destination = row.reduce((best, value, index) => value > (row[best] ?? -1) ? index : best, 0)
+        const preparation = (() => {
+          switch (evidence.preparation.kind) {
+            case 'preparedRows': return null
+            case 'longitudinalStates': return `Hirmos converted ${formatCount(evidence.preparation.sourceRows).text} exact state observations into ${formatCount(evidence.preparation.transitionRows).text} transition-risk rows.`
+            case 'wideEvents': return `Hirmos converted ${formatCount(evidence.preparation.sourceRows).text} subject records into ${formatCount(evidence.preparation.transitionRows).text} transition-risk rows.`
+            default: return assertNever(evidence.preparation)
+          }
+        })()
         return <>
           <Tiles>
             <MetricTile frame="cell" size="compact" label="States" value={formatCount(evidence.states.length)} />
@@ -378,6 +509,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             uncertainty={<>These state probabilities are fitted point estimates; this result does not yet include simulation intervals.</>}
             mustBeTrue={<>Every permitted move must be represented by the observed transition rows. Transition hazards must follow the chosen proportional-hazards family, and future movement must depend on the state history in the way specified by this clock-forward model.</>}
           />
+          {preparation !== null && <div className="mt-3 rounded-lg border border-hair bg-well px-3 py-2.5 text-body text-muted"><p className="m-0">{preparation}</p>{evidence.preparation.kind !== 'preparedRows' && evidence.preparation.notices.map((notice) => <p key={notice} className="mb-0 mt-1">{notice}</p>)}</div>}
           <MultiStateCharts evidence={evidence} initial={initial} />
         </>
       }

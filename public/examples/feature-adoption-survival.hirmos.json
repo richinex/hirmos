@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-09T06:33:27.312Z",
+  "exportedAt": "2026-09-09T12:45:35.136Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-09T06:33:27.307Z",
+    "savedAt": "2026-09-09T12:45:35.131Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "6a3f2c9e-7b14-4d58-a2e6-9c5d1f8b3e07",
       "name": "Feature adoption and abandonment",
-      "createdAt": "2026-09-09T06:33:23.471Z"
+      "createdAt": "2026-09-09T12:45:31.797Z"
     },
     "source": {
       "name": "feature-adoption-spells.csv",
@@ -457,8 +457,8 @@
       ]
     },
     "prepared": {
-      "id": "9e4bbbff-fa44-4cb3-8807-a42375011840",
-      "recipe": "65410eaf-306a-438a-b8f2-c3614dff40e9",
+      "id": "26966fc2-32b5-42fd-baf0-9146eda1fb9d",
+      "recipe": "b1e209f5-8af3-4e5a-90b9-b840b3afcdca",
       "sourceProfile": "duckdb-wasm:1.30.0:ba446613750e90cc6ffad3601bf8a655a891506902d5c231905137d05b20148c",
       "observations": 455,
       "columns": [
@@ -515,9 +515,9 @@
     "counterfactualRuns": [],
     "survivalRuns": [
       {
-        "id": "8e0123d7-8a60-49c3-b676-58ba637e8668",
-        "preparedDataset": "9e4bbbff-fa44-4cb3-8807-a42375011840",
-        "createdAt": "2026-09-09T06:33:26.688Z",
+        "id": "aec3a593-dfb1-4038-8098-6c338e36c661",
+        "preparedDataset": "26966fc2-32b5-42fd-baf0-9146eda1fb9d",
+        "createdAt": "2026-09-09T12:45:34.576Z",
         "columns": [
           {
             "id": "1:start",

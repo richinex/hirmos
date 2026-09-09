@@ -34,8 +34,10 @@ test('build the March cohort AI adoption example bundle', async ({ page }) => {
 
   await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: /^Interventions/ }).click()
-  await page.getByRole('radio', { name: /Panel DID/ }).click()
-  await page.getByRole('button', { name: /^Run panel DID/i }).first().click()
+  // The panel opens on this estimator for a prepared panel; the click is only needed when it does not.
+  const panelDid = page.getByRole('radio', { name: /Panel difference-in-differences/ })
+  if (!(await panelDid.isChecked())) await panelDid.click()
+  await page.getByRole('button', { name: /^Run panel difference-in-differences/i }).first().click()
   await expect(page.getByText('Current estimate').first()).toBeVisible({ timeout: 300_000 })
 
   await exportBundle(page, example)

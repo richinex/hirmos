@@ -1,16 +1,15 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { readFile, writeFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { EXAMPLE_PROJECT_ID } from '../../src/domain/example'
+import { shippedExampleById, EXAMPLE_PROJECT_ID } from '../../src/domain/example'
+import { exportBundle } from './support'
 
 /**
  * Builds the shipped example: the Seatbelts walkthrough run end to end through the product's own
- * controls, then exported with its source file to public/examples/seatbelts.hirmos.json.
+ * controls, then exported with its source file to the bundle the catalog names.
  * Run on demand: BUILD_EXAMPLE=1 npx playwright test tests/examples --project=chromium
  */
 
 const seatbelts = fileURLToPath(new URL('../fixtures/Seatbelts.csv', import.meta.url))
-const target = fileURLToPath(new URL('../../public/examples/seatbelts.hirmos.json', import.meta.url))
 
 const choose = async (trigger: Locator, label: string) => {
   await trigger.click()
@@ -33,9 +32,10 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await page.getByRole('button', { name: /Create prepared/ }).click()
   await expect(page.getByText(/Prepared time series/)).toBeVisible({ timeout: 30_000 })
 
-  // diagnostics
+  // diagnostics: the section opens on multicollinearity, so choose the stationarity tests first
+  await page.getByRole('radio', { name: /Stationarity/ }).click()
   await page.getByRole('button', { name: /Run stationarity/ }).click()
-  await expect(page.getByText(/Stationarity tests · 192 rows/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText(/Stationarity tests · \d+ variables · 192 rows/)).toBeVisible({ timeout: 120_000 })
   await page.getByRole('radio', { name: /Breaks/ }).click()
   await page.getByRole('button', { name: /Analyse temporal structure/ }).click()
   await expect(page.getByText(/4 series checked/)).toBeVisible({ timeout: 120_000 })
@@ -49,7 +49,7 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await chapter(page, /Discovery/)
   await page.getByRole('button', { name: /Run PCMCI\+/ }).click()
   await expect(page.getByRole('heading', { name: /Stationary lag-graph evidence/ })).toBeVisible({ timeout: 120_000 })
-  await page.getByRole('radio', { name: 'LPCMCI', exact: true }).click()
+  await page.getByRole('radio', { name: /^LPCMCI/ }).click()
   await page.getByRole('button', { name: /Run LPCMCI/ }).click()
   await expect(page.getByRole('heading', { name: /Latent-aware/ })).toBeVisible({ timeout: 120_000 })
 
@@ -98,12 +98,10 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await page.getByRole('spinbutton', { name: 'Draws' }).fill('400')
   await page.getByRole('button', { name: /Run Bayesian/ }).click()
   await expect(page.getByText('Runs · 1')).toBeVisible({ timeout: 180_000 })
-  await page.getByRole('radio', { name: /Discrete Bayesian network/ }).click()
-  await page.getByRole('button', { name: /Run discrete BN/i }).click()
-  await expect(page.getByText('Runs · 2')).toBeVisible({ timeout: 120_000 })
+  // The discrete Bayesian network do-query is refused for this study, so the example records two estimates.
   await page.getByRole('radio', { name: /Adjusted linear regression/ }).click()
   await page.getByRole('button', { name: /Run adjusted linear/ }).click()
-  await expect(page.getByText('Runs · 3')).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('Runs · 2')).toBeVisible({ timeout: 120_000 })
 
   // one probe, one counterfactual
   await chapter(page, /Sensitivity/)
@@ -116,13 +114,8 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await expect(page.getByText(/Counterfactuals · 1|Runs · 1/)).toBeVisible({ timeout: 120_000 })
 
   // export with the source file inside
-  await chapter(page, /Data studio/i)
-  await page.getByRole('checkbox', { name: /Include the source file/ }).check()
-  const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: /Export project/ }).click()
-  await (await download).saveAs(target)
-  // The app recognises its saved copy of the example by this id, whichever build produced the bundle.
-  const bundle = JSON.parse(await readFile(target, 'utf8')) as { project: { project: { id: string } } }
-  bundle.project.project.id = EXAMPLE_PROJECT_ID
-  await writeFile(target, JSON.stringify(bundle, null, 2))
+  const example = shippedExampleById(EXAMPLE_PROJECT_ID)
+  expect(example).not.toBeNull()
+  if (example === null) return
+  await exportBundle(page, example)
 })

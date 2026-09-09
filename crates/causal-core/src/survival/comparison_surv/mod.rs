@@ -3,6 +3,7 @@
 //! ComparisonSurv compares two already-observed survival curves.  Its tests
 //! and summaries remain separate from flexsurv's parametric regression model.
 
+mod ab_test;
 mod cox;
 mod data;
 mod descriptive;
@@ -12,6 +13,10 @@ mod overall;
 mod plot;
 mod tshrc;
 
+pub use ab_test::{
+    fixed_time_conversion, g_rho_test, observed_conversion, AbTestError, FixedTimeConversionResult,
+    GRho, GRhoResult, ObservedConversionResult,
+};
 pub use cox::{proportional_hazards_check, CoxError, ProportionalHazardsCheck};
 pub use data::{ComparisonData, ComparisonDataError, Event, Group, SurvivalSample};
 pub use descriptive::{

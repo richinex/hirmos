@@ -251,7 +251,16 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
   readonly onDeleteRun: (run: CounterfactualRunArtifact['id']) => void
 }) {
   const identified = identifications.filter((identification) => identification.result.kind === 'identified')
-  const [state, dispatch] = useReducer(step, null, (): State => ({ identification: identified.at(-1)?.id ?? null, configuration: prepared.kind === 'prepared-time-series' ? DEFAULT_DYNAMIC_LINEAR_SCM : DEFAULT_LINEAR_SCM, job: { kind: 'idle' } }))
+  const [state, dispatch] = useReducer(step, null, (): State => {
+    // The controls open as the latest recorded run set them, so a reopened project shows the query it holds.
+    const latest = runs.at(-1) ?? null
+    const recorded = latest === null ? null : identified.find((candidate) => candidate.id === latest.identification) ?? null
+    return {
+      identification: recorded?.id ?? identified.at(-1)?.id ?? null,
+      configuration: latest !== null && recorded !== null ? latest.configuration : prepared.kind === 'prepared-time-series' ? DEFAULT_DYNAMIC_LINEAR_SCM : DEFAULT_LINEAR_SCM,
+      job: { kind: 'idle' },
+    }
+  })
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
   const study = identification === null ? null : studies.find((candidate) => candidate.id === identification.study) ?? null
   const selectedRevision = study === null ? null : documents.find((document) => document.id === study.dagDocument)?.audit.find((revision) => revision.id === study.dagRevision) ?? null

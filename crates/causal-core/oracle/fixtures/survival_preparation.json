@@ -1,0 +1,1370 @@
+{
+  "sources": {
+    "mstate": "0.3.3",
+    "msm": "1.8.2"
+  },
+  "msprep": [
+    {
+      "name": "illness_death_default_start",
+      "time": [
+        [
+          null,
+          1,
+          5
+        ],
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          6,
+          9
+        ],
+        [
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          8,
+          8
+        ],
+        [
+          null,
+          9,
+          12
+        ]
+      ],
+      "status": [
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          0,
+          1
+        ],
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          0,
+          1
+        ],
+        [
+          null,
+          1,
+          1
+        ]
+      ],
+      "transition_matrix": [
+        [
+          null,
+          1,
+          2
+        ],
+        [
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "ids": ["2", "3", "4", "5", "6", "7"],
+      "start_states": [1, 1, 1, 1, 1, 1],
+      "start_times": [0, 0, 0, 0, 0, 0],
+      "covariates": [
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          1
+        ]
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "2",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 1,
+            "covariates": [
+              1,
+              6
+            ]
+          },
+          {
+            "id": "2",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 0,
+            "covariates": [
+              1,
+              6
+            ]
+          },
+          {
+            "id": "2",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 1,
+            "stop": 5,
+            "duration": 4,
+            "event": 1,
+            "covariates": [
+              1,
+              6
+            ]
+          },
+          {
+            "id": "3",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 0,
+            "covariates": [
+              1,
+              5
+            ]
+          },
+          {
+            "id": "3",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 1,
+            "covariates": [
+              1,
+              5
+            ]
+          },
+          {
+            "id": "4",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 1,
+            "covariates": [
+              1,
+              4
+            ]
+          },
+          {
+            "id": "4",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 0,
+            "covariates": [
+              1,
+              4
+            ]
+          },
+          {
+            "id": "4",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 6,
+            "stop": 9,
+            "duration": 3,
+            "event": 1,
+            "covariates": [
+              1,
+              4
+            ]
+          },
+          {
+            "id": "5",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 1,
+            "covariates": [
+              2,
+              3
+            ]
+          },
+          {
+            "id": "5",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 0,
+            "covariates": [
+              2,
+              3
+            ]
+          },
+          {
+            "id": "5",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 6,
+            "stop": 7,
+            "duration": 1,
+            "event": 1,
+            "covariates": [
+              2,
+              3
+            ]
+          },
+          {
+            "id": "6",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 8,
+            "duration": 8,
+            "event": 0,
+            "covariates": [
+              2,
+              2
+            ]
+          },
+          {
+            "id": "6",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 8,
+            "duration": 8,
+            "event": 1,
+            "covariates": [
+              2,
+              2
+            ]
+          },
+          {
+            "id": "7",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 9,
+            "duration": 9,
+            "event": 1,
+            "covariates": [
+              2,
+              1
+            ]
+          },
+          {
+            "id": "7",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 9,
+            "duration": 9,
+            "event": 0,
+            "covariates": [
+              2,
+              1
+            ]
+          },
+          {
+            "id": "7",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 9,
+            "stop": 12,
+            "duration": 3,
+            "event": 1,
+            "covariates": [
+              2,
+              1
+            ]
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            2
+          ],
+          [
+            null,
+            null,
+            3
+          ],
+          [
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": []
+      }
+    },
+    {
+      "name": "illness_death_custom_start",
+      "time": [
+        [
+          null,
+          1,
+          5
+        ],
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          6,
+          9
+        ],
+        [
+          null,
+          6,
+          7
+        ],
+        [
+          null,
+          8,
+          8
+        ],
+        [
+          null,
+          9,
+          12
+        ]
+      ],
+      "status": [
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          0,
+          1
+        ],
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          1,
+          1
+        ],
+        [
+          null,
+          0,
+          1
+        ],
+        [
+          null,
+          1,
+          1
+        ]
+      ],
+      "transition_matrix": [
+        [
+          null,
+          1,
+          2
+        ],
+        [
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "ids": ["2", "3", "4", "5", "6", "7"],
+      "start_states": [1, 1, 1, 1, 2, 2],
+      "start_times": [0, 0, 0, 0, 4, 10],
+      "covariates": [
+        [
+          1,
+          6
+        ],
+        [
+          1,
+          5
+        ],
+        [
+          1,
+          4
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          2,
+          1
+        ]
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "2",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 1,
+            "covariates": [
+              1,
+              6
+            ]
+          },
+          {
+            "id": "2",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 0,
+            "covariates": [
+              1,
+              6
+            ]
+          },
+          {
+            "id": "2",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 1,
+            "stop": 5,
+            "duration": 4,
+            "event": 1,
+            "covariates": [
+              1,
+              6
+            ]
+          },
+          {
+            "id": "3",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 0,
+            "covariates": [
+              1,
+              5
+            ]
+          },
+          {
+            "id": "3",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 1,
+            "duration": 1,
+            "event": 1,
+            "covariates": [
+              1,
+              5
+            ]
+          },
+          {
+            "id": "4",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 1,
+            "covariates": [
+              1,
+              4
+            ]
+          },
+          {
+            "id": "4",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 0,
+            "covariates": [
+              1,
+              4
+            ]
+          },
+          {
+            "id": "4",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 6,
+            "stop": 9,
+            "duration": 3,
+            "event": 1,
+            "covariates": [
+              1,
+              4
+            ]
+          },
+          {
+            "id": "5",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 1,
+            "covariates": [
+              2,
+              3
+            ]
+          },
+          {
+            "id": "5",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 6,
+            "duration": 6,
+            "event": 0,
+            "covariates": [
+              2,
+              3
+            ]
+          },
+          {
+            "id": "5",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 6,
+            "stop": 7,
+            "duration": 1,
+            "event": 1,
+            "covariates": [
+              2,
+              3
+            ]
+          },
+          {
+            "id": "6",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 4,
+            "stop": 8,
+            "duration": 4,
+            "event": 1,
+            "covariates": [
+              2,
+              2
+            ]
+          },
+          {
+            "id": "7",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 10,
+            "stop": 12,
+            "duration": 2,
+            "event": 1,
+            "covariates": [
+              2,
+              1
+            ]
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            2
+          ],
+          [
+            null,
+            null,
+            3
+          ],
+          [
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": []
+      }
+    },
+    {
+      "name": "simultaneous_observed_transitions",
+      "time": [
+        [
+          null,
+          5,
+          5
+        ]
+      ],
+      "status": [
+        [
+          null,
+          1,
+          1
+        ]
+      ],
+      "transition_matrix": [
+        [
+          null,
+          1,
+          2
+        ],
+        [
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "ids": [
+        "1"
+      ],
+      "start_states": [
+        1
+      ],
+      "start_times": [
+        0
+      ],
+      "covariates": [
+        []
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "1",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 5,
+            "duration": 5,
+            "event": 1,
+            "covariates": []
+          },
+          {
+            "id": "1",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 5,
+            "duration": 5,
+            "event": 0,
+            "covariates": []
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            2
+          ],
+          [
+            null,
+            null,
+            3
+          ],
+          [
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": ["Starting from state 1, simultaneous transitions possible for subjects 1 at times 5; smallest receiving state chosen"]
+      }
+    },
+    {
+      "name": "earlier_censoring_time_before_observed_transition",
+      "time": [
+        [
+          null,
+          2,
+          5
+        ]
+      ],
+      "status": [
+        [
+          null,
+          0,
+          1
+        ]
+      ],
+      "transition_matrix": [
+        [
+          null,
+          1,
+          2
+        ],
+        [
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "ids": [
+        "1"
+      ],
+      "start_states": [
+        1
+      ],
+      "start_times": [
+        0
+      ],
+      "covariates": [
+        []
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "1",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 5,
+            "duration": 5,
+            "event": 0,
+            "covariates": []
+          },
+          {
+            "id": "1",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 5,
+            "duration": 5,
+            "event": 1,
+            "covariates": []
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            2
+          ],
+          [
+            null,
+            null,
+            3
+          ],
+          [
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": ["From starting state 1, subject 1 has smallest transition time with status=0, larger transition time with status=1"]
+      }
+    },
+    {
+      "name": "all_outgoing_transitions_censored",
+      "time": [
+        [
+          null,
+          4,
+          7
+        ]
+      ],
+      "status": [
+        [
+          null,
+          0,
+          0
+        ]
+      ],
+      "transition_matrix": [
+        [
+          null,
+          1,
+          2
+        ],
+        [
+          null,
+          null,
+          3
+        ],
+        [
+          null,
+          null,
+          null
+        ]
+      ],
+      "ids": [
+        "1"
+      ],
+      "start_states": [
+        1
+      ],
+      "start_times": [
+        0
+      ],
+      "covariates": [
+        []
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "1",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 4,
+            "duration": 4,
+            "event": 0,
+            "covariates": []
+          },
+          {
+            "id": "1",
+            "from": 1,
+            "to": 3,
+            "transition": 2,
+            "start": 0,
+            "stop": 4,
+            "duration": 4,
+            "event": 0,
+            "covariates": []
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            2
+          ],
+          [
+            null,
+            null,
+            3
+          ],
+          [
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": []
+      }
+    }
+  ],
+  "msm2surv": [
+    {
+      "name": "documented_longitudinal_states",
+      "observations": [
+        {
+          "id": "1",
+          "time": 0,
+          "state": 1,
+          "covariates": [
+            66,
+            1
+          ]
+        },
+        {
+          "id": "1",
+          "time": 27,
+          "state": 2,
+          "covariates": [
+            66,
+            1
+          ]
+        },
+        {
+          "id": "1",
+          "time": 75,
+          "state": 3,
+          "covariates": [
+            66,
+            1
+          ]
+        },
+        {
+          "id": "1",
+          "time": 97,
+          "state": 4,
+          "covariates": [
+            66,
+            1
+          ]
+        },
+        {
+          "id": "1",
+          "time": 1106,
+          "state": 4,
+          "covariates": [
+            69,
+            1
+          ]
+        },
+        {
+          "id": "2",
+          "time": 0,
+          "state": 1,
+          "covariates": [
+            49,
+            0
+          ]
+        },
+        {
+          "id": "2",
+          "time": 90,
+          "state": 2,
+          "covariates": [
+            49,
+            0
+          ]
+        },
+        {
+          "id": "2",
+          "time": 1037,
+          "state": 2,
+          "covariates": [
+            51,
+            0
+          ]
+        }
+      ],
+      "allowed": [
+        [
+          1,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "1",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 27,
+            "duration": 27,
+            "event": 1,
+            "covariates": [
+              66,
+              1
+            ]
+          },
+          {
+            "id": "1",
+            "from": 1,
+            "to": 4,
+            "transition": 2,
+            "start": 0,
+            "stop": 27,
+            "duration": 27,
+            "event": 0,
+            "covariates": [
+              66,
+              1
+            ]
+          },
+          {
+            "id": "1",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 27,
+            "stop": 75,
+            "duration": 48,
+            "event": 1,
+            "covariates": [
+              66,
+              1
+            ]
+          },
+          {
+            "id": "1",
+            "from": 2,
+            "to": 4,
+            "transition": 4,
+            "start": 27,
+            "stop": 75,
+            "duration": 48,
+            "event": 0,
+            "covariates": [
+              66,
+              1
+            ]
+          },
+          {
+            "id": "1",
+            "from": 3,
+            "to": 4,
+            "transition": 5,
+            "start": 75,
+            "stop": 97,
+            "duration": 22,
+            "event": 1,
+            "covariates": [
+              66,
+              1
+            ]
+          },
+          {
+            "id": "2",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 90,
+            "duration": 90,
+            "event": 1,
+            "covariates": [
+              49,
+              0
+            ]
+          },
+          {
+            "id": "2",
+            "from": 1,
+            "to": 4,
+            "transition": 2,
+            "start": 0,
+            "stop": 90,
+            "duration": 90,
+            "event": 0,
+            "covariates": [
+              49,
+              0
+            ]
+          },
+          {
+            "id": "2",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 90,
+            "stop": 1037,
+            "duration": 947,
+            "event": 0,
+            "covariates": [
+              49,
+              0
+            ]
+          },
+          {
+            "id": "2",
+            "from": 2,
+            "to": 4,
+            "transition": 4,
+            "start": 90,
+            "stop": 1037,
+            "duration": 947,
+            "event": 0,
+            "covariates": [
+              49,
+              0
+            ]
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            null,
+            2
+          ],
+          [
+            null,
+            null,
+            3,
+            4
+          ],
+          [
+            null,
+            null,
+            null,
+            5
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": []
+      }
+    },
+    {
+      "name": "duplicate_observation_time",
+      "observations": [
+        {
+          "id": "1",
+          "time": 0,
+          "state": 1,
+          "covariates": [
+            10
+          ]
+        },
+        {
+          "id": "1",
+          "time": 0,
+          "state": 2,
+          "covariates": [
+            11
+          ]
+        },
+        {
+          "id": "1",
+          "time": 3,
+          "state": 3,
+          "covariates": [
+            12
+          ]
+        },
+        {
+          "id": "2",
+          "time": 0,
+          "state": 1,
+          "covariates": [
+            20
+          ]
+        },
+        {
+          "id": "2",
+          "time": 4,
+          "state": 4,
+          "covariates": [
+            21
+          ]
+        }
+      ],
+      "allowed": [
+        [
+          1,
+          1,
+          0,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          0,
+          0,
+          0
+        ]
+      ],
+      "expected": {
+        "rows": [
+          {
+            "id": "1",
+            "from": 2,
+            "to": 3,
+            "transition": 3,
+            "start": 0,
+            "stop": 3,
+            "duration": 3,
+            "event": 1,
+            "covariates": [
+              11
+            ]
+          },
+          {
+            "id": "1",
+            "from": 2,
+            "to": 4,
+            "transition": 4,
+            "start": 0,
+            "stop": 3,
+            "duration": 3,
+            "event": 0,
+            "covariates": [
+              11
+            ]
+          },
+          {
+            "id": "2",
+            "from": 1,
+            "to": 2,
+            "transition": 1,
+            "start": 0,
+            "stop": 4,
+            "duration": 4,
+            "event": 0,
+            "covariates": [
+              20
+            ]
+          },
+          {
+            "id": "2",
+            "from": 1,
+            "to": 4,
+            "transition": 2,
+            "start": 0,
+            "stop": 4,
+            "duration": 4,
+            "event": 1,
+            "covariates": [
+              20
+            ]
+          }
+        ],
+        "transition_matrix": [
+          [
+            null,
+            1,
+            null,
+            2
+          ],
+          [
+            null,
+            null,
+            3,
+            4
+          ],
+          [
+            null,
+            null,
+            null,
+            5
+          ],
+          [
+            null,
+            null,
+            null,
+            null
+          ]
+        ],
+        "notices": ["Omitting 1 rows with two observations at the same time"]
+      }
+    }
+  ]
+}

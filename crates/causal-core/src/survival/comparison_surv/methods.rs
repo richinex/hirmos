@@ -126,11 +126,11 @@ fn normal_cdf(value: f64) -> f64 {
     0.5 * libm::erfc(-value / std::f64::consts::SQRT_2)
 }
 
-fn two_sided_normal(value: f64) -> f64 {
+pub(crate) fn two_sided_normal(value: f64) -> f64 {
     2.0 * (1.0 - normal_cdf(value.abs()))
 }
 
-fn chi_square_one_survival(value: f64) -> f64 {
+pub(crate) fn chi_square_one_survival(value: f64) -> f64 {
     two_sided_normal(value.max(0.0).sqrt())
 }
 

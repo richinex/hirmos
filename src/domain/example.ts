@@ -65,7 +65,7 @@ export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = 
     name: 'Seat-belt law and road deaths',
     sourceName: 'Seatbelts.csv',
     bundleUrl: '/examples/seatbelts.hirmos.json',
-    question: 'effect', approach: 'Back-door adjustment', shape: 'time series', size: '192 months', estimationRuns: 3, glyph: 'dag', collection: null,
+    question: 'effect', approach: 'Back-door adjustment', shape: 'time series', size: '192 months', estimationRuns: 2, glyph: 'dag', collection: null,
   },
   {
     id: id('7c2f1b3e-5a64-4d1e-9b0a-2e6f8c1d4a71'),

@@ -282,7 +282,7 @@ test('opens the shipped example Estimation chapter without the compatibility bou
   await example.getByRole('button', { name: 'Open' }).click()
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByText('The Estimation chapter could not be displayed.')).toHaveCount(0)
-  await expect(page.getByText('Runs · 3')).toBeVisible()
+  await expect(page.getByText('Runs · 2')).toBeVisible()
 })
 
 test('replaces an unstamped saved example even when it has the shipped project creation time', async ({ page }, testInfo) => {
@@ -314,7 +314,7 @@ test('replaces an unstamped saved example even when it has the shipped project c
   await example.getByRole('button', { name: 'Open' }).click()
   await expect(page.getByText('The example changed in this build, so your earlier copy was replaced.')).toBeVisible()
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
-  await expect(page.getByText('Runs · 3')).toBeVisible()
+  await expect(page.getByText('Runs · 2')).toBeVisible()
 
   const releases = await page.evaluate(async () => {
     const [exampleModule, bundleModule, store] = await Promise.all([

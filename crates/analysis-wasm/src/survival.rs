@@ -1,9 +1,15 @@
 //! Browser façades for the parity-tested flexsurv and ComparisonSurv kernels.
 
 use super::*;
+use hirmos_causal_core::data_preparation::{
+    prepare_longitudinal_states, prepare_wide_events, EventStatus, LongitudinalObservation,
+    LongitudinalStateHistory, NonEmptyVec, StateId, StateObservation, SubjectId, TransitionMatrix,
+    WideEventHistory, WideSubject,
+};
 use hirmos_causal_core::survival::comparison_surv::{
-    comparison_curves, crossing_times, describe, overall_test, smooth_hazard_curves,
-    ComparisonData, ComparisonTime, Event, Group, OverallConfiguration, RmstWindow,
+    comparison_curves, crossing_times, describe, fixed_time_conversion, g_rho_test,
+    observed_conversion, overall_test, smooth_hazard_curves, ComparisonData, ComparisonTime, Event,
+    FixedPointResult, FixedPointScale, GRho, GRhoResult, Group, OverallConfiguration, RmstWindow,
     SignificanceLevel, SurvivalSample,
 };
 use hirmos_causal_core::survival::flexsurv::fit::{
@@ -19,6 +25,53 @@ use hirmos_causal_core::survival::flexsurv::observation::SurvivalObservation;
 use hirmos_causal_core::survival::flexsurv::predict::{Prediction, PredictionRequest};
 use hirmos_causal_core::survival::flexsurv::r_optim::ROptimControl;
 use std::num::NonZeroUsize;
+
+fn fixed_point_scale(scale: FixedPointScale) -> FixedPointScaleEvidence {
+    match scale {
+        FixedPointScale::Naive => FixedPointScaleEvidence::Naive,
+        FixedPointScale::Log => FixedPointScaleEvidence::Log,
+        FixedPointScale::ComplementaryLogLog => FixedPointScaleEvidence::ComplementaryLogLog,
+        FixedPointScale::ArcsineSquareRoot => FixedPointScaleEvidence::ArcsineSquareRoot,
+        FixedPointScale::Logit => FixedPointScaleEvidence::Logit,
+    }
+}
+
+fn fixed_point_tests(result: &FixedPointResult) -> Result<Vec<FixedPointTestEvidence>, String> {
+    result
+        .tests
+        .iter()
+        .map(|test| {
+            let group_zero = result
+                .group_zero
+                .iter()
+                .find(|estimate| estimate.scale == test.scale)
+                .ok_or_else(|| "fixed-time comparison omitted a group 0 scale".to_owned())?;
+            let group_one = result
+                .group_one
+                .iter()
+                .find(|estimate| estimate.scale == test.scale)
+                .ok_or_else(|| "fixed-time comparison omitted a group 1 scale".to_owned())?;
+            Ok(FixedPointTestEvidence {
+                scale: fixed_point_scale(test.scale),
+                group_zero_interval: [1.0 - group_zero.upper, 1.0 - group_zero.lower],
+                group_one_interval: [1.0 - group_one.upper, 1.0 - group_one.lower],
+                statistic: test.statistic,
+                p_value: test.p_value,
+            })
+        })
+        .collect()
+}
+
+fn g_rho_evidence(result: GRhoResult) -> GRhoEvidence {
+    GRhoEvidence {
+        rho: result.rho.get(),
+        observed: result.observed,
+        expected: result.expected,
+        variance: result.variance,
+        statistic: result.statistic,
+        p_value: result.p_value,
+    }
+}
 
 fn column(values: &[f64], rows: usize, columns: usize, index: usize) -> Result<Vec<f64>, String> {
     if index >= columns || values.len() != rows.saturating_mul(columns) {
@@ -294,6 +347,47 @@ pub(crate) fn comparison_survival_evidence(
     .map_err(|problem| format!("survival comparison description failed: {problem:?}"))?;
     let curves = comparison_curves(&data);
     let smoothed_hazards = smooth_hazard_curves(&data);
+    let observed_conversion = match observed_conversion(&data) {
+        Ok(result) => SurvivalSummary::Recorded {
+            result: ObservedConversionEvidence {
+                group_zero_rate: result.control_rate,
+                group_one_rate: result.treatment_rate,
+                difference: result.difference,
+                standard_error: result.standard_error,
+                statistic: result.statistic,
+                p_value: result.p_value,
+            },
+        },
+        Err(problem) => SurvivalSummary::Unavailable {
+            reason: format!("observed conversion comparison unavailable: {problem:?}"),
+        },
+    };
+    let fixed_time_conversion = match fixed_time_conversion(&data, truncation_time) {
+        Ok(result) => SurvivalSummary::Recorded {
+            result: FixedTimeConversionEvidence {
+                time: result.time,
+                group_zero_rate: result.control_rate,
+                group_one_rate: result.treatment_rate,
+                difference: result.difference,
+                standard_error: result.standard_error,
+                interval: result.interval,
+                statistic: result.statistic,
+                p_value: result.p_value,
+                scale_tests: fixed_point_tests(&result.comparison_surv)?,
+            },
+        },
+        Err(problem) => SurvivalSummary::Unavailable {
+            reason: format!("fixed-time conversion comparison unavailable: {problem:?}"),
+        },
+    };
+    let peto_peto = match g_rho_test(&data, GRho::peto_peto()) {
+        Ok(result) => SurvivalSummary::Recorded {
+            result: g_rho_evidence(result),
+        },
+        Err(problem) => SurvivalSummary::Unavailable {
+            reason: format!("Peto–Peto comparison unavailable: {problem:?}"),
+        },
+    };
     Ok(AnalysisResult::ComparisonSurvival {
         observations: rows,
         truncation_time,
@@ -370,6 +464,9 @@ pub(crate) fn comparison_survival_evidence(
             },
             crossing_times: crossing_times(&data),
         },
+        observed_conversion,
+        fixed_time_conversion,
+        peto_peto,
         proportional_hazards_p_value: result.proportional_hazards.p_value,
         log_rank_p_value: result.log_rank.p_value,
         gehan_wilcoxon_p_value: result.gehan_wilcoxon.p_value,
@@ -391,11 +488,7 @@ pub(crate) fn multi_state_survival_evidence(
     values: &[f64],
     rows: usize,
     columns: usize,
-    start: usize,
-    stop: usize,
-    event: usize,
-    from: usize,
-    to: usize,
+    input: MultiStateInputCommand,
     requested_family: SurvivalFamily,
     prediction_times: &[f64],
 ) -> Result<AnalysisResult, String> {
@@ -413,11 +506,13 @@ pub(crate) fn multi_state_survival_evidence(
     {
         return Err("multi-state prediction times must be non-negative and ordered".to_owned());
     }
-    let starts = column(values, rows, columns, start)?;
-    let stops = column(values, rows, columns, stop)?;
-    let events = column(values, rows, columns, event)?;
-    let origins = column(values, rows, columns, from)?;
-    let destinations = column(values, rows, columns, to)?;
+    let prepared = prepare_multi_state_input(values, rows, columns, input)?;
+    let rows = prepared.rows;
+    let starts = column(&prepared.values, rows, 5, 0)?;
+    let stops = column(&prepared.values, rows, 5, 1)?;
+    let events = column(&prepared.values, rows, 5, 2)?;
+    let origins = column(&prepared.values, rows, 5, 3)?;
+    let destinations = column(&prepared.values, rows, 5, 4)?;
     if origins
         .iter()
         .chain(&destinations)
@@ -525,9 +620,249 @@ pub(crate) fn multi_state_survival_evidence(
             .map(|(origin, destination)| [origin, destination])
             .collect(),
         family: requested_family,
+        preparation: prepared.evidence,
         prediction_times: result.times,
         probabilities: result.probabilities,
     })
+}
+
+struct PreparedMultiStateInput {
+    values: Vec<f64>,
+    rows: usize,
+    evidence: MultiStatePreparationEvidence,
+}
+
+fn prepare_multi_state_input(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    input: MultiStateInputCommand,
+) -> Result<PreparedMultiStateInput, String> {
+    match input {
+        MultiStateInputCommand::PreparedRows {
+            start,
+            stop,
+            event,
+            from,
+            to,
+        } => {
+            let selected = [start, stop, event, from, to];
+            let mut prepared = Vec::with_capacity(rows.saturating_mul(selected.len()));
+            for column_index in selected {
+                prepared.extend(column(values, rows, columns, column_index)?);
+            }
+            Ok(PreparedMultiStateInput {
+                values: prepared,
+                rows,
+                evidence: MultiStatePreparationEvidence::PreparedRows,
+            })
+        }
+        MultiStateInputCommand::LongitudinalStates {
+            subject,
+            time,
+            state,
+            allowed,
+        } => prepare_longitudinal_input(values, rows, columns, subject, time, state, allowed),
+        MultiStateInputCommand::WideEvents {
+            states,
+            transitions,
+            entry,
+        } => prepare_wide_input(values, rows, columns, states, transitions, entry),
+    }
+}
+
+fn prepare_longitudinal_input(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    subject: usize,
+    time: usize,
+    state: usize,
+    allowed: Vec<Vec<bool>>,
+) -> Result<PreparedMultiStateInput, String> {
+    let subjects = column(values, rows, columns, subject)?;
+    let times = column(values, rows, columns, time)?;
+    let states = column(values, rows, columns, state)?;
+    let transitions = TransitionMatrix::from_allowed(allowed)
+        .map_err(|problem| format!("longitudinal transition structure refused: {problem}"))?;
+    let mut observations = Vec::with_capacity(rows);
+    for row in 0..rows {
+        observations.push(
+            LongitudinalObservation::new(
+                subject_id(subjects[row], row)?,
+                times[row],
+                state_id(states[row], row)?,
+                Vec::new(),
+            )
+            .map_err(|problem| format!("longitudinal row {} refused: {problem}", row + 1))?,
+        );
+    }
+    let observations = NonEmptyVec::try_from_vec(observations)
+        .map_err(|problem| format!("longitudinal observations refused: {problem}"))?;
+    let history = LongitudinalStateHistory::new(transitions, observations)
+        .map_err(|problem| format!("longitudinal state history refused: {problem}"))?;
+    let prepared = prepare_longitudinal_states(history)
+        .map_err(|problem| format!("longitudinal state preparation refused: {problem}"))?;
+    prepared_input(
+        prepared,
+        |source_rows, transition_rows, notices| MultiStatePreparationEvidence::LongitudinalStates {
+            source_rows,
+            transition_rows,
+            notices,
+        },
+        rows,
+    )
+}
+
+fn prepare_wide_input(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    states: Vec<WideStateColumnsCommand>,
+    transitions: Vec<Vec<Option<usize>>>,
+    entry: WideEntryCommand,
+) -> Result<PreparedMultiStateInput, String> {
+    let transition_matrix = TransitionMatrix::from_numbered(transitions)
+        .map_err(|problem| format!("wide transition structure refused: {problem}"))?;
+    if states.len() != transition_matrix.state_count() {
+        return Err(format!(
+            "wide input defines {} state column pairs for a {}-state transition matrix",
+            states.len(),
+            transition_matrix.state_count()
+        ));
+    }
+
+    let mut subjects = Vec::with_capacity(rows);
+    for row in 0..rows {
+        let state_observations = states
+            .iter()
+            .map(|state| match state {
+                WideStateColumnsCommand::NotApplicable => Ok(StateObservation::NotApplicable),
+                WideStateColumnsCommand::Recorded { time, status } => {
+                    let time_value = value_at(values, rows, columns, *time, row)?;
+                    let status_value = value_at(values, rows, columns, *status, row)?;
+                    StateObservation::recorded(time_value, event_status(status_value, row)?)
+                        .map_err(|problem| format!("wide row {} refused: {problem}", row + 1))
+                }
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let (entry_state, entry_time) = match entry {
+            WideEntryCommand::Shared { state, time } => (
+                StateId::new(state)
+                    .map_err(|problem| format!("shared entry state refused: {problem}"))?,
+                time,
+            ),
+            WideEntryCommand::Columns { state, time } => (
+                state_id(value_at(values, rows, columns, state, row)?, row)?,
+                value_at(values, rows, columns, time, row)?,
+            ),
+        };
+        subjects.push(
+            WideSubject::new(
+                SubjectId::new((row + 1).to_string())
+                    .map_err(|problem| format!("wide subject id refused: {problem}"))?,
+                NonEmptyVec::try_from_vec(state_observations)
+                    .map_err(|problem| format!("wide state observations refused: {problem}"))?,
+                entry_state,
+                entry_time,
+                Vec::new(),
+            )
+            .map_err(|problem| format!("wide row {} refused: {problem}", row + 1))?,
+        );
+    }
+    let subjects = NonEmptyVec::try_from_vec(subjects)
+        .map_err(|problem| format!("wide subjects refused: {problem}"))?;
+    let history = WideEventHistory::new(transition_matrix, subjects)
+        .map_err(|problem| format!("wide event history refused: {problem}"))?;
+    let prepared = prepare_wide_events(history)
+        .map_err(|problem| format!("wide event preparation refused: {problem}"))?;
+    prepared_input(
+        prepared,
+        |source_rows, transition_rows, notices| MultiStatePreparationEvidence::WideEvents {
+            source_rows,
+            transition_rows,
+            notices,
+        },
+        rows,
+    )
+}
+
+fn prepared_input(
+    prepared: hirmos_causal_core::data_preparation::PreparedMultiStateData,
+    evidence: impl FnOnce(usize, usize, Vec<String>) -> MultiStatePreparationEvidence,
+    source_rows: usize,
+) -> Result<PreparedMultiStateInput, String> {
+    let transition_rows = prepared.rows().len();
+    let notices = prepared.notices().iter().map(ToString::to_string).collect();
+    let mut values = vec![0.0; transition_rows.saturating_mul(5)];
+    for (row, transition) in prepared.rows().iter().enumerate() {
+        values[row] = transition.start;
+        values[transition_rows + row] = transition.stop;
+        values[2 * transition_rows + row] = f64::from(transition.status.indicator());
+        values[3 * transition_rows + row] = transition.from.get() as f64;
+        values[4 * transition_rows + row] = transition.to.get() as f64;
+    }
+    Ok(PreparedMultiStateInput {
+        values,
+        rows: transition_rows,
+        evidence: evidence(source_rows, transition_rows, notices),
+    })
+}
+
+fn value_at(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    column_index: usize,
+    row: usize,
+) -> Result<f64, String> {
+    if values.len() != rows.saturating_mul(columns) {
+        return Err(
+            "multi-state preparation payload shape does not match rows and columns".to_owned(),
+        );
+    }
+    if column_index >= columns {
+        return Err(format!(
+            "multi-state preparation column {column_index} is outside the {columns}-column matrix"
+        ));
+    }
+    values
+        .get(column_index * rows + row)
+        .copied()
+        .ok_or_else(|| format!("multi-state preparation row {row} is outside the matrix"))
+}
+
+fn subject_id(value: f64, row: usize) -> Result<SubjectId, String> {
+    if !value.is_finite() || value.fract() != 0.0 {
+        return Err(format!(
+            "longitudinal subject code at row {} must be a finite integer",
+            row + 1
+        ));
+    }
+    SubjectId::new(format!("{value:.0}"))
+        .map_err(|problem| format!("longitudinal subject at row {} refused: {problem}", row + 1))
+}
+
+fn state_id(value: f64, row: usize) -> Result<StateId, String> {
+    if !value.is_finite() || value.fract() != 0.0 || value < 1.0 || value > usize::MAX as f64 {
+        return Err(format!(
+            "state at row {} must be a positive integer",
+            row + 1
+        ));
+    }
+    StateId::new(value as usize)
+        .map_err(|problem| format!("state at row {} refused: {problem}", row + 1))
+}
+
+fn event_status(value: f64, row: usize) -> Result<EventStatus, String> {
+    match value {
+        0.0 => Ok(EventStatus::Censored),
+        1.0 => Ok(EventStatus::Observed),
+        _ => Err(format!(
+            "status at row {} must be 0 for censored or 1 for observed",
+            row + 1
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -616,6 +951,9 @@ mod upstream_data_tests {
             group_zero_curve,
             group_one_curve,
             diagnostics,
+            observed_conversion,
+            fixed_time_conversion,
+            peto_peto,
             two_stage_p_value,
             restricted_mean_interval,
             ..
@@ -640,6 +978,15 @@ mod upstream_data_tests {
         assert!(group_zero.restricted_mean.is_finite());
         assert!(group_one.restricted_mean.is_finite());
         assert!(!crossing_times.is_empty());
+        assert!(matches!(
+            observed_conversion,
+            SurvivalSummary::Recorded { .. }
+        ));
+        assert!(matches!(
+            fixed_time_conversion,
+            SurvivalSummary::Recorded { .. }
+        ));
+        assert!(matches!(peto_peto, SurvivalSummary::Recorded { .. }));
         assert!((0.0..=1.0).contains(&two_stage_p_value));
         assert!(restricted_mean_interval[0] <= restricted_mean_interval[1]);
     }
@@ -699,11 +1046,13 @@ mod upstream_data_tests {
             &multi_state,
             rows,
             columns,
-            0,
-            1,
-            2,
-            3,
-            4,
+            MultiStateInputCommand::PreparedRows {
+                start: 0,
+                stop: 1,
+                event: 2,
+                from: 3,
+                to: 4,
+            },
             SurvivalFamily::WeibullPh,
             &[0.0, 3.0, 6.0, 12.0],
         )

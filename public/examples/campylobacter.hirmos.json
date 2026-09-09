@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T15:26:54.054Z",
+  "exportedAt": "2026-09-09T12:34:09.628Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T15:26:54.047Z",
+    "savedAt": "2026-09-09T12:34:09.623Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "8e1c4f7b-9a25-4d63-a7f0-2b5c9d8e1a64",
       "name": "Campylobacter cases and an outbreak step",
-      "createdAt": "2026-09-04T15:26:48.310Z"
+      "createdAt": "2026-09-09T12:34:03.655Z"
     },
     "source": {
       "name": "campylobacter.csv",
@@ -347,8 +347,8 @@
       ]
     },
     "prepared": {
-      "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
-      "recipe": "d7c19d95-8bd8-46a5-b33a-5acb7efd5d8f",
+      "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3",
+      "recipe": "302aeef7-b04c-445a-960f-ad5af457b5c4",
       "sourceProfile": "duckdb-wasm:1.30.0:903f2f1c1453d0de7417e0e7dbde7ffb3718496ea0a4bc16c619160dbcee4452",
       "observations": 140,
       "columns": [
@@ -395,9 +395,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "39a4951e-1abc-4845-8c0f-d9e907f89c19",
+        "id": "b457b032-67fb-467c-9da0-b7416aa7e59f",
         "name": "Outbreak step and campylobacter cases",
-        "preparedDataset": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
+        "preparedDataset": "c11110b8-1c4b-42d2-a315-62c58609f8d3",
         "dataset": {
           "kind": "time-series",
           "observations": 140
@@ -409,21 +409,21 @@
         "history": [
           {
             "kind": "draft",
-            "id": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
+            "id": "58b57f7a-0b7d-4862-9c00-0807f923a864",
             "parent": null,
-            "createdAt": "2026-09-04T15:26:50.939Z",
+            "createdAt": "2026-09-09T12:34:06.420Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
                   "column": "3:outbreak",
                   "name": "outbreak"
                 },
                 {
                   "kind": "observed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
                   "column": "4:cases",
                   "name": "cases"
                 }
@@ -444,21 +444,21 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
+            "id": "58b57f7a-0b7d-4862-9c00-0807f923a864",
             "parent": null,
-            "createdAt": "2026-09-04T15:26:50.939Z",
+            "createdAt": "2026-09-09T12:34:06.420Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
                   "column": "3:outbreak",
                   "name": "outbreak"
                 },
                 {
                   "kind": "observed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
                   "column": "4:cases",
                   "name": "cases"
                 }
@@ -476,21 +476,21 @@
           },
           {
             "kind": "draft",
-            "id": "b468b561-2bfe-4b69-8045-ee2f39ab4857",
-            "parent": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
-            "createdAt": "2026-09-04T15:26:51.200Z",
+            "id": "c19bba2f-828b-49b3-aa4d-6d09aa193213",
+            "parent": "58b57f7a-0b7d-4862-9c00-0807f923a864",
+            "createdAt": "2026-09-09T12:34:06.678Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
                   "column": "3:outbreak",
                   "name": "outbreak"
                 },
                 {
                   "kind": "observed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
                   "column": "4:cases",
                   "name": "cases"
                 }
@@ -498,9 +498,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak->d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases@t",
-                  "cause": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
-                  "effect": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                  "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak->c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases@t",
+                  "cause": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
+                  "effect": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -519,21 +519,21 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "b468b561-2bfe-4b69-8045-ee2f39ab4857",
-          "parent": "e8eb31ff-ad06-46de-877f-9e3240d7e588",
-          "createdAt": "2026-09-04T15:26:51.200Z",
+          "id": "c19bba2f-828b-49b3-aa4d-6d09aa193213",
+          "parent": "58b57f7a-0b7d-4862-9c00-0807f923a864",
+          "createdAt": "2026-09-09T12:34:06.678Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+                "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
                 "column": "3:outbreak",
                 "name": "outbreak"
               },
               {
                 "kind": "observed",
-                "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
                 "column": "4:cases",
                 "name": "cases"
               }
@@ -541,9 +541,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak->d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases@t",
-                "cause": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
-                "effect": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+                "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak->c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases@t",
+                "cause": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
+                "effect": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -564,10 +564,16 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "39a4951e-1abc-4845-8c0f-d9e907f89c19",
-      "treatment": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
-      "outcome": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+      "dagDocument": "b457b032-67fb-467c-9da0-b7416aa7e59f",
+      "treatment": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
+      "outcome": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": "policy-change",
         "description": "The indicator marks period 84 onward, the strongest level shift in the window the tscount example searches."
@@ -578,23 +584,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "537f7389-e9b2-4325-a412-0cc61cfd9a60",
-        "createdAt": "2026-09-04T15:26:52.374Z",
-        "preparedDataset": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
+        "id": "80045040-5cb2-46b5-966d-a5258765426d",
+        "createdAt": "2026-09-09T12:34:07.846Z",
+        "preparedDataset": "c11110b8-1c4b-42d2-a315-62c58609f8d3",
         "dataset": {
           "kind": "time-series",
           "observations": 140
         },
-        "dagDocument": "39a4951e-1abc-4845-8c0f-d9e907f89c19",
-        "dagRevision": "b468b561-2bfe-4b69-8045-ee2f39ab4857",
+        "dagDocument": "b457b032-67fb-467c-9da0-b7416aa7e59f",
+        "dagRevision": "c19bba2f-828b-49b3-aa4d-6d09aa193213",
         "dagName": "Outbreak step and campylobacter cases",
         "treatment": {
-          "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+          "node": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
           "column": "3:outbreak",
           "name": "outbreak"
         },
         "outcome": {
-          "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+          "node": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
           "column": "4:cases",
           "name": "cases"
         },
@@ -624,12 +630,12 @@
         "graph": {
           "nodes": [
             {
-              "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+              "node": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
               "name": "outbreak",
               "column": "3:outbreak"
             },
             {
-              "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+              "node": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
               "name": "cases",
               "column": "4:cases"
             }
@@ -647,13 +653,13 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+              "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
               "column": "3:outbreak",
               "name": "outbreak"
             },
             {
               "kind": "observed",
-              "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+              "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
               "column": "4:cases",
               "name": "cases"
             }
@@ -661,9 +667,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak->d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases@t",
-              "cause": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
-              "effect": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+              "id": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak->c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases@t",
+              "cause": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
+              "effect": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -680,9 +686,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "3b98e24d-3c90-493e-9a5c-a3dc66e1227c",
-        "study": "537f7389-e9b2-4325-a412-0cc61cfd9a60",
-        "createdAt": "2026-09-04T15:26:52.495Z",
+        "id": "e4fc303a-505a-4fba-897e-1520ed368cf4",
+        "study": "80045040-5cb2-46b5-966d-a5258765426d",
+        "createdAt": "2026-09-09T12:34:07.965Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -699,6 +705,9 @@
             "truncated": false
           },
           "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "instruments": {
             "kind": "notIdentified"
           },
           "graphicalIdentification": {
@@ -735,6 +744,9 @@
             ]
           },
           "mediators": [],
+          "instruments": {
+            "kind": "not-identified"
+          },
           "basis": [
             {
               "kind": "design-record",
@@ -744,7 +756,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “Outbreak step and campylobacter cases” (revision b468b561) states the causes of outbreak and cases; a missing arrow claims there is no direct cause."
+              "statement": "The graph “Outbreak step and campylobacter cases” (revision c19bba2f) states the causes of outbreak and cases; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -774,11 +786,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "0d18593e-beeb-4a13-aabe-755cbdd21e9d",
-        "study": "537f7389-e9b2-4325-a412-0cc61cfd9a60",
-        "identification": "3b98e24d-3c90-493e-9a5c-a3dc66e1227c",
-        "preparedDataset": "d815fe32-d5b9-416e-acde-e1d19f41b7ab",
-        "createdAt": "2026-09-04T15:26:53.579Z",
+        "id": "481ca1d8-330e-44a9-90bf-9fbec838b7a8",
+        "study": "80045040-5cb2-46b5-966d-a5258765426d",
+        "identification": "e4fc303a-505a-4fba-897e-1520ed368cf4",
+        "preparedDataset": "c11110b8-1c4b-42d2-a315-62c58609f8d3",
+        "createdAt": "2026-09-09T12:34:09.047Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -1284,12 +1296,12 @@
         "method": "negative-binomial-ingarch",
         "columns": [
           {
-            "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:3:outbreak",
+            "node": "c11110b8-1c4b-42d2-a315-62c58609f8d3:3:outbreak",
             "column": "3:outbreak",
             "name": "outbreak"
           },
           {
-            "node": "d815fe32-d5b9-416e-acde-e1d19f41b7ab:4:cases",
+            "node": "c11110b8-1c4b-42d2-a315-62c58609f8d3:4:cases",
             "column": "4:cases",
             "name": "cases"
           }
@@ -1422,7 +1434,8 @@
       }
     ],
     "sensitivityRuns": [],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

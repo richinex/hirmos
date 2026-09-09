@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-04T15:02:51.243Z",
+  "exportedAt": "2026-09-09T12:35:21.336Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-04T15:02:51.237Z",
+    "savedAt": "2026-09-09T12:35:21.330Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "9c5b2e7a-1d38-4f64-a2b9-7e4c1f8d3a25",
       "name": "A simulated process with a collider",
-      "createdAt": "2026-09-04T15:02:44.088Z"
+      "createdAt": "2026-09-09T12:35:13.957Z"
     },
     "source": {
       "name": "molak-ch7.csv",
@@ -347,8 +347,8 @@
       ]
     },
     "prepared": {
-      "id": "2546294c-d59c-41ce-9ad0-dd6884704874",
-      "recipe": "88d3d9ee-b412-472f-bc11-24671d7fc68f",
+      "id": "fdb83bfb-d804-4873-9482-4743f578c157",
+      "recipe": "50fa3c2d-8780-4002-98a9-e70913ac668c",
       "sourceProfile": "duckdb-wasm:1.30.0:90ba47592c494f7397d1cc2f70b1b72a6d18d3c92a49fc127da0f8cf96a6d0b5",
       "observations": 1000,
       "columns": [
@@ -379,9 +379,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "7d55da16-c463-4ba4-bfde-6bebcac90699",
+        "id": "62be061e-f40e-4c68-b784-35a2b68f816e",
         "name": "Simulated five-variable process",
-        "preparedDataset": "2546294c-d59c-41ce-9ad0-dd6884704874",
+        "preparedDataset": "fdb83bfb-d804-4873-9482-4743f578c157",
         "dataset": {
           "kind": "cross-section",
           "observations": 1000
@@ -393,39 +393,39 @@
         "history": [
           {
             "kind": "draft",
-            "id": "20eaabbd-e1b7-4260-8e65-0515e6c3ea57",
+            "id": "d4cda360-16ef-44c2-9525-9970b7ab9588",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:46.744Z",
+            "createdAt": "2026-09-09T12:35:16.628Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -443,39 +443,39 @@
           },
           {
             "kind": "draft",
-            "id": "1833f73b-ee31-4b44-b776-ea8602ae2c03",
-            "parent": "20eaabbd-e1b7-4260-8e65-0515e6c3ea57",
-            "createdAt": "2026-09-04T15:02:47.038Z",
+            "id": "85aeaa57-d3d0-4f3f-8fc5-9c8afde8c597",
+            "parent": "d4cda360-16ef-44c2-9525-9970b7ab9588",
+            "createdAt": "2026-09-09T12:35:16.914Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -483,9 +483,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -503,39 +503,39 @@
           },
           {
             "kind": "draft",
-            "id": "e9667c91-a708-444d-a269-bf6ded72a805",
-            "parent": "1833f73b-ee31-4b44-b776-ea8602ae2c03",
-            "createdAt": "2026-09-04T15:02:47.228Z",
+            "id": "253b5831-add8-4449-bc7c-ded944565ed4",
+            "parent": "85aeaa57-d3d0-4f3f-8fc5-9c8afde8c597",
+            "createdAt": "2026-09-09T12:35:17.103Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -543,9 +543,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -557,9 +557,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -577,39 +577,39 @@
           },
           {
             "kind": "draft",
-            "id": "f22bca1b-5288-4904-98f7-6c2b26a27c12",
-            "parent": "e9667c91-a708-444d-a269-bf6ded72a805",
-            "createdAt": "2026-09-04T15:02:47.469Z",
+            "id": "77ee1caf-e1b6-4616-9db6-fef59957d4e0",
+            "parent": "253b5831-add8-4449-bc7c-ded944565ed4",
+            "createdAt": "2026-09-09T12:35:17.329Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -617,9 +617,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -631,9 +631,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -645,9 +645,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -665,39 +665,39 @@
           },
           {
             "kind": "draft",
-            "id": "2a52fbd4-8857-4a53-b6ce-b9239d84b2b3",
-            "parent": "f22bca1b-5288-4904-98f7-6c2b26a27c12",
-            "createdAt": "2026-09-04T15:02:47.644Z",
+            "id": "e66ce8e5-d741-4481-be95-7a742d1d6fad",
+            "parent": "77ee1caf-e1b6-4616-9db6-fef59957d4e0",
+            "createdAt": "2026-09-09T12:35:17.504Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -705,9 +705,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -719,9 +719,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -733,9 +733,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -747,9 +747,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -767,39 +767,39 @@
           },
           {
             "kind": "draft",
-            "id": "883b7ed7-6e6f-4fc9-83ab-0fad0a565ab6",
-            "parent": "2a52fbd4-8857-4a53-b6ce-b9239d84b2b3",
-            "createdAt": "2026-09-04T15:02:47.828Z",
+            "id": "bedc9ae7-a2ff-4212-be18-c8031daed602",
+            "parent": "e66ce8e5-d741-4481-be95-7a742d1d6fad",
+            "createdAt": "2026-09-09T12:35:17.672Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -807,9 +807,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -821,9 +821,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -835,9 +835,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -849,9 +849,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -863,9 +863,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -883,39 +883,39 @@
           },
           {
             "kind": "draft",
-            "id": "fa913cc4-bfaf-47c0-bb19-eef0843ea3bd",
-            "parent": "883b7ed7-6e6f-4fc9-83ab-0fad0a565ab6",
-            "createdAt": "2026-09-04T15:02:47.994Z",
+            "id": "b2865fb3-8463-486a-ae2d-2c56dc273d66",
+            "parent": "bedc9ae7-a2ff-4212-be18-c8031daed602",
+            "createdAt": "2026-09-09T12:35:17.829Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -923,9 +923,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -937,9 +937,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -951,9 +951,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -965,9 +965,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -979,9 +979,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -993,9 +993,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1016,39 +1016,39 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "20eaabbd-e1b7-4260-8e65-0515e6c3ea57",
+            "id": "d4cda360-16ef-44c2-9525-9970b7ab9588",
             "parent": null,
-            "createdAt": "2026-09-04T15:02:46.744Z",
+            "createdAt": "2026-09-09T12:35:16.628Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1066,39 +1066,39 @@
           },
           {
             "kind": "draft",
-            "id": "1833f73b-ee31-4b44-b776-ea8602ae2c03",
-            "parent": "20eaabbd-e1b7-4260-8e65-0515e6c3ea57",
-            "createdAt": "2026-09-04T15:02:47.038Z",
+            "id": "85aeaa57-d3d0-4f3f-8fc5-9c8afde8c597",
+            "parent": "d4cda360-16ef-44c2-9525-9970b7ab9588",
+            "createdAt": "2026-09-09T12:35:16.914Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1106,9 +1106,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1126,39 +1126,39 @@
           },
           {
             "kind": "draft",
-            "id": "e9667c91-a708-444d-a269-bf6ded72a805",
-            "parent": "1833f73b-ee31-4b44-b776-ea8602ae2c03",
-            "createdAt": "2026-09-04T15:02:47.228Z",
+            "id": "253b5831-add8-4449-bc7c-ded944565ed4",
+            "parent": "85aeaa57-d3d0-4f3f-8fc5-9c8afde8c597",
+            "createdAt": "2026-09-09T12:35:17.103Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1166,9 +1166,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1180,9 +1180,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1200,39 +1200,39 @@
           },
           {
             "kind": "draft",
-            "id": "f22bca1b-5288-4904-98f7-6c2b26a27c12",
-            "parent": "e9667c91-a708-444d-a269-bf6ded72a805",
-            "createdAt": "2026-09-04T15:02:47.469Z",
+            "id": "77ee1caf-e1b6-4616-9db6-fef59957d4e0",
+            "parent": "253b5831-add8-4449-bc7c-ded944565ed4",
+            "createdAt": "2026-09-09T12:35:17.329Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1240,9 +1240,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1254,9 +1254,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1268,9 +1268,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1288,39 +1288,39 @@
           },
           {
             "kind": "draft",
-            "id": "2a52fbd4-8857-4a53-b6ce-b9239d84b2b3",
-            "parent": "f22bca1b-5288-4904-98f7-6c2b26a27c12",
-            "createdAt": "2026-09-04T15:02:47.644Z",
+            "id": "e66ce8e5-d741-4481-be95-7a742d1d6fad",
+            "parent": "77ee1caf-e1b6-4616-9db6-fef59957d4e0",
+            "createdAt": "2026-09-09T12:35:17.504Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1328,9 +1328,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1342,9 +1342,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1356,9 +1356,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1370,9 +1370,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1390,39 +1390,39 @@
           },
           {
             "kind": "draft",
-            "id": "883b7ed7-6e6f-4fc9-83ab-0fad0a565ab6",
-            "parent": "2a52fbd4-8857-4a53-b6ce-b9239d84b2b3",
-            "createdAt": "2026-09-04T15:02:47.828Z",
+            "id": "bedc9ae7-a2ff-4212-be18-c8031daed602",
+            "parent": "e66ce8e5-d741-4481-be95-7a742d1d6fad",
+            "createdAt": "2026-09-09T12:35:17.672Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1430,9 +1430,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1444,9 +1444,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1458,9 +1458,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1472,9 +1472,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1486,9 +1486,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1506,39 +1506,39 @@
           },
           {
             "kind": "draft",
-            "id": "fa913cc4-bfaf-47c0-bb19-eef0843ea3bd",
-            "parent": "883b7ed7-6e6f-4fc9-83ab-0fad0a565ab6",
-            "createdAt": "2026-09-04T15:02:47.994Z",
+            "id": "b2865fb3-8463-486a-ae2d-2c56dc273d66",
+            "parent": "bedc9ae7-a2ff-4212-be18-c8031daed602",
+            "createdAt": "2026-09-09T12:35:17.829Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1546,9 +1546,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1560,9 +1560,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1574,9 +1574,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1588,9 +1588,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1602,9 +1602,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1616,9 +1616,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1636,39 +1636,39 @@
           },
           {
             "kind": "draft",
-            "id": "4e2cc0df-9b30-4e29-837a-a1571b05044a",
-            "parent": "fa913cc4-bfaf-47c0-bb19-eef0843ea3bd",
-            "createdAt": "2026-09-04T15:02:48.171Z",
+            "id": "9df61709-47fc-4bc7-bc99-31fc8a8b4d44",
+            "parent": "b2865fb3-8463-486a-ae2d-2c56dc273d66",
+            "createdAt": "2026-09-09T12:35:18.003Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                   "column": "0:S",
                   "name": "S"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "column": "2:X",
                   "name": "X"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "column": "3:Y",
                   "name": "Y"
                 },
                 {
                   "kind": "observed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "column": "4:P",
                   "name": "P"
                 }
@@ -1676,9 +1676,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1690,9 +1690,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1704,9 +1704,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1718,9 +1718,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1732,9 +1732,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1746,9 +1746,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1760,9 +1760,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                  "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                  "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                  "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                  "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                  "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -1781,39 +1781,39 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "4e2cc0df-9b30-4e29-837a-a1571b05044a",
-          "parent": "fa913cc4-bfaf-47c0-bb19-eef0843ea3bd",
-          "createdAt": "2026-09-04T15:02:48.171Z",
+          "id": "9df61709-47fc-4bc7-bc99-31fc8a8b4d44",
+          "parent": "b2865fb3-8463-486a-ae2d-2c56dc273d66",
+          "createdAt": "2026-09-09T12:35:18.003Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
                 "column": "0:S",
                 "name": "S"
               },
               {
                 "kind": "observed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                 "column": "1:Q",
                 "name": "Q"
               },
               {
                 "kind": "observed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                 "column": "2:X",
                 "name": "X"
               },
               {
                 "kind": "observed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                 "column": "3:Y",
                 "name": "Y"
               },
               {
                 "kind": "observed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                 "column": "4:P",
                 "name": "P"
               }
@@ -1821,9 +1821,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1835,9 +1835,9 @@
               },
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1849,9 +1849,9 @@
               },
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1863,9 +1863,9 @@
               },
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1877,9 +1877,9 @@
               },
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1891,9 +1891,9 @@
               },
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1905,9 +1905,9 @@
               },
               {
                 "kind": "directed",
-                "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-                "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-                "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+                "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+                "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+                "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -1928,10 +1928,16 @@
     "dagChecks": [],
     "interventionQueries": [],
     "studyDraft": {
-      "dagDocument": "7d55da16-c463-4ba4-bfde-6bebcac90699",
-      "treatment": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-      "outcome": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+      "dagDocument": "62be061e-f40e-4c68-b784-35a2b68f816e",
+      "treatment": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+      "outcome": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
       "estimand": "average-treatment-effect",
+      "modifier": null,
+      "grouping": {
+        "kind": "quantiles",
+        "bins": 3
+      },
+      "modifiers": [],
       "assignment": {
         "kind": "observed-choice",
         "description": "X is generated from Q and its own noise in the simulated process; nothing assigns it."
@@ -1942,23 +1948,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "8dfc59e0-aca7-43f4-9919-c58c78bc7cfc",
-        "createdAt": "2026-09-04T15:02:49.320Z",
-        "preparedDataset": "2546294c-d59c-41ce-9ad0-dd6884704874",
+        "id": "04e866b9-70a0-4b99-92de-2fa2ca9f0db6",
+        "createdAt": "2026-09-09T12:35:19.137Z",
+        "preparedDataset": "fdb83bfb-d804-4873-9482-4743f578c157",
         "dataset": {
           "kind": "cross-section",
           "observations": 1000
         },
-        "dagDocument": "7d55da16-c463-4ba4-bfde-6bebcac90699",
-        "dagRevision": "4e2cc0df-9b30-4e29-837a-a1571b05044a",
+        "dagDocument": "62be061e-f40e-4c68-b784-35a2b68f816e",
+        "dagRevision": "9df61709-47fc-4bc7-bc99-31fc8a8b4d44",
         "dagName": "Simulated five-variable process",
         "treatment": {
-          "node": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+          "node": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
           "column": "2:X",
           "name": "X"
         },
         "outcome": {
-          "node": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+          "node": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
           "column": "3:Y",
           "name": "Y"
         },
@@ -1988,27 +1994,27 @@
         "graph": {
           "nodes": [
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
               "name": "S",
               "column": "0:S"
             },
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
               "name": "Q",
               "column": "1:Q"
             },
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
               "name": "X",
               "column": "2:X"
             },
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
               "name": "Y",
               "column": "3:Y"
             },
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
               "name": "P",
               "column": "4:P"
             }
@@ -2050,31 +2056,31 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
               "column": "0:S",
               "name": "S"
             },
             {
               "kind": "observed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
               "column": "1:Q",
               "name": "Q"
             },
             {
               "kind": "observed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
               "column": "2:X",
               "name": "X"
             },
             {
               "kind": "observed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
               "column": "3:Y",
               "name": "Y"
             },
             {
               "kind": "observed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
               "column": "4:P",
               "name": "P"
             }
@@ -2082,9 +2088,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:1:Q@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:1:Q@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2096,9 +2102,9 @@
             },
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:0:S->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2110,9 +2116,9 @@
             },
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:2:X@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:2:X@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2124,9 +2130,9 @@
             },
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2138,9 +2144,9 @@
             },
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2152,9 +2158,9 @@
             },
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y->2546294c-d59c-41ce-9ad0-dd6884704874:4:P@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:4:P",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y->fdb83bfb-d804-4873-9482-4743f578c157:4:P@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:4:P",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2166,9 +2172,9 @@
             },
             {
               "kind": "directed",
-              "id": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X->2546294c-d59c-41ce-9ad0-dd6884704874:3:Y@t",
-              "cause": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
-              "effect": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+              "id": "fdb83bfb-d804-4873-9482-4743f578c157:2:X->fdb83bfb-d804-4873-9482-4743f578c157:3:Y@t",
+              "cause": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
+              "effect": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -2185,9 +2191,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "75e83723-1453-4487-96ee-507ae3c66ca3",
-        "study": "8dfc59e0-aca7-43f4-9919-c58c78bc7cfc",
-        "createdAt": "2026-09-04T15:02:49.435Z",
+        "id": "5f7a2eb0-d5c5-4198-9598-cf10ef20e16a",
+        "study": "04e866b9-70a0-4b99-92de-2fa2ca9f0db6",
+        "createdAt": "2026-09-09T12:35:19.258Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -2209,6 +2215,9 @@
             "truncated": false
           },
           "frontdoor": {
+            "kind": "notIdentified"
+          },
+          "instruments": {
             "kind": "notIdentified"
           },
           "graphicalIdentification": {
@@ -2261,7 +2270,7 @@
             "ordinal": 0,
             "variables": [
               {
-                "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                 "column": "1:Q",
                 "name": "Q"
               }
@@ -2269,12 +2278,12 @@
           },
           "canonicalAdjustmentSet": [
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:0:S",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:0:S",
               "column": "0:S",
               "name": "S"
             },
             {
-              "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+              "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
               "column": "1:Q",
               "name": "Q"
             }
@@ -2284,7 +2293,7 @@
             "sets": [
               [
                 {
-                  "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                  "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                   "column": "1:Q",
                   "name": "Q"
                 }
@@ -2292,6 +2301,9 @@
             ]
           },
           "mediators": [],
+          "instruments": {
+            "kind": "not-identified"
+          },
           "basis": [
             {
               "kind": "design-record",
@@ -2301,7 +2313,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “Simulated five-variable process” (revision 4e2cc0df) states the causes of X and Y; a missing arrow claims there is no direct cause."
+              "statement": "The graph “Simulated five-variable process” (revision 9df61709) states the causes of X and Y; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -2393,11 +2405,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "07f153a7-8438-47a8-bc0e-8380aa927308",
-        "study": "8dfc59e0-aca7-43f4-9919-c58c78bc7cfc",
-        "identification": "75e83723-1453-4487-96ee-507ae3c66ca3",
-        "preparedDataset": "2546294c-d59c-41ce-9ad0-dd6884704874",
-        "createdAt": "2026-09-04T15:02:50.391Z",
+        "id": "1a93a6dd-c1cd-4bda-82b3-b06ef1bcd2c9",
+        "study": "04e866b9-70a0-4b99-92de-2fa2ca9f0db6",
+        "identification": "5f7a2eb0-d5c5-4198-9598-cf10ef20e16a",
+        "preparedDataset": "fdb83bfb-d804-4873-9482-4743f578c157",
+        "createdAt": "2026-09-09T12:35:20.207Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -2468,7 +2480,7 @@
               "caveat": {
                 "id": "linear-hac-bandwidth",
                 "category": "finite-sample",
-                "requirement": "The HAC bandwidth is statsmodels’ default, floor(4 (n/100)^(2/9)) lags, recorded with the run.",
+                "requirement": "The HAC bandwidth is floor(4 (n/100)^(2/9)) lags, recorded with the run.",
                 "consequenceIfUnmet": "A bandwidth chosen after the result changes the interval without a record.",
                 "sources": [
                   {
@@ -2583,38 +2595,38 @@
             2
           ],
           "level": 0.95,
-          "estimate": 0.7513220911886245,
-          "standardError": 0.03133869263542019,
+          "estimate": 0.7513220911886254,
+          "standardError": 0.031338692635420266,
           "interval": [
-            0.6898247256515428,
-            0.8128194567257061
+            0.6898247256515435,
+            0.8128194567257072
           ],
           "degreesOfFreedom": 997,
           "residualSd": 0.11321480771312968,
           "rSquared": 0.4885467059733256,
           "hacMaxLags": 6,
-          "hacStandardError": 0.031194510001438643,
+          "hacStandardError": 0.03119451000143873,
           "hacInterval": [
-            0.6901819750704302,
-            0.8124622073068187
+            0.690181975070431,
+            0.8124622073068197
           ],
-          "hacPValue": 3.583678067152283e-128,
-          "durbinWatson": 2.0210696376448105
+          "hacPValue": 3.5836780671557583e-128,
+          "durbinWatson": 2.021069637644811
         },
         "method": "backdoor-linear-regression",
         "columns": [
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
             "column": "2:X",
             "name": "X"
           },
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
             "column": "3:Y",
             "name": "Y"
           },
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
             "column": "1:Q",
             "name": "Q"
           }
@@ -2627,21 +2639,21 @@
           },
           "effect": {
             "kind": "additive",
-            "value": 0.7513220911886245,
+            "value": 0.7513220911886254,
             "unit": ""
           },
           "interval": {
             "kind": "confidence",
             "level": 0.95,
-            "lower": 0.6898247256515428,
-            "upper": 0.8128194567257061
+            "lower": 0.6898247256515435,
+            "upper": 0.8128194567257072
           },
-          "standardError": 0.03133869263542019,
+          "standardError": 0.031338692635420266,
           "adjustment": {
             "kind": "contemporaneous",
             "variables": [
               {
-                "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                 "column": "1:Q",
                 "name": "Q"
               }
@@ -2655,11 +2667,11 @@
         }
       },
       {
-        "id": "ab4a55e2-1d89-41c1-9760-afaf629146d1",
-        "study": "8dfc59e0-aca7-43f4-9919-c58c78bc7cfc",
-        "identification": "75e83723-1453-4487-96ee-507ae3c66ca3",
-        "preparedDataset": "2546294c-d59c-41ce-9ad0-dd6884704874",
-        "createdAt": "2026-09-04T15:02:50.565Z",
+        "id": "3f5f0098-9713-4dde-8874-ede376aa2126",
+        "study": "04e866b9-70a0-4b99-92de-2fa2ca9f0db6",
+        "identification": "5f7a2eb0-d5c5-4198-9598-cf10ef20e16a",
+        "preparedDataset": "fdb83bfb-d804-4873-9482-4743f578c157",
+        "createdAt": "2026-09-09T12:35:20.362Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -2700,7 +2712,7 @@
                   }
                 ]
               },
-              "evidence": "Nuisance learners see the identified set: Q."
+              "evidence": "Nuisance learners see Q."
             },
             {
               "kind": "satisfied",
@@ -2722,6 +2734,33 @@
                 ]
               },
               "evidence": "The prepared dataset holds independent rows, so shuffled folds are valid."
+            },
+            {
+              "kind": "satisfied",
+              "caveat": {
+                "id": "dml-plr-group-effects",
+                "category": "functional-form",
+                "requirement": "For a conditional target the effect of the treatment is linear within each group of the effect modifier, and may differ between groups; the modifier is distinct from the treatment and joins the adjustment set as a nuisance input.",
+                "consequenceIfUnmet": "A group effect then averages over effects that vary inside the group, and the contrast between groups is not the heterogeneity it appears to be.",
+                "sources": [
+                  {
+                    "kind": "paper",
+                    "title": "Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 8",
+                    "locator": "§8.1.4 heterogeneous treatment effects, the conditional average treatment effect"
+                  },
+                  {
+                    "kind": "paper",
+                    "title": "Causal AI (Ness, Manning), chapter 11",
+                    "locator": "§11.4 conditional average treatment effect estimation"
+                  },
+                  {
+                    "kind": "paper",
+                    "title": "DoubleML: an object-oriented implementation of double machine learning in R (Bach, Chernozhukov, Kurz and Spindler)",
+                    "locator": "arXiv:2103.09603; theorem 1"
+                  }
+                ]
+              },
+              "evidence": "The study targets one average, so no group effects are estimated."
             },
             {
               "kind": "satisfied",
@@ -2838,22 +2877,25 @@
             0.678721965038035,
             0.7947512446351785
           ],
-          "level": 0.95
+          "level": 0.95,
+          "groups": {
+            "kind": "none"
+          }
         },
         "method": "dml-plr",
         "columns": [
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
             "column": "2:X",
             "name": "X"
           },
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
             "column": "3:Y",
             "name": "Y"
           },
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
             "column": "1:Q",
             "name": "Q"
           }
@@ -2880,7 +2922,7 @@
             "kind": "contemporaneous",
             "variables": [
               {
-                "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+                "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
                 "column": "1:Q",
                 "name": "Q"
               }
@@ -2896,23 +2938,23 @@
     ],
     "sensitivityRuns": [
       {
-        "id": "8ab99644-fc6d-498d-baa0-d5d4e2061f78",
-        "estimationRun": "07f153a7-8438-47a8-bc0e-8380aa927308",
-        "preparedDataset": "2546294c-d59c-41ce-9ad0-dd6884704874",
-        "createdAt": "2026-09-04T15:02:50.914Z",
+        "id": "69b078b7-146f-4ca4-9d83-0c079391f003",
+        "estimationRun": "1a93a6dd-c1cd-4bda-82b3-b06ef1bcd2c9",
+        "preparedDataset": "fdb83bfb-d804-4873-9482-4743f578c157",
+        "createdAt": "2026-09-09T12:35:20.717Z",
         "columns": [
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:2:X",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:2:X",
             "column": "2:X",
             "name": "X"
           },
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:3:Y",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:3:Y",
             "column": "3:Y",
             "name": "Y"
           },
           {
-            "node": "2546294c-d59c-41ce-9ad0-dd6884704874:1:Q",
+            "node": "fdb83bfb-d804-4873-9482-4743f578c157:1:Q",
             "column": "1:Q",
             "name": "Q"
           }
@@ -2928,13 +2970,13 @@
         "evidence": {
           "kind": "linearRefutation",
           "observations": 1000,
-          "estimate": 0.7513220911886245,
+          "estimate": 0.7513220911886254,
           "simulations": 50,
           "seed": 555,
-          "placeboEffect": 0.00006971282604227358,
+          "placeboEffect": 0.00006971282604229635,
           "subsetFraction": 0.8,
-          "subsetEffect": 0.7520530544341937,
-          "randomCommonCauseEffect": 0.7512887354487116,
+          "subsetEffect": 0.7520530544341933,
+          "randomCommonCauseEffect": 0.7512887354487131,
           "ljungBoxLags": [
             1,
             2,
@@ -2950,43 +2992,43 @@
             12
           ],
           "ljungBoxStatistics": [
-            0.15005332274385497,
-            2.7716503779255337,
-            2.824860286472448,
-            4.706451042826242,
-            4.919265069099331,
-            5.109968441862163,
-            7.131980682041476,
-            9.311993249826518,
-            9.82171074317069,
-            9.944360729622097,
-            10.923367065607883,
-            11.434617149629984
+            0.15005332274385402,
+            2.7716503779255346,
+            2.8248602864724486,
+            4.706451042826233,
+            4.91926506909932,
+            5.109968441862149,
+            7.131980682041462,
+            9.311993249826493,
+            9.82171074317067,
+            9.944360729622076,
+            10.923367065607858,
+            11.434617149629956
           ],
           "ljungBoxPValues": [
-            0.6984844063945097,
-            0.25011732055889874,
+            0.6984844063945106,
+            0.25011732055889857,
             0.41942380537289026,
-            0.3187644670874259,
-            0.42581252359087973,
-            0.5297883030157957,
-            0.41526878279570617,
-            0.31666406194571567,
-            0.3651107531316043,
-            0.44538822703788394,
-            0.4497055483503124,
-            0.4920841176211629
+            0.318764467087427,
+            0.4258125235908812,
+            0.5297883030157973,
+            0.4152687827957075,
+            0.3166640619457176,
+            0.3651107531316066,
+            0.4453882270378857,
+            0.4497055483503143,
+            0.49208411762116533
           ],
-          "shapiroW": 0.9935144688174296,
-          "shapiroP": 0.00024299439272046169,
-          "durbinWatson": 2.0210696376448105
+          "shapiroW": 0.9935144688174289,
+          "shapiroP": 0.00024299439272026596,
+          "durbinWatson": 2.021069637644811
         },
         "refuters": [
           {
             "id": "placebo",
             "method": "placebo-treatment-refuter",
-            "original": 0.7513220911886245,
-            "refuted": 0.00006971282604227358,
+            "original": 0.7513220911886254,
+            "refuted": 0.00006971282604229635,
             "interpretation": {
               "kind": "reference-distance",
               "reference": "zero",
@@ -2996,8 +3038,8 @@
           {
             "id": "data-subset",
             "method": "data-subset-refuter",
-            "original": 0.7513220911886245,
-            "refuted": 0.7520530544341937,
+            "original": 0.7513220911886254,
+            "refuted": 0.7520530544341933,
             "interpretation": {
               "kind": "reference-distance",
               "reference": "original-estimate",
@@ -3007,8 +3049,8 @@
           {
             "id": "random-common-cause",
             "method": "random-common-cause-refuter",
-            "original": 0.7513220911886245,
-            "refuted": 0.7512887354487116,
+            "original": 0.7513220911886254,
+            "refuted": 0.7512887354487131,
             "interpretation": {
               "kind": "reference-distance",
               "reference": "original-estimate",
@@ -3035,7 +3077,8 @@
         ]
       }
     ],
-    "counterfactualRuns": []
+    "counterfactualRuns": [],
+    "survivalRuns": []
   },
   "data": {
     "kind": "source-file",

@@ -11,11 +11,12 @@ import { Select } from '@/components/ui/Select'
 import { button, chapterIntro, field, fieldHint, fieldLabel, label, num, panel, sectionTitle } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { RunActivity } from '@/domain/activity'
-import type { ColumnId, DatasetProfile, NumericColumnSelection } from '@/domain/dataset'
-import { assertNever, err, ok, type NonEmptyArray, type Result } from '@/domain/dop'
+import { isNumericDuckDbType, type ColumnId, type ColumnSelection, type DatasetProfile, type NumericColumnSelection } from '@/domain/dataset'
+import { assertNever, err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { chapterLabel } from '@/domain/navigation'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import {
+  describeSurvivalRefusal,
   multiStateSurvivalRun,
   newSurvivalRunId,
   parametricSurvivalFamilySchema,
@@ -24,6 +25,7 @@ import {
   startStopSurvivalRun,
   type ParametricSurvivalFamily,
   type ProportionalHazardsFamily,
+  type MultiStateInputConfiguration,
   type SurvivalRunArtifact,
 } from '@/domain/survival'
 import type { SelectedSource } from '@/domain/workflow'
@@ -35,13 +37,39 @@ type Draft =
   | { readonly kind: 'right-censored'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[]; readonly family: ParametricSurvivalFamily; readonly horizon: number }
   | { readonly kind: 'start-stop'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[]; readonly family: ProportionalHazardsFamily; readonly horizon: number }
   | { readonly kind: 'two-group'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly group: ColumnId | null; readonly truncationTime: number; readonly permutations: number; readonly seed: number }
-  | { readonly kind: 'multi-state'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly from: ColumnId | null; readonly to: ColumnId | null; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+  | { readonly kind: 'multi-state'; readonly input: MultiStateDraftInput; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+
+interface TransitionDraft { readonly from: number; readonly to: number }
+type WideStateDraft =
+  | { readonly kind: 'not-applicable' }
+  | { readonly kind: 'recorded'; readonly time: ColumnId | null; readonly status: ColumnId | null }
+type MultiStateDraftInput =
+  | { readonly kind: 'prepared-rows'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly from: ColumnId | null; readonly to: ColumnId | null }
+  | { readonly kind: 'longitudinal-states'; readonly subject: ColumnId | null; readonly time: ColumnId | null; readonly state: ColumnId | null; readonly stateCount: number; readonly transitions: readonly TransitionDraft[] }
+  | {
+      readonly kind: 'wide-events'
+      readonly states: readonly WideStateDraft[]
+      readonly transitions: readonly TransitionDraft[]
+      readonly entry: { readonly kind: 'shared'; readonly state: number; readonly time: number } | { readonly kind: 'columns'; readonly state: ColumnId | null; readonly time: ColumnId | null }
+    }
 
 type ReadyDraft =
   | { readonly kind: 'right-censored'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ParametricSurvivalFamily; readonly horizon: number }
   | { readonly kind: 'start-stop'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ProportionalHazardsFamily; readonly horizon: number }
   | { readonly kind: 'two-group'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly group: NumericColumnSelection; readonly columns: NonEmptyArray<ColumnId>; readonly truncationTime: number; readonly permutations: number; readonly seed: number }
-  | { readonly kind: 'multi-state'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly from: NumericColumnSelection; readonly to: NumericColumnSelection; readonly columns: NonEmptyArray<ColumnId>; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+  | { readonly kind: 'multi-state'; readonly input: MultiStateReadyInput; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+
+type MultiStateReadyInput =
+  | { readonly kind: 'prepared-rows'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly from: NumericColumnSelection; readonly to: NumericColumnSelection; readonly columns: NonEmptyArray<ColumnId> }
+  | { readonly kind: 'longitudinal-states'; readonly subject: ColumnSelection; readonly time: NumericColumnSelection; readonly state: NumericColumnSelection; readonly stateCount: number; readonly transitions: NonEmptyArray<TransitionDraft>; readonly columns: NonEmptyArray<ColumnId> }
+  | {
+      readonly kind: 'wide-events'
+      readonly states: NonEmptyArray<{ readonly kind: 'not-applicable' } | { readonly kind: 'recorded'; readonly time: NumericColumnSelection; readonly status: NumericColumnSelection }>
+      readonly transitions: NonEmptyArray<TransitionDraft>
+      readonly entry: { readonly kind: 'shared'; readonly state: number; readonly time: number } | { readonly kind: 'columns'; readonly state: NumericColumnSelection; readonly time: NumericColumnSelection }
+      readonly columns: NonEmptyArray<ColumnId>
+    }
+type WideReadyInput = Extract<MultiStateReadyInput, { readonly kind: 'wide-events' }>
 
 type DraftProblem = { readonly kind: 'invalid-survival-draft'; readonly detail: string }
 
@@ -68,8 +96,23 @@ const step = (state: State, event: Event): State => {
 }
 
 /** A column whose name says what it is; otherwise the field waits for a choice rather than guessing by position. */
-const columnLike = (columns: readonly NumericColumnSelection[], pattern: RegExp): ColumnId | null =>
+const columnLike = (columns: readonly ColumnSelection[], pattern: RegExp): ColumnId | null =>
   columns.find((column) => pattern.test(column.name))?.id ?? null
+
+const defaultTransitions = (): readonly TransitionDraft[] => [
+  { from: 1, to: 2 },
+  { from: 1, to: 3 },
+  { from: 2, to: 3 },
+]
+
+const preparedMultiStateInput = (columns: readonly NumericColumnSelection[]): Extract<MultiStateDraftInput, { readonly kind: 'prepared-rows' }> => ({
+  kind: 'prepared-rows',
+  start: columnLike(columns, /^(start|tstart)$/i),
+  stop: columnLike(columns, /^(stop|tstop)$/i),
+  event: columnLike(columns, /^(event|status)$/i),
+  from: columnLike(columns, /^from$/i),
+  to: columnLike(columns, /^to$/i),
+})
 
 const draftFor = (kind: Draft['kind'], columns: readonly NumericColumnSelection[]): Draft => {
   const duration = columnLike(columns, /^(time|duration|years?|months?|recyrs)$/i)
@@ -78,8 +121,46 @@ const draftFor = (kind: Draft['kind'], columns: readonly NumericColumnSelection[
     case 'right-censored': return { kind, duration, event, covariates: [], family: 'weibull', horizon: 10 }
     case 'start-stop': return { kind, start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event, covariates: [], family: 'weibullPh', horizon: 10 }
     case 'two-group': return { kind, duration, event, group: columnLike(columns, /^(group|arm|treatment|treat)$/i), truncationTime: 10, permutations: 1_000, seed: 43 }
-    case 'multi-state': return { kind, start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event, from: columnLike(columns, /^from$/i), to: columnLike(columns, /^to$/i), family: 'weibullPh', horizon: 10 }
+    case 'multi-state': return { kind, input: preparedMultiStateInput(columns), family: 'weibullPh', horizon: 10 }
     default: return assertNever(kind)
+  }
+}
+
+/**
+ * The controls as the latest run set them, so a reopened project or example shows the analysis it
+ * recorded rather than the defaults. A column the prepared dataset no longer has is left unchosen.
+ */
+const draftFromRun = (run: SurvivalRunArtifact, columns: readonly NumericColumnSelection[], sourceColumns: readonly ColumnSelection[]): Draft => {
+  const present = (column: ColumnSelection): ColumnId | null => columns.some((candidate) => candidate.id === column.id) ? column.id : null
+  const presentSource = (column: ColumnSelection): ColumnId | null => sourceColumns.some((candidate) => candidate.id === column.id) ? column.id : null
+  const presentAll = (selected: readonly NumericColumnSelection[]): readonly ColumnId[] => selected.map(present).filter((id): id is ColumnId => id !== null)
+  const horizon = (times: readonly number[]): number => times.at(-1) ?? 10
+  const configuration = run.configuration
+  switch (configuration.kind) {
+    case 'right-censored-parametric':
+      return { kind: 'right-censored', duration: present(configuration.duration), event: present(configuration.event), covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+    case 'start-stop-proportional-hazards':
+      return { kind: 'start-stop', start: present(configuration.start), stop: present(configuration.stop), event: present(configuration.event), covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+    case 'two-group-comparison':
+      return { kind: 'two-group', duration: present(configuration.duration), event: present(configuration.event), group: present(configuration.group), truncationTime: configuration.truncationTime, permutations: configuration.permutations, seed: configuration.seed }
+    case 'multi-state-proportional-hazards': {
+      const input = configuration.input
+      const restored: MultiStateDraftInput = (() => {
+        switch (input.kind) {
+          case 'prepared-transition-rows': return { kind: 'prepared-rows', start: present(input.start), stop: present(input.stop), event: present(input.event), from: present(input.from), to: present(input.to) }
+          case 'longitudinal-state-observations': return { kind: 'longitudinal-states', subject: presentSource(input.subject), time: present(input.time), state: present(input.state), stateCount: input.stateCount, transitions: input.transitions.map(([from, to]) => ({ from, to })) }
+          case 'wide-state-events': return {
+            kind: 'wide-events',
+            states: input.states.map((state) => state.kind === 'not-applicable' ? state : { kind: 'recorded', time: present(state.time), status: present(state.status) }),
+            transitions: input.transitions.map(([from, to]) => ({ from, to })),
+            entry: input.entry.kind === 'shared' ? input.entry : { kind: 'columns', state: present(input.entry.state), time: present(input.entry.time) },
+          }
+          default: return assertNever(input)
+        }
+      })()
+      return { kind: 'multi-state', input: restored, family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+    }
+    default: return assertNever(configuration)
   }
 }
 
@@ -102,6 +183,7 @@ const selectColumns = (
 const validateDraft = (
   draft: Draft,
   columns: readonly NumericColumnSelection[],
+  sourceColumns: readonly ColumnSelection[],
 ): Result<ReadyDraft, DraftProblem> => {
   const invalid = (detail: string): Result<never, DraftProblem> =>
     err({ kind: 'invalid-survival-draft', detail })
@@ -110,6 +192,16 @@ const validateDraft = (
     return selected === null
       ? invalid('A selected column is no longer in the prepared dataset.')
       : ok(selected)
+  }
+  const transitionsOrProblem = (transitions: readonly TransitionDraft[], stateCount: number): Result<NonEmptyArray<TransitionDraft>, DraftProblem> => {
+    if (!Number.isInteger(stateCount) || stateCount < 2 || stateCount > 32) return invalid('Use between 2 and 32 states.')
+    if (!isNonEmpty(transitions)) return invalid('Add at least one allowed transition.')
+    const keys = transitions.map(({ from, to }) => `${from}:${to}`)
+    if (new Set(keys).size !== keys.length) return invalid('Each allowed transition must appear once.')
+    if (transitions.some(({ from, to }) => !Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < 1 || from > stateCount || to > stateCount || from === to)) {
+      return invalid(`Each transition must connect two different states numbered 1 through ${stateCount}.`)
+    }
+    return ok(transitions)
   }
 
   switch (draft.kind) {
@@ -165,25 +257,86 @@ const validateDraft = (
       return ok({ ...draft, duration, event, group, columns: ids })
     }
     case 'multi-state': {
-      const startId = draft.start
-      const stopId = draft.stop
-      const eventId = draft.event
-      const fromId = draft.from
-      const toId = draft.to
-      if (startId === null) return invalid('Choose the start time column.')
-      if (stopId === null) return invalid('Choose the stop time column.')
-      if (eventId === null) return invalid('Choose the event column.')
-      if (fromId === null) return invalid('Choose the origin state column.')
-      if (toId === null) return invalid('Choose the destination state column.')
-      if (new Set([startId, stopId, eventId, fromId, toId]).size !== 5) return invalid('The start, the stop, the event, the origin state and the destination state must be different columns.')
-      const ids: NonEmptyArray<ColumnId> = [startId, stopId, eventId, fromId, toId]
-      const selected = selectedOrProblem(ids)
-      if (!selected.ok) return selected
-      const [start, stop, event, from, to] = selected.value
-      if (start === undefined || stop === undefined || event === undefined || from === undefined || to === undefined) {
-        return invalid('Choose all five multi-state columns.')
+      const input = draft.input
+      switch (input.kind) {
+        case 'prepared-rows': {
+          const { start: startId, stop: stopId, event: eventId, from: fromId, to: toId } = input
+          if (startId === null) return invalid('Choose the start time column.')
+          if (stopId === null) return invalid('Choose the stop time column.')
+          if (eventId === null) return invalid('Choose the event column.')
+          if (fromId === null) return invalid('Choose the origin state column.')
+          if (toId === null) return invalid('Choose the destination state column.')
+          if (new Set([startId, stopId, eventId, fromId, toId]).size !== 5) return invalid('The five prepared-row roles must use different columns.')
+          const ids: NonEmptyArray<ColumnId> = [startId, stopId, eventId, fromId, toId]
+          const selected = selectedOrProblem(ids)
+          if (!selected.ok) return selected
+          const [start, stop, event, from, to] = selected.value
+          if (start === undefined || stop === undefined || event === undefined || from === undefined || to === undefined) return invalid('Choose all five prepared-row columns.')
+          return ok({ ...draft, input: { kind: input.kind, start, stop, event, from, to, columns: ids } })
+        }
+        case 'longitudinal-states': {
+          if (input.subject === null) return invalid('Choose the subject column.')
+          if (input.time === null) return invalid('Choose the numeric observation-time column.')
+          if (input.state === null) return invalid('Choose the observed state column.')
+          const transitions = transitionsOrProblem(input.transitions, input.stateCount)
+          if (!transitions.ok) return transitions
+          const subject = sourceColumns.find((column) => column.id === input.subject) ?? null
+          const time = selectColumn(columns, input.time)
+          const state = selectColumn(columns, input.state)
+          if (subject === null || time === null || state === null) return invalid('The subject, numeric observation time, or state column is no longer available.')
+          if (new Set([subject.id, time.id, state.id]).size !== 3) return invalid('Subject, time, and state must be different columns.')
+          return ok({ ...draft, input: { ...input, subject, time, state, transitions: transitions.value, columns: [time.id, state.id] } })
+        }
+        case 'wide-events': {
+          if (!isNonEmpty(input.states)) return invalid('Define at least two states.')
+          const transitions = transitionsOrProblem(input.transitions, input.states.length)
+          if (!transitions.ok) return transitions
+          const recordedIds: ColumnId[] = []
+          for (const state of input.states) {
+            if (state.kind === 'not-applicable') continue
+            if (state.time === null || state.status === null) return invalid('Choose both a time and status column for every recorded state.')
+            if (state.time === state.status) return invalid('A state time and its event status must use different columns.')
+            recordedIds.push(state.time, state.status)
+          }
+          const entryIds: ColumnId[] = input.entry.kind === 'columns'
+            ? input.entry.state === null || input.entry.time === null
+              ? []
+              : [input.entry.state, input.entry.time]
+            : []
+          if (input.entry.kind === 'columns' && entryIds.length === 0) return invalid('Choose the entry state and entry time columns.')
+          if (input.entry.kind === 'shared' && (!Number.isInteger(input.entry.state) || input.entry.state < 1 || input.entry.state > input.states.length || !Number.isFinite(input.entry.time))) {
+            return invalid(`The shared entry state must be numbered 1 through ${input.states.length}, and its time must be finite.`)
+          }
+          const uniqueIds = [...new Set([...recordedIds, ...entryIds])]
+          if (!isNonEmpty(uniqueIds)) return invalid('Choose at least one state time and status pair.')
+          const selected = selectedOrProblem(uniqueIds)
+          if (!selected.ok) return selected
+          const byId = new Map(selected.value.map((column) => [column.id, column]))
+          const states: Array<{ readonly kind: 'not-applicable' } | { readonly kind: 'recorded'; readonly time: NumericColumnSelection; readonly status: NumericColumnSelection }> = []
+          for (const state of input.states) {
+            if (state.kind === 'not-applicable') {
+              states.push(state)
+              continue
+            }
+            if (state.time === null || state.status === null) return invalid('Choose both a time and status column for every recorded state.')
+            const time = byId.get(state.time)
+            const status = byId.get(state.status)
+            if (time === undefined || status === undefined) return invalid('A selected wide-event column is no longer in the prepared dataset.')
+            states.push({ kind: 'recorded', time, status })
+          }
+          if (!isNonEmpty(states)) return invalid('Define at least two states.')
+          const entry: WideReadyInput['entry'] | null = (() => {
+            if (input.entry.kind === 'shared') return input.entry
+            if (input.entry.state === null || input.entry.time === null) return null
+            const state = byId.get(input.entry.state)
+            const time = byId.get(input.entry.time)
+            return state === undefined || time === undefined ? null : { kind: 'columns' as const, state, time }
+          })()
+          if (entry === null) return invalid('The selected entry-state or entry-time column is no longer in the prepared dataset.')
+          return ok({ ...draft, input: { kind: input.kind, states, transitions: transitions.value, entry, columns: uniqueIds } })
+        }
+        default: return assertNever(input)
       }
-      return ok({ ...draft, start, stop, event, from, to, columns: ids })
     }
     default: return assertNever(draft)
   }
@@ -194,7 +347,18 @@ const observationColumns = (draft: Draft): readonly (ColumnId | null)[] => {
     case 'right-censored': return [draft.duration, draft.event]
     case 'start-stop': return [draft.start, draft.stop, draft.event]
     case 'two-group': return [draft.duration, draft.event, draft.group]
-    case 'multi-state': return [draft.start, draft.stop, draft.event, draft.from, draft.to]
+    case 'multi-state': {
+      const input = draft.input
+      switch (input.kind) {
+        case 'prepared-rows': return [input.start, input.stop, input.event, input.from, input.to]
+        case 'longitudinal-states': return [input.subject, input.time, input.state]
+        case 'wide-events': return [
+          ...input.states.flatMap((state) => state.kind === 'recorded' ? [state.time, state.status] : []),
+          ...(input.entry.kind === 'columns' ? [input.entry.state, input.entry.time] : []),
+        ]
+        default: return assertNever(input)
+      }
+    }
     default: return assertNever(draft)
   }
 }
@@ -255,7 +419,7 @@ const analysisType = (kind: Draft['kind']): AnalysisType => {
   }
 }
 
-function ColumnSelect({ title, value, columns, onChange }: { readonly title: string; readonly value: ColumnId | null; readonly columns: readonly NumericColumnSelection[]; readonly onChange: (value: ColumnId | null) => void }) {
+function ColumnSelect({ title, value, columns, onChange }: { readonly title: string; readonly value: ColumnId | null; readonly columns: readonly ColumnSelection[]; readonly onChange: (value: ColumnId | null) => void }) {
   return (
     <label className="block">
       <span className={fieldLabel}>{title}</span>
@@ -267,6 +431,63 @@ function ColumnSelect({ title, value, columns, onChange }: { readonly title: str
   )
 }
 
+function TransitionControls({ stateCount, transitions, onStateCount, onTransitions }: {
+  readonly stateCount: number
+  readonly transitions: readonly TransitionDraft[]
+  readonly onStateCount: (value: number) => void
+  readonly onTransitions: (value: readonly TransitionDraft[]) => void
+}) {
+  const [candidate, setCandidate] = useState<TransitionDraft>({ from: 1, to: 2 })
+  const addTransition = () => {
+    if (candidate.from === candidate.to) return
+    if (candidate.from > stateCount || candidate.to > stateCount) return
+    if (transitions.some((transition) => transition.from === candidate.from && transition.to === candidate.to)) return
+    onTransitions([...transitions, candidate])
+  }
+  return (
+    <fieldset className="m-0 border-0 p-0 sm:col-span-2">
+      <legend className={fieldLabel}>Allowed state changes</legend>
+      <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr]">
+        <label className="block">
+          <span className={fieldHint}>Number of states</span>
+          <input className={field('text', 'mt-1 w-full')} type="number" min={2} max={32} step={1} value={stateCount} aria-label="Number of states" onChange={(event) => onStateCount(Math.min(32, Math.max(2, Number(event.target.value) || 2)))} />
+        </label>
+        <div>
+          <div className="flex flex-wrap gap-2">
+            {transitions.map((transition, index) => (
+              <button key={`${transition.from}-${transition.to}-${index}`} type="button" className={button('quiet')} onClick={() => onTransitions(transitions.filter((_, candidate) => candidate !== index))} aria-label={`Remove transition ${transition.from} to ${transition.to}`}>
+                {transition.from} → {transition.to} ×
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap items-end gap-2">
+            <label><span className={fieldHint}>From</span><Select className={field('text', 'mt-1 w-20')} value={candidate.from} onChange={(event) => setCandidate({ ...candidate, from: Number(event.target.value) })}>{Array.from({ length: stateCount }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</Select></label>
+            <label><span className={fieldHint}>To</span><Select className={field('text', 'mt-1 w-20')} value={candidate.to} onChange={(event) => setCandidate({ ...candidate, to: Number(event.target.value) })}>{Array.from({ length: stateCount }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</Select></label>
+            <button type="button" className={button('quiet')} onClick={addTransition} disabled={candidate.from === candidate.to || transitions.some((transition) => transition.from === candidate.from && transition.to === candidate.to)}>Add transition</button>
+          </div>
+          <p className={cn(fieldHint, 'mb-0 mt-2')}>Transitions are numbered in the order shown for wide event histories. Select a listed transition to remove it.</p>
+        </div>
+      </div>
+    </fieldset>
+  )
+}
+
+const allowedMatrix = (stateCount: number, transitions: readonly TransitionDraft[]): readonly (readonly boolean[])[] =>
+  Array.from({ length: stateCount }, (_, from) => Array.from({ length: stateCount }, (_, to) => transitions.some((transition) => transition.from === from + 1 && transition.to === to + 1)))
+
+const numberedMatrix = (stateCount: number, transitions: readonly TransitionDraft[]): readonly (readonly (number | null)[])[] => {
+  const numbers = new Map(transitions.map((transition, index) => [`${transition.from}:${transition.to}`, index + 1]))
+  return Array.from({ length: stateCount }, (_, from) => Array.from({ length: stateCount }, (_, to) => numbers.get(`${from + 1}:${to + 1}`) ?? null))
+}
+
+const columnPosition = (columns: readonly NumericColumnSelection[], selected: NumericColumnSelection): number =>
+  columns.findIndex((column) => column.id === selected.id)
+
+const transitionPairs = (transitions: NonEmptyArray<TransitionDraft>): NonEmptyArray<readonly [number, number]> => {
+  const [first, ...rest] = transitions
+  return [[first.from, first.to], ...rest.map(({ from, to }) => [from, to] as const)]
+}
+
 export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDeleteRun, onActivity }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -276,8 +497,12 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
   readonly onDeleteRun: (run: SurvivalRunArtifact['id']) => void
   readonly onActivity?: (activity: RunActivity | null) => void
 }) {
-  const columns = useMemo(() => profile.columns.filter((column) => prepared.columns.includes(column.id)).map((column) => ({ id: column.id, name: column.name })), [prepared.columns, profile.columns])
-  const [state, dispatch] = useReducer(step, columns, (available): State => ({ draft: draftFor('right-censored', available), job: { kind: 'idle' } }))
+  const columns = useMemo(() => profile.columns.filter((column) => prepared.columns.includes(column.id) && isNumericDuckDbType(column.duckdbType)).map((column) => ({ id: column.id, name: column.name })), [prepared.columns, profile.columns])
+  const sourceColumns = useMemo(() => profile.columns.map((column) => ({ id: column.id, name: column.name })), [profile.columns])
+  const [state, dispatch] = useReducer(step, columns, (available): State => {
+    const recorded = runs.at(-1)
+    return { draft: recorded === undefined ? draftFor('right-censored', available) : draftFromRun(recorded, available, sourceColumns), job: { kind: 'idle' } }
+  })
   const [pendingDelete, setPendingDelete] = useState<SurvivalRunArtifact | null>(null)
   const latest = runs.at(-1) ?? null
   useRunActivity(onActivity, state.job.kind === 'running' ? { label: 'Survival analysis', progress: null } : null)
@@ -285,7 +510,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
 
   const execute = async () => {
     if (state.job.kind === 'running') return
-    const validated = validateDraft(state.draft, columns)
+    const validated = validateDraft(state.draft, columns, sourceColumns)
     if (!validated.ok) {
       dispatch({ type: 'run-failed', detail: validated.error.detail })
       return
@@ -294,7 +519,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
     const fail = (detail: string) => dispatch({ type: 'run-failed', detail })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
-      const identity = (matrixColumns: NonEmptyArray<NumericColumnSelection>) => ({ id: newSurvivalRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), columns: matrixColumns })
+      const identity = (matrixColumns: NonEmptyArray<ColumnSelection>) => ({ id: newSurvivalRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), columns: matrixColumns })
       const materialise = async (ids: NonEmptyArray<ColumnId>) => {
         const matrix = await materialisePrepared(source, profile, prepared, ids)
         if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return null }
@@ -306,7 +531,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           const matrix = await materialise(draft.columns); if (matrix === null) return
           const times = predictionTimes(draft.horizon)
           const result = await analysis.runFlexSurv(matrix.values, matrix.rowCount, matrix.columns.length, { observation: { kind: 'rightCensored', duration: 0, event: 1 }, covariates: draft.covariates.map((_, index) => index + 2), family: draft.family, predictionTimes: times })
-          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
           const recorded = rightCensoredSurvivalRun(identity(matrix.columns), { kind: 'right-censored-parametric', duration: draft.duration, event: draft.event, covariates: draft.covariates, family: draft.family, predictionTimes: times }, result.value)
           if (!recorded.ok) { fail('The fitted family does not match the requested family.'); return }
           onRun(recorded.value); break
@@ -316,7 +541,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           const matrix = await materialise(draft.columns); if (matrix === null) return
           const times = predictionTimes(draft.horizon)
           const result = await analysis.runFlexSurv(matrix.values, matrix.rowCount, matrix.columns.length, { observation: { kind: 'startStop', start: 0, stop: 1, event: 2 }, covariates: draft.covariates.map((_, index) => index + 3), family: draft.family, predictionTimes: times })
-          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
           const recorded = startStopSurvivalRun(identity(matrix.columns), { kind: 'start-stop-proportional-hazards', start: draft.start, stop: draft.stop, event: draft.event, covariates: draft.covariates, family: draft.family, predictionTimes: times }, result.value)
           if (!recorded.ok) { fail('The fitted family does not match the requested family.'); return }
           onRun(recorded.value); break
@@ -325,16 +550,64 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           const draft = validated.value
           const matrix = await materialise(draft.columns); if (matrix === null) return
           const result = await analysis.runComparisonSurvival(matrix.values, matrix.rowCount, matrix.columns.length, { duration: 0, event: 1, group: 2, truncationTime: draft.truncationTime, permutations: draft.permutations, seed: draft.seed })
-          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
           onRun({ kind: 'two-group-survival-run', ...identity(matrix.columns), configuration: { kind: 'two-group-comparison', duration: draft.duration, event: draft.event, group: draft.group, truncationTime: draft.truncationTime, permutations: draft.permutations, seed: draft.seed }, evidence: result.value }); break
         }
         case 'multi-state': {
           const draft = validated.value
-          const matrix = await materialise(draft.columns); if (matrix === null) return
           const times = predictionTimes(draft.horizon)
-          const result = await analysis.runMultiStateSurvival(matrix.values, matrix.rowCount, matrix.columns.length, { start: 0, stop: 1, event: 2, from: 3, to: 4, family: draft.family, predictionTimes: times })
-          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
-          const recorded = multiStateSurvivalRun(identity(matrix.columns), { kind: 'multi-state-proportional-hazards', start: draft.start, stop: draft.stop, event: draft.event, from: draft.from, to: draft.to, family: draft.family, predictionTimes: times }, result.value)
+          const input = draft.input
+          let result: Awaited<ReturnType<typeof analysis.runMultiStateSurvival>>
+          let configuration: MultiStateInputConfiguration
+          let runColumns: NonEmptyArray<NumericColumnSelection>
+          switch (input.kind) {
+            case 'prepared-rows': {
+              const matrix = await materialise(input.columns); if (matrix === null) return
+              result = await analysis.runMultiStateSurvival(matrix.values, matrix.rowCount, matrix.columns.length, { input: { kind: 'preparedRows', start: 0, stop: 1, event: 2, from: 3, to: 4 }, family: draft.family, predictionTimes: times })
+              configuration = { kind: 'prepared-transition-rows', start: input.start, stop: input.stop, event: input.event, from: input.from, to: input.to }
+              runColumns = matrix.columns
+              break
+            }
+            case 'longitudinal-states': {
+              const matrix = await materialise(input.columns); if (matrix === null) return
+              const { materializePanelKeysInWorker } = await import('@/data/client')
+              const keys = await materializePanelKeysInWorker(source.file, profile, input.subject.id, input.time.id)
+              if (!keys.ok) { fail(`The subject and time keys could not be prepared: ${keys.error.kind}.`); return }
+              if (keys.value.rowCount !== matrix.rowCount) { fail('The subject keys and prepared time/state columns contain different rows. Use a preparation that retains every source row.'); return }
+              const subjectCodes = new Map<string, number>()
+              const values = new Float64Array(matrix.rowCount * 3)
+              for (let row = 0; row < matrix.rowCount; row += 1) {
+                const label = keys.value.units[row]!
+                const code = subjectCodes.get(label) ?? subjectCodes.size + 1
+                subjectCodes.set(label, code)
+                values[row] = code
+                values[matrix.rowCount + row] = matrix.values[row]!
+                values[2 * matrix.rowCount + row] = matrix.values[matrix.rowCount + row]!
+              }
+              result = await analysis.runMultiStateSurvival(values, matrix.rowCount, 3, { input: { kind: 'longitudinalStates', subject: 0, time: 1, state: 2, allowed: allowedMatrix(input.stateCount, input.transitions) }, family: draft.family, predictionTimes: times })
+              configuration = { kind: 'longitudinal-state-observations', subject: input.subject, time: input.time, state: input.state, stateCount: input.stateCount, transitions: transitionPairs(input.transitions) }
+              runColumns = [input.subject, input.time, input.state]
+              break
+            }
+            case 'wide-events': {
+              const matrix = await materialise(input.columns); if (matrix === null) return
+              const states = input.states.map((state) => state.kind === 'not-applicable'
+                ? { kind: 'notApplicable' as const }
+                : { kind: 'recorded' as const, time: columnPosition(matrix.columns, state.time), status: columnPosition(matrix.columns, state.status) })
+              const entry = input.entry.kind === 'shared'
+                ? input.entry
+                : { kind: 'columns' as const, state: columnPosition(matrix.columns, input.entry.state), time: columnPosition(matrix.columns, input.entry.time) }
+              result = await analysis.runMultiStateSurvival(matrix.values, matrix.rowCount, matrix.columns.length, { input: { kind: 'wideEvents', states, transitions: numberedMatrix(input.states.length, input.transitions), entry }, family: draft.family, predictionTimes: times })
+              const configuredStates = input.states.map((state) => state.kind === 'not-applicable' ? state : { kind: 'recorded' as const, time: state.time, status: state.status })
+              if (!isNonEmpty(configuredStates)) { fail('Wide event preparation needs at least two states.'); return }
+              configuration = { kind: 'wide-state-events', states: configuredStates, transitions: transitionPairs(input.transitions), entry: input.entry }
+              runColumns = matrix.columns
+              break
+            }
+            default: assertNever(input)
+          }
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
+          const recorded = multiStateSurvivalRun(identity(runColumns), { kind: 'multi-state-proportional-hazards', input: configuration, family: draft.family, predictionTimes: times }, result.value)
           if (!recorded.ok) { fail('The fitted family does not match the requested family.'); return }
           onRun(recorded.value); break
         }
@@ -408,15 +681,84 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           <input className={field('text', 'mt-1 w-full')} type="number" min={0.001} step="any" value={draft.truncationTime} aria-label="Compare through time" onChange={(event) => configure({ ...draft, truncationTime: Math.max(0.001, Number(event.target.value) || 10) })} />
         </label>
       </>
-      case 'multi-state': return <>
-        <ColumnSelect title="Start time" value={draft.start} columns={columns} onChange={(start) => configure({ ...draft, start })} />
-        <ColumnSelect title="Stop time" value={draft.stop} columns={columns} onChange={(stop) => configure({ ...draft, stop })} />
-        <ColumnSelect title="Event · 1 transition, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
-        <ColumnSelect title="Origin state" value={draft.from} columns={columns} onChange={(from) => configure({ ...draft, from })} />
-        <ColumnSelect title="Destination state" value={draft.to} columns={columns} onChange={(to) => configure({ ...draft, to })} />
-        {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
-        {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
-      </>
+      case 'multi-state': {
+        const input = draft.input
+        const chooseInput = (kind: MultiStateDraftInput['kind']) => {
+          switch (kind) {
+            case 'prepared-rows': configure({ ...draft, input: preparedMultiStateInput(columns) }); return
+            case 'longitudinal-states': configure({ ...draft, input: {
+              kind,
+              subject: prepared.kind === 'prepared-panel' ? prepared.sampling.unitColumn : columnLike(sourceColumns, /^(subject|id|team|unit)$/i),
+              time: prepared.kind === 'prepared-panel' && columns.some((column) => column.id === prepared.sampling.timeColumn) ? prepared.sampling.timeColumn : columnLike(columns, /^(time|month|week|day|year)$/i),
+              state: columnLike(columns, /^(state|status)$/i),
+              stateCount: 3,
+              transitions: defaultTransitions(),
+            } }); return
+            case 'wide-events': configure({ ...draft, input: { kind, states: [{ kind: 'not-applicable' }, { kind: 'recorded', time: null, status: null }, { kind: 'recorded', time: null, status: null }], transitions: defaultTransitions(), entry: { kind: 'shared', state: 1, time: 0 } } }); return
+            default: assertNever(kind)
+          }
+        }
+        const inputControls = (() => {
+          switch (input.kind) {
+            case 'prepared-rows': return <>
+              <ColumnSelect title="Start time" value={input.start} columns={columns} onChange={(start) => configure({ ...draft, input: { ...input, start } })} />
+              <ColumnSelect title="Stop time" value={input.stop} columns={columns} onChange={(stop) => configure({ ...draft, input: { ...input, stop } })} />
+              <ColumnSelect title="Event · 1 transition, 0 censored" value={input.event} columns={columns} onChange={(event) => configure({ ...draft, input: { ...input, event } })} />
+              <ColumnSelect title="Origin state" value={input.from} columns={columns} onChange={(from) => configure({ ...draft, input: { ...input, from } })} />
+              <ColumnSelect title="Destination state" value={input.to} columns={columns} onChange={(to) => configure({ ...draft, input: { ...input, to } })} />
+            </>
+            case 'longitudinal-states': return <>
+              <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>Use one row per exact state observation. Time keeps the numeric units in the source data; irregular observation times are allowed.</p>
+              <ColumnSelect title="Subject" value={input.subject} columns={sourceColumns} onChange={(subject) => configure({ ...draft, input: { ...input, subject } })} />
+              <ColumnSelect title="Observation time" value={input.time} columns={columns} onChange={(time) => configure({ ...draft, input: { ...input, time } })} />
+              <ColumnSelect title="Observed state" value={input.state} columns={columns} onChange={(state) => configure({ ...draft, input: { ...input, state } })} />
+              <TransitionControls stateCount={input.stateCount} transitions={input.transitions} onStateCount={(stateCount) => configure({ ...draft, input: { ...input, stateCount, transitions: input.transitions.filter(({ from, to }) => from <= stateCount && to <= stateCount) } })} onTransitions={(transitions) => configure({ ...draft, input: { ...input, transitions } })} />
+            </>
+            case 'wide-events': return <>
+              <TransitionControls stateCount={input.states.length} transitions={input.transitions} onStateCount={(stateCount) => {
+                const states = Array.from({ length: stateCount }, (_, index) => input.states[index] ?? { kind: 'recorded' as const, time: null, status: null })
+                configure({ ...draft, input: { ...input, states, transitions: input.transitions.filter(({ from, to }) => from <= stateCount && to <= stateCount) } })
+              }} onTransitions={(transitions) => configure({ ...draft, input: { ...input, transitions } })} />
+              <div className="grid gap-3 sm:col-span-2">
+                {input.states.map((state, index) => (
+                  <fieldset key={index} className="m-0 grid gap-3 rounded-md border border-hair p-3 sm:grid-cols-2">
+                    <legend className="px-1 text-body font-medium text-ink">State {index + 1}</legend>
+                    <label className="flex items-center gap-2 text-body sm:col-span-2"><input type="checkbox" checked={state.kind === 'not-applicable'} onChange={(event) => {
+                      const states = input.states.map((candidate, candidateIndex) => candidateIndex === index ? event.target.checked ? { kind: 'not-applicable' as const } : { kind: 'recorded' as const, time: null, status: null } : candidate)
+                      configure({ ...draft, input: { ...input, states } })
+                    }} />No time/status fields for this state</label>
+                    {state.kind === 'recorded' && <>
+                      <ColumnSelect title="Time reached or last followed" value={state.time} columns={columns} onChange={(time) => configure({ ...draft, input: { ...input, states: input.states.map((candidate, candidateIndex) => candidateIndex === index && candidate.kind === 'recorded' ? { ...candidate, time } : candidate) } })} />
+                      <ColumnSelect title="Reached · 1 yes, 0 censored" value={state.status} columns={columns} onChange={(status) => configure({ ...draft, input: { ...input, states: input.states.map((candidate, candidateIndex) => candidateIndex === index && candidate.kind === 'recorded' ? { ...candidate, status } : candidate) } })} />
+                    </>}
+                  </fieldset>
+                ))}
+              </div>
+              <div className="sm:col-span-2">
+                <span className={fieldLabel}>Entry for each subject</span>
+                <SegmentedControl size="sm" ariaLabel="Wide event entry mode" value={input.entry.kind} onChange={(kind) => configure({ ...draft, input: { ...input, entry: kind === 'shared' ? { kind, state: 1, time: 0 } : { kind, state: null, time: null } } })} options={[{ value: 'shared', label: 'Same entry' }, { value: 'columns', label: 'Entry columns' }]} />
+              </div>
+              {input.entry.kind === 'shared' ? <>
+                <label className="block"><span className={fieldLabel}>Entry state</span><input className={field('text', 'mt-1 w-full')} type="number" min={1} max={input.states.length} step={1} value={input.entry.state} onChange={(event) => { if (input.entry.kind === 'shared') configure({ ...draft, input: { ...input, entry: { kind: 'shared', state: Number(event.target.value) || 1, time: input.entry.time } } }) }} /></label>
+                <label className="block"><span className={fieldLabel}>Entry time</span><input className={field('text', 'mt-1 w-full')} type="number" step="any" value={input.entry.time} onChange={(event) => { if (input.entry.kind === 'shared') configure({ ...draft, input: { ...input, entry: { kind: 'shared', state: input.entry.state, time: Number(event.target.value) || 0 } } }) }} /></label>
+              </> : <>
+                <ColumnSelect title="Entry state" value={input.entry.state} columns={columns} onChange={(state) => { if (input.entry.kind === 'columns') configure({ ...draft, input: { ...input, entry: { kind: 'columns', state, time: input.entry.time } } }) }} />
+                <ColumnSelect title="Entry time" value={input.entry.time} columns={columns} onChange={(time) => { if (input.entry.kind === 'columns') configure({ ...draft, input: { ...input, entry: { kind: 'columns', state: input.entry.state, time } } }) }} />
+              </>}
+            </>
+            default: return assertNever(input)
+          }
+        })()
+        return <>
+          <div className="sm:col-span-2">
+            <ParameterLabel label="Input rows" help="Use existing transition-risk rows, exact state observations recorded over time, or one wide event-history row per subject. Hirmos validates and expands the last two forms before fitting." />
+            <SegmentedControl wrap size="sm" ariaLabel="Multi-state input rows" value={input.kind} onChange={chooseInput} options={[{ value: 'prepared-rows', label: 'Prepared rows' }, { value: 'longitudinal-states', label: 'State observations' }, { value: 'wide-events', label: 'Wide event history' }]} />
+          </div>
+          {inputControls}
+          {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
+          {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
+        </>
+      }
       default: return assertNever(draft)
     }
   })()
