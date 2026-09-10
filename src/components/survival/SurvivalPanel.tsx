@@ -929,7 +929,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{type.name}</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <SegmentedControl wrap size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
+            <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
             <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{type.summary}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">{draftControls}</div>

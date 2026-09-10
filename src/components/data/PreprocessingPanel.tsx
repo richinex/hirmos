@@ -933,7 +933,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             </div>
             {/* A cross-section has one diagnostic, and one option is not a choice, so the switch appears only when there are several. */}
             {diagnosticOptions.length > 1 && (
-              <SegmentedControl size="sm" ariaLabel="Diagnostic" value={diagnostic} onChange={setDiagnostic} options={diagnosticOptions} />
+              <SegmentedControl variant="line" size="sm" ariaLabel="Diagnostic" value={diagnostic} onChange={setDiagnostic} options={diagnosticOptions} />
             )}
           </div>
           {preparedCurrent === null && (

@@ -1662,7 +1662,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </label>
               <div>
                 <SegmentedControl
-                  wrap
+                  variant="line"
                   size="sm"
                   ariaLabel="Estimator family"
                   value={visibleEstimatorGroup}

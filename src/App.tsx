@@ -674,11 +674,11 @@ function App() {
                       {workflow.restore === null ? (
                         <>
                           <SegmentedControl
-                            fill
+                            variant="line"
                             ariaLabel="Data input method"
                             value={dataEntryMode}
                             onChange={setDataEntryMode}
-                            options={[{ value: 'file', label: 'Use one file' }, { value: 'sql', label: 'Prepare with SQL' }]}
+                            options={[{ value: 'file', label: 'Upload a file' }, { value: 'sql', label: 'Prepare with SQL' }]}
                           />
                           <p className={cn(fieldHint, 'mt-3 min-h-[3lh]')}>
                             {dataEntryMode === 'file'

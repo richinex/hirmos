@@ -3,7 +3,14 @@ import { cn } from '@/lib/utils'
 import { well } from './recipes'
 
 /**
- * A single-choice control: one raised knob slides to the chosen option inside a bordered well.
+ * A single-choice control in two forms, chosen by `variant`.
+ *
+ * `track`, the default, is a setting among settings: a filled track with no border, a knob that is the
+ * panel surface lifted by the house `lift` shadow, hairline dividers between the resting options that
+ * fade beside the knob, and the chosen label in medium weight. It sits level with the fields around
+ * it at the `sm` and `md` sizes. `line` is a view switch: no track, the labels on a hairline, and a
+ * 2px rule of ink that slides under the chosen one. Use `line` where the choice changes what the stage
+ * shows, `track` where it sets a value.
  *
  * Semantics follow the WAI-ARIA radio group pattern. The host is a `radiogroup` and each option owns a
  * native radio input, so form submission, required state and assistive-technology behavior do not have
@@ -18,7 +25,7 @@ import { well } from './recipes'
  * The knob is a measured overlay. It takes the left, top, width and height of the checked option, so
  * text and hit areas never move and the knob stays right when the group wraps onto a second line. The
  * house ease-out carries the slide; reduced motion drops it to a jump. A pointer can also press and
- * slide along the well: the choice follows the pointer live and settles where it lifts, so the well
+ * slide along the track: the choice follows the pointer live and settles where it lifts, so the track
  * owns its touch gesture and a swipe on it selects rather than scrolls. While the pointer holds the
  * knob it tracks one-to-one with no easing and presses in slightly; the release settles on the house
  * curve.
@@ -44,15 +51,16 @@ export interface SegmentedControlProps<V extends string> {
   readonly className?: string
   /** `sm` is the 24px chrome size for toolbars; `md` the 30px field size, matching `button()`. */
   readonly size?: 'sm' | 'md'
+  /** `track` for a setting that carries a value; `line` for a view switch that changes what the stage shows. */
+  readonly variant?: 'track' | 'line'
   /** Stretch to the container and give every segment the same width. Use only with labels of similar length. */
   readonly fill?: boolean
   /** A wrapping choice grid for longer catalogues: no sliding knob; each chip carries its own selected surface, focus ring, press acknowledgement, and a hatch when disabled. */
   readonly wrap?: boolean
   /**
-   * `well` gives the track its own recessed surface; `none` leaves it on the surface it sits on.
-   *
-   * The knob reads by its own raised fill against whatever is behind it, so a track dropped into a
-   * well of the same fill adds a border without adding contrast.
+   * `well` gives the control its own surface: the filled track behind a sliding knob, or the recessed
+   * well behind wrapping chips. `none` leaves the options on the surface they sit on; the knob still
+   * reads by its own lifted fill. `line` has no surface either way.
    */
   readonly frame?: 'well' | 'none'
   readonly disabled?: boolean
@@ -72,10 +80,16 @@ interface Frame {
 const sameFrame = (a: Frame | null, b: Frame | null): boolean =>
   a === b || (a !== null && b !== null && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height)
 
-const SIZE: Record<'sm' | 'md', string> = {
-  sm: 'px-2 py-1 text-label',
-  md: 'px-3 py-1.5 text-body',
+type Variant = 'track' | 'line'
+
+/** Option padding per form and size; the track and line forms are shorter than the chips because the host adds its own. */
+const SIZE: Record<Variant | 'wrap', Record<'sm' | 'md', string>> = {
+  track: { sm: 'px-2 py-0.5 text-label', md: 'px-3 py-1 text-body' },
+  line: { sm: 'px-1.5 py-1 text-label', md: 'px-2 py-1.5 text-body' },
+  wrap: { sm: 'px-2 py-1 text-label', md: 'px-3 py-1.5 text-body' },
 }
+
+const LINE_RULE = 2
 
 /**
  * Wrap-grid chips draw their states on two pseudo-element layers, so selection and keyboard focus
@@ -89,7 +103,7 @@ const CHIP_LAYERS = [
   'has-[:focus-visible]:outline-none has-[:focus-visible]:before:scale-100 has-[:focus-visible]:before:opacity-100',
 ].join(' ')
 
-export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', fill = false, wrap = false, disabled = false, name, required = false, frame = 'well' }: SegmentedControlProps<V>) {
+export function SegmentedControl<V extends string>({ value, onChange, options, ariaLabel, className, size = 'md', variant = 'track', fill = false, wrap = false, disabled = false, name, required = false, frame = 'well' }: SegmentedControlProps<V>) {
   const host = useRef<HTMLDivElement>(null)
   const [knob, setKnob] = useState<Frame | null>(null)
   const [dragging, setDragging] = useState(false)
@@ -206,6 +220,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
   }
 
   const dragEnabled = !wrap && !disabled
+  const form: Variant | 'wrap' = wrap ? 'wrap' : variant
 
   return (
     <div
@@ -223,7 +238,10 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
       onPointerUp={dragEnabled ? () => { setDragging(false); radios()[checkedIndex]?.focus() } : undefined}
       onPointerCancel={dragEnabled ? () => setDragging(false) : undefined}
       className={cn(
-        frame === 'well' ? well('relative max-w-full flex-wrap gap-1 p-1') : 'relative max-w-full flex-wrap gap-1 p-1',
+        'relative max-w-full flex-wrap',
+        form === 'wrap' && (frame === 'well' ? well('gap-1 p-1') : 'gap-1 p-1'),
+        form === 'track' && cn('gap-0 rounded-lg p-0.5', frame === 'well' && 'bg-raised'),
+        form === 'line' && 'gap-1 border-b border-hair',
         !wrap && 'touch-none',
         fill ? 'flex w-full' : 'inline-flex',
         className,
@@ -233,30 +251,38 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
         <span
           aria-hidden
           className={cn(
-            'pointer-events-none absolute left-0 top-0 rounded-md border border-edge bg-raised duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+            'pointer-events-none absolute left-0 top-0 duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
+            form === 'track' ? 'lift rounded-md bg-panel' : 'bg-ink',
             !motionReady ? 'transition-none' : dragging ? 'transition-[width,height]' : 'transition-[transform,width,height]',
           )}
-          style={{ width: knob.width, height: knob.height, transform: `translate(${knob.left}px, ${knob.top}px)${dragging ? ' scale(0.96)' : ''}` }}
+          style={form === 'track'
+            ? { width: knob.width, height: knob.height, transform: `translate(${knob.left}px, ${knob.top}px)${dragging ? ' scale(0.96)' : ''}` }
+            : { width: knob.width, height: LINE_RULE, transform: `translate(${knob.left}px, ${knob.top + knob.height - LINE_RULE / 2}px)` }}
         />
       )}
       {options.map((option, index) => {
         const checked = index === checkedIndex
         const enabled = isEnabled(index)
         const descriptionId = option.title === undefined ? undefined : `${descriptionBase}-${index}`
-        return (
+        // A divider stands between two resting options and fades where the knob is.
+        const divider = form === 'track' && index > 0
+          ? <span key={`divider-${option.value}`} aria-hidden className={cn('my-1.5 w-px shrink-0 self-stretch bg-edge/60 transition-opacity duration-(--motion-fast)', (index === checkedIndex || index - 1 === checkedIndex) && 'opacity-0')} />
+          : null
+        return [divider, (
           <label
             key={option.value}
             data-segment-option
             title={option.title}
             className={cn(
-              'relative grid cursor-pointer place-items-center whitespace-nowrap rounded-md border border-transparent transition-colors duration-(--motion-fast) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal pointer-coarse:min-h-10',
-              SIZE[size],
+              'relative grid cursor-pointer place-items-center whitespace-nowrap border border-transparent transition-colors duration-(--motion-fast) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal pointer-coarse:min-h-10',
+              form === 'line' ? 'rounded-sm' : 'rounded-md',
+              SIZE[form][size],
               fill && 'min-w-0 flex-1 basis-0 truncate text-center',
               wrap && CHIP_LAYERS,
               !enabled
                 ? cn('cursor-not-allowed text-faint', wrap && 'hatch')
                 : checked
-                  ? cn('text-ink', wrap && 'after:scale-100 after:opacity-100')
+                  ? cn('text-ink', form !== 'wrap' && 'font-medium', wrap && 'after:scale-100 after:opacity-100')
                   : cn('text-muted hover:text-ink', wrap && 'active:after:scale-100 active:after:opacity-40'),
             )}
           >
@@ -277,7 +303,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
             <span className="relative z-10 min-w-0">{option.label}</span>
             {descriptionId !== undefined && <span id={descriptionId} className="sr-only">{option.title}</span>}
           </label>
-        )
+        )]
       })}
     </div>
   )

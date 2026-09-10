@@ -303,7 +303,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   })()
 
   const familyControl = estimationRuns.length > 0 && survivalRuns.length > 0
-    ? <SegmentedControl size="sm" ariaLabel="Result family" value={activeView.kind} onChange={selectFamily} options={[{ value: 'estimation', label: 'Causal estimates' }, { value: 'survival', label: 'Survival' }]} />
+    ? <SegmentedControl variant="line" size="sm" ariaLabel="Result family" value={activeView.kind} onChange={selectFamily} options={[{ value: 'estimation', label: 'Causal estimates' }, { value: 'survival', label: 'Survival' }]} />
     : null
 
   return <WorkbenchLayout id="results" stage={<section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5"><div><span className={label('text-faint')}>{chapterLabel('results')}</span><h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2><p className={chapterIntro}>{resultIntroduction(activeView)}</p></div>{familyControl}{body}</section>} bottom={bottom} />

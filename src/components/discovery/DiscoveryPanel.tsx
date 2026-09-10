@@ -1865,7 +1865,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         <section className={panel('p-(--panel-space)')} aria-labelledby="discovery-method-title">
           <h3 id="discovery-method-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Discovery method</h3>
           <SegmentedControl
-            wrap
+            variant="line"
             size="sm"
             ariaLabel="Discovery method family"
             value={visibleMethodGroup}

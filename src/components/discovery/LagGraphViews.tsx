@@ -162,7 +162,7 @@ function LagGraphFigure({ graph, warnings, label, highlighted, view, onView, com
     <div className={cn(well('p-2'), fill && 'flex min-h-0 flex-1 flex-col')}>
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
         {graph.tauMax > 0
-          ? <SegmentedControl size="sm" frame="none" ariaLabel="Structure view" value={view} onChange={onView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
+          ? <SegmentedControl variant="line" size="sm" ariaLabel="Structure view" value={view} onChange={onView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
           : <span className="text-micro text-faint">Directed structure</span>}
         <span className="flex items-center gap-2 text-micro text-faint">
           {graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}
