@@ -97,9 +97,16 @@ const consoleTheme = (): ITheme => {
 const embedThemed = async (host: HTMLDivElement, resolveDatabase: () => Promise<Awaited<ReturnType<Parameters<typeof embed>[0]['resolveDatabase']>>>): Promise<Terminal | null> => {
   let caught: Terminal | null = null
   const open = Terminal.prototype.open
+  const attach = Terminal.prototype.attachCustomKeyEventHandler
   Terminal.prototype.open = function (this: Terminal, parent: HTMLElement) {
     if (parent === host) caught = this
     return open.call(this, parent)
+  }
+  // Android keyboards compose text: every key first arrives as a keydown named "Unidentified" (keyCode 229)
+  // and the characters follow through composition events. The shell must not see those keydowns, or it
+  // advances the cursor on them; xterm turns the composed text into data, and the bridge replays that.
+  Terminal.prototype.attachCustomKeyEventHandler = function (this: Terminal, handler: (event: KeyboardEvent) => boolean) {
+    return attach.call(this, (event: KeyboardEvent) => (event.isComposing || event.keyCode === 229 || event.key === 'Unidentified' || event.key === 'Process') ? true : handler(event))
   }
   try {
     await embed({
@@ -111,6 +118,7 @@ const embedThemed = async (host: HTMLDivElement, resolveDatabase: () => Promise<
     })
   } finally {
     Terminal.prototype.open = open
+    Terminal.prototype.attachCustomKeyEventHandler = attach
   }
   if (caught !== null) (caught as Terminal).options.theme = consoleTheme()
   return caught
