@@ -723,13 +723,16 @@ pub(crate) fn multi_state_survival_evidence(
     let core_family = family(requested_family);
     let mut transition_models = Vec::with_capacity(transitions.len());
     for &(origin, destination) in &transitions {
+        // One prepared row per permitted move per spell: the fit for a transition takes the rows
+        // addressed to it, so a spell at risk of several moves is counted once in each fit.
         let selected = (0..rows)
-            .filter(|row| state_index(origins[*row]) == origin)
+            .filter(|row| {
+                state_index(origins[*row]) == origin && state_index(destinations[*row]) == destination
+            })
             .collect::<Vec<_>>();
         let mut records = Vec::with_capacity(selected.len());
         for row in selected {
-            let observed =
-                event_indicator(&events, row)? && state_index(destinations[row]) == destination;
+            let observed = event_indicator(&events, row)?;
             let observation = if observed {
                 SurvivalObservation::delayed_event(starts[row], stops[row])
             } else {

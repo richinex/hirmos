@@ -43,7 +43,7 @@ export const survivalRunSummary = (run: SurvivalRunArtifact): { readonly method:
     case 'start-stop-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `median ${formatStatistic('raw', run.evidence.median).text}` }
     case 'nonparametric-survival-run': return { method: survivalRunLabel(run), figure: `event-free ${formatPercent(run.evidence.survival.at(-1) ?? Number.NaN).text}` }
     case 'two-group-survival-run': return { method: survivalRunLabel(run), figure: `event-free time difference ${formatStatistic('raw', run.evidence.restrictedMeanDifference).text}` }
-    case 'multi-state-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `${formatCount(run.evidence.states.length).text} states` }
+    case 'multi-state-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `${formatCount(run.evidence.transitions.length).text} transitions` }
     default: return assertNever(run)
   }
 }

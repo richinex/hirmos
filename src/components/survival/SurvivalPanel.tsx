@@ -555,8 +555,8 @@ function TransitionControls({ stateCount, transitions, onStateCount, onTransitio
             ))}
           </div>
           <div className="mt-2 flex flex-wrap items-end gap-2">
-            <label><span className={fieldHint}>From</span><Select className={field('text', 'mt-1 w-20')} value={candidate.from} onChange={(event) => setCandidate({ ...candidate, from: Number(event.target.value) })}>{Array.from({ length: stateCount }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</Select></label>
-            <label><span className={fieldHint}>To</span><Select className={field('text', 'mt-1 w-20')} value={candidate.to} onChange={(event) => setCandidate({ ...candidate, to: Number(event.target.value) })}>{Array.from({ length: stateCount }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</Select></label>
+            <label className="flex flex-col"><span className={fieldHint}>From</span><Select className={field('text', 'mt-1 w-20')} value={candidate.from} onChange={(event) => setCandidate({ ...candidate, from: Number(event.target.value) })}>{Array.from({ length: stateCount }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</Select></label>
+            <label className="flex flex-col"><span className={fieldHint}>To</span><Select className={field('text', 'mt-1 w-20')} value={candidate.to} onChange={(event) => setCandidate({ ...candidate, to: Number(event.target.value) })}>{Array.from({ length: stateCount }, (_, index) => <option key={index + 1} value={index + 1}>{index + 1}</option>)}</Select></label>
             <button type="button" className={button('quiet')} onClick={addTransition} disabled={candidate.from === candidate.to || transitions.some((transition) => transition.from === candidate.from && transition.to === candidate.to)}>Add transition</button>
           </div>
           <p className={cn(fieldHint, 'mb-0 mt-2')}>Transitions are numbered in the order shown for wide event histories. Select a listed transition to remove it.</p>
