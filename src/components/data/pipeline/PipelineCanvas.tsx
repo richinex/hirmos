@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type DragEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -6,6 +6,7 @@ import {
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useReactFlow,
   type Connection,
   type Edge,
@@ -124,8 +125,6 @@ const toEdge = (connection: Connection): PipelineEdge | null => connection.sourc
   ? { from: connection.source as PipelineBlockId, to: connection.target as PipelineBlockId, port: portOf(connection.targetHandle) }
   : null
 
-type CardPosition = { readonly x: number; readonly y: number }
-
 function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnect, onRemoveEdge, onRemoveBlock, onRefused, onDropBlock, onTidy }: PipelineCanvasProps) {
   const { screenToFlowPosition, fitView } = useReactFlow()
   const index = useMemo(() => indexGraph(graph), [graph])
@@ -135,8 +134,27 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
   const isMobile = useIsMobile()
   const [lockOverride, setLockOverride] = useState<boolean | null>(null)
   const viewLocked = lockOverride ?? isMobile
-  // A card being dragged moves here, not in the graph, so the workspace and its DuckDB run see one change when the drag ends.
-  const [dragging, setDragging] = useState<ReadonlyMap<PipelineBlockId, CardPosition>>(() => new Map())
+  // React Flow's own copy of the cards: it holds what React Flow measures and where a card is while it is
+  // dragged, so the graph and its DuckDB run see one change when the drag ends. The graph is the source
+  // for everything else and is copied in whenever it changes.
+  const [nodes, setNodes, applyChanges] = useNodesState<CanvasNode>([])
+  useEffect(() => {
+    setNodes((current) => {
+      const existing = new Map(current.map((node) => [node.id, node]))
+      return graph.nodes.map((node) => {
+        const previous = existing.get(node.id)
+        return {
+          ...previous,
+          id: node.id,
+          type: 'block',
+          position: previous?.dragging ? previous.position : node.position,
+          selected: node.id === selected,
+          deletable: node.block.kind !== 'input' && node.block.kind !== 'output',
+          data: { node, ports: inputPorts(index, node), outcome: outcomes.get(node.id), summary: summaries.get(node.id) ?? '' },
+        }
+      })
+    })
+  }, [graph.nodes, index, outcomes, selected, setNodes, summaries])
 
   const dropBlock = useCallback((event: DragEvent<HTMLDivElement>) => {
     const kind = event.dataTransfer.getData(BLOCK_DRAG_TYPE)
@@ -151,14 +169,6 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
     event.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  const nodes = useMemo<CanvasNode[]>(() => graph.nodes.map((node) => ({
-    id: node.id,
-    type: 'block',
-    position: dragging.get(node.id) ?? node.position,
-    selected: node.id === selected,
-    deletable: node.block.kind !== 'input' && node.block.kind !== 'output',
-    data: { node, ports: inputPorts(index, node), outcome: outcomes.get(node.id), summary: summaries.get(node.id) ?? '' },
-  })), [dragging, graph.nodes, index, outcomes, selected, summaries])
   const edges = useMemo<CanvasEdge[]>(() => graph.edges.map((edge) => ({
     id: edgeId(edge),
     source: edge.from,
@@ -170,15 +180,13 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
   })), [graph.edges])
 
   const applyNodeChanges = useCallback((changes: NodeChange<CanvasNode>[]) => {
+    applyChanges(changes)
     for (const change of changes) {
-      if (change.type === 'position' && change.position !== undefined) {
-        const id = change.id as PipelineBlockId
-        if (change.dragging) setDragging((current) => new Map(current).set(id, change.position!))
-        else { onMove(id, change.position); setDragging((current) => { if (!current.has(id)) return current; const next = new Map(current); next.delete(id); return next }) }
-      } else if (change.type === 'select' && change.selected) onSelect(change.id as PipelineBlockId)
+      if (change.type === 'position' && change.position !== undefined && !change.dragging) onMove(change.id as PipelineBlockId, change.position)
+      else if (change.type === 'select' && change.selected) onSelect(change.id as PipelineBlockId)
       else if (change.type === 'remove') onRemoveBlock(change.id as PipelineBlockId)
     }
-  }, [onMove, onRemoveBlock, onSelect])
+  }, [applyChanges, onMove, onRemoveBlock, onSelect])
   const applyEdgeChanges = useCallback((changes: EdgeChange<CanvasEdge>[]) => {
     for (const change of changes) {
       if (change.type !== 'remove') continue
@@ -220,6 +228,8 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
           isValidConnection={isConnectionValid}
           onConnectEnd={connectEnd}
           onPaneClick={clearSelection}
+          selectNodesOnDrag={false}
+          multiSelectionKeyCode={null}
           connectionLineStyle={CONNECTION_LINE_STYLE}
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           onInit={fitAfterLayout}

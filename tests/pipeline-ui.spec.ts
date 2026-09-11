@@ -255,6 +255,34 @@ test.describe('pipeline canvas', () => {
     await expect(page.getByRole('button', { name: 'Add a condition' })).toBeFocused()
   })
 
+  test('drags one card at a time, whatever is selected, without React Flow complaints', async ({ page }) => {
+    const complaints: string[] = []
+    page.on('console', (message) => { if (message.type() === 'error' || message.text().includes('not initialized')) complaints.push(message.text()) })
+    await startPipeline(page)
+    await block(page, 'input-cities').click({ position: { x: 20, y: 8 } })
+    const positions = () => page.locator('.react-flow__node').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).style.transform))
+    const before = await positions()
+    const card = (await block(page, 'input-regions').boundingBox())!
+    const x = card.x + card.width / 2, y = card.y + 12
+    await page.mouse.move(x, y)
+    await page.mouse.down()
+    for (let i = 1; i <= 12; i++) await page.mouse.move(x + 5 * i, y + 8 * i)
+    await page.mouse.up()
+    await expect.poll(positions).not.toEqual(before)
+    const after = await positions()
+    expect(after[0]).toBe(before[0])
+    expect(after[1]).not.toBe(before[1])
+    expect(after[2]).toBe(before[2])
+    const added = await addBlock(page, 'Union', 'union')
+    const union = (await block(page, added).boundingBox())!
+    await page.mouse.move(union.x + union.width / 2, union.y + 12)
+    await page.mouse.down()
+    for (let i = 1; i <= 8; i++) await page.mouse.move(union.x + union.width / 2 + 10 * i, union.y + 12)
+    await page.mouse.up()
+    await expect.poll(async () => (await positions()).length).toBe(4)
+    expect(complaints).toEqual([])
+  })
+
   test('edits a script block in a Python editor with line numbers', async ({ page }) => {
     await startPipeline(page)
     await addBlock(page, 'Script', 'script')
