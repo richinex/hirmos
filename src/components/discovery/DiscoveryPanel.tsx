@@ -1,6 +1,6 @@
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -21,6 +21,7 @@ import {
   type EvidenceSelection,
 } from '@/domain/evidenceScope'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
+import { RunFold } from '@/components/ui/RunFold'
 import { CmlpLagPlot, NeuralSummaryPlot, OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
 import { button, chapterIntro, field, figureGrid, iconControl, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
@@ -82,7 +83,7 @@ import {
 import { describeSeriesTransform, type MissingnessDraft, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { interpretDiscoveryResult } from '@/domain/resultInterpretation'
-import { formatTimestamp } from '@/lib/format/date'
+import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { describeAnalysisWorkerProblem, type AnalysisWorkerProblem, type TemporalSamples } from '@/workers/analysisProtocol'
@@ -801,33 +802,45 @@ function RunRecord({ run }: { readonly run: DiscoveryRunArtifact }) {
   )
 }
 
-/** One run's card: a disclosure whose summary carries the method, title and figures, so a reader can keep one run open and fold the rest. */
-function ResultCard({ run, method, title, meta, open, current, children }: {
+/** The panel's delete request, read by the history rows so the result components need not carry it. */
+const DeleteRunContext = createContext<((run: DiscoveryRunArtifact) => void) | null>(null)
+
+/**
+ * One run's result. The newest run keeps the stage as the current result; every run, newest first,
+ * is a row in the runs pane that folds open to the same record, as the other chapters' ledgers do.
+ */
+function ResultCard({ run, method, title, meta, current, children }: {
   readonly run: DiscoveryRunArtifact
   readonly method: string
   readonly title: ReactNode
   readonly meta: ReactNode
-  readonly open: boolean
-  /** The newest run: the one card that carries the emphasised border. */
+  /** The newest run: the one result that keeps the stage. */
   readonly current: boolean
   readonly children: ReactNode
 }) {
+  const requestDeletion = useContext(DeleteRunContext)
+  const body = (
+    <>
+      <p className="mb-3 mt-0 text-body text-faint">{meta}</p>
+      <ResultInterpretation interpretation={interpretDiscoveryResult(run)} context="discovery-run" className="mb-3" />
+      {children}
+    </>
+  )
+  if (!current) {
+    return (
+      <RunFold title={title} figure={method} stamp={formatTime(run.createdAt)} onDelete={requestDeletion === null ? undefined : () => requestDeletion(run)} deleteLabel={`Delete ${discoveryRunName(run)} run`}>
+        {body}
+      </RunFold>
+    )
+  }
   return (
-    <article aria-labelledby={`run-${run.id}`}>
-      <details className={`group rounded-xl border bg-panel ${current ? 'border-edge' : 'border-hair'}`} open={open}>
-        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl py-4 pl-4 pr-14 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
-          <div className="min-w-0 flex-1">
-            <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
-            <h3 id={`run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{title}</h3>
-            <p className="m-0 text-body text-faint">{meta}</p>
-          </div>
-        </summary>
-        <div className="px-4 pb-4">
-          <ResultInterpretation interpretation={interpretDiscoveryResult(run)} context="discovery-run" className="mb-3" />
-          {children}
-        </div>
-      </details>
+    <article aria-labelledby={`run-${run.id}`} className="rounded-xl border border-edge bg-panel p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className={label('text-signal')}>Current result · {method}</span>
+        <span className={num('text-micro text-faint')}>{formatTime(run.createdAt)}</span>
+      </div>
+      <h3 id={`run-${run.id}`} className="mb-2 mt-1 text-title font-medium text-ink">{title}</h3>
+      {body}
     </article>
   )
 }
@@ -873,7 +886,7 @@ function EvidenceScopeControls({ selection, onChange, variables, tauMax, alpha }
   )
 }
 
-function TimeGraphResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: TimeGraphRun }) {
+function TimeGraphResult({ run, current }: { readonly current: boolean; readonly run: TimeGraphRun }) {
   const [selection, setSelection] = useState<EvidenceSelection>(NO_EVIDENCE_SELECTION)
   const rows = useMemo(
     () => run.result.graph.flatMap((targets, sourceIndex) =>
@@ -901,7 +914,7 @@ function TimeGraphResult({ run, open, current }: { readonly open: boolean; reado
   const resultTitle = isLpcmci ? 'Latent-aware partial ancestral graph evidence' : 'Stationary lag-graph evidence'
   const tableLabel = isLpcmci ? 'LPCMCI raw evidence' : 'PCMCI+ raw evidence'
   return (
-    <ResultCard run={run} open={open} current={current} method={methodLabel} title={resultTitle} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
+    <ResultCard run={run} current={current} method={methodLabel} title={resultTitle} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${methodLabel} structure`} />
@@ -928,7 +941,7 @@ function TimeGraphResult({ run, open, current }: { readonly open: boolean; reado
   )
 }
 
-function JpcmciResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'jpcmci-plus-run' }> }) {
+function JpcmciResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'jpcmci-plus-run' }> }) {
   const names = useMemo(() => run.nodes.map((node) => node.kind === 'observed' ? node.column.name : node.name), [run.nodes])
   const rows = useMemo(
     () => run.result.graph.flatMap((targets, sourceIndex) => targets.flatMap((lags, targetIndex) => lags.map((mark, lag) => ({
@@ -955,7 +968,7 @@ function JpcmciResult({ run, open, current }: { readonly open: boolean; readonly
     }
   }
   return (
-    <ResultCard run={run} open={open} current={current} method="J-PCMCI+ · ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<>{run.result.datasets} units × {run.result.periods} periods · {run.result.observedVariables} observed variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
+    <ResultCard run={run} current={current} method="J-PCMCI+ · ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<>{run.result.datasets} units × {run.result.periods} periods · {run.result.observedVariables} observed variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="J-PCMCI+ joint structure" />
@@ -983,7 +996,7 @@ function JpcmciResult({ run, open, current }: { readonly open: boolean; readonly
   )
 }
 
-function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }> }) {
+function RpcmciResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'rpcmci-run' }> }) {
   const [regime, setRegime] = useState(0)
   const [selection, setSelection] = useState<EvidenceSelection>(NO_EVIDENCE_SELECTION)
   const graph = run.result.graphs[regime]
@@ -1009,7 +1022,7 @@ function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly
   return (
     <ResultCard
       run={run}
-      open={open}
+     
       current={current}
       method="RPCMCI · ParCorr"
       title={<>Regime-dependent lag-graph evidence</>}
@@ -1053,7 +1066,7 @@ function RpcmciResult({ run, open, current }: { readonly open: boolean; readonly
 
 type CdnotsRun = Extract<DiscoveryRunArtifact, { readonly kind: 'cdnots-run' | 'cdnots-plus-run' }>
 
-function CdnotsResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: CdnotsRun }) {
+function CdnotsResult({ run, current }: { readonly current: boolean; readonly run: CdnotsRun }) {
   const method = run.kind === 'cdnots-run' ? 'CD-NOTS' : 'CD-NOTS+'
   const names = [...run.variables.map(({ name }) => name), ...run.result.contextVariables]
   const rows = run.result.graph.flatMap((targets, source) => targets.flatMap((lags, target) => lags.map((mark, lag) => ({
@@ -1067,7 +1080,7 @@ function CdnotsResult({ run, open, current }: { readonly open: boolean; readonly
   }))))
   const context = run.result.contextVariables.length === 0 ? 'no time-context node' : run.result.contextVariables.join(' + ')
   return (
-    <ResultCard run={run} open={open} current={current} method={`${method} · ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.observedVariables} observed variables · maximum lag {run.result.maxLag} · {context}</>}>
+    <ResultCard run={run} current={current} method={`${method} · ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.observedVariables} observed variables · maximum lag {run.result.maxLag} · {context}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} structure`} />
@@ -1091,7 +1104,7 @@ function CdnotsResult({ run, open, current }: { readonly open: boolean; readonly
   )
 }
 
-function GraceResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'grace-run' }> }) {
+function GraceResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'grace-run' }> }) {
   const rows = run.result.gateValues.flatMap((targets, source) => targets.flatMap((lags, target) => lags.map((gate, lag) => ({
     key: `${source}:${target}:${lag}`,
     source: run.variables[source].name,
@@ -1104,7 +1117,7 @@ function GraceResult({ run, open, current }: { readonly open: boolean; readonly 
   const finalLoss = run.result.loss.at(-1)
   const finalRmse = run.result.rmse.at(-1)
   return (
-    <ResultCard run={run} open={open} current={current} method="GRACE" title={<>Gated lag-graph refinement</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · {run.result.epochs} epochs · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="GRACE" title={<>Gated lag-graph refinement</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · {run.result.epochs} epochs · seed {run.result.seed}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="GRACE retained relations" />
@@ -1134,13 +1147,13 @@ function GraceResult({ run, open, current }: { readonly open: boolean; readonly 
   )
 }
 
-function DynotearsResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' }> }) {
+function DynotearsResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'dynotears-run' }> }) {
   const weights = [run.result.contemporaneousWeights, ...run.result.laggedWeights].flatMap((matrix, lag) =>
     matrix.flatMap((targets, source) => targets.map((weight, target) => ({ lag, source, target, weight }))),
   )
   const rows = weights.map((cell) => ({ key: `${cell.lag}:${cell.source}:${cell.target}`, source: run.variables[cell.source].name, target: run.variables[cell.target].name, lag: cell.lag, weight: cell.weight }))
   return (
-    <ResultCard run={run} open={open} current={current} method="DYNOTEARS" title={<>Sparse dynamic structural equation model weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · λW {run.result.lambdaW} · λA {run.result.lambdaA}</>}>
+    <ResultCard run={run} current={current} method="DYNOTEARS" title={<>Sparse dynamic structural equation model weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · λW {run.result.lambdaW} · λA {run.result.lambdaA}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="DYNOTEARS structure" />
@@ -1159,14 +1172,14 @@ function DynotearsResult({ run, open, current }: { readonly open: boolean; reado
   )
 }
 
-function VarLingamResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'var-lingam-run' }> }) {
+function VarLingamResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'var-lingam-run' }> }) {
   const weights = [run.result.contemporaneousWeights, ...run.result.laggedWeights].flatMap((matrix, lag) =>
     matrix.flatMap((targets, source) => targets.map((weight, target) => ({ lag, source, target, weight }))),
   )
   const rows = weights.map((cell) => ({ key: `${cell.lag}:${cell.source}:${cell.target}`, source: run.variables[cell.source].name, target: run.variables[cell.target].name, lag: cell.lag, weight: cell.weight }))
   const order = run.result.causalOrder.map((index) => run.variables[index]?.name ?? String(index))
   return (
-    <ResultCard run={run} open={open} current={current} method="VAR-LiNGAM" title={<>Non-Gaussian structural vector autoregression weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · Bayesian information criterion lag {run.result.selectedLag} of at most {run.result.lags} · {run.result.prune ? 'adaptive-lasso pruned' : 'unpruned'}</>}>
+    <ResultCard run={run} current={current} method="VAR-LiNGAM" title={<>Non-Gaussian structural vector autoregression weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · Bayesian information criterion lag {run.result.selectedLag} of at most {run.result.lags} · {run.result.prune ? 'adaptive-lasso pruned' : 'unpruned'}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-1 mt-3 text-body text-muted">Contemporaneous causal order from residual non-Gaussianity:</p>
@@ -1187,7 +1200,7 @@ function VarLingamResult({ run, open, current }: { readonly open: boolean; reado
   )
 }
 
-function DirectLingamResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' }> }) {
+function DirectLingamResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'direct-lingam-run' }> }) {
   const rows = run.result.weights.flatMap((targets, source) => targets.map((weight, target) => ({
     key: `${source}:${target}`,
     source: run.variables[source].name,
@@ -1196,7 +1209,7 @@ function DirectLingamResult({ run, open, current }: { readonly open: boolean; re
   })))
   const order = run.result.causalOrder.map((index) => run.variables[index]?.name ?? String(index))
   return (
-    <ResultCard run={run} open={open} current={current} method="DirectLiNGAM" title={<>Linear non-Gaussian directed structure</>} meta={<>{formatCount(run.result.observations).text} independent observations · {run.result.variables} variables · adaptive-lasso adjacency</>}>
+    <ResultCard run={run} current={current} method="DirectLiNGAM" title={<>Linear non-Gaussian directed structure</>} meta={<>{formatCount(run.result.observations).text} independent observations · {run.result.variables} variables · adaptive-lasso adjacency</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-1 mt-3 text-body text-muted">Causal order inferred from non-Gaussianity:</p>
@@ -1221,10 +1234,10 @@ function DirectLingamResult({ run, open, current }: { readonly open: boolean; re
   )
 }
 
-function OcseResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
+function OcseResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
   const rows = run.result.edges.map((edge, index) => ({ key: `${edge.source}:${edge.target}:${edge.lag}:${index}`, source: run.variables[edge.source].name, target: run.variables[edge.target].name, lag: edge.lag, cmi: edge.cmi, pValue: edge.pValue }))
   return (
-    <ResultCard run={run} open={open} current={current} method="Optimal causation entropy" title={<>Conditional-information network evidence</>} meta={<>{formatCount(run.result.observations).text} rows · maximum lag {run.result.maxLag} · {run.result.method} conditional mutual information · {run.result.nShuffles} shuffles · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="Optimal causation entropy" title={<>Conditional-information network evidence</>} meta={<>{formatCount(run.result.observations).text} rows · maximum lag {run.result.maxLag} · {run.result.method} conditional mutual information · {run.result.nShuffles} shuffles · seed {run.result.seed}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="oCSE structure" />
@@ -1243,8 +1256,7 @@ function OcseResult({ run, open, current }: { readonly open: boolean; readonly c
   )
 }
 
-function ConstraintDiscoveryResult({ run, open, current }: {
-  readonly open: boolean
+function ConstraintDiscoveryResult({ run, current }: {
   readonly current: boolean
   readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'pc-stable-run' | 'fci-run' }>
 }) {
@@ -1272,7 +1284,7 @@ function ConstraintDiscoveryResult({ run, open, current }: {
   const method = run.kind === 'fci-run' ? 'FCI' : 'PC-stable'
   const graphName = run.kind === 'fci-run' ? 'Partial ancestral graph' : 'Completed partially directed acyclic graph'
   return (
-    <ResultCard run={run} open={open} current={current} method={method} title={<>{graphName}</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.ciTest === 'fisherZ' ? 'Fisher Z' : 'KCI'} · α {run.result.alpha} · {run.result.ciTests.length} CI tests</>}>
+    <ResultCard run={run} current={current} method={method} title={<>{graphName}</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.ciTest === 'fisherZ' ? 'Fisher Z' : 'KCI'} · α {run.result.alpha} · {run.result.ciTests.length} CI tests</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} ${graphName.toLowerCase()}`} />
@@ -1310,7 +1322,7 @@ function ConstraintDiscoveryResult({ run, open, current }: {
   )
 }
 
-function CmlpResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'cmlp-run' }> }) {
+function CmlpResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'cmlp-run' }> }) {
   const rows = run.result.lagOrder.flatMap((lag, position) => run.result.lagScores.flatMap((targets, source) =>
     targets.map((scores, target) => ({
       key: `${source}:${target}:${lag}`,
@@ -1322,7 +1334,7 @@ function CmlpResult({ run, open, current }: { readonly open: boolean; readonly c
     })),
   ))
   return (
-    <ResultCard run={run} open={open} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.lag} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.lag} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
@@ -1347,7 +1359,7 @@ function CmlpResult({ run, open, current }: { readonly open: boolean; readonly c
   )
 }
 
-function ClstmResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }> }) {
+function ClstmResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'clstm-run' }> }) {
   const rows = run.result.summaryScores.flatMap((targets, source) => targets.map((score, target) => ({
     key: `${source}:${target}`,
     source: run.variables[source].name,
@@ -1356,7 +1368,7 @@ function ClstmResult({ run, open, current }: { readonly open: boolean; readonly 
     active: run.result.summaryActive[source][target],
   })))
   return (
-    <ResultCard run={run} open={open} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · context {run.result.context} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · context {run.result.context} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
@@ -1380,23 +1392,23 @@ function ClstmResult({ run, open, current }: { readonly open: boolean; readonly 
   )
 }
 
-function DiscoveryResult({ run, open, current }: { readonly open: boolean; readonly current: boolean; readonly run: DiscoveryRunArtifact }) {
+function DiscoveryResult({ run, current }: { readonly current: boolean; readonly run: DiscoveryRunArtifact }) {
   switch (run.kind) {
-    case 'direct-lingam-run': return <DirectLingamResult run={run} open={open} current={current} />
-    case 'pc-stable-run': return <ConstraintDiscoveryResult run={run} open={open} current={current} />
-    case 'fci-run': return <ConstraintDiscoveryResult run={run} open={open} current={current} />
-    case 'pcmci-plus-run': return <TimeGraphResult run={run} open={open} current={current} />
-    case 'jpcmci-plus-run': return <JpcmciResult run={run} open={open} current={current} />
-    case 'lpcmci-run': return <TimeGraphResult run={run} open={open} current={current} />
-    case 'rpcmci-run': return <RpcmciResult run={run} open={open} current={current} />
-    case 'cdnots-run': return <CdnotsResult run={run} open={open} current={current} />
-    case 'cdnots-plus-run': return <CdnotsResult run={run} open={open} current={current} />
-    case 'grace-run': return <GraceResult run={run} open={open} current={current} />
-    case 'dynotears-run': return <DynotearsResult run={run} open={open} current={current} />
-    case 'var-lingam-run': return <VarLingamResult run={run} open={open} current={current} />
-    case 'ocse-run': return <OcseResult run={run} open={open} current={current} />
-    case 'cmlp-run': return <CmlpResult run={run} open={open} current={current} />
-    case 'clstm-run': return <ClstmResult run={run} open={open} current={current} />
+    case 'direct-lingam-run': return <DirectLingamResult run={run} current={current} />
+    case 'pc-stable-run': return <ConstraintDiscoveryResult run={run} current={current} />
+    case 'fci-run': return <ConstraintDiscoveryResult run={run} current={current} />
+    case 'pcmci-plus-run': return <TimeGraphResult run={run} current={current} />
+    case 'jpcmci-plus-run': return <JpcmciResult run={run} current={current} />
+    case 'lpcmci-run': return <TimeGraphResult run={run} current={current} />
+    case 'rpcmci-run': return <RpcmciResult run={run} current={current} />
+    case 'cdnots-run': return <CdnotsResult run={run} current={current} />
+    case 'cdnots-plus-run': return <CdnotsResult run={run} current={current} />
+    case 'grace-run': return <GraceResult run={run} current={current} />
+    case 'dynotears-run': return <DynotearsResult run={run} current={current} />
+    case 'var-lingam-run': return <VarLingamResult run={run} current={current} />
+    case 'ocse-run': return <OcseResult run={run} current={current} />
+    case 'cmlp-run': return <CmlpResult run={run} current={current} />
+    case 'clstm-run': return <ClstmResult run={run} current={current} />
     default: return assertNever(run)
   }
 }
@@ -1414,7 +1426,6 @@ function SettingsBadge({ configuration, onReset }: { readonly configuration: Dis
 }
 
 export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, documents, draft, onEvent: dispatch, cancellation, onRun, onDeleteRun }: DiscoveryPanelProps) {
-  const [expanded, setExpanded] = useState<'latest' | 'all' | 'none'>('latest')
   const [deletionDialog, setDeletionDialog] = useState<DiscoveryDeletionDialog>({ kind: 'closed' })
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
@@ -1445,6 +1456,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     }]
   })
 
+  const latestRun = runs.at(-1) ?? null
   const requestDeletion = (run: DiscoveryRunArtifact) => {
     const decision = assessDiscoveryRunDeletion(runs.map((candidate) => candidate.id), documents, run.id)
     switch (decision.kind) {
@@ -2092,73 +2104,75 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         </section>
       </div>
 
-      <section aria-labelledby="discovery-runs-title">
-        <div className="mb-3 flex items-end justify-between gap-3">
-          <div>
-            <h2 id="discovery-runs-title" className={cn(sectionTitle, 'm-0')}>Discovery runs</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            {runs.length > 1 && (
-              <>
-                <button type="button" className={button('quiet', 'h-7 px-2 text-label')} onClick={() => setExpanded('all')}>Expand all</button>
-                <button type="button" className={button('quiet', 'h-7 px-2 text-label')} onClick={() => setExpanded('none')}>Collapse all</button>
-              </>
-            )}
-            <span className={num('text-body text-faint')}>{runs.length} run{runs.length === 1 ? '' : 's'}</span>
-          </div>
-        </div>
-        {deletionDialog.kind === 'blocked' && (
-          <Alert tone="warn" className="mb-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="m-0">The {discoveryRunName(deletionDialog.run)} run cannot be deleted because a DAG audit record refers to it.</p>
-                <ul className="mb-0 mt-2 pl-5 text-label text-muted">
-                  {deletionDialog.references.map((reference) => (
-                    <li key={reference.kind === 'dag-origin-reference'
-                      ? `origin:${reference.document}`
-                      : `edge:${reference.document}:${reference.revision}:${reference.edge}:${reference.candidate}`}
-                    >{describeDiscoveryReference(reference)}</li>
-                  ))}
-                </ul>
-              </div>
-              <button type="button" className={iconControl('quiet')} aria-label="Dismiss deletion notice" onClick={() => setDeletionDialog({ kind: 'closed' })}><Icon name="close" size={14} /></button>
-            </div>
-          </Alert>
-        )}
-        {deletionDialog.kind === 'not-found' && (
-          <Alert tone="danger" className="mb-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="m-0">The {discoveryRunName(deletionDialog.run)} run is no longer present in the project.</p>
-              <button type="button" className={iconControl('quiet')} aria-label="Dismiss deletion notice" onClick={() => setDeletionDialog({ kind: 'closed' })}><Icon name="close" size={14} /></button>
-            </div>
-          </Alert>
-        )}
-        {runs.length === 0 ? (
-          <EmptyState>Choose a method and run discovery.</EmptyState>
-        ) : (
-          <div className="space-y-4">
-            {[...runs].reverse().map((run, index) => (
-              <div key={`${run.id}:${expanded}`} className="relative">
-                <DiscoveryResult run={run} open={expanded === 'all' || (expanded === 'latest' && index === 0)} current={index === 0} />
-                <button type="button" className={iconControl('danger', 'absolute right-4 top-4 z-10')} aria-label={`Delete ${discoveryRunName(run)} run`} title={`Delete ${discoveryRunName(run)} run`} onClick={() => requestDeletion(run)}><Icon name="delete" size={14} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-        <ConfirmDialog
-          open={deletionDialog.kind === 'confirming'}
-          title={deletionDialog.kind === 'confirming' ? `Delete ${discoveryRunName(deletionDialog.run)} run?` : 'Delete discovery run?'}
-          danger
-          confirmLabel="Delete run"
-          message={deletionDialog.kind === 'confirming' ? 'The recorded result will be removed from this project and cannot be restored.' : ''}
-          onConfirm={() => {
-            if (deletionDialog.kind === 'confirming') onDeleteRun(deletionDialog.deletion)
-          }}
-          onClose={() => setDeletionDialog({ kind: 'closed' })}
-        />
-      </section>
+      {latestRun !== null && (
+        <section aria-labelledby={`run-${latestRun.id}`}>
+          <DiscoveryResult run={latestRun} current />
+        </section>
+      )}
     </section>
   )
 
-  return <WorkbenchLayout id="discovery" stage={stage} inspector={{ title: 'Prepared dataset and method requirements', body: inspector }} />
+  const deletionNotices = (
+    <>
+      {deletionDialog.kind === 'blocked' && (
+        <Alert tone="warn" className="m-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="m-0">The {discoveryRunName(deletionDialog.run)} run cannot be deleted because a DAG audit record refers to it.</p>
+              <ul className="mb-0 mt-2 pl-5 text-label text-muted">
+                {deletionDialog.references.map((reference) => (
+                  <li key={reference.kind === 'dag-origin-reference'
+                    ? `origin:${reference.document}`
+                    : `edge:${reference.document}:${reference.revision}:${reference.edge}:${reference.candidate}`}
+                  >{describeDiscoveryReference(reference)}</li>
+                ))}
+              </ul>
+            </div>
+            <button type="button" className={iconControl('quiet')} aria-label="Dismiss deletion notice" onClick={() => setDeletionDialog({ kind: 'closed' })}><Icon name="close" size={14} /></button>
+          </div>
+        </Alert>
+      )}
+      {deletionDialog.kind === 'not-found' && (
+        <Alert tone="danger" className="m-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="m-0">The {discoveryRunName(deletionDialog.run)} run is no longer present in the project.</p>
+            <button type="button" className={iconControl('quiet')} aria-label="Dismiss deletion notice" onClick={() => setDeletionDialog({ kind: 'closed' })}><Icon name="close" size={14} /></button>
+          </div>
+        </Alert>
+      )}
+    </>
+  )
+
+  const ledger = (
+    <DeleteRunContext.Provider value={requestDeletion}>
+      {deletionNotices}
+      <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Discovery runs">
+        {runs.length === 0 && <li className="px-3 py-2 text-faint">Choose a method and run discovery.</li>}
+        {[...runs].reverse().map((run) => <DiscoveryResult key={run.id} run={run} current={false} />)}
+      </ul>
+    </DeleteRunContext.Provider>
+  )
+
+  const deleteDialog = (
+    <ConfirmDialog
+      open={deletionDialog.kind === 'confirming'}
+      title={deletionDialog.kind === 'confirming' ? `Delete ${discoveryRunName(deletionDialog.run)} run?` : 'Delete discovery run?'}
+      danger
+      confirmLabel="Delete run"
+      message={deletionDialog.kind === 'confirming' ? 'The recorded result will be removed from this project and cannot be restored.' : ''}
+      onConfirm={() => {
+        if (deletionDialog.kind === 'confirming') onDeleteRun(deletionDialog.deletion)
+      }}
+      onClose={() => setDeletionDialog({ kind: 'closed' })}
+    />
+  )
+
+  return (
+    <WorkbenchLayout
+      id="discovery"
+      stage={stage}
+      inspector={{ title: 'Prepared dataset and method requirements', body: inspector }}
+      bottom={{ title: `Runs · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+    />
+  )
 }

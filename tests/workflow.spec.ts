@@ -286,10 +286,12 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await discoveryFamilies.getByRole('radio', { name: 'LiNGAM' }).click()
   await page.getByRole('button', { name: 'Run DirectLiNGAM' }).click()
 
-  await expect(page.getByLabel('DirectLiNGAM causal order')).toContainText('→', { timeout: 30_000 })
-  await expect(page.getByRole('img', { name: 'DirectLiNGAM structure' })).toBeVisible()
-  await expect(page.getByRole('img', { name: 'DirectLiNGAM weight heatmap' })).toBeVisible()
-  const weights = page.getByRole('region', { name: 'DirectLiNGAM raw weights' })
+  // The newest run is the current result on the stage; the runs pane below lists it again, folded.
+  const stage = page.getByTestId('canvas')
+  await expect(stage.getByLabel('DirectLiNGAM causal order')).toContainText('→', { timeout: 30_000 })
+  await expect(stage.getByRole('img', { name: 'DirectLiNGAM structure' })).toBeVisible()
+  await expect(stage.getByRole('img', { name: 'DirectLiNGAM weight heatmap' })).toBeVisible()
+  const weights = stage.getByRole('region', { name: 'DirectLiNGAM raw weights' })
   await expect(weights.getByRole('row')).toHaveCount(10)
 
   await navigation.getByRole('button', { name: /DAG workspace/ }).click()
