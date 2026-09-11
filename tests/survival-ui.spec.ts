@@ -11,9 +11,7 @@ const testData = (name: string): string =>
   fileURLToPath(new URL(`fixtures/${name}`, import.meta.url))
 
 const openExample = async (page: Page, name: string): Promise<void> => {
-  const title = page.getByText(name, { exact: true })
-  const entry = title.locator('xpath=ancestor::*[.//button[normalize-space()="Open"]][1]')
-  await entry.getByRole('button', { name: 'Open', exact: true }).click()
+  await page.getByRole('button', { name: `Open ${name}`, exact: true }).click()
 }
 
 const openSurvivalChapter = async (page: Page, phone: boolean): Promise<void> => {

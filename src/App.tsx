@@ -18,6 +18,7 @@ import type { ChapterActivity, RunActivity } from '@/domain/activity'
 import { describeSnapshotProblem, snapshotWorkflow, type PersistedProject, type SavedProjectHeader } from '@/domain/persistence'
 import { assessExampleCopy, isShippedExampleId, SHIPPED_EXAMPLES, stampExampleRelease, type ShippedExample } from '@/domain/example'
 import { ExampleLedger } from '@/components/projects/ExampleLedger'
+import { OpenControl } from '@/components/projects/OpenControl'
 import { deleteProject, listProjects, loadProject, saveProject, saveProjectIfChanged } from '@/data/projectStore'
 import { lastStorageFailure, subscribeStorageHealth, type StorageFailure } from '@/data/storageHealth'
 import { cacheSource, readCachedSource, removeCachedSource, sourceCacheAvailable } from '@/data/sourceCache'
@@ -696,7 +697,7 @@ function App() {
                                   {`${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`}
                                 </span>
                               </div>
-                              <button type="button" className={button('outline')} onClick={() => void reopenProject(entry.id)}>Open</button>
+                              <OpenControl name={entry.name} onOpen={() => void reopenProject(entry.id)} />
                               <button type="button" className={iconControl('quiet')} aria-label={`Export ${entry.name}`} title="Export this project as a bundle, without the source file" onClick={() => void exportSaved(entry.id)}><Icon name="download" size={14} /></button>
                               <button type="button" className={iconControl('danger')} aria-label={`Delete ${entry.name}`} title="Delete this saved project" onClick={() => void removeProject(entry)}><Icon name="delete" size={14} /></button>
                             </li>

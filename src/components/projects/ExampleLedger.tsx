@@ -1,8 +1,9 @@
 import { Icon } from '@/components/Icon'
-import { button, iconControl, num, table, td, th, tr } from '@/components/ui/recipes'
+import { iconControl, num, table, td, th, tr } from '@/components/ui/recipes'
 import { EXAMPLE_COLLECTIONS, EXAMPLE_QUESTIONS, type ShippedExample } from '@/domain/example'
 import type { SavedProjectHeader } from '@/domain/persistence'
 import { ExampleGlyph } from './ExampleGlyph'
+import { OpenControl } from './OpenControl'
 
 interface Group {
   readonly key: string
@@ -119,7 +120,7 @@ function Ledger({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelet
                 <td className={td(num('px-2.5 text-right text-faint'))}>{copy === null ? example.estimationRuns : copy.estimationRuns}</td>
                 <td className={td('px-2.5')}>
                   <span className="flex items-center gap-1.5">
-                    <button type="button" className={button('outline')} onClick={() => onOpen(example)}>Open</button>
+                    <OpenControl name={example.name} onOpen={() => onOpen(example)} />
                     <CopyControls example={example} copy={copy} placeholders onReset={onReset} onExport={onExport} onDelete={onDelete} />
                   </span>
                 </td>
@@ -154,7 +155,7 @@ function Sections({ groups, saved, formatSaved, onOpen, onReset, onExport, onDel
                     <span className="block text-label text-muted">{example.approach}</span>
                     <span className={num('block text-label text-faint')}>{example.shape} · {example.size}{count > 0 ? ` · ${estimationRuns(count)}` : ''}</span>
                   </div>
-                  <button type="button" className={button('outline')} onClick={() => onOpen(example)}>Open</button>
+                  <OpenControl name={example.name} onOpen={() => onOpen(example)} />
                   {copy !== null && (
                     <span className="col-start-2 col-end-4 flex items-center gap-1.5">
                       <span className={num('mr-auto text-label text-faint')}>saved {formatSaved(copy.savedAt)}</span>

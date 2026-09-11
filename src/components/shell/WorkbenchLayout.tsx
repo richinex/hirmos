@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/ui/Sheet'
-import { button, iconControl, panelTitle } from '@/components/ui/recipes'
+import { iconControl, panelTitle } from '@/components/ui/recipes'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { useShellLayout } from './useShellLayout'
@@ -62,6 +62,29 @@ const PaneRequestContext = createContext<(pane: PhonePane) => void>(() => {})
 
 export const useOpenPane = (): ((pane: PhonePane) => void) => useContext(PaneRequestContext)
 
+/**
+ * The pane openers share the segmented control's `track` form: a raised track, each name in its own
+ * column, a hairline between them. They are buttons that open dialogs rather than radios setting a
+ * value, so the control is drawn here with the same classes instead of borrowed. The open pane's name
+ * lifts to the panel surface for as long as its sheet is up.
+ */
+const PANE_TRACK = 'flex w-full rounded-lg bg-raised p-0.5'
+const PANE_OPENER = 'min-w-0 flex-1 basis-0 truncate rounded-md border border-transparent px-3 py-1 text-body transition-colors duration-(--motion-fast) pointer-coarse:min-h-10'
+
+function PaneOpener({ title, open, onOpen }: { readonly title: string; readonly open: boolean; readonly onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      className={cn(PANE_OPENER, open ? 'lift bg-panel font-medium text-ink' : 'text-muted hover:text-ink')}
+      aria-haspopup="dialog"
+      aria-expanded={open}
+      onClick={onOpen}
+    >
+      {title}
+    </button>
+  )
+}
+
 /** Below `md` the panes become bottom sheets opened from a bar under the stage, as Octopus does for its drawer. */
 function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
   readonly stage: ReactNode
@@ -77,13 +100,12 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
         <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'px-4 py-5')}>{stage}</div>
       </div>
       {(inspector || bottom) && (
-        <div className="flex shrink-0 gap-1.5 border-t border-line bg-panel px-2 py-1.5" role="group" aria-label="Panes">
-          {inspector && (
-            <button type="button" className={button('quiet', 'flex-1')} aria-haspopup="dialog" onClick={() => setOpen('inspector')}>{inspector.title}</button>
-          )}
-          {bottom && (
-            <button type="button" className={button('quiet', 'flex-1')} aria-haspopup="dialog" onClick={() => setOpen('bottom')}>{bottom.title}</button>
-          )}
+        <div className="shrink-0 border-t border-line bg-panel px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+          <div className={PANE_TRACK} role="group" aria-label="Panes">
+            {inspector && <PaneOpener title={inspector.title} open={open === 'inspector'} onOpen={() => setOpen('inspector')} />}
+            {inspector && bottom && <span aria-hidden className={cn('my-1.5 w-px shrink-0 self-stretch bg-edge/60 transition-opacity duration-(--motion-fast)', open !== null && 'opacity-0')} />}
+            {bottom && <PaneOpener title={bottom.title} open={open === 'bottom'} onOpen={() => setOpen('bottom')} />}
+          </div>
         </div>
       )}
       {inspector && (
