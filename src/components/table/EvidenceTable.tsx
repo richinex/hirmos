@@ -3,7 +3,7 @@ import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type Col
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cellPadding, countLine, DensityToggle, FilterField, ROW_HEIGHT, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
 import { Icon } from '@/components/Icon'
-import { button, num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
+import { button, literal, num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
 import { fontFor, lineCountAt, lineHeightFor, useTextMetricsVersion } from '@/lib/textMetrics'
 import { toCsv } from '@/lib/csv'
 import { cn } from '@/lib/utils'
@@ -32,6 +32,8 @@ export type EvidenceValue = string | number
 export interface EvidenceColumn<Row> {
   readonly id: string
   readonly header: string
+  /** A second line under the header in the micro register: a column's type, a unit. */
+  readonly detail?: string
   readonly align?: 'left' | 'right'
   readonly value: (row: Row) => EvidenceValue
   readonly format?: (value: EvidenceValue, row: Row) => ReactNode
@@ -80,7 +82,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
   const definitions = useMemo<ColumnDef<Row, EvidenceValue>[]>(
     () => columns.map((column) => ({
       id: column.id,
-      header: column.header,
+      header: column.detail === undefined ? column.header : () => <span className="block"><span className="block">{column.header}</span><span className={literal('block text-micro font-normal text-faint')}>{column.detail}</span></span>,
       accessorFn: column.value,
       cell: (info) => (column.format ? column.format(info.getValue(), info.row.original) : String(info.getValue())),
       sortingFn: column.align === 'right' ? 'basic' : 'alphanumeric',

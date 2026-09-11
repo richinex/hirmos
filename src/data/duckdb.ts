@@ -133,8 +133,35 @@ const temporalPreview = (value: number, duckdbType: string): PreviewCell | null 
   return Number.isNaN(date.valueOf()) ? null : { kind: 'temporal', value: date.toISOString() }
 }
 
-const previewCell = (value: unknown, duckdbType: string): PreviewCell => {
+/** Arrow hands 128-bit integers and decimals over as sixteen little-endian bytes; this turns them back into a number. */
+const wideInteger = (view: ArrayBufferView, signed: boolean): bigint => {
+  const bytes = new Uint8Array(view.buffer, view.byteOffset, view.byteLength)
+  let value = 0n
+  for (let index = bytes.length - 1; index >= 0; index -= 1) value = (value << 8n) | BigInt(bytes[index]!)
+  if (signed && (bytes[bytes.length - 1]! & 0x80) !== 0) value -= 1n << BigInt(bytes.length * 8)
+  return value
+}
+
+/** A 128-bit integer or decimal as the digits it stands for; the decimal point is placed in the text, so wide values keep every digit. */
+const wideValue = (value: ArrayBufferView, duckdbType: string): PreviewCell => {
+  const integer = wideInteger(value, !duckdbType.startsWith('U'))
+  const decimal = /^DECIMAL\(\d+,(\d+)\)$/.exec(duckdbType)
+  const scale = decimal === null ? 0 : Number(decimal[1])
+  if (scale === 0) return { kind: 'integer', value: integer.toString() }
+  const magnitude = (integer < 0n ? -integer : integer).toString().padStart(scale + 1, '0')
+  const text = `${integer < 0n ? '-' : ''}${magnitude.slice(0, -scale)}.${magnitude.slice(-scale)}`
+  // Past fifteen digits a double would round the value, so the digits are shown as written instead.
+  return magnitude.length > 15 ? { kind: 'text', value: text } : { kind: 'number', value: Number(text) }
+}
+
+const isWideNumberType = (duckdbType: string): boolean => /^(U?HUGEINT|DECIMAL\()/.test(duckdbType)
+
+export const previewCell = (value: unknown, duckdbType: string): PreviewCell => {
   if (value === null || value === undefined) return { kind: 'null' }
+  if (ArrayBuffer.isView(value)) {
+    if (isWideNumberType(duckdbType) && value.byteLength === 16) return wideValue(value, duckdbType)
+    return { kind: 'text', value: `${value.byteLength} bytes` }
+  }
   if (typeof value === 'number') return temporalPreview(value, duckdbType) ?? { kind: 'number', value }
   if (typeof value === 'bigint') return { kind: 'integer', value: value.toString() }
   if (typeof value === 'boolean') return { kind: 'boolean', value }

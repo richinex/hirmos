@@ -71,6 +71,13 @@ export type Workflow =
       /** The files the SQL console exposes as tables; a view becomes the source only once it materialises. */
       readonly inputs: NonEmptyArray<SqlPreparationInput>
     }
+  | {
+      readonly kind: 'pipeline-inputs-chosen'
+      readonly project: Project
+      readonly origin: ProjectOrigin
+      /** The files the pipeline canvas offers as input blocks; the output block becomes the source only once it materialises. */
+      readonly inputs: NonEmptyArray<SqlPreparationInput>
+    }
   | { readonly kind: 'source-selected'; readonly project: Project; readonly origin: ProjectOrigin; readonly source: SelectedSource }
   | {
       readonly kind: 'profiling'
@@ -117,6 +124,8 @@ export type WorkflowEvent =
   | { readonly type: 'project-submitted' }
   | { readonly type: 'file-selected'; readonly file: File }
   | { readonly type: 'sql-inputs-chosen'; readonly inputs: NonEmptyArray<SqlPreparationInput> }
+  | { readonly type: 'pipeline-inputs-chosen'; readonly inputs: NonEmptyArray<SqlPreparationInput> }
+  /** A derived source is ready: the SQL view or the pipeline's output block has been written to a file. */
   | { readonly type: 'sql-source-created'; readonly source: SelectedSource }
   | { readonly type: 'profile-requested'; readonly request: ImportRequestId }
   | { readonly type: 'profile-succeeded'; readonly request: ImportRequestId; readonly profile: DatasetProfile }
@@ -205,13 +214,16 @@ export function selectSource(file: File): Result<SelectedSource, SourceSelection
   })
 }
 
-export function selectSqlDerivedSource(
+export function selectDerivedSource(
   file: File,
-  recipe: Extract<SourceRecipe, { readonly kind: 'sql-derived' }>,
+  recipe: Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>,
 ): Result<SelectedSource, SourceSelectionProblem> {
   const selected = selectSource(file)
   return selected.ok ? ok({ ...selected.value, recipe }) : selected
 }
+
+/** The SQL workspace's name for the same step. */
+export const selectSqlDerivedSource = selectDerivedSource
 
 export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
   // Closing returns to the list whatever the project's stage; the caller saves first.
@@ -266,6 +278,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'sql-inputs-chosen' && state.restore === null) {
         return { kind: 'sql-inputs-chosen', project: state.project, origin: state.origin, inputs: event.inputs }
       }
+      if (event.type === 'pipeline-inputs-chosen' && state.restore === null) {
+        return { kind: 'pipeline-inputs-chosen', project: state.project, origin: state.origin, inputs: event.inputs }
+      }
       if (event.type !== 'file-selected' || state.restore !== null) return state
       const parsed = selectSource(event.file)
       return parsed.ok
@@ -273,6 +288,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         : { ...state, problem: parsed.error }
     }
     case 'sql-inputs-chosen':
+    case 'pipeline-inputs-chosen':
       if (event.type === 'sql-source-created') {
         return { kind: 'source-selected', project: state.project, origin: state.origin, source: event.source }
       }

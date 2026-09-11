@@ -266,13 +266,21 @@ test('the shipped example uses the current applied-adjustment record', async ({ 
     const response = await fetch('/examples/seatbelts.hirmos.json')
     const parsed = bundle.parseBundle(await response.text())
     if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
-    return parsed.value.project.estimationRuns.map((run: { readonly estimate: { readonly adjustment: unknown } }) => run.estimate.adjustment)
+    const project = parsed.value.project
+    return {
+      preparedId: project.prepared?.id ?? null,
+      adjustments: project.estimationRuns.map((run: { readonly estimate: { readonly adjustment: unknown } }) => run.estimate.adjustment),
+    }
   })
-  expect(adjustments).toEqual([
-    { kind: 'contemporaneous', variables: [{ node: '855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice', column: '6:PetrolPrice', name: 'PetrolPrice' }] },
-    { kind: 'contemporaneous', variables: [{ node: '855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice', column: '6:PetrolPrice', name: 'PetrolPrice' }] },
-    { kind: 'contemporaneous', variables: [{ node: '855efccf-0540-48c3-b7f0-4620b6744971:6:PetrolPrice', column: '6:PetrolPrice', name: 'PetrolPrice' }] },
-  ])
+  // DAG node ids are prefixed by the prepared dataset's id, which changes each time the example is re-recorded; the record shape is what matters here.
+  expect(adjustments.preparedId).not.toBeNull()
+  expect(adjustments.adjustments.length).toBeGreaterThan(0)
+  for (const adjustment of adjustments.adjustments) {
+    expect(adjustment).toEqual({
+      kind: 'contemporaneous',
+      variables: [{ node: `${adjustments.preparedId}:6:PetrolPrice`, column: '6:PetrolPrice', name: 'PetrolPrice' }],
+    })
+  }
 })
 
 test('opens the shipped example Estimation chapter without the compatibility boundary', async ({ page }, testInfo) => {

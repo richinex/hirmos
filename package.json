@@ -16,13 +16,18 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.8",
+    "@codemirror/commands": "^6.11.0",
+    "@codemirror/lang-python": "^6.2.1",
+    "@codemirror/language": "^6.12.4",
+    "@codemirror/state": "^6.7.4",
+    "@codemirror/view": "^6.43.11",
     "@dagrejs/dagre": "^3.1.1",
     "@duckdb/duckdb-wasm": "1.30.0",
     "@duckdb/duckdb-wasm-shell": "1.30.0",
-    "xterm": "5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",
     "@fontsource-variable/source-serif-4": "^5.3.0",
     "@fontsource/arimo": "^5.3.0",
+    "@lezer/highlight": "^1.2.3",
     "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-select": "^2.3.7",
     "@radix-ui/react-tooltip": "^1.2.16",
@@ -44,6 +49,7 @@
     "thinking-orbs": "^0.3.1",
     "three": "^0.185.1",
     "vaul": "^1.1.2",
+    "xterm": "5.3.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

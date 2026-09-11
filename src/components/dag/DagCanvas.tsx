@@ -9,7 +9,6 @@ import {
   EdgeLabelRenderer,
   Handle,
   MarkerType,
-  Panel,
   Position,
   ReactFlow,
   useConnection,
@@ -52,8 +51,8 @@ import { dagCardSize } from './dagCardSize'
 import { useTextMetricsVersion } from '@/lib/textMetrics'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
 import type { InterventionOverlay } from '@/domain/intervention'
-import { cn } from '@/lib/utils'
-import { useIsMobile, useMediaQuery } from '@/lib/useMediaQuery'
+import { FlowControls, flowControl } from '@/components/flow/FlowControls'
+import { useMediaQuery } from '@/lib/useMediaQuery'
 import { dagPointerTarget, type ScreenTargetBox } from './dagPointerTarget'
 
 interface DagNodeData extends Record<string, unknown> {
@@ -468,16 +467,10 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
   readonly expanded: boolean
   readonly onToggleExpand: () => void
 }) {
-  const { fitView, zoomIn, zoomOut } = useReactFlow<CanvasNode, CanvasEdge>()
-  const phone = useIsMobile()
-  const control = iconControl('quiet', 'rounded-none border-0')
+  const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
+  const control = flowControl
   return (
-    // A column at the graph's right on a desktop; on a phone a centred row along its foot, where a column would sit over the nodes.
-    <Panel position={phone ? 'bottom-center' : 'bottom-right'} className="!m-2">
-      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', phone ? 'flex-row' : 'flex-col')}>
-        <button type="button" className={control} title="Zoom in" aria-label="Zoom in" onClick={() => void zoomIn({ duration: 160 })}><Icon name="add" size={14} /></button>
-        <button type="button" className={control} title="Zoom out" aria-label="Zoom out" onClick={() => void zoomOut({ duration: 160 })}><Icon name="remove" size={14} /></button>
-        <button type="button" className={control} title="Fit graph" aria-label="Fit graph" onClick={() => void fitView({ ...FIT_VIEW, duration: 220 })}><Icon name="fit_screen" size={14} /></button>
+    <FlowControls fit={FIT_VIEW} fitLabel="Fit graph">
         <button
           type="button"
           className={control}
@@ -509,8 +502,7 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
         >
           <Icon name={expanded ? 'close_fullscreen' : 'open_in_full'} size={14} />
         </button>
-      </div>
-    </Panel>
+    </FlowControls>
   )
 }
 

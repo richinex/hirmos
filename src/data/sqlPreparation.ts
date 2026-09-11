@@ -57,7 +57,7 @@ const relationFor = (input: SqlPreparationInput, path: string): string => input.
   ? `read_parquet(${sqlString(path)})`
   : `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480)`
 
-async function registerInputs(
+export async function registerInputs(
   engine: DuckDbEngine,
   inputs: NonEmptyArray<SqlPreparationInput>,
   namespace: string,
@@ -169,7 +169,7 @@ export async function cancelSqlPreparationQuery(
   }
 }
 
-interface SqlViewDefinition {
+export interface SqlViewDefinition {
   readonly name: SqlViewName
   readonly statement: string
 }
@@ -210,6 +210,42 @@ export async function listSqlPreparationViews(
   return definitions.ok ? ok(definitions.value.map((definition) => definition.name)) : definitions
 }
 
+/**
+ * The output view's columns, row count and Parquet bytes, read on an open connection whose views are
+ * in place. Shared by the SQL path, which rebuilds its views first, and the pipeline path, which has
+ * run its steps on the connection already.
+ */
+export async function materializeView(
+  engine: DuckDbEngine,
+  connection: duckdb.AsyncDuckDBConnection,
+  outputView: string,
+  fileName: string,
+): Promise<Result<Omit<SqlPreparedOutput, 'recipe'>, SqlPreparationProblem>> {
+  const outputPath = `prepared-${crypto.randomUUID()}.parquet`
+  try {
+    const description = await connection.query(`DESCRIBE SELECT * FROM ${sqlIdentifier(outputView)}`)
+    const columns = Array.from({ length: description.numRows }, (_, index) => ({
+      name: String(description.getChild('column_name')?.get(index) ?? ''),
+      type: String(description.getChild('column_type')?.get(index) ?? ''),
+    }))
+    if (!isNonEmpty(columns) || columns.some((column) => column.name.length === 0 || column.type.length === 0)) {
+      return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has no readable columns.' })
+    }
+    const names = new Set(columns.map((column) => column.name))
+    if (names.size !== columns.length) return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has duplicate column names.' })
+    const countTable = await connection.query(`SELECT count(*)::UBIGINT AS rows FROM ${sqlIdentifier(outputView)}`)
+    const count = scalarCount(countTable.getChild('rows')?.get(0))
+    if (!count.ok) return count
+    if (count.value === 0) return err({ kind: 'prepared-view-empty' })
+    await connection.query(`COPY (SELECT * FROM ${sqlIdentifier(outputView)}) TO ${sqlString(outputPath)} (FORMAT PARQUET)`)
+    const bytes = await engine.db.copyFileToBuffer(outputPath)
+    const file = new File([Uint8Array.from(bytes)], fileName, { type: 'application/vnd.apache.parquet', lastModified: Date.now() })
+    return ok({ file, rowCount: count.value, columns })
+  } catch (cause) {
+    return err({ kind: 'materialization-failed', detail: detailOf(cause) })
+  }
+}
+
 async function verifyAndMaterialize(
   definitions: readonly SqlViewDefinition[],
   outputView: SqlViewName,
@@ -219,7 +255,6 @@ async function verifyAndMaterialize(
   try { engine = await isolatedDuckDbEngine() } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
-  const outputPath = `sql-prepared-${crypto.randomUUID()}.parquet`
   try {
     const registered = await registerInputs(engine, inputs, `sql-verify-${crypto.randomUUID()}`)
     if (!registered.ok) return registered
@@ -238,26 +273,7 @@ async function verifyAndMaterialize(
         if (failed.length === pending.length) break
         pending = failed
       }
-      const description = await connection.query(`DESCRIBE SELECT * FROM ${sqlIdentifier(outputView)}`)
-      const columns = Array.from({ length: description.numRows }, (_, index) => ({
-        name: String(description.getChild('column_name')?.get(index) ?? ''),
-        type: String(description.getChild('column_type')?.get(index) ?? ''),
-      }))
-      if (!isNonEmpty(columns) || columns.some((column) => column.name.length === 0 || column.type.length === 0)) {
-        return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has no readable columns.' })
-      }
-      const names = new Set(columns.map((column) => column.name))
-      if (names.size !== columns.length) return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has duplicate column names.' })
-      const countTable = await connection.query(`SELECT count(*)::UBIGINT AS rows FROM ${sqlIdentifier(outputView)}`)
-      const count = scalarCount(countTable.getChild('rows')?.get(0))
-      if (!count.ok) return count
-      if (count.value === 0) return err({ kind: 'prepared-view-empty' })
-      await connection.query(`COPY (SELECT * FROM ${sqlIdentifier(outputView)}) TO ${sqlString(outputPath)} (FORMAT PARQUET)`)
-      const bytes = await engine.db.copyFileToBuffer(outputPath)
-      const file = new File([Uint8Array.from(bytes)], `${outputView}.parquet`, { type: 'application/vnd.apache.parquet', lastModified: Date.now() })
-      return ok({ file, rowCount: count.value, columns })
-    } catch (cause) {
-      return err({ kind: 'materialization-failed', detail: detailOf(cause) })
+      return await materializeView(engine, connection, outputView, `${outputView}.parquet`)
     } finally {
       await connection.close()
     }

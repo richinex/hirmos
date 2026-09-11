@@ -97,6 +97,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [],
       }
     case 'sql-inputs-chosen':
+    case 'pipeline-inputs-chosen':
     case 'source-selected':
     case 'profiling':
     case 'import-failed':

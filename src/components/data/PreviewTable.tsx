@@ -1,60 +1,22 @@
 import { Select } from '@/components/ui/Select'
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { Icon } from '@/components/Icon'
 import { cellPadding, Chip, FilterField, HeaderMenu, ROW_HEIGHT, TableShell, useTableDensity, type MenuItem } from '@/components/table/primitives'
 import { Alert } from '@/components/ui/Alert'
-import { facet, button, field, label, literal, num, table as tableCn, th } from '@/components/ui/recipes'
+import { facet, button, field, label, num, table as tableCn, th } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type ColumnId, type ColumnSummary, type DatasetProfile, type PhysicalColumnProfile, type PreviewCell, type PreviewFilter, type PreviewSort } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatAbsent, formatCount } from '@/lib/format/number'
+import { formatCount } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
+import { columnDecimals, isNumericCell, PreviewCellText } from './previewCell'
 import type { DatasetSummaryState } from './useDatasetSummary'
 import { usePreviewWindows } from './usePreviewWindows'
 import { fontFor, textWidth } from '@/lib/textMetrics'
 
-const locale = (): string => (typeof navigator === 'undefined' ? 'en-GB' : navigator.language || 'en-GB')
-
-const decimalsOf = (value: number): number => {
-  if (Number.isInteger(value)) return 0
-  const text = String(value)
-  const exponent = text.indexOf('e-')
-  if (exponent >= 0) return Math.min(6, Number(text.slice(exponent + 2)) + 1)
-  const point = text.indexOf('.')
-  return point < 0 ? 0 : Math.min(6, text.length - point - 1)
-}
-
-/** One decimal count per column, from the values on screen, so a column's figures align. */
-const columnDecimals = (rows: readonly (readonly PreviewCell[] | null)[], columnIndex: number): number => {
-  let decimals = 0
-  for (const row of rows) {
-    const cell = row?.[columnIndex]
-    if (cell?.kind === 'number') decimals = Math.max(decimals, decimalsOf(cell.value))
-  }
-  return Math.min(decimals, 4)
-}
-
-function CellText({ cell, decimals }: { readonly cell: PreviewCell; readonly decimals: number }): ReactNode {
-  switch (cell.kind) {
-    case 'null': {
-      const absent = formatAbsent('unavailable', 'missing value')
-      return <span className="text-muted" title="Missing value"><span className="sr-only">{absent.srText}</span><span aria-hidden>{absent.text}</span></span>
-    }
-    case 'number': return new Intl.NumberFormat(locale(), { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(cell.value)
-    case 'integer': {
-      const value = Number(cell.value)
-      return Number.isSafeInteger(value) ? formatCount(value).text : cell.value
-    }
-    case 'boolean': return cell.value ? 'true' : 'false'
-    case 'temporal': return cell.value.replace('T', ' ').replace(/\.000Z$/, '').replace(/Z$/, '')
-    case 'text': return cell.value
-    default: return assertNever(cell)
-  }
-}
-
 const isRightAligned = (cell: PreviewCell | undefined, column: PhysicalColumnProfile): boolean =>
-  cell === undefined || cell.kind === 'null' ? isNumericDuckDbType(column.duckdbType) : cell.kind === 'number' || cell.kind === 'integer'
+  cell === undefined || cell.kind === 'null' ? isNumericDuckDbType(column.duckdbType) : isNumericCell(cell)
 
 const describeFilter = (filter: PreviewFilter, name: string): string => {
   switch (filter.kind) {
@@ -354,7 +316,7 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
                       className={cn('truncate whitespace-nowrap px-3.5', padding, right ? num('text-right') : 'text-left', cell?.kind === 'null' ? 'text-muted' : 'text-ink', column.id === selectedColumn && 'bg-raised')}
                       title={cell !== undefined && cell.kind !== 'null' ? String(cell.kind === 'boolean' ? cell.value : cell.value) : undefined}
                     >
-                      {cell === undefined ? <span className="text-faint">…</span> : <CellText cell={cell} decimals={decimals.get(column.id) ?? 0} />}
+                      {cell === undefined ? <span className="text-faint">…</span> : <PreviewCellText cell={cell} decimals={decimals.get(column.id) ?? 0} />}
                     </td>
                   )
                 })}

@@ -216,7 +216,8 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('button', { name: 'Expand chapter list' }).click()
   await mobileNav.getByRole('button', { name: /Discovery lab/ }).click()
   await expect(page.getByText('Lag-resolved neural Granger evidence')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('1 run')).toBeVisible()
+  // On a phone the run ledger is a bottom pane opened from a bar under the stage; its button carries the count.
+  await expect(page.getByRole('button', { name: 'Runs · 1' })).toBeVisible()
   await expect(page.getByText('divided by its recorded population standard deviation')).toBeVisible()
   await discoveryFamilies.getByRole('radio', { name: 'PCMCI' }).click()
   await discoveryMethods.getByRole('radio', { name: /^PCMCI\+/ }).click()

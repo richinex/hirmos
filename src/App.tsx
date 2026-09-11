@@ -42,7 +42,8 @@ import {
   type DiscoveryEvent,
 } from '@/domain/discovery'
 import { useRunActivity } from '@/lib/useRunActivity'
-import { assertNever } from '@/domain/dop'
+import { assertNever, err, type Result } from '@/domain/dop'
+import type { SourceRecipe } from '@/domain/sqlPreparation'
 import { cn } from '@/lib/utils'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
@@ -53,6 +54,7 @@ const loadSensitivityPanel = () => import('@/components/sensitivity/SensitivityP
 const loadCounterfactualPanel = () => import('@/components/counterfactual/CounterfactualPanel')
 const loadResultsPanel = () => import('@/components/results/ResultsPanel')
 const loadSqlPreparationWorkspace = () => import('@/components/data/SqlPreparationWorkspace')
+const loadPipelineWorkspace = () => import('@/components/data/pipeline/PipelineWorkspace')
 
 /** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk `lazy` will ask for. */
 const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
@@ -86,6 +88,7 @@ const CounterfactualPanel = lazy(async () => ({ default: (await loadCounterfactu
 const ResultsPanel = lazy(async () => ({ default: (await loadResultsPanel()).ResultsPanel }))
 
 const SqlShell = lazy(async () => ({ default: (await loadSqlPreparationWorkspace()).SqlShell }))
+const PipelineWorkspace = lazy(async () => ({ default: (await loadPipelineWorkspace()).PipelineWorkspace }))
 
 type SqlIntake =
   | { readonly kind: 'idle' }
@@ -114,6 +117,7 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
     switch (source.recipe.kind) {
       case 'uploaded-file': return `${source.format} · ${formatBytes(source.bytes)}`
       case 'sql-derived': return `prepared with SQL · ${source.recipe.outputView} · ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'} · ${formatBytes(source.bytes)}`
+      case 'pipeline-derived': return `built with a pipeline · ${source.recipe.graph.nodes.length} blocks · ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'} · ${formatBytes(source.bytes)}`
       default: return assertNever(source.recipe)
     }
   })()
@@ -137,7 +141,7 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
 function App() {
   const [workflow, dispatch] = useReducer(stepWorkflow, INITIAL_WORKFLOW)
   const fileInput = useRef<HTMLInputElement>(null)
-  const [dataEntryMode, setDataEntryMode] = useState<'file' | 'sql'>('file')
+  const [dataEntryMode, setDataEntryMode] = useState<'file' | 'sql' | 'pipeline'>('file')
   const { location, route } = useRoute()
   const shell = useShellLayout()
   /** Whether the rail's lobe is out over the stage; on a phone, whether the rail is slid in. Session state, never saved. */
@@ -204,16 +208,26 @@ function App() {
     dispatch({ type: 'file-selected', file })
   }
 
-  // A source the SQL step built is rebuilt from its input files; the result then passes the same fingerprint check.
+  const replayRecipe = async (recipe: Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>, files: readonly File[]): Promise<Result<File, string>> => {
+    if (recipe.kind === 'sql-derived') {
+      const data = await import('@/data/sqlPreparation')
+      const replayed = await data.replaySqlRecipe(recipe, files)
+      return replayed.ok ? replayed : err(data.describeSqlPreparationProblem(replayed.error))
+    }
+    const [data, python] = await Promise.all([import('@/data/pipeline'), import('@/data/pythonRuntime')])
+    const replayed = await data.replayPipelineRecipe(recipe, files, python.pythonScriptRuntime())
+    return replayed.ok ? replayed : err(data.describePipelineRunProblem(replayed.error, (id) => id))
+  }
+
+  // A source the SQL or pipeline step built is rebuilt from its input files; the result then passes the same fingerprint check.
   const restoreFromInputs = async (files: readonly File[]) => {
     if (workflow.kind !== 'awaiting-data' || workflow.restore === null) return
     const recipe = workflow.restore.source?.recipe
-    if (recipe === undefined || recipe.kind !== 'sql-derived') return
+    if (recipe === undefined || recipe.kind === 'uploaded-file') return
     setSqlIntake({ kind: 'reading' })
-    const data = await import('@/data/sqlPreparation')
-    const replayed = await data.replaySqlRecipe(recipe, files)
+    const replayed = await replayRecipe(recipe, files)
     setSqlIntake({ kind: 'idle' })
-    if (!replayed.ok) { dispatch({ type: 'restore-rejected', problem: { kind: 'replay-failed', detail: data.describeSqlPreparationProblem(replayed.error) } }); return }
+    if (!replayed.ok) { dispatch({ type: 'restore-rejected', problem: { kind: 'replay-failed', detail: replayed.error } }); return }
     chooseFile(replayed.value)
   }
 
@@ -251,6 +265,14 @@ function App() {
     if (!prepared.ok) { setSqlIntake({ kind: 'failed', detail: data.describeSqlPreparationProblem(prepared.error) }); return }
     setSqlIntake({ kind: 'idle' })
     dispatch({ type: 'sql-inputs-chosen', inputs: prepared.value })
+  }
+  const choosePipelineInputs = async (files: readonly File[]) => {
+    setSqlIntake({ kind: 'reading' })
+    const [data] = await Promise.all([import('@/data/sqlPreparation'), loadPipelineWorkspace()])
+    const prepared = await data.prepareSqlInputs(files)
+    if (!prepared.ok) { setSqlIntake({ kind: 'failed', detail: data.describeSqlPreparationProblem(prepared.error) }); return }
+    setSqlIntake({ kind: 'idle' })
+    dispatch({ type: 'pipeline-inputs-chosen', inputs: prepared.value })
   }
   const [activity, setActivity] = useState<ChapterActivity>({})
   const reportActivity = useMemo(() => Object.fromEntries(CHAPTER_IDS.map((chapter) => [chapter, (run: RunActivity | null) => setActivity((current) => {
@@ -579,7 +601,7 @@ function App() {
     </>
   )
 
-  const fullBleed = profiled !== null && ['data', 'survival', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
+  const fullBleed = workflow.kind === 'pipeline-inputs-chosen' || profiled !== null && ['data', 'survival', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
   // Every chart export names the project it came from.
   const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
@@ -678,17 +700,19 @@ function App() {
                             ariaLabel="Data input method"
                             value={dataEntryMode}
                             onChange={setDataEntryMode}
-                            options={[{ value: 'file', label: 'Upload a file' }, { value: 'sql', label: 'Prepare with SQL' }]}
+                            options={[{ value: 'file', label: 'Upload a file' }, { value: 'sql', label: 'Prepare with SQL' }, { value: 'pipeline', label: 'Build a pipeline' }]}
                           />
                           <p className={cn(fieldHint, 'mt-3 min-h-[3lh]')}>
                             {dataEntryMode === 'file'
                               ? 'Choose one CSV, TSV or Parquet file. It becomes the source as it is.'
-                              : 'Choose one or more CSV, TSV or Parquet files. Each file becomes a table in a SQL console, and created views can be selected for further analysis.'}
+                              : dataEntryMode === 'sql'
+                                ? 'Choose one or more CSV, TSV or Parquet files. Each file becomes a table in a SQL console, and created views can be selected for further analysis.'
+                                : 'Choose one or more CSV, TSV or Parquet files. Each file becomes an input block on a canvas. Wire blocks together to filter, join, derive and aggregate, then use the result as the source.'}
                           </p>
                         </>
-                      ) : workflow.restore.source?.recipe.kind === 'sql-derived' ? (
+                      ) : workflow.restore.source !== null && workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
                         <p className={cn(fieldHint, 'mt-0')}>
-                          {`${workflow.project.name} was built from ${workflow.restore.source.name}, which the SQL step created from ${workflow.restore.source.recipe.inputs.map((input) => `${input.fileName} (${formatBytes(input.bytes)})`).join(' and ')}. Choose those files again, unchanged. The recorded statement runs on them and the result is checked against the recorded fingerprint before the work returns.`}
+                          {`${workflow.project.name} was built from ${workflow.restore.source.name}, which the ${workflow.restore.source.recipe.kind === 'sql-derived' ? 'SQL step' : 'pipeline'} created from ${workflow.restore.source.recipe.inputs.map((input) => `${input.fileName} (${formatBytes(input.bytes)})`).join(' and ')}. Choose those files again, unchanged. The recorded ${workflow.restore.source.recipe.kind === 'sql-derived' ? 'statement runs' : 'blocks run'} on them and the result is checked against the recorded fingerprint before the work returns.`}
                         </p>
                       ) : (
                         <p className={cn(fieldHint, 'mt-0')}>
@@ -698,11 +722,11 @@ function App() {
                       {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
                       {sqlIntake.kind === 'failed' && <p role="alert" className="mt-3 text-body text-danger">{sqlIntake.detail}</p>}
                     </div>
-                    {workflow.restore?.source?.recipe.kind === 'sql-derived' ? (
+                    {workflow.restore?.source !== null && workflow.restore?.source !== undefined && workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
                       <DataDropZone
                         multiple
                         invitation="Drop the input files here."
-                        consequence="The SQL step runs again on them."
+                        consequence={workflow.restore.source.recipe.kind === 'sql-derived' ? 'The SQL step runs again on them.' : 'The pipeline runs again on them.'}
                         action="Choose input files"
                         busy={sqlIntake.kind === 'reading'}
                         onFiles={(files) => void restoreFromInputs(files)}
@@ -713,7 +737,7 @@ function App() {
                         action="Choose data file"
                         onFiles={([file]) => chooseFile(file)}
                       />
-                    ) : (
+                    ) : dataEntryMode === 'sql' ? (
                       <DataDropZone
                         multiple
                         invitation="Drop one or more CSV, TSV or Parquet files here."
@@ -723,9 +747,29 @@ function App() {
                         onFiles={(files) => void chooseSqlInputs(files)}
                         onIntent={() => { void loadSqlPreparationWorkspace() }}
                       />
+                    ) : (
+                      <DataDropZone
+                        multiple
+                        invitation="Drop one or more CSV, TSV or Parquet files here."
+                        consequence="Each file becomes an input block on the canvas."
+                        action="Choose input files"
+                        busy={sqlIntake.kind === 'reading'}
+                        onFiles={(files) => void choosePipelineInputs(files)}
+                        onIntent={() => { void loadPipelineWorkspace() }}
+                      />
                     )}
                   </div>
                 </section>
+              )}
+
+              {workflow.kind === 'pipeline-inputs-chosen' && (
+                <Suspense fallback={<ChapterSkeleton label="Loading the pipeline canvas…" />}>
+                  <PipelineWorkspace
+                    inputs={workflow.inputs}
+                    onPrepared={(source) => dispatch({ type: 'sql-source-created', source })}
+                    onCleared={() => dispatch({ type: 'source-cleared' })}
+                  />
+                </Suspense>
               )}
 
               {workflow.kind === 'sql-inputs-chosen' && (
