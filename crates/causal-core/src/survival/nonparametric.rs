@@ -127,25 +127,26 @@ fn event_table(observations: &[WeightedObservation]) -> Result<Vec<EventRow>, No
     times.sort_by(f64::total_cmp);
     times.dedup_by(|left, right| same_number(*left, *right));
 
+    let positions = times
+        .iter()
+        .enumerate()
+        .map(|(index, time)| (time.to_bits(), index))
+        .collect::<std::collections::HashMap<_, _>>();
+    let mut totals = vec![[0.0; 3]; times.len()];
+    // Accumulate each time's weights in original observation order, as before.
+    for observation in observations {
+        totals[positions[&observation.entry.to_bits()]][0] += observation.weight;
+        let total = &mut totals[positions[&observation.duration.to_bits()]];
+        total[1] += observation.weight;
+        if observation.event == EventStatus::Observed {
+            total[2] += observation.weight;
+        }
+    }
+
     let mut entered = 0.0;
     let mut removed_before = 0.0;
     let mut rows = Vec::with_capacity(times.len());
-    for time in times {
-        let entrance = observations
-            .iter()
-            .filter(|row| same_number(row.entry, time))
-            .map(|row| row.weight)
-            .sum::<f64>();
-        let removed = observations
-            .iter()
-            .filter(|row| same_number(row.duration, time))
-            .map(|row| row.weight)
-            .sum::<f64>();
-        let observed = observations
-            .iter()
-            .filter(|row| same_number(row.duration, time) && row.event == EventStatus::Observed)
-            .map(|row| row.weight)
-            .sum::<f64>();
+    for (time, [entrance, removed, observed]) in times.into_iter().zip(totals) {
         entered += entrance;
         rows.push(EventRow {
             time,
@@ -179,14 +180,15 @@ fn validate_request(
 fn at_timeline<T: Copy>(timeline: &[f64], estimates: &[(f64, T)], initial: T) -> Vec<(f64, T)> {
     let mut sorted = timeline.to_vec();
     sorted.sort_by(f64::total_cmp);
+    let mut position = 0;
+    let mut value = initial;
     sorted
         .into_iter()
         .map(|time| {
-            let value = estimates
-                .iter()
-                .take_while(|(event_time, _)| *event_time <= time)
-                .last()
-                .map_or(initial, |(_, value)| *value);
+            while position < estimates.len() && estimates[position].0 <= time {
+                value = estimates[position].1;
+                position += 1;
+            }
             (time, value)
         })
         .collect()

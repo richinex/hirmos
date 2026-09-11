@@ -12,17 +12,23 @@ import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefuta
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
 import {
   comparisonSurvivalEvidenceSchema,
+  coxRegressionEvidenceSchema,
   flexSurvEvidenceSchema,
   nonparametricSurvivalEvidenceSchema,
   multiStateSurvivalEvidenceSchema,
   parametricSurvivalFamilySchema,
   proportionalHazardsFamilySchema,
   parseComparisonSurvivalEvidence,
+  parseCoxRegressionEvidence,
   parseFlexSurvEvidence,
+  parsePenalizedAftEvidence,
+  penalizedAftEvidenceSchema,
   parseNonparametricSurvivalEvidence,
   parseMultiStateSurvivalEvidence,
   type ComparisonSurvivalEvidence,
+  type CoxRegressionEvidence,
   type FlexSurvEvidence,
+  type PenalizedAftEvidence,
   type NonparametricSurvivalEvidence,
   type MultiStateSurvivalEvidence,
   type ParametricSurvivalFamily,
@@ -168,6 +174,37 @@ export type MultiStateWorkerInput =
         | { readonly kind: 'columns'; readonly state: number; readonly time: number }
     }
 
+export type CoxRegressionWorkerDesign = {
+  readonly observation:
+    | {
+        readonly kind: 'rightCensored'
+        readonly duration: number
+        readonly event: number
+        readonly entry: { readonly kind: 'notUsed' } | { readonly kind: 'column'; readonly column: number }
+        readonly standardErrors:
+          | { readonly kind: 'modelBased' }
+          | { readonly kind: 'robust' }
+          | { readonly kind: 'clustered'; readonly column: number }
+        readonly frailty:
+          | { readonly kind: 'none' }
+          | { readonly kind: 'gamma'; readonly column: number; readonly ties: 'efron' | 'breslow' }
+      }
+    | {
+        readonly kind: 'startStop'
+        readonly subject: number
+        readonly start: number
+        readonly stop: number
+        readonly event: number
+      }
+  readonly weights: { readonly kind: 'equal' } | { readonly kind: 'column'; readonly column: number }
+  readonly strata: { readonly kind: 'unstratified' } | { readonly kind: 'column'; readonly column: number }
+  readonly covariates: readonly number[]
+  readonly penalty:
+    | { readonly kind: 'unpenalized' }
+    | { readonly kind: 'elasticNet'; readonly penalizer: number; readonly l1Ratio: number }
+  readonly confidenceLevel: number
+}
+
 export type AnalysisWorkerCommand =
   | {
       readonly kind: 'flexsurv'
@@ -183,6 +220,28 @@ export type AnalysisWorkerCommand =
         | { readonly kind: 'frequencyColumn'; readonly column: number }
       readonly covariates: readonly number[]
       readonly family: ParametricSurvivalFamily
+      readonly predictionTimes: readonly number[]
+    }
+  | {
+      readonly kind: 'cox-regression'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly design: CoxRegressionWorkerDesign
+    }
+  | {
+      readonly kind: 'penalized-aft'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly duration: number
+      readonly event: number
+      readonly covariates: readonly number[]
+      readonly family: 'weibull' | 'logLogistic'
+      readonly penalizer: number
+      readonly confidenceLevel: number
       readonly predictionTimes: readonly number[]
     }
   | {
@@ -900,6 +959,8 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'multicollinearity-succeeded'; readonly request: WorkerRequestId; readonly result: MulticollinearityEvidence }
   | { readonly kind: 'pandas-resampling-succeeded'; readonly request: WorkerRequestId; readonly result: PandasResamplingEvidence }
   | { readonly kind: 'flexsurv-succeeded'; readonly request: WorkerRequestId; readonly result: FlexSurvEvidence }
+  | { readonly kind: 'cox-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CoxRegressionEvidence }
+  | { readonly kind: 'penalized-aft-succeeded'; readonly request: WorkerRequestId; readonly result: PenalizedAftEvidence }
   | { readonly kind: 'nonparametric-survival-succeeded'; readonly request: WorkerRequestId; readonly result: NonparametricSurvivalEvidence }
   | { readonly kind: 'comparison-survival-succeeded'; readonly request: WorkerRequestId; readonly result: ComparisonSurvivalEvidence }
   | { readonly kind: 'multi-state-survival-succeeded'; readonly request: WorkerRequestId; readonly result: MultiStateSurvivalEvidence }
@@ -1091,6 +1152,95 @@ const commandSchema = z.discriminatedUnion('kind', [
     }
     if (value.observation.kind === 'startStop' && !proportionalHazardsFamilySchema.safeParse(value.family).success) {
       context.addIssue({ code: 'custom', message: 'Start-stop data requires a proportional-hazards family.' })
+    }
+  }),
+  z.object({
+    kind: z.literal('cox-regression'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(2),
+    columns: z.number().int().min(3).max(256),
+    design: z.object({
+      observation: z.discriminatedUnion('kind', [
+        z.object({
+          kind: z.literal('rightCensored'),
+          duration: z.number().int().nonnegative(),
+          event: z.number().int().nonnegative(),
+          entry: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('notUsed') }).strict(),
+            z.object({ kind: z.literal('column'), column: z.number().int().nonnegative() }).strict(),
+          ]),
+          standardErrors: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('modelBased') }).strict(),
+            z.object({ kind: z.literal('robust') }).strict(),
+            z.object({ kind: z.literal('clustered'), column: z.number().int().nonnegative() }).strict(),
+          ]),
+          frailty: z.discriminatedUnion('kind', [
+            z.object({ kind: z.literal('none') }).strict(),
+            z.object({ kind: z.literal('gamma'), column: z.number().int().nonnegative(), ties: z.enum(['efron', 'breslow']) }).strict(),
+          ]),
+        }).strict(),
+        z.object({
+          kind: z.literal('startStop'),
+          subject: z.number().int().nonnegative(),
+          start: z.number().int().nonnegative(),
+          stop: z.number().int().nonnegative(),
+          event: z.number().int().nonnegative(),
+        }).strict(),
+      ]),
+      weights: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('equal') }).strict(),
+        z.object({ kind: z.literal('column'), column: z.number().int().nonnegative() }).strict(),
+      ]),
+      strata: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('unstratified') }).strict(),
+        z.object({ kind: z.literal('column'), column: z.number().int().nonnegative() }).strict(),
+      ]),
+      covariates: z.array(z.number().int().nonnegative()).min(1),
+      penalty: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('unpenalized') }).strict(),
+        z.object({ kind: z.literal('elasticNet'), penalizer: z.number().finite().positive(), l1Ratio: z.number().finite().min(0).max(1) }).strict(),
+      ]),
+      confidenceLevel: z.number().finite().gt(0).lt(1),
+    }).strict(),
+  }).strict().superRefine((value, context) => {
+    const observation = value.design.observation
+    const roles = observation.kind === 'rightCensored'
+      ? [
+          observation.duration,
+          observation.event,
+          ...(observation.entry.kind === 'column' ? [observation.entry.column] : []),
+          ...(observation.standardErrors.kind === 'clustered' ? [observation.standardErrors.column] : []),
+          ...(observation.frailty.kind === 'gamma' ? [observation.frailty.column] : []),
+        ]
+      : [observation.subject, observation.start, observation.stop, observation.event]
+    const selected = [
+      ...roles,
+      ...(value.design.weights.kind === 'column' ? [value.design.weights.column] : []),
+      ...(value.design.strata.kind === 'column' ? [value.design.strata.column] : []),
+      ...value.design.covariates,
+    ]
+    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'Cox regression roles and covariates must be distinct columns inside the matrix.' })
+    }
+  }),
+  z.object({
+    kind: z.literal('penalized-aft'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(2),
+    columns: z.number().int().min(3).max(256),
+    duration: z.number().int().nonnegative(),
+    event: z.number().int().nonnegative(),
+    covariates: z.array(z.number().int().nonnegative()).min(1),
+    family: z.enum(['weibull', 'logLogistic']),
+    penalizer: z.number().finite().nonnegative(),
+    confidenceLevel: z.number().finite().gt(0).lt(1),
+    predictionTimes: z.array(z.number().finite().nonnegative()).min(1).max(500),
+  }).strict().superRefine((value, context) => {
+    const selected = [value.duration, value.event, ...value.covariates]
+    if (new Set(selected).size !== selected.length || selected.some((column) => column >= value.columns)) {
+      context.addIssue({ code: 'custom', message: 'AFT roles and covariates must be distinct columns inside the matrix.' })
     }
   }),
   z.object({
@@ -1825,6 +1975,8 @@ const eventSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('multicollinearity-succeeded'), request: requestSchema, result: multicollinearityEvidenceSchema }).strict(),
   z.object({ kind: z.literal('flexsurv-succeeded'), request: requestSchema, result: flexSurvEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('cox-regression-succeeded'), request: requestSchema, result: coxRegressionEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('penalized-aft-succeeded'), request: requestSchema, result: penalizedAftEvidenceSchema }).strict(),
   z.object({ kind: z.literal('nonparametric-survival-succeeded'), request: requestSchema, result: nonparametricSurvivalEvidenceSchema }).strict(),
   z.object({ kind: z.literal('comparison-survival-succeeded'), request: requestSchema, result: comparisonSurvivalEvidenceSchema }).strict(),
   z.object({ kind: z.literal('multi-state-survival-succeeded'), request: requestSchema, result: multiStateSurvivalEvidenceSchema }).strict(),
@@ -2017,9 +2169,17 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (!request.ok) return err({ kind: 'invalid-event', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'analysis-failed') return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'analysis-progress') return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'penalized-aft-succeeded') {
+    const result = parsePenalizedAftEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'penalized-aft-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
   if (parsed.data.kind === 'flexsurv-succeeded') {
     const result = parseFlexSurvEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'flexsurv-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'cox-regression-succeeded') {
+    const result = parseCoxRegressionEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'cox-regression-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'nonparametric-survival-succeeded') {
     const result = parseNonparametricSurvivalEvidence(parsed.data.result)

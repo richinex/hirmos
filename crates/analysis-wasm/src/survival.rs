@@ -12,6 +12,14 @@ use hirmos_causal_core::survival::comparison_surv::{
     FixedPointResult, FixedPointScale, GRho, GRhoResult, Group, OverallConfiguration, RmstWindow,
     SignificanceLevel, SurvivalSample,
 };
+use hirmos_causal_core::survival::aft::{AftFamily, AftPreparation};
+use hirmos_causal_core::survival::coxph::{
+    fit_gamma_frailty, fit_right_censored, fit_time_varying, BaselineCurves, CoxCovariates, CoxFit,
+    CoxFitOptions, CoxPenalty, Event as CoxEvent, GammaFrailtyFit, GammaFrailtyOptions,
+    ProportionalHazardsDiagnostics, RightCensoredData, StandardErrorMethod, TieMethod, TimeTransform,
+    TimeVaryingData,
+};
+use spec_math::cephes64::{chdtrc, ndtri};
 use hirmos_causal_core::survival::flexsurv::fit::{
     fit, FlexSurvFitPlan, SurvivalDataset, SurvivalRecord, UncertaintyEvidence,
 };
@@ -92,6 +100,850 @@ fn event_indicator(values: &[f64], row: usize) -> Result<bool, String> {
             "survival event row {} must be 0 for censored or 1 for observed; found {value}",
             row + 1
         )),
+    }
+}
+
+fn cox_events(values: &[f64]) -> Result<Vec<CoxEvent>, String> {
+    values
+        .iter()
+        .enumerate()
+        .map(|(row, _)| {
+            event_indicator(values, row).map(|observed| {
+                if observed {
+                    CoxEvent::Observed
+                } else {
+                    CoxEvent::Censored
+                }
+            })
+        })
+        .collect()
+}
+
+fn cox_group_column(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    index: usize,
+    role: &str,
+) -> Result<Vec<usize>, String> {
+    column(values, rows, columns, index)?
+        .into_iter()
+        .enumerate()
+        .map(|(row, value)| {
+            if value.is_finite()
+                && value >= 0.0
+                && value.fract() == 0.0
+                && value <= usize::MAX as f64
+            {
+                Ok(value as usize)
+            } else {
+                Err(format!(
+                    "Cox {role} row {} must be a non-negative whole-number code",
+                    row + 1
+                ))
+            }
+        })
+        .collect()
+}
+
+fn cox_weights(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    command: CoxWeightsCommand,
+) -> Result<Vec<f64>, String> {
+    let weights = match command {
+        CoxWeightsCommand::Equal => vec![1.0; rows],
+        CoxWeightsCommand::Column { column: index } => column(values, rows, columns, index)?,
+    };
+    if let Some(row) = weights
+        .iter()
+        .position(|weight| !weight.is_finite() || *weight <= 0.0)
+    {
+        return Err(format!(
+            "Cox observation weight row {} must be finite and greater than zero",
+            row + 1
+        ));
+    }
+    Ok(weights)
+}
+
+fn cox_strata(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    command: CoxStrataCommand,
+) -> Result<Option<Vec<usize>>, String> {
+    match command {
+        CoxStrataCommand::Unstratified => Ok(None),
+        CoxStrataCommand::Column { column: index } => {
+            cox_group_column(values, rows, columns, index, "stratum").map(Some)
+        }
+    }
+}
+
+fn cox_covariates(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    selected: &[usize],
+    reserved: &[usize],
+) -> Result<CoxCovariates, String> {
+    if selected.is_empty() {
+        return Err("Cox regression needs at least one covariate".to_owned());
+    }
+    let distinct = selected
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    if distinct.len() != selected.len()
+        || selected
+            .iter()
+            .any(|index| *index >= columns || reserved.contains(index))
+    {
+        return Err(
+            "Cox covariates must be distinct matrix columns with no other analysis role".to_owned(),
+        );
+    }
+    let mut design = Vec::with_capacity(rows.saturating_mul(selected.len()));
+    for row in 0..rows {
+        for index in selected {
+            design.push(values[index * rows + row]);
+        }
+    }
+    CoxCovariates::new(rows, selected.len(), design)
+        .map_err(|problem| format!("Cox covariates refused: {problem:?}"))
+}
+
+fn cox_options(
+    penalty: CoxPenaltyCommand,
+    confidence_level: f64,
+    standard_errors: StandardErrorMethod,
+) -> Result<CoxFitOptions, String> {
+    if !confidence_level.is_finite() || !(0.0..1.0).contains(&confidence_level) {
+        return Err("Cox confidence level must be between 0 and 1".to_owned());
+    }
+    let (penalizer, l1_ratio) = match penalty {
+        CoxPenaltyCommand::Unpenalized => (0.0, 0.0),
+        CoxPenaltyCommand::ElasticNet {
+            penalizer,
+            l1_ratio,
+        } => {
+            if !penalizer.is_finite()
+                || penalizer < 0.0
+                || !l1_ratio.is_finite()
+                || !(0.0..=1.0).contains(&l1_ratio)
+            {
+                return Err(
+                    "Cox elastic-net penalizer must be non-negative and its L1 ratio must be between 0 and 1"
+                        .to_owned(),
+                );
+            }
+            (penalizer, l1_ratio)
+        }
+    };
+    Ok(CoxFitOptions {
+        penalizer: CoxPenalty::Uniform(penalizer),
+        l1_ratio,
+        alpha: 1.0 - confidence_level,
+        standard_errors,
+        ..CoxFitOptions::default()
+    })
+}
+
+fn cox_baseline(curves: &BaselineCurves) -> CoxBaselineEvidence {
+    let estimates = |values: &[hirmos_causal_core::survival::coxph::BaselineEstimate]| {
+        values
+            .iter()
+            .map(|value| CoxBaselineEstimateEvidence {
+                time: value.time,
+                hazard: value.hazard,
+                cumulative_hazard: value.cumulative_hazard,
+                survival: value.survival,
+            })
+            .collect()
+    };
+    match curves {
+        BaselineCurves::Shared(values) => CoxBaselineEvidence::Shared {
+            estimates: estimates(values),
+        },
+        BaselineCurves::Stratified(values) => CoxBaselineEvidence::Stratified {
+            curves: values
+                .iter()
+                .map(|curve| CoxStratumBaselineEvidence {
+                    stratum: curve.stratum,
+                    estimates: estimates(&curve.estimates),
+                })
+                .collect(),
+        },
+    }
+}
+
+fn cox_coefficients(fit: &CoxFit) -> Vec<CoxCoefficientEvidence> {
+    fit.coefficients
+        .iter()
+        .map(|estimate| CoxCoefficientEvidence {
+            coefficient: estimate.coefficient,
+            hazard_ratio: estimate.hazard_ratio,
+            standard_error: estimate.standard_error,
+            coefficient_interval: [estimate.lower, estimate.upper],
+            hazard_ratio_interval: [estimate.lower.exp(), estimate.upper.exp()],
+            z: estimate.z,
+            p_value: estimate.p_value,
+        })
+        .collect()
+}
+
+fn cox_proportional_hazards_tests(
+    data: &RightCensoredData,
+    fit: &CoxFit,
+    delayed_entry: bool,
+) -> CoxProportionalHazardsEvidence {
+    if delayed_entry {
+        return CoxProportionalHazardsEvidence::Unavailable {
+            reason: "Proportional-hazards tests are unavailable with delayed entry.".to_owned(),
+        };
+    }
+    let Ok(diagnostics) = ProportionalHazardsDiagnostics::new(data, fit) else {
+        return CoxProportionalHazardsEvidence::Unavailable {
+            reason: "Proportional-hazards tests could not be calculated for these observations."
+                .to_owned(),
+        };
+    };
+    let requested = [
+        (
+            CoxTimeTransformEvidence::EventRank,
+            TimeTransform::EventRank,
+        ),
+        (
+            CoxTimeTransformEvidence::KaplanMeier,
+            TimeTransform::KaplanMeier,
+        ),
+        (CoxTimeTransformEvidence::Identity, TimeTransform::Identity),
+        (CoxTimeTransformEvidence::LogTime, TimeTransform::LogTime),
+    ];
+    let transforms = requested
+        .into_iter()
+        .filter_map(|(evidence, transform)| {
+            diagnostics.test(transform)
+                .ok()
+                .map(|tests| CoxProportionalHazardsTransformEvidence {
+                    transform: evidence,
+                    tests: tests
+                        .into_iter()
+                        .map(|test| CoxProportionalHazardsTestEvidence {
+                            statistic: test.statistic,
+                            p_value: test.p_value,
+                        })
+                        .collect(),
+                })
+        })
+        .collect::<Vec<_>>();
+    if transforms.is_empty() {
+        CoxProportionalHazardsEvidence::Unavailable {
+            reason: "Proportional-hazards tests could not be calculated for these observations."
+                .to_owned(),
+        }
+    } else {
+        CoxProportionalHazardsEvidence::Recorded { transforms }
+    }
+}
+
+fn cox_standard_errors_evidence(method: StandardErrorMethod) -> CoxStandardErrorsEvidence {
+    match method {
+        StandardErrorMethod::ModelBased => CoxStandardErrorsEvidence::ModelBased,
+        StandardErrorMethod::Sandwich => CoxStandardErrorsEvidence::Robust,
+        StandardErrorMethod::Clustered => CoxStandardErrorsEvidence::Clustered,
+    }
+}
+
+
+/// lifelines' `WeibullAFTFitter` and `LogLogisticAFTFitter` with an L2 penalty: the covariates
+/// enter the location parameter with an intercept, the ancillary parameter is an intercept alone,
+/// the design is scaled by sample standard deviations, and the fit starts from the univariate
+/// distribution, as the source does.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn penalized_aft_evidence(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    duration: usize,
+    event: usize,
+    covariates: &[usize],
+    family: AftFamilyCommand,
+    penalizer: f64,
+    confidence_level: f64,
+    prediction_times: &[f64],
+) -> Result<AnalysisResult, String> {
+    if rows < 2 || columns == 0 || values.len() != rows.saturating_mul(columns) {
+        return Err("A penalized AFT model needs at least two complete rows".to_owned());
+    }
+    if covariates.is_empty() {
+        return Err("A penalized AFT model needs at least one covariate".to_owned());
+    }
+    let mut roles = vec![duration, event];
+    roles.extend_from_slice(covariates);
+    require_distinct_cox_roles(columns, &roles)?;
+    if !penalizer.is_finite() || penalizer < 0.0 {
+        return Err("The AFT penalizer must be a non-negative number".to_owned());
+    }
+    if !confidence_level.is_finite() || !(0.0..1.0).contains(&confidence_level) {
+        return Err("AFT confidence level must be between 0 and 1".to_owned());
+    }
+    if prediction_times.is_empty() || prediction_times.iter().any(|t| !t.is_finite() || *t < 0.0) {
+        return Err("AFT prediction times must be a non-empty list of non-negative values".to_owned());
+    }
+    let durations = column(values, rows, columns, duration)?;
+    if let Some(row) = durations.iter().position(|t| !t.is_finite() || *t <= 0.0) {
+        return Err(format!(
+            "AFT row {} has a duration of zero or less; lifelines' AFT models take the logarithm of every duration",
+            row + 1
+        ));
+    }
+    let events = cox_events(&column(values, rows, columns, event)?)?
+        .into_iter()
+        .map(|e| e == CoxEvent::Observed)
+        .collect::<Vec<_>>();
+    let event_count = events.iter().filter(|e| **e).count();
+    let k = covariates.len();
+    let mut design = Vec::with_capacity(rows * (k + 2));
+    // The matrix arrives column-major, as `column` reads it.
+    for row in 0..rows {
+        for &c in covariates {
+            let value = values[c * rows + row];
+            if !value.is_finite() {
+                return Err(format!("AFT row {} has a non-finite covariate value", row + 1));
+            }
+            design.push(value);
+        }
+        design.extend([1.0, 1.0]);
+    }
+    let prepared = AftPreparation::new(k + 1, k + 2, design.clone(), durations.clone(), events.clone())
+        .map_err(|problem| format!("AFT preparation refused: {problem:?}"))?;
+    let aft_family = match family {
+        AftFamilyCommand::Weibull => AftFamily::Weibull,
+        AftFamilyCommand::LogLogistic => AftFamily::LogLogistic,
+    };
+    let fit = prepared
+        .fit(aft_family, penalizer, 1.0 - confidence_level)
+        .map_err(|problem| format!("AFT fit failed: {problem:?}"))?;
+    let evidence = |c: &hirmos_causal_core::survival::aft::AftCoefficient| AftCoefficientEvidence {
+        coefficient: c.estimate,
+        time_ratio: c.estimate.exp(),
+        standard_error: c.standard_error,
+        coefficient_interval: [c.lower, c.upper],
+        time_ratio_interval: [c.lower.exp(), c.upper.exp()],
+        z: c.z,
+        p_value: c.p_value,
+    };
+    let coefficients = fit.coefficients[..k].iter().map(evidence).collect::<Vec<_>>();
+    let intercept = evidence(&fit.coefficients[k]);
+    let ancillary = evidence(&fit.coefficients[k + 1]);
+    let concordance = match fit
+        .concordance(&design, &durations, &events)
+        .map_err(|problem| format!("AFT concordance failed: {problem:?}"))?
+    {
+        Some(value) => SurvivalSummary::Recorded {
+            result: value.value(),
+        },
+        None => SurvivalSummary::Unavailable {
+            reason: "Concordance needs at least one comparable pair of observations.".to_owned(),
+        },
+    };
+    // The curve at the covariate means: the location at the means and the fitted ancillary parameter.
+    let covariate_means = (0..k)
+        .map(|j| design.chunks_exact(k + 2).map(|row| row[j]).sum::<f64>() / rows as f64)
+        .collect::<Vec<_>>();
+    let location = (covariate_means
+        .iter()
+        .zip(&fit.coefficients[..k])
+        .map(|(mean, c)| mean * c.estimate)
+        .sum::<f64>()
+        + fit.coefficients[k].estimate)
+        .exp();
+    let shape = fit.coefficients[k + 1].estimate.exp();
+    let survival_at = |t: f64| match aft_family {
+        AftFamily::Weibull => (-(t / location).powf(shape)).exp(),
+        AftFamily::LogLogistic => 1.0 / (1.0 + (t / location).powf(shape)),
+    };
+    let survival = prediction_times.iter().map(|&t| survival_at(t)).collect::<Vec<_>>();
+    let median = match aft_family {
+        AftFamily::Weibull => location * std::f64::consts::LN_2.powf(1.0 / shape),
+        AftFamily::LogLogistic => location,
+    };
+    Ok(AnalysisResult::PenalizedAft {
+        observations: rows,
+        events: event_count,
+        family: match family {
+            AftFamilyCommand::Weibull => AftFamilyEvidence::Weibull,
+            AftFamilyCommand::LogLogistic => AftFamilyEvidence::LogLogistic,
+        },
+        penalizer,
+        coefficients,
+        intercept,
+        ancillary,
+        covariance: fit.covariance.clone(),
+        log_likelihood: fit.log_likelihood,
+        aic: fit.aic,
+        bic: fit.bic,
+        iterations: fit.iterations.max(1),
+        concordance,
+        covariate_means,
+        prediction_times: prediction_times.to_vec(),
+        survival,
+        median,
+    })
+}
+
+/// The Breslow or Efron baseline at the fitted linear predictors, as `survfit.coxph` forms it, for
+/// the frailty model whose kernel does not return curves.
+fn frailty_baseline(
+    durations: &[f64],
+    events: &[CoxEvent],
+    weights: &[f64],
+    strata: Option<&[usize]>,
+    linear_predictors: &[f64],
+    ties: TieMethod,
+) -> CoxBaselineEvidence {
+    let rows = durations.len();
+    let curve = |rows: &[usize]| {
+        let mut order = rows.to_vec();
+        order.sort_by(|&a, &b| durations[a].total_cmp(&durations[b]));
+        // The risk set at each time is every row from that position on; sum it once from the end.
+        let mut at_risk = vec![0.0; order.len() + 1];
+        for position in (0..order.len()).rev() {
+            let row = order[position];
+            at_risk[position] = at_risk[position + 1] + weights[row] * linear_predictors[row].exp();
+        }
+        let mut estimates = Vec::new();
+        let mut cumulative = 0.0;
+        let mut index = 0;
+        while index < order.len() {
+            let time = durations[order[index]];
+            let mut end = index;
+            while end < order.len() && durations[order[end]] == time {
+                end += 1;
+            }
+            let tied = &order[index..end];
+            let deaths = tied
+                .iter()
+                .filter(|&&row| events[row] == CoxEvent::Observed)
+                .collect::<Vec<_>>();
+            if !deaths.is_empty() {
+                let denominator = at_risk[index];
+                let death_weight = deaths.iter().map(|&&row| weights[row]).sum::<f64>();
+                let hazard = match ties {
+                    TieMethod::Breslow => death_weight / denominator,
+                    TieMethod::Efron => {
+                        let count = deaths.len() as f64;
+                        let death_risk = deaths
+                            .iter()
+                            .map(|&&row| weights[row] * linear_predictors[row].exp())
+                            .sum::<f64>();
+                        let average = death_weight / count;
+                        (0..deaths.len())
+                            .map(|k| average / (denominator - death_risk * k as f64 / count))
+                            .sum::<f64>()
+                    }
+                };
+                cumulative += hazard;
+                estimates.push(CoxBaselineEstimateEvidence {
+                    time,
+                    hazard,
+                    cumulative_hazard: cumulative,
+                    survival: (-cumulative).exp(),
+                });
+            }
+            index = end;
+        }
+        estimates
+    };
+    match strata {
+        None => CoxBaselineEvidence::Shared {
+            estimates: curve(&(0..rows).collect::<Vec<_>>()),
+        },
+        Some(strata) => {
+            let mut levels = strata.to_vec();
+            levels.sort_unstable();
+            levels.dedup();
+            CoxBaselineEvidence::Stratified {
+                curves: levels
+                    .into_iter()
+                    .map(|stratum| CoxStratumBaselineEvidence {
+                        stratum,
+                        estimates: curve(
+                            &(0..rows)
+                                .filter(|&row| strata[row] == stratum)
+                                .collect::<Vec<_>>(),
+                        ),
+                    })
+                    .collect(),
+            }
+        }
+    }
+}
+
+/// Sample standard deviation of each covariate column, for the summaries the evidence carries.
+fn covariate_standard_deviations(data: &RightCensoredData) -> Vec<f64> {
+    let rows = data.rows();
+    let columns = data.columns();
+    let covariates = data.covariates();
+    (0..columns)
+        .map(|column| {
+            let mean = (0..rows).map(|row| covariates.row(row)[column]).sum::<f64>() / rows as f64;
+            let sum = (0..rows)
+                .map(|row| (covariates.row(row)[column] - mean).powi(2))
+                .sum::<f64>();
+            (sum / (rows as f64 - 1.0)).sqrt()
+        })
+        .collect()
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cox_frailty_result(
+    fit: &GammaFrailtyFit,
+    data: &RightCensoredData,
+    raw: (&[f64], &[CoxEvent], &[f64]),
+    groups: &[usize],
+    ties: TieMethod,
+    observations: usize,
+    events: usize,
+    total_weight: f64,
+    confidence_level: f64,
+) -> AnalysisResult {
+    // coxph reports Wald intervals with qnorm((1 + conf.int) / 2).
+    let quantile = ndtri((1.0 + confidence_level) / 2.0);
+    let coefficients = fit
+        .coefficients
+        .iter()
+        .zip(&fit.standard_errors)
+        .map(|(&coefficient, &standard_error)| {
+            let z = coefficient / standard_error;
+            CoxCoefficientEvidence {
+                coefficient,
+                hazard_ratio: coefficient.exp(),
+                standard_error,
+                coefficient_interval: [
+                    coefficient - quantile * standard_error,
+                    coefficient + quantile * standard_error,
+                ],
+                hazard_ratio_interval: [
+                    (coefficient - quantile * standard_error).exp(),
+                    (coefficient + quantile * standard_error).exp(),
+                ],
+                z,
+                p_value: chdtrc(1.0, z * z),
+            }
+        })
+        .collect::<Vec<_>>();
+    let mut levels = groups.to_vec();
+    levels.sort_unstable();
+    levels.dedup();
+    let count = fit.coefficients.len() as f64;
+    AnalysisResult::CoxRegression {
+        observations,
+        events,
+        total_weight,
+        observation: CoxObservationEvidence::RightCensored {
+            delayed_entry: false,
+        },
+        standard_errors: CoxStandardErrorsEvidence::ModelBased,
+        coefficients,
+        covariance: fit.var.clone(),
+        log_likelihood: fit.loglik[1],
+        null_log_likelihood: fit.loglik[0],
+        likelihood_ratio: fit.likelihood_ratio,
+        likelihood_ratio_p_value: fit.likelihood_ratio_p_value,
+        partial_aic: 2.0 * count - 2.0 * fit.loglik[1],
+        iterations: fit.inner_iterations.max(1),
+        covariate_means: fit.means.clone(),
+        covariate_standard_deviations: covariate_standard_deviations(data),
+        baseline: frailty_baseline(raw.0, raw.1, raw.2, data.strata(), &fit.linear_predictors, ties),
+        concordance: match fit.concordance {
+            Some(value) => SurvivalSummary::Recorded { result: value },
+            None => SurvivalSummary::Unavailable {
+                reason: "Concordance needs at least one comparable pair of observations.".to_owned(),
+            },
+        },
+        proportional_hazards_tests: CoxProportionalHazardsEvidence::Unavailable {
+            reason: "Proportional-hazards tests are not reported for a shared frailty model.".to_owned(),
+        },
+        frailty: CoxFrailtyEvidence::Gamma {
+            groups: levels.len(),
+            ties: match ties {
+                TieMethod::Efron => CoxTiesEvidence::Efron,
+                TieMethod::Breslow => CoxTiesEvidence::Breslow,
+            },
+            theta: fit.history.last().map_or(f64::NAN, |row| row[0]),
+            term_test: CoxFrailtyTermTestEvidence {
+                statistic: fit.frailty_test.statistic,
+                df: fit.frailty_test.df,
+                p_value: fit.frailty_test.p_value,
+            },
+            degrees_of_freedom: fit.likelihood_ratio_df,
+            outer_iterations: fit.outer_iterations,
+            inner_iterations: fit.inner_iterations,
+            history: fit.history.clone(),
+            standard_errors2: fit.standard_errors2.clone(),
+        },
+    }
+}
+
+fn cox_result(
+    fit: CoxFit,
+    observations: usize,
+    events: usize,
+    total_weight: f64,
+    observation: CoxObservationEvidence,
+    standard_errors: CoxStandardErrorsEvidence,
+    concordance: SurvivalSummary<f64>,
+    proportional_hazards_tests: CoxProportionalHazardsEvidence,
+) -> AnalysisResult {
+    AnalysisResult::CoxRegression {
+        frailty: CoxFrailtyEvidence::None,
+        observations,
+        events,
+        total_weight,
+        observation,
+        standard_errors,
+        coefficients: cox_coefficients(&fit),
+        covariance: fit.covariance.clone(),
+        log_likelihood: fit.log_likelihood,
+        null_log_likelihood: fit.null_log_likelihood,
+        likelihood_ratio: fit.likelihood_ratio,
+        likelihood_ratio_p_value: fit.likelihood_ratio_p_value,
+        partial_aic: fit.partial_aic,
+        iterations: fit.iterations,
+        covariate_means: fit.covariate_means.clone(),
+        covariate_standard_deviations: fit.covariate_standard_deviations.clone(),
+        baseline: cox_baseline(&fit.baseline),
+        concordance,
+        proportional_hazards_tests,
+    }
+}
+
+fn cox_optional_column(command: CoxEntryCommand) -> Option<usize> {
+    match command {
+        CoxEntryCommand::NotUsed => None,
+        CoxEntryCommand::Column { column } => Some(column),
+    }
+}
+
+fn cox_weight_column(command: CoxWeightsCommand) -> Option<usize> {
+    match command {
+        CoxWeightsCommand::Equal => None,
+        CoxWeightsCommand::Column { column } => Some(column),
+    }
+}
+
+fn cox_stratum_column(command: CoxStrataCommand) -> Option<usize> {
+    match command {
+        CoxStrataCommand::Unstratified => None,
+        CoxStrataCommand::Column { column } => Some(column),
+    }
+}
+
+fn require_distinct_cox_roles(columns: usize, roles: &[usize]) -> Result<(), String> {
+    if roles.iter().any(|index| *index >= columns) {
+        return Err("Cox analysis roles must refer to columns inside the matrix".to_owned());
+    }
+    let distinct = roles
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    if distinct.len() != roles.len() {
+        return Err(
+            "Cox duration, event, entry, weight, start, and stop roles must use different columns"
+                .to_owned(),
+        );
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn cox_regression_evidence(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    observation: CoxObservationCommand,
+    weights_command: CoxWeightsCommand,
+    strata_command: CoxStrataCommand,
+    covariates: &[usize],
+    penalty: CoxPenaltyCommand,
+    confidence_level: f64,
+) -> Result<AnalysisResult, String> {
+    if rows < 2 || columns == 0 || values.len() != rows.saturating_mul(columns) {
+        return Err("Cox regression needs at least two complete rows".to_owned());
+    }
+    let weights = cox_weights(values, rows, columns, weights_command)?;
+    let total_weight = weights.iter().sum::<f64>();
+    let strata = cox_strata(values, rows, columns, strata_command)?;
+    let weight_column = cox_weight_column(weights_command);
+    let stratum_column = cox_stratum_column(strata_command);
+
+    match observation {
+        CoxObservationCommand::RightCensored {
+            duration,
+            event,
+            entry,
+            standard_errors,
+            frailty,
+        } => {
+            let entry_column = cox_optional_column(entry);
+            let frailty_column = match frailty {
+                CoxFrailtyCommand::None => None,
+                CoxFrailtyCommand::Gamma { column, .. } => Some(column),
+            };
+            let (standard_error_method, cluster_column) = match standard_errors {
+                CoxStandardErrorsCommand::ModelBased => (StandardErrorMethod::ModelBased, None),
+                CoxStandardErrorsCommand::Robust => (StandardErrorMethod::Sandwich, None),
+                CoxStandardErrorsCommand::Clustered { column } => {
+                    (StandardErrorMethod::Clustered, Some(column))
+                }
+            };
+            let mut observation_roles = vec![duration, event];
+            observation_roles.extend(entry_column);
+            observation_roles.extend(weight_column);
+            observation_roles.extend(frailty_column);
+            require_distinct_cox_roles(columns, &observation_roles)?;
+            let mut reserved = observation_roles;
+            reserved.extend(stratum_column);
+            reserved.extend(cluster_column);
+            let covariates = cox_covariates(values, rows, columns, covariates, &reserved)?;
+            let durations = column(values, rows, columns, duration)?;
+            let events = cox_events(&column(values, rows, columns, event)?)?;
+            let event_count = events
+                .iter()
+                .filter(|event| **event == CoxEvent::Observed)
+                .count();
+            let entries = entry_column
+                .map(|index| column(values, rows, columns, index))
+                .transpose()?;
+            let clusters = cluster_column
+                .map(|index| cox_group_column(values, rows, columns, index, "cluster"))
+                .transpose()?;
+            let raw = match frailty {
+                CoxFrailtyCommand::Gamma { .. } => Some((durations.clone(), events.clone(), weights.clone())),
+                CoxFrailtyCommand::None => None,
+            };
+            let data = RightCensoredData::with_grouping(
+                durations, events, weights, entries, strata, clusters, covariates,
+            )
+            .map_err(|problem| format!("Cox right-censored data refused: {problem:?}"))?;
+            if let CoxFrailtyCommand::Gamma { column, ties } = frailty {
+                let raw = raw.expect("raw copies are kept for the frailty path");
+                if entry_column.is_some() {
+                    return Err("A shared frailty model does not take a delayed-entry column.".to_owned());
+                }
+                if !matches!(standard_errors, CoxStandardErrorsCommand::ModelBased) {
+                    return Err("A shared frailty model reports model-based standard errors only.".to_owned());
+                }
+                if !matches!(penalty, CoxPenaltyCommand::Unpenalized) {
+                    return Err("A shared frailty model cannot also carry an elastic-net penalty.".to_owned());
+                }
+                if !confidence_level.is_finite() || !(0.0..1.0).contains(&confidence_level) {
+                    return Err("Cox confidence level must be between 0 and 1".to_owned());
+                }
+                let groups = cox_group_column(values, rows, columns, column, "frailty group")?;
+                let ties = match ties {
+                    CoxTiesCommand::Efron => TieMethod::Efron,
+                    CoxTiesCommand::Breslow => TieMethod::Breslow,
+                };
+                let options = GammaFrailtyOptions {
+                    ties,
+                    ..GammaFrailtyOptions::default()
+                };
+                let fit = fit_gamma_frailty(&data, &groups, &options)
+                    .map_err(|problem| format!("Shared frailty Cox regression failed: {problem:?}"))?;
+                return Ok(cox_frailty_result(
+                    &fit,
+                    &data,
+                    (&raw.0, &raw.1, &raw.2),
+                    &groups,
+                    ties,
+                    rows,
+                    event_count,
+                    total_weight,
+                    confidence_level,
+                ));
+            }
+            let options = cox_options(penalty, confidence_level, standard_error_method)?;
+            let fit = fit_right_censored(&data, &options)
+                .map_err(|problem| format!("Cox regression failed: {problem:?}"))?;
+            let delayed_entry = entry_column.is_some();
+            let concordance = match fit.concordance_index {
+                Some(value) => SurvivalSummary::Recorded {
+                    result: value.value(),
+                },
+                None => SurvivalSummary::Unavailable {
+                    reason: "Concordance needs at least one comparable pair of observations."
+                        .to_owned(),
+                },
+            };
+            let proportional_hazards_tests =
+                cox_proportional_hazards_tests(&data, &fit.model, delayed_entry);
+            Ok(cox_result(
+                fit.model,
+                rows,
+                event_count,
+                total_weight,
+                CoxObservationEvidence::RightCensored { delayed_entry },
+                cox_standard_errors_evidence(standard_error_method),
+                concordance,
+                proportional_hazards_tests,
+            ))
+        }
+        CoxObservationCommand::StartStop {
+            subject,
+            start,
+            stop,
+            event,
+        } => {
+            let mut observation_roles = vec![subject, start, stop, event];
+            observation_roles.extend(weight_column);
+            require_distinct_cox_roles(columns, &observation_roles)?;
+            let mut reserved = observation_roles;
+            reserved.extend(stratum_column);
+            let covariates = cox_covariates(values, rows, columns, covariates, &reserved)?;
+            let subjects = cox_group_column(values, rows, columns, subject, "subject")?;
+            let subject_count = subjects
+                .iter()
+                .copied()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len();
+            let starts = column(values, rows, columns, start)?;
+            let stops = column(values, rows, columns, stop)?;
+            let events = cox_events(&column(values, rows, columns, event)?)?;
+            let event_count = events
+                .iter()
+                .filter(|event| **event == CoxEvent::Observed)
+                .count();
+            let data = TimeVaryingData::with_strata(
+                subjects, starts, stops, events, weights, strata, covariates,
+            )
+            .map_err(|problem| format!("Cox start-stop data refused: {problem:?}"))?;
+            let options = cox_options(penalty, confidence_level, StandardErrorMethod::ModelBased)?;
+            let fit = fit_time_varying(&data, &options)
+                .map_err(|problem| format!("Cox regression failed: {problem:?}"))?;
+            Ok(cox_result(
+                fit,
+                rows,
+                event_count,
+                total_weight,
+                CoxObservationEvidence::StartStop {
+                    subjects: subject_count,
+                },
+                CoxStandardErrorsEvidence::ModelBased,
+                SurvivalSummary::Unavailable {
+                    reason: "Concordance is not calculated for start-stop Cox regression."
+                        .to_owned(),
+                },
+                CoxProportionalHazardsEvidence::Unavailable {
+                    reason: "Proportional-hazards tests are not calculated for start-stop Cox regression."
+                        .to_owned(),
+                },
+            ))
+        }
     }
 }
 
@@ -727,7 +1579,8 @@ pub(crate) fn multi_state_survival_evidence(
         // addressed to it, so a spell at risk of several moves is counted once in each fit.
         let selected = (0..rows)
             .filter(|row| {
-                state_index(origins[*row]) == origin && state_index(destinations[*row]) == destination
+                state_index(origins[*row]) == origin
+                    && state_index(destinations[*row]) == destination
             })
             .collect::<Vec<_>>();
         let mut records = Vec::with_capacity(selected.len());
@@ -1030,6 +1883,65 @@ fn event_status(value: f64, row: usize) -> Result<EventStatus, String> {
 mod upstream_data_tests {
     use super::*;
 
+    fn cox_case(section: &str, name: &str) -> serde_json::Value {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../causal-core/oracle/fixtures/lifelines_coxph.json"
+        ))
+        .expect("Cox fixture is valid JSON");
+        fixture[section]
+            .as_array()
+            .expect("Cox fixture section is an array")
+            .iter()
+            .find(|case| case["name"] == name)
+            .expect("named Cox fixture exists")
+            .clone()
+    }
+
+    fn numeric_values(value: &serde_json::Value) -> Vec<f64> {
+        value
+            .as_array()
+            .expect("fixture value is an array")
+            .iter()
+            .map(|value| value.as_f64().expect("fixture value is numeric"))
+            .collect()
+    }
+
+    fn event_values(value: &serde_json::Value) -> Vec<f64> {
+        value
+            .as_array()
+            .expect("fixture events are an array")
+            .iter()
+            .map(|value| f64::from(value.as_bool().expect("fixture event is Boolean")))
+            .collect()
+    }
+
+    fn cox_matrix(input: &serde_json::Value, observation_columns: &[&str]) -> (Vec<f64>, usize) {
+        let mut values = Vec::new();
+        for name in observation_columns {
+            if *name == "event" {
+                values.extend(event_values(&input[*name]));
+            } else {
+                values.extend(numeric_values(&input[*name]));
+            }
+        }
+        let covariates = input["covariates"]
+            .as_array()
+            .expect("fixture covariates are rows");
+        let rows = covariates.len();
+        let columns = covariates[0]
+            .as_array()
+            .expect("fixture covariate row is an array")
+            .len();
+        for column in 0..columns {
+            values.extend(
+                covariates
+                    .iter()
+                    .map(|row| row[column].as_f64().expect("fixture covariate is numeric")),
+            );
+        }
+        (values, rows)
+    }
+
     fn selected_columns(csv: &str, selected: &[&str]) -> (Vec<f64>, usize, usize) {
         let mut lines = csv.lines();
         let headers = lines
@@ -1059,6 +1971,259 @@ mod upstream_data_tests {
             }));
         }
         (values, rows.len(), selected.len())
+    }
+
+    #[test]
+    fn right_censored_cox_fixture_reaches_the_browser_facade() {
+        let case = cox_case("right_censored", "one_covariate_no_forced_batch");
+        let input = &case["input"];
+        let (values, rows) = cox_matrix(input, &["duration", "event"]);
+        let result = cox_regression_evidence(
+            &values,
+            rows,
+            3,
+            CoxObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+                entry: CoxEntryCommand::NotUsed,
+                standard_errors: CoxStandardErrorsCommand::ModelBased,
+            },
+            CoxWeightsCommand::Equal,
+            CoxStrataCommand::Unstratified,
+            &[2],
+            CoxPenaltyCommand::Unpenalized,
+            0.95,
+        )
+        .expect("the lifelines right-censored fixture fits through the facade");
+        let serialized = serde_json::to_value(&result).expect("Cox evidence serializes");
+        assert_eq!(serialized["kind"], "coxRegression");
+        assert_eq!(serialized["observation"]["kind"], "rightCensored");
+        assert_eq!(serialized["baseline"]["kind"], "shared");
+        assert_eq!(serialized["concordance"]["kind"], "recorded");
+        assert_eq!(serialized["proportionalHazardsTests"]["kind"], "recorded");
+        assert_eq!(serialized["coefficients"].as_array().unwrap().len(), 1);
+        let actual = serialized["coefficients"][0]["coefficient"]
+            .as_f64()
+            .unwrap();
+        let expected = case["fit"]["coefficients"][0].as_f64().unwrap();
+        assert!((actual - expected).abs() <= 2e-9);
+    }
+
+    #[test]
+    fn cox_command_accepts_the_browser_contract() {
+        let command: AnalysisCommand = serde_json::from_str(
+            r#"{"kind":"coxRegression","rows":18,"columns":4,"observation":{"kind":"rightCensored","duration":0,"event":1,"entry":{"kind":"notUsed"},"standardErrors":{"kind":"clustered","column":2}},"weights":{"kind":"equal"},"strata":{"kind":"unstratified"},"covariates":[3],"penalty":{"kind":"elasticNet","penalizer":0.1,"l1Ratio":0.25},"confidenceLevel":0.95}"#,
+        )
+        .expect("browser Cox command should parse");
+        let AnalysisCommand::CoxRegression {
+            rows,
+            columns,
+            observation:
+                CoxObservationCommand::RightCensored {
+                    duration,
+                    event,
+                    entry: CoxEntryCommand::NotUsed,
+                    standard_errors: CoxStandardErrorsCommand::Clustered { column: cluster },
+                },
+            weights: CoxWeightsCommand::Equal,
+            strata: CoxStrataCommand::Unstratified,
+            covariates,
+            penalty:
+                CoxPenaltyCommand::ElasticNet {
+                    penalizer,
+                    l1_ratio,
+                },
+            confidence_level,
+        } = command
+        else {
+            panic!("browser command parsed as another Cox state")
+        };
+        assert_eq!((rows, columns, duration, event, cluster), (18, 4, 0, 1, 2));
+        assert_eq!(covariates, vec![3]);
+        assert_eq!((penalizer, l1_ratio, confidence_level), (0.1, 0.25, 0.95));
+    }
+
+    #[test]
+    fn start_stop_cox_fixture_reaches_the_browser_facade() {
+        let case = cox_case("time_varying", "two_covariates");
+        let input = &case["input"];
+        let (mut values, rows) = cox_matrix(input, &["start", "stop", "event"]);
+        let subjects = input["subject"]
+            .as_array()
+            .expect("fixture subjects are an array")
+            .iter()
+            .map(|value| value.as_u64().expect("fixture subject is numeric") as f64)
+            .collect::<Vec<_>>();
+        values.splice(0..0, subjects);
+        let result = cox_regression_evidence(
+            &values,
+            rows,
+            6,
+            CoxObservationCommand::StartStop {
+                subject: 0,
+                start: 1,
+                stop: 2,
+                event: 3,
+            },
+            CoxWeightsCommand::Equal,
+            CoxStrataCommand::Unstratified,
+            &[4, 5],
+            CoxPenaltyCommand::Unpenalized,
+            0.95,
+        )
+        .expect("the lifelines start-stop fixture fits through the facade");
+        let serialized = serde_json::to_value(&result).expect("Cox evidence serializes");
+        assert_eq!(serialized["kind"], "coxRegression");
+        assert_eq!(serialized["observation"]["kind"], "startStop");
+        assert_eq!(serialized["baseline"]["kind"], "shared");
+        assert_eq!(serialized["concordance"]["kind"], "unavailable");
+        assert_eq!(
+            serialized["proportionalHazardsTests"]["kind"],
+            "unavailable"
+        );
+        assert_eq!(serialized["coefficients"].as_array().unwrap().len(), 2);
+        for (actual, expected) in serialized["coefficients"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(case["fit"]["coefficients"].as_array().unwrap())
+        {
+            assert!(
+                (actual["coefficient"].as_f64().unwrap() - expected.as_f64().unwrap()).abs()
+                    <= 2e-7
+            );
+        }
+    }
+
+    #[test]
+    fn delayed_entry_and_clustered_errors_keep_distinct_evidence() {
+        let delayed = cox_case("right_censored", "delayed_entry");
+        let delayed_input = &delayed["input"];
+        let (mut delayed_values, rows) = cox_matrix(delayed_input, &["duration", "event"]);
+        delayed_values.splice(2 * rows..2 * rows, numeric_values(&delayed_input["entry"]));
+        let delayed_result = cox_regression_evidence(
+            &delayed_values,
+            rows,
+            6,
+            CoxObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+                entry: CoxEntryCommand::Column { column: 2 },
+                standard_errors: CoxStandardErrorsCommand::ModelBased,
+            },
+            CoxWeightsCommand::Equal,
+            CoxStrataCommand::Unstratified,
+            &[3, 4, 5],
+            CoxPenaltyCommand::Unpenalized,
+            0.95,
+        )
+        .expect("the lifelines delayed-entry fixture fits through the facade");
+        let delayed_json = serde_json::to_value(delayed_result).unwrap();
+        assert_eq!(delayed_json["observation"]["delayedEntry"], true);
+        assert_eq!(
+            delayed_json["proportionalHazardsTests"]["kind"],
+            "unavailable"
+        );
+
+        let clustered = cox_case("right_censored", "clustered");
+        let clustered_input = &clustered["input"];
+        let (mut clustered_values, rows) = cox_matrix(clustered_input, &["duration", "event"]);
+        clustered_values.splice(
+            2 * rows..2 * rows,
+            numeric_values(&clustered_input["cluster"]),
+        );
+        let clustered_result = cox_regression_evidence(
+            &clustered_values,
+            rows,
+            6,
+            CoxObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+                entry: CoxEntryCommand::NotUsed,
+                standard_errors: CoxStandardErrorsCommand::Clustered { column: 2 },
+            },
+            CoxWeightsCommand::Equal,
+            CoxStrataCommand::Unstratified,
+            &[3, 4, 5],
+            CoxPenaltyCommand::Unpenalized,
+            0.95,
+        )
+        .expect("the lifelines clustered fixture fits through the facade");
+        let clustered_json = serde_json::to_value(clustered_result).unwrap();
+        assert_eq!(clustered_json["standardErrors"], "clustered");
+        for (actual, expected) in clustered_json["coefficients"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(clustered["fit"]["standard_errors"].as_array().unwrap())
+        {
+            assert!(
+                (actual["standardError"].as_f64().unwrap() - expected.as_f64().unwrap()).abs()
+                    <= 2e-7
+            );
+        }
+    }
+
+    #[test]
+    fn weights_strata_and_elastic_net_reach_their_typed_lanes() {
+        let weighted = cox_case("right_censored", "weighted");
+        let input = &weighted["input"];
+        let (mut values, rows) = cox_matrix(input, &["duration", "event"]);
+        values.splice(2 * rows..2 * rows, numeric_values(&input["weights"]));
+        let result = cox_regression_evidence(
+            &values,
+            rows,
+            6,
+            CoxObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+                entry: CoxEntryCommand::NotUsed,
+                standard_errors: CoxStandardErrorsCommand::ModelBased,
+            },
+            CoxWeightsCommand::Column { column: 2 },
+            CoxStrataCommand::Unstratified,
+            &[3, 4, 5],
+            CoxPenaltyCommand::Unpenalized,
+            0.95,
+        )
+        .expect("the lifelines weighted fixture fits through the facade");
+        let result = serde_json::to_value(result).unwrap();
+        assert!(result["totalWeight"].as_f64().unwrap() > rows as f64);
+
+        let stratified = cox_case("right_censored", "stratified_robust");
+        let input = &stratified["input"];
+        let (mut values, rows) = cox_matrix(input, &["duration", "event"]);
+        let strata = input["strata"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|value| if value == "north" { 0.0 } else { 1.0 })
+            .collect::<Vec<_>>();
+        values.splice(2 * rows..2 * rows, strata);
+        let result = cox_regression_evidence(
+            &values,
+            rows,
+            6,
+            CoxObservationCommand::RightCensored {
+                duration: 0,
+                event: 1,
+                entry: CoxEntryCommand::NotUsed,
+                standard_errors: CoxStandardErrorsCommand::Robust,
+            },
+            CoxWeightsCommand::Equal,
+            CoxStrataCommand::Column { column: 2 },
+            &[3, 4, 5],
+            CoxPenaltyCommand::ElasticNet {
+                penalizer: 0.0,
+                l1_ratio: 0.0,
+            },
+            0.95,
+        )
+        .expect("the lifelines stratified robust fixture fits through the facade");
+        let result = serde_json::to_value(result).unwrap();
+        assert_eq!(result["standardErrors"], "robust");
+        assert_eq!(result["baseline"]["kind"], "stratified");
+        assert_eq!(result["baseline"]["curves"].as_array().unwrap().len(), 2);
     }
 
     #[test]

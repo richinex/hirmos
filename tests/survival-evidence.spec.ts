@@ -1,5 +1,10 @@
 import { expect, test } from '@playwright/test'
-import { describeSurvivalRefusal, parseFlexSurvEvidence, parseNonparametricSurvivalEvidence } from '../src/domain/survival'
+import {
+  describeSurvivalRefusal,
+  parseCoxRegressionEvidence,
+  parseFlexSurvEvidence,
+  parseNonparametricSurvivalEvidence,
+} from '../src/domain/survival'
 
 // A family whose hazard rises without bound as time approaches zero reports no value there; the
 // evidence admits that one point and nothing else.
@@ -55,4 +60,55 @@ test('nonparametric evidence refuses intervals and increments that contradict th
   const invalidIncrement = nonparametric()
   invalidIncrement.hazardIncrement[2] = 0.5
   expect(parseNonparametricSurvivalEvidence(invalidIncrement).ok).toBe(false)
+})
+
+const coxRegression = () => ({
+  kind: 'coxRegression',
+  observations: 40,
+  events: 12,
+  totalWeight: 40,
+  observation: { kind: 'rightCensored', delayedEntry: false },
+  standardErrors: 'modelBased',
+  coefficients: [{
+    coefficient: 0.2,
+    hazardRatio: Math.exp(0.2),
+    standardError: 0.1,
+    coefficientInterval: [0.004, 0.396],
+    hazardRatioInterval: [Math.exp(0.004), Math.exp(0.396)],
+    z: 2,
+    pValue: 0.0455,
+  }],
+  covariance: [0.01],
+  logLikelihood: -42,
+  nullLogLikelihood: -44,
+  likelihoodRatio: 4,
+  likelihoodRatioPValue: 0.0455,
+  partialAic: 86,
+  iterations: 4,
+  covariateMeans: [0.5],
+  covariateStandardDeviations: [0.2],
+  baseline: {
+    kind: 'shared',
+    estimates: [{ time: 1, hazard: 0.1, cumulativeHazard: 0.1, survival: Math.exp(-0.1) }],
+  },
+  concordance: { kind: 'recorded', result: 0.7 },
+  proportionalHazardsTests: {
+    kind: 'recorded',
+    transforms: [{ transform: 'eventRank', tests: [{ statistic: 0.4, pValue: 0.53 }] }],
+  },
+})
+
+test('Cox evidence admits a consistent fitted model', () => {
+  expect(parseCoxRegressionEvidence(coxRegression()).ok).toBe(true)
+})
+
+test('Cox evidence refuses a hazard ratio that contradicts its coefficient', () => {
+  const evidence = coxRegression()
+  evidence.coefficients[0]!.hazardRatio = 0.5
+  expect(parseCoxRegressionEvidence(evidence).ok).toBe(false)
+})
+
+test('Cox evidence refuses right-censored diagnostics on a start-stop fit', () => {
+  const evidence = { ...coxRegression(), observation: { kind: 'startStop', subjects: 20 } }
+  expect(parseCoxRegressionEvidence(evidence).ok).toBe(false)
 })

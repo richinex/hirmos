@@ -1812,6 +1812,7 @@ mod tests {
             | AnalysisCommand::Multicollinearity { .. }
             | AnalysisCommand::PandasResampleDaily { .. }
             | AnalysisCommand::FlexSurv { .. }
+            | AnalysisCommand::CoxRegression { .. }
             | AnalysisCommand::NonparametricSurvival { .. }
             | AnalysisCommand::ComparisonSurvival { .. }
             | AnalysisCommand::MultiStateSurvival { .. }

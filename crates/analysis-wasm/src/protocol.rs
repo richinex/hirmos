@@ -109,6 +109,277 @@ pub(crate) enum SurvivalRowFrequencyCommand {
 }
 
 #[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxEntryCommand {
+    NotUsed,
+    Column { column: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxWeightsCommand {
+    Equal,
+    Column { column: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxStrataCommand {
+    Unstratified,
+    Column { column: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxStandardErrorsCommand {
+    ModelBased,
+    Robust,
+    Clustered { column: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxPenaltyCommand {
+    Unpenalized,
+    ElasticNet { penalizer: f64, l1_ratio: f64 },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxObservationCommand {
+    RightCensored {
+        duration: usize,
+        event: usize,
+        entry: CoxEntryCommand,
+        standard_errors: CoxStandardErrorsCommand,
+        #[serde(default)]
+        frailty: CoxFrailtyCommand,
+    },
+    StartStop {
+        subject: usize,
+        start: usize,
+        stop: usize,
+        event: usize,
+    },
+}
+
+#[derive(Clone, Copy, Default, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CoxTiesCommand {
+    #[default]
+    Efron,
+    Breslow,
+}
+
+#[derive(Clone, Copy, Default, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    deny_unknown_fields
+)]
+pub(crate) enum CoxFrailtyCommand {
+    #[default]
+    None,
+    Gamma {
+        column: usize,
+        ties: CoxTiesCommand,
+    },
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CoxTiesEvidence {
+    Efron,
+    Breslow,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CoxFrailtyTermTestEvidence {
+    pub(crate) statistic: f64,
+    pub(crate) df: f64,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CoxFrailtyEvidence {
+    None,
+    Gamma {
+        groups: usize,
+        ties: CoxTiesEvidence,
+        theta: f64,
+        term_test: CoxFrailtyTermTestEvidence,
+        degrees_of_freedom: f64,
+        outer_iterations: usize,
+        inner_iterations: usize,
+        history: Vec<[f64; 3]>,
+        standard_errors2: Vec<f64>,
+    },
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CoxObservationEvidence {
+    RightCensored { delayed_entry: bool },
+    StartStop { subjects: usize },
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CoxStandardErrorsEvidence {
+    ModelBased,
+    Robust,
+    Clustered,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CoxCoefficientEvidence {
+    pub(crate) coefficient: f64,
+    pub(crate) hazard_ratio: f64,
+    pub(crate) standard_error: f64,
+    pub(crate) coefficient_interval: [f64; 2],
+    pub(crate) hazard_ratio_interval: [f64; 2],
+    pub(crate) z: f64,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CoxBaselineEstimateEvidence {
+    pub(crate) time: f64,
+    pub(crate) hazard: f64,
+    pub(crate) cumulative_hazard: f64,
+    pub(crate) survival: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CoxStratumBaselineEvidence {
+    pub(crate) stratum: usize,
+    pub(crate) estimates: Vec<CoxBaselineEstimateEvidence>,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CoxBaselineEvidence {
+    Shared {
+        estimates: Vec<CoxBaselineEstimateEvidence>,
+    },
+    Stratified {
+        curves: Vec<CoxStratumBaselineEvidence>,
+    },
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CoxTimeTransformEvidence {
+    EventRank,
+    KaplanMeier,
+    Identity,
+    LogTime,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CoxProportionalHazardsTestEvidence {
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CoxProportionalHazardsTransformEvidence {
+    pub(crate) transform: CoxTimeTransformEvidence,
+    pub(crate) tests: Vec<CoxProportionalHazardsTestEvidence>,
+}
+
+#[derive(Serialize)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(crate) enum CoxProportionalHazardsEvidence {
+    Recorded {
+        transforms: Vec<CoxProportionalHazardsTransformEvidence>,
+    },
+    Unavailable {
+        reason: String,
+    },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum AftFamilyCommand {
+    Weibull,
+    LogLogistic,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum AftFamilyEvidence {
+    Weibull,
+    LogLogistic,
+}
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AftCoefficientEvidence {
+    pub(crate) coefficient: f64,
+    pub(crate) time_ratio: f64,
+    pub(crate) standard_error: f64,
+    pub(crate) coefficient_interval: [f64; 2],
+    pub(crate) time_ratio_interval: [f64; 2],
+    pub(crate) z: f64,
+    pub(crate) p_value: f64,
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum NelsonAalenTiesCommand {
     Discrete,
@@ -554,6 +825,16 @@ pub(crate) enum AnalysisCommand {
         family: SurvivalFamily,
         prediction_times: Vec<f64>,
     },
+    CoxRegression {
+        rows: usize,
+        columns: usize,
+        observation: CoxObservationCommand,
+        weights: CoxWeightsCommand,
+        strata: CoxStrataCommand,
+        covariates: Vec<usize>,
+        penalty: CoxPenaltyCommand,
+        confidence_level: f64,
+    },
     NonparametricSurvival {
         rows: usize,
         columns: usize,
@@ -562,6 +843,17 @@ pub(crate) enum AnalysisCommand {
         row_frequency: SurvivalRowFrequencyCommand,
         prediction_times: Vec<f64>,
         ties: NelsonAalenTiesCommand,
+    },
+    PenalizedAft {
+        rows: usize,
+        columns: usize,
+        duration: usize,
+        event: usize,
+        covariates: Vec<usize>,
+        family: AftFamilyCommand,
+        penalizer: f64,
+        confidence_level: f64,
+        prediction_times: Vec<f64>,
     },
     ComparisonSurvival {
         rows: usize,
@@ -1700,6 +1992,46 @@ pub(crate) enum AnalysisResult {
         hazard: Vec<f64>,
         median: f64,
         mean: Option<f64>,
+    },
+    CoxRegression {
+        observations: usize,
+        events: usize,
+        total_weight: f64,
+        observation: CoxObservationEvidence,
+        standard_errors: CoxStandardErrorsEvidence,
+        coefficients: Vec<CoxCoefficientEvidence>,
+        covariance: Vec<f64>,
+        log_likelihood: f64,
+        null_log_likelihood: f64,
+        likelihood_ratio: f64,
+        likelihood_ratio_p_value: f64,
+        partial_aic: f64,
+        iterations: usize,
+        covariate_means: Vec<f64>,
+        covariate_standard_deviations: Vec<f64>,
+        baseline: CoxBaselineEvidence,
+        concordance: SurvivalSummary<f64>,
+        proportional_hazards_tests: CoxProportionalHazardsEvidence,
+        frailty: CoxFrailtyEvidence,
+    },
+    PenalizedAft {
+        observations: usize,
+        events: usize,
+        family: AftFamilyEvidence,
+        penalizer: f64,
+        coefficients: Vec<AftCoefficientEvidence>,
+        intercept: AftCoefficientEvidence,
+        ancillary: AftCoefficientEvidence,
+        covariance: Vec<f64>,
+        log_likelihood: f64,
+        aic: f64,
+        bic: f64,
+        iterations: usize,
+        concordance: SurvivalSummary<f64>,
+        covariate_means: Vec<f64>,
+        prediction_times: Vec<f64>,
+        survival: Vec<f64>,
+        median: f64,
     },
     NonparametricSurvival {
         observations: usize,

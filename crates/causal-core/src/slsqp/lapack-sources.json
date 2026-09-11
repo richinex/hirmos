@@ -1,0 +1,143 @@
+{
+  "source": "LAPACK 3.12.1 Fortran via f2c; s_cat from CLAPACK libf2c",
+  "roots": [
+    "dgelsy_",
+    "dgerq2_",
+    "dlarfgp_",
+    "dlartgp_",
+    "dormr2_"
+  ],
+  "translated": {
+    "dgelsy_": {
+      "file": "reference/lapack-3.12.1/SRC/dgelsy.f",
+      "sha256": "85252e44f69323a66c0f46bcfcb3a50854d418e386018cc9ae105e62f64eb977"
+    },
+    "dgeqp3_": {
+      "file": "reference/lapack-3.12.1/SRC/dgeqp3.f",
+      "sha256": "9729351c8f2de43860f9b1b31efb4bdd533b5afbf318a6f231d0e4f5ba2ef684"
+    },
+    "dgerq2_": {
+      "file": "reference/lapack-3.12.1/SRC/dgerq2.f",
+      "sha256": "615934f2d61c7f4b6b24a0c351caefb4d81bd7fc9935ca00a8cad8e8871b4092"
+    },
+    "dlaic1_": {
+      "file": "reference/lapack-3.12.1/SRC/dlaic1.f",
+      "sha256": "6b3a3d399e0ee4fde4eb18754c027e2d143666405960a74dce3708a2e5fc74aa"
+    },
+    "dlaqp2_": {
+      "file": "reference/lapack-3.12.1/SRC/dlaqp2.f",
+      "sha256": "b4b7decd2eceb04a94ee61ff891f7d9e35c9619637cd4d939934ce434004a8a7"
+    },
+    "dlaqps_": {
+      "file": "reference/lapack-3.12.1/SRC/dlaqps.f",
+      "sha256": "8ed3be79f159333f4eebec34c3966d140da5d700fef5e5c7d25d9ee1f198d77b"
+    },
+    "dlarf1f_": {
+      "file": "reference/lapack-3.12.1/SRC/dlarf1f.f",
+      "sha256": "a09860405adf9e56c42d51a107abc764b51367c3864102e83c0710d5cec48738"
+    },
+    "dlarf1l_": {
+      "file": "reference/lapack-3.12.1/SRC/dlarf1l.f",
+      "sha256": "aa82686d354f1114acf9b22d53dc04b54dc9e1d171f6269d20d02b04302fcc8c"
+    },
+    "dlarz_": {
+      "file": "reference/lapack-3.12.1/SRC/dlarz.f",
+      "sha256": "69e417fd305a5d645a3545d528d1eaa4d7a11871345d7325f609a34e2f0d64b5"
+    },
+    "dlarzb_": {
+      "file": "reference/lapack-3.12.1/SRC/dlarzb.f",
+      "sha256": "b7739ded0dedd43821a108968d631a72c03e81565a361ca5deb0a4fc580e609c"
+    },
+    "dlarzt_": {
+      "file": "reference/lapack-3.12.1/SRC/dlarzt.f",
+      "sha256": "209b869bb771f7f386a2bc522056a67df152d38b4d8be7c3b0412d7db446c8bf"
+    },
+    "dlatrz_": {
+      "file": "reference/lapack-3.12.1/SRC/dlatrz.f",
+      "sha256": "5062fb665a4840dbea7354c0b0de46dbef2a9fbba0fb8a5fe7f211f5a17b4497"
+    },
+    "dormr2_": {
+      "file": "reference/lapack-3.12.1/SRC/dormr2.f",
+      "sha256": "61e89c43d48e932f49ce88ab4bcb84bfbd97886e28f5ff4548ebad6ced2a1965"
+    },
+    "dormr3_": {
+      "file": "reference/lapack-3.12.1/SRC/dormr3.f",
+      "sha256": "04bb348758a7199eeb181cba85259b64c2b8d7ea39076b9839a18456495f002e"
+    },
+    "dormrz_": {
+      "file": "reference/lapack-3.12.1/SRC/dormrz.f",
+      "sha256": "3954fadc83aedf352d7da73b1a106658367cffbeb47ed366f8de799311fb8a4b"
+    },
+    "dtrsm_": {
+      "file": "reference/lapack-3.12.1/BLAS/SRC/dtrsm.f",
+      "sha256": "08dd17ab70986fabda036ed11bcb1a0892cceeb69cd2c28d7dd0a37c49c1d560"
+    },
+    "dtzrzf_": {
+      "file": "reference/lapack-3.12.1/SRC/dtzrzf.f",
+      "sha256": "90becf7c60cd9d1c47ec2786a0b220c694470b71dfad64d9d47a92e6ce01597e"
+    },
+    "s_cat": {
+      "file": "reference/CLAPACK-3.2.1/F2CLIBS/libf2c/s_cat.c",
+      "sha256": "cd513ccd60e826c7e74b39fa75b11ef6a44c6dd233de49ccb7d1dd359264c313"
+    },
+    "dlarfgp_": {
+      "file": "reference/lapack-3.12.1/SRC/dlarfgp.f",
+      "sha256": "92be2c8b8483629c586b0ca43438299c64a7c5f000e7b843412a75c5df30f16c"
+    },
+    "dlartgp_": {
+      "file": "reference/lapack-3.12.1/SRC/dlartgp.f",
+      "sha256": "883db0660892cc772839e624243194f73ec8991858e528016071744a0a350dec"
+    }
+  },
+  "symbols": {
+    "i_dnnt": "slsqp_closure_i_dnnt",
+    "d_sign": "dgelsd_closure_d_sign",
+    "daxpy_": "dsyevd_closure_f2c_daxpy",
+    "dcopy_": "dgelsd_closure_f2c_dcopy",
+    "ddot_": "dgelsd_closure_f2c_ddot",
+    "dgelsy_": "slsqp_closure_dgelsy_",
+    "dgemm_": "dgelsd_closure_f2c_dgemm",
+    "dgemv_": "dgelsd_closure_f2c_dgemv",
+    "dgeqp3_": "slsqp_closure_dgeqp3_",
+    "dgeqrf_": "dgesdd_closure_dgeqrf_",
+    "dger_": "dsyevd_closure_f2c_dger",
+    "dgerq2_": "slsqp_closure_dgerq2_",
+    "dlaic1_": "slsqp_closure_dlaic1_",
+    "dlamch_": "dgelsd_closure_dlamch_",
+    "dlange_": "dgeev_closure_dlange_",
+    "dlaqp2_": "slsqp_closure_dlaqp2_",
+    "dlaqps_": "slsqp_closure_dlaqps_",
+    "dlarf1f_": "slsqp_closure_dlarf1f_",
+    "dlarf1l_": "slsqp_closure_dlarf1l_",
+    "dlarf_": "dgeev_closure_dlarf_",
+    "dlarfg_": "dgeev_closure_dlarfg_",
+    "dlarz_": "slsqp_closure_dlarz_",
+    "dlarzb_": "slsqp_closure_dlarzb_",
+    "dlarzt_": "slsqp_closure_dlarzt_",
+    "dlascl_": "dgelsd_closure_dlascl_",
+    "dlaset_": "dgelsd_closure_dlaset_",
+    "dlatrz_": "slsqp_closure_dlatrz_",
+    "dnrm2_": "dgelsd_closure_f2c_dnrm2",
+    "dormqr_": "dgeev_closure_dormqr_",
+    "dormr2_": "slsqp_closure_dormr2_",
+    "dormr3_": "slsqp_closure_dormr3_",
+    "dormrz_": "slsqp_closure_dormrz_",
+    "dscal_": "dgelsd_closure_f2c_dscal",
+    "dswap_": "dgelsd_closure_f2c_dswap",
+    "dtrmm_": "dsyevd_closure_f2c_dtrmm",
+    "dtrmv_": "dsyevd_closure_f2c_dtrmv",
+    "dtrsm_": "slsqp_closure_dtrsm_",
+    "dtzrzf_": "slsqp_closure_dtzrzf_",
+    "idamax_": "dgelsd_closure_f2c_idamax",
+    "iladlc_": "dgeev_closure_iladlc_",
+    "iladlr_": "dgeev_closure_iladlr_",
+    "ilaenv_": "dgelsd_closure_ilaenv_",
+    "lsame_": "dgelsd_closure_lsame_",
+    "s_cat": "slsqp_closure_s_cat",
+    "xerbla_": "dgelsd_closure_xerbla_",
+    "dlapy2_": "dgelsd_closure_dlapy2_",
+    "dlarfgp_": "slsqp_closure_dlarfgp_",
+    "dlartgp_": "slsqp_closure_dlartgp_",
+    "pow_di": "dgelsd_closure_pow_di"
+  }
+}

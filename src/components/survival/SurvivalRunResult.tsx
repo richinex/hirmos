@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { comparisonMeasureOption, hazardCurveOption, observedSurvivalOption, restrictedMeanOption, stateOccupancyOption, survivalCurvesOption, transitionMapOption, transitionMatrixOption } from '@/charts/survival/curves'
+import { ratioForestHeight, ratioForestOption, type RatioEstimate } from '@/charts/survival/estimates'
 import { useChartTheme } from '@/charts/theme'
 import type { VisibleWindow } from '@/charts/window'
 import { Icon } from '@/components/Icon'
@@ -9,7 +10,7 @@ import { MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
 import { caption, label, num, prose, well } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
-import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
+import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, CoxRegressionEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
 import { formatCount, formatEstimate, formatP, formatPercent, formatStatistic } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
 
@@ -30,17 +31,23 @@ export const survivalRunLabel = (run: SurvivalRunArtifact): string => {
     case 'right-censored-survival-run': return 'Parametric'
     case 'nonparametric-survival-run': return 'Kaplan–Meier and Nelson–Aalen'
     case 'start-stop-survival-run': return 'Start–stop'
+    case 'cox-regression-run': return 'Cox regression'
+    case 'penalized-aft-run': return 'Penalised AFT'
     case 'two-group-survival-run': return 'Two-group comparison'
     case 'multi-state-survival-run': return 'Multi-state'
     default: return assertNever(run)
   }
 }
 
+export const penalizedAftFamilyLabel = (family: 'weibull' | 'logLogistic'): string => family === 'weibull' ? 'Weibull AFT' : 'Log-logistic AFT'
+
 /** The method and the headline figure of a run, for the ledger row. */
 export const survivalRunSummary = (run: SurvivalRunArtifact): { readonly method: string; readonly figure: string } => {
   switch (run.kind) {
     case 'right-censored-survival-run':
     case 'start-stop-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `median ${formatStatistic('raw', run.evidence.median).text}` }
+    case 'cox-regression-run': return { method: survivalRunLabel(run), figure: `hazard ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.hazardRatio ?? Number.NaN).text}` }
+    case 'penalized-aft-run': return { method: `${survivalRunLabel(run)} · ${penalizedAftFamilyLabel(run.evidence.family)}`, figure: `time ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.timeRatio ?? Number.NaN).text}` }
     case 'nonparametric-survival-run': return { method: survivalRunLabel(run), figure: `event-free ${formatPercent(run.evidence.survival.at(-1) ?? Number.NaN).text}` }
     case 'two-group-survival-run': return { method: survivalRunLabel(run), figure: `event-free time difference ${formatStatistic('raw', run.evidence.restrictedMeanDifference).text}` }
     case 'multi-state-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `${formatCount(run.evidence.transitions.length).text} transitions` }
@@ -87,6 +94,37 @@ interface NonparametricRow {
   readonly cumulativeHazard: number
   readonly hazardInterval: readonly [number, number]
   readonly hazardIncrement: number
+}
+
+interface CoxCoefficientRow {
+  readonly key: string
+  readonly covariate: string
+  readonly coefficient: number
+  readonly standardError: number
+  readonly hazardRatio: number
+  readonly hazardRatioInterval: readonly [number, number]
+  readonly z: number
+  readonly pValue: number
+}
+
+interface AftRow {
+  readonly key: string
+  readonly parameter: string
+  readonly role: string
+  readonly coefficient: number
+  readonly standardError: number
+  readonly timeRatio: number
+  readonly timeRatioInterval: readonly [number, number]
+  readonly z: number
+  readonly pValue: number
+}
+
+interface CoxAssumptionRow {
+  readonly key: string
+  readonly covariate: string
+  readonly transform: string
+  readonly statistic: number
+  readonly pValue: number
 }
 
 const parameterColumns = (ratioLabel: string): readonly EvidenceColumn<ParameterRow>[] => [
@@ -268,7 +306,7 @@ function ComparisonCharts({ evidence }: { readonly evidence: ComparisonSurvivalE
 
   return (
     <div className="mt-3">
-      <SegmentedControl value={chart} onChange={setChart} options={COMPARISON_CHARTS} ariaLabel="Survival comparison chart" size="sm" wrap />
+      <SegmentedControl value={chart} onChange={setChart} options={COMPARISON_CHARTS} ariaLabel="Survival comparison chart" size="sm" variant="line" />
       <ExpandableChart className="mt-3 h-[280px]" label={view.label} testId={view.testId} option={view.option} />
       {chart === 'survival' ? <AtRiskTable diagnostics={diagnostics} truncationTime={evidence.truncationTime} /> : null}
       {chart === 'eventFreeTime' ? <p className={caption('mb-0 mt-2')}>Through time {statistic(evidence.truncationTime)}, group 0 accumulated {statistic(diagnostics.groupZero.restrictedMean)} and group 1 accumulated {statistic(diagnostics.groupOne.restrictedMean)} units of event-free time.</p> : null}
@@ -299,14 +337,61 @@ function MultiStateCharts({ evidence, initial }: { readonly evidence: MultiState
   })()
   return (
     <div className="mt-3">
-      <SegmentedControl value={chart} onChange={setChart} options={MULTI_STATE_CHARTS} ariaLabel="Multi-state chart" size="sm" fill />
+      <SegmentedControl value={chart} onChange={setChart} options={MULTI_STATE_CHARTS} ariaLabel="Multi-state chart" size="sm" variant="line" />
       <ExpandableChart className="mt-3 h-[280px]" label={view.label} testId={view.testId} option={view.option} />
+    </div>
+  )
+}
+
+/** The covariate ratios of one fit as a forest plot, under the table that lists them. */
+function RatioForest({ rows, ratioName, confidence, testId }: { readonly rows: readonly RatioEstimate[]; readonly ratioName: 'hazard ratio' | 'time ratio'; readonly confidence: number; readonly testId: string }) {
+  const theme = useChartTheme()
+  if (rows.length === 0) return null
+  const unchanged = ratioName === 'hazard ratio' ? 'the event rate' : 'the time to the event'
+  return (
+    <div className="mt-3">
+      <p className={label('m-0 mb-2 text-muted')}>{ratioName === 'hazard ratio' ? 'Hazard ratios' : 'Time ratios'} with {confidence}% intervals</p>
+      <ExpandableChart className="" style={{ height: ratioForestHeight(rows.length) }} label={`${ratioName === 'hazard ratio' ? 'Hazard' : 'Time'} ratio forest plot`} testId={testId} option={ratioForestOption(rows, ratioName, confidence, theme)} />
+      <p className={caption('mb-0 mt-2')}>Each square is a covariate's {ratioName} and the line through it is the {confidence}% interval, on a log scale with the largest ratio at the top. The dashed rule at 1 is where the covariate leaves {unchanged} unchanged; an interval that crosses it is compatible with no change.</p>
     </div>
   )
 }
 
 function Tiles({ children }: { readonly children: ReactNode }) {
   return <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-hair bg-hair sm:grid-cols-3">{children}</div>
+}
+
+const coxStandardErrorLabel = (method: CoxRegressionEvidence['standardErrors']): string => {
+  switch (method) {
+    case 'modelBased': return 'Model-based'
+    case 'robust': return 'Robust'
+    case 'clustered': return 'Clustered'
+    default: return assertNever(method)
+  }
+}
+
+const coxTimeTransformLabel = (transform: Extract<CoxRegressionEvidence['proportionalHazardsTests'], { readonly kind: 'recorded' }>['transforms'][number]['transform']): string => {
+  switch (transform) {
+    case 'eventRank': return 'Event rank'
+    case 'kaplanMeier': return 'Kaplan–Meier'
+    case 'identity': return 'Time'
+    case 'logTime': return 'Log time'
+    default: return assertNever(transform)
+  }
+}
+
+const coxBaselineSeries = (baseline: CoxRegressionEvidence['baseline']) => {
+  switch (baseline.kind) {
+    case 'shared': return [{ name: 'baseline', points: baseline.estimates.map(({ time, survival }) => [time, survival] as const) }]
+    case 'stratified': return baseline.curves.map(({ stratum, estimates }) => ({ name: `stratum ${stratum}`, points: estimates.map(({ time, survival }) => [time, survival] as const) }))
+    default: return assertNever(baseline)
+  }
+}
+
+const hazardRatioIntervalPosition = (interval: readonly [number, number]): string => {
+  if (interval[1] < 1) return 'is entirely below 1'
+  if (interval[0] > 1) return 'is entirely above 1'
+  return 'includes 1'
 }
 
 /**
@@ -330,6 +415,10 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
         return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
       case 'start-stop-survival-run':
         return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} intervals · ${formatCount(run.evidence.events).text} events` }
+      case 'penalized-aft-run':
+        return { title: `${penalizedAftFamilyLabel(run.evidence.family)} with an L2 penalty`, meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events · penalizer ${statistic(run.evidence.penalizer)}` }
+      case 'cox-regression-run':
+        return { title: 'Cox proportional-hazards model', meta: `${formatCount(run.evidence.observations).text} ${run.evidence.observation.kind === 'startStop' ? 'intervals' : 'observations'} · ${formatCount(run.evidence.events).text} events` }
       case 'nonparametric-survival-run': return { title: 'Kaplan–Meier and Nelson–Aalen', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
       case 'two-group-survival-run': return { title: 'Group 1 compared with group 0', meta: `${formatCount(run.evidence.observations).text} rows · compared through time ${statistic(run.evidence.truncationTime)}` }
       case 'multi-state-survival-run': return { title: `${survivalFamilyLabel(run.evidence.family)} transition model`, meta: `${formatCount(run.evidence.observations).text} transition rows · ${formatCount(run.evidence.states.length).text} states` }
@@ -341,6 +430,8 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
       case 'right-censored-survival-run': return 'Parametric survival'
       case 'nonparametric-survival-run': return 'Nonparametric survival'
       case 'start-stop-survival-run': return 'Start–stop survival'
+      case 'cox-regression-run': return 'Cox regression'
+      case 'penalized-aft-run': return 'Penalised accelerated failure time'
       case 'two-group-survival-run': return 'Two-group survival comparison'
       case 'multi-state-survival-run': return 'Multi-state survival'
       default: return assertNever(run)
@@ -450,6 +541,161 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           <div className="mt-3">
             <p className={label('m-0 mb-2 text-muted')}>Hazard over follow-up</p>
             <ExpandableChart className="h-[220px]" label="Fitted hazard" testId="hazard-curve" window={window} onWindow={setWindow} option={hazardCurveOption(evidence.predictionTimes, evidence.hazard, 'follow-up time', theme)} />
+          </div>
+        </>
+      }
+      case 'cox-regression-run': {
+        const evidence = run.evidence
+        const confidence = Math.round(run.configuration.confidenceLevel * 100)
+        const coefficientRows: CoxCoefficientRow[] = run.configuration.covariates.map((covariate, index) => {
+          const estimate = evidence.coefficients[index]!
+          return {
+            key: covariate.id,
+            covariate: covariate.name,
+            coefficient: estimate.coefficient,
+            standardError: estimate.standardError,
+            hazardRatio: estimate.hazardRatio,
+            hazardRatioInterval: estimate.hazardRatioInterval,
+            z: estimate.z,
+            pValue: estimate.pValue,
+          }
+        })
+        const first = coefficientRows[0]!
+        const rateChange = Math.abs(first.hazardRatio - 1)
+        const direction = first.hazardRatio < 1 ? 'lower' : 'higher'
+        const intervalPosition = hazardRatioIntervalPosition(first.hazardRatioInterval)
+        const assumptionRows: CoxAssumptionRow[] = evidence.proportionalHazardsTests.kind === 'recorded'
+          ? evidence.proportionalHazardsTests.transforms.flatMap(({ transform, tests }) => tests.map((test, index) => ({
+              key: `${transform}-${index}`,
+              covariate: run.configuration.covariates[index]?.name ?? `Covariate ${index + 1}`,
+              transform: coxTimeTransformLabel(transform),
+              statistic: test.statistic,
+              pValue: test.pValue,
+            })))
+          : []
+        const frailty = evidence.frailty
+        const frailtyGroup = run.configuration.observation.kind === 'right-censored' && run.configuration.observation.frailty.kind === 'gamma'
+          ? run.configuration.observation.frailty.group.name
+          : 'group'
+        return <>
+          <Tiles>
+            <MetricTile frame="cell" size="compact" label={`${first.covariate} hazard ratio`} value={formatStatistic('raw', first.hazardRatio)} context={`${formatPercent(rateChange, { precision: 1 }).text} ${direction} event rate`} />
+            <MetricTile frame="cell" size="compact" label={`${confidence}% interval`} value={formatStatistic('raw', first.hazardRatioInterval[0])} context={`to ${statistic(first.hazardRatioInterval[1])}`} />
+            <MetricTile frame="cell" size="compact" label="Concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? coxStandardErrorLabel(evidence.standardErrors) : 'unavailable for this observation form'} />
+          </Tiles>
+          <Interpretation
+            bottomLine={<>With the other selected covariates held fixed, a 1-unit higher {first.covariate} is associated with a {formatPercent(rateChange, { precision: 1 }).text} {direction} event rate at each follow-up time. Its estimated hazard ratio is {statistic(first.hazardRatio)}.</>}
+            uncertainty={<>The {confidence}% interval for this hazard ratio is {statistic(first.hazardRatioInterval[0])} to {statistic(first.hazardRatioInterval[1])}. The interval {intervalPosition}; a hazard ratio of 1 means the fitted event rate does not change with the covariate.</>}
+            mustBeTrue={<>{frailty.kind === 'gamma' ? <>Each {frailtyGroup} carries one unobserved multiplier on its hazard, drawn from a gamma distribution with mean 1, and the covariate effects are the same within every {frailtyGroup}. </> : null}The event-rate ratio must remain constant over follow-up, after accounting for the selected covariates{run.configuration.strata.kind === 'column' ? ' within each stratum' : ''}. Censoring must not depend on an unrecorded reason that also predicts the event. These coefficients describe associations unless a separate causal design supports an effect interpretation.</>}
+          />
+          {frailty.kind === 'gamma' && <div className="mt-4">
+            <p className={label('m-0 mb-2 text-muted')}>Shared gamma frailty by {frailtyGroup}</p>
+            <Tiles>
+              <MetricTile frame="cell" size="compact" label="Variance of the frailty" value={formatStatistic('raw', frailty.theta)} context={`${formatCount(frailty.groups).text} groups`} />
+              <MetricTile frame="cell" size="compact" label="Frailty term" value={formatStatistic('raw', frailty.termTest.statistic)} context={`chi-squared on ${statistic(frailty.termTest.df)} df · ${formatP(frailty.termTest.pValue).text}`} />
+              <MetricTile frame="cell" size="compact" label="Effective degrees of freedom" value={formatStatistic('raw', frailty.degreesOfFreedom)} context={`${formatCount(frailty.outerIterations).text} outer and ${formatCount(frailty.innerIterations).text} Newton iterations · ${frailty.ties === 'breslow' ? 'Breslow' : 'Efron'} ties`} />
+            </Tiles>
+            <p className={caption('mb-0 mt-2')}>The variance is the theta of the gamma frailty, chosen by the "em" search of survival's frailty.gamma on the corrected likelihood. The frailty term's statistic is the sum of squared frailty coefficients over their variances, tested on the term's effective degrees of freedom (Therneau, Grambsch and Pankratz 2003). The coefficient standard errors are from the penalised information matrix; the likelihood-ratio test uses the effective degrees of freedom of the whole model.</p>
+          </div>}
+          <div className="mt-4">
+            <EvidenceTable<CoxCoefficientRow>
+              frame="none"
+              title="Covariate estimates"
+              rows={coefficientRows}
+              rowKey={(row) => row.key}
+              noun="covariate"
+              empty="The fit reported no covariate estimate."
+              exportName="cox-regression-coefficients"
+              columns={[
+                { id: 'covariate', header: 'Covariate', value: (row) => row.covariate },
+                figureColumn<CoxCoefficientRow>('coefficient', 'Coefficient', (row) => row.coefficient),
+                figureColumn<CoxCoefficientRow>('standard-error', 'Standard error', (row) => row.standardError),
+                figureColumn<CoxCoefficientRow>('hazard-ratio', 'Hazard ratio', (row) => row.hazardRatio),
+                { id: 'hazard-ratio-interval', header: `${confidence}% interval`, align: 'right', value: (row) => `${statistic(row.hazardRatioInterval[0])} to ${statistic(row.hazardRatioInterval[1])}` },
+                figureColumn<CoxCoefficientRow>('z', 'z', (row) => row.z),
+                figureColumn<CoxCoefficientRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+              ]}
+            />
+            <p className={caption('mb-0 mt-2')}>A hazard ratio above 1 corresponds to a higher fitted event rate; a value below 1 corresponds to a lower fitted event rate. Each comparison is per 1-unit increase in that covariate, with the other selected covariates held fixed.</p>
+          </div>
+          <RatioForest rows={coefficientRows.map((row) => ({ label: row.covariate, ratio: row.hazardRatio, interval: row.hazardRatioInterval, pValue: row.pValue }))} ratioName="hazard ratio" confidence={confidence} testId="cox-forest" />
+          <div className="mt-3">
+            <p className={label('m-0 mb-2 text-muted')}>{evidence.baseline.kind === 'shared' ? 'Baseline event-free probability' : 'Baseline event-free probability by stratum'}</p>
+            <ExpandableChart className="h-[260px]" label="Cox baseline event-free probability" testId="cox-baseline-survival" option={survivalCurvesOption(coxBaselineSeries(evidence.baseline), 'follow-up time', theme)} />
+            <p className={caption('mb-0 mt-2')}>The baseline curves use the fitted covariate means. They are not unadjusted Kaplan–Meier curves.</p>
+          </div>
+          {assumptionRows.length > 0 && <div className="mt-4">
+            <EvidenceTable<CoxAssumptionRow>
+              frame="none"
+              title="Proportional-hazards checks"
+              rows={assumptionRows}
+              rowKey={(row) => row.key}
+              noun="check"
+              empty="No proportional-hazards check was recorded."
+              exportName="cox-proportional-hazards-checks"
+              columns={[
+                { id: 'covariate', header: 'Covariate', value: (row) => row.covariate },
+                { id: 'transform', header: 'Time scale', value: (row) => row.transform },
+                figureColumn<CoxAssumptionRow>('statistic', 'Statistic', (row) => row.statistic),
+                figureColumn<CoxAssumptionRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+              ]}
+            />
+          </div>}
+        </>
+      }
+      case 'penalized-aft-run': {
+        const evidence = run.evidence
+        const confidence = Math.round(run.configuration.confidenceLevel * 100)
+        const rows: AftRow[] = [
+          ...run.configuration.covariates.map((covariate, index) => {
+            const estimate = evidence.coefficients[index]!
+            return { key: covariate.id, parameter: covariate.name, role: 'covariate', coefficient: estimate.coefficient, standardError: estimate.standardError, timeRatio: estimate.timeRatio, timeRatioInterval: estimate.timeRatioInterval, z: estimate.z, pValue: estimate.pValue }
+          }),
+          { key: 'intercept', parameter: 'Intercept', role: 'location', coefficient: evidence.intercept.coefficient, standardError: evidence.intercept.standardError, timeRatio: evidence.intercept.timeRatio, timeRatioInterval: evidence.intercept.timeRatioInterval, z: evidence.intercept.z, pValue: evidence.intercept.pValue },
+          { key: 'ancillary', parameter: evidence.family === 'weibull' ? 'rho (shape)' : 'beta (shape)', role: 'ancillary', coefficient: evidence.ancillary.coefficient, standardError: evidence.ancillary.standardError, timeRatio: evidence.ancillary.timeRatio, timeRatioInterval: evidence.ancillary.timeRatioInterval, z: evidence.ancillary.z, pValue: evidence.ancillary.pValue },
+        ]
+        const first = rows[0]!
+        const change = Math.abs(first.timeRatio - 1)
+        const direction = first.timeRatio < 1 ? 'shorter' : 'longer'
+        const lastTime = evidence.predictionTimes.at(-1) ?? Number.NaN
+        const lastSurvival = evidence.survival.at(-1) ?? Number.NaN
+        return <>
+          <Tiles>
+            <MetricTile frame="cell" size="compact" label={`${first.parameter} time ratio`} value={formatStatistic('raw', first.timeRatio)} context={`${formatPercent(change, { precision: 1 }).text} ${direction} time to the event`} />
+            <MetricTile frame="cell" size="compact" label="AIC" value={formatStatistic('raw', evidence.aic)} context={`BIC ${statistic(evidence.bic)} · log likelihood ${statistic(evidence.logLikelihood)}`} />
+            <MetricTile frame="cell" size="compact" label="Concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? 'on the predicted medians' : 'unavailable'} />
+          </Tiles>
+          <Interpretation
+            bottomLine={<>With the other covariates held fixed, a 1-unit higher {first.parameter} multiplies the expected time to the event by {statistic(first.timeRatio)}, a {formatPercent(change, { precision: 1 }).text} {direction} time. At the covariate means the fitted median time is {statistic(evidence.median)} and the event-free probability at {statistic(lastTime)} is {formatPercent(lastSurvival).text}.</>}
+            uncertainty={<>The {confidence}% interval for this time ratio is {statistic(first.timeRatioInterval[0])} to {statistic(first.timeRatioInterval[1])}. The intervals come from the inverse of the penalised Hessian at the fit, as lifelines reports them. The penalty of {statistic(evidence.penalizer)} shrinks the coefficients toward zero, so the log likelihood, AIC and BIC are those of the penalised fit.</>}
+            mustBeTrue={<>The log of the duration must follow the {penalizedAftFamilyLabel(evidence.family)} family, shifted by the covariates through the location parameter. Censoring must not depend on an unrecorded reason that also predicts the event. These time ratios describe associations unless a separate causal design supports an effect interpretation.</>}
+          />
+          <div className="mt-4">
+            <EvidenceTable<AftRow>
+              frame="none"
+              title="Parameter estimates"
+              rows={rows}
+              rowKey={(row) => row.key}
+              noun="parameter"
+              empty="The fit reported no estimate."
+              exportName="penalized-aft-estimates"
+              columns={[
+                { id: 'parameter', header: 'Parameter', value: (row) => row.parameter },
+                { id: 'role', header: 'Role', value: (row) => row.role },
+                figureColumn<AftRow>('coefficient', 'Coefficient', (row) => row.coefficient),
+                figureColumn<AftRow>('standard-error', 'Standard error', (row) => row.standardError),
+                figureColumn<AftRow>('time-ratio', 'Time ratio', (row) => row.timeRatio),
+                { id: 'time-ratio-interval', header: `${confidence}% interval`, align: 'right', value: (row) => `${statistic(row.timeRatioInterval[0])} to ${statistic(row.timeRatioInterval[1])}` },
+                figureColumn<AftRow>('z', 'z', (row) => row.z),
+                figureColumn<AftRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+              ]}
+            />
+            <p className={caption('mb-0 mt-2')}>A time ratio above 1 means a longer time to the event per 1-unit increase in the covariate; below 1, a shorter one. The intercept row is the location parameter at zero covariates and the shape row is the ancillary parameter, both on the log scale in the coefficient column.</p>
+          </div>
+          <RatioForest rows={rows.filter((row) => row.role === 'covariate').map((row) => ({ label: row.parameter, ratio: row.timeRatio, interval: row.timeRatioInterval, pValue: row.pValue }))} ratioName="time ratio" confidence={confidence} testId="aft-forest" />
+          <div className="mt-3">
+            <p className={label('m-0 mb-2 text-muted')}>Fitted event-free probability at the covariate means</p>
+            <ExpandableChart className="h-[260px]" label="AFT event-free probability" testId="aft-survival" option={survivalCurvesOption([{ name: penalizedAftFamilyLabel(evidence.family), points: evidence.predictionTimes.map((time, index) => [time, evidence.survival[index] ?? Number.NaN] as const) }], 'follow-up time', theme)} />
           </div>
         </>
       }
@@ -570,7 +816,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           <Tiles>
             <MetricTile frame="cell" size="compact" label="States" value={formatCount(evidence.states.length)} />
             <MetricTile frame="cell" size="compact" label="Transitions" value={formatCount(evidence.transitions.length)} />
-            <MetricTile frame="cell" size="compact" label="Most likely final state" value={formatStatistic('raw', evidence.states[destination] ?? Number.NaN)} context={formatPercent(row[destination] ?? Number.NaN).text} />
+            <MetricTile frame="cell" size="compact" label="Most likely final state" value={formatCount(evidence.states[destination] ?? Number.NaN)} context={formatPercent(row[destination] ?? Number.NaN).text} />
           </Tiles>
           <Interpretation
             bottomLine={<>For observations starting in state {initial}, the chart estimates the chance of occupying each state as follow-up continues.</>}

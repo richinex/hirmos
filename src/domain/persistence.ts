@@ -368,6 +368,30 @@ const upgradeSurvivalRunRecord = (value: Record<string, unknown>): Record<string
       evidence: { ...(evidence as Record<string, unknown>), ...additions },
     }
   }
+  if (kind === 'cox-regression-run') {
+    // A Cox run recorded before the shared frailty existed carries no frailty field in its
+    // right-censored configuration or in its evidence.
+    const configuration = Reflect.get(value, 'configuration')
+    const evidence = Reflect.get(value, 'evidence')
+    const observation = typeof configuration === 'object' && configuration !== null ? Reflect.get(configuration, 'observation') : null
+    const needsConfiguration = typeof observation === 'object' && observation !== null
+      && Reflect.get(observation, 'kind') === 'right-censored'
+      && Reflect.get(observation, 'frailty') === undefined
+    const needsEvidence = typeof evidence === 'object' && evidence !== null && Reflect.get(evidence, 'frailty') === undefined
+    if (!needsConfiguration && !needsEvidence) return value
+    return {
+      ...value,
+      ...(needsConfiguration
+        ? {
+            configuration: {
+              ...(configuration as Record<string, unknown>),
+              observation: { ...(observation as Record<string, unknown>), frailty: { kind: 'none' } },
+            },
+          }
+        : {}),
+      ...(needsEvidence ? { evidence: { ...(evidence as Record<string, unknown>), frailty: { kind: 'none' } } } : {}),
+    }
+  }
   if (kind !== 'multi-state-survival-run') return value
   const configuration = Reflect.get(value, 'configuration')
   const evidence = Reflect.get(value, 'evidence')

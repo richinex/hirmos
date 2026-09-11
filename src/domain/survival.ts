@@ -76,6 +76,77 @@ export interface StartStopSurvivalConfiguration<
   readonly predictionTimes: NonEmptyArray<number>
 }
 
+export type CoxStandardErrors =
+  | { readonly kind: 'model-based' }
+  | { readonly kind: 'robust' }
+  | { readonly kind: 'clustered'; readonly cluster: NumericColumnSelection }
+
+export type CoxPenalty =
+  | { readonly kind: 'none' }
+  | {
+      readonly kind: 'uniform'
+      readonly strength: number
+      readonly l1Ratio: number
+    }
+
+export type CoxTies = 'efron' | 'breslow'
+
+/** A shared gamma frailty on a group column, as survival's `frailty(group, distribution = "gamma")`. */
+export type CoxFrailty =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'gamma'; readonly group: NumericColumnSelection; readonly ties: CoxTies }
+
+export type CoxObservationConfiguration =
+  | {
+      readonly kind: 'right-censored'
+      readonly duration: NumericColumnSelection
+      readonly event: NumericColumnSelection
+      readonly entry:
+        | { readonly kind: 'not-used' }
+        | { readonly kind: 'column'; readonly column: NumericColumnSelection }
+      readonly standardErrors: CoxStandardErrors
+      readonly frailty: CoxFrailty
+    }
+  | {
+      readonly kind: 'start-stop'
+      readonly subject: NumericColumnSelection
+      readonly start: NumericColumnSelection
+      readonly stop: NumericColumnSelection
+      readonly event: NumericColumnSelection
+      readonly standardErrors: { readonly kind: 'model-based' }
+    }
+
+export interface CoxRegressionConfiguration {
+  readonly kind: 'cox-regression'
+  readonly observation: CoxObservationConfiguration
+  readonly weights:
+    | { readonly kind: 'equal' }
+    | { readonly kind: 'column'; readonly column: NumericColumnSelection }
+  readonly strata:
+    | { readonly kind: 'unstratified' }
+    | { readonly kind: 'column'; readonly column: NumericColumnSelection }
+  readonly covariates: NonEmptyArray<NumericColumnSelection>
+  readonly penalty: CoxPenalty
+  readonly confidenceLevel: number
+}
+
+export type PenalizedAftFamily = 'weibull' | 'logLogistic'
+
+/**
+ * lifelines' `WeibullAFTFitter` or `LogLogisticAFTFitter` with an L2 penalty: the covariates enter the
+ * location parameter with an intercept, and the ancillary parameter is an intercept alone.
+ */
+export interface PenalizedAftConfiguration {
+  readonly kind: 'penalized-aft'
+  readonly duration: NumericColumnSelection
+  readonly event: NumericColumnSelection
+  readonly covariates: NonEmptyArray<NumericColumnSelection>
+  readonly family: PenalizedAftFamily
+  readonly penalizer: number
+  readonly confidenceLevel: number
+  readonly predictionTimes: NonEmptyArray<number>
+}
+
 export interface NonparametricSurvivalConfiguration {
   readonly kind: 'right-censored-nonparametric'
   readonly duration: NumericColumnSelection
@@ -133,8 +204,10 @@ export interface MultiStateSurvivalConfiguration {
 
 export type SurvivalConfiguration =
   | RightCensoredSurvivalConfiguration
+  | PenalizedAftConfiguration
   | NonparametricSurvivalConfiguration
   | StartStopSurvivalConfiguration
+  | CoxRegressionConfiguration
   | TwoGroupSurvivalConfiguration
   | MultiStateSurvivalConfiguration
 
@@ -186,6 +259,141 @@ export const nonparametricSurvivalEvidenceSchema = z.object({
 }).strict()
 
 export type NonparametricSurvivalEvidence = z.infer<typeof nonparametricSurvivalEvidenceSchema>
+
+const coxCoefficientEstimateSchema = z.object({
+  coefficient: finiteNumber,
+  hazardRatio: finiteNumber.positive(),
+  standardError: finiteNumber.positive(),
+  coefficientInterval: intervalSchema,
+  hazardRatioInterval: z.tuple([finiteNumber.positive(), finiteNumber.positive()]),
+  z: finiteNumber,
+  pValue: probability,
+}).strict()
+
+const coxBaselinePointSchema = z.object({
+  time: nonNegativeTime,
+  hazard: finiteNumber.nonnegative(),
+  cumulativeHazard: finiteNumber.nonnegative(),
+  survival: probability,
+}).strict()
+
+type CoxBaselinePoint = z.infer<typeof coxBaselinePointSchema>
+
+const coxBaselineCurveSchema = z.array(coxBaselinePointSchema).min(1)
+
+const coxBaselineSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('shared'),
+    estimates: coxBaselineCurveSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('stratified'),
+    curves: z.array(z.object({
+      stratum: z.number().int().nonnegative(),
+      estimates: coxBaselineCurveSchema,
+    }).strict()).min(1),
+  }).strict(),
+])
+
+const coxConcordanceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('recorded'), result: probability }).strict(),
+  z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+])
+
+const coxProportionalHazardsTestSchema = z.object({
+  statistic: finiteNumber.nonnegative(),
+  pValue: probability,
+}).strict()
+
+const coxProportionalHazardsTestsSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('recorded'),
+    transforms: z.array(z.object({
+      transform: z.enum(['eventRank', 'kaplanMeier', 'identity', 'logTime']),
+      tests: z.array(coxProportionalHazardsTestSchema).min(1),
+    }).strict()).min(1),
+  }).strict(),
+  z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
+])
+
+const coxFrailtyEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z.object({
+    kind: z.literal('gamma'),
+    groups: z.number().int().min(2),
+    ties: z.enum(['efron', 'breslow']),
+    theta: finiteNumber.nonnegative(),
+    termTest: z.object({ statistic: finiteNumber.nonnegative(), df: finiteNumber, pValue: probability }).strict(),
+    degreesOfFreedom: finiteNumber.positive(),
+    outerIterations: z.number().int().positive(),
+    innerIterations: z.number().int().positive(),
+    history: z.array(z.tuple([finiteNumber.nonnegative(), finiteNumber, finiteNumber])).min(1),
+    standardErrors2: z.array(finiteNumber.positive()).min(1),
+  }).strict(),
+])
+
+export type CoxFrailtyEvidence = z.infer<typeof coxFrailtyEvidenceSchema>
+
+export const coxRegressionEvidenceSchema = z.object({
+  kind: z.literal('coxRegression'),
+  observation: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('rightCensored'), delayedEntry: z.boolean() }).strict(),
+    z.object({ kind: z.literal('startStop'), subjects: z.number().int().positive() }).strict(),
+  ]),
+  observations: z.number().int().positive(),
+  events: z.number().int().positive(),
+  totalWeight: finiteNumber.positive(),
+  standardErrors: z.enum(['modelBased', 'robust', 'clustered']),
+  coefficients: z.array(coxCoefficientEstimateSchema).min(1),
+  covariance: z.array(finiteNumber).min(1),
+  logLikelihood: finiteNumber,
+  nullLogLikelihood: finiteNumber,
+  likelihoodRatio: finiteNumber.nonnegative(),
+  likelihoodRatioPValue: probability,
+  partialAic: finiteNumber,
+  iterations: z.number().int().positive(),
+  covariateMeans: z.array(finiteNumber).min(1),
+  covariateStandardDeviations: z.array(finiteNumber.positive()).min(1),
+  concordance: coxConcordanceSchema,
+  proportionalHazardsTests: coxProportionalHazardsTestsSchema,
+  baseline: coxBaselineSchema,
+  frailty: coxFrailtyEvidenceSchema.default({ kind: 'none' }),
+}).strict()
+
+export type CoxRegressionEvidence = z.infer<typeof coxRegressionEvidenceSchema>
+
+const aftCoefficientEstimateSchema = z.object({
+  coefficient: finiteNumber,
+  timeRatio: finiteNumber.positive(),
+  standardError: finiteNumber.positive(),
+  coefficientInterval: intervalSchema,
+  timeRatioInterval: z.tuple([finiteNumber.positive(), finiteNumber.positive()]),
+  z: finiteNumber,
+  pValue: probability,
+}).strict()
+
+export const penalizedAftEvidenceSchema = z.object({
+  kind: z.literal('penalizedAft'),
+  observations: z.number().int().positive(),
+  events: z.number().int().positive(),
+  family: z.enum(['weibull', 'logLogistic']),
+  penalizer: finiteNumber.nonnegative(),
+  coefficients: z.array(aftCoefficientEstimateSchema).min(1),
+  intercept: aftCoefficientEstimateSchema,
+  ancillary: aftCoefficientEstimateSchema,
+  covariance: z.array(finiteNumber).min(1),
+  logLikelihood: finiteNumber,
+  aic: finiteNumber,
+  bic: finiteNumber,
+  iterations: z.number().int().positive(),
+  concordance: coxConcordanceSchema,
+  covariateMeans: z.array(finiteNumber).min(1),
+  predictionTimes: z.array(nonNegativeTime).min(1),
+  survival: z.array(probability).min(1),
+  median: nonNegativeTime,
+}).strict()
+
+export type PenalizedAftEvidence = z.infer<typeof penalizedAftEvidenceSchema>
 
 const survivalCurvePointSchema = z.tuple([nonNegativeTime, probability])
 const nonNegativeCurvePointSchema = z.tuple([nonNegativeTime, finiteNumber.nonnegative()])
@@ -327,6 +535,9 @@ export type MultiStateSurvivalEvidence = z.infer<typeof multiStateSurvivalEviden
 
 export type SurvivalEvidence =
   | FlexSurvEvidence
+  | PenalizedAftEvidence
+  | NonparametricSurvivalEvidence
+  | CoxRegressionEvidence
   | ComparisonSurvivalEvidence
   | MultiStateSurvivalEvidence
 
@@ -429,6 +640,39 @@ function conversionDifferenceMatches(groupZero: number, groupOne: number, differ
   const expected = groupOne - groupZero
   const scale = Math.max(1, Math.abs(expected), Math.abs(difference))
   return Math.abs(expected - difference) <= scale * 1e-8
+}
+
+function approximatelyEqual(left: number, right: number): boolean {
+  const scale = Math.max(1, Math.abs(left), Math.abs(right))
+  return Math.abs(left - right) <= scale * 1e-8
+}
+
+function coxCoefficientProblem(estimate: CoxRegressionEvidence['coefficients'][number]): string | null {
+  const [coefficientLower, coefficientUpper] = estimate.coefficientInterval
+  const [hazardLower, hazardUpper] = estimate.hazardRatioInterval
+  const checks: readonly (readonly [invalid: boolean, detail: string])[] = [
+    [coefficientLower > coefficientUpper, 'A Cox coefficient interval has its bounds reversed.'],
+    [hazardLower > hazardUpper, 'A Cox hazard-ratio interval has its bounds reversed.'],
+    [!approximatelyEqual(estimate.hazardRatio, Math.exp(estimate.coefficient)), 'A Cox hazard ratio does not equal the exponential of its coefficient.'],
+    [!approximatelyEqual(hazardLower, Math.exp(coefficientLower)) || !approximatelyEqual(hazardUpper, Math.exp(coefficientUpper)), 'A Cox hazard-ratio interval does not match its coefficient interval.'],
+    [!approximatelyEqual(estimate.z, estimate.coefficient / estimate.standardError), 'A Cox z statistic does not match its coefficient and standard error.'],
+  ]
+  return checks.find(([invalid]) => invalid)?.[1] ?? null
+}
+
+function coxBaselineCurveProblem(curve: readonly CoxBaselinePoint[]): string | null {
+  const inconsistentSurvival = curve.some((point) => (
+    !approximatelyEqual(point.survival, Math.exp(-point.cumulativeHazard))
+  ))
+  if (inconsistentSurvival) return 'A Cox baseline survival value does not match its cumulative hazard.'
+  return curve.reduce<string | null>((problem, point, index) => {
+    if (problem !== null || index === 0) return problem
+    const previous = curve[index - 1]!
+    if (previous.time > point.time) return 'A Cox baseline curve is not ordered by time.'
+    if (previous.cumulativeHazard > point.cumulativeHazard) return 'A Cox baseline cumulative hazard decreases over time.'
+    if (previous.survival < point.survival) return 'A Cox baseline survival curve increases over time.'
+    return null
+  }, null)
 }
 
 function comparisonSummaryProblem(evidence: ComparisonSurvivalEvidence): string | null {
@@ -570,6 +814,136 @@ export function parseNonparametricSurvivalEvidence(
   return ok(evidence)
 }
 
+export function parseCoxRegressionEvidence(
+  value: unknown,
+): Result<CoxRegressionEvidence, SurvivalEvidenceProblem> {
+  const parsed = coxRegressionEvidenceSchema.safeParse(value)
+  if (!parsed.success) return invalidEvidence(z.prettifyError(parsed.error))
+  const evidence = parsed.data
+  if (evidence.events > evidence.observations) {
+    return invalidEvidence('The event count exceeds the observation count.')
+  }
+  const coefficientProblem = evidence.coefficients
+    .map(coxCoefficientProblem)
+    .find((problem) => problem !== null)
+  if (coefficientProblem !== undefined && coefficientProblem !== null) {
+    return invalidEvidence(coefficientProblem)
+  }
+  const baselineCurves = (() => {
+    switch (evidence.baseline.kind) {
+      case 'shared': return [evidence.baseline.estimates]
+      case 'stratified': return evidence.baseline.curves.map(({ estimates }) => estimates)
+      default: return assertNever(evidence.baseline)
+    }
+  })()
+  const baselineProblem = baselineCurves
+    .map(coxBaselineCurveProblem)
+    .find((problem) => problem !== null)
+  if (baselineProblem !== undefined && baselineProblem !== null) {
+    return invalidEvidence(baselineProblem)
+  }
+  if (
+    evidence.baseline.kind === 'stratified'
+    && new Set(evidence.baseline.curves.map(({ stratum }) => stratum)).size !== evidence.baseline.curves.length
+  ) {
+    return invalidEvidence('A Cox baseline result repeats a stratum.')
+  }
+  if (evidence.covariance.length !== evidence.coefficients.length ** 2) {
+    return invalidEvidence('The Cox covariance matrix does not match the coefficient count.')
+  }
+  const coefficientCount = evidence.coefficients.length
+  const asymmetricCovariance = evidence.covariance.some((value, index) => {
+    const row = Math.floor(index / coefficientCount)
+    const column = index % coefficientCount
+    return !approximatelyEqual(value, evidence.covariance[column * coefficientCount + row]!)
+  })
+  if (asymmetricCovariance) return invalidEvidence('The Cox covariance matrix is not symmetric.')
+  if (evidence.standardErrors === 'modelBased') {
+    const inconsistentStandardError = evidence.coefficients.some((estimate, column) => (
+      !approximatelyEqual(
+        estimate.standardError ** 2,
+        evidence.covariance[column * coefficientCount + column]!,
+      )
+    ))
+    if (inconsistentStandardError) {
+      return invalidEvidence('A model-based Cox standard error does not match the covariance matrix.')
+    }
+  }
+  if (
+    evidence.covariateMeans.length !== evidence.coefficients.length
+    || evidence.covariateStandardDeviations.length !== evidence.coefficients.length
+  ) {
+    return invalidEvidence('The Cox covariate summaries do not match the coefficient count.')
+  }
+  if (!approximatelyEqual(evidence.likelihoodRatio, 2 * (evidence.logLikelihood - evidence.nullLogLikelihood))) {
+    return invalidEvidence('The Cox likelihood-ratio statistic does not match the fitted and null log likelihoods.')
+  }
+  if (!approximatelyEqual(evidence.partialAic, 2 * coefficientCount - 2 * evidence.logLikelihood)) {
+    return invalidEvidence('The Cox partial AIC does not match the fitted log likelihood and coefficient count.')
+  }
+  if (evidence.proportionalHazardsTests.kind === 'recorded') {
+    const transforms = evidence.proportionalHazardsTests.transforms
+    if (new Set(transforms.map(({ transform }) => transform)).size !== transforms.length) {
+      return invalidEvidence('The proportional-hazards result repeats a time transform.')
+    }
+    if (transforms.some(({ tests }) => tests.length !== evidence.coefficients.length)) {
+      return invalidEvidence('Each proportional-hazards transform must contain one result for each coefficient.')
+    }
+  }
+  if (evidence.observation.kind === 'startStop' && evidence.concordance.kind === 'recorded') {
+    return invalidEvidence('A start-stop Cox result cannot record a concordance statistic.')
+  }
+  if (
+    evidence.observation.kind === 'startStop'
+    && evidence.proportionalHazardsTests.kind === 'recorded'
+  ) {
+    return invalidEvidence('A start-stop Cox result cannot record proportional-hazards tests.')
+  }
+  if (evidence.frailty.kind === 'gamma') {
+    if (evidence.observation.kind !== 'rightCensored' || evidence.observation.delayedEntry) {
+      return invalidEvidence('A shared frailty result needs right-censored rows without delayed entry.')
+    }
+    if (evidence.standardErrors !== 'modelBased') {
+      return invalidEvidence('A shared frailty result reports model-based standard errors only.')
+    }
+    if (evidence.frailty.standardErrors2.length !== coefficientCount) {
+      return invalidEvidence('The shared frailty second standard errors do not match the coefficient count.')
+    }
+    if (evidence.frailty.history.length !== evidence.frailty.outerIterations) {
+      return invalidEvidence('The shared frailty history does not match the outer iteration count.')
+    }
+    if (evidence.proportionalHazardsTests.kind === 'recorded') {
+      return invalidEvidence('A shared frailty result cannot record proportional-hazards tests.')
+    }
+  }
+  return ok(evidence)
+}
+
+export function parsePenalizedAftEvidence(
+  value: unknown,
+): Result<PenalizedAftEvidence, SurvivalEvidenceProblem> {
+  const parsed = penalizedAftEvidenceSchema.safeParse(value)
+  if (!parsed.success) return invalidEvidence(z.prettifyError(parsed.error))
+  const evidence = parsed.data
+  if (evidence.events > evidence.observations) {
+    return invalidEvidence('The event count exceeds the observation count.')
+  }
+  const parameters = evidence.coefficients.length + 2
+  if (evidence.covariance.length !== parameters ** 2) {
+    return invalidEvidence('The AFT covariance matrix does not match the parameter count.')
+  }
+  if (evidence.covariateMeans.length !== evidence.coefficients.length) {
+    return invalidEvidence('The AFT covariate means do not match the coefficient count.')
+  }
+  if (evidence.survival.length !== evidence.predictionTimes.length) {
+    return invalidEvidence('The AFT survival curve does not match its prediction times.')
+  }
+  const inconsistent = [...evidence.coefficients, evidence.intercept, evidence.ancillary]
+    .some((estimate) => !approximatelyEqual(estimate.timeRatio, Math.exp(estimate.coefficient)))
+  if (inconsistent) return invalidEvidence('An AFT time ratio does not match its coefficient.')
+  return ok(evidence)
+}
+
 export function parseComparisonSurvivalEvidence(
   value: unknown,
 ): Result<ComparisonSurvivalEvidence, SurvivalEvidenceProblem> {
@@ -646,7 +1020,17 @@ export interface NewSurvivalRunIdentity {
   readonly columns: NonEmptyArray<ColumnSelection>
 }
 
-export type SurvivalRunProblem = { readonly kind: 'family-mismatch' }
+export type SurvivalRunProblem =
+  | { readonly kind: 'family-mismatch' }
+  | { readonly kind: 'observation-mismatch' }
+  | { readonly kind: 'entry-mismatch' }
+  | { readonly kind: 'standard-errors-mismatch' }
+  | { readonly kind: 'strata-mismatch' }
+  | {
+      readonly kind: 'coefficient-count-mismatch'
+      readonly covariates: number
+      readonly coefficients: number
+    }
 
 type RightCensoredSurvivalRun = {
   readonly [Family in ParametricSurvivalFamily]: SurvivalRunIdentity & {
@@ -682,6 +1066,16 @@ export type SurvivalRunArtifact =
       readonly configuration: MultiStateSurvivalConfiguration
       readonly evidence: MultiStateSurvivalEvidence
     }
+  | SurvivalRunIdentity & {
+      readonly kind: 'cox-regression-run'
+      readonly configuration: CoxRegressionConfiguration
+      readonly evidence: CoxRegressionEvidence
+    }
+  | SurvivalRunIdentity & {
+      readonly kind: 'penalized-aft-run'
+      readonly configuration: PenalizedAftConfiguration
+      readonly evidence: PenalizedAftEvidence
+    }
 
 /** Bind a fitted parametric result to the exact family and row roles that produced it. */
 export function rightCensoredSurvivalRun(
@@ -710,6 +1104,65 @@ export function multiStateSurvivalRun(
 ): Result<SurvivalRunArtifact, SurvivalRunProblem> {
   if (configuration.family !== evidence.family) return err({ kind: 'family-mismatch' })
   return ok({ ...identity, kind: 'multi-state-survival-run', configuration, evidence })
+}
+
+/** Bind a penalised AFT fit to the family and covariates that produced it. */
+export function penalizedAftRun(
+  identity: NewSurvivalRunIdentity,
+  configuration: PenalizedAftConfiguration,
+  evidence: PenalizedAftEvidence,
+): Result<SurvivalRunArtifact, SurvivalRunProblem> {
+  if (configuration.family !== evidence.family) return err({ kind: 'family-mismatch' })
+  if (configuration.covariates.length !== evidence.coefficients.length) {
+    return err({ kind: 'coefficient-count-mismatch', covariates: configuration.covariates.length, coefficients: evidence.coefficients.length })
+  }
+  return ok({ ...identity, kind: 'penalized-aft-run', configuration, evidence })
+}
+
+export function coxRegressionRun(
+  identity: NewSurvivalRunIdentity,
+  configuration: CoxRegressionConfiguration,
+  evidence: CoxRegressionEvidence,
+): Result<SurvivalRunArtifact, SurvivalRunProblem> {
+  const observationMatches = (
+    configuration.observation.kind === 'right-censored'
+    && evidence.observation.kind === 'rightCensored'
+  ) || (
+    configuration.observation.kind === 'start-stop'
+    && evidence.observation.kind === 'startStop'
+  )
+  if (!observationMatches) {
+    return err({ kind: 'observation-mismatch' })
+  }
+  if (
+    configuration.observation.kind === 'right-censored'
+    && evidence.observation.kind === 'rightCensored'
+    && (configuration.observation.entry.kind === 'column') !== evidence.observation.delayedEntry
+  ) {
+    return err({ kind: 'entry-mismatch' })
+  }
+  const configuredStandardErrors = configuration.observation.standardErrors.kind === 'model-based'
+    ? 'modelBased'
+    : configuration.observation.standardErrors.kind
+  if (configuredStandardErrors !== evidence.standardErrors) {
+    return err({ kind: 'standard-errors-mismatch' })
+  }
+  const baselineMatches = (
+    configuration.strata.kind === 'unstratified'
+    && evidence.baseline.kind === 'shared'
+  ) || (
+    configuration.strata.kind === 'column'
+    && evidence.baseline.kind === 'stratified'
+  )
+  if (!baselineMatches) return err({ kind: 'strata-mismatch' })
+  if (configuration.covariates.length !== evidence.coefficients.length) {
+    return err({
+      kind: 'coefficient-count-mismatch',
+      covariates: configuration.covariates.length,
+      coefficients: evidence.coefficients.length,
+    })
+  }
+  return ok({ ...identity, kind: 'cox-regression-run', configuration, evidence })
 }
 
 /**

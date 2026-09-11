@@ -26,6 +26,8 @@ mod lapack_dgelsd;
 mod lapack_dgesdd;
 mod lapack_dsyevd;
 mod lapack_lu;
+mod slsqp;
+mod nelder_mead;
 mod least_squares;
 mod linalg;
 pub mod mackinnon;

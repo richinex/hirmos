@@ -199,6 +199,79 @@ test('runs start-stop and multi-state flexsurv on the exact bosms3 package data'
   await expect(page.getByTestId('transition-probability-matrix')).toBeVisible()
 })
 
+test('runs start-stop Cox regression through the worker and records its diagnostics', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once; phone layout is covered separately.')
+  await createPreparedProjectFrom(page, 'Cox start-stop regression', testData('survival/panel.csv'), ['id', 'start', 'stop', 'event', 'feature_active', 'experience', 'complexity'])
+
+  await page.getByRole('radio', { name: 'Cox regression' }).click()
+  await page.getByRole('radiogroup', { name: 'Cox observation structure' }).getByRole('radio', { name: 'Start–stop' }).click()
+  await chooseColumn(page, 'Subject', 'id')
+  await chooseColumn(page, 'Start time', 'start')
+  await chooseColumn(page, 'Stop time', 'stop')
+  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'event')
+  for (const covariate of ['feature_active', 'experience', 'complexity']) {
+    await page.getByRole('checkbox', { name: covariate, exact: true }).check()
+  }
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Cox proportional-hazards model' }).first()).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('455 intervals · 132 events').first()).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Covariate estimates' }).first()).toContainText('feature_active')
+  await expect(page.getByTestId('cox-forest').first()).toBeVisible()
+  await expect(page.getByTestId('cox-baseline-survival').first()).toBeVisible()
+  await expect(page.getByText('Survival runs · 1')).toBeVisible()
+})
+
+test('fits a shared gamma frailty as survival does on the kidney data', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once; phone layout is covered separately.')
+  await createPreparedProjectFrom(page, 'Kidney gamma frailty', testData('kidney.csv'), ['time', 'status', 'age', 'sex', 'id'])
+
+  await page.getByRole('radio', { name: 'Cox regression' }).click()
+  await chooseColumn(page, 'Duration', 'time')
+  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
+  await page.getByRole('radiogroup', { name: 'Cox shared frailty' }).getByRole('radio', { name: 'Gamma by group' }).click()
+  await chooseColumn(page, 'Frailty group', 'id')
+  await page.getByRole('radiogroup', { name: 'Cox tied event times' }).getByRole('radio', { name: 'Breslow' }).click()
+  for (const covariate of ['age', 'sex']) {
+    await page.getByRole('checkbox', { name: covariate, exact: true }).check()
+  }
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+
+  await expect(page.getByRole('heading', { name: 'Cox proportional-hazards model' }).first()).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('76 observations · 58 events').first()).toBeVisible()
+  // survival 3.6-4 prints the frailty variance of the final fit as 0.398; sex has coefficient −1.5568
+  // (hazard ratio 0.211) and the concordance is 0.813.
+  await expect(page.getByText('Shared gamma frailty by id').first()).toBeVisible()
+  const estimates = page.getByRole('region', { name: 'Covariate estimates' }).first()
+  await expect(estimates).toContainText('0.211')
+  await expect(page.getByTestId('cox-forest').first()).toBeVisible()
+  await bodyText(page, '0.398')
+  await bodyText(page, '0.813')
+})
+
+test('fits a penalised Weibull AFT as lifelines does on the kidney data', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once; phone layout is covered separately.')
+  await createPreparedProjectFrom(page, 'Kidney penalised AFT', testData('kidney.csv'), ['time', 'status', 'age', 'sex', 'id'])
+
+  await page.getByRole('radio', { name: 'Penalised AFT' }).click()
+  await chooseColumn(page, 'Duration', 'time')
+  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
+  for (const covariate of ['age', 'sex']) {
+    await page.getByRole('checkbox', { name: covariate, exact: true }).check()
+  }
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+
+  // lifelines 0.30.3, WeibullAFTFitter(penalizer=0.1): AIC 682.40, sex time ratio 2.30 [1.28, 4.15], concordance 0.662.
+  await expect(page.getByRole('heading', { name: 'Weibull AFT with an L2 penalty' }).first()).toBeVisible({ timeout: 120_000 })
+  const estimates = page.getByRole('region', { name: 'Parameter estimates' }).first()
+  await expect(estimates).toContainText('2.30')
+  await expect(estimates).toContainText('1.28 to 4.15')
+  await expect(page.getByTestId('aft-forest').first()).toBeVisible()
+  await bodyText(page, '682')
+  await bodyText(page, '0.662')
+  await expect(page.getByText('Survival runs · 1')).toBeVisible()
+})
+
 test('converts longitudinal state observations before fitting the multi-state model', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'The numerical browser flow runs once.')
   await createPreparedProject(page, 'Longitudinal state observations', 'longitudinal-states.csv', ['time', 'state'])

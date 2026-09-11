@@ -500,10 +500,25 @@ fn dcstep(
     *stp = stpf;
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LbfgsbTermination {
+    ProjectedGradient,
+    FunctionTolerance,
+    IterationLimit,
+    LineSearchFailed,
+}
+
+impl LbfgsbTermination {
+    pub fn converged(self) -> bool {
+        matches!(self, Self::ProjectedGradient | Self::FunctionTolerance)
+    }
+}
+
 pub struct LbfgsbResult {
     pub x: Vec<f64>,
     pub f: f64,
     pub iterations: usize,
+    pub termination: LbfgsbTermination,
 }
 
 /// The mainlb driver at scipy defaults semantics: closure evaluates (f, g); bounds are encoded
@@ -607,6 +622,7 @@ where
             x: x[1..].to_vec(),
             f,
             iterations: iter,
+            termination: LbfgsbTermination::ProjectedGradient,
         };
     }
 
@@ -841,6 +857,7 @@ where
                     x: x[1..].to_vec(),
                     f,
                     iterations: iter,
+                    termination: LbfgsbTermination::LineSearchFailed,
                 };
             }
             col = 0;
@@ -860,6 +877,7 @@ where
                 x: x[1..].to_vec(),
                 f,
                 iterations: iter,
+                termination: LbfgsbTermination::ProjectedGradient,
             };
         }
         let ddum = fold.abs().max(f.abs()).max(ONE);
@@ -868,6 +886,7 @@ where
                 x: x[1..].to_vec(),
                 f,
                 iterations: iter,
+                termination: LbfgsbTermination::FunctionTolerance,
             };
         }
         if iter >= max_iter {
@@ -875,6 +894,7 @@ where
                 x: x[1..].to_vec(),
                 f,
                 iterations: iter,
+                termination: LbfgsbTermination::IterationLimit,
             };
         }
 

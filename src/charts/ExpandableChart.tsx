@@ -9,10 +9,12 @@ import { useChartExport } from './useChartExport'
  * A diagnostic chart that can be lifted into a floating window, where it fills the window and can be
  * exported as it stands. Builders that declare `dataZoom` gain wheel zoom and drag panning there.
  */
-export function ExpandableChart({ option, label, className = 'h-[260px]', testId, defaultWidth, defaultHeight, window: wanted, onWindow }: {
+export function ExpandableChart({ option, label, className = 'h-[260px]', style, testId, defaultWidth, defaultHeight, window: wanted, onWindow }: {
   readonly option: EChartsCoreOption
   readonly label: string
   readonly className?: string
+  /** An explicit pixel size for a chart whose height follows its rows, in the panel; the lifted copy fills its window. */
+  readonly style?: React.CSSProperties
   /** The figure's short name: its test hook, and the stem of any file exported from it. */
   readonly testId?: string
   readonly defaultWidth?: number
@@ -36,7 +38,7 @@ export function ExpandableChart({ option, label, className = 'h-[260px]', testId
       {(openButton) => (
         <div className="relative">
           <div className="absolute right-1 top-1 z-10">{openButton}</div>
-          <EChart option={option} label={label} className={className} testId={testId} window={wanted} onWindow={onWindow} />
+          <EChart option={option} label={label} className={className} style={style} testId={testId} window={wanted} onWindow={onWindow} />
         </div>
       )}
     </FloatingFigure>

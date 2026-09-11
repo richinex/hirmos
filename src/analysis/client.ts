@@ -33,7 +33,7 @@ import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/r
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
-import type { ComparisonSurvivalEvidence, FlexSurvEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, ProportionalHazardsFamily } from '@/domain/survival'
+import type { ComparisonSurvivalEvidence, CoxRegressionEvidence, FlexSurvEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, PenalizedAftEvidence, ProportionalHazardsFamily } from '@/domain/survival'
 import {
   newWorkerRequestId,
   parseAnalysisWorkerEvent,
@@ -42,6 +42,7 @@ import {
   type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
   type DmlGroupsRequest,
+  type CoxRegressionWorkerDesign,
   type MultiStateWorkerInput,
   type TemporalSamples,
   type WorkerRequestId,
@@ -96,6 +97,8 @@ type BinaryEttOutcome = Result<BinaryEttEvidence, AnalysisWorkerProblem>
 type LinearScmOutcome = Result<LinearScmEvidence, AnalysisWorkerProblem>
 type DynamicLinearScmOutcome = Result<DynamicLinearScmEvidence, AnalysisWorkerProblem>
 type FlexSurvOutcome = Result<FlexSurvEvidence, AnalysisWorkerProblem>
+type CoxRegressionOutcome = Result<CoxRegressionEvidence, AnalysisWorkerProblem>
+type PenalizedAftOutcome = Result<PenalizedAftEvidence, AnalysisWorkerProblem>
 type NonparametricSurvivalOutcome = Result<NonparametricSurvivalEvidence, AnalysisWorkerProblem>
 type ComparisonSurvivalOutcome = Result<ComparisonSurvivalEvidence, AnalysisWorkerProblem>
 type MultiStateSurvivalOutcome = Result<MultiStateSurvivalEvidence, AnalysisWorkerProblem>
@@ -823,6 +826,30 @@ export function runFlexSurv(values: Float64Array, rows: number, columns: number,
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<FlexSurvOutcome> {
   const request = newWorkerRequestId()
   return post('flexsurv-succeeded', { kind: 'flexsurv', request, values, rows, columns, ...design }, values, onProgress)
+}
+
+export function runCoxRegression(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: CoxRegressionWorkerDesign,
+  onProgress?: (progress: AnalysisProgress) => void,
+): Promise<CoxRegressionOutcome> {
+  const request = newWorkerRequestId()
+  return post('cox-regression-succeeded', { kind: 'cox-regression', request, values, rows, columns, design }, values, onProgress)
+}
+
+export function runPenalizedAft(values: Float64Array, rows: number, columns: number, design: {
+  readonly duration: number
+  readonly event: number
+  readonly covariates: readonly number[]
+  readonly family: 'weibull' | 'logLogistic'
+  readonly penalizer: number
+  readonly confidenceLevel: number
+  readonly predictionTimes: readonly number[]
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<PenalizedAftOutcome> {
+  const request = newWorkerRequestId()
+  return post('penalized-aft-succeeded', { kind: 'penalized-aft', request, values, rows, columns, ...design }, values, onProgress)
 }
 
 export function runComparisonSurvival(values: Float64Array, rows: number, columns: number, design: {

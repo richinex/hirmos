@@ -35,7 +35,7 @@ import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
-import { parseComparisonSurvivalEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence, parseNonparametricSurvivalEvidence } from '@/domain/survival'
+import { parseComparisonSurvivalEvidence, parseCoxRegressionEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence, parseNonparametricSurvivalEvidence, parsePenalizedAftEvidence } from '@/domain/survival'
 import {
   analysisProgressSchema,
   parseAnalysisRefusal,
@@ -90,6 +90,10 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
     case 'flexsurv':
       return { kind: 'flexSurv', rows: command.rows, columns: command.columns, observation: command.observation, rowFrequency: command.rowFrequency, covariates: command.covariates, family: command.family, predictionTimes: command.predictionTimes }
+    case 'cox-regression':
+      return { kind: 'coxRegression', rows: command.rows, columns: command.columns, ...command.design }
+    case 'penalized-aft':
+      return { kind: 'penalizedAft', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, covariates: command.covariates, family: command.family, penalizer: command.penalizer, confidenceLevel: command.confidenceLevel, predictionTimes: command.predictionTimes }
     case 'nonparametric-survival':
       return { kind: 'nonparametricSurvival', rows: command.rows, columns: command.columns, duration: command.duration, event: command.event, rowFrequency: command.rowFrequency, predictionTimes: command.predictionTimes, ties: command.ties }
     case 'comparison-survival':
@@ -442,6 +446,18 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parseFlexSurvEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'flexsurv-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'cox-regression': {
+        const result = parseCoxRegressionEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'cox-regression-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'penalized-aft': {
+        const result = parsePenalizedAftEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'penalized-aft-succeeded', request: command.request, result: result.value })
         return
       }
       case 'nonparametric-survival': {

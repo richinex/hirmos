@@ -17,6 +17,7 @@ import { chapterLabel } from '@/domain/navigation'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import {
   describeSurvivalRefusal,
+  coxRegressionRun,
   multiStateSurvivalRun,
   newSurvivalRunId,
   parametricSurvivalFamilySchema,
@@ -25,7 +26,14 @@ import {
   startStopSurvivalRun,
   type ParametricSurvivalFamily,
   type ProportionalHazardsFamily,
+  type CoxFrailty,
+  type CoxPenalty,
+  type CoxTies,
+  type CoxStandardErrors,
+  type CoxObservationConfiguration,
   type MultiStateInputConfiguration,
+  type PenalizedAftFamily,
+  penalizedAftRun,
   type SurvivalRowFrequency,
   type SurvivalRunArtifact,
 } from '@/domain/survival'
@@ -38,10 +46,54 @@ type RowFrequencyDraft =
   | { readonly kind: 'one-observation-per-row' }
   | { readonly kind: 'frequency-column'; readonly column: ColumnId | null }
 
+type CoxEntryDraft =
+  | { readonly kind: 'not-used' }
+  | { readonly kind: 'column'; readonly column: ColumnId | null }
+
+type CoxWeightsDraft =
+  | { readonly kind: 'equal' }
+  | { readonly kind: 'column'; readonly column: ColumnId | null }
+
+type CoxStrataDraft =
+  | { readonly kind: 'unstratified' }
+  | { readonly kind: 'column'; readonly column: ColumnId | null }
+
+type CoxStandardErrorsDraft =
+  | { readonly kind: 'model-based' }
+  | { readonly kind: 'robust' }
+  | { readonly kind: 'clustered'; readonly column: ColumnId | null }
+
+type CoxPenaltyDraft =
+  | { readonly kind: 'unpenalized' }
+  | { readonly kind: 'elastic-net'; readonly strength: number; readonly l1Ratio: number }
+
+type CoxFrailtyDraft =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'gamma'; readonly column: ColumnId | null; readonly ties: CoxTies }
+
+type CoxObservationDraft =
+  | {
+      readonly kind: 'right-censored'
+      readonly duration: ColumnId | null
+      readonly event: ColumnId | null
+      readonly entry: CoxEntryDraft
+      readonly standardErrors: CoxStandardErrorsDraft
+      readonly frailty: CoxFrailtyDraft
+    }
+  | {
+      readonly kind: 'start-stop'
+      readonly subject: ColumnId | null
+      readonly start: ColumnId | null
+      readonly stop: ColumnId | null
+      readonly event: ColumnId | null
+    }
+
 type Draft =
   | { readonly kind: 'right-censored'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly covariates: readonly ColumnId[]; readonly family: ParametricSurvivalFamily; readonly horizon: number }
   | { readonly kind: 'nonparametric'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly horizon: number; readonly ties: 'discrete' | 'smoothed' }
   | { readonly kind: 'start-stop'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly covariates: readonly ColumnId[]; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+  | { readonly kind: 'cox-regression'; readonly observation: CoxObservationDraft; readonly weights: CoxWeightsDraft; readonly strata: CoxStrataDraft; readonly covariates: readonly ColumnId[]; readonly penalty: CoxPenaltyDraft; readonly confidenceLevel: number }
+  | { readonly kind: 'penalized-aft'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[]; readonly family: PenalizedAftFamily; readonly penalizer: number; readonly confidenceLevel: number; readonly horizon: number }
   | { readonly kind: 'two-group'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly group: ColumnId | null; readonly truncationTime: number; readonly permutations: number; readonly seed: number }
   | { readonly kind: 'multi-state'; readonly input: MultiStateDraftInput; readonly family: ProportionalHazardsFamily; readonly horizon: number }
 
@@ -59,10 +111,23 @@ type MultiStateDraftInput =
       readonly entry: { readonly kind: 'shared'; readonly state: number; readonly time: number } | { readonly kind: 'columns'; readonly state: ColumnId | null; readonly time: ColumnId | null }
     }
 
+type CoxReadyDraft = {
+  readonly kind: 'cox-regression'
+  readonly observation: CoxObservationConfiguration
+  readonly weights: { readonly kind: 'equal' } | { readonly kind: 'column'; readonly column: NumericColumnSelection }
+  readonly strata: { readonly kind: 'unstratified' } | { readonly kind: 'column'; readonly column: NumericColumnSelection }
+  readonly covariates: NonEmptyArray<NumericColumnSelection>
+  readonly penalty: CoxPenalty
+  readonly confidenceLevel: number
+  readonly columns: NonEmptyArray<ColumnId>
+}
+
 type ReadyDraft =
   | { readonly kind: 'right-censored'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ParametricSurvivalFamily; readonly horizon: number }
   | { readonly kind: 'nonparametric'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly columns: NonEmptyArray<ColumnId>; readonly horizon: number; readonly ties: 'discrete' | 'smoothed' }
   | { readonly kind: 'start-stop'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ProportionalHazardsFamily; readonly horizon: number }
+  | CoxReadyDraft
+  | { readonly kind: 'penalized-aft'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: NonEmptyArray<NumericColumnSelection>; readonly family: PenalizedAftFamily; readonly penalizer: number; readonly confidenceLevel: number; readonly horizon: number; readonly columns: NonEmptyArray<ColumnId> }
   | { readonly kind: 'two-group'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly group: NumericColumnSelection; readonly columns: NonEmptyArray<ColumnId>; readonly truncationTime: number; readonly permutations: number; readonly seed: number }
   | { readonly kind: 'multi-state'; readonly input: MultiStateReadyInput; readonly family: ProportionalHazardsFamily; readonly horizon: number }
 
@@ -128,6 +193,16 @@ const draftFor = (kind: Draft['kind'], columns: readonly NumericColumnSelection[
     case 'right-censored': return { kind, duration, event, rowFrequency: { kind: 'one-observation-per-row' }, covariates: [], family: 'weibull', horizon: 10 }
     case 'nonparametric': return { kind, duration, event, rowFrequency: { kind: 'one-observation-per-row' }, horizon: 10, ties: 'discrete' }
     case 'start-stop': return { kind, start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event, rowFrequency: { kind: 'one-observation-per-row' }, covariates: [], family: 'weibullPh', horizon: 10 }
+    case 'cox-regression': return {
+      kind,
+      observation: { kind: 'right-censored', duration, event, entry: { kind: 'not-used' }, standardErrors: { kind: 'model-based' }, frailty: { kind: 'none' } },
+      weights: { kind: 'equal' },
+      strata: { kind: 'unstratified' },
+      covariates: [],
+      penalty: { kind: 'unpenalized' },
+      confidenceLevel: 0.95,
+    }
+    case 'penalized-aft': return { kind, duration, event, covariates: [], family: 'weibull', penalizer: 0.1, confidenceLevel: 0.95, horizon: 10 }
     case 'two-group': return { kind, duration, event, group: columnLike(columns, /^(group|arm|treatment|treat)$/i), truncationTime: 10, permutations: 1_000, seed: 43 }
     case 'multi-state': return { kind, input: preparedMultiStateInput(columns), family: 'weibullPh', horizon: 10 }
     default: return assertNever(kind)
@@ -151,6 +226,47 @@ const draftFromRun = (run: SurvivalRunArtifact, columns: readonly NumericColumnS
       return { kind: 'nonparametric', duration: present(configuration.duration), event: present(configuration.event), rowFrequency: configuration.rowFrequency.kind === 'one-observation-per-row' ? configuration.rowFrequency : { kind: 'frequency-column', column: present(configuration.rowFrequency.column) }, horizon: horizon(configuration.predictionTimes), ties: configuration.ties }
     case 'start-stop-proportional-hazards':
       return { kind: 'start-stop', start: present(configuration.start), stop: present(configuration.stop), event: present(configuration.event), rowFrequency: configuration.rowFrequency.kind === 'one-observation-per-row' ? configuration.rowFrequency : { kind: 'frequency-column', column: present(configuration.rowFrequency.column) }, covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
+    case 'penalized-aft':
+      return { kind: 'penalized-aft', duration: present(configuration.duration), event: present(configuration.event), covariates: presentAll(configuration.covariates), family: configuration.family, penalizer: configuration.penalizer, confidenceLevel: configuration.confidenceLevel, horizon: horizon(configuration.predictionTimes) }
+    case 'cox-regression': {
+      const observation: CoxObservationDraft = (() => {
+        switch (configuration.observation.kind) {
+          case 'right-censored': return {
+            kind: 'right-censored',
+            duration: present(configuration.observation.duration),
+            event: present(configuration.observation.event),
+            entry: configuration.observation.entry.kind === 'not-used'
+              ? configuration.observation.entry
+              : { kind: 'column', column: present(configuration.observation.entry.column) },
+            standardErrors: configuration.observation.standardErrors.kind === 'clustered'
+              ? { kind: 'clustered', column: present(configuration.observation.standardErrors.cluster) }
+              : configuration.observation.standardErrors,
+            frailty: configuration.observation.frailty.kind === 'gamma'
+              ? { kind: 'gamma', column: present(configuration.observation.frailty.group), ties: configuration.observation.frailty.ties }
+              : { kind: 'none' },
+          }
+          case 'start-stop': return {
+            kind: 'start-stop',
+            subject: present(configuration.observation.subject),
+            start: present(configuration.observation.start),
+            stop: present(configuration.observation.stop),
+            event: present(configuration.observation.event),
+          }
+          default: return assertNever(configuration.observation)
+        }
+      })()
+      return {
+        kind: 'cox-regression',
+        observation,
+        weights: configuration.weights.kind === 'equal' ? configuration.weights : { kind: 'column', column: present(configuration.weights.column) },
+        strata: configuration.strata.kind === 'unstratified' ? configuration.strata : { kind: 'column', column: present(configuration.strata.column) },
+        covariates: presentAll(configuration.covariates),
+        penalty: configuration.penalty.kind === 'none'
+          ? { kind: 'unpenalized' }
+          : { kind: 'elastic-net', strength: configuration.penalty.strength, l1Ratio: configuration.penalty.l1Ratio },
+        confidenceLevel: configuration.confidenceLevel,
+      }
+    }
     case 'two-group-comparison':
       return { kind: 'two-group', duration: present(configuration.duration), event: present(configuration.event), group: present(configuration.group), truncationTime: configuration.truncationTime, permutations: configuration.permutations, seed: configuration.seed }
     case 'multi-state-proportional-hazards': {
@@ -294,6 +410,169 @@ const validateDraft = (
       if (covariates === null) return invalid('A selected covariate is no longer in the prepared dataset.')
       return ok({ ...draft, start, stop, event, rowFrequency: rowFrequency.value.configuration, covariates, columns: ids })
     }
+    case 'penalized-aft': {
+      const durationId = draft.duration
+      const eventId = draft.event
+      if (durationId === null) return invalid('Choose the duration column.')
+      if (eventId === null) return invalid('Choose the event column.')
+      if (!isNonEmpty(draft.covariates)) return invalid('Choose at least one covariate.')
+      if (!(Number.isFinite(draft.penalizer) && draft.penalizer >= 0)) return invalid('Use a penalty of zero or more.')
+      if (!(draft.confidenceLevel > 0 && draft.confidenceLevel < 1)) return invalid('Use a confidence level between 0 and 100 percent.')
+      const ids: NonEmptyArray<ColumnId> = [durationId, eventId, ...draft.covariates]
+      if (new Set(ids).size !== ids.length) return invalid('The duration, event, and each covariate must use different columns.')
+      const selected = selectedOrProblem(ids)
+      if (!selected.ok) return selected
+      const [duration, event] = selected.value
+      if (duration === undefined || event === undefined) return invalid('Choose duration and event columns.')
+      const covariates = selectColumns(columns, draft.covariates)
+      if (covariates === null || !isNonEmpty(covariates)) return invalid('A selected covariate is no longer in the prepared dataset.')
+      return ok({ ...draft, duration, event, covariates, columns: ids })
+    }
+    case 'cox-regression': {
+      const covariateIds = draft.covariates
+      if (!isNonEmpty(covariateIds)) return invalid('Choose at least one covariate.')
+      if (!(draft.confidenceLevel > 0 && draft.confidenceLevel < 1)) return invalid('Use a confidence level between 0 and 100 percent.')
+
+      const observationIds: readonly ColumnId[] | null = (() => {
+        switch (draft.observation.kind) {
+          case 'right-censored': {
+            const { duration, event, entry, standardErrors, frailty } = draft.observation
+            if (duration === null || event === null) return null
+            if (entry.kind === 'column' && entry.column === null) return null
+            if (standardErrors.kind === 'clustered' && standardErrors.column === null) return null
+            if (frailty.kind === 'gamma' && frailty.column === null) return null
+            const ids: ColumnId[] = [duration, event]
+            if (entry.kind === 'column' && entry.column !== null) ids.push(entry.column)
+            if (standardErrors.kind === 'clustered' && standardErrors.column !== null) ids.push(standardErrors.column)
+            if (frailty.kind === 'gamma' && frailty.column !== null) ids.push(frailty.column)
+            return ids
+          }
+          case 'start-stop': {
+            const { subject, start, stop, event } = draft.observation
+            return subject === null || start === null || stop === null || event === null
+              ? null
+              : [subject, start, stop, event]
+          }
+          default: return assertNever(draft.observation)
+        }
+      })()
+      if (observationIds === null) return invalid('Choose every column required by the selected Cox observation, standard-error and frailty settings.')
+      if (draft.observation.kind === 'right-censored' && draft.observation.frailty.kind === 'gamma') {
+        if (draft.observation.entry.kind !== 'not-used') return invalid('A shared frailty model does not take a delayed-entry column.')
+        if (draft.observation.standardErrors.kind !== 'model-based') return invalid('A shared frailty model reports model-based standard errors only.')
+        if (draft.penalty.kind !== 'unpenalized') return invalid('A shared frailty model cannot also carry an elastic-net penalty.')
+      }
+      if (draft.weights.kind === 'column' && draft.weights.column === null) return invalid('Choose the observation-weight column.')
+      if (draft.strata.kind === 'column' && draft.strata.column === null) return invalid('Choose the stratum column.')
+
+      const roleIds: ColumnId[] = [...observationIds]
+      if (draft.weights.kind === 'column' && draft.weights.column !== null) roleIds.push(draft.weights.column)
+      if (draft.strata.kind === 'column' && draft.strata.column !== null) roleIds.push(draft.strata.column)
+      if (!isNonEmpty(roleIds)) return invalid('Choose the columns that define the Cox observation rows.')
+      const ids: NonEmptyArray<ColumnId> = [roleIds[0], ...roleIds.slice(1), ...covariateIds]
+      if (new Set(ids).size !== ids.length) return invalid('Each Cox row role and covariate must use a different column.')
+      const selected = selectedOrProblem(ids)
+      if (!selected.ok) return selected
+      const byId = new Map(selected.value.map((column) => [column.id, column]))
+      const chosen = (id: ColumnId): NumericColumnSelection | null => byId.get(id) ?? null
+
+      const observation: CoxObservationConfiguration | null = (() => {
+        switch (draft.observation.kind) {
+          case 'right-censored': {
+            const duration = draft.observation.duration === null ? null : chosen(draft.observation.duration)
+            const event = draft.observation.event === null ? null : chosen(draft.observation.event)
+            if (duration === null || event === null) return null
+            const entry: Extract<CoxObservationConfiguration, { readonly kind: 'right-censored' }>['entry'] | null = (() => {
+              switch (draft.observation.entry.kind) {
+                case 'not-used': return draft.observation.entry
+                case 'column': {
+                  if (draft.observation.entry.column === null) return null
+                  const column = chosen(draft.observation.entry.column)
+                  return column === null ? null : { kind: 'column', column }
+                }
+                default: return assertNever(draft.observation.entry)
+              }
+            })()
+            const standardErrors: CoxStandardErrors | null = (() => {
+              switch (draft.observation.standardErrors.kind) {
+                case 'model-based': return draft.observation.standardErrors
+                case 'robust': return draft.observation.standardErrors
+                case 'clustered': {
+                  if (draft.observation.standardErrors.column === null) return null
+                  const cluster = chosen(draft.observation.standardErrors.column)
+                  return cluster === null ? null : { kind: 'clustered', cluster }
+                }
+                default: return assertNever(draft.observation.standardErrors)
+              }
+            })()
+            const frailty: CoxFrailty | null = (() => {
+              switch (draft.observation.frailty.kind) {
+                case 'none': return draft.observation.frailty
+                case 'gamma': {
+                  if (draft.observation.frailty.column === null) return null
+                  const group = chosen(draft.observation.frailty.column)
+                  return group === null ? null : { kind: 'gamma', group, ties: draft.observation.frailty.ties }
+                }
+                default: return assertNever(draft.observation.frailty)
+              }
+            })()
+            return entry === null || standardErrors === null || frailty === null
+              ? null
+              : { kind: 'right-censored', duration, event, entry, standardErrors, frailty }
+          }
+          case 'start-stop': {
+            const subject = draft.observation.subject === null ? null : chosen(draft.observation.subject)
+            const start = draft.observation.start === null ? null : chosen(draft.observation.start)
+            const stop = draft.observation.stop === null ? null : chosen(draft.observation.stop)
+            const event = draft.observation.event === null ? null : chosen(draft.observation.event)
+            return subject === null || start === null || stop === null || event === null
+              ? null
+              : { kind: 'start-stop', subject, start, stop, event, standardErrors: { kind: 'model-based' } }
+          }
+          default: return assertNever(draft.observation)
+        }
+      })()
+      if (observation === null) return invalid('A selected Cox observation column is no longer in the prepared dataset.')
+
+      const weights: CoxReadyDraft['weights'] = (() => {
+        switch (draft.weights.kind) {
+          case 'equal': return draft.weights
+          case 'column': {
+            const column = draft.weights.column === null ? null : chosen(draft.weights.column)
+            return column === null ? { kind: 'equal' } : { kind: 'column', column }
+          }
+          default: return assertNever(draft.weights)
+        }
+      })()
+      if (draft.weights.kind === 'column' && weights.kind === 'equal') return invalid('The observation-weight column is no longer in the prepared dataset.')
+      const strata: CoxReadyDraft['strata'] = (() => {
+        switch (draft.strata.kind) {
+          case 'unstratified': return draft.strata
+          case 'column': {
+            const column = draft.strata.column === null ? null : chosen(draft.strata.column)
+            return column === null ? { kind: 'unstratified' } : { kind: 'column', column }
+          }
+          default: return assertNever(draft.strata)
+        }
+      })()
+      if (draft.strata.kind === 'column' && strata.kind === 'unstratified') return invalid('The stratum column is no longer in the prepared dataset.')
+
+      const covariates = covariateIds.map(chosen)
+      if (!covariates.every((column): column is NumericColumnSelection => column !== null) || !isNonEmpty(covariates)) {
+        return invalid('A selected Cox covariate is no longer in the prepared dataset.')
+      }
+      const penalty: CoxPenalty = (() => {
+        switch (draft.penalty.kind) {
+          case 'unpenalized': return { kind: 'none' }
+          case 'elastic-net': return { kind: 'uniform', strength: draft.penalty.strength, l1Ratio: draft.penalty.l1Ratio }
+          default: return assertNever(draft.penalty)
+        }
+      })()
+      if (penalty.kind === 'uniform' && (!Number.isFinite(penalty.strength) || !(penalty.strength > 0) || !Number.isFinite(penalty.l1Ratio) || penalty.l1Ratio < 0 || penalty.l1Ratio > 1)) {
+        return invalid('Penalty strength must be above zero and the L1 ratio must be between 0 and 1.')
+      }
+      return ok({ kind: draft.kind, observation, weights, strata, covariates, penalty, confidenceLevel: draft.confidenceLevel, columns: ids })
+    }
     case 'two-group': {
       const durationId = draft.duration
       const eventId = draft.event
@@ -402,6 +681,28 @@ const observationColumns = (draft: Draft): readonly (ColumnId | null)[] => {
     case 'right-censored': return [draft.duration, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
     case 'nonparametric': return [draft.duration, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
     case 'start-stop': return [draft.start, draft.stop, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
+    case 'penalized-aft': return [draft.duration, draft.event]
+    case 'cox-regression': {
+      const observation = draft.observation
+      const observationRoles = (() => {
+        switch (observation.kind) {
+          case 'right-censored': return [
+            observation.duration,
+            observation.event,
+            ...(observation.entry.kind === 'column' ? [observation.entry.column] : []),
+            ...(observation.standardErrors.kind === 'clustered' ? [observation.standardErrors.column] : []),
+            ...(observation.frailty.kind === 'gamma' ? [observation.frailty.column] : []),
+          ]
+          case 'start-stop': return [observation.subject, observation.start, observation.stop, observation.event]
+          default: return assertNever(observation)
+        }
+      })()
+      return [
+        ...observationRoles,
+        ...(draft.weights.kind === 'column' ? [draft.weights.column] : []),
+        ...(draft.strata.kind === 'column' ? [draft.strata.column] : []),
+      ]
+    }
     case 'two-group': return [draft.duration, draft.event, draft.group]
     case 'multi-state': {
       const input = draft.input
@@ -460,6 +761,26 @@ const analysisType = (kind: Draft['kind']): AnalysisType => {
         { holds: 'The intervals of one observation do not overlap and the event flag is 1 only on the interval where the event occurred.', otherwise: 'the observation is counted more than once and its event is double-counted or lost.' },
         { holds: 'Covariates multiply the hazard. Accelerated failure-time families are not available for start–stop rows in this analysis.', otherwise: 'the covariate coefficient does not have the reported hazard-ratio interpretation.' },
         { holds: 'Censoring is independent of the event after accounting for the model covariates.', otherwise: 'the estimated survival function can be biased.' },
+      ],
+    }
+    case 'penalized-aft': return {
+      name: 'Penalised AFT',
+      summary: 'Fit a Weibull or log-logistic accelerated failure-time model the way lifelines does: the covariates act on the location parameter with an intercept, the ancillary parameter is an intercept alone, and an L2 penalty on the standardised coefficients holds the fit stable. Coefficients are reported as time ratios.',
+      requirements: [
+        { holds: 'Every duration is above zero; the model takes the logarithm of each one.', otherwise: 'the fit is refused.' },
+        { holds: 'The event flag is 1 when the event occurred and 0 when follow-up ended first.', otherwise: 'events and right-censoring are reversed.' },
+        { holds: 'The log of the duration follows the chosen family, shifted by the covariates.', otherwise: 'the time ratios do not describe the covariate associations.' },
+        { holds: 'The penalty is the one the study specifies; lifelines applies it to coefficients scaled by their sample standard deviation.', otherwise: 'the estimates are shrunk by a different amount than the study reports.' },
+      ],
+    }
+    case 'cox-regression': return {
+      name: 'Cox regression',
+      summary: 'Estimate how one or more covariates are associated with the event rate while leaving the baseline event rate unspecified. Use right-censored rows or start–stop rows for covariates that change during follow-up.',
+      requirements: [
+        { holds: 'The event flag is 1 when the event occurred and 0 when follow-up ended first.', otherwise: 'events and right-censoring are reversed.' },
+        { holds: 'The covariate hazard ratios remain constant during follow-up.', otherwise: 'one hazard ratio does not describe the covariate association over time.' },
+        { holds: 'Censoring is independent of the event after accounting for the selected covariates.', otherwise: 'the fitted coefficients and survival estimates can be biased.' },
+        { holds: 'Start–stop rows identify the same subject and contain non-overlapping intervals with constant covariates.', otherwise: 'a subject can be counted in the wrong risk sets.' },
       ],
     }
     case 'two-group': return {
@@ -661,6 +982,96 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           if (!recorded.ok) { fail('The fitted family does not match the requested family.'); return }
           onRun(recorded.value); break
         }
+        case 'penalized-aft': {
+          const draft = validated.value
+          const matrix = await materialise(draft.columns); if (matrix === null) return
+          // lifelines' formula transformer sorts the covariates by name before appending the intercept.
+          const ordered = [...draft.covariates].sort((left, right) => left.name.localeCompare(right.name, 'en'))
+          if (!isNonEmpty(ordered)) { fail('Choose at least one covariate.'); return }
+          const times = predictionTimes(draft.horizon)
+          const result = await analysis.runPenalizedAft(matrix.values, matrix.rowCount, matrix.columns.length, {
+            duration: columnPosition(matrix.columns, draft.duration),
+            event: columnPosition(matrix.columns, draft.event),
+            covariates: ordered.map((covariate) => columnPosition(matrix.columns, covariate)),
+            family: draft.family,
+            penalizer: draft.penalizer,
+            confidenceLevel: draft.confidenceLevel,
+            predictionTimes: times,
+          })
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
+          const recorded = penalizedAftRun(identity(matrix.columns), { kind: 'penalized-aft', duration: draft.duration, event: draft.event, covariates: ordered, family: draft.family, penalizer: draft.penalizer, confidenceLevel: draft.confidenceLevel, predictionTimes: times }, result.value)
+          if (!recorded.ok) { fail('The AFT result does not match the requested family or covariates.'); return }
+          onRun(recorded.value); break
+        }
+        case 'cox-regression': {
+          const draft = validated.value
+          const matrix = await materialise(draft.columns); if (matrix === null) return
+          const observation = (() => {
+            switch (draft.observation.kind) {
+              case 'right-censored': {
+                const entry = draft.observation.entry.kind === 'not-used'
+                  ? { kind: 'notUsed' as const }
+                  : { kind: 'column' as const, column: columnPosition(matrix.columns, draft.observation.entry.column) }
+                const standardErrors = (() => {
+                  switch (draft.observation.standardErrors.kind) {
+                    case 'model-based': return { kind: 'modelBased' as const }
+                    case 'robust': return { kind: 'robust' as const }
+                    case 'clustered': return { kind: 'clustered' as const, column: columnPosition(matrix.columns, draft.observation.standardErrors.cluster) }
+                    default: return assertNever(draft.observation.standardErrors)
+                  }
+                })()
+                const frailty = draft.observation.frailty.kind === 'none'
+                  ? { kind: 'none' as const }
+                  : { kind: 'gamma' as const, column: columnPosition(matrix.columns, draft.observation.frailty.group), ties: draft.observation.frailty.ties }
+                return {
+                  kind: 'rightCensored' as const,
+                  duration: columnPosition(matrix.columns, draft.observation.duration),
+                  event: columnPosition(matrix.columns, draft.observation.event),
+                  entry,
+                  standardErrors,
+                  frailty,
+                }
+              }
+              case 'start-stop': return {
+                kind: 'startStop' as const,
+                subject: columnPosition(matrix.columns, draft.observation.subject),
+                start: columnPosition(matrix.columns, draft.observation.start),
+                stop: columnPosition(matrix.columns, draft.observation.stop),
+                event: columnPosition(matrix.columns, draft.observation.event),
+              }
+              default: return assertNever(draft.observation)
+            }
+          })()
+          const weights = draft.weights.kind === 'equal'
+            ? draft.weights
+            : { kind: 'column' as const, column: columnPosition(matrix.columns, draft.weights.column) }
+          const strata = draft.strata.kind === 'unstratified'
+            ? draft.strata
+            : { kind: 'column' as const, column: columnPosition(matrix.columns, draft.strata.column) }
+          const penalty = draft.penalty.kind === 'none'
+            ? { kind: 'unpenalized' as const }
+            : { kind: 'elasticNet' as const, penalizer: draft.penalty.strength, l1Ratio: draft.penalty.l1Ratio }
+          const result = await analysis.runCoxRegression(matrix.values, matrix.rowCount, matrix.columns.length, {
+            observation,
+            weights,
+            strata,
+            covariates: draft.covariates.map((covariate) => columnPosition(matrix.columns, covariate)),
+            penalty,
+            confidenceLevel: draft.confidenceLevel,
+          })
+          if (!result.ok) { fail(describeSurvivalRefusal(describeAnalysisWorkerProblem(result.error))); return }
+          const recorded = coxRegressionRun(identity(matrix.columns), {
+            kind: 'cox-regression',
+            observation: draft.observation,
+            weights: draft.weights,
+            strata: draft.strata,
+            covariates: draft.covariates,
+            penalty: draft.penalty,
+            confidenceLevel: draft.confidenceLevel,
+          }, result.value)
+          if (!recorded.ok) { fail('The Cox result does not match the selected observation structure or covariates.'); return }
+          onRun(recorded.value); break
+        }
         case 'two-group': {
           const draft = validated.value
           const matrix = await materialise(draft.columns); if (matrix === null) return
@@ -752,6 +1163,11 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       }
       case 'two-group': return
       case 'nonparametric': return
+      case 'cox-regression': return
+      case 'penalized-aft': {
+        if (value === 'weibull' || value === 'logLogistic') configure({ ...draft, family: value })
+        return
+      }
       default: return assertNever(draft)
     }
   }
@@ -800,6 +1216,154 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
       </>
+      case 'penalized-aft': return <>
+        <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
+        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <label className="block">
+          <ParameterLabel label="Distribution" help="Weibull AFT: the log duration has a Gumbel-type error with a shape parameter; log-logistic AFT: a logistic error. Both report a time ratio per covariate, the multiplier on the duration for a one-unit increase." />
+          <Select className={field('text', 'mt-1')} value={draft.family} onChange={(event) => changeFamily(event.target.value)}>
+            <option value="weibull">Weibull AFT</option>
+            <option value="logLogistic">Log-logistic AFT</option>
+          </Select>
+        </label>
+        <label className="block">
+          <ParameterLabel label="Penalty" help="lifelines' penalizer: an L2 penalty on the coefficients after each column is divided by its sample standard deviation. Zero fits without a penalty." />
+          <input className={field('text', 'mt-1 w-full')} type="number" min={0} step="any" value={draft.penalizer} aria-label="AFT penalizer" onChange={(event) => configure({ ...draft, penalizer: Number(event.target.value) })} />
+        </label>
+        <label className="block">
+          <ParameterLabel label="Confidence level" help="The percentage used for coefficient and time-ratio intervals." />
+          <input className={field('text', 'mt-1 w-full')} type="number" min={1} max={99.9} step="any" value={draft.confidenceLevel * 100} onChange={(event) => configure({ ...draft, confidenceLevel: Number(event.target.value) / 100 })} />
+        </label>
+        {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
+      </>
+      case 'cox-regression': {
+        const penalty = draft.penalty
+        const setObservation = (observation: CoxObservationDraft) => {
+          const changed: Draft = { ...draft, observation }
+          const reserved = observationColumns(changed)
+          configure({ ...draft, observation, covariates: draft.covariates.filter((id) => !reserved.includes(id)) })
+        }
+        const setWeights = (weights: CoxWeightsDraft) => {
+          const changed: Draft = { ...draft, weights }
+          const reserved = observationColumns(changed)
+          configure({ ...draft, weights, covariates: draft.covariates.filter((id) => !reserved.includes(id)) })
+        }
+        const setStrata = (strata: CoxStrataDraft) => {
+          const changed: Draft = { ...draft, strata }
+          const reserved = observationColumns(changed)
+          configure({ ...draft, strata, covariates: draft.covariates.filter((id) => !reserved.includes(id)) })
+        }
+        const chooseObservation = (kind: CoxObservationDraft['kind']) => {
+          switch (kind) {
+            case 'right-censored': setObservation({ kind, duration: columnLike(columns, /^(time|duration|years?|months?|recyrs)$/i), event: columnLike(columns, /^(event|status|death|censrec)$/i), entry: { kind: 'not-used' }, standardErrors: { kind: 'model-based' }, frailty: { kind: 'none' } }); return
+            case 'start-stop': setObservation({ kind, subject: columnLike(columns, /^(subject|id|team|unit)$/i), start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event: columnLike(columns, /^(event|status|death)$/i) }); return
+            default: return assertNever(kind)
+          }
+        }
+        const observationControls = (() => {
+          switch (draft.observation.kind) {
+            case 'right-censored': {
+              const observation = draft.observation
+              const chooseEntry = (kind: CoxEntryDraft['kind']) => {
+                switch (kind) {
+                  case 'not-used': setObservation({ ...observation, entry: { kind } }); return
+                  case 'column': setObservation({ ...observation, entry: { kind, column: columnLike(columns, /^(entry|entry_time)$/i) } }); return
+                  default: return assertNever(kind)
+                }
+              }
+              const chooseFrailty = (kind: CoxFrailtyDraft['kind']) => {
+                switch (kind) {
+                  case 'none': setObservation({ ...observation, frailty: { kind } }); return
+                  case 'gamma':
+                    // survival's frailty() takes model-based errors, no delayed entry and no ridge penalty.
+                    configure({
+                      ...draft,
+                      observation: { ...observation, entry: { kind: 'not-used' }, standardErrors: { kind: 'model-based' }, frailty: { kind, column: columnLike(columns, /^(group|cluster|subject|id|repo|team|unit)$/i), ties: 'efron' } },
+                      penalty: { kind: 'unpenalized' },
+                      covariates: draft.covariates.filter((id) => !observationColumns({ ...draft, observation: { ...observation, frailty: { kind, column: columnLike(columns, /^(group|cluster|subject|id|repo|team|unit)$/i), ties: 'efron' } } }).includes(id)),
+                    })
+                    return
+                  default: return assertNever(kind)
+                }
+              }
+              const chooseStandardErrors = (kind: CoxStandardErrorsDraft['kind']) => {
+                switch (kind) {
+                  case 'model-based': setObservation({ ...observation, standardErrors: { kind } }); return
+                  case 'robust': setObservation({ ...observation, standardErrors: { kind } }); return
+                  case 'clustered': setObservation({ ...observation, standardErrors: { kind, column: columnLike(columns, /^(cluster|subject|id|team|unit)$/i) } }); return
+                  default: return assertNever(kind)
+                }
+              }
+              return <>
+                <ColumnSelect title="Duration" value={observation.duration} columns={columns} onChange={(duration) => setObservation({ ...observation, duration })} />
+                <ColumnSelect title="Event · 1 observed, 0 censored" value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
+                <div>
+                  <ParameterLabel label="Shared frailty" help="A gamma frailty gives every observation in a group the same unobserved multiplier on its hazard, fitted as survival's frailty(group, distribution = 'gamma') with its penalised likelihood. Use it when observations are grouped, for example lines within a repository, and the group's own risk is not a covariate." />
+                  <SegmentedControl size="sm" ariaLabel="Cox shared frailty" value={observation.frailty.kind} onChange={chooseFrailty} options={[{ value: 'none', label: 'None' }, { value: 'gamma', label: 'Gamma by group' }]} />
+                </div>
+                {observation.frailty.kind === 'gamma' && <ColumnSelect title="Frailty group" value={observation.frailty.column} columns={columns} onChange={(column) => setObservation({ ...observation, frailty: { kind: 'gamma', column, ties: observation.frailty.kind === 'gamma' ? observation.frailty.ties : 'efron' } })} />}
+                {observation.frailty.kind === 'gamma' && <div>
+                  <ParameterLabel label="Tied event times" help="Efron's approximation is coxph's default. Breslow's treats every tied event as if it came after the others at that time; choose it to match a study that fitted with ties = 'breslow'." />
+                  <SegmentedControl size="sm" ariaLabel="Cox tied event times" value={observation.frailty.ties} onChange={(ties) => setObservation({ ...observation, frailty: { kind: 'gamma', column: observation.frailty.kind === 'gamma' ? observation.frailty.column : null, ties } })} options={[{ value: 'efron', label: 'Efron' }, { value: 'breslow', label: 'Breslow' }]} />
+                </div>}
+                {observation.frailty.kind === 'none' && <>
+                  <div>
+                    <ParameterLabel label="Delayed entry" help="Select an entry-time column when an observation joined the risk set after time zero." />
+                    <SegmentedControl size="sm" ariaLabel="Cox delayed entry" value={observation.entry.kind} onChange={chooseEntry} options={[{ value: 'not-used', label: 'Not used' }, { value: 'column', label: 'Entry column' }]} />
+                  </div>
+                  {observation.entry.kind === 'column' && <ColumnSelect title="Entry time" value={observation.entry.column} columns={columns} onChange={(column) => setObservation({ ...observation, entry: { kind: 'column', column } })} />}
+                  <div className="sm:col-span-2">
+                    <ParameterLabel label="Standard errors" help="Use robust errors for weighted or misspecified models. Use clustered errors when rows within the same cluster may be related." />
+                    <SegmentedControl size="sm" ariaLabel="Cox standard errors" value={observation.standardErrors.kind} onChange={chooseStandardErrors} options={[{ value: 'model-based', label: 'Model-based' }, { value: 'robust', label: 'Robust' }, { value: 'clustered', label: 'Clustered' }]} />
+                  </div>
+                  {observation.standardErrors.kind === 'clustered' && <ColumnSelect title="Cluster" value={observation.standardErrors.column} columns={columns} onChange={(column) => setObservation({ ...observation, standardErrors: { kind: 'clustered', column } })} />}
+                </>}
+                {observation.frailty.kind === 'gamma' && <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>A shared frailty model uses model-based standard errors, no delayed entry and no penalty.</p>}
+              </>
+            }
+            case 'start-stop': {
+              const observation = draft.observation
+              return <>
+                <ColumnSelect title="Subject" value={observation.subject} columns={columns} onChange={(subject) => setObservation({ ...observation, subject })} />
+                <ColumnSelect title="Start time" value={observation.start} columns={columns} onChange={(start) => setObservation({ ...observation, start })} />
+                <ColumnSelect title="Stop time" value={observation.stop} columns={columns} onChange={(stop) => setObservation({ ...observation, stop })} />
+                <ColumnSelect title="Event · 1 observed, 0 censored" value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
+                <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>Model-based standard errors are used for start–stop Cox regression.</p>
+              </>
+            }
+            default: return assertNever(draft.observation)
+          }
+        })()
+        return <>
+          <div className="sm:col-span-2">
+            <ParameterLabel label="Observation structure" help="Use right-censored rows when each observation has one duration. Use start–stop rows when a subject contributes intervals with covariates that can change." />
+            <SegmentedControl size="sm" ariaLabel="Cox observation structure" value={draft.observation.kind} onChange={chooseObservation} options={[{ value: 'right-censored', label: 'Right-censored' }, { value: 'start-stop', label: 'Start–stop' }]} />
+          </div>
+          {observationControls}
+          <div>
+            <ParameterLabel label="Observation weights" help="Select a positive weight column when rows contribute different weights to the partial likelihood." />
+            <SegmentedControl size="sm" ariaLabel="Cox observation weights" value={draft.weights.kind} onChange={(kind) => setWeights(kind === 'equal' ? { kind } : { kind, column: columnLike(columns, /^(weight|weights)$/i) })} options={[{ value: 'equal', label: 'Equal' }, { value: 'column', label: 'Weight column' }]} />
+          </div>
+          {draft.weights.kind === 'column' && <ColumnSelect title="Weight" value={draft.weights.column} columns={columns} onChange={(column) => setWeights({ kind: 'column', column })} />}
+          <div>
+            <ParameterLabel label="Strata" help="Select a stratum column when groups may have different baseline hazards but share the same covariate coefficients." />
+            <SegmentedControl size="sm" ariaLabel="Cox strata" value={draft.strata.kind} onChange={(kind) => setStrata(kind === 'unstratified' ? { kind } : { kind, column: columnLike(columns, /^(strata|stratum|group)$/i) })} options={[{ value: 'unstratified', label: 'Unstratified' }, { value: 'column', label: 'Stratum column' }]} />
+          </div>
+          {draft.strata.kind === 'column' && <ColumnSelect title="Stratum" value={draft.strata.column} columns={columns} onChange={(column) => setStrata({ kind: 'column', column })} />}
+          {!(draft.observation.kind === 'right-censored' && draft.observation.frailty.kind === 'gamma') && <div className="sm:col-span-2">
+            <ParameterLabel label="Penalty" help="An elastic-net penalty can stabilize a model with many or strongly related covariates. Leave the model unpenalized unless the study specifies a penalty." />
+            <SegmentedControl size="sm" ariaLabel="Cox penalty" value={penalty.kind} onChange={(kind) => configure({ ...draft, penalty: kind === 'unpenalized' ? { kind } : { kind, strength: 0.1, l1Ratio: 0 } })} options={[{ value: 'unpenalized', label: 'Unpenalized' }, { value: 'elastic-net', label: 'Elastic net' }]} />
+          </div>}
+          {penalty.kind === 'elastic-net' && <>
+            <label className="block"><span className={fieldLabel}>Penalty strength</span><input className={field('text', 'mt-1 w-full')} type="number" min={Number.EPSILON} step="any" value={penalty.strength} onChange={(event) => configure({ ...draft, penalty: { ...penalty, strength: Number(event.target.value) } })} /></label>
+            <label className="block"><span className={fieldLabel}>L1 ratio</span><input className={field('text', 'mt-1 w-full')} type="number" min={0} max={1} step="any" value={penalty.l1Ratio} onChange={(event) => configure({ ...draft, penalty: { ...penalty, l1Ratio: Number(event.target.value) } })} /></label>
+          </>}
+          <label className="block">
+            <ParameterLabel label="Confidence level" help="The percentage used for coefficient and hazard-ratio intervals." />
+            <input className={field('text', 'mt-1 w-full')} type="number" min={1} max={99.9} step="any" value={draft.confidenceLevel * 100} onChange={(event) => configure({ ...draft, confidenceLevel: Number(event.target.value) / 100 })} />
+          </label>
+        </>
+      }
       case 'two-group': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration })} />
         <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
@@ -880,7 +1444,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         return <>
           <div className="sm:col-span-2">
             <ParameterLabel label="Input rows" help="Use existing transition-risk rows, exact state observations recorded over time, or one wide event-history row per subject. Hirmos validates and expands the last two forms before fitting." />
-            <SegmentedControl wrap size="sm" ariaLabel="Multi-state input rows" value={input.kind} onChange={chooseInput} options={[{ value: 'prepared-rows', label: 'Prepared rows' }, { value: 'longitudinal-states', label: 'State observations' }, { value: 'wide-events', label: 'Wide event history' }]} />
+            <SegmentedControl size="sm" ariaLabel="Multi-state input rows" value={input.kind} onChange={chooseInput} options={[{ value: 'prepared-rows', label: 'Prepared rows' }, { value: 'longitudinal-states', label: 'State observations' }, { value: 'wide-events', label: 'Wide event history' }]} />
           </div>
           {inputControls}
           {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
@@ -893,20 +1457,33 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
   const covariateControls = (() => {
     switch (draft.kind) {
       case 'right-censored':
-      case 'start-stop': {
+      case 'start-stop':
+      case 'cox-regression':
+      case 'penalized-aft': {
         const roles = observationColumns(draft)
+        const help = draft.kind === 'cox-regression'
+          ? 'Choose at least one covariate. The columns selected for the event-time row roles cannot also be covariates.'
+          : draft.kind === 'penalized-aft'
+            ? 'Choose at least one covariate. Each enters the location parameter on the log time scale; lifelines fits them in alphabetical order with the intercept last, and so does this run.'
+            : 'Each enters the model on the log hazard or log time scale. The columns already chosen as times or the event cannot be covariates.'
         return (
-          <fieldset className="m-0 border-0 p-0">
-            <legend className={fieldLabel}>Covariates</legend>
-            <p className={cn(fieldHint, 'mb-2 max-w-[65ch]')}>Each enters the model on the log hazard or log time scale. The columns already chosen as times or the event cannot be covariates.</p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">{columns.map((column) => {
+          <div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className={fieldLabel}>Covariates</span>
+              <div className="flex items-center gap-2">
+                <button type="button" className={button('quiet')} onClick={() => configure({ ...draft, covariates: columns.filter((column) => !roles.includes(column.id)).map((column) => column.id) })}>Select all</button>
+                <button type="button" className={button('quiet')} onClick={() => configure({ ...draft, covariates: [] })}>Clear</button>
+              </div>
+            </div>
+            <p className={cn(fieldHint, 'mb-2 max-w-[65ch]')}>{help}</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5" role="group" aria-label="Covariates">{columns.map((column) => {
               const reserved = roles.includes(column.id)
               return <label key={column.id} className={cn('flex items-center gap-2 text-body', reserved ? 'text-faint' : 'text-ink')}><input type="checkbox" disabled={reserved} checked={draft.covariates.includes(column.id)} onChange={() => {
                 if (reserved) return
                 configure({ ...draft, covariates: draft.covariates.includes(column.id) ? draft.covariates.filter((id) => id !== column.id) : [...draft.covariates, column.id] })
               }} />{column.name}</label>
             })}</div>
-          </fieldset>
+          </div>
         )
       }
       case 'two-group':
@@ -929,7 +1506,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{type.name}</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
+            <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'cox-regression', label: 'Cox regression' }, { value: 'penalized-aft', label: 'Penalised AFT' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
             <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{type.summary}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">{draftControls}</div>
