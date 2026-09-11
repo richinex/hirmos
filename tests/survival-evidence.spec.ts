@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import {
   describeSurvivalRefusal,
+  parseComparisonSurvivalEvidence,
   parseCoxRegressionEvidence,
   parseFlexSurvEvidence,
   parseNonparametricSurvivalEvidence,
@@ -111,4 +113,13 @@ test('Cox evidence refuses a hazard ratio that contradicts its coefficient', () 
 test('Cox evidence refuses right-censored diagnostics on a start-stop fit', () => {
   const evidence = { ...coxRegression(), observation: { kind: 'startStop', subjects: 20 } }
   expect(parseCoxRegressionEvidence(evidence).ok).toBe(false)
+})
+
+// The veteran trial compared through day 500: the untransformed fixed-time interval runs past 1,
+// as the reference reports it, and the evidence keeps it.
+test('comparison evidence admits an untransformed fixed-time interval that passes 1', () => {
+  const evidence = JSON.parse(readFileSync('tests/fixtures/veteran-comparison-500.json', 'utf8'))
+  const parsed = parseComparisonSurvivalEvidence(evidence)
+  expect(parsed.ok).toBe(true)
+  expect(evidence.fixedTimeConversion.result.scaleTests[0].groupZeroInterval[1]).toBeGreaterThan(1)
 })

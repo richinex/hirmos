@@ -8,9 +8,9 @@ use hirmos_causal_core::data_preparation::{
 };
 use hirmos_causal_core::survival::comparison_surv::{
     comparison_curves, crossing_times, describe, fixed_time_conversion, g_rho_test,
-    observed_conversion, overall_test, smooth_hazard_curves, ComparisonData, ComparisonTime, Event,
-    FixedPointResult, FixedPointScale, GRho, GRhoResult, Group, OverallConfiguration, RmstWindow,
-    SignificanceLevel, SurvivalSample,
+    observed_conversion, overall_test, smooth_hazard_curves, ComparisonData, ComparisonError,
+    ComparisonTime, DescriptiveError, Event, FixedPointResult, FixedPointScale, GRho, GRhoResult,
+    Group, OverallConfiguration, OverallError, RmstWindow, SignificanceLevel, SurvivalSample,
 };
 use hirmos_causal_core::survival::aft::{AftFamily, AftPreparation};
 use hirmos_causal_core::survival::coxph::{
@@ -1299,6 +1299,38 @@ pub(crate) fn nonparametric_survival_evidence(
     })
 }
 
+/// The last observed time of the group that is followed for less long: the latest time the
+/// restricted mean can be taken to.
+fn shortest_group_follow_up(durations: &[f64], groups: &[f64]) -> f64 {
+    let latest = |wanted: f64| {
+        durations
+            .iter()
+            .zip(groups)
+            .filter(|(_, group)| **group == wanted)
+            .map(|(time, _)| *time)
+            .fold(f64::NEG_INFINITY, f64::max)
+    };
+    latest(0.0).min(latest(1.0))
+}
+
+/// A refusal from the two-group comparison as a sentence that names the value to change.
+fn comparison_problem(problem: &OverallError, truncation_time: f64, follow_up: f64) -> String {
+    match problem {
+        OverallError::InvalidTruncationTime
+        | OverallError::Description(DescriptiveError::InvalidTruncationTime) => format!(
+            "Compare through time is {truncation_time}, but follow-up in the shorter group ends at {follow_up}; choose a time at or before that."
+        ),
+        OverallError::Comparison(
+            ComparisonError::ComparisonTimeTooEarly
+            | ComparisonError::ComparisonTimeTooLate
+            | ComparisonError::FixedTimeOutsideEventRange,
+        ) => format!(
+            "Compare through time is {truncation_time}; the comparison needs a time after the first event and before the last one."
+        ),
+        other => format!("The two-group comparison could not be computed ({other:?})."),
+    }
+}
+
 pub(crate) fn comparison_survival_evidence(
     values: &[f64],
     rows: usize,
@@ -1339,22 +1371,23 @@ pub(crate) fn comparison_survival_evidence(
         .map_err(|problem| format!("two-group survival comparison refused: {problem:?}"))?;
     let permutations = NonZeroUsize::new(permutations)
         .ok_or_else(|| "survival comparison needs at least one permutation".to_owned())?;
+    let follow_up = shortest_group_follow_up(&durations, &groups);
     let result = overall_test(
         &data,
         OverallConfiguration::new(truncation_time, permutations, seed)
-            .map_err(|problem| format!("survival comparison configuration refused: {problem:?}"))?,
+            .map_err(|problem| comparison_problem(&problem, truncation_time, follow_up))?,
     )
-    .map_err(|problem| format!("survival comparison failed: {problem:?}"))?;
+    .map_err(|problem| comparison_problem(&problem, truncation_time, follow_up))?;
     let description = describe(
         &data,
         RmstWindow::At(
             ComparisonTime::new(truncation_time)
-                .map_err(|problem| format!("survival comparison horizon refused: {problem:?}"))?,
+                .map_err(|problem| comparison_problem(&OverallError::Description(problem), truncation_time, follow_up))?,
         ),
         SignificanceLevel::new(0.05)
             .map_err(|problem| format!("survival comparison interval refused: {problem:?}"))?,
     )
-    .map_err(|problem| format!("survival comparison description failed: {problem:?}"))?;
+    .map_err(|problem| comparison_problem(&OverallError::Description(problem), truncation_time, follow_up))?;
     let curves = comparison_curves(&data);
     let smoothed_hazards = smooth_hazard_curves(&data);
     let observed_conversion = match observed_conversion(&data) {
@@ -1987,6 +2020,7 @@ mod upstream_data_tests {
                 event: 1,
                 entry: CoxEntryCommand::NotUsed,
                 standard_errors: CoxStandardErrorsCommand::ModelBased,
+                frailty: CoxFrailtyCommand::None,
             },
             CoxWeightsCommand::Equal,
             CoxStrataCommand::Unstratified,
@@ -2024,6 +2058,7 @@ mod upstream_data_tests {
                     event,
                     entry: CoxEntryCommand::NotUsed,
                     standard_errors: CoxStandardErrorsCommand::Clustered { column: cluster },
+                    frailty: _,
                 },
             weights: CoxWeightsCommand::Equal,
             strata: CoxStrataCommand::Unstratified,
@@ -2110,6 +2145,7 @@ mod upstream_data_tests {
                 event: 1,
                 entry: CoxEntryCommand::Column { column: 2 },
                 standard_errors: CoxStandardErrorsCommand::ModelBased,
+                frailty: CoxFrailtyCommand::None,
             },
             CoxWeightsCommand::Equal,
             CoxStrataCommand::Unstratified,
@@ -2141,6 +2177,7 @@ mod upstream_data_tests {
                 event: 1,
                 entry: CoxEntryCommand::NotUsed,
                 standard_errors: CoxStandardErrorsCommand::Clustered { column: 2 },
+                frailty: CoxFrailtyCommand::None,
             },
             CoxWeightsCommand::Equal,
             CoxStrataCommand::Unstratified,
@@ -2179,6 +2216,7 @@ mod upstream_data_tests {
                 event: 1,
                 entry: CoxEntryCommand::NotUsed,
                 standard_errors: CoxStandardErrorsCommand::ModelBased,
+                frailty: CoxFrailtyCommand::None,
             },
             CoxWeightsCommand::Column { column: 2 },
             CoxStrataCommand::Unstratified,
@@ -2209,6 +2247,7 @@ mod upstream_data_tests {
                 event: 1,
                 entry: CoxEntryCommand::NotUsed,
                 standard_errors: CoxStandardErrorsCommand::Robust,
+                frailty: CoxFrailtyCommand::None,
             },
             CoxWeightsCommand::Equal,
             CoxStrataCommand::Column { column: 2 },
@@ -2373,6 +2412,22 @@ mod upstream_data_tests {
         assert!(matches!(peto_peto, SurvivalSummary::Recorded { .. }));
         assert!((0.0..=1.0).contains(&two_stage_p_value));
         assert!(restricted_mean_interval[0] <= restricted_mean_interval[1]);
+    }
+
+    #[test]
+    fn comparison_past_the_shorter_follow_up_names_the_day_to_stay_within() {
+        // Group 0 of the crossing data is last observed at 4.103844950351483; group 1 runs to 4.67.
+        let (values, rows, columns) = selected_columns(
+            include_str!("../../../public/examples/data/survival/comparison_surv_crossdata.csv"),
+            &["time", "status", "group"],
+        );
+        let Err(problem) = comparison_survival_evidence(&values, rows, columns, 0, 1, 2, 4.5, 19, 43) else {
+            panic!("a comparison time past group 0's last observation is refused")
+        };
+        assert_eq!(
+            problem,
+            "Compare through time is 4.5, but follow-up in the shorter group ends at 4.103844950351483; choose a time at or before that."
+        );
     }
 
     #[test]

@@ -449,10 +449,13 @@ const fixedPointScaleSchema = z.enum([
   'logit',
 ])
 
+// Only the transformed scales keep their bounds inside the unit interval; the untransformed
+// interval is the estimate plus or minus 1.96 standard errors, and the reference reports it as it
+// falls, so a bound below 0 or above 1 is a result to show, not a malformed one.
 const fixedPointTestSchema = z.object({
   scale: fixedPointScaleSchema,
-  groupZeroInterval: z.tuple([probability, probability]),
-  groupOneInterval: z.tuple([probability, probability]),
+  groupZeroInterval: z.tuple([finiteNumber, finiteNumber]),
+  groupOneInterval: z.tuple([finiteNumber, finiteNumber]),
   statistic: finiteNumber.nonnegative(),
   pValue: probability,
 }).strict()

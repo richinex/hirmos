@@ -1813,6 +1813,7 @@ mod tests {
             | AnalysisCommand::PandasResampleDaily { .. }
             | AnalysisCommand::FlexSurv { .. }
             | AnalysisCommand::CoxRegression { .. }
+            | AnalysisCommand::PenalizedAft { .. }
             | AnalysisCommand::NonparametricSurvival { .. }
             | AnalysisCommand::ComparisonSurvival { .. }
             | AnalysisCommand::MultiStateSurvival { .. }
