@@ -85,6 +85,32 @@ test('reopens a project built by the SQL step from its input files', async ({ pa
   await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('group_name')
 })
 
+test('reopens the console on the source it made, with its views and output view in place', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The console reopen runs once')
+  await createSqlProject(page)
+  await selectTwoInputs(page)
+  await runSql(page, 'CREATE OR REPLACE VIEW joined AS SELECT m.id, m.value, g.group_name FROM measurements m JOIN groups g USING (id);')
+  await refreshViews(page, 'joined')
+  await page.getByRole('button', { name: 'Use selected view' }).click()
+  await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
+
+  await page.getByRole('button', { name: 'Edit SQL' }).click()
+  await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('combobox', { name: 'Output view' })).toContainText('joined', { timeout: 30_000 })
+  await runSql(page, 'CREATE OR REPLACE VIEW joined_a AS SELECT * FROM joined WHERE group_name = \'A\';')
+  await refreshViews(page, 'joined_a')
+  await page.getByRole('button', { name: 'Use selected view' }).click()
+  await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('button', { name: 'Inspect data' }).click()
+  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('Rows', { exact: true }).locator('..')).toContainText('1')
+
+  await page.getByRole('button', { name: 'Edit SQL' }).click()
+  await expect(page.getByRole('alertdialog')).toContainText('Editing replaces the prepared dataset and removes the current analysis.')
+  await page.getByRole('button', { name: 'Edit and remove' }).click()
+  await expect(page.getByRole('combobox', { name: 'Output view' })).toContainText('joined_a', { timeout: 30_000 })
+})
+
 test('opens the official SQL shell again after clearing a prepared source', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'The shell lifecycle test runs once')
   await createSqlProject(page)

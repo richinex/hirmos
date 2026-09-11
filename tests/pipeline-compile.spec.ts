@@ -11,7 +11,7 @@ const at = (x: number, y: number) => ({ x, y })
 // events, joined back to the lines, comment-like lines dropped, ast_group coded as five indicators.
 const frailty: PipelineGraph = {
   nodes: [
-    { id: id('in'), block: { kind: 'input', alias }, position: at(0, 0) },
+    { id: id('in'), block: { kind: 'input', file: { kind: 'chosen', alias } }, position: at(0, 0) },
     { id: id('events'), block: { kind: 'aggregate', groupBy: ['repo_id'], measures: [{ function: 'sum', column: 'event', as: 'events' }] }, position: at(0, 1) },
     { id: id('kept'), block: { kind: 'filter-rows', match: 'all', conditions: [{ column: 'events', test: 'ge', value: 30 }] }, position: at(0, 2) },
     { id: id('join'), block: { kind: 'join', how: 'inner', keys: [{ left: 'repo_id', right: 'repo_id' }] }, position: at(1, 2) },
@@ -51,7 +51,7 @@ test('compiles the frailty pipeline to one view per block in dependency order', 
 test('a script block becomes a step for the Python runtime with its inputs named', () => {
   const graph: PipelineGraph = {
     nodes: [
-      { id: id('in'), block: { kind: 'input', alias }, position: at(0, 0) },
+      { id: id('in'), block: { kind: 'input', file: { kind: 'chosen', alias } }, position: at(0, 0) },
       { id: id('py'), block: { kind: 'script', code: 'prepared = inputs[0]' }, position: at(0, 1) },
       { id: id('out'), block: { kind: 'output' }, position: at(0, 2) },
     ],
@@ -98,7 +98,7 @@ test('refuses wiring the runtime could not follow, and says which block', () => 
 })
 
 test('an input file nothing reads is allowed; a draft runs what is wired and says what the rest waits on', () => {
-  const spare = { id: id('spare'), block: { kind: 'input' as const, alias: brand<string, 'SqlInputAlias'>('spare') }, position: at(9, 0) }
+  const spare = { id: id('spare'), block: { kind: 'input' as const, file: { kind: 'chosen' as const, alias: brand<string, 'SqlInputAlias'>('spare') } }, position: at(9, 0) }
   const withSpare = compilePipeline({ ...frailty, nodes: [...frailty.nodes, spare] }, new Set([alias as string, 'spare']))
   expect(withSpare.ok).toBe(true)
 

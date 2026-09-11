@@ -9,6 +9,7 @@ import { useShellLayout } from '@/components/shell/useShellLayout'
 import { button, chromeAction, field, fieldHint, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
 import { formatDay, formatTimestamp } from '@/lib/format/date'
+import { formatBytes } from '@/lib/format/number'
 import { DataStudio } from '@/components/data/DataStudio'
 import { PreprocessingPanel } from '@/components/data/PreprocessingPanel'
 import { DiscoveryPanel } from '@/components/discovery/DiscoveryPanel'
@@ -33,6 +34,7 @@ import {
   INITIAL_WORKFLOW,
   newImportRequestId,
   stepWorkflow,
+  type DerivedRecipe,
   type SelectedSource,
 } from '@/domain/workflow'
 import { identificationAllowsEstimation } from '@/domain/study'
@@ -42,8 +44,9 @@ import {
   type DiscoveryEvent,
 } from '@/domain/discovery'
 import { useRunActivity } from '@/lib/useRunActivity'
-import { assertNever, err, type Result } from '@/domain/dop'
-import type { SourceRecipe } from '@/domain/sqlPreparation'
+import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
+import type { SourceRecipe, SqlPreparationInput } from '@/domain/sqlPreparation'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
@@ -104,12 +107,6 @@ const THEME_ICON: Record<ThemeChoice, string> = {
   dark: 'dark_mode',
   light: 'light_mode',
   system: 'brightness_auto',
-}
-
-const formatBytes = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
@@ -219,6 +216,33 @@ function App() {
     return replayed.ok ? replayed : err(data.describePipelineRunProblem(replayed.error, (id) => id))
   }
 
+  // The editor that made a derived source opens on it again, with its files when the page still holds them.
+  const reopenEditor = async (recipe: DerivedRecipe) => {
+    const [{ inputsFromMemory }] = await Promise.all([import('@/data/inputFiles'), recipe.kind === 'sql-derived' ? loadSqlPreparationWorkspace() : loadPipelineWorkspace()])
+    const inputs = inputsFromMemory(recipe.inputs)
+    dispatch({ type: 'editor-reopened', recipe, inputs: inputs !== null && isNonEmpty(inputs) ? inputs : null })
+  }
+  // The files chosen again for an editor: each must match a recorded fingerprint, and takes the alias the recipe used.
+  const editorFilesChosen = async (files: readonly File[]) => {
+    if (workflow.kind !== 'awaiting-editor-files') return
+    const recipe = workflow.recipe
+    setSqlIntake({ kind: 'reading' })
+    const data = await import('@/data/sqlPreparation')
+    const offered = await data.prepareSqlInputs(files)
+    setSqlIntake({ kind: 'idle' })
+    if (!offered.ok) { dispatch({ type: 'editor-files-refused', detail: data.describeSqlPreparationProblem(offered.error) }); return }
+    const matched: SqlPreparationInput[] = []
+    const missing: string[] = []
+    for (const descriptor of recipe.inputs) {
+      const input = offered.value.find((candidate) => candidate.fingerprint === descriptor.fingerprint)
+      if (input === undefined) missing.push(descriptor.fileName)
+      else matched.push({ ...input, alias: descriptor.alias })
+    }
+    if (missing.length > 0 || !isNonEmpty(matched)) { dispatch({ type: 'editor-files-refused', detail: `The files chosen do not include ${missing.join(', ')}, unchanged.` }); return }
+    dispatch({ type: 'editor-reopened', recipe, inputs: matched })
+  }
+  const [editConfirm, setEditConfirm] = useState<DerivedRecipe | null>(null)
+
   // A source the SQL or pipeline step built is rebuilt from its input files; the result then passes the same fingerprint check.
   const restoreFromInputs = async (files: readonly File[]) => {
     if (workflow.kind !== 'awaiting-data' || workflow.restore === null) return
@@ -266,13 +290,10 @@ function App() {
     setSqlIntake({ kind: 'idle' })
     dispatch({ type: 'sql-inputs-chosen', inputs: prepared.value })
   }
-  const choosePipelineInputs = async (files: readonly File[]) => {
-    setSqlIntake({ kind: 'reading' })
-    const [data] = await Promise.all([import('@/data/sqlPreparation'), loadPipelineWorkspace()])
-    const prepared = await data.prepareSqlInputs(files)
-    if (!prepared.ok) { setSqlIntake({ kind: 'failed', detail: data.describeSqlPreparationProblem(prepared.error) }); return }
-    setSqlIntake({ kind: 'idle' })
-    dispatch({ type: 'pipeline-inputs-chosen', inputs: prepared.value })
+  // The canvas takes its files on its input cards, so opening it needs no file up front.
+  const openPipelineEditor = async () => {
+    await loadPipelineWorkspace()
+    dispatch({ type: 'pipeline-opened' })
   }
   const [activity, setActivity] = useState<ChapterActivity>({})
   const reportActivity = useMemo(() => Object.fromEntries(CHAPTER_IDS.map((chapter) => [chapter, (run: RunActivity | null) => setActivity((current) => {
@@ -601,12 +622,24 @@ function App() {
     </>
   )
 
-  const fullBleed = workflow.kind === 'pipeline-inputs-chosen' || profiled !== null && ['data', 'survival', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
+  const editConfirmDialog = editConfirm !== null && (
+    <ConfirmDialog
+      open
+      title={editConfirm.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'}
+      message="Editing replaces the prepared dataset and removes the current analysis."
+      confirmLabel="Edit and remove"
+      danger
+      onConfirm={() => { const recipe = editConfirm; setEditConfirm(null); void reopenEditor(recipe) }}
+      onClose={() => setEditConfirm(null)}
+    />
+  )
+  const fullBleed = workflow.kind === 'pipeline-opened' || profiled !== null && ['data', 'survival', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
   // Every chart export names the project it came from.
   const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
   return (
     <ChartExportProvider.Provider value={exportContext}>
+      {editConfirmDialog}
       <AppShell
         skipTarget="stage"
         mode={fullBleed ? 'full' : 'reading'}
@@ -707,7 +740,7 @@ function App() {
                               ? 'Choose one CSV, TSV or Parquet file. It becomes the source as it is.'
                               : dataEntryMode === 'sql'
                                 ? 'Choose one or more CSV, TSV or Parquet files. Each file becomes a table in a SQL console, and created views can be selected for further analysis.'
-                                : 'Choose one or more CSV, TSV or Parquet files. Each file becomes an input block on a canvas. Wire blocks together to filter, join, derive and aggregate, then use the result as the source.'}
+                                : 'Open a canvas of blocks. Give each Input file card a file, wire blocks together to filter, join, derive and aggregate, and use the result as the source.'}
                           </p>
                         </>
                       ) : workflow.restore.source !== null && workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
@@ -748,27 +781,20 @@ function App() {
                         onIntent={() => { void loadSqlPreparationWorkspace() }}
                       />
                     ) : (
-                      <DataDropZone
-                        multiple
-                        invitation="Drop one or more CSV, TSV or Parquet files here."
-                        consequence="Each file becomes an input block on the canvas."
-                        action="Choose input files"
-                        busy={sqlIntake.kind === 'reading'}
-                        onFiles={(files) => void choosePipelineInputs(files)}
-                        onIntent={() => { void loadPipelineWorkspace() }}
-                      />
+                      <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-well px-6 py-8 text-center">
+                        <Icon name="account_tree" size={28} className="text-faint" aria-hidden />
+                        <p className="m-0 text-body text-ink">Build the source from blocks on a canvas.</p>
+                        <p className="m-0 max-w-[40ch] font-serif text-body text-faint text-pretty">Each Input file card takes one CSV, TSV or Parquet file. Wire the cards into filters, joins, derived columns, aggregates or a Python script, and use the last block as the source.</p>
+                        <button type="button" className={button('signal', 'mt-1 inline-flex items-center gap-2')} onMouseEnter={() => { void loadPipelineWorkspace() }} onFocus={() => { void loadPipelineWorkspace() }} onClick={() => void openPipelineEditor()}>Open the editor</button>
+                      </div>
                     )}
                   </div>
                 </section>
               )}
 
-              {workflow.kind === 'pipeline-inputs-chosen' && (
+              {workflow.kind === 'pipeline-opened' && (
                 <Suspense fallback={<ChapterSkeleton label="Loading the pipeline canvas…" />}>
-                  <PipelineWorkspace
-                    inputs={workflow.inputs}
-                    onPrepared={(source) => dispatch({ type: 'sql-source-created', source })}
-                    onCleared={() => dispatch({ type: 'source-cleared' })}
-                  />
+                  <PipelineWorkspace resume={workflow.resume} onPrepared={(source) => dispatch({ type: 'sql-source-created', source })} />
                 </Suspense>
               )}
 
@@ -777,6 +803,7 @@ function App() {
                   <Suspense fallback={<ChapterSkeleton label="Loading SQL preparation…" />}>
                     <SqlShell
                       inputs={workflow.inputs}
+                      resume={workflow.resume}
                       onPrepared={(source) => dispatch({ type: 'sql-source-created', source })}
                       onCleared={() => dispatch({ type: 'source-cleared' })}
                     />
@@ -793,9 +820,38 @@ function App() {
                     <button type="button" className={button('signal')} onClick={() => void inspectSource()}>
                       Inspect data
                     </button>
+                    {workflow.source.recipe.kind !== 'uploaded-file' && (
+                      <button type="button" className={button('outline')} onClick={() => { const recipe = workflow.source.recipe; if (recipe.kind !== 'uploaded-file') void reopenEditor(recipe) }}>
+                        {workflow.source.recipe.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'}
+                      </button>
+                    )}
                     <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
                       Choose another file
                     </button>
+                  </div>
+                </section>
+              )}
+
+              {workflow.kind === 'awaiting-editor-files' && (
+                <section className="rise my-auto w-full max-w-6xl" aria-labelledby="editor-files-title">
+                  <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
+                    <div className="min-w-0">
+                      <span className={label('text-signal')}>{chapterLabel('data')}</span>
+                      <h2 id="editor-files-title" className="mb-3 mt-3 text-heading text-ink">Choose the input files again</h2>
+                      <p className={cn(fieldHint, 'mt-0')}>
+                        {`The page no longer holds the files the ${workflow.recipe.kind === 'sql-derived' ? 'SQL' : 'pipeline'} was built from: ${workflow.recipe.inputs.map((input) => `${input.fileName} (${formatBytes(input.bytes)})`).join(' and ')}. Choose them again, unchanged, and the editor opens where it left off.`}
+                      </p>
+                      {workflow.problem !== null && <p role="alert" className="mt-3 text-body text-danger">{workflow.problem}</p>}
+                      <button type="button" className={button('quiet', 'mt-4')} onClick={() => dispatch({ type: 'source-cleared' })}>Choose other data instead</button>
+                    </div>
+                    <DataDropZone
+                      multiple
+                      invitation="Drop the input files here."
+                      consequence="The editor opens with its blocks and arrows as they were."
+                      action="Choose input files"
+                      busy={sqlIntake.kind === 'reading'}
+                      onFiles={(files) => void editorFilesChosen(files)}
+                    />
                   </div>
                 </section>
               )}
@@ -824,6 +880,11 @@ function App() {
                   )}
                   <div className="mt-4 flex gap-2">
                     <button type="button" className={button('signal')} onClick={() => void inspectSource()}>Try again</button>
+                    {workflow.source.recipe.kind !== 'uploaded-file' && (
+                      <button type="button" className={button('outline')} onClick={() => { const recipe = workflow.source.recipe; if (recipe.kind !== 'uploaded-file') void reopenEditor(recipe) }}>
+                        {workflow.source.recipe.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'}
+                      </button>
+                    )}
                     <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'source-cleared' })}>
                       Choose another file
                     </button>
@@ -834,7 +895,7 @@ function App() {
               {workflow.kind === 'profiled' && (
                 <>
                   {activeChapter === 'data' && (
-                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}>
+                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared} onEditSource={workflow.source.recipe.kind === 'uploaded-file' ? null : () => { const recipe = workflow.source.recipe; if (recipe.kind !== 'uploaded-file') setEditConfirm(recipe) }}>
                       <PreprocessingPanel
                         key={workflow.profile.id}
                         source={workflow.source}

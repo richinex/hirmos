@@ -1,6 +1,7 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { fingerprintFile } from './fingerprint'
 import { isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
+import { rememberInputFiles } from './inputFiles'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { selectSource, type SelectedSource } from '@/domain/workflow'
 import {
@@ -79,10 +80,11 @@ export async function registerInputs(
   }
 }
 
-export async function prepareSqlInputs(files: readonly File[]): Promise<Result<NonEmptyArray<SqlPreparationInput>, SqlPreparationProblem>> {
+/** Each file gets an alias no other file in the batch, nor any in `taken`, already uses. */
+export async function prepareSqlInputs(files: readonly File[], taken: ReadonlySet<string> = new Set()): Promise<Result<NonEmptyArray<SqlPreparationInput>, SqlPreparationProblem>> {
   if (!isNonEmpty(files)) return err({ kind: 'no-input-files' })
   const prepared: SqlPreparationInput[] = []
-  const occupied = new Set<string>()
+  const occupied = new Set<string>(taken)
   for (const file of files) {
     const source = selectSource(file)
     if (!source.ok) {
@@ -101,7 +103,27 @@ export async function prepareSqlInputs(files: readonly File[]): Promise<Result<N
       fingerprint: fingerprint.value,
     })
   }
-  return isNonEmpty(prepared) ? ok(prepared) : err({ kind: 'no-input-files' })
+  if (!isNonEmpty(prepared)) return err({ kind: 'no-input-files' })
+  rememberInputFiles(prepared)
+  return ok(prepared)
+}
+
+/**
+ * Runs a recipe's recorded view definitions on the shell's database, so an editor reopened on the
+ * recipe starts with the views it had made. Each line is one definition, in creation order.
+ */
+export async function replayDefinitionsInShell(session: SqlPreparationSession, statement: string): Promise<Result<null, SqlPreparationProblem>> {
+  const connection = await session.shellDatabase.connect()
+  try {
+    for (const line of statement.split('\n').map((text) => text.trim()).filter((text) => text.length > 0)) {
+      await connection.query(line)
+    }
+    return ok(null)
+  } catch (cause) {
+    return err({ kind: 'prepared-view-invalid', detail: detailOf(cause) })
+  } finally {
+    await connection.close()
+  }
 }
 
 /**

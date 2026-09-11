@@ -50,7 +50,7 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
   const measuresKeys = useRowKeys(`${node.id}:measures`, rowsOf('measures'))
   const sortKeys = useRowKeys(`${node.id}:sort`, rowsOf('sort'))
   switch (block.kind) {
-    case 'input': return <p className={caption('m-0')}>The file as it was chosen, every column and row. Wire its output into the next block.</p>
+    case 'input': return null
     case 'output': return <p className={caption('m-0')}>The table wired into this block becomes the source. It is written to Parquet like a regular upload.</p>
     case 'filter-rows': return (
       <div className="space-y-3">

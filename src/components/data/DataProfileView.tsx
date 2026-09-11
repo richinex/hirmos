@@ -4,7 +4,8 @@ import { isNumericDuckDbType } from '@/domain/dataset'
 import { chapterLabel } from '@/domain/navigation'
 import type { SelectedSource } from '@/domain/workflow'
 import { FigureParts } from '@/components/ui/figures'
-import { figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { Icon } from '@/components/Icon'
+import { figureGrid, iconControl, label, literal, num } from '@/components/ui/recipes'
 import { formatCount } from '@/lib/format/number'
 import { PreviewTable } from './PreviewTable'
 import { SchemaTable } from './SchemaTable'
@@ -15,11 +16,12 @@ import { useDatasetSummary } from './useDatasetSummary'
  * onto the whole file, and the preparation cards passed as children. Selecting a column in either
  * table drives the column profile in the inspector.
  */
-export function DataProfileView({ source, profile, selectedColumn, onSelectColumn, children }: {
+export function DataProfileView({ source, profile, selectedColumn, onSelectColumn, onEditSource, children }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly selectedColumn: ColumnId | null
   readonly onSelectColumn: (column: ColumnId) => void
+  readonly onEditSource: (() => void) | null
   readonly children?: ReactNode
 }) {
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType)).length
@@ -35,7 +37,14 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
         <div>
           <span className={label('text-faint')}>{chapterLabel('data')}</span>
           <h2 id="data-profile-title" className="mb-0 mt-2 text-heading text-ink">Data profile</h2>
-          <p className="mb-0 mt-1 text-body text-muted">{profile.source.fileName}</p>
+          <p className="mb-0 mt-1 flex items-center gap-1 text-body text-muted">
+            <span>{profile.source.fileName}</span>
+            {source.recipe.kind !== 'uploaded-file' && onEditSource !== null && (
+              <button type="button" className={iconControl('quiet', 'h-7 w-7')} aria-label={source.recipe.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'} title={source.recipe.kind === 'sql-derived' ? 'Edit the SQL that made this source' : 'Edit the pipeline that made this source'} onClick={onEditSource}>
+                <Icon name="edit" size={15} />
+              </button>
+            )}
+          </p>
         </div>
         <dl aria-label="Dataset size" className={figureGrid('m-0 w-full grid-cols-3 @2xl/studio:w-auto')}>
           {sizeFigures.map(({ name, figure }) => (

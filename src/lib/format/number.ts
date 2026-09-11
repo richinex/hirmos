@@ -319,3 +319,10 @@ export function formatAbsent(reason: AbsenceReason, detail?: string): Formatted 
   const srText = detail ? `${token.srText}: ${detail}` : token.srText
   return assemble([{ kind: 'token', text: token.text, srText }], '', srText)
 }
+
+/** A file size in the unit that keeps it to a few digits. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}

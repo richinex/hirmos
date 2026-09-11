@@ -9,12 +9,13 @@ import { cn } from '@/lib/utils'
 import { assertNever, isNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { chapterLabel } from '@/domain/navigation'
 import { PREPARED_VIEW, type SqlPreparationInput, type SqlViewName } from '@/domain/sqlPreparation'
-import type { SelectedSource } from '@/domain/workflow'
+import type { SelectedSource, SqlResume } from '@/domain/workflow'
 import {
   cancelSqlPreparationQuery,
   closeSqlPreparation,
   describeSqlPreparationProblem,
   listSqlPreparationViews,
+  replayDefinitionsInShell,
   materializePreparedView,
   openSqlPreparation,
   type SqlPreparationProblem,
@@ -43,6 +44,8 @@ type CopyState = 'idle' | 'copied' | 'refused'
 
 interface SqlShellProps {
   readonly inputs: NonEmptyArray<SqlPreparationInput>
+  /** The recorded statement and output view to start from, when the console reopens on a source it made. */
+  readonly resume: SqlResume | null
   readonly onPrepared: (source: SelectedSource) => void
   readonly onCleared: () => void
 }
@@ -157,7 +160,7 @@ const onThemeChange = (listener: () => void): (() => void) => {
 }
 
 /** Display input and output controls beside the SQL console. */
-export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
+export function SqlShell({ inputs, resume, onPrepared, onCleared }: SqlShellProps) {
   const container = useRef<HTMLDivElement>(null)
   const [state, setState] = useState<ShellState>({ kind: 'opening' })
   const [cancellation, setCancellation] = useState<CancellationState>({ kind: 'idle' })
@@ -165,15 +168,17 @@ export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
   const [copy, setCopy] = useState<CopyState>('idle')
   const [size, setSize] = useState<{ readonly cols: number; readonly rows: number } | null>(null)
 
-  const refreshViews = useCallback(async (session: SqlPreparationSession) => {
+  const refreshViews = useCallback(async (session: SqlPreparationSession, prefer: SqlViewName | null = null) => {
     const listed = await listSqlPreparationViews(session)
     if (!listed.ok) { setOutputView({ kind: 'failed', problem: listed.error }); return }
     if (!isNonEmpty(listed.value)) { setOutputView({ kind: 'none' }); return }
     const views = listed.value
     setOutputView((current) => {
-      const retained = current.kind === 'available' && views.includes(current.selected)
-        ? current.selected
-        : views.find((view) => view === PREPARED_VIEW) ?? views[0]
+      const retained = prefer !== null && views.includes(prefer)
+        ? prefer
+        : current.kind === 'available' && views.includes(current.selected)
+          ? current.selected
+          : views.find((view) => view === PREPARED_VIEW) ?? views[0]
       return { kind: 'available', views, selected: retained }
     })
   }, [])
@@ -205,7 +210,12 @@ export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
           unbridge = bridgeSoftKeyboard(terminal)
         }
         setState({ kind: 'ready', session: opened.value })
-        await refreshViews(opened.value)
+        // Reopened on a source it made: the recorded definitions run again, so the views are there and the output view is chosen.
+        if (resume !== null) {
+          const replayed = await replayDefinitionsInShell(opened.value, resume.statement)
+          if (!replayed.ok) setOutputView({ kind: 'failed', problem: replayed.error })
+        }
+        await refreshViews(opened.value, resume?.outputView ?? null)
       } catch (cause) {
         setState({
           kind: 'failed-to-open',
@@ -227,7 +237,7 @@ export function SqlShell({ inputs, onPrepared, onCleared }: SqlShellProps) {
         })
       }
     }
-  }, [inputs, refreshViews])
+  }, [inputs, refreshViews, resume])
 
   const sessionOf = (value: ShellState): SqlPreparationSession | null => {
     switch (value.kind) {

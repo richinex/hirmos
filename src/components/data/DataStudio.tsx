@@ -9,10 +9,12 @@ import { DataProfileView } from './DataProfileView'
 import { useColumnProfile } from './useColumnProfile'
 
 /** The Data Studio chapter: schema and preview on the stage, the selected column described beside and below. */
-export function DataStudio({ source, profile, prepared, children }: {
+export function DataStudio({ source, profile, prepared, onEditSource, children }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact | null
+  /** Reopens the editor that made the source; null for an uploaded file. */
+  readonly onEditSource: (() => void) | null
   /** The preparation cards and the continue card, rendered under the tables. */
   readonly children?: ReactNode
 }) {
@@ -24,7 +26,7 @@ export function DataStudio({ source, profile, prepared, children }: {
     <WorkbenchLayout
       id="data"
       stage={(
-        <DataProfileView source={source} profile={profile} selectedColumn={selected.id} onSelectColumn={setChosen}>
+        <DataProfileView source={source} profile={profile} selectedColumn={selected.id} onSelectColumn={setChosen} onEditSource={onEditSource}>
           {children}
         </DataProfileView>
       )}

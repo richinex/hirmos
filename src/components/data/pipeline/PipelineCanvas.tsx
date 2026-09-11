@@ -2,15 +2,20 @@ import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react
 import {
   Background,
   BackgroundVariant,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   Handle,
   Position,
   ReactFlow,
   ReactFlowProvider,
+  useEdgesState,
   useNodesState,
   useReactFlow,
   type Connection,
   type Edge,
   type EdgeChange,
+  type EdgeProps,
   type FinalConnectionState,
   type ReactFlowInstance,
   type Node,
@@ -26,6 +31,7 @@ import type { BlockOutcome } from '@/data/pipeline'
 import { formatCount, formatDuration } from '@/lib/format/number'
 import { Orb } from '@/components/ui/Orb'
 import { usePythonRun } from './usePythonRun'
+import { iconControl } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import { BLOCK_DRAG_TYPE, blockIcon, type PaletteKind } from './blockIcons'
 import { CARD_WIDTH, connectionRefusal, indexGraph, inputPorts, type ConnectionRefusal } from './pipelineWorkspaceModel'
@@ -84,7 +90,33 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
   )
 }
 
+/** A smoothstep arrow that, once selected, shows a button to remove it, so an arrow can go without a keyboard. */
+function ArrowEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, selected, markerEnd }: EdgeProps<CanvasEdge>) {
+  const { deleteElements } = useReactFlow<CanvasNode, CanvasEdge>()
+  const [path, labelX, labelY] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
+  return (
+    <>
+      <BaseEdge id={id} path={path} style={selected ? { ...style, stroke: 'var(--color-signal)', strokeWidth: 2 } : style} markerEnd={markerEnd} />
+      {selected && (
+        <EdgeLabelRenderer>
+          <button
+            type="button"
+            className={cn(iconControl('danger'), 'nodrag nopan pointer-events-auto h-6 w-6 rounded-full border border-hair bg-panel')}
+            style={{ position: 'absolute', transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            title="Remove arrow"
+            aria-label="Remove arrow"
+            onClick={() => void deleteElements({ edges: [{ id }] })}
+          >
+            <Icon name="close" size={13} />
+          </button>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  )
+}
+
 const NODE_TYPES = { block: BlockCard }
+const EDGE_TYPES = { arrow: ArrowEdge }
 const edgeId = (edge: PipelineEdge): string => `${edge.from}->${edge.to}:${edge.port}`
 const portOf = (handle: string | null | undefined): number => Number((handle ?? 'in-0').replace('in-', '')) || 0
 
@@ -116,7 +148,7 @@ interface PipelineCanvasProps {
 const FIT_VIEW = { padding: 0.2, maxZoom: 1 } as const
 const EDGE_STYLE = { stroke: 'var(--color-edge)', strokeWidth: 1.5 } as const
 const CONNECTION_LINE_STYLE = { stroke: 'var(--color-signal)', strokeWidth: 2 } as const
-const DEFAULT_EDGE_OPTIONS = { type: 'smoothstep' } as const
+const DEFAULT_EDGE_OPTIONS = { type: 'arrow' } as const
 const PRO_OPTIONS = { hideAttribution: true } as const
 const BACKGROUND = <Background variant={BackgroundVariant.Dots} color="var(--color-edge)" gap={18} size={1} />
 const fitAfterLayout = (instance: ReactFlowInstance<CanvasNode, CanvasEdge>) => { void instance.fitView(FIT_VIEW) }
@@ -169,15 +201,24 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
     event.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  const edges = useMemo<CanvasEdge[]>(() => graph.edges.map((edge) => ({
-    id: edgeId(edge),
-    source: edge.from,
-    target: edge.to,
-    sourceHandle: 'out',
-    targetHandle: `in-${edge.port}`,
-    data: { edge },
-    style: EDGE_STYLE,
-  })), [graph.edges])
+  // React Flow's copies of the arrows carry the selection, so a selected arrow can be removed with the key or its button.
+  const [edges, setEdges, applyEdgeSelection] = useEdgesState<CanvasEdge>([])
+  useEffect(() => {
+    setEdges((current) => {
+      const selectedIds = new Set(current.filter((edge) => edge.selected).map((edge) => edge.id))
+      return graph.edges.map((edge) => ({
+        id: edgeId(edge),
+        type: 'arrow',
+        source: edge.from,
+        target: edge.to,
+        sourceHandle: 'out',
+        targetHandle: `in-${edge.port}`,
+        data: { edge },
+        selected: selectedIds.has(edgeId(edge)),
+        style: EDGE_STYLE,
+      }))
+    })
+  }, [graph.edges, setEdges])
 
   const applyNodeChanges = useCallback((changes: NodeChange<CanvasNode>[]) => {
     applyChanges(changes)
@@ -188,12 +229,13 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
     }
   }, [applyChanges, onMove, onRemoveBlock, onSelect])
   const applyEdgeChanges = useCallback((changes: EdgeChange<CanvasEdge>[]) => {
+    applyEdgeSelection(changes)
     for (const change of changes) {
       if (change.type !== 'remove') continue
       const edge = graph.edges.find((candidate) => edgeId(candidate) === change.id)
       if (edge !== undefined) onRemoveEdge(edge)
     }
-  }, [graph.edges, onRemoveEdge])
+  }, [applyEdgeSelection, graph.edges, onRemoveEdge])
   const isConnectionValid = useCallback((connection: Connection | CanvasEdge): boolean => {
     const edge = toEdge({ source: connection.source, target: connection.target, sourceHandle: connection.sourceHandle ?? null, targetHandle: connection.targetHandle ?? null })
     return edge !== null && connectionRefusal(index, edge) === null
@@ -222,6 +264,7 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
           onNodesChange={applyNodeChanges}
           onEdgesChange={applyEdgeChanges}
           onConnect={connect}

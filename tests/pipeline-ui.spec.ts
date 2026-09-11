@@ -8,18 +8,45 @@ const files = () => [
   { name: 'regions.csv', mimeType: 'text/csv', buffer: Buffer.from(REGIONS) },
 ]
 
-const startPipeline = async (page: Page) => {
+const block = (page: Page, id: string): Locator => page.getByTestId(`block-${id}`)
+
+/** Opens the editor and gives the first input card the cities file; a second card takes the regions file when asked. */
+const openEditor = async (page: Page) => {
   await page.goto('/app')
   await page.getByRole('textbox', { name: 'Project name' }).fill('Pipeline')
   await page.getByRole('button', { name: 'Create project' }).click()
   await page.getByRole('radio', { name: 'Build a pipeline' }).click({ force: true })
-  await page.locator('input[type="file"][multiple]').setInputFiles(files())
+  await page.getByRole('button', { name: 'Open the editor' }).click()
   await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
-  await expect(block(page, 'input-cities')).toContainText('4 rows · 3 columns', { timeout: 30_000 })
-  await expect(block(page, 'input-regions')).toContainText('4 rows · 2 columns')
+  await expect(block(page, 'input-1')).toContainText('choose a file')
 }
 
-const block = (page: Page, id: string): Locator => page.getByTestId(`block-${id}`)
+const giveFile = async (page: Page, id: string, file: { name: string; mimeType: string; buffer: Buffer }) => {
+  await block(page, id).click({ position: { x: 20, y: 8 } })
+  // On a phone the inspector is a sheet opened from the bar under the stage.
+  const panes = page.getByRole('group', { name: 'Panes' })
+  if (await panes.count() > 0) await panes.getByRole('button', { name: 'Input file' }).click()
+  await page.getByLabel('File for this card').setInputFiles(file)
+  if (await panes.count() > 0) {
+    await expect(block(page, id)).toContainText(/rows ·|failed/, { timeout: 30_000 })
+    await page.keyboard.press('Escape')
+    await expect(page.locator('[data-vaul-overlay]')).toHaveCount(0)
+  }
+}
+
+const startPipeline = async (page: Page, both = true) => {
+  await openEditor(page)
+  const [cities, regions] = files()
+  await giveFile(page, 'input-1', cities!)
+  await expect(block(page, 'input-1')).toContainText('4 rows · 3 columns', { timeout: 30_000 })
+  if (!both) return
+  await page.getByRole('toolbar', { name: 'Add a block' }).getByRole('button', { name: 'Input file', exact: true }).click()
+  const added = page.locator('[data-testid^="block-input-"]').last()
+  const id = (await added.getAttribute('data-testid'))!.replace('block-', '')
+  await giveFile(page, id, regions!)
+  await expect(block(page, id)).toContainText('4 rows · 2 columns', { timeout: 30_000 })
+  return id
+}
 
 const addBlock = async (page: Page, name: string, prefix: string): Promise<string> => {
   await page.getByRole('toolbar', { name: 'Add a block' }).getByRole('button', { name, exact: true }).click()
@@ -53,6 +80,7 @@ test.describe('pipeline canvas', () => {
 
   test('runs each block as it is wired, previews it, and reports what stops the output', async ({ page }) => {
     await startPipeline(page)
+    await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } })
     await expect(page.getByTestId('pipeline-incomplete')).toHaveText('Use as source needs 1 input wired in; it has 0.')
     await expect(useAsSource(page)).toBeDisabled()
 
@@ -60,7 +88,7 @@ test.describe('pipeline canvas', () => {
     await expect(block(page, filter)).toContainText('waiting')
     await expect(page.getByTestId('block-status')).toHaveText('Not run yet: needs 1 input wired in; it has 0.')
 
-    await wire(page, 'input-cities', filter)
+    await wire(page, 'input-1', filter)
     await expect(block(page, filter)).toContainText('4 rows · 3 columns')
     await expect(page.getByRole('region', { name: 'Filter rows' }).getByRole('table')).toBeVisible()
     await expect(page.getByRole('region', { name: 'Filter rows' }).getByRole('table').locator('tbody tr')).toHaveCount(4)
@@ -85,12 +113,12 @@ test.describe('pipeline canvas', () => {
   })
 
   test('refuses arrows that would not make a pipeline and says why', async ({ page }) => {
-    await startPipeline(page)
+    const regions = (await startPipeline(page))!
     const filter = await addBlock(page, 'Filter rows', 'filter-rows')
-    await wire(page, 'input-cities', filter)
+    await wire(page, 'input-1', filter)
     await expect(block(page, filter)).toContainText('4 rows')
 
-    await wire(page, 'input-regions', filter)
+    await wire(page, regions, filter)
     await expect(page.getByRole('alert')).toContainText('That input already has an arrow. Remove it first.')
 
     await wire(page, filter, filter)
@@ -106,7 +134,7 @@ test.describe('pipeline canvas', () => {
     await startPipeline(page)
     const derive = await addBlock(page, 'Derive columns', 'derive-columns')
     const sort = await addBlock(page, 'Sort and limit', 'sort-limit')
-    await wire(page, 'input-cities', derive)
+    await wire(page, 'input-1', derive)
     await wire(page, derive, sort)
     await wire(page, sort, 'output')
 
@@ -128,10 +156,10 @@ test.describe('pipeline canvas', () => {
   })
 
   test('joins two files, uses the result as the source, and rebuilds it on reopening', async ({ page }) => {
-    await startPipeline(page)
+    const regions = (await startPipeline(page))!
     const join = await addBlock(page, 'Join', 'join')
-    await wire(page, 'input-cities', join, 0)
-    await wire(page, 'input-regions', join, 1)
+    await wire(page, 'input-1', join, 0)
+    await wire(page, regions, join, 1)
     await block(page, join).click()
     await page.getByRole('button', { name: 'Add a key' }).click()
     await pick(page, 'Key 1 in Input file cities', 'id')
@@ -159,7 +187,7 @@ test.describe('pipeline canvas', () => {
   })
 
   test('drops a block from the palette onto the canvas and removes it again', async ({ page }) => {
-    await startPipeline(page)
+    const regions = (await startPipeline(page))!
     await expect(page.locator('.react-flow__node')).toHaveCount(3)
     await page.getByRole('toolbar', { name: 'Add a block' }).getByRole('button', { name: 'Union', exact: true })
       .dragTo(page.locator('.react-flow__pane'), { targetPosition: { x: 600, y: 260 } })
@@ -168,9 +196,9 @@ test.describe('pipeline canvas', () => {
     await expect(union.locator('[data-handleid^="in-"]')).toHaveCount(2)
 
     const unionId = (await union.getAttribute('data-testid'))!.replace('block-', '')
-    await wire(page, 'input-cities', unionId, 0)
+    await wire(page, 'input-1', unionId, 0)
     await expect(union.locator('[data-handleid^="in-"]')).toHaveCount(2)
-    await wire(page, 'input-regions', unionId, 1)
+    await wire(page, regions, unionId, 1)
     await expect(union.locator('[data-handleid^="in-"]')).toHaveCount(3)
     await expect(union).toContainText('8 rows · 4 columns')
 
@@ -185,7 +213,7 @@ test.describe('pipeline canvas', () => {
     await startPipeline(page)
     const script = await addBlock(page, 'Script', 'script')
     await expect(page.getByTestId('python-runtime')).toContainText('pandas · numpy', { timeout: 180_000 })
-    await wire(page, 'input-cities', script)
+    await wire(page, 'input-1', script)
     await expect(block(page, script)).toContainText('4 rows · 3 columns', { timeout: 60_000 })
 
     const editor = page.getByTestId('python-editor')
@@ -222,7 +250,7 @@ test.describe('pipeline canvas', () => {
     const editor = page.getByTestId('python-editor')
     const set = async (code: string) => { await editor.locator('.cm-content').click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace'); await page.keyboard.type(code) }
     await set('import time\ntime.sleep(60)\nprepared = inputs[0]\n')
-    await wire(page, 'input-cities', script)
+    await wire(page, 'input-1', script)
     await block(page, script).click()
     await expect(page.getByRole('button', { name: 'Cancel run' })).toBeVisible({ timeout: 30_000 })
     await expect(block(page, script)).toContainText('running ·')
@@ -238,7 +266,7 @@ test.describe('pipeline canvas', () => {
   test('keeps each condition row with its own element when one is removed', async ({ page }) => {
     await startPipeline(page)
     const filter = await addBlock(page, 'Filter rows', 'filter-rows')
-    await wire(page, 'input-cities', filter)
+    await wire(page, 'input-1', filter)
     await expect(block(page, filter)).toContainText('4 rows')
     for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Add a condition' }).click()
     await page.getByLabel('Condition 1 value').fill('one')
@@ -258,11 +286,11 @@ test.describe('pipeline canvas', () => {
   test('drags one card at a time, whatever is selected, without React Flow complaints', async ({ page }) => {
     const complaints: string[] = []
     page.on('console', (message) => { if (message.type() === 'error' || message.text().includes('not initialized')) complaints.push(message.text()) })
-    await startPipeline(page)
-    await block(page, 'input-cities').click({ position: { x: 20, y: 8 } })
-    const positions = () => page.locator('.react-flow__node').evaluateAll((nodes) => nodes.map((node) => (node as HTMLElement).style.transform))
+    const regions = (await startPipeline(page))!
+    await block(page, 'input-1').click({ position: { x: 20, y: 8 } })
+    const positions = () => page.locator('.react-flow__node').evaluateAll((nodes) => Object.fromEntries(nodes.map((node) => [node.getAttribute('data-id'), (node as HTMLElement).style.transform])))
     const before = await positions()
-    const card = (await block(page, 'input-regions').boundingBox())!
+    const card = (await block(page, regions).boundingBox())!
     const x = card.x + card.width / 2, y = card.y + 12
     await page.mouse.move(x, y)
     await page.mouse.down()
@@ -270,17 +298,83 @@ test.describe('pipeline canvas', () => {
     await page.mouse.up()
     await expect.poll(positions).not.toEqual(before)
     const after = await positions()
-    expect(after[0]).toBe(before[0])
-    expect(after[1]).not.toBe(before[1])
-    expect(after[2]).toBe(before[2])
+    expect(after['input-1']).toBe(before['input-1'])
+    expect(after[regions]).not.toBe(before[regions])
+    expect(after['output']).toBe(before['output'])
     const added = await addBlock(page, 'Union', 'union')
     const union = (await block(page, added).boundingBox())!
     await page.mouse.move(union.x + union.width / 2, union.y + 12)
     await page.mouse.down()
     for (let i = 1; i <= 8; i++) await page.mouse.move(union.x + union.width / 2 + 10 * i, union.y + 12)
     await page.mouse.up()
-    await expect.poll(async () => (await positions()).length).toBe(4)
+    await expect.poll(async () => Object.keys(await positions()).length).toBe(4)
     expect(complaints).toEqual([])
+  })
+
+  test('reopens the canvas on the source it made: from Source selected, from the profile with a confirm, and after the files are forgotten', async ({ page }) => {
+    test.setTimeout(120_000)
+    const regions = (await startPipeline(page))!
+    const join = await addBlock(page, 'Join', 'join')
+    await wire(page, 'input-1', join, 0)
+    await wire(page, regions, join, 1)
+    await block(page, join).click()
+    await page.getByRole('button', { name: 'Add a key' }).click()
+    await pick(page, 'Key 1 in Input file cities', 'id')
+    await pick(page, 'Key 1 in Input file regions', 'id')
+    await wire(page, join, 'output')
+    await expect(useAsSource(page)).toBeEnabled()
+    await useAsSource(page).click()
+    await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
+
+    // Back from Source selected: the same cards, arrows and join keys, files still loaded.
+    await page.getByRole('button', { name: 'Edit pipeline' }).click()
+    await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.react-flow__node')).toHaveCount(4)
+    await expect(page.locator('.react-flow__edge')).toHaveCount(3)
+    await expect(block(page, join)).toContainText('4 rows · 4 columns', { timeout: 30_000 })
+    await block(page, join).click()
+    await expect(page.getByRole('combobox', { name: 'Key 1 in Input file cities' })).toContainText('id')
+
+    // A change: the arrow into the output goes, a filter takes its place.
+    // A smoothstep arrow's box centre is off its path, so the arrow is selected by the event itself; its button removes it.
+    await page.locator(`.react-flow__edge[data-id="${join}->output:0"]`).dispatchEvent('click')
+    await page.getByRole('button', { name: 'Remove arrow' }).click()
+    await expect(page.locator('.react-flow__edge')).toHaveCount(2)
+    const filter = await addBlock(page, 'Filter rows', 'filter-rows')
+    await wire(page, join, filter)
+    await wire(page, filter, 'output')
+    await block(page, filter).click()
+    await page.getByRole('button', { name: 'Add a condition' }).click()
+    await pick(page, 'Condition 1 column', 'population')
+    await pick(page, 'Condition 1 test', 'is at least')
+    await page.getByLabel('Condition 1 value').fill('300000')
+    await expect(block(page, filter)).toContainText('3 rows · 4 columns')
+    await useAsSource(page).click()
+    await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
+    await page.getByRole('button', { name: 'Inspect data' }).click()
+    await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('region')
+
+    // Back from the profile: a confirm, since what was built from this source goes with it.
+    await page.getByRole('button', { name: 'Edit pipeline' }).click()
+    await expect(page.getByRole('alertdialog')).toContainText('Editing replaces the prepared dataset and removes the current analysis.')
+    await page.getByRole('button', { name: 'Edit and remove' }).click()
+    await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.react-flow__node')).toHaveCount(5)
+    await expect(block(page, filter)).toContainText('3 rows · 4 columns', { timeout: 30_000 })
+    await useAsSource(page).click()
+    await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
+
+    // Files forgotten, as after a reload: the editor asks for them first, refuses the wrong one, then opens where it left off.
+    await page.evaluate(async () => { const files = await import(new URL('/src/data/inputFiles.ts', window.location.href).href); files.forgetInputFiles() })
+    await page.getByRole('button', { name: 'Edit pipeline' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose the input files again' })).toBeVisible()
+    await page.locator('input[type="file"][multiple]').setInputFiles([files()[0]!])
+    await expect(page.getByRole('alert')).toContainText('do not include regions.csv')
+    await page.locator('input[type="file"][multiple]').setInputFiles(files())
+    await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('.react-flow__node')).toHaveCount(5)
+    await expect(block(page, filter)).toContainText('3 rows · 4 columns', { timeout: 30_000 })
   })
 
   test('edits a script block in a Python editor with line numbers', async ({ page }) => {
@@ -298,13 +392,11 @@ test.describe('pipeline canvas', () => {
 
 test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pans under a finger', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'This is the phone layout check')
-  await page.goto('/app')
-  await page.getByRole('textbox', { name: 'Project name' }).fill('Pipeline')
-  await page.getByRole('button', { name: 'Create project' }).click()
-  await page.getByRole('radio', { name: 'Build a pipeline' }).click({ force: true })
-  await page.locator('input[type="file"][multiple]').setInputFiles(files())
-  await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
-  await expect(block(page, 'input-cities')).toContainText('4 rows', { timeout: 30_000 })
+  await openEditor(page)
+  await giveFile(page, 'input-1', files()[0]!)
+  await expect(block(page, 'input-1')).toContainText('4 rows', { timeout: 30_000 })
+  const paneBox = (await page.locator('.react-flow__pane').boundingBox())!
+  await page.mouse.click(paneBox.x + 10, paneBox.y + 10)
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
   expect(width.content).toBeLessThanOrEqual(width.viewport)
 
@@ -312,7 +404,7 @@ test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pa
   const palette = page.getByRole('toolbar', { name: 'Add a block' })
   expect(await palette.evaluate((el) => el.clientHeight)).toBeLessThan(60)
   const chips = await palette.getByRole('button').evaluateAll((buttons) => buttons.map((button) => { const box = button.getBoundingClientRect(); return { name: button.getAttribute('aria-label'), inView: box.width > 0 && box.right <= document.documentElement.clientWidth } }))
-  expect(chips.map((chip) => chip.name)).toEqual(['Filter rows', 'Sort and limit', 'Select columns', 'Derive columns', 'Join', 'Union', 'Group and aggregate', 'Script'])
+  expect(chips.map((chip) => chip.name)).toEqual(['Input file', 'Filter rows', 'Sort and limit', 'Select columns', 'Derive columns', 'Join', 'Union', 'Group and aggregate', 'Script'])
   expect(chips.every((chip) => chip.inView)).toBe(true)
 
   // The canvas takes the stage's height, so its controls sit along the foot of the screen, not mid-way.

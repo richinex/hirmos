@@ -15,7 +15,8 @@ import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, 
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { PersistedProject } from './persistence'
 import type { ProjectOrigin } from './projectOrigin'
-import type { SourceRecipe, SqlPreparationInput } from './sqlPreparation'
+import type { SourceRecipe, SqlPreparationInput, SqlViewName } from './sqlPreparation'
+import type { PipelineGraph } from './pipeline'
 
 export type ProjectId = Brand<string, 'ProjectId'>
 export type ProjectName = Brand<string, 'ProjectName'>
@@ -70,13 +71,24 @@ export type Workflow =
       readonly origin: ProjectOrigin
       /** The files the SQL console exposes as tables; a view becomes the source only once it materialises. */
       readonly inputs: NonEmptyArray<SqlPreparationInput>
+      /** The recorded statement and output view to start from, when the console is reopened on a source it made. */
+      readonly resume: SqlResume | null
     }
   | {
-      readonly kind: 'pipeline-inputs-chosen'
+      /** The pipeline canvas is open; its input blocks take their files on the canvas, and the output block becomes the source only once it materialises. */
+      readonly kind: 'pipeline-opened'
       readonly project: Project
       readonly origin: ProjectOrigin
-      /** The files the pipeline canvas offers as input blocks; the output block becomes the source only once it materialises. */
-      readonly inputs: NonEmptyArray<SqlPreparationInput>
+      /** The graph and files to start from, when the canvas is reopened on a source it made. */
+      readonly resume: PipelineResume | null
+    }
+  | {
+      /** An editor is to be reopened on a derived source, but its input files are no longer in memory and must be chosen again. */
+      readonly kind: 'awaiting-editor-files'
+      readonly project: Project
+      readonly origin: ProjectOrigin
+      readonly recipe: DerivedRecipe
+      readonly problem: string | null
     }
   | { readonly kind: 'source-selected'; readonly project: Project; readonly origin: ProjectOrigin; readonly source: SelectedSource }
   | {
@@ -119,12 +131,19 @@ export type Workflow =
       readonly survivalRuns: readonly SurvivalRunArtifact[]
     }
 
+export type DerivedRecipe = Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>
+export interface SqlResume { readonly statement: string; readonly outputView: SqlViewName }
+export interface PipelineResume { readonly graph: PipelineGraph; readonly inputs: readonly SqlPreparationInput[] }
+
 export type WorkflowEvent =
   | { readonly type: 'project-name-changed'; readonly value: string }
   | { readonly type: 'project-submitted' }
   | { readonly type: 'file-selected'; readonly file: File }
   | { readonly type: 'sql-inputs-chosen'; readonly inputs: NonEmptyArray<SqlPreparationInput> }
-  | { readonly type: 'pipeline-inputs-chosen'; readonly inputs: NonEmptyArray<SqlPreparationInput> }
+  | { readonly type: 'pipeline-opened' }
+  /** Reopen the editor that made the source; with the files when they are still in memory, otherwise the files are asked for first. Everything made from the source is dropped. */
+  | { readonly type: 'editor-reopened'; readonly recipe: DerivedRecipe; readonly inputs: NonEmptyArray<SqlPreparationInput> | null }
+  | { readonly type: 'editor-files-refused'; readonly detail: string }
   /** A derived source is ready: the SQL view or the pipeline's output block has been written to a file. */
   | { readonly type: 'sql-source-created'; readonly source: SelectedSource }
   | { readonly type: 'profile-requested'; readonly request: ImportRequestId }
@@ -225,6 +244,16 @@ export function selectDerivedSource(
 /** The SQL workspace's name for the same step. */
 export const selectSqlDerivedSource = selectDerivedSource
 
+/** The editor that made a derived source, open on it again; without the files in memory, the state that asks for them. */
+const reopenEditor = (project: Project, origin: ProjectOrigin, event: Extract<WorkflowEvent, { readonly type: 'editor-reopened' }>): Workflow => {
+  if (event.inputs === null) return { kind: 'awaiting-editor-files', project, origin, recipe: event.recipe, problem: null }
+  switch (event.recipe.kind) {
+    case 'sql-derived': return { kind: 'sql-inputs-chosen', project, origin, inputs: event.inputs, resume: { statement: event.recipe.statement, outputView: event.recipe.outputView } }
+    case 'pipeline-derived': return { kind: 'pipeline-opened', project, origin, resume: { graph: event.recipe.graph, inputs: event.inputs } }
+    default: return assertNever(event.recipe)
+  }
+}
+
 export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
   // Closing returns to the list whatever the project's stage; the caller saves first.
   if (event.type === 'project-closed') return INITIAL_WORKFLOW
@@ -276,10 +305,10 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         }
       }
       if (event.type === 'sql-inputs-chosen' && state.restore === null) {
-        return { kind: 'sql-inputs-chosen', project: state.project, origin: state.origin, inputs: event.inputs }
+        return { kind: 'sql-inputs-chosen', project: state.project, origin: state.origin, inputs: event.inputs, resume: null }
       }
-      if (event.type === 'pipeline-inputs-chosen' && state.restore === null) {
-        return { kind: 'pipeline-inputs-chosen', project: state.project, origin: state.origin, inputs: event.inputs }
+      if (event.type === 'pipeline-opened' && state.restore === null) {
+        return { kind: 'pipeline-opened', project: state.project, origin: state.origin, resume: null }
       }
       if (event.type !== 'file-selected' || state.restore !== null) return state
       const parsed = selectSource(event.file)
@@ -288,13 +317,19 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         : { ...state, problem: parsed.error }
     }
     case 'sql-inputs-chosen':
-    case 'pipeline-inputs-chosen':
+    case 'pipeline-opened':
       if (event.type === 'sql-source-created') {
         return { kind: 'source-selected', project: state.project, origin: state.origin, source: event.source }
       }
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       return state
+    case 'awaiting-editor-files':
+      if (event.type === 'editor-reopened') return reopenEditor(state.project, state.origin, event)
+      if (event.type === 'editor-files-refused') return { ...state, problem: event.detail }
+      if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
+      return state
     case 'source-selected':
+      if (event.type === 'editor-reopened') return reopenEditor(state.project, state.origin, event)
       if (event.type === 'profile-requested') {
         return { kind: 'profiling', project: state.project, origin: state.origin, source: state.source, request: event.request }
       }
@@ -336,6 +371,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       return state
     case 'profiled':
+      if (event.type === 'editor-reopened') return reopenEditor(state.project, state.origin, event)
       if (event.type === 'source-persistence-changed') {
         return { ...state, profile: { ...state.profile, source: { ...state.profile.source, persistence: event.persistence } } }
       }

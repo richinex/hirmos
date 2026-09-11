@@ -17,10 +17,11 @@ export const blockIcon = (kind: PipelineBlockKind): string => {
   }
 }
 
-export type PaletteKind = Exclude<PipelineBlockKind, 'input' | 'output'>
+export type PaletteKind = Exclude<PipelineBlockKind, 'output'>
 
-/** The palette in groups: what a block does to rows, to columns, to several tables, and code. */
+/** The palette in groups: files, then what a block does to rows, to columns, to several tables, and code. */
 export const PALETTE_GROUPS: readonly { readonly label: string; readonly kinds: readonly PaletteKind[] }[] = [
+  { label: 'Files', kinds: ['input'] },
   { label: 'Rows', kinds: ['filter-rows', 'sort-limit'] },
   { label: 'Columns', kinds: ['select-columns', 'derive-columns'] },
   { label: 'Tables', kinds: ['join', 'union', 'aggregate'] },

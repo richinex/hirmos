@@ -4,16 +4,18 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { button, caption, chromeAction, label, literal, num, prose } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
-import { assertNever, type NonEmptyArray } from '@/domain/dop'
+import { assertNever } from '@/domain/dop'
 import { blockLabel, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineGraph, type PipelineNode, type RowTest } from '@/domain/pipeline'
 import type { SqlPreparationInput } from '@/domain/sourceInputs'
-import { selectDerivedSource, type SelectedSource } from '@/domain/workflow'
+import { selectDerivedSource, type PipelineResume, type SelectedSource } from '@/domain/workflow'
 import {
+  addPipelineInput,
   closePipeline,
   describePipelineRunProblem,
   materializePipeline,
   openPipeline,
   previewBlock,
+  removePipelineInput,
   runPipeline,
   type BlockOutcome,
   type BlockPreview,
@@ -21,7 +23,7 @@ import {
   type PipelineSession,
 } from '@/data/pipeline'
 import { pythonScriptRuntime } from '@/data/pythonRuntime'
-import { formatCount } from '@/lib/format/number'
+import { formatBytes, formatCount } from '@/lib/format/number'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
@@ -30,7 +32,7 @@ import { BlockSettings, blockSqlText, preloadPythonEditor } from './BlockSetting
 import { usePythonRun } from './usePythonRun'
 import { BLOCK_DRAG_TYPE, blockIcon, PALETTE_GROUPS, type PaletteKind } from './blockIcons'
 import { PipelineCanvas } from './PipelineCanvas'
-import { addBlock, configureBlock, connect, describeConnectionRefusal, indexGraph, initialGraph, inputsOf, moveBlock, placeFor, removeBlock, removeEdge, tidyGraph, type ConnectionRefusal, type GraphIndex } from './pipelineWorkspaceModel'
+import { addBlock, addInputBlock, configureBlock, connect, describeConnectionRefusal, indexGraph, initialGraph, inputsOf, moveBlock, placeFor, removeBlock, removeEdge, tidyGraph, type ConnectionRefusal, type GraphIndex } from './pipelineWorkspaceModel'
 
 type SessionState =
   | { readonly kind: 'opening' }
@@ -89,7 +91,7 @@ const sortableValue = (cell: PreviewCell | undefined): EvidenceValue => {
 
 const summarise = (block: PipelineBlock): string => {
   switch (block.kind) {
-    case 'input': return block.alias
+    case 'input': return block.file.kind === 'chosen' ? block.file.alias : 'choose a file'
     case 'filter-rows': return block.conditions.length === 0 ? 'every row' : block.conditions.map((c) => `${c.column} ${testWord(c.test)}${'value' in c ? ` ${c.value}` : ''}`).join(block.match === 'all' ? ' and ' : ' or ')
     case 'select-columns': return block.columns.length === 0 ? 'every column' : `${block.mode} ${block.columns.join(', ')}`
     case 'derive-columns': return block.columns.length === 0 ? 'no new columns yet' : block.columns.map((c) => c.name || '?').join(', ')
@@ -103,12 +105,14 @@ const summarise = (block: PipelineBlock): string => {
   }
 }
 
-export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
-  readonly inputs: NonEmptyArray<SqlPreparationInput>
+export function PipelineWorkspace({ resume, onPrepared }: {
+  /** A graph and its files to start from, when the canvas reopens on a source it made. */
+  readonly resume: PipelineResume | null
   readonly onPrepared: (source: SelectedSource) => void
-  readonly onCleared: () => void
 }) {
-  const [graph, setGraph] = useState<PipelineGraph>(() => initialGraph(inputs))
+  const [graph, setGraph] = useState<PipelineGraph>(() => resume === null ? initialGraph([]) : resume.graph)
+  // The files the session holds, mirrored into state so the inspector re-renders when a card takes or drops one.
+  const [files, setFiles] = useState<readonly SqlPreparationInput[]>(() => resume === null ? [] : resume.inputs)
   const [selected, setSelected] = useState<PipelineBlockId | null>(null)
   const [session, setSession] = useState<SessionState>({ kind: 'opening' })
   const [run, setRun] = useState<RunState>({ kind: 'idle' })
@@ -118,22 +122,24 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
   const index = useMemo(() => indexGraph(graph), [graph])
   const isMobile = useIsMobile()
 
+  const sessionReady = useRef<Promise<PipelineSession | null>>(Promise.resolve(null))
   useEffect(() => {
     let cancelled = false
     let opened: PipelineSession | null = null
-    void openPipeline(inputs, pythonScriptRuntime()).then((result) => {
-      if (cancelled) { if (result.ok) void closePipeline(result.value); return }
-      if (!result.ok) { setSession({ kind: 'failed', detail: describePipelineRunProblem(result.error, String) }); return }
+    sessionReady.current = openPipeline(resume === null ? [] : resume.inputs, pythonScriptRuntime()).then((result) => {
+      if (cancelled) { if (result.ok) void closePipeline(result.value); return null }
+      if (!result.ok) { setSession({ kind: 'failed', detail: describePipelineRunProblem(result.error, String) }); return null }
       opened = result.value
       setSession({ kind: 'ready', live: result.value })
+      return result.value
     })
     return () => { cancelled = true; if (opened !== null) void closePipeline(opened) }
-  }, [inputs])
+  }, [resume])
 
   const nameOf = useCallback((id: PipelineBlockId): string => {
     const node = index.nodes.get(id)
     if (node === undefined) return id
-    return node.block.kind === 'input' ? `${blockLabel('input')} ${node.block.alias}` : blockLabel(node.block.kind)
+    return node.block.kind === 'input' && node.block.file.kind === 'chosen' ? `${blockLabel('input')} ${node.block.file.alias}` : blockLabel(node.block.kind)
   }, [index])
 
   // What the pipeline computes: the blocks and the arrows, not where the cards sit. Moving a card must not rerun DuckDB.
@@ -182,10 +188,36 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
 
   const add = useCallback((kind: PaletteKind, position?: { readonly x: number; readonly y: number }) => {
     const current = latest.current.graph
-    const added = addBlock(current, kind, position ?? placeFor(current, selected))
-    setGraph(added.graph)
+    const added = kind === 'input'
+      ? addInputBlock(position === undefined ? current : { ...current })
+      : addBlock(current, kind, position ?? placeFor(current, selected))
+    setGraph(position === undefined || kind !== 'input' ? added.graph : moveBlock(added.graph, added.id, position))
     setSelected(added.id)
   }, [selected])
+
+  // A card takes a file: the session registers it, and a file the card held before is dropped once the new one is in.
+  const [choosing, setChoosing] = useState<{ readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }>({ kind: 'idle' })
+  const chooseFile = useCallback(async (id: PipelineBlockId, file: File) => {
+    setChoosing({ kind: 'busy' })
+    // A file chosen before DuckDB has opened waits for it rather than being dropped.
+    const live = await sessionReady.current
+    if (live === null) { setChoosing({ kind: 'refused', detail: 'DuckDB could not start, so the file cannot be read.' }); return }
+    const previous = latest.current.graph.nodes.find((node) => node.id === id)?.block
+    const added = await addPipelineInput(live, file)
+    if (!added.ok) { setChoosing({ kind: 'refused', detail: describePipelineRunProblem(added.error, latest.current.nameOf) }); return }
+    setGraph((current) => configureBlock(current, id, { kind: 'input', file: { kind: 'chosen', alias: added.value.alias } }))
+    if (previous?.kind === 'input' && previous.file.kind === 'chosen') await removePipelineInput(live, previous.file.alias)
+    setFiles([...live.inputs])
+    setChoosing({ kind: 'idle' })
+  }, [])
+  const dropBlock = useCallback((id: PipelineBlockId) => {
+    const node = latest.current.graph.nodes.find((candidate) => candidate.id === id)
+    setGraph((current) => removeBlock(current, id))
+    setSelected((current) => current === id ? null : current)
+    if (session.kind === 'ready' && node?.block.kind === 'input' && node.block.file.kind === 'chosen') {
+      void removePipelineInput(session.live, node.block.file.alias).then(() => setFiles([...session.live.inputs]))
+    }
+  }, [session])
   const tidy = useCallback(() => { void tidyGraph(latest.current.graph).then((tidied) => setGraph(tidied)) }, [])
   const refuse = (refusal: ConnectionRefusal | null) => setRefusal(refusal === null ? null : describeConnectionRefusal(refusal))
   useEffect(() => {
@@ -210,9 +242,9 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
 
   const stage = (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* One row, never a stack: on a phone the chips show their glyph alone so all eight fit; wider than that they carry their labels and scroll sideways if the stage is narrow. */}
+      {/* One row, never a stack: on a phone the chips show their glyph alone and the row drops its label so all nine fit; wider than that they carry their labels and scroll sideways if the stage is narrow. */}
       <div className="flex min-w-0 max-w-full flex-nowrap items-center gap-1 overflow-x-auto border-b border-line px-2 py-1.5 [scrollbar-width:thin]" role="toolbar" aria-label="Add a block">
-        <span className={label('mx-1 shrink-0 text-faint')}>Add a block</span>
+        {isMobile ? null : <span className={label('mx-1 shrink-0 text-faint')}>Add a block</span>}
         {PALETTE_GROUPS.map((group, index) => (
           <div key={group.label} className="flex shrink-0 items-center gap-0.5" role="group" aria-label={group.label}>
             {index > 0 && <span aria-hidden className="mx-0.5 h-4 w-px bg-hair" />}
@@ -251,7 +283,7 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
           onMove={(id, position) => setGraph((current) => moveBlock(current, id, position))}
           onConnect={(edge: PipelineEdge) => setGraph((current) => connect(current, edge))}
           onRemoveEdge={(edge) => setGraph((current) => removeEdge(current, edge))}
-          onRemoveBlock={(id) => { setGraph((current) => removeBlock(current, id)); if (selected === id) setSelected(null) }}
+          onRemoveBlock={dropBlock}
           onRefused={refuse}
           onDropBlock={(kind, position) => add(kind, position)}
           onTidy={tidy}
@@ -263,19 +295,20 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
   const inspector = selectedNode === null
     ? (
       <div className="space-y-3">
-        <p className={prose('m-0 text-muted')}>Each block is one operation on a table. Wire the input files into blocks and the last block into "Use as source"; select a block to set it up and to see its rows below.</p>
+        <p className={prose('m-0 text-muted')}>Each block is one operation on a table. Select an Input file card and choose its file, wire it into blocks, and wire the last block into "Use as source". Select a block to set it up and to see its rows below.</p>
         <p className={caption('m-0')}>{formatCount(graph.nodes.length).text} blocks · {formatCount(graph.edges.length).text} arrows</p>
         {completeProblem !== null && <p className={caption('m-0 text-warn')} data-testid="pipeline-incomplete">{completeProblem}</p>}
-        <div className="border-t border-hair pt-3">
-          <span className={label('block text-muted')}>Input files</span>
-          <ul className="m-0 mt-1 list-none space-y-0.5 p-0">
-            {inputs.map((input) => <li key={input.alias} className="flex items-baseline gap-2 text-body text-ink"><span className={literal('truncate')}>{input.alias}</span><span className="ml-auto shrink-0 text-micro text-faint">{input.fileName}</span></li>)}
-          </ul>
-          <button type="button" className={button('quiet', 'mt-3', 'sm')} onClick={onCleared}><Icon name="folder_open" size={14} /> Choose other files</button>
-        </div>
+        {files.length > 0 && (
+          <div className="border-t border-hair pt-3">
+            <span className={label('block text-muted')}>Files</span>
+            <ul className="m-0 mt-1 list-none space-y-0.5 p-0">
+              {files.map((input) => <li key={input.alias} className="flex items-baseline gap-2 text-body text-ink"><span className={literal('truncate')}>{input.alias}</span><span className="ml-auto shrink-0 text-micro text-faint">{input.fileName} · {formatBytes(input.bytes)}</span></li>)}
+            </ul>
+          </div>
+        )}
       </div>
     )
-    : <Inspector node={selectedNode} index={index} outcomes={outcomes} viewOf={viewOf} onChange={(block) => setGraph((current) => configureBlock(current, selectedNode.id, block))} onRemove={() => { setGraph((current) => removeBlock(current, selectedNode.id)); setSelected(null) }} />
+    : <Inspector node={selectedNode} index={index} outcomes={outcomes} viewOf={viewOf} files={files} choosing={choosing} onChooseFile={(file) => void chooseFile(selectedNode.id, file)} onChange={(block) => setGraph((current) => configureBlock(current, selectedNode.id, block))} onRemove={() => dropBlock(selectedNode.id)} />
 
   const decimals = useMemo(() => preview === null ? [] : preview.columns.map((_, index) => columnDecimals(preview.rows, index)), [preview])
   const previewColumns = useMemo<EvidenceColumn<PreviewRow>[]>(() => preview === null ? [] : [
@@ -339,24 +372,31 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
   )
 }
 
-function Inspector({ node, index, outcomes, viewOf, onChange, onRemove }: {
+function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFile, onChange, onRemove }: {
   readonly node: PipelineNode
   readonly index: GraphIndex
   readonly outcomes: ReadonlyMap<PipelineBlockId, BlockOutcome>
   readonly viewOf: (id: PipelineBlockId) => string | null
+  readonly files: readonly SqlPreparationInput[]
+  readonly choosing: { readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }
+  readonly onChooseFile: (file: File) => void
   readonly onChange: (block: PipelineBlock) => void
   readonly onRemove: () => void
 }) {
   const inputs = inputsOf(index, node.id)
   const running = usePythonRun(node.id)
   const inputColumns = inputs.map((input) => { const outcome = outcomes.get(input.id); return outcome?.kind === 'ran' ? outcome.columns : [] })
-  const inputNames = inputs.map((input) => blockLabel(input.block.kind) + (input.block.kind === 'input' ? ` ${input.block.alias}` : ''))
+  const inputNames = inputs.map((input) => blockLabel(input.block.kind) + (input.block.kind === 'input' && input.block.file.kind === 'chosen' ? ` ${input.block.file.alias}` : ''))
   const outcome = outcomes.get(node.id)
   const sql = blockSqlText(node, inputs.map((input) => viewOf(input.id) ?? '?'))
-  const removable = node.block.kind !== 'input' && node.block.kind !== 'output'
+  const removable = node.block.kind !== 'output'
+  const heldAlias = node.block.kind === 'input' && node.block.file.kind === 'chosen' ? node.block.file.alias : null
+  const held = heldAlias === null ? null : files.find((input) => input.alias === heldAlias) ?? null
+  const picker = useRef<HTMLInputElement>(null)
   return (
     <div className="space-y-4">
-      <BlockStatus outcome={outcome} running={running !== null} />
+      {node.block.kind === 'input' && <InputFileField held={held} choosing={choosing} />}
+      {!(node.block.kind === 'input' && node.block.file.kind === 'empty') && <BlockStatus outcome={outcome} running={running !== null} />}
       {outcome?.kind === 'ran' && (
         <details className="group/schema">
           <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Icon name="chevron_right" size={14} className="transition-transform group-open/schema:rotate-90" /> Columns · {outcome.columns.length}</summary>
@@ -379,10 +419,42 @@ function Inspector({ node, index, outcomes, viewOf, onChange, onRemove }: {
         </details>
       )}
       {removable && (
-        <div className="flex justify-end border-t border-hair pt-3">
-          <button type="button" className={chromeAction('danger')} onClick={onRemove}><Icon name="delete" size={14} /> Remove block</button>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hair pt-3">
+          {node.block.kind === 'input'
+            ? (
+              <button type="button" className={button(held === null ? 'signal' : 'quiet', 'whitespace-nowrap', 'sm')} disabled={choosing.kind === 'busy'} aria-busy={choosing.kind === 'busy'} onClick={() => picker.current?.click()}>
+                <Icon name="upload_file" size={14} /> {held === null ? 'Choose file' : 'Replace file'}
+              </button>
+            )
+            : <span />}
+          {/* The same control family as the file button beside it: control radius, the small step, danger only in the ink. */}
+          <button type="button" className={button('quiet', 'whitespace-nowrap text-danger hover:border-danger/50 hover:text-danger', 'sm')} onClick={onRemove}><Icon name="delete" size={14} /> Remove block</button>
         </div>
       )}
+      {node.block.kind === 'input' && <input ref={picker} type="file" accept={FILE_ACCEPT} className="sr-only" aria-label="File for this card" onChange={(event) => { const file = event.target.files?.[0]; if (file !== undefined) onChooseFile(file); event.target.value = '' }} />}
+    </div>
+  )
+}
+
+const FILE_ACCEPT = '.csv,.tsv,.parquet,text/csv,text/tab-separated-values'
+
+/** The file an input card holds, or the prompt to choose one; choosing and replacing are actions in the footer. */
+function InputFileField({ held, choosing }: {
+  readonly held: SqlPreparationInput | null
+  readonly choosing: { readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }
+}) {
+  return (
+    <div className="space-y-2">
+      {held === null
+        ? <p className={caption('m-0')}>Choose a CSV, TSV or Parquet file, then connect to the next block to continue processing.</p>
+        : (
+          <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-body">
+            <dt className="text-muted">File</dt><dd className={literal('m-0 truncate text-ink')} title={held.fileName}>{held.fileName}</dd>
+            <dt className="text-muted">Size</dt><dd className={num('m-0 text-ink')}>{formatBytes(held.bytes)}</dd>
+            <dt className="text-muted">Table</dt><dd className={literal('m-0 text-ink')}>{held.alias}</dd>
+          </dl>
+        )}
+      {choosing.kind === 'refused' && <Alert tone="danger"><p className="m-0">{choosing.detail}</p></Alert>}
     </div>
   )
 }

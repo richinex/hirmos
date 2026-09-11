@@ -49,8 +49,13 @@ export type AggregateMeasure =
 export const measureWithFunction = (measure: AggregateMeasure, fn: AggregateFunction, fallbackColumn: string): AggregateMeasure =>
   fn === 'count' ? { function: fn, as: measure.as } : { function: fn, column: 'column' in measure ? measure.column : fallbackColumn, as: measure.as }
 
+/** An input block either holds a chosen file, known by its alias, or is still waiting for one. */
+export type InputFile =
+  | { readonly kind: 'chosen'; readonly alias: SqlInputAlias }
+  | { readonly kind: 'empty' }
+
 export type PipelineBlock =
-  | { readonly kind: 'input'; readonly alias: SqlInputAlias }
+  | { readonly kind: 'input'; readonly file: InputFile }
   | { readonly kind: 'filter-rows'; readonly match: 'all' | 'any'; readonly conditions: readonly RowCondition[] }
   | { readonly kind: 'select-columns'; readonly mode: 'keep' | 'drop'; readonly columns: readonly string[]; readonly renames: readonly { readonly from: string; readonly to: string }[] }
   | { readonly kind: 'derive-columns'; readonly columns: readonly DerivedColumn[] }
@@ -211,11 +216,13 @@ export function blockSql(node: PipelineNode, inputs: readonly string[]): Result<
     case 'filter-rows': {
       if (only === null) return incomplete('nothing is wired in')
       if (block.conditions.length === 0) return ok(`SELECT * FROM ${only}`)
+      if (block.conditions.some((condition) => condition.column === '')) return incomplete('every condition needs a column')
       const joiner = block.match === 'all' ? ' AND ' : ' OR '
       return ok(`SELECT * FROM ${only} WHERE ${block.conditions.map(conditionSql).join(joiner)}`)
     }
     case 'select-columns': {
       if (only === null) return incomplete('nothing is wired in')
+      if (block.renames.some((rename) => rename.from === '' || rename.to.trim() === '')) return incomplete('every rename needs a column and a new name')
       const renamed = new Map(block.renames.map((rename) => [rename.from, rename.to]))
       const columns = block.columns.map((column) => {
         const to = renamed.get(column)
@@ -241,6 +248,7 @@ export function blockSql(node: PipelineNode, inputs: readonly string[]): Result<
       if (left === undefined || right === undefined) return incomplete('a join needs both sides wired in')
       if (block.how === 'cross') return ok(`SELECT * FROM ${identifier(left)} CROSS JOIN ${identifier(right)}`)
       if (block.keys.length === 0) return incomplete('a join needs at least one key column on each side')
+      if (block.keys.some((key) => key.left === '' || key.right === '')) return incomplete('every key needs a column on each side')
       const same = block.keys.every((key) => key.left === key.right)
       if (same) {
         return ok(`SELECT * FROM ${identifier(left)} ${block.how.toUpperCase()} JOIN ${identifier(right)} USING (${block.keys.map((key) => identifier(key.left)).join(', ')})`)
@@ -258,6 +266,7 @@ export function blockSql(node: PipelineNode, inputs: readonly string[]): Result<
       if (block.measures.length === 0) return incomplete('an aggregate needs at least one measure')
       const missingName = block.measures.find((measure) => measure.as.trim().length === 0)
       if (missingName !== undefined) return incomplete('every measure needs a name for its result column')
+      if (block.measures.some((measure) => measure.function !== 'count' && measure.column === '')) return incomplete('every measure needs a column')
       const groups = block.groupBy.map(identifier)
       const selected = [...groups, ...block.measures.map(measureSql)].join(', ')
       const grouping = groups.length === 0 ? '' : ` GROUP BY ${groups.join(', ')}`
@@ -265,6 +274,7 @@ export function blockSql(node: PipelineNode, inputs: readonly string[]): Result<
     }
     case 'sort-limit': {
       if (only === null) return incomplete('nothing is wired in')
+      if (block.sort.some((entry) => entry.column === '')) return incomplete('every sort needs a column')
       const order = block.sort.length === 0 ? '' : ` ORDER BY ${block.sort.map((entry) => `${identifier(entry.column)} ${entry.direction === 'ascending' ? 'ASC' : 'DESC'}`).join(', ')}`
       const limit = block.limit === null ? '' : ` LIMIT ${Math.max(0, Math.floor(block.limit))}`
       return ok(`SELECT * FROM ${only}${order}${limit}`)
@@ -320,8 +330,9 @@ export function compileDraft(graph: PipelineGraph, aliases: ReadonlySet<string>)
   const steps: DraftStep[] = []
   for (const node of graph.nodes) {
     if (node.block.kind !== 'input') continue
-    if (aliases.has(node.block.alias)) views.set(node.id, node.block.alias)
-    else waiting.set(node.id, `${node.block.alias} is not one of the input files`)
+    if (node.block.file.kind === 'empty') waiting.set(node.id, 'no file chosen yet')
+    else if (aliases.has(node.block.file.alias)) views.set(node.id, node.block.file.alias)
+    else waiting.set(node.id, `${node.block.file.alias} is not one of the input files`)
   }
   // Blocks become ready as their inputs do; a pass that settles nothing means the rest are in a loop.
   let pending = graph.nodes.filter((node) => node.block.kind !== 'input')
@@ -403,7 +414,7 @@ const draftProblem = (graph: PipelineGraph, draft: DraftPipeline): PipelineProbl
     const reason = draft.waiting.get(node.id)
     if (reason === undefined) continue
     if (doubled.has(node.id)) return { kind: 'port-taken', id: node.id, port: 0 }
-    if (node.block.kind === 'input') return { kind: 'unknown-input-alias', id: node.id, alias: node.block.alias }
+    if (node.block.kind === 'input') return node.block.file.kind === 'empty' ? { kind: 'incomplete-block', id: node.id, detail: 'no file chosen yet' } : { kind: 'unknown-input-alias', id: node.id, alias: node.block.file.alias }
     if (reason === 'the arrows into it form a loop') return { kind: 'cycle' }
     const arity = blockArity(node.block.kind)
     const actual = inputIdsOf(node.id).length
@@ -436,7 +447,7 @@ export function describePipelineProblem(problem: PipelineProblem, name: (id: Pip
 const identifierSchema = z.string().min(1)
 
 const blockSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('input'), alias: z.string().min(1) }).strict(),
+  z.object({ kind: z.literal('input'), file: z.discriminatedUnion('kind', [z.object({ kind: z.literal('chosen'), alias: z.string().min(1) }).strict(), z.object({ kind: z.literal('empty') }).strict()]) }).strict(),
   z.object({
     kind: z.literal('filter-rows'),
     match: z.enum(['all', 'any']),
@@ -483,7 +494,9 @@ export function parsePipelineRecipe(value: unknown): Result<PipelineRecipe, { re
   const graph: PipelineGraph = {
     nodes: parsed.data.graph.nodes.map((node) => ({
       id: pipelineBlockId(node.id),
-      block: node.block.kind === 'input' ? { kind: 'input', alias: brand<string, 'SqlInputAlias'>(node.block.alias) } : node.block,
+      block: node.block.kind === 'input'
+        ? { kind: 'input', file: node.block.file.kind === 'chosen' ? { kind: 'chosen', alias: brand<string, 'SqlInputAlias'>(node.block.file.alias) } : { kind: 'empty' } }
+        : node.block,
       position: node.position,
     })),
     edges: parsed.data.graph.edges.map((edge) => ({ from: pipelineBlockId(edge.from), to: pipelineBlockId(edge.to), port: edge.port })),

@@ -4,7 +4,7 @@ import { describeSqlPreparationProblem, materializeView, prepareSqlInputs, regis
 import type { PreviewCell } from '@/domain/dataset'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { compileDraft, compilePipeline, describePipelineProblem, type CompiledPipeline, type PipelineBlockId, type PipelineGraph, type PipelineProblem, type PipelineRecipe, type PipelineStep } from '@/domain/pipeline'
-import { inputDescriptor, type SqlPreparationInput } from '@/domain/sourceInputs'
+import { inputDescriptor, type SqlInputAlias, type SqlPreparationInput } from '@/domain/sourceInputs'
 
 export type PipelineRunProblem =
   | { readonly kind: 'engine-unavailable'; readonly detail: string }
@@ -55,9 +55,11 @@ export interface ScriptRuntime {
 
 export interface PipelineSession {
   readonly engine: DuckDbEngine
-  readonly inputs: NonEmptyArray<SqlPreparationInput>
+  /** The files registered so far, each a DuckDB view under its alias; input blocks add and replace them from the canvas. */
+  readonly inputs: SqlPreparationInput[]
   readonly lifecycle: { current: 'open' | 'closed' }
   readonly scripts: ScriptRuntime
+  readonly namespace: string
 }
 
 const PREVIEW_ROWS = 8
@@ -69,20 +71,45 @@ const detailOf = (cause: unknown): string => {
 }
 const identifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
-export async function openPipeline(inputs: NonEmptyArray<SqlPreparationInput>, scripts: ScriptRuntime): Promise<Result<PipelineSession, PipelineRunProblem>> {
+export async function openPipeline(inputs: readonly SqlPreparationInput[], scripts: ScriptRuntime): Promise<Result<PipelineSession, PipelineRunProblem>> {
   let engine: DuckDbEngine
   try { engine = await isolatedDuckDbEngine() } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
+  const namespace = `pipeline-${crypto.randomUUID()}`
   try {
-    const registered = await registerInputs(engine, inputs, `pipeline-${crypto.randomUUID()}`)
-    if (registered.ok) return ok({ engine, inputs, lifecycle: { current: 'open' }, scripts })
+    const registered = isNonEmpty(inputs) ? await registerInputs(engine, inputs, namespace) : ok(null)
+    if (registered.ok) return ok({ engine, inputs: [...inputs], lifecycle: { current: 'open' }, scripts, namespace })
     await engine.db.terminate()
     return err({ kind: 'input', problem: registered.error })
   } catch (cause) {
     await engine.db.terminate().catch(() => undefined)
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
+}
+
+/** Registers one more file under an alias no other input uses, and returns the input the block now refers to. */
+export async function addPipelineInput(session: PipelineSession, file: File): Promise<Result<SqlPreparationInput, PipelineRunProblem>> {
+  if (session.lifecycle.current === 'closed') return err({ kind: 'session-closed' })
+  const prepared = await prepareSqlInputs([file], new Set(session.inputs.map((input) => input.alias as string)))
+  if (!prepared.ok) return err({ kind: 'input', problem: prepared.error })
+  const input = prepared.value[0]
+  const registered = await registerInputs(session.engine, [input], session.namespace)
+  if (!registered.ok) return err({ kind: 'input', problem: registered.error })
+  session.inputs.push(input)
+  return ok(input)
+}
+
+/** Drops a registered file's view and forgets it; the block that held it is the caller's to update. */
+export async function removePipelineInput(session: PipelineSession, alias: SqlInputAlias): Promise<void> {
+  const index = session.inputs.findIndex((input) => input.alias === alias)
+  if (index === -1 || session.lifecycle.current === 'closed') return
+  const [removed] = session.inputs.splice(index, 1)
+  await withConnection(session, async (connection) => {
+    await connection.query(`DROP VIEW IF EXISTS ${identifier(alias)}`)
+    return ok(null)
+  })
+  await session.engine.db.dropFile(`${session.namespace}-${removed!.fingerprint}.${removed!.format}`).catch(() => undefined)
 }
 
 /** One connection for the work, closed afterwards; a session closed under it reports that instead of throwing. */
@@ -142,7 +169,7 @@ export async function runPipeline(session: PipelineSession, graph: PipelineGraph
   for (const [id, detail] of draft.waiting) outcomes.set(id, { kind: 'waiting', detail })
   return withConnection(session, async (connection) => {
     const inputs = graph.nodes.filter((node) => node.block.kind === 'input' && draft.views.has(node.id))
-    const describedInputs = await Promise.all(inputs.map((node) => describeView(connection, node.block.kind === 'input' ? node.block.alias : '')))
+    const describedInputs = await Promise.all(inputs.map((node) => describeView(connection, draft.views.get(node.id) ?? '')))
     inputs.forEach((node, index) => {
       const described = describedInputs[index]!
       outcomes.set(node.id, described.ok ? { kind: 'ran', ...described.value } : { kind: 'failed', detail: `the input file could not be read: ${described.error.detail}` })
@@ -206,8 +233,11 @@ export async function materializePipeline(session: PipelineSession, graph: Pipel
   return withConnection(session, async (connection) => {
     const materialized = await materializeView(session.engine, connection, outputView, 'pipeline_prepared.parquet')
     if (!materialized.ok) return err({ kind: 'materialization', problem: materialized.error })
-    const [first, ...rest] = session.inputs
-    return ok({ ...materialized.value, recipe: { kind: 'pipeline-derived', graph, inputs: [inputDescriptor(first), ...rest.map(inputDescriptor)] } })
+    // The recipe records the files the graph reads, not every file that was ever chosen.
+    const used = new Set(graph.nodes.flatMap((node) => node.block.kind === 'input' && node.block.file.kind === 'chosen' ? [node.block.file.alias as string] : []))
+    const descriptors = session.inputs.filter((input) => used.has(input.alias)).map(inputDescriptor)
+    if (!isNonEmpty(descriptors)) return err({ kind: 'wiring', problem: { kind: 'no-output-block' } })
+    return ok({ ...materialized.value, recipe: { kind: 'pipeline-derived', graph, inputs: descriptors } })
   })
 }
 

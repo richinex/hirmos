@@ -17,8 +17,8 @@ const runInBrowser = async (page: import('@playwright/test').Page) => page.evalu
   const id = domain.pipelineBlockId
   const graph = {
     nodes: [
-      { id: id('cities'), block: { kind: 'input', alias: cities.alias }, position: { x: 0, y: 0 } },
-      { id: id('regions'), block: { kind: 'input', alias: regions.alias }, position: { x: 1, y: 0 } },
+      { id: id('cities'), block: { kind: 'input', file: { kind: 'chosen', alias: cities.alias } }, position: { x: 0, y: 0 } },
+      { id: id('regions'), block: { kind: 'input', file: { kind: 'chosen', alias: regions.alias } }, position: { x: 1, y: 0 } },
       { id: id('join'), block: { kind: 'join', how: 'inner', keys: [{ left: 'id', right: 'id' }] }, position: { x: 0, y: 1 } },
       { id: id('big'), block: { kind: 'filter-rows', match: 'all', conditions: [{ column: 'population', test: 'gt', value: 300 }] }, position: { x: 0, y: 2 } },
       { id: id('thousands'), block: { kind: 'derive-columns', columns: [{ name: 'population_m', expression: 'population / 1000.0' }] }, position: { x: 0, y: 3 } },
@@ -98,7 +98,7 @@ test('previews 128-bit sums and decimals as numbers, not as Arrow words', async 
     const alias = inputs.value[0].alias
     const graph = {
       nodes: [
-        { id: 'in', block: { kind: 'input', alias }, position: { x: 0, y: 0 } },
+        { id: 'in', block: { kind: 'input', file: { kind: 'chosen', alias } }, position: { x: 0, y: 0 } },
         { id: 'exact', block: { kind: 'derive-columns', columns: [{ name: 'price_exact', expression: 'CAST(price AS DECIMAL(10,2))' }] }, position: { x: 0, y: 1 } },
         { id: 'sum', block: { kind: 'aggregate', groupBy: ['year'], measures: [{ function: 'sum', column: 'cases', as: 'total' }, { function: 'sum', column: 'price', as: 'spent' }, { function: 'sum', column: 'price_exact', as: 'spent_exact' }] }, position: { x: 0, y: 2 } },
         { id: 'out', block: { kind: 'output' }, position: { x: 0, y: 3 } },

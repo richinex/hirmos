@@ -7,14 +7,29 @@ export const CARD_HEIGHT = 86
 const COLUMN_GAP = 40
 const ROW_GAP = 120
 
+/** A fresh canvas: one input card for each file given, or one empty card when none is, and the output card below. */
 export function initialGraph(inputs: readonly SqlPreparationInput[]): PipelineGraph {
-  const nodes: PipelineNode[] = inputs.map((input, index) => ({
-    id: pipelineBlockId(`input-${input.alias}`),
-    block: { kind: 'input', alias: input.alias },
-    position: { x: index * (CARD_WIDTH + COLUMN_GAP), y: 0 },
-  }))
+  const nodes: PipelineNode[] = inputs.length === 0
+    ? [{ id: pipelineBlockId('input-1'), block: { kind: 'input', file: { kind: 'empty' } }, position: { x: 0, y: 0 } }]
+    : inputs.map((input, index) => ({
+      id: pipelineBlockId(`input-${input.alias}`),
+      block: { kind: 'input', file: { kind: 'chosen', alias: input.alias } },
+      position: { x: index * (CARD_WIDTH + COLUMN_GAP), y: 0 },
+    }))
   nodes.push({ id: pipelineBlockId('output'), block: { kind: 'output' }, position: { x: 0, y: ROW_GAP * 3 } })
   return { nodes, edges: [] }
+}
+
+/** Where a new input card goes: on the first row, to the right of the last input card. */
+export function placeForInput(graph: PipelineGraph): { readonly x: number; readonly y: number } {
+  const inputs = graph.nodes.filter((node) => node.block.kind === 'input')
+  const rightmost = inputs.reduce((best, node) => node.position.x > best ? node.position.x : best, -(CARD_WIDTH + COLUMN_GAP))
+  return { x: rightmost + CARD_WIDTH + COLUMN_GAP, y: inputs[0]?.position.y ?? 0 }
+}
+
+export function addInputBlock(graph: PipelineGraph): { readonly graph: PipelineGraph; readonly id: PipelineBlockId } {
+  const id = pipelineBlockId(`input-${crypto.randomUUID().slice(0, 8)}`)
+  return { graph: { ...graph, nodes: [...graph.nodes, { id, block: { kind: 'input', file: { kind: 'empty' } }, position: placeForInput(graph) }] }, id }
 }
 
 /** Under the selected block, or under the lowest block that is not the output, so new blocks stack towards the output. */
