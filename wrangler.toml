@@ -4,6 +4,8 @@ pages_build_output_dir = "dist"
 
 # The DuckDB engine binaries exceed the 25 MiB Pages file limit, so they are served from R2 by
 # functions/duckdb/[[path]].js under the app's own origin. Keys are <package version>/<file>.
+# The Python runtime (Pyodide with pandas and numpy, about 20 MB) shares the bucket under
+# pyodide/<version>/<file>, served by functions/pyodide/[[path]].js.
 [[r2_buckets]]
 binding = "DUCKDB"
 bucket_name = "hirmos-duckdb"

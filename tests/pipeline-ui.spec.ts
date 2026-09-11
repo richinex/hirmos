@@ -268,7 +268,7 @@ test.describe('pipeline canvas', () => {
   })
 })
 
-test('keeps the pipeline canvas inside a phone viewport', async ({ page }, testInfo) => {
+test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pans under a finger', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'mobile-chromium', 'This is the phone layout check')
   await page.goto('/app')
   await page.getByRole('textbox', { name: 'Project name' }).fill('Pipeline')
@@ -276,6 +276,31 @@ test('keeps the pipeline canvas inside a phone viewport', async ({ page }, testI
   await page.getByRole('radio', { name: 'Build a pipeline' }).click({ force: true })
   await page.locator('input[type="file"][multiple]').setInputFiles(files())
   await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
+  await expect(block(page, 'input-cities')).toContainText('4 rows', { timeout: 30_000 })
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
   expect(width.content).toBeLessThanOrEqual(width.viewport)
+
+  // The palette is one row of glyphs on a phone, every block kind in view, never a stack.
+  const palette = page.getByRole('toolbar', { name: 'Add a block' })
+  expect(await palette.evaluate((el) => el.clientHeight)).toBeLessThan(60)
+  const chips = await palette.getByRole('button').evaluateAll((buttons) => buttons.map((button) => { const box = button.getBoundingClientRect(); return { name: button.getAttribute('aria-label'), inView: box.width > 0 && box.right <= document.documentElement.clientWidth } }))
+  expect(chips.map((chip) => chip.name)).toEqual(['Filter rows', 'Sort and limit', 'Select columns', 'Derive columns', 'Join', 'Union', 'Group and aggregate', 'Script'])
+  expect(chips.every((chip) => chip.inView)).toBe(true)
+
+  // The canvas takes the stage's height, so its controls sit along the foot of the screen, not mid-way.
+  const canvas = (await page.getByTestId('pipeline-canvas').boundingBox())!
+  const controls = (await page.getByRole('toolbar', { name: 'Canvas' }).boundingBox())!
+  expect(canvas.height).toBeGreaterThan(400)
+  expect(controls.y + controls.height).toBeGreaterThan(canvas.y + canvas.height - 40)
+  for (const name of ['Zoom in', 'Zoom out', 'Fit the pipeline', 'Tidy pipeline', 'Lock the view']) await expect(page.getByRole('button', { name, exact: true })).toBeInViewport()
+
+  // A finger on empty canvas pans it.
+  const before = await page.locator('.react-flow__viewport').getAttribute('style')
+  const pane = (await page.locator('.react-flow__pane').boundingBox())!
+  const x = pane.x + 30, y = pane.y + pane.height / 2
+  const client = await page.context().newCDPSession(page)
+  await client.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] })
+  for (let i = 1; i <= 8; i++) await client.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - 15 * i }] })
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+  await expect.poll(async () => page.locator('.react-flow__viewport').getAttribute('style')).not.toBe(before)
 })

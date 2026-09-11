@@ -22,6 +22,7 @@ import {
 } from '@/data/pipeline'
 import { pythonScriptRuntime } from '@/data/pythonRuntime'
 import { formatCount } from '@/lib/format/number'
+import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
 import { columnDecimals, PreviewCellText } from '../previewCell'
@@ -115,6 +116,7 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
   const [refusal, setRefusal] = useState<string | null>(null)
   const [materializing, setMaterializing] = useState<{ readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }>({ kind: 'idle' })
   const index = useMemo(() => indexGraph(graph), [graph])
+  const isMobile = useIsMobile()
 
   useEffect(() => {
     let cancelled = false
@@ -207,17 +209,19 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
   const outputReady = run.kind === 'ran' && run.result.complete.ok && [...run.result.outcomes.values()].every((outcome) => outcome.kind === 'ran')
 
   const stage = (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex flex-wrap items-center gap-1 border-b border-line px-2 py-1.5" role="toolbar" aria-label="Add a block">
-        <span className={label('mx-1 text-faint')}>Add a block</span>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* One row, never a stack: on a phone the chips show their glyph alone so all eight fit; wider than that they carry their labels and scroll sideways if the stage is narrow. */}
+      <div className="flex min-w-0 max-w-full flex-nowrap items-center gap-1 overflow-x-auto border-b border-line px-2 py-1.5 [scrollbar-width:thin]" role="toolbar" aria-label="Add a block">
+        <span className={label('mx-1 shrink-0 text-faint')}>Add a block</span>
         {PALETTE_GROUPS.map((group, index) => (
-          <div key={group.label} className="flex items-center gap-0.5" role="group" aria-label={group.label}>
-            {index > 0 && <span aria-hidden className="mx-1 h-4 w-px bg-hair" />}
+          <div key={group.label} className="flex shrink-0 items-center gap-0.5" role="group" aria-label={group.label}>
+            {index > 0 && <span aria-hidden className="mx-0.5 h-4 w-px bg-hair" />}
             {group.kinds.map((kind) => (
               <button
                 key={kind}
                 type="button"
-                className={chromeAction('quiet', 'cursor-grab active:cursor-grabbing')}
+                className={chromeAction('quiet', 'shrink-0 cursor-grab whitespace-nowrap active:cursor-grabbing')}
+                aria-label={blockLabel(kind)}
                 title={`Click to add ${blockLabel(kind).toLowerCase()} after the selected block, or drag it onto the canvas`}
                 draggable
                 onDragStart={(event) => { event.dataTransfer.setData(BLOCK_DRAG_TYPE, kind); event.dataTransfer.effectAllowed = 'copy' }}
@@ -225,7 +229,7 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
                 onFocus={kind === 'script' ? preloadPythonEditor : undefined}
                 onClick={() => add(kind)}
               >
-                <Icon name={blockIcon(kind)} size={16} /> {blockLabel(kind)}
+                <Icon name={blockIcon(kind)} size={16} />{isMobile ? null : <span>{blockLabel(kind)}</span>}
               </button>
             ))}
           </div>
@@ -237,7 +241,7 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
       </div>
       {refusal !== null && <Alert tone="warn" className="mx-3 mt-2"><p className="m-0">{refusal}</p></Alert>}
       {run.kind === 'refused' && <Alert tone="danger" className="mx-3 mt-2"><p className="m-0">{run.detail}</p></Alert>}
-      <div className="relative min-h-[16rem] flex-1 @max-md/panel:min-h-[28rem]">
+      <div className="relative min-h-[16rem] flex-1">
         <PipelineCanvas
           graph={graph}
           outcomes={outcomes}
@@ -313,7 +317,7 @@ export function PipelineWorkspace({ inputs, onPrepared, onCleared }: {
   const previewTitle = 'Preview'
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" aria-label="Build a pipeline">
+    <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col" aria-label="Build a pipeline">
       <WorkbenchLayout
         id="pipeline"
         stage={stage}

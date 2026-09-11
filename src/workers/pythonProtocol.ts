@@ -9,8 +9,8 @@ import { err, ok, type Result } from '@/domain/dop'
  */
 
 export const PYODIDE_VERSION = '314.0.6'
-/** Where the runtime and its wheels are fetched from; one constant, so moving them to R2 is one change. */
-export const PYODIDE_INDEX_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`
+/** The runtime and its wheels live under the app's own origin: R2 behind a Pages function in production, the Pyodide CDN behind the dev server. */
+export const PYODIDE_INDEX_URL = `${self.location.origin}/pyodide/${PYODIDE_VERSION}/`
 export const PYTHON_PACKAGES = ['numpy', 'pandas'] as const
 
 export type PythonCommand =

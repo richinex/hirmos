@@ -129,7 +129,9 @@ type CardPosition = { readonly x: number; readonly y: number }
 function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnect, onRemoveEdge, onRemoveBlock, onRefused, onDropBlock, onTidy }: PipelineCanvasProps) {
   const { screenToFlowPosition, fitView } = useReactFlow()
   const index = useMemo(() => indexGraph(graph), [graph])
-  // On a phone the canvas sits in a page that scrolls, so a swipe scrolls the page until the view is unlocked; on a desktop the canvas fills the stage and the wheel zooms it.
+  // A finger or the pointer always pans, as on the DAG editor. On a phone the canvas sits in a page that
+  // scrolls, so the wheel and pinch stay with the page until the view is unlocked; on a desktop the canvas
+  // fills the stage and the wheel zooms it.
   const isMobile = useIsMobile()
   const [lockOverride, setLockOverride] = useState<boolean | null>(null)
   const viewLocked = lockOverride ?? isMobile
@@ -222,7 +224,6 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
           onInit={fitAfterLayout}
           zoomOnScroll={!viewLocked}
-          panOnDrag={!viewLocked || !isMobile}
           preventScrolling={!viewLocked}
           minZoom={0.3}
           maxZoom={1.6}
@@ -244,7 +245,7 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
               <button
                 type="button"
                 className={flowControl}
-                title={viewLocked ? 'A swipe scrolls the page. Tap to let it move the canvas instead.' : 'A swipe moves the canvas. Tap to give it back to the page.'}
+                title={viewLocked ? 'Scrolling and pinching stay with the page. Tap to let them zoom the canvas.' : 'Scrolling and pinching zoom the canvas. Tap to give them back to the page.'}
                 aria-label="Lock the view"
                 aria-pressed={viewLocked}
                 onClick={() => setLockOverride(!viewLocked)}

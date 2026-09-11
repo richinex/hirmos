@@ -1,4 +1,4 @@
-import { createReadStream, existsSync, readFileSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
@@ -47,9 +47,44 @@ const duckdbBinaries = (): Plugin => {
   }
 }
 
+/**
+ * Serve the Python runtime at /pyodide/<version>/<file> in development and preview by fetching it
+ * from the Pyodide CDN. The deployment answers the same path from R2 (functions/pyodide/[[path]].js),
+ * so the worker loads the runtime from the app's own origin in both.
+ */
+const pyodideRuntime = (): Plugin => {
+  const cache = join(process.cwd(), 'node_modules', '.cache', 'pyodide')
+  const types: Record<string, string> = { mjs: 'text/javascript', wasm: 'application/wasm', json: 'application/json', zip: 'application/zip', whl: 'application/octet-stream' }
+  const serve = (request: { url?: string }, response: { setHeader: (name: string, value: string) => void; statusCode: number; end: (body?: Uint8Array | string) => void }, next: () => void) => {
+    const match = /^\/pyodide\/([0-9.]+)\/([A-Za-z0-9_.-]+\.(mjs|wasm|json|zip|whl))$/.exec(new URL(request.url ?? '/', 'http://hirmos.local').pathname)
+    if (match === null) { next(); return }
+    const [, version, file, extension] = match
+    const cached = join(cache, version, file)
+    const send = (body: Uint8Array) => {
+      response.setHeader('content-type', types[extension] ?? 'application/octet-stream')
+      response.setHeader('cache-control', 'public, max-age=31536000, immutable')
+      response.end(body)
+    }
+    if (existsSync(cached)) { send(readFileSync(cached)); return }
+    // Fetched once from the Pyodide CDN and kept under node_modules/.cache, so the runtime loads in dev as fast as it does from R2.
+    void fetch(`https://cdn.jsdelivr.net/pyodide/v${version}/full/${file}`).then(async (upstream) => {
+      if (!upstream.ok) { response.statusCode = upstream.status; response.end('Not found'); return }
+      const body = new Uint8Array(await upstream.arrayBuffer())
+      mkdirSync(dirname(cached), { recursive: true })
+      writeFileSync(cached, body)
+      send(body)
+    }).catch(() => { response.statusCode = 502; response.end('The Pyodide CDN could not be reached') })
+  }
+  return {
+    name: 'hirmos:pyodide-runtime',
+    configureServer(server) { server.middlewares.use(serve) },
+    configurePreviewServer(server) { server.middlewares.use(serve) },
+  }
+}
+
 export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0') },
-  plugins: [react(), tailwindcss(), appRoute(), duckdbBinaries()],
+  plugins: [react(), tailwindcss(), appRoute(), duckdbBinaries(), pyodideRuntime()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     port: 5179,
