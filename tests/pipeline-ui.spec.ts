@@ -22,12 +22,13 @@ const openEditor = async (page: Page) => {
 }
 
 const giveFile = async (page: Page, id: string, file: { name: string; mimeType: string; buffer: Buffer }) => {
+  // On a phone the inspector is a sheet, and a tap on a block brings it up. The bar is read before the tap:
+  // behind an open sheet it is aria-hidden and no longer found by role.
+  const phone = await page.getByRole('group', { name: 'Panes' }).count() > 0
   await block(page, id).click({ position: { x: 20, y: 8 } })
-  // On a phone the inspector is a sheet opened from the bar under the stage.
-  const panes = page.getByRole('group', { name: 'Panes' })
-  if (await panes.count() > 0) await panes.getByRole('button', { name: 'Input file' }).click()
+  if (phone) await expect(page.getByRole('dialog', { name: 'Input file' })).toBeVisible()
   await page.getByLabel('File for this card').setInputFiles(file)
-  if (await panes.count() > 0) {
+  if (phone) {
     await expect(block(page, id)).toContainText(/rows ·|failed/, { timeout: 30_000 })
     await page.keyboard.press('Escape')
     await expect(page.locator('[data-vaul-overlay]')).toHaveCount(0)
@@ -395,6 +396,19 @@ test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pa
   await openEditor(page)
   await giveFile(page, 'input-1', files()[0]!)
   await expect(block(page, 'input-1')).toContainText('4 rows', { timeout: 30_000 })
+
+  // A tap on a block brings its settings up as a sheet, and the bar shows which pane is open; a second tap on
+  // the same block, its selection unchanged, brings the sheet up again.
+  // Behind the open sheet the bar is aria-hidden, so its opener is read by attribute rather than by role.
+  const opener = page.locator('[aria-label="Panes"] button', { hasText: 'Input file' })
+  for (let tap = 0; tap < 2; tap++) {
+    await block(page, 'input-1').click({ position: { x: 20, y: 8 } })
+    await expect(page.getByRole('dialog', { name: 'Input file' })).toBeVisible()
+    await expect(opener).toHaveAttribute('aria-expanded', 'true')
+    await page.keyboard.press('Escape')
+    await expect(page.locator('[data-vaul-overlay]')).toHaveCount(0)
+    await expect(opener).toHaveAttribute('aria-expanded', 'false')
+  }
   const paneBox = (await page.locator('.react-flow__pane').boundingBox())!
   await page.mouse.click(paneBox.x + 10, paneBox.y + 10)
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))

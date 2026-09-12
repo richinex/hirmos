@@ -136,7 +136,7 @@ export function FilterField({ value, onChange, placeholder, label: fieldLabel, c
 }) {
   const input = useRef<HTMLInputElement>(null)
   return (
-    <div className={cn('flex min-w-0 items-center gap-2 rounded-md border border-hair bg-well px-2 py-[2px] focus-within:border-signal/60', className)}>
+    <div className={cn('flex min-w-0 items-center gap-2 rounded-full border border-hair bg-well px-2.5 py-[2px] focus-within:border-signal/60', className)}>
       <Icon name="search" size={13} className="shrink-0 text-faint" />
       <input
         ref={input}

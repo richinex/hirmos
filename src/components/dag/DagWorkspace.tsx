@@ -982,7 +982,7 @@ export function DagWorkspace({
                   {selectedEdgeDraft.timing.kind === 'lagged' && <label className="text-body text-ink">Arrow lag<input className={field('text', 'mt-1')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={selectedEdgeDraft.timing.lag} onChange={(event) => dispatch({ type: 'selected-edge-lag-changed', value: event.target.value })} /></label>}
                 </div>
               )}
-              <label className="mt-3 block text-body text-ink">Rationale<textarea className={field('text', 'mt-1 min-h-20 resize-y')} value={selectedEdgeDraft.rationale} onChange={(event) => dispatch({ type: 'selected-edge-rationale-changed', value: event.target.value })} placeholder="Record the mechanism, assignment rule, protocol, prior study, or expert evidence supporting this arrow." /></label>
+              <label className="mt-3 block text-body text-ink">Rationale<textarea className={field('text', 'mt-1 min-h-20 resize-y rounded-lg')} value={selectedEdgeDraft.rationale} onChange={(event) => dispatch({ type: 'selected-edge-rationale-changed', value: event.target.value })} placeholder="Record the mechanism, assignment rule, protocol, prior study, or expert evidence supporting this arrow." /></label>
               <p className={literal('mb-0 mt-2 text-micro text-faint')}>{selectedEdge.evidence.length} attached discovery item{selectedEdge.evidence.length === 1 ? '' : 's'}</p>
               {selectedEdgeDraft.problem !== null && <p role="alert" className="mb-0 mt-3 text-body text-danger">{describeDagEditProblem(selectedEdgeDraft.problem)}</p>}
               <div className="mt-3 flex flex-wrap gap-2">

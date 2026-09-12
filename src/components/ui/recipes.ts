@@ -29,10 +29,10 @@ const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-hi
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
  * remains "not ready"; a busy button keeps focus so nothing jumps when the run ends. */
-const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
+const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
-  signal: cn('rounded-full bg-signal px-4', FILLED),
+  signal: cn('bg-signal px-4', FILLED),
   soft: SIGNAL_WASH,
   danger: cn('bg-danger', FILLED),
   outline: 'border border-hair text-ink hover:border-edge',
@@ -74,7 +74,7 @@ const CHROME_TONE: Record<ChromeTone, string> = {
 
 export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'grid h-8 w-8 shrink-0 place-items-center rounded-lg border pointer-coarse:h-10 pointer-coarse:w-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'grid h-8 w-8 shrink-0 place-items-center rounded-full border pointer-coarse:h-10 pointer-coarse:w-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
     extra,
   )
@@ -83,7 +83,7 @@ export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string 
  * as one control family even when some actions need labels and others only need a familiar glyph. */
 export const chromeAction = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'flex min-h-8 items-center gap-1.5 rounded-lg border px-2 text-label pointer-coarse:min-h-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-label pointer-coarse:min-h-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
     extra,
   )
@@ -117,7 +117,7 @@ export const pill = (active: boolean, extra?: string): string =>
  *  the affordance at 3:1, and the placeholder is italic so it never reads as an entered value. */
 export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string =>
   cn(
-    'w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink placeholder:italic placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint',
+    'w-full rounded-full border border-control bg-well px-3 py-1.5 text-body text-ink placeholder:italic placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint',
     variant === 'mono' && 'font-mono',
     extra,
   )

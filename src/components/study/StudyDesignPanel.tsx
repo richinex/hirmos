@@ -548,7 +548,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
             <label className="flex min-w-0 flex-col">
               <span className={fieldLabel}>Assignment sentence</span>
               <textarea
-                className={field('text', 'mt-1 min-h-24 flex-1 resize-y')}
+                className={field('text', 'mt-1 min-h-24 flex-1 resize-y rounded-lg')}
                 placeholder="One sentence: who or what set the treatment, and when"
                 value={state.draft.assignment.description}
                 onChange={(event) => onDraftChanged({ ...draft, assignment: { ...draft.assignment, description: event.target.value } })}

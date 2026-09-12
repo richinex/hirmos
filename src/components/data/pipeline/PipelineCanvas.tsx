@@ -25,6 +25,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { Icon } from '@/components/Icon'
 import { FlowControls, flowControl } from '@/components/flow/FlowControls'
+import { useOpenPane } from '@/components/shell/WorkbenchLayout'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { blockLabel, type PipelineBlockId, type PipelineEdge, type PipelineGraph, type PipelineNode } from '@/domain/pipeline'
 import type { BlockOutcome } from '@/data/pipeline'
@@ -158,6 +159,7 @@ const toEdge = (connection: Connection): PipelineEdge | null => connection.sourc
   : null
 
 function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnect, onRemoveEdge, onRemoveBlock, onRefused, onDropBlock, onTidy }: PipelineCanvasProps) {
+  const openPane = useOpenPane()
   const { screenToFlowPosition, fitView } = useReactFlow()
   const index = useMemo(() => indexGraph(graph), [graph])
   // A finger or the pointer always pans, as on the DAG editor. On a phone the canvas sits in a page that
@@ -256,6 +258,13 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
     if (refusal !== null) onRefused(refusal)
   }, [index, onRefused])
   const clearSelection = useCallback(() => onSelect(null), [onSelect])
+  // On a phone the inspector is a sheet, so a tap on a block brings its settings up the way the desktop
+  // panel shows them. The click, not the selection change, carries it: a tap on the block already selected
+  // changes nothing and must still open the sheet.
+  const selectByClick = useCallback((_event: unknown, node: CanvasNode) => {
+    onSelect(node.id as PipelineBlockId)
+    openPane('inspector')
+  }, [onSelect, openPane])
   const tidy = useCallback(() => { onTidy(); window.setTimeout(() => void fitView({ ...FIT_VIEW, duration: 220 }), 30) }, [fitView, onTidy])
 
   return (
@@ -271,6 +280,7 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
           isValidConnection={isConnectionValid}
           onConnectEnd={connectEnd}
           onPaneClick={clearSelection}
+          onNodeClick={selectByClick}
           selectNodesOnDrag={false}
           multiSelectionKeyCode={null}
           connectionLineStyle={CONNECTION_LINE_STYLE}

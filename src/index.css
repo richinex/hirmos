@@ -180,12 +180,12 @@
    of the system default: without this, Android renders a dark picker sheet over the paper themes. */
 :root { color-scheme: dark; }
 
-/* Radius: rounded-md for controls, fields and every choice among a few options (segments, facets,
-   view switches), rounded-lg for rows and small cards, rounded-xl for section cards, rounded-2xl for
-   the palette, rounded-3xl for floating windows and sheets, rounded-full for the one primary action
-   on a surface (`button('signal')`) and for no other control, so the thing to do next is the only
-   pill-shaped button on the screen; progress tracks, drag handles and dots are shapes, not controls.
-   Anything else is drift. */
+/* Radius: rounded-full for every action and every single-line field (`button()`, `iconControl()`,
+   `chromeAction()`, `field()`), so an action reads as a capsule and a filled capsule is the primary
+   one; rounded-md for every choice among a few options (segments, facets, view switches), which keeps
+   a choice apart from an action; rounded-lg for rows, small cards and multi-line fields, rounded-xl
+   for section cards, rounded-2xl for the palette, rounded-3xl for floating windows and sheets.
+   Progress tracks, drag handles and dots are shapes, not controls. Anything else is drift. */
 
 /* The layering order, in one readable list. Increments of 10 leave room; nothing floats
    without a name here. */
