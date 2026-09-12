@@ -2,6 +2,13 @@
 
 use super::*;
 
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ForestSplitCommand {
+    LogRank,
+    ExtraTrees,
+}
+
 pub(crate) const MIN_STATIONARITY_OBSERVATIONS: usize = 24;
 pub(crate) const MAX_MINIMAL_ADJUSTMENT_SETS: usize = 128;
 
@@ -854,6 +861,28 @@ pub(crate) enum AnalysisCommand {
         penalizer: f64,
         confidence_level: f64,
         prediction_times: Vec<f64>,
+    },
+    Aalen {
+        rows: usize,
+        columns: usize,
+        duration: usize,
+        event: usize,
+        covariates: Vec<usize>,
+    },
+    SurvivalForest {
+        rows: usize,
+        columns: usize,
+        duration: usize,
+        event: usize,
+        covariates: Vec<usize>,
+        categorical: Vec<usize>,
+        trees: usize,
+        mtry: usize,
+        seed: u32,
+        min_node_size: usize,
+        min_bucket: usize,
+        prediction_row: usize,
+        split_rule: ForestSplitCommand,
     },
     ComparisonSurvival {
         rows: usize,
@@ -2032,6 +2061,29 @@ pub(crate) enum AnalysisResult {
         prediction_times: Vec<f64>,
         survival: Vec<f64>,
         median: f64,
+    },
+    Aalen {
+        observations: usize,
+        events: usize,
+        fitted_events: usize,
+        last_time: f64,
+        coefficients: Vec<[f64; 5]>,
+        curves: Vec<Vec<[f64; 4]>>,
+        chisq: f64,
+        degrees_of_freedom: usize,
+        p_value: f64,
+    },
+    SurvivalForest {
+        observations: usize,
+        events: usize,
+        trees: usize,
+        importance: Vec<SurvivalSummary<f64>>,
+        concordance: SurvivalSummary<f64>,
+        prediction_row: usize,
+        profile: Vec<f64>,
+        prediction_times: Vec<f64>,
+        survival: Vec<f64>,
+        cumulative_hazard: Vec<f64>,
     },
     NonparametricSurvival {
         observations: usize,

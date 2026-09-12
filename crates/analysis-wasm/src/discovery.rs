@@ -1814,6 +1814,8 @@ mod tests {
             | AnalysisCommand::FlexSurv { .. }
             | AnalysisCommand::CoxRegression { .. }
             | AnalysisCommand::PenalizedAft { .. }
+            | AnalysisCommand::Aalen { .. }
+            | AnalysisCommand::SurvivalForest { .. }
             | AnalysisCommand::NonparametricSurvival { .. }
             | AnalysisCommand::ComparisonSurvival { .. }
             | AnalysisCommand::MultiStateSurvival { .. }

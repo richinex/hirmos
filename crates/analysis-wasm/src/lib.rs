@@ -279,6 +279,10 @@ pub fn run_analysis(
             confidence_level,
             &prediction_times,
         ),
+        AnalysisCommand::Aalen { rows, columns, duration, event, covariates } =>
+            aalen_evidence(values, rows, columns, duration, event, &covariates),
+        AnalysisCommand::SurvivalForest { rows, columns, duration, event, covariates, categorical, trees, mtry, seed, min_node_size, min_bucket, prediction_row, split_rule } =>
+            forest_evidence(values, rows, columns, duration, event, &covariates, &categorical, trees, mtry, seed, min_node_size, min_bucket, prediction_row, split_rule),
         AnalysisCommand::NonparametricSurvival {
             rows,
             columns,

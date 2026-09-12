@@ -105,6 +105,7 @@ fn prediction_counts(
     events: &[Event],
     predicted_event_times: &[f64],
     selected: &[usize],
+    ties: EventTimeTies,
 ) -> (u64, u64, u64) {
     let observed_predictions = selected
         .iter()
@@ -154,7 +155,26 @@ fn prediction_counts(
                 &ranks,
             );
             pairs += new_pairs;
-            correct += new_correct;
+            let excluded = match ties {
+                EventTimeTies::ObservedFirst => 0,
+                EventTimeTies::Unordered => {
+                    let time = durations[censored[censored_index]];
+                    let begin = observed.partition_point(|&r| durations[r] < time);
+                    let finish = observed.partition_point(|&r| durations[r] <= time);
+                    let mut predictions: Vec<f64> = observed[begin..finish]
+                        .iter()
+                        .map(|&r| predicted_event_times[r])
+                        .collect();
+                    predictions.sort_unstable_by(f64::total_cmp);
+                    censored[censored_index..end]
+                        .iter()
+                        .map(|&r| {
+                            predictions.partition_point(|v| *v < predicted_event_times[r]) as u64
+                        })
+                        .sum()
+                }
+            };
+            correct += new_correct - excluded;
             tied += new_tied;
             censored_index = end;
             continue;
@@ -202,6 +222,29 @@ pub(crate) fn prediction_concordance_index(
     predictions: &[f64],
     strata: Option<&[usize]>,
 ) -> Option<ConcordanceIndex> {
+    prediction_concordance_with_ties(
+        durations,
+        events,
+        predictions,
+        strata,
+        EventTimeTies::ObservedFirst,
+    )
+}
+
+/// Specify whether an observed event precedes censoring recorded at the same time.
+#[derive(Clone, Copy)]
+pub(crate) enum EventTimeTies {
+    ObservedFirst,
+    Unordered,
+}
+
+pub(crate) fn prediction_concordance_with_ties(
+    durations: &[f64],
+    events: &[Event],
+    predictions: &[f64],
+    strata: Option<&[usize]>,
+    ties: EventTimeTies,
+) -> Option<ConcordanceIndex> {
     let (pairs, correct, tied) = if let Some(strata) = strata {
         let mut groups = strata.to_vec();
         groups.sort_unstable();
@@ -213,7 +256,7 @@ pub(crate) fn prediction_concordance_index(
                     .filter(|row| strata[*row] == stratum)
                     .collect::<Vec<_>>();
                 let (pairs, correct, tied) =
-                    prediction_counts(durations, events, predictions, &selected);
+                    prediction_counts(durations, events, predictions, &selected, ties);
                 (all_pairs + pairs, all_correct + correct, all_tied + tied)
             },
         )
@@ -223,6 +266,7 @@ pub(crate) fn prediction_concordance_index(
             events,
             predictions,
             &(0..durations.len()).collect::<Vec<_>>(),
+            ties,
         )
     };
     (pairs > 0).then(|| ConcordanceIndex((correct as f64 + tied as f64 / 2.0) / pairs as f64))
@@ -246,6 +290,7 @@ mod tests {
                 .map(|v| -v.exp())
                 .collect::<Vec<_>>(),
             selected,
+            EventTimeTies::ObservedFirst,
         )
     }
 
@@ -253,6 +298,7 @@ mod tests {
         durations: &[f64],
         events: &[Event],
         log_partial_hazards: &[f64],
+        ties: EventTimeTies,
     ) -> (u64, u64, u64) {
         let predictions = log_partial_hazards
             .iter()
@@ -278,6 +324,9 @@ mod tests {
                 pairs += 1;
                 if predictions[left] == predictions[right] {
                     tied += 1;
+                    continue;
+                }
+                if durations[left] == durations[right] && matches!(ties, EventTimeTies::Unordered) {
                     continue;
                 }
                 let is_correct = if predictions[left] < predictions[right] {
@@ -312,7 +361,8 @@ mod tests {
                     Event::Censored
                 });
             }
-            let expected = naive_counts(&durations, &events, &hazards);
+            let expected =
+                naive_counts(&durations, &events, &hazards, EventTimeTies::ObservedFirst);
             let actual = concordance_counts(
                 &durations,
                 &events,
@@ -320,6 +370,15 @@ mod tests {
                 &(0..durations.len()).collect::<Vec<_>>(),
             );
             assert_eq!(actual, expected, "encoded case {encoded}");
+            let expected = naive_counts(&durations, &events, &hazards, EventTimeTies::Unordered);
+            let actual = prediction_counts(
+                &durations,
+                &events,
+                &hazards.iter().map(|v| -v.exp()).collect::<Vec<_>>(),
+                &(0..durations.len()).collect::<Vec<_>>(),
+                EventTimeTies::Unordered,
+            );
+            assert_eq!(actual, expected, "ranger encoded case {encoded}");
         }
     }
 }

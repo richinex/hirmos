@@ -1,4 +1,16 @@
 import { err, ok, type Result } from '@/domain/dop'
+import type { AalenEvidence, ForestEvidence } from '@/domain/survivalRegression'
+import type { AalenWorkerDesign, ForestWorkerDesign } from '@/workers/analysisProtocol'
+
+export function runAalen(values: Float64Array, rows: number, columns: number, design: AalenWorkerDesign): Promise<Result<AalenEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('aalen-succeeded', { kind: 'aalen', request, values, rows, columns, design }, values)
+}
+
+export function runSurvivalForest(values: Float64Array, rows: number, columns: number, design: ForestWorkerDesign): Promise<Result<ForestEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('survival-forest-succeeded', { kind: 'survival-forest', request, values, rows, columns, design }, values)
+}
 import type { CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import type { MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { GrangerSsrEvidence } from '@/domain/granger'

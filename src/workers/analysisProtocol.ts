@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
@@ -206,6 +207,8 @@ export type CoxRegressionWorkerDesign = {
 }
 
 export type AnalysisWorkerCommand =
+  | { readonly kind: 'aalen'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly rows: number; readonly columns: number; readonly design: AalenWorkerDesign }
+  | { readonly kind: 'survival-forest'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly rows: number; readonly columns: number; readonly design: ForestWorkerDesign }
   | {
       readonly kind: 'flexsurv'
       readonly request: WorkerRequestId
@@ -946,6 +949,8 @@ export const describeAnalysisWorkerProblem = (problem: AnalysisWorkerProblem): s
 }
 
 export type AnalysisWorkerEvent =
+  | { readonly kind: 'aalen-succeeded'; readonly request: WorkerRequestId; readonly result: AalenEvidence }
+  | { readonly kind: 'survival-forest-succeeded'; readonly request: WorkerRequestId; readonly result: ForestEvidence }
   | {
       readonly kind: 'analysis-progress'
       readonly request: WorkerRequestId
@@ -1066,6 +1071,26 @@ export type AnalysisProtocolProblem =
 
 const requestSchema = z.string().uuid()
 
+export interface AalenWorkerDesign {
+  readonly duration: number
+  readonly event: number
+  readonly covariates: readonly number[]
+}
+export interface ForestWorkerDesign extends AalenWorkerDesign, ForestSettings {
+  readonly categorical: readonly number[]
+  readonly predictionRow: number
+}
+const regressionDesignSchema = z.object({
+  duration: z.number().int().nonnegative(),
+  event: z.number().int().nonnegative(),
+  covariates: z.array(z.number().int().nonnegative()).min(1),
+}).strict()
+const forestDesignSchema = regressionDesignSchema.extend({
+  ...forestSettingsSchema.shape,
+  categorical: z.array(z.number().int().nonnegative()),
+  predictionRow: z.number().int().nonnegative(),
+}).strict()
+
 const workerRequestId = (value: string): Result<WorkerRequestId, { readonly kind: 'invalid-worker-request-id' }> =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
     ? ok(brand<string, 'WorkerRequestId'>(value))
@@ -1124,6 +1149,8 @@ const constraintCommandBaseSchema = z.object({
 })
 
 const commandSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('aalen'), request: requestSchema, values: z.instanceof(Float64Array), rows: z.number().int().min(2), columns: z.number().int().min(3), design: regressionDesignSchema }).strict(),
+  z.object({ kind: z.literal('survival-forest'), request: requestSchema, values: z.instanceof(Float64Array), rows: z.number().int().min(2), columns: z.number().int().min(3), design: forestDesignSchema }).strict(),
   z.object({
     kind: z.literal('flexsurv'),
     request: requestSchema,
@@ -1963,6 +1990,8 @@ export const analysisProgressSchema = z.object({
 })
 
 const eventSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('aalen-succeeded'), request: requestSchema, result: aalenEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('survival-forest-succeeded'), request: requestSchema, result: forestEvidenceSchema }).strict(),
   z.object({
     kind: z.literal('analysis-progress'),
     request: requestSchema,
@@ -2169,6 +2198,7 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (!request.ok) return err({ kind: 'invalid-event', detail: 'The worker request identity is invalid.' })
   if (parsed.data.kind === 'analysis-failed') return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'analysis-progress') return ok({ ...parsed.data, request: request.value })
+  if (parsed.data.kind === 'aalen-succeeded' || parsed.data.kind === 'survival-forest-succeeded') return ok({ ...parsed.data, request: request.value })
   if (parsed.data.kind === 'penalized-aft-succeeded') {
     const result = parsePenalizedAftEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'penalized-aft-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })

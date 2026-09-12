@@ -1,7 +1,7 @@
 //! Cox proportional-hazards regression for right-censored and start-stop data.
 
 mod baseline;
-mod concordance;
+pub(crate) mod concordance;
 mod data;
 mod fit;
 mod frailty;

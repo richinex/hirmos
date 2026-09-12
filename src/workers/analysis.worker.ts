@@ -36,6 +36,7 @@ import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
 import { parseComparisonSurvivalEvidence, parseCoxRegressionEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence, parseNonparametricSurvivalEvidence, parsePenalizedAftEvidence } from '@/domain/survival'
+import { parseAalenEvidence, parseForestEvidence } from '@/domain/survivalRegression'
 import {
   analysisProgressSchema,
   parseAnalysisRefusal,
@@ -88,6 +89,8 @@ const sampleArrays = (command: AnalysisWorkerCommand): readonly [Uint8Array, Uin
 
 const rustCommand = (command: AnalysisWorkerCommand): object => {
   switch (command.kind) {
+    case 'aalen': return { kind: 'aalen', rows: command.rows, columns: command.columns, ...command.design }
+    case 'survival-forest': return { kind: 'survivalForest', rows: command.rows, columns: command.columns, ...command.design }
     case 'flexsurv':
       return { kind: 'flexSurv', rows: command.rows, columns: command.columns, observation: command.observation, rowFrequency: command.rowFrequency, covariates: command.covariates, family: command.family, predictionTimes: command.predictionTimes }
     case 'cox-regression':
@@ -458,6 +461,18 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parsePenalizedAftEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'penalized-aft-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'aalen': {
+        const result = parseAalenEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'aalen-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'survival-forest': {
+        const result = parseForestEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'survival-forest-succeeded', request: command.request, result: result.value })
         return
       }
       case 'nonparametric-survival': {

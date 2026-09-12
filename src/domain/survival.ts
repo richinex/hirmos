@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AalenConfiguration, AalenEvidence, ForestConfiguration, ForestEvidence } from './survivalRegression'
 import type { ColumnSelection, NumericColumnSelection } from './dataset'
 import {
   assertNever,
@@ -203,6 +204,8 @@ export interface MultiStateSurvivalConfiguration {
 }
 
 export type SurvivalConfiguration =
+  | AalenConfiguration
+  | ForestConfiguration
   | RightCensoredSurvivalConfiguration
   | PenalizedAftConfiguration
   | NonparametricSurvivalConfiguration
@@ -1052,6 +1055,8 @@ type StartStopSurvivalRun = {
 }[ProportionalHazardsFamily]
 
 export type SurvivalRunArtifact =
+  | SurvivalRunIdentity & { readonly kind: 'aalen-run'; readonly configuration: AalenConfiguration; readonly evidence: AalenEvidence }
+  | SurvivalRunIdentity & { readonly kind: 'survival-forest-run'; readonly configuration: ForestConfiguration; readonly evidence: ForestEvidence }
   | RightCensoredSurvivalRun
   | StartStopSurvivalRun
   | SurvivalRunIdentity & {

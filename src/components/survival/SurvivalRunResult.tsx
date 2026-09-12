@@ -8,11 +8,13 @@ import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
 import { MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
-import { caption, label, num, prose, well } from '@/components/ui/recipes'
+import { caption, label, num } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
 import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, CoxRegressionEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
 import { formatCount, formatEstimate, formatP, formatPercent, formatStatistic } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
+import { SurvivalInterpretation as Interpretation } from './SurvivalInterpretation'
+import { AalenResult, ForestResult } from './SurvivalRegressionResult'
 
 export const survivalFamilyLabel = (family: ParametricSurvivalFamily): string => ({
   exponential: 'Exponential',
@@ -32,6 +34,8 @@ export const survivalRunLabel = (run: SurvivalRunArtifact): string => {
     case 'nonparametric-survival-run': return 'Kaplan–Meier and Nelson–Aalen'
     case 'start-stop-survival-run': return 'Start–stop'
     case 'cox-regression-run': return 'Cox regression'
+    case 'aalen-run': return 'Aalen regression'
+    case 'survival-forest-run': return 'Survival forest'
     case 'penalized-aft-run': return 'Penalised AFT'
     case 'two-group-survival-run': return 'Two-group comparison'
     case 'multi-state-survival-run': return 'Multi-state'
@@ -47,6 +51,8 @@ export const survivalRunSummary = (run: SurvivalRunArtifact): { readonly method:
     case 'right-censored-survival-run':
     case 'start-stop-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `median ${formatStatistic('raw', run.evidence.median).text}` }
     case 'cox-regression-run': return { method: survivalRunLabel(run), figure: `hazard ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.hazardRatio ?? Number.NaN).text}` }
+    case 'aalen-run': return { method: survivalRunLabel(run), figure: `fitted through ${statistic(run.evidence.lastTime)}` }
+    case 'survival-forest-run': return { method: survivalRunLabel(run), figure: run.evidence.concordance.kind === 'recorded' ? `out-of-bag concordance ${statistic(run.evidence.concordance.result)}` : 'out-of-bag concordance unavailable' }
     case 'penalized-aft-run': return { method: `${survivalRunLabel(run)} · ${penalizedAftFamilyLabel(run.evidence.family)}`, figure: `time ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.timeRatio ?? Number.NaN).text}` }
     case 'nonparametric-survival-run': return { method: survivalRunLabel(run), figure: `event-free ${formatPercent(run.evidence.survival.at(-1) ?? Number.NaN).text}` }
     case 'two-group-survival-run': return { method: survivalRunLabel(run), figure: `event-free time difference ${formatStatistic('raw', run.evidence.restrictedMeanDifference).text}` }
@@ -135,20 +141,6 @@ const parameterColumns = (ratioLabel: string): readonly EvidenceColumn<Parameter
   { id: 'ratio', header: ratioLabel, align: 'right', value: (row) => row.ratio === null ? '' : row.ratio, format: (value) => value === '' ? '—' : statistic(asNumber(value)) },
   { id: 'profile', header: 'Drawn at', align: 'right', value: (row) => row.profile === null ? '' : row.profile, format: (value) => value === '' ? '—' : statistic(asNumber(value)) },
 ]
-
-function Interpretation({ bottomLine, uncertainty, mustBeTrue }: { readonly bottomLine: ReactNode; readonly uncertainty: ReactNode; readonly mustBeTrue: ReactNode }) {
-  return (
-    <section className={well('mt-4 px-3 py-3')} aria-label="Interpretation">
-      <h4 className="m-0 text-label font-medium text-faint">What this result means</h4>
-      <h5 className="mb-0 mt-3 text-label font-medium text-bone">Bottom line</h5>
-      <p className={prose('mb-0 mt-1 text-ink')}>{bottomLine}</p>
-      <h5 className="mb-0 mt-3 border-t border-hair pt-3 text-label font-medium text-bone">Uncertainty</h5>
-      <p className={prose('mb-0 mt-1 text-muted')}>{uncertainty}</p>
-      <h5 className="mb-0 mt-3 border-t border-hair pt-3 text-label font-medium text-bone">What must be true</h5>
-      <p className={prose('mb-0 mt-1 text-faint')}>{mustBeTrue}</p>
-    </section>
-  )
-}
 
 type ComparisonChart = 'survival' | 'eventFreeTime' | 'cumulativeHazard' | 'smoothedHazard'
 
@@ -411,6 +403,8 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
   const summary = survivalRunSummary(run)
   const heading = (() => {
     switch (run.kind) {
+      case 'aalen-run': return { title: 'Aalen additive regression', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
+      case 'survival-forest-run': return { title: 'Random survival forest', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.trees).text} trees` }
       case 'right-censored-survival-run':
         return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
       case 'start-stop-survival-run':
@@ -427,6 +421,8 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
   })()
   const method = (() => {
     switch (run.kind) {
+      case 'aalen-run': return 'Aalen additive regression'
+      case 'survival-forest-run': return 'Random survival forest'
       case 'right-censored-survival-run': return 'Parametric survival'
       case 'nonparametric-survival-run': return 'Nonparametric survival'
       case 'start-stop-survival-run': return 'Start–stop survival'
@@ -440,6 +436,8 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
 
   const body = (() => {
     switch (run.kind) {
+      case 'aalen-run': return <AalenResult run={run} />
+      case 'survival-forest-run': return <ForestResult run={run} />
       case 'nonparametric-survival-run': {
         const evidence: NonparametricSurvivalEvidence = run.evidence
         const lastTime = evidence.predictionTimes.at(-1) ?? Number.NaN

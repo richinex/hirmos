@@ -1,6 +1,8 @@
 //! Browser façades for the parity-tested flexsurv and ComparisonSurv kernels.
 
 use super::*;
+mod regression;
+pub(crate) use regression::{aalen_evidence, forest_evidence};
 use hirmos_causal_core::data_preparation::{
     prepare_longitudinal_states, prepare_wide_events, EventStatus, LongitudinalObservation,
     LongitudinalStateHistory, NonEmptyVec, StateId, StateObservation, SubjectId, TransitionMatrix,

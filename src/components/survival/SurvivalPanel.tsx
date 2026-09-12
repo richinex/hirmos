@@ -41,6 +41,7 @@ import type { SelectedSource } from '@/domain/workflow'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import { forestSettingsSchema, type ForestSettings } from '@/domain/survivalRegression'
 
 type RowFrequencyDraft =
   | { readonly kind: 'one-observation-per-row' }
@@ -89,6 +90,8 @@ type CoxObservationDraft =
     }
 
 type Draft =
+  | { readonly kind: 'aalen'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[] }
+  | { readonly kind: 'survival-forest'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly covariates: readonly ColumnId[]; readonly categorical: readonly ColumnId[]; readonly settings: ForestSettings; readonly predictionRow: number }
   | { readonly kind: 'right-censored'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly covariates: readonly ColumnId[]; readonly family: ParametricSurvivalFamily; readonly horizon: number }
   | { readonly kind: 'nonparametric'; readonly duration: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly horizon: number; readonly ties: 'discrete' | 'smoothed' }
   | { readonly kind: 'start-stop'; readonly start: ColumnId | null; readonly stop: ColumnId | null; readonly event: ColumnId | null; readonly rowFrequency: RowFrequencyDraft; readonly covariates: readonly ColumnId[]; readonly family: ProportionalHazardsFamily; readonly horizon: number }
@@ -123,6 +126,8 @@ type CoxReadyDraft = {
 }
 
 type ReadyDraft =
+  | { readonly kind: 'aalen'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: NonEmptyArray<NumericColumnSelection>; readonly columns: NonEmptyArray<ColumnId> }
+  | { readonly kind: 'survival-forest'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly covariates: NonEmptyArray<NumericColumnSelection>; readonly categorical: readonly NumericColumnSelection[]; readonly settings: ForestSettings; readonly predictionRow: number; readonly columns: NonEmptyArray<ColumnId> }
   | { readonly kind: 'right-censored'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ParametricSurvivalFamily; readonly horizon: number }
   | { readonly kind: 'nonparametric'; readonly duration: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly columns: NonEmptyArray<ColumnId>; readonly horizon: number; readonly ties: 'discrete' | 'smoothed' }
   | { readonly kind: 'start-stop'; readonly start: NumericColumnSelection; readonly stop: NumericColumnSelection; readonly event: NumericColumnSelection; readonly rowFrequency: SurvivalRowFrequency; readonly covariates: readonly NumericColumnSelection[]; readonly columns: NonEmptyArray<ColumnId>; readonly family: ProportionalHazardsFamily; readonly horizon: number }
@@ -144,6 +149,14 @@ type MultiStateReadyInput =
 type WideReadyInput = Extract<MultiStateReadyInput, { readonly kind: 'wide-events' }>
 
 type DraftProblem = { readonly kind: 'invalid-survival-draft'; readonly detail: string }
+
+const FOREST_PARAMETERS = [
+  { key: 'trees', title: 'Trees', help: 'Number of trees. Each uses a bootstrap sample of the observations.' },
+  { key: 'mtry', title: 'Candidate covariates per split', help: 'Number of covariates considered at each split. Cannot exceed the number selected below.' },
+  { key: 'seed', title: 'Random seed', help: 'A positive seed makes the same inputs and settings reproducible.' },
+  { key: 'minNodeSize', title: 'Minimum node size', help: 'Do not split a node with fewer than this many observations.' },
+  { key: 'minBucket', title: 'Minimum terminal size', help: 'Require at least this many observations in each child node.' },
+] as const
 
 type Job =
   | { readonly kind: 'idle' }
@@ -190,6 +203,8 @@ const draftFor = (kind: Draft['kind'], columns: readonly NumericColumnSelection[
   const duration = columnLike(columns, /^(time|duration|years?|months?|recyrs)$/i)
   const event = columnLike(columns, /^(event|status|death|censrec)$/i)
   switch (kind) {
+    case 'aalen': return { kind, duration, event, covariates: [] }
+    case 'survival-forest': return { kind, duration, event, covariates: [], categorical: [], settings: { trees: 500, mtry: 1, seed: 43, minNodeSize: 3, minBucket: 3, splitRule: 'logRank' }, predictionRow: 0 }
     case 'right-censored': return { kind, duration, event, rowFrequency: { kind: 'one-observation-per-row' }, covariates: [], family: 'weibull', horizon: 10 }
     case 'nonparametric': return { kind, duration, event, rowFrequency: { kind: 'one-observation-per-row' }, horizon: 10, ties: 'discrete' }
     case 'start-stop': return { kind, start: columnLike(columns, /^(start|tstart)$/i), stop: columnLike(columns, /^(stop|tstop)$/i), event, rowFrequency: { kind: 'one-observation-per-row' }, covariates: [], family: 'weibullPh', horizon: 10 }
@@ -220,6 +235,8 @@ const draftFromRun = (run: SurvivalRunArtifact, columns: readonly NumericColumnS
   const horizon = (times: readonly number[]): number => times.at(-1) ?? 10
   const configuration = run.configuration
   switch (configuration.kind) {
+    case 'aalen': return { kind: 'aalen', duration: present(configuration.duration), event: present(configuration.event), covariates: presentAll(configuration.covariates) }
+    case 'survival-forest': return { kind: 'survival-forest', duration: present(configuration.duration), event: present(configuration.event), covariates: presentAll(configuration.covariates), categorical: presentAll(configuration.categorical), settings: configuration.settings, predictionRow: configuration.predictionRow }
     case 'right-censored-parametric':
       return { kind: 'right-censored', duration: present(configuration.duration), event: present(configuration.event), rowFrequency: configuration.rowFrequency.kind === 'one-observation-per-row' ? configuration.rowFrequency : { kind: 'frequency-column', column: present(configuration.rowFrequency.column) }, covariates: presentAll(configuration.covariates), family: configuration.family, horizon: horizon(configuration.predictionTimes) }
     case 'right-censored-nonparametric':
@@ -409,6 +426,26 @@ const validateDraft = (
       const covariates = selectColumns(columns, draft.covariates)
       if (covariates === null) return invalid('A selected covariate is no longer in the prepared dataset.')
       return ok({ ...draft, start, stop, event, rowFrequency: rowFrequency.value.configuration, covariates, columns: ids })
+    }
+    case 'aalen':
+    case 'survival-forest': {
+      if (draft.duration === null) return invalid('Choose the duration column.')
+      if (draft.event === null) return invalid('Choose the event column.')
+      const ids: NonEmptyArray<ColumnId> = [draft.duration, draft.event, ...draft.covariates]
+      if (new Set(ids).size !== ids.length) return invalid('Duration, event and each covariate must use different columns.')
+      const selected = selectedOrProblem(ids)
+      if (!selected.ok) return selected
+      const [duration, event] = selected.value
+      if (duration === undefined || event === undefined) return invalid('Choose duration and event columns.')
+      const covariates = selectColumns(columns, draft.covariates)
+      if (covariates === null || !isNonEmpty(covariates)) return invalid('Choose at least one available covariate.')
+      if (draft.kind === 'aalen') return ok({ kind: draft.kind, duration, event, covariates, columns: ids })
+      const settings = forestSettingsSchema.safeParse(draft.settings)
+      if (!settings.success) return invalid('Use positive whole numbers for tree count, candidate covariates, node sizes and seed. At most 5,000 trees are allowed.')
+      if (settings.data.mtry > covariates.length) return invalid('Candidate covariates per split cannot exceed the number of selected covariates.')
+      if (!Number.isInteger(draft.predictionRow) || draft.predictionRow < 0) return invalid('Choose a prediction row of 1 or more.')
+      const categorical = covariates.filter((column) => draft.categorical.includes(column.id))
+      return ok({ kind: draft.kind, duration, event, covariates, categorical, settings: settings.data, predictionRow: draft.predictionRow, columns: ids })
     }
     case 'penalized-aft': {
       const durationId = draft.duration
@@ -681,6 +718,8 @@ const observationColumns = (draft: Draft): readonly (ColumnId | null)[] => {
     case 'right-censored': return [draft.duration, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
     case 'nonparametric': return [draft.duration, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
     case 'start-stop': return [draft.start, draft.stop, draft.event, draft.rowFrequency.kind === 'frequency-column' ? draft.rowFrequency.column : null]
+    case 'aalen':
+    case 'survival-forest':
     case 'penalized-aft': return [draft.duration, draft.event]
     case 'cox-regression': {
       const observation = draft.observation
@@ -725,6 +764,39 @@ const withoutCovariate = (
   role: ColumnId | null,
 ): readonly ColumnId[] => role === null ? covariates : covariates.filter((id) => id !== role)
 
+/** Carry the user's predictor choices across regression methods; reserve the new observation roles. */
+const retainCovariates = (previous: Draft, next: Draft): Draft => {
+  const selected = (() => {
+    switch (previous.kind) {
+      case 'right-censored':
+      case 'start-stop':
+      case 'cox-regression':
+      case 'penalized-aft':
+      case 'aalen':
+      case 'survival-forest': return previous.covariates
+      case 'nonparametric':
+      case 'two-group':
+      case 'multi-state': return []
+      default: return assertNever(previous)
+    }
+  })()
+  switch (next.kind) {
+    case 'right-censored':
+    case 'start-stop':
+    case 'cox-regression':
+    case 'penalized-aft':
+    case 'aalen':
+    case 'survival-forest': {
+      const reserved = new Set(observationColumns(next))
+      return { ...next, covariates: selected.filter((id) => !reserved.has(id)) }
+    }
+    case 'nonparametric':
+    case 'two-group':
+    case 'multi-state': return next
+    default: return assertNever(next)
+  }
+}
+
 interface AnalysisType {
   readonly name: string
   readonly summary: string
@@ -733,6 +805,26 @@ interface AnalysisType {
 
 const analysisType = (kind: Draft['kind']): AnalysisType => {
   switch (kind) {
+    case 'aalen': return {
+      name: 'Aalen additive regression',
+      summary: 'Estimate how covariates add to or subtract from the event rate, allowing their associations to change during follow-up.',
+      requirements: [
+        { holds: 'Each row describes one independent observation, with a positive duration and an event flag of 0 or 1.', otherwise: 'the risk sets or the model-based uncertainty are incorrect.' },
+        { holds: 'Covariates contribute additively to the event rate and remain constant during each observation.', otherwise: 'the fitted coefficient curves may not describe the associations.' },
+        { holds: 'Censoring is independent of the event after accounting for the covariates.', otherwise: 'estimated associations may be biased.' },
+        { holds: 'Enough observations remain at risk to estimate the selected covariates separately.', otherwise: 'fitting stops before the end of follow-up or is refused. The result records the last fitted event time.' },
+      ],
+    }
+    case 'survival-forest': return {
+      name: 'Random survival forest',
+      summary: 'Predict event-free probability from an ensemble of survival trees. Estimate predictive importance by shuffling each covariate in observations excluded from a tree’s training sample.',
+      requirements: [
+        { holds: 'Rows are independent observations with non-negative durations and an event flag of 0 or 1.', otherwise: 'the training samples and prediction checks do not represent independent observations.' },
+        { holds: 'Categorical covariates use whole-number codes from 1 to 53 and are explicitly marked categorical.', otherwise: 'their numeric ordering affects how the trees split.' },
+        { holds: 'Censoring is independent of the event conditional on the covariates.', otherwise: 'survival predictions may be biased.' },
+        { holds: 'Out-of-bag concordance assesses ranking within this dataset; predictive importance describes the fitted forest.', otherwise: 'these results can be mistaken for external validation or causal effects.' },
+      ],
+    }
     case 'right-censored': return {
       name: 'Parametric survival',
       summary: 'Fit a parametric distribution to the observed durations and event indicators. The result includes a survival curve, hazard curve and median survival time.',
@@ -941,6 +1033,25 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         return matrix.value
       }
       switch (validated.value.kind) {
+        case 'aalen': {
+          const draft = validated.value
+          const matrix = await materialise(draft.columns); if (matrix === null) return
+          const result = await analysis.runAalen(matrix.values, matrix.rowCount, matrix.columns.length, { duration: 0, event: 1, covariates: draft.covariates.map((_, i) => i + 2) })
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
+          if (result.value.coefficients.length !== draft.covariates.length + 1) { fail('The coefficient count does not match the selected covariates.'); return }
+          onRun({ kind: 'aalen-run', ...identity(matrix.columns), configuration: { kind: 'aalen', duration: draft.duration, event: draft.event, covariates: draft.covariates }, evidence: result.value })
+          break
+        }
+        case 'survival-forest': {
+          const draft = validated.value
+          const matrix = await materialise(draft.columns); if (matrix === null) return
+          if (draft.predictionRow >= matrix.rowCount) { fail(`Choose a prediction row between 1 and ${matrix.rowCount}.`); return }
+          const result = await analysis.runSurvivalForest(matrix.values, matrix.rowCount, matrix.columns.length, { duration: 0, event: 1, covariates: draft.covariates.map((_, i) => i + 2), categorical: draft.categorical.map((column) => columnPosition(matrix.columns, column)), ...draft.settings, predictionRow: draft.predictionRow })
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
+          if (result.value.importance.length !== draft.covariates.length) { fail('The importance count does not match the selected covariates.'); return }
+          onRun({ kind: 'survival-forest-run', ...identity(matrix.columns), configuration: { kind: 'survival-forest', duration: draft.duration, event: draft.event, covariates: draft.covariates, categorical: draft.categorical, settings: draft.settings, predictionRow: draft.predictionRow }, evidence: result.value })
+          break
+        }
         case 'right-censored': {
           const draft = validated.value
           const matrix = await materialise(draft.columns); if (matrix === null) return
@@ -1147,7 +1258,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
   }
 
   const draft = state.draft
-  const selectDraft = (kind: Draft['kind']) => configure(draftFor(kind, columns))
+  const selectDraft = (kind: Draft['kind']) => configure(retainCovariates(draft, draftFor(kind, columns)))
   const changeFamily = (value: string) => {
     switch (draft.kind) {
       case 'right-censored': {
@@ -1162,6 +1273,8 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         return
       }
       case 'two-group': return
+      case 'aalen': return
+      case 'survival-forest': return
       case 'nonparametric': return
       case 'cox-regression': return
       case 'penalized-aft': {
@@ -1191,6 +1304,16 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
 
   const draftControls = (() => {
     switch (draft.kind) {
+      case 'aalen':
+      case 'survival-forest': return <>
+        <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
+        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        {draft.kind === 'survival-forest' ? <>
+          <label className="block"><ParameterLabel label="Split rule" help="Log-rank selects the best eligible split. Extra trees tests one randomly chosen threshold per candidate covariate." /><Select className={field('text', 'mt-1')} value={draft.settings.splitRule} onChange={(event) => { const splitRule = event.target.value; if (splitRule === 'logRank' || splitRule === 'extraTrees') configure({ ...draft, settings: { ...draft.settings, splitRule } }) }}><option value="logRank">Log-rank</option><option value="extraTrees">Extra trees</option></Select></label>
+          {FOREST_PARAMETERS.map(({ key, title, help }) => <label className="block" key={key}><ParameterLabel label={title} help={help} /><input aria-label={title} className={field('text', 'mt-1 w-full')} type="number" min={1} step={1} value={draft.settings[key]} onChange={(event) => configure({ ...draft, settings: { ...draft.settings, [key]: Number(event.target.value) } })} /></label>)}
+          <label className="block"><ParameterLabel label="Prediction row" help="Draw the fitted survival curve for the covariate values in this prepared row. Row numbering begins at 1. This is a fitted prediction, not an out-of-bag prediction." /><input aria-label="Prediction row" className={field('text', 'mt-1 w-full')} type="number" min={1} max={prepared.observations} step={1} value={draft.predictionRow + 1} onChange={(event) => configure({ ...draft, predictionRow: Number(event.target.value) - 1 })} /></label>
+        </> : null}
+      </>
       case 'right-censored': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
         <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
@@ -1459,9 +1582,13 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       case 'right-censored':
       case 'start-stop':
       case 'cox-regression':
+      case 'aalen':
+      case 'survival-forest':
       case 'penalized-aft': {
         const roles = observationColumns(draft)
-        const help = draft.kind === 'cox-regression'
+        const help = draft.kind === 'aalen' || draft.kind === 'survival-forest'
+          ? 'Choose at least one covariate. Times and event status cannot also be covariates. For Aalen, encode categories as separate indicator columns with one reference category omitted.'
+          : draft.kind === 'cox-regression'
           ? 'Choose at least one covariate. The columns selected for the event-time row roles cannot also be covariates.'
           : draft.kind === 'penalized-aft'
             ? 'Choose at least one covariate. Each enters the location parameter on the log time scale; lifelines fits them in alphabetical order with the intercept last, and so does this run.'
@@ -1483,6 +1610,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
                 configure({ ...draft, covariates: draft.covariates.includes(column.id) ? draft.covariates.filter((id) => id !== column.id) : [...draft.covariates, column.id] })
               }} />{column.name}</label>
             })}</div>
+            {draft.kind === 'survival-forest' ? <fieldset className="mt-3 border-0 p-0"><legend className={fieldLabel}>Categorical covariates</legend><p className={fieldHint}>Mark categorical columns coded with whole numbers from 1 to 53. Unmarked columns use numeric thresholds.</p><div className="flex flex-wrap gap-3">{columns.filter((column) => draft.covariates.includes(column.id)).map((column) => <label key={column.id} className="flex items-center gap-2 text-body"><input type="checkbox" checked={draft.categorical.includes(column.id)} onChange={() => configure({ ...draft, categorical: draft.categorical.includes(column.id) ? draft.categorical.filter((id) => id !== column.id) : [...draft.categorical, column.id] })} />{column.name}</label>)}</div></fieldset> : null}
           </div>
         )
       }
@@ -1506,7 +1634,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{type.name}</h3>
         <div className="grid grid-cols-1 gap-4">
           <div>
-            <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'cox-regression', label: 'Cox regression' }, { value: 'penalized-aft', label: 'Penalised AFT' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
+            <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'cox-regression', label: 'Cox regression' }, { value: 'aalen', label: 'Aalen regression' }, { value: 'survival-forest', label: 'Survival forest' }, { value: 'penalized-aft', label: 'Penalised AFT' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
             <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{type.summary}</p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">{draftControls}</div>
