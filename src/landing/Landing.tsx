@@ -120,7 +120,6 @@ export function Landing() {
           </h1>
           <div className="landing-actions">
             <InternalLink className="landing-primary" href="/app">Start an analysis</InternalLink>
-            <a className="landing-secondary" href="#workflow">See the workflow</a>
           </div>
         </section>
       </div>
