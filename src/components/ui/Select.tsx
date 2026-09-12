@@ -74,7 +74,7 @@ export function Select({ value, onChange, children, className, disabled, id, 'ar
         <span className="min-w-0 flex-1 truncate">
           <RadixSelect.Value placeholder={placeholder?.label ?? ''}>{selected !== undefined && selected.value !== '' ? selected.label : undefined}</RadixSelect.Value>
         </span>
-        <RadixSelect.Icon aria-hidden className="shrink-0 text-faint">
+        <RadixSelect.Icon aria-hidden className="flex shrink-0 text-faint">
           <Icon name="expand_more" size={14} />
         </RadixSelect.Icon>
       </RadixSelect.Trigger>

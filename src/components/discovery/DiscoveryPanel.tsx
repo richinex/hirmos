@@ -870,15 +870,15 @@ function EvidenceScopeControls({ selection, onChange, variables, tauMax, alpha }
         onChange={(kind) => onChange({ ...selection, scope: EVIDENCE_SCOPES.find((scope) => scope.kind === kind) ?? { kind: 'all' } })}
         options={EVIDENCE_SCOPES.map((scope) => ({ value: scope.kind, label: describeEvidenceScope(scope), title: explainEvidenceScope(scope, alpha) }))}
       />
-      <Select className={field('text', 'w-28')} aria-label="Filter by source" value={selection.source ?? ''} onChange={(event) => onChange({ ...selection, source: event.target.value === '' ? null : event.target.value })}>
+      <Select className={field('text', 'w-28 py-[2px]')} aria-label="Filter by source" value={selection.source ?? ''} onChange={(event) => onChange({ ...selection, source: event.target.value === '' ? null : event.target.value })}>
         <option value="">Any source</option>
         {variables.map((name) => <option key={name} value={name}>{name}</option>)}
       </Select>
-      <Select className={field('text', 'w-28')} aria-label="Filter by target" value={selection.target ?? ''} onChange={(event) => onChange({ ...selection, target: event.target.value === '' ? null : event.target.value })}>
+      <Select className={field('text', 'w-28 py-[2px]')} aria-label="Filter by target" value={selection.target ?? ''} onChange={(event) => onChange({ ...selection, target: event.target.value === '' ? null : event.target.value })}>
         <option value="">Any target</option>
         {variables.map((name) => <option key={name} value={name}>{name}</option>)}
       </Select>
-      <Select className={field('text', 'w-24')} aria-label="Filter by lag" value={selection.lag === null ? '' : String(selection.lag)} onChange={(event) => onChange({ ...selection, lag: event.target.value === '' ? null : Number(event.target.value) })}>
+      <Select className={field('text', 'w-24 py-[2px]')} aria-label="Filter by lag" value={selection.lag === null ? '' : String(selection.lag)} onChange={(event) => onChange({ ...selection, lag: event.target.value === '' ? null : Number(event.target.value) })}>
         <option value="">Any lag</option>
         {lags.map((lag) => <option key={lag} value={lag}>lag {lag}</option>)}
       </Select>

@@ -242,9 +242,8 @@ export function PipelineWorkspace({ resume, onPrepared }: {
 
   const stage = (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* One row, never a stack: on a phone the chips show their glyph alone and the row drops its label so all nine fit; wider than that they carry their labels and scroll sideways if the stage is narrow. */}
+      {/* One row, never a stack: on a phone the chips show their glyph alone so all nine fit; wider than that they carry their labels and scroll sideways if the stage is narrower than the row. The row has no heading of its own: the chip names say what it adds. */}
       <div className="flex min-w-0 max-w-full flex-nowrap items-center gap-1 overflow-x-auto border-b border-line px-2 py-1.5 [scrollbar-width:thin]" role="toolbar" aria-label="Add a block">
-        {isMobile ? null : <span className={label('mx-1 shrink-0 text-faint')}>Add a block</span>}
         {PALETTE_GROUPS.map((group, index) => (
           <div key={group.label} className="flex shrink-0 items-center gap-0.5" role="group" aria-label={group.label}>
             {index > 0 && <span aria-hidden className="mx-0.5 h-4 w-px bg-hair" />}
