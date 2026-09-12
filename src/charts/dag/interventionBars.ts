@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
 import { baseOption, categoryAxis, gridAuto, legend, tooltip, valueAxis } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { seriesColour, type ChartTheme } from '../theme'
 
 export interface InterventionBarsView {
   readonly set: string
@@ -35,8 +35,8 @@ export function interventionBarsOption(view: InterventionBarsView, theme: ChartT
     xAxis: categoryAxis(theme, view.states.map((state) => `bin ${state}`), `${view.read} bin`),
     yAxis: { ...valueAxis(theme, 'probability'), min: 0, max: 1 },
     series: [
-      { type: 'bar', name: lowName, data: [...view.low], barMaxWidth: 28, itemStyle: { color: theme.info } },
-      { type: 'bar', name: highName, data: [...view.high], barMaxWidth: 28, itemStyle: { color: theme.signal } },
+      { type: 'bar', name: lowName, data: [...view.low], barMaxWidth: 28, itemStyle: { color: seriesColour(theme, 0) } },
+      { type: 'bar', name: highName, data: [...view.high], barMaxWidth: 28, itemStyle: { color: seriesColour(theme, 1) } },
     ],
   }
 }

@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
 import { baseOption, gridAuto, responsive, tooltip, valueAxis, rangeSelection } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { variableColour, type ChartTheme } from '../theme'
 
 export interface ChangePointsChartView {
   readonly name: string
@@ -56,7 +56,8 @@ export function changePointsOption(view: ChangePointsChartView, theme: ChartThem
       // away or dropped by a heuristic — which matters when the outliers are what the plot is for.
       sampling: 'minmax',
       symbol: 'none',
-      lineStyle: { color: theme.ink, width: 1.2 },
+      lineStyle: { color: variableColour(theme, view.name), width: 1.2 },
+      itemStyle: { color: variableColour(theme, view.name) },
       markLine: {
         symbol: 'none',
         silent: true,

@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
 import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis, rangeSelection } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { seriesColour, type ChartTheme } from '../theme'
 
 export interface OutcomePathsView {
   readonly outcome: string
@@ -56,8 +56,8 @@ export function outcomePathsOption(view: OutcomePathsView, theme: ChartTheme): E
     },
     yAxis: { ...valueAxis(theme), scale: true },
     series: [
-      { type: 'line', name: `${view.treatment} = ${view.interventions[0]}`, data: view.low.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.muted, width: 1.2, type: 'dashed' }, itemStyle: { color: theme.muted }, symbol: 'none' },
-      { type: 'line', name: `${view.treatment} = ${view.interventions[1]}`, data: view.high.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.bone, width: 1.2, type: 'dashed' }, itemStyle: { color: theme.bone }, symbol: 'none' },
+      { type: 'line', name: `${view.treatment} = ${view.interventions[0]}`, data: view.low.map((value, index) => [firstStep + index, value]), lineStyle: { color: seriesColour(theme, 0), width: 1.2, type: 'dashed' }, itemStyle: { color: seriesColour(theme, 0) }, symbol: 'none' },
+      { type: 'line', name: `${view.treatment} = ${view.interventions[1]}`, data: view.high.map((value, index) => [firstStep + index, value]), lineStyle: { color: seriesColour(theme, 1), width: 1.2, type: 'dashed' }, itemStyle: { color: seriesColour(theme, 1) }, symbol: 'none' },
       { type: 'line', name: 'observed', data: view.factual.map((value, index) => [firstStep + index, value]), lineStyle: { color: theme.ink, width: 1.4 }, symbol: 'circle', symbolSize: 3, itemStyle: { color: theme.ink } },
     ],
   }

@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
 import { axisLabelStyle, axisNameStyle, baseOption, tooltip, valueAxis, rangeSelection } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { variableColour, seriesColour, type ChartTheme } from '../theme'
 
 export interface StlChartView {
   readonly name: string
@@ -18,10 +18,10 @@ const day = (timestamp: number): string => new Date(timestamp).toISOString().sli
 /** Statsmodels-compatible additive STL as four aligned panels sharing one time axis. */
 export function decompositionOption(view: StlChartView, theme: ChartTheme): EChartsCoreOption {
   const components = [
-    ['Observed', view.observed, theme.ink],
-    ['Trend', view.trend, theme.info],
-    ['Seasonal', view.seasonal, theme.ok],
-    ['Remainder', view.remainder, theme.signal],
+    ['Observed', view.observed, variableColour(theme, view.name)],
+    ['Trend', view.trend, seriesColour(theme, 0)],
+    ['Seasonal', view.seasonal, seriesColour(theme, 1)],
+    ['Remainder', view.remainder, seriesColour(theme, 3)],
   ] as const
   const grids = components.map((_, index) => ({ left: 70, right: 18, top: `${3 + index * 24}%`, height: '18%' }))
   const xAxes = components.map((_, index) => ({
@@ -73,6 +73,7 @@ export function decompositionOption(view: StlChartView, theme: ChartTheme): ECha
       data: values.map((value, row) => [view.time[row], value]),
       symbol: 'none',
       lineStyle: { color: colour, width: 1.2 },
+      itemStyle: { color: colour },
     })),
   }
 }

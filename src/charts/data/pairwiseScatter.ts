@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
 import { axisNameStyle, baseOption, gridAuto, tooltip } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { variableColour, type ChartTheme } from '../theme'
 
 export interface PairwiseScatterView {
   readonly xName: string
@@ -64,7 +64,7 @@ export function pairwiseScatterOption(view: PairwiseScatterView, theme: ChartThe
       type: 'scatter',
       data: points,
       symbolSize: 5,
-      itemStyle: { color: theme.signal, opacity: 0.62 },
+      itemStyle: { color: variableColour(theme, view.yName), opacity: 0.62 },
       large: points.length >= 1_000,
       largeThreshold: 1_000,
     }],

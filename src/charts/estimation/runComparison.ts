@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
 import { baseOption, tooltip } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { variableColour, type ChartTheme } from '../theme'
 
 export interface RunComparisonRow {
   readonly label: string
@@ -15,7 +15,7 @@ export interface RunComparisonRow {
 /** Every comparable run on one axis: its interval as a horizontal line, its estimate as a dot, and the zero reference. */
 export function runComparisonOption(rows: readonly RunComparisonRow[], theme: ChartTheme): EChartsCoreOption {
   const labels = rows.map((row) => row.label)
-  const colour = (row: RunComparisonRow) => (row.current ? theme.signal : theme.bone)
+  const colour = (row: RunComparisonRow) => (row.current ? theme.signal : variableColour(theme, row.label))
   const description = `Estimates compared: ${rows.map((row) => `${row.label} ${formatStatistic('raw', row.estimate).text}`).join('; ')}.`
   return {
     ...baseOption(theme, description),

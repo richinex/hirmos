@@ -32,6 +32,17 @@ export const CATEGORICAL_RAMP = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#5
 /** The same hues darkened in OKLCH until each reaches 3:1 on a white or paper panel; neighbours alternate light and dark. */
 export const LIGHT_CATEGORICAL_RAMP = ['#0072B2', '#CC8600', '#009E73', '#B0609A', '#3D9DD1', '#D55E00', '#A49600', '#949494'] as const
 
+/** Pass the category's original position, before filtering, paging or sorting. */
+export const seriesColour = (theme: ChartTheme, index: number): string =>
+  theme.categorical[index % theme.categorical.length] ?? theme.ink
+
+/** Keep a variable's colour consistent across separately rendered data views and recipe stages. */
+export function variableColour(theme: ChartTheme, name: string): string {
+  let hash = 2166136261
+  for (let index = 0; index < name.length; index += 1) hash = Math.imul(hash ^ name.charCodeAt(index), 16777619)
+  return seriesColour(theme, hash >>> 0)
+}
+
 const LIGHT_THEMES = new Set(['light'])
 
 const FALLBACK: ChartTheme = {

@@ -2,7 +2,7 @@ import type { EChartsCoreOption } from 'echarts/core'
 import type { HistogramBins } from '@/domain/dataset'
 import { formatCount, formatStatistic } from '@/lib/format/number'
 import { baseOption, categoryAxis, gridAuto, tooltip, valueAxis, type ReferenceMark } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { variableColour, type ChartTheme } from '../theme'
 
 export interface HistogramView {
   readonly name: string
@@ -26,7 +26,7 @@ const binPosition = (bins: HistogramBins, value: number): number => {
   return ((value - low) / (high - low)) * bins.counts.length - 0.5
 }
 
-/** Distribution of one numeric column: bars on `bone`, one bin per bar, counts in the tooltip. */
+/** Distribution of one numeric column: one bin per bar, counts in the tooltip. */
 export function histogramOption(view: HistogramView, theme: ChartTheme): EChartsCoreOption {
   const { edges, counts } = view.bins
   const labels = counts.map((_, index) => edgeLabel(edges[index]))
@@ -55,8 +55,8 @@ export function histogramOption(view: HistogramView, theme: ChartTheme): ECharts
       name: view.name,
       data: [...counts],
       barCategoryGap: '8%',
-      itemStyle: { color: theme.bone, borderRadius: [2, 2, 0, 0] },
-      emphasis: { itemStyle: { color: theme.ink } },
+      itemStyle: { color: variableColour(theme, view.name), borderRadius: [2, 2, 0, 0] },
+      emphasis: { itemStyle: { color: variableColour(theme, view.name), borderColor: theme.ink, borderWidth: 1 } },
       markLine: marks.length === 0 ? undefined : {
         silent: true,
         symbol: 'none',

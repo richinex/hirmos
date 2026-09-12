@@ -1,7 +1,7 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatCount, formatStatistic } from '@/lib/format/number'
 import { axisLabelStyle, baseOption, gridAuto, responsive, tooltip, valueAxis, rangeSelection } from '../grammar'
-import type { ChartTheme } from '../theme'
+import { variableColour, type ChartTheme } from '../theme'
 
 export interface SeriesOverviewView {
   readonly name: string
@@ -11,7 +11,7 @@ export interface SeriesOverviewView {
   readonly stepLabel: string
 }
 
-/** One column in row order: a hairline `bone` line, LTTB-sampled beyond a few thousand points, with a slider zoom. */
+/** One column in row order, with min/max downsampling and a slider zoom. */
 export function seriesOverviewOption(view: SeriesOverviewView, theme: ChartTheme): EChartsCoreOption {
   const observed = view.values.length
   let min = Number.POSITIVE_INFINITY
@@ -62,8 +62,8 @@ export function seriesOverviewOption(view: SeriesOverviewView, theme: ChartTheme
       showSymbol: false,
       connectNulls: false,
       sampling: 'minmax',
-      lineStyle: { color: theme.bone, width: 1.2 },
-      itemStyle: { color: theme.bone },
+      lineStyle: { color: variableColour(theme, view.name), width: 1.2 },
+      itemStyle: { color: variableColour(theme, view.name) },
       emphasis: { lineStyle: { width: 1.2 } },
     }],
   }

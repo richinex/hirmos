@@ -334,6 +334,19 @@ test('saves per-column time-series transformations and previews the materialized
   await expect(plots).toContainText('linear detrend')
   await expect(page.getByText('5 aligned rows')).toBeVisible()
   await expect(page.getByText('first source row removed for alignment')).toBeVisible()
+  for (const theme of ['light', 'dark']) {
+    const colours = await page.evaluate(async (name) => {
+      document.documentElement.dataset.theme = name
+      const path = '/src/charts/theme.ts'
+      const charts = await import(/* @vite-ignore */ path)
+      return ['x', 'y'].map((variable) => charts.variableColour(charts.readChartTheme(), variable))
+    }, theme)
+    for (const [index, variable] of ['x', 'y'].entries()) {
+      const stages = plots.getByRole('list', { name: `${variable} preparation stages` })
+      await expect(stages.locator(`path[stroke="${colours[index]}"]`).first()).toBeVisible()
+    }
+    await testInfo.attach(`prepared-series-${theme}`, { body: await plots.screenshot(), contentType: 'image/png' })
+  }
 })
 
 test('shows the saved STL decomposition and ACF/PACF diagnostics', async ({ page }, testInfo) => {
