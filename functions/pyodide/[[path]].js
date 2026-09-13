@@ -1,6 +1,6 @@
 /**
  * Serves the Python runtime from the R2 bucket bound as DUCKDB, at /pyodide/<version>/<file>: the
- * Pyodide loader, its wasm and standard library, the lock file, and the wheels for pandas and numpy.
+ * Pyodide loader, its wasm and standard library, the lock file, and the pandas, NumPy and PyArrow wheels.
  * The Vite dev server answers the same path from the Pyodide CDN, so the app has one URL.
  */
 const TYPES = { mjs: 'text/javascript', wasm: 'application/wasm', json: 'application/json', zip: 'application/zip', whl: 'application/octet-stream' }

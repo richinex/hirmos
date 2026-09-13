@@ -4,7 +4,7 @@
  */
 export async function onRequestGet({ env, params }) {
   const key = [].concat(params.path ?? []).join('/')
-  if (!/^[0-9]+\.[0-9]+\.[0-9]+\/duckdb-(eh|mvp)\.wasm$/.test(key)) return new Response('Not found', { status: 404 })
+  if (!/^[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*)?\/duckdb-(eh|mvp)\.wasm$/.test(key)) return new Response('Not found', { status: 404 })
   const object = await env.DUCKDB.get(key)
   if (object === null) return new Response('Not found', { status: 404 })
   const headers = new Headers()

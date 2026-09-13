@@ -78,7 +78,7 @@ export interface DatasetProfile {
   readonly source: SourceArtifact
   readonly parser: {
     readonly kind: 'duckdb-wasm'
-    readonly packageVersion: '1.30.0'
+    readonly packageVersion: DataParserVersion
     readonly engineVersion: string
   }
   readonly rowCount: number
@@ -170,8 +170,8 @@ export const sourceFingerprint = (value: string): Result<SourceFingerprint, { re
     ? ok(brand<string, 'SourceFingerprint'>(value))
     : err({ kind: 'invalid-fingerprint' })
 
-export const datasetProfileId = (fingerprint: SourceFingerprint): DatasetProfileId =>
-  brand<string, 'DatasetProfileId'>(`duckdb-wasm:1.30.0:${fingerprint}`)
+export const datasetProfileId = (fingerprint: SourceFingerprint, version: DataParserVersion = DUCKDB_PACKAGE_VERSION): DatasetProfileId =>
+  brand<string, 'DatasetProfileId'>(`duckdb-wasm:${version}:${fingerprint}`)
 
 export const columnId = (index: number, name: string): ColumnId =>
   brand<string, 'ColumnId'>(`${index}:${name}`)
@@ -212,7 +212,7 @@ const datasetProfileSchema = z.object({
   }).strict(),
   parser: z.object({
     kind: z.literal('duckdb-wasm'),
-    packageVersion: z.literal('1.30.0'),
+    packageVersion: z.enum(DATA_PARSER_VERSIONS),
     engineVersion: z.string().min(1),
   }).strict(),
   rowCount: z.number().int().positive(),
@@ -323,7 +323,7 @@ export function parseDatasetProfile(value: unknown): Result<DatasetProfile, Data
   if (!fingerprint.ok) {
     return err({ kind: 'inconsistent-profile', detail: 'The source fingerprint is not a SHA-256 digest.' })
   }
-  const expectedProfileId = datasetProfileId(fingerprint.value)
+  const expectedProfileId = datasetProfileId(fingerprint.value, parsed.data.parser.packageVersion)
   if (parsed.data.id !== expectedProfileId) {
     return err({ kind: 'inconsistent-profile', detail: 'The dataset profile identity does not match its source fingerprint.' })
   }
@@ -625,3 +625,4 @@ export function parsePreviewWindow(value: unknown, profile: DatasetProfile): Res
   }
   return ok({ ...parsed.data, sourceFingerprint: profile.source.fingerprint })
 }
+import { DATA_PARSER_VERSIONS, DUCKDB_PACKAGE_VERSION, type DataParserVersion } from './dataEngine'

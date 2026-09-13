@@ -1,13 +1,13 @@
 import type * as duckdb from '@duckdb/duckdb-wasm'
 import { err, ok, type Result } from '@/domain/dop'
 import type { PipelineBlockId, PipelineStep } from '@/domain/pipeline'
-import { parsePythonEvent, type PythonCommand, type PythonEvent } from '@/workers/pythonProtocol'
+import { parsePythonEvent, type PythonCommand, type PythonEvent, type PythonInput } from '@/workers/pythonProtocol'
 import type { ScriptFailure, ScriptRun, ScriptRuntime } from './pipeline'
 
 /**
  * The page side of the Python worker: one worker for the page, started on the first script run or
- * on request, its state observable so the inspector can say "Loading pandas and numpy". A script
- * step's inputs are read out of DuckDB as CSV, run in the worker, and the result registered back
+ * on request, its state observable by the inspector. A script
+ * step's inputs are read out of DuckDB as Arrow, run in the worker, and the result registered back
  * into DuckDB as the step's view.
  */
 
@@ -104,28 +104,25 @@ const pythonWorker = (): Worker => {
 
 const send = (command: PythonCommand, transfer: readonly ArrayBuffer[] = []): void => { pythonWorker().postMessage(command, [...transfer]) }
 
-/** Starts loading the runtime now, so the first script does not wait for twenty megabytes. */
+/** Start loading the runtime before the first script needs it. */
 export const warmPythonRuntime = (): void => {
   if (state.kind === 'idle' || state.kind === 'failed') { setState({ kind: 'loading', detail: 'Loading Python' }); send({ kind: 'start' }) }
 }
 
 const identifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
 
-const csvOf = async (connection: duckdb.AsyncDuckDBConnection, database: duckdb.AsyncDuckDB, view: string, file: string): Promise<Uint8Array> => {
-  try {
-    await connection.query(`COPY (SELECT * FROM ${identifier(view)}) TO '${file}' (FORMAT CSV, HEADER)`)
-    return await database.copyFileToBuffer(file)
-  } finally {
-    await database.dropFile(file).catch(() => undefined)
-  }
-}
+/** Read raw IPC bytes without decoding and re-encoding them through JavaScript Arrow. */
+const arrowOf = async (connection: duckdb.AsyncDuckDBConnection, view: string): Promise<PythonInput> => ({
+  format: 'arrow-file',
+  bytes: await connection.useUnsafe((bindings, id) => bindings.runQuery(id, `SELECT * FROM ${identifier(view)}`)),
+})
 
 export const pythonScriptRuntime = (): ScriptRuntime => ({
-  async run(step: ScriptStep, connection, database): Promise<Result<ScriptRun, ScriptFailure>> {
+  async run(step: ScriptStep, connection): Promise<Result<ScriptRun, ScriptFailure>> {
     const request = crypto.randomUUID()
-    let inputs: Uint8Array[]
+    let inputs: PythonInput[]
     try {
-      inputs = await Promise.all(step.inputs.map((view, index) => csvOf(connection, database, view, `${request}-in-${index}.csv`)))
+      inputs = await Promise.all(step.inputs.map((view) => arrowOf(connection, view)))
     } catch (cause) {
       return err({ detail: `the inputs could not be handed to Python: ${cause instanceof Error ? cause.message : String(cause)}`, stdout: '' })
     }
@@ -137,25 +134,32 @@ export const pythonScriptRuntime = (): ScriptRuntime => ({
     }, PYTHON_RUN_LIMIT_MS)
     const event = await new Promise<RunEvent>((resolve) => {
       pending.set(request, resolve)
-      send({ kind: 'run', request, code: step.code, inputs }, inputs.map((input) => input.buffer as ArrayBuffer))
+      send({ kind: 'run', request, code: step.code, inputs }, inputs.map((input) => input.bytes.buffer as ArrayBuffer))
     })
     window.clearTimeout(limit)
     if (active?.step === step.id) setActive(null)
     if (event.kind === 'run-failed') return err({ detail: event.detail, stdout: event.stdout })
     if (event.columns.length === 0) return err({ detail: 'prepared has no columns', stdout: event.stdout })
-    const file = `${request}-out.csv`
+    const staging = `script_result_${request.replaceAll('-', '')}`
     try {
-      await database.registerFileBuffer(file, event.prepared)
-      // The rows land in a table of their own and the step's view reads it, so every step stays a view
-      // whatever kind it is, and a rerun that renumbers the steps never finds a table where a view should be.
+      // Validate insertion before replacing the last successful result. A failed
+      // conversion must not leave a partially populated result behind.
+      await connection.insertArrowFromIPCStream(event.prepared.bytes, { name: staging })
       const table = `script_${step.id.replaceAll('"', '')}`
-      await connection.query(`CREATE OR REPLACE TABLE ${identifier(table)} AS SELECT * FROM read_csv('${file}', header = true)`)
-      await connection.query(`CREATE OR REPLACE VIEW ${identifier(step.view)} AS SELECT * FROM ${identifier(table)}`)
+      await connection.query('BEGIN TRANSACTION')
+      try {
+        await connection.query(`CREATE OR REPLACE TABLE ${identifier(table)} AS SELECT * FROM ${identifier(staging)}`)
+        await connection.query(`CREATE OR REPLACE VIEW ${identifier(step.view)} AS SELECT * FROM ${identifier(table)}`)
+        await connection.query('COMMIT')
+      } catch (cause) {
+        await connection.query('ROLLBACK')
+        throw cause
+      }
       return ok({ stdout: event.stdout })
     } catch (cause) {
       return err({ detail: `prepared could not be read back: ${cause instanceof Error ? cause.message : String(cause)}`, stdout: event.stdout })
     } finally {
-      await database.dropFile(file).catch(() => undefined)
+      await connection.query(`DROP TABLE IF EXISTS ${identifier(staging)}`).catch(() => undefined)
     }
   },
 })

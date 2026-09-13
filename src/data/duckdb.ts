@@ -1,4 +1,5 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
+import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
 import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
 import { fingerprintFile } from './fingerprint'
@@ -31,8 +32,6 @@ import {
 import type { SelectedSource } from '@/domain/workflow'
 import type { PanelDataProblem, PanelKeyMatrix, PanelLongMatrix, PanelPeriod, PanelStructureEvidence } from '@/domain/panel'
 
-const DUCKDB_PACKAGE_VERSION = '1.30.0'
-const DUCKDB_ENGINE_VERSION = 'v1.3.2'
 const PREVIEW_ROWS = 12
 
 /** The engine binaries are served under the app's own origin at this path: from node_modules by the dev and preview servers, from R2 by the deployment. */

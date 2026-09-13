@@ -1,8 +1,8 @@
 diff --git a/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.cjs b/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.cjs
-index b369fa9..46ccbe0 100644
+index 82dafe9..85a18c2 100644
 --- a/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.cjs
 +++ b/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.cjs
-@@ -1291,7 +1291,7 @@ function extraswaps(input) {
+@@ -1292,7 +1292,7 @@ function extraswaps(input) {
  }
  async function embed2(props) {
    var _a, _b;
@@ -12,10 +12,10 @@ index b369fa9..46ccbe0 100644
    embed(props.container, runtime, {
      fontFamily: (_a = props.fontFamily) != null ? _a : "monospace",
 diff --git a/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.js b/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.js
-index 4a531bb..94dd5a6 100644
+index a40b662..33be6fe 100644
 --- a/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.js
 +++ b/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.js
-@@ -1281,7 +1281,7 @@
+@@ -1282,7 +1282,7 @@
    }
    async function embed2(props) {
      var _a, _b;
@@ -25,10 +25,10 @@ index 4a531bb..94dd5a6 100644
      embed(props.container, runtime, {
        fontFamily: (_a = props.fontFamily) != null ? _a : "monospace",
 diff --git a/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.mjs b/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.mjs
-index 2792f16..8fdb696 100644
+index 944af37..2458adc 100644
 --- a/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.mjs
 +++ b/node_modules/@duckdb/duckdb-wasm-shell/dist/shell.mjs
-@@ -1248,7 +1248,7 @@ function extraswaps(input) {
+@@ -1249,7 +1249,7 @@ function extraswaps(input) {
  }
  async function embed2(props) {
    var _a, _b;
