@@ -456,7 +456,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <MetricTile frame="cell" size="compact" label="Events" value={formatCount(evidence.events)} context={`${formatCount(evidence.observations).text} observations`} />
             <MetricTile frame="cell" size="compact" label="Cumulative hazard" value={formatStatistic('raw', evidence.cumulativeHazard.at(-1) ?? Number.NaN)} context={`through ${statistic(lastTime)}`} />
           </Tiles>
-          <Interpretation
+          <Interpretation run={run}
             bottomLine={<>By follow-up time {statistic(lastTime)}, the Kaplan–Meier estimated survival function is {formatPercent(lastSurvival).text}. The Nelson–Aalen curve gives the estimated cumulative hazard over the same follow-up.</>}
             uncertainty={<>The table reports pointwise 95% confidence intervals for the estimated survival function and cumulative hazard.</>}
             mustBeTrue={<>An event indicator of 0 means the observation was right-censored at its recorded duration. These estimates describe the observed durations and events; they do not estimate a causal effect.</>}
@@ -514,7 +514,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <MetricTile frame="cell" size="compact" label="Median time" value={formatStatistic('raw', evidence.median)} context={evidence.mean === null ? undefined : `mean ${statistic(evidence.mean)}`} />
             <MetricTile frame="cell" size="compact" label="AIC" value={formatStatistic('raw', evidence.aic)} context={`log likelihood ${statistic(evidence.logLikelihood)}`} />
           </Tiles>
-          <Interpretation
+          <Interpretation run={run}
             bottomLine={<>At follow-up time {statistic(lastTime)}, the model estimates that {formatPercent(last).text} of rows like the drawn profile remain event-free. The estimated median time to the event is {statistic(evidence.median)}. {profileNote}</>}
             uncertainty={<>The curve is a fitted point estimate. The 95% intervals in the table describe uncertainty in the fitted parameters; this result does not yet draw a band around the curve.</>}
             mustBeTrue={<>The chosen distribution and covariate form must describe how event risk changes over follow-up. Censoring must not depend on an unrecorded reason that also predicts the event. Covariate coefficients are associations unless a separate causal design justifies an effect interpretation.</>}
@@ -581,7 +581,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <MetricTile frame="cell" size="compact" label={`${confidence}% interval`} value={formatStatistic('raw', first.hazardRatioInterval[0])} context={`to ${statistic(first.hazardRatioInterval[1])}`} />
             <MetricTile frame="cell" size="compact" label="Concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? coxStandardErrorLabel(evidence.standardErrors) : 'unavailable for this observation form'} />
           </Tiles>
-          <Interpretation
+          <Interpretation run={run}
             bottomLine={<>With the other selected covariates held fixed, a 1-unit higher {first.covariate} is associated with a {formatPercent(rateChange, { precision: 1 }).text} {direction} event rate at each follow-up time. Its estimated hazard ratio is {statistic(first.hazardRatio)}.</>}
             uncertainty={<>The {confidence}% interval for this hazard ratio is {statistic(first.hazardRatioInterval[0])} to {statistic(first.hazardRatioInterval[1])}. The interval {intervalPosition}; a hazard ratio of 1 means the fitted event rate does not change with the covariate.</>}
             mustBeTrue={<>{frailty.kind === 'gamma' ? <>Each {frailtyGroup} carries one unobserved multiplier on its hazard, drawn from a gamma distribution with mean 1, and the covariate effects are the same within every {frailtyGroup}. </> : null}The event-rate ratio must remain constant over follow-up, after accounting for the selected covariates{run.configuration.strata.kind === 'column' ? ' within each stratum' : ''}. Censoring must not depend on an unrecorded reason that also predicts the event. These coefficients describe associations unless a separate causal design supports an effect interpretation.</>}
@@ -663,7 +663,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <MetricTile frame="cell" size="compact" label="AIC" value={formatStatistic('raw', evidence.aic)} context={`BIC ${statistic(evidence.bic)} · log likelihood ${statistic(evidence.logLikelihood)}`} />
             <MetricTile frame="cell" size="compact" label="Concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? 'on the predicted medians' : 'unavailable'} />
           </Tiles>
-          <Interpretation
+          <Interpretation run={run}
             bottomLine={<>With the other covariates held fixed, a 1-unit higher {first.parameter} multiplies the expected time to the event by {statistic(first.timeRatio)}, a {formatPercent(change, { precision: 1 }).text} {direction} time. At the covariate means the fitted median time is {statistic(evidence.median)} and the event-free probability at {statistic(lastTime)} is {formatPercent(lastSurvival).text}.</>}
             uncertainty={<>The {confidence}% interval for this time ratio is {statistic(first.timeRatioInterval[0])} to {statistic(first.timeRatioInterval[1])}. The intervals come from the inverse of the penalised Hessian at the fit, as lifelines reports them. The penalty of {statistic(evidence.penalizer)} shrinks the coefficients toward zero, so the log likelihood, AIC and BIC are those of the penalised fit.</>}
             mustBeTrue={<>The log of the duration must follow the {penalizedAftFamilyLabel(evidence.family)} family, shifted by the covariates through the location parameter. Censoring must not depend on an unrecorded reason that also predicts the event. These time ratios describe associations unless a separate causal design supports an effect interpretation.</>}
@@ -725,7 +725,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
               <MetricTile frame="cell" size="compact" label="95% interval" value={formatStatistic('raw', evidence.restrictedMeanInterval[0])} context={`to ${statistic(evidence.restrictedMeanInterval[1])}`} />
               <MetricTile frame="cell" size="compact" label="Overall test p" value={formatP(evidence.twoStagePValue, { withLabel: false })} context="two-stage" />
             </Tiles>
-            <Interpretation
+            <Interpretation run={run}
               bottomLine={<>Up to follow-up time {statistic(evidence.truncationTime)}, group 1 accumulated {statistic(Math.abs(evidence.restrictedMeanDifference))} {direction} event-free time than group 0 on average.</>}
               uncertainty={<>The 95% interval runs from {statistic(evidence.restrictedMeanInterval[0])} to {statistic(evidence.restrictedMeanInterval[1])}. The overall test also compares the full curves and remains useful when they cross.</>}
               mustBeTrue={<>Censoring must be comparable between groups, and each row must represent an independent observation. This is a group comparison, not a causal effect, unless group assignment and the study design support that interpretation.</>}
@@ -736,7 +736,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
               <MetricTile frame="cell" size="compact" label="Group 1 conversion" value={formatConversion(conversionRate(fixedTime.groupOneRate))} context={`by time ${statistic(fixedTime.time)}`} />
               <MetricTile frame="cell" size="compact" label="Difference" value={formatConversion(conversionDifference(fixedTime.difference))} context="group 1 minus group 0" />
             </Tiles>
-            <Interpretation
+            <Interpretation run={run}
               bottomLine={<>By follow-up time {statistic(fixedTime.time)}, estimated conversion was {formatConversion(conversionRate(fixedTime.groupZeroRate)).text} in group 0 and {formatConversion(conversionRate(fixedTime.groupOneRate)).text} in group 1, a difference of {formatConversion(conversionDifference(fixedTime.difference)).text}.</>}
               uncertainty={<>The 95% interval for the conversion difference runs from {formatConversion(conversionDifference(fixedTime.interval[0])).text} to {formatConversion(conversionDifference(fixedTime.interval[1])).text}. The data are compatible with no difference when this interval includes 0.</>}
               mustBeTrue={<>People who have not converted by the end of follow-up must be represented as censored, and censoring must be comparable between groups. This is a group comparison, not a causal effect, unless assignment and the study design support that interpretation.</>}
@@ -816,7 +816,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <MetricTile frame="cell" size="compact" label="Transitions" value={formatCount(evidence.transitions.length)} />
             <MetricTile frame="cell" size="compact" label="Most likely final state" value={formatCount(evidence.states[destination] ?? Number.NaN)} context={formatPercent(row[destination] ?? Number.NaN).text} />
           </Tiles>
-          <Interpretation
+          <Interpretation run={run}
             bottomLine={<>For observations starting in state {initial}, the chart estimates the chance of occupying each state as follow-up continues.</>}
             uncertainty={<>These state probabilities are fitted point estimates; this result does not yet include simulation intervals.</>}
             mustBeTrue={<>Every permitted move must be represented by the observed transition rows. Transition hazards must follow the chosen proportional-hazards family, and future movement must depend on the state history in the way specified by this clock-forward model.</>}

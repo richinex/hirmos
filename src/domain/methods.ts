@@ -1642,7 +1642,6 @@ const UNOBSERVED_COMMON_CAUSE: MethodDefinition = {
   caveats: [
     { id: caveatId('unobserved-binary-flip'), category: 'functional-form', requirement: 'The treatment is binary and the simulated outcome shift is linear; the grid represents specified sensitivity scenarios.', consequenceIfUnmet: 'The sensitivity parameters are interpreted as estimates of an actual unmeasured confounder.', sources: [NESS_CH11('§11.5.5 unobserved common cause refuter'), dowhy('dowhy/causal_refuters/add_unobserved_common_cause.py#simulation_method="direct-simulation"')] },
     { id: caveatId('unobserved-kappa-range'), category: 'interpretation', requirement: 'Default strengths are calibrated from observed common causes; stronger unmeasured confounding is outside the evaluated grid.', consequenceIfUnmet: 'The reported grid omits confounding scenarios that may be relevant to the study.', sources: [dowhy('dowhy/causal_refuters/add_unobserved_common_cause.py#_infer_default_kappa_t')] },
-    { id: caveatId('unobserved-stream'), category: 'computation', requirement: 'Cells share one seeded stream and mutate the frame in turn, as the reference does.', consequenceIfUnmet: 'One cell rerun alone gives another number.', sources: [hirmos('crates/causal-core/src/unobserved.rs#unobserved_common_cause_grid')] },
   ],
 }
 

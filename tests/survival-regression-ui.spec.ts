@@ -14,7 +14,7 @@ test('new survival regressions preserve covariates, validate settings, render an
   await page.locator('input[type=file]').setInputFiles(fileURLToPath(new URL('../docs/2026-09-11-rviews-survival-veteran/data/veteran.csv', import.meta.url)))
   await page.getByRole('button', { name: /Inspect data/ }).click()
   await expect(page.getByText('Choose the observation structure')).toBeVisible({ timeout: 90_000 })
-  await prepare(page, { structure: 'cross-section', columns: ['time', 'status', 'age', 'karno', 'prior'] })
+  await prepare(page, { structure: 'cross-section', columns: ['time', 'status', 'age', 'karno', 'prior', 'diagtime', 'trt'] })
   const chapter = async (pattern: RegExp) => {
     const toggle = page.getByRole('button', { name: 'Expand chapter list' })
     if (phone && await toggle.isVisible()) await toggle.click()
@@ -24,6 +24,18 @@ test('new survival regressions preserve covariates, validate settings, render an
   const setup = page.locator('section[aria-labelledby="survival-setup-title"]')
   const choose = async (analysis: string) => setup.getByRole('radio', { name: analysis, exact: true }).click({ force: true })
   const run = () => setup.getByRole('button', { name: 'Run survival analysis' }).click()
+  const checkEquation = async () => {
+    const equation = page.getByTestId('survival-equation').first()
+    await equation.locator('summary').first().click()
+    await expect(equation.locator('.katex')).not.toHaveCount(0)
+    await expect(equation.locator('.katex-error')).toHaveCount(0)
+    const dimensions = await equation.evaluate((el) => ({
+      width: el.clientWidth, content: el.scrollWidth,
+      formulas: Array.from(el.querySelectorAll('.formula')).map((f) => ({ width: f.clientWidth, content: f.scrollWidth, text: f.getAttribute('aria-label') })),
+    }))
+    expect(dimensions.content, JSON.stringify(dimensions)).toBeLessThanOrEqual(dimensions.width + 1)
+    await equation.locator('summary').first().click()
+  }
   const covariates = setup.getByRole('group', { name: 'Covariates', exact: true })
   await choose('Cox regression')
   await covariates.getByRole('checkbox', { name: 'age', exact: true }).check()
@@ -34,6 +46,7 @@ test('new survival regressions preserve covariates, validate settings, render an
   await run()
   await expect(page.getByText('Survival runs · 1')).toBeVisible({ timeout: 60_000 })
   await expect(page.getByTestId('aalen-coefficients').first()).toBeVisible()
+  await checkEquation()
   const plots = page.getByRole('region', { name: 'Cumulative coefficient plots' }).first()
   await expect(plots.getByTestId('aalen-coefficient-card')).toHaveCount(3)
   await plots.getByRole('searchbox', { name: 'Filter coefficients' }).fill('karno')
@@ -65,6 +78,7 @@ test('new survival regressions preserve covariates, validate settings, render an
   await expect(page.getByText('Survival runs · 2')).toBeVisible({ timeout: 60_000 })
   await expect(page.getByTestId('survival-forest-survival').first()).toBeVisible()
   await expect(page.getByTestId('survival-forest-importance').first()).toBeVisible()
+  await checkEquation()
   await expect(page.getByText('No confidence interval is calculated for this prediction.', { exact: false }).first()).toBeVisible()
   const fits = await page.locator('body').evaluate((el) => el.scrollWidth <= window.innerWidth + 1)
   expect(fits).toBe(true)
@@ -83,5 +97,22 @@ test('new survival regressions preserve covariates, validate settings, render an
   await page.getByRole('combobox', { name: 'Survival run' }).click()
   await page.getByRole('option', { name: /Survival forest/ }).click()
   await expect(page.getByTestId('survival-forest-survival').first()).toBeVisible()
+  await checkEquation()
+  await chapter(/Survival analysis/)
+  await choose('Cox regression')
+  for (const name of ['age', 'karno', 'prior', 'diagtime', 'trt']) {
+    await covariates.getByRole('checkbox', { name, exact: true }).check()
+  }
+  await run()
+  await expect(page.getByText('Survival runs · 3')).toBeVisible({ timeout: 60_000 })
+  const equation = page.getByTestId('survival-equation').first()
+  await equation.locator('summary').first().click()
+  await equation.evaluate((el) => { el.style.width = '320px' })
+  const expression = equation.getByTestId('survival-equation-fitted').locator('.formula').first()
+  await expect(expression.locator('.katex')).toHaveCount(1)
+  const lines = await expression.locator('.katex-html > .base').evaluateAll((parts) => new Set(parts.map((part) => Math.round(part.getBoundingClientRect().top))).size)
+  expect(lines).toBeGreaterThan(1)
+  expect(await equation.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true)
+  await equation.screenshot({ path: info.outputPath('cox-wrapped-equation.png') })
   expect(errors).toEqual([])
 })

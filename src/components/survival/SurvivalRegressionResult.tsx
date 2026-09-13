@@ -22,7 +22,7 @@ export function AalenResult({ run }: { readonly run: Extract<SurvivalRunArtifact
       <MetricTile frame="cell" size="compact" label="Events used" value={formatCount(evidence.fittedEvents)} context={`of ${evidence.events} observed events`} />
       <MetricTile frame="cell" size="compact" label="Overall association" value={formatP(evidence.pValue)} context={`chi-squared ${statistic(evidence.chisq)} on ${evidence.degreesOfFreedom} df`} />
     </div>
-    <SurvivalInterpretation
+    <SurvivalInterpretation run={run}
       bottomLine={<>The coefficient curves show how each covariate’s association with the event rate changes during follow-up. An upward slope indicates an increased event rate; a downward slope indicates a decreased rate, with the other covariates held fixed. The fit extends through time {statistic(evidence.lastTime)}.</>}
       uncertainty={<>The dashed curves give approximate 95% confidence bounds at each time. They do not provide 95% coverage for the entire curve at once. Estimates become less precise as fewer observations remain at risk.</>}
       mustBeTrue={<>Covariates must contribute additively to the event rate. Censoring must be independent of the event after accounting for the covariates. These are associations unless the study design supports a causal interpretation.</>}
@@ -50,7 +50,7 @@ export function ForestResult({ run }: { readonly run: Extract<SurvivalRunArtifac
       <MetricTile frame="cell" size="compact" label="Out-of-bag concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? 'ranking of comparable observations' : 'unavailable'} />
       <MetricTile frame="cell" size="compact" label={`Event-free at ${statistic(last)}`} value={formatPercent(evidence.survival.at(-1)!)} context={`prepared row ${evidence.predictionRow + 1}`} />
     </div>
-    <SurvivalInterpretation
+    <SurvivalInterpretation run={run}
       bottomLine={<>For the covariate values in prepared row {evidence.predictionRow + 1}, the forest estimates an event-free probability of {formatPercent(evidence.survival.at(-1)!).text} at time {statistic(last)}. The curve shows this prediction across follow-up; the table identifies the covariate values used.</>}
       uncertainty={<>No confidence interval is calculated for this prediction. Out-of-bag concordance checks whether observations with earlier events receive higher predicted risk, using trees that did not train on those observations. It measures ranking accuracy rather than uncertainty in the curve.</>}
       mustBeTrue={<>Censoring must be independent of the event conditional on the covariates. Predictions for other populations require separate validation. Covariate importance measures predictive contribution and does not establish a causal effect.</>}
