@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import { CHAPTER_IDS } from '../src/domain/navigation'
 
 const seatbelts = fileURLToPath(new URL('./fixtures/Seatbelts.csv', import.meta.url))
 const seatbeltsParquet = fileURLToPath(new URL('./fixtures/Seatbelts.parquet', import.meta.url))
@@ -48,7 +49,7 @@ test('keeps null distinct from a real zero at the Arrow boundary', async ({ page
   })
   await page.getByRole('button', { name: 'Inspect data' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
   const schemaRows = page.getByRole('region', { name: 'Physical schema' }).getByRole('row')
   await expect(schemaRows.filter({ has: page.getByRole('cell', { name: 'y', exact: true }) })).toContainText('1')
   const preview = page.getByLabel('Preview')
@@ -83,7 +84,7 @@ test('profiles the pinned Seatbelts Parquet through the same canonical worker', 
   await expect(page.getByText(/^parquet · /)).toBeVisible()
   await page.getByRole('button', { name: 'Inspect data' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
   // Each figure renders a screen-reader form beside the visible one, so assert the visible span.
   const profileFacts = page.locator('dl[aria-label="Dataset size"]')
   await expect(profileFacts.locator('dd').nth(0).locator('[aria-hidden]')).toHaveText('192')
@@ -122,7 +123,7 @@ test('keeps the current stage usable on a phone', async ({ page }, testInfo) => 
   await createProject(page)
   await page.locator('input[type="file"]').setInputFiles(seatbelts)
   await page.getByRole('button', { name: 'Inspect data' }).click()
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
 
   const mobileNav = page.locator('nav[aria-label="Workspace chapters"]')
   await expect(mobileNav).toHaveAttribute('inert', '')
@@ -132,7 +133,7 @@ test('keeps the current stage usable on a phone', async ({ page }, testInfo) => 
   await expect(mobileNav.getByRole('button', { name: /Discovery lab/ })).toHaveAttribute('aria-disabled', 'true')
   await expect(mobileNav.getByRole('button', { name: /Study design/ })).toHaveAttribute('aria-disabled', 'true')
   await expect(mobileNav.getByRole('button', { name: /Counterfactuals/ })).toHaveAttribute('aria-disabled', 'true')
-  await expect(mobileNav.getByRole('button')).toHaveCount(10)
+  await expect(mobileNav.getByRole('button')).toHaveCount(CHAPTER_IDS.length)
   await page.keyboard.press('Escape')
   await expect(mobileNav).toHaveAttribute('inert', '')
   await expect(page.getByRole('region', { name: 'Physical schema' }).getByRole('row').nth(1).getByRole('cell').nth(4)).not.toHaveText('…', { timeout: 30_000 })
@@ -260,7 +261,7 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
 
   const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
   await navigation.getByRole('button', { name: /Discovery lab/ }).click()
-  await expect(page.getByRole('heading', { name: 'Examine candidate relationships' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Causal discovery', exact: true })).toBeVisible()
   // Methods are grouped into families, so only the selected family's methods are on the page. The
   // eligible method decides the family, and the time-series methods are checked in their own.
   const discoveryFamilies = page.getByRole('radiogroup', { name: 'Discovery method family' })

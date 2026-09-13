@@ -998,12 +998,17 @@ export function runDmlRefutationBatch(values: Float64Array, rows: number, column
   return post('dml-refutation-succeeded', { kind: 'dml-refutation-batch', request, values, rows, columns, ...design }, values)
 }
 
+export function runArdlModel(values: Float64Array, rows: number, columns: number, model: import('@/domain/ardlModel').ArdlModelRequest): Promise<Result<import('@/domain/ardlModel').ArdlModelEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('ardl-model-succeeded', { kind: 'ardl-model', request, values, rows, columns, model }, values)
+}
+
 export function runArdlPss(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly maxLag: number; readonly trend: 'c' | 'ct'; readonly case: number }): Promise<ArdlOutcome> {
   const request = newWorkerRequestId()
   return post('ardl-succeeded', { kind: 'ardl-pss', request, values, rows, columns, ...design }, values)
 }
 
-export function runVecm(values: Float64Array, rows: number, columns: number, design: { readonly endogenous: readonly number[]; readonly maxLags: number; readonly deterministic: 'n' | 'co' | 'ci' | 'coli'; readonly significance: number; readonly breakIndex: number | null }): Promise<VecmOutcome> {
+export function runVecm(values: Float64Array, rows: number, columns: number, design: { readonly endogenous: readonly number[]; readonly maxLags: number; readonly deterministic: 'n' | 'co' | 'ci' | 'coli'; readonly significance: number; readonly breakIndex: number | null; readonly forecastSteps?: number | null }): Promise<VecmOutcome> {
   const request = newWorkerRequestId()
   return post('vecm-succeeded', { kind: 'vecm', request, values, rows, columns, ...design }, values)
 }

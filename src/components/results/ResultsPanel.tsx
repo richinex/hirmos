@@ -1,4 +1,9 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useMemo, useState } from 'react'
+import { TimeSeriesRunResult } from '@/components/time-series/TimeSeriesRunResult'
+import { CountSeriesRecord } from '@/components/time-series/CountSeriesCard'
+import type { TimeSeriesRun } from '@/domain/timeSeries'
+import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { EstimateHeadline } from '@/components/results/EstimateHeadline'
 import { SurvivalRunResult, survivalRunLabel } from '@/components/survival/SurvivalRunResult'
@@ -18,7 +23,6 @@ import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import type { SurvivalRunArtifact, SurvivalRunId } from '@/domain/survival'
 import { describeAssignmentKind, describeEstimand, describeStudyDesignCategory, estimandSentence, identifiedExpression, identifiedExpressionTex, studyDesignCategory, type IdentificationArtifact, type StudySpecification, type StudyVariable } from '@/domain/study'
 import { assertNever } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import { describeStationarityAssessment } from '@/domain/stationarityAssessment'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatP, formatStatistic } from '@/lib/format/number'
@@ -177,21 +181,26 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
 }
 
 type ResultView =
+  | { readonly kind: 'time-series' }
   | { readonly kind: 'estimation'; readonly selected: EstimationRunId | null; readonly compareWith: EstimationRunId | null }
   | { readonly kind: 'survival'; readonly selected: SurvivalRunId | null }
 
 const initialResultView = (
   estimationRuns: readonly EstimationRunArtifact[],
   survivalRuns: readonly SurvivalRunArtifact[],
+  hasTimeSeries: boolean,
 ): ResultView => estimationRuns.length > 0
   ? { kind: 'estimation', selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }
-  : { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null }
+  : survivalRuns.length > 0 ? { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null } : hasTimeSeries ? { kind: 'time-series' } : { kind: 'survival', selected: null }
 
 const availableResultView = (
   view: ResultView,
   estimationRuns: readonly EstimationRunArtifact[],
   survivalRuns: readonly SurvivalRunArtifact[],
+  hasTimeSeries: boolean,
 ): ResultView => {
+  if (view.kind === 'time-series') return hasTimeSeries ? view : initialResultView(estimationRuns, survivalRuns, false)
+  if (estimationRuns.length + survivalRuns.length === 0 && hasTimeSeries) return { kind: 'time-series' }
   switch (view.kind) {
     case 'estimation': {
       if (estimationRuns.length === 0 && survivalRuns.length > 0) {
@@ -222,13 +231,14 @@ const availableResultView = (
 
 const resultIntroduction = (view: ResultView): string => {
   switch (view.kind) {
+    case 'time-series': return 'Review count-model scans and long-run relationships fitted to the prepared series. These results do not by themselves estimate the effect of an intervention.'
     case 'estimation': return 'A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this chapter, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.'
     case 'survival': return 'Review the event definition, fitted curve or group comparison, uncertainty, and assumptions together. Survival results describe time until an event or movement between states; they are not causal effects unless a separate study design supports that interpretation.'
     default: return assertNever(view)
   }
 }
 
-export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns }: {
+export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns, timeSeriesRuns, countSeriesModels }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -240,15 +250,19 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
   readonly survivalRuns: readonly SurvivalRunArtifact[]
+  readonly timeSeriesRuns: readonly TimeSeriesRun[]
+  readonly countSeriesModels: readonly CountSeriesModelArtifact[]
 }) {
-  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns))
-  const activeView = availableResultView(view, estimationRuns, survivalRuns)
+  const hasTimeSeries = timeSeriesRuns.length + countSeriesModels.length > 0
+  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns, hasTimeSeries))
+  const activeView = availableResultView(view, estimationRuns, survivalRuns, hasTimeSeries)
   const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
   const inputs = useMemo(() => ({ source, profile, prepared, stationarity, documents, studies, identifications, sensitivityRuns, counterfactualRuns }), [counterfactualRuns, documents, identifications, prepared, profile, sensitivityRuns, source, stationarity, studies])
   const studyOf = (candidate: EstimationRunArtifact) => studies.find((study) => study.id === candidate.study)
 
   const selectFamily = (kind: ResultView['kind']) => {
     switch (kind) {
+      case 'time-series': setView({ kind }); return
       case 'estimation': setView({ kind, selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }); return
       case 'survival': setView({ kind, selected: survivalRuns.at(-1)?.id ?? null }); return
       default: return assertNever(kind)
@@ -257,6 +271,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
 
   const body = (() => {
     switch (activeView.kind) {
+      case 'time-series': return <><div className="space-y-4">{[...timeSeriesRuns].reverse().map((run) => <TimeSeriesRunResult key={run.id} run={run} />)}</div><ul className="list-none space-y-4 p-0">{[...countSeriesModels].reverse().map((artifact) => <CountSeriesRecord key={artifact.id} artifact={artifact} open />)}</ul></>
       case 'estimation': {
         const run = estimationRuns.find((candidate) => candidate.id === activeView.selected) ?? null
         const other = estimationRuns.find((candidate) => candidate.id === activeView.compareWith) ?? null
@@ -288,6 +303,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
 
   const bottom = (() => {
     switch (activeView.kind) {
+      case 'time-series': return undefined
       case 'estimation': return {
         title: `Estimates · ${estimationRuns.length}`,
         body: <div className="figure-strip overflow-x-auto"><table className={table} aria-label="Estimates"><thead><tr><th className={th()}>Target</th><th className={th()}>Estimator</th><th className={th('text-right')}>Estimate</th><th className={th()}>Graph</th><th className={th()}>Created</th></tr></thead><tbody>{[...estimationRuns].reverse().map((candidate) => { const study = studyOf(candidate); const effect = candidate.estimate.effect; return <tr key={candidate.id} className={tr(candidate.id === activeView.selected ? 'selected' : 'action')} onClick={() => setView({ ...activeView, selected: candidate.id })}><td className={td('text-ink')}>{study === undefined ? candidate.method : estimandSentence(study)}</td><td className={td('text-muted')}>{describeEstimator(candidate.configuration.kind)}</td><td className={td(num('whitespace-nowrap text-right text-ink'))}>{formatStatistic('raw', effect.kind === 'path' ? effect.aggregate.average : headlineValue(effect)).text}</td><td className={td('text-muted')}>{study?.dagName ?? '—'}</td><td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td></tr> })}</tbody></table></div>,
@@ -302,9 +318,14 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
     }
   })()
 
-  const familyControl = estimationRuns.length > 0 && survivalRuns.length > 0
-    ? <SegmentedControl variant="line" size="sm" ariaLabel="Result family" value={activeView.kind} onChange={selectFamily} options={[{ value: 'estimation', label: 'Causal estimates' }, { value: 'survival', label: 'Survival' }]} />
+  const families: { value: ResultView['kind']; label: string }[] = [
+    ...(estimationRuns.length > 0 ? [{ value: 'estimation' as const, label: 'Causal estimates' }] : []),
+    ...(hasTimeSeries ? [{ value: 'time-series' as const, label: 'Time series' }] : []),
+    ...(survivalRuns.length > 0 ? [{ value: 'survival' as const, label: 'Survival' }] : []),
+  ]
+  const familyControl = families.length > 1
+    ? <SegmentedControl variant="line" size="sm" ariaLabel="Result family" value={activeView.kind} onChange={selectFamily} options={families} />
     : null
 
-  return <WorkbenchLayout id="results" stage={<section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5"><div><span className={label('text-faint')}>{chapterLabel('results')}</span><h2 id="results-title" className="mb-2 mt-2 text-heading text-ink">Review the complete analysis</h2><p className={chapterIntro}>{resultIntroduction(activeView)}</p></div>{familyControl}{body}</section>} bottom={bottom} />
+  return <WorkbenchLayout id="results" stage={<section aria-labelledby="results-title" className="@container/panel flex flex-col gap-5"><div><ChapterHeading id="results-title" className="mb-2">Results</ChapterHeading><p className={chapterIntro}>{resultIntroduction(activeView)}</p></div>{familyControl}{body}</section>} bottom={bottom} />
 }

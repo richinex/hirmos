@@ -1,3 +1,4 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
@@ -9,7 +10,7 @@ import type { SelectedSource } from '@/domain/workflow'
 import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
-import { button, chapterIntro, field, iconControl, label, literal, panel, pill, sectionTitle, segment, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, iconControl, literal, panel, pill, sectionTitle, segment, well } from '@/components/ui/recipes'
 import {
   createDagDocument,
   describeDagCreateProblem,
@@ -52,7 +53,6 @@ import {
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DiscoveryRunArtifact, DiscoveryRunId } from '@/domain/discovery'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import { methodDefinition } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { formatTime } from '@/lib/format/date'
@@ -797,8 +797,7 @@ export function DagWorkspace({
   const header = (
     <div className="mb-3">
       <div>
-        <span className={label('text-faint')}>{chapterLabel('dag')}</span>
-        <h2 id="dag-workspace-title" className="mb-2 mt-2 text-heading text-ink">Represent the causal assumptions</h2>
+        <ChapterHeading id="dag-workspace-title" className="mb-2">DAG workspace</ChapterHeading>
         <p className={chapterIntro}>A directed acyclic graph (DAG) represents a data-generating process: nodes are variables, and each arrow states a direct causal relationship. In this chapter, construct the graph for the causal question and record the basis for each arrow. Discovery results can contribute empirical evidence, but they do not determine the graph.</p>
       </div>
     </div>

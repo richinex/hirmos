@@ -4,6 +4,7 @@ import { err, ok, type Result } from './dop'
 export const CHAPTER_IDS = [
   'projects',
   'data',
+  'time-series',
   'discovery',
   'dag',
   'study',
@@ -16,7 +17,7 @@ export const CHAPTER_IDS = [
 
 export type ChapterId = (typeof CHAPTER_IDS)[number]
 
-const CHAPTER_SECTION_TITLES = ['Set up', 'Model', 'Estimate', 'Time to event', 'Report'] as const
+const CHAPTER_SECTION_TITLES = ['Set up', 'Time series', 'Model', 'Estimate', 'Time to event', 'Report'] as const
 type ChapterSectionTitle = (typeof CHAPTER_SECTION_TITLES)[number]
 
 export interface ChapterMetadata {
@@ -30,6 +31,7 @@ export interface ChapterMetadata {
 export const CHAPTER_METADATA = {
   projects: { name: 'Projects', shortName: 'Projects', icon: 'folder_open', section: 'Set up' },
   data: { name: 'Data studio', shortName: 'Data', icon: 'table_view', section: 'Set up' },
+  'time-series': { name: 'Time-series analysis', shortName: 'Time series', icon: 'timeline', section: 'Time series' },
   discovery: { name: 'Discovery lab', shortName: 'Discovery', icon: 'schema', section: 'Model' },
   dag: { name: 'DAG workspace', shortName: 'DAG', icon: 'conversion_path', section: 'Model' },
   study: { name: 'Study design', shortName: 'Study', icon: 'experiment', section: 'Model' },

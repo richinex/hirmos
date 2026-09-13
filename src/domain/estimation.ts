@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { vecmForecastSchema } from './vecmForecast'
+import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
 import type { ColumnId } from './dataset'
 import type { DagDocument, EditableDag } from './dag'
 import { assertNever, brand, err, flattenNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
@@ -266,9 +268,9 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
   },
   {
     id: 'dynamic-time-series',
-    name: 'Dynamic time-series models',
-    description: 'Models for count dynamics, distributed lags, long-run relations and error correction.',
-    estimators: ['negative-binomial-ingarch', 'ardl-pss', 'vecm'],
+    name: 'Count time-series interventions',
+    description: 'Compare count paths under specified treatment schedules.',
+    estimators: ['negative-binomial-ingarch'],
   },
   {
     id: 'intervention-comparison',
@@ -561,6 +563,7 @@ export type TLearnerEvidence = z.infer<typeof tLearnerEvidenceSchema>
 
 export const ardlEvidenceSchema = z.object({
   kind: z.literal('ardlPss'),
+  longRun: ardlLongRunSchema.optional(),
   observations: z.number().int().positive(),
   trend: z.enum(['c', 'ct']),
   case: z.number().int().min(2).max(5),
@@ -591,6 +594,8 @@ export const boundsReading = (evidence: ArdlEvidence): BoundsReading => {
 
 export const vecmEvidenceSchema = z.object({
   kind: z.literal('vecm'),
+  forecast: vecmForecastSchema.optional(),
+  longRun: vecmLongRunSchema.optional(),
   observations: z.number().int().positive(),
   deterministic: z.enum(['n', 'co', 'ci', 'coli']),
   kArDiff: z.number().int().positive(),

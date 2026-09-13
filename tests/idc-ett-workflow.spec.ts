@@ -59,7 +59,7 @@ test('a fresh IDC*-only project reaches and runs binary ETT estimation', async (
 
   await page.getByRole('button', { name: 'Continue to estimation' }).click()
   await expect(page).toHaveURL(/\/app\/estimation$/)
-  await expect(page.getByRole('heading', { name: 'Estimate the identified effect' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Estimation', exact: true })).toBeVisible()
   await expect(page.getByRole('radio', { name: /Binary ETT by IDC\*/ })).toBeChecked()
   const run = page.getByRole('button', { name: /Run binary ETT by IDC\*/i })
   await expect(run).toBeEnabled({ timeout: 30_000 })

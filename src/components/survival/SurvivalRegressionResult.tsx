@@ -3,7 +3,7 @@ import { survivalCurvesOption, comparisonMeasureOption } from '@/charts/survival
 import { importanceOption } from '@/charts/survival/regression'
 import { useChartTheme } from '@/charts/theme'
 import { EvidenceTable } from '@/components/table/EvidenceTable'
-import { MetricTile } from '@/components/ui/figures'
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { caption } from '@/components/ui/recipes'
 import { AalenCoefficients } from './AalenCoefficients'
 import type { SurvivalRunArtifact } from '@/domain/survival'
@@ -17,11 +17,11 @@ export function AalenResult({ run }: { readonly run: Extract<SurvivalRunArtifact
   const names = ['Intercept', ...configuration.covariates.map((c) => c.name)]
   const rows = evidence.coefficients.map(([slope, coefficient, standardError, z, p], i) => ({ name: names[i]!, slope, coefficient, standardError, z, p }))
   return <>
-    <div className="grid grid-cols-2 gap-px bg-hair sm:grid-cols-3">
+    <MetricGrid>
       <MetricTile frame="cell" size="compact" label="Last fitted time" value={formatStatistic('raw', evidence.lastTime)} context={configuration.duration.name} />
       <MetricTile frame="cell" size="compact" label="Events used" value={formatCount(evidence.fittedEvents)} context={`of ${evidence.events} observed events`} />
       <MetricTile frame="cell" size="compact" label="Overall association" value={formatP(evidence.pValue)} context={`chi-squared ${statistic(evidence.chisq)} on ${evidence.degreesOfFreedom} df`} />
-    </div>
+    </MetricGrid>
     <SurvivalInterpretation run={run}
       bottomLine={<>The coefficient curves show how each covariate’s association with the event rate changes during follow-up. An upward slope indicates an increased event rate; a downward slope indicates a decreased rate, with the other covariates held fixed. The fit extends through time {statistic(evidence.lastTime)}.</>}
       uncertainty={<>The dashed curves give approximate 95% confidence bounds at each time. They do not provide 95% coverage for the entire curve at once. Estimates become less precise as fewer observations remain at risk.</>}
@@ -45,11 +45,11 @@ export function ForestResult({ run }: { readonly run: Extract<SurvivalRunArtifac
   const survival = { name: `Prepared row ${evidence.predictionRow + 1}`, points: evidence.predictionTimes.map((t, i) => [t, evidence.survival[i]!] as const) }
   const hazard = { name: survival.name, points: evidence.predictionTimes.map((t, i) => [t, evidence.cumulativeHazard[i]!] as const) }
   return <>
-    <div className="grid grid-cols-2 gap-px bg-hair sm:grid-cols-3">
+    <MetricGrid>
       <MetricTile frame="cell" size="compact" label="Trees" value={formatCount(evidence.trees)} context={`seed ${configuration.settings.seed}`} />
       <MetricTile frame="cell" size="compact" label="Out-of-bag concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? 'ranking of comparable observations' : 'unavailable'} />
       <MetricTile frame="cell" size="compact" label={`Event-free at ${statistic(last)}`} value={formatPercent(evidence.survival.at(-1)!)} context={`prepared row ${evidence.predictionRow + 1}`} />
-    </div>
+    </MetricGrid>
     <SurvivalInterpretation run={run}
       bottomLine={<>For the covariate values in prepared row {evidence.predictionRow + 1}, the forest estimates an event-free probability of {formatPercent(evidence.survival.at(-1)!).text} at time {statistic(last)}. The curve shows this prediction across follow-up; the table identifies the covariate values used.</>}
       uncertainty={<>No confidence interval is calculated for this prediction. Out-of-bag concordance checks whether observations with earlier events receive higher predicted risk, using trees that did not train on those observations. It measures ranking accuracy rather than uncertainty in the curve.</>}

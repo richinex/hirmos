@@ -2,6 +2,27 @@
 
 use super::*;
 
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum ArdlLongRun {
+    Recorded { observed: Vec<f64>, departures: Vec<f64> },
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum VecmLongRun {
+    NotFitted,
+    Recorded { start_row: usize, departures: Vec<Vec<f64>> },
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum VecmForecast {
+    NotRequested,
+    NotFitted,
+    Recorded {confidence:f64, mean:Vec<Vec<f64>>, lower:Vec<Vec<f64>>, upper:Vec<Vec<f64>>, covariance:Vec<Vec<Vec<f64>>>},
+}
+
 #[derive(Clone, Copy, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum ForestSplitCommand {
@@ -808,6 +829,7 @@ pub(crate) enum IdentifiedDiscreteResult {
     deny_unknown_fields
 )]
 pub(crate) enum AnalysisCommand {
+    ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
     StationarityBattery,
     Multicollinearity {
         rows: usize,
@@ -1358,6 +1380,8 @@ pub(crate) enum AnalysisCommand {
         significance: usize,
         /// Optional Chow break index for the first two endogenous columns.
         break_index: Option<usize>,
+        #[serde(default)]
+        forecast_steps: Option<usize>,
     },
     ResolveMissingness {
         rows: usize,
@@ -1970,6 +1994,7 @@ pub(crate) enum DagFalsificationEvidence {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum AnalysisResult {
+    ArdlModel { evidence: crate::ardl_model::Evidence },
     DiscreteStateRefused {
         query: DiscreteStateQuery,
         node: usize,
@@ -2552,6 +2577,7 @@ pub(crate) enum AnalysisResult {
     },
     ArdlPss {
         observations: usize,
+        long_run: ArdlLongRun,
         trend: ArdlTrend,
         case: usize,
         ar_lag: usize,
@@ -2714,6 +2740,8 @@ pub(crate) enum AnalysisResult {
     },
     Vecm {
         observations: usize,
+        forecast: VecmForecast,
+        long_run: VecmLongRun,
         deterministic: VecmDeterministic,
         k_ar_diff: usize,
         rank: usize,

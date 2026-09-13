@@ -42,6 +42,11 @@ test('requires sourced caveats for every registered method', async ({ page }, te
 
   expect(parsed.success).toBe(true)
   if (!parsed.success) return
+  const countScan = parsed.data.find((method) => method.id === 'count-series-intervention-scan')
+  expect(countScan?.caveats.map((caveat) => caveat.id)).toEqual([
+    'count-scan-regular-count-series',
+    'count-scan-stable-recursion',
+  ])
   expect(parsed.data.map((method) => method.id)).toEqual([
     'adf',
     'kpss',

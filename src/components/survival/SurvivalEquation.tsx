@@ -10,8 +10,8 @@ export function SurvivalEquation({ run }: { readonly run: SurvivalRunArtifact })
   // Reserve space for italic glyph overhang at a formula's right edge.
   return <details className="@container mt-4 min-w-0 border-t border-hair pt-3 [&_.formula]:pr-2" data-testid="survival-equation">
     <summary className="cursor-pointer text-label font-medium text-ink">Model equation</summary>
-    <div className={`mt-5 grid min-w-0 gap-6 ${equations.fitted.length > 0 ? '@min-[44rem]:grid-cols-2' : ''}`} data-testid="survival-equation-layout">
-      <div className="min-w-0 space-y-3" data-testid="survival-equation-formulas">
+    <div className="equation-columns mt-5" data-paired={equations.fitted.length > 0} data-testid="survival-equation-layout">
+      <div className="equation-group" data-testid="survival-equation-formulas">
         <h5 className="m-0 text-label font-medium text-ink">General model</h5>
         <div className="space-y-4 py-2">
           {equations.general.map((equation, i) => <Formula key={`general-${i}`} {...equation} />)}
@@ -21,19 +21,19 @@ export function SurvivalEquation({ run }: { readonly run: SurvivalRunArtifact })
           {explanations.map((definition, index) => <p key={index} className="m-0">{definition}</p>)}
         </div>
       </div>
-      {equations.fitted.length > 0 && <div className="min-w-0 space-y-3 border-t border-hair pt-4 @min-[44rem]:border-l @min-[44rem]:border-t-0 @min-[44rem]:pl-6 @min-[44rem]:pt-0" data-testid="survival-equation-fitted">
+      {equations.fitted.length > 0 && <div className="equation-group" data-testid="survival-equation-fitted">
         <h5 className="m-0 text-label font-medium text-ink">Fitted model</h5>
         <div className="space-y-4 py-2">
         {equations.fitted.map((equation, i) => <Formula key={`fitted-${i}`} {...equation} />)}
         </div>
-        <p className="m-0 text-label text-faint">Values are rounded for display.</p>
+        <div className="space-y-3"><p className="m-0 text-label text-faint">Values are rounded for display.</p>
         {variables.length > 0 && <div className="space-y-3 border-t border-hair pt-3 text-body text-muted">
           <h6 className="m-0 text-label font-medium text-ink">Variables in this model</h6>
           <dl className="m-0 grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2">
             {variables.map((name, i) => <Variable key={i} index={i + 1} name={name} />)}
           </dl>
           <p className="m-0">These are the numeric values in the prepared data, including any transformations or indicator coding.</p>
-        </div>}
+        </div>}</div>
       </div>}
     </div>
     {details.map((detail, index) => <details key={index} className="mt-5 min-w-0 border-t border-hair pt-3" data-testid="survival-equation-detail">

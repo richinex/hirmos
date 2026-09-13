@@ -15,6 +15,7 @@ import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, 
 import type { ProjectOrigin } from './projectOrigin'
 import type { Project, SelectedSource, Workflow } from './workflow'
 import type { SurvivalRunArtifact } from './survival'
+import { timeSeriesRunMatches, timeSeriesRunSchema, type TimeSeriesRun } from './timeSeries'
 import { parseSourceRecipe, type SourceRecipe } from './sqlPreparation'
 
 /**
@@ -55,6 +56,7 @@ export interface PersistedProject {
   readonly sensitivityRuns: readonly SensitivityRunArtifact[]
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
   readonly survivalRuns: readonly SurvivalRunArtifact[]
+  readonly timeSeriesRuns: readonly TimeSeriesRun[]
 }
 
 /** The lines a project list shows without opening the record. */
@@ -94,7 +96,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       if (workflow.restore !== null) return null
       return {
         kind: 'hirmos-project', version: 1, savedAt, origin: workflow.origin, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
-        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [],
+        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [],
       }
     case 'sql-inputs-chosen':
     case 'pipeline-opened':
@@ -127,6 +129,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         sensitivityRuns: workflow.sensitivityRuns,
         counterfactualRuns: workflow.counterfactualRuns,
         survivalRuns: workflow.survivalRuns,
+        timeSeriesRuns: workflow.timeSeriesRuns,
       }
     default: return null
   }
@@ -205,6 +208,7 @@ const envelopeSchema = z.object({
   sensitivityRuns: z.array(artifact),
   counterfactualRuns: z.array(artifact),
   survivalRuns: z.array(artifact).default([]),
+  timeSeriesRuns: z.array(timeSeriesRunSchema).default([]),
 })
 type ParsedEnvelope = z.output<typeof envelopeSchema>
 
@@ -429,6 +433,13 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   }
   const prepared = upgradePreparedTransformRecord(parsed.data.prepared)
   if (!prepared.ok) return prepared
+  if (parsed.data.timeSeriesRuns.length > 0) {
+    const series = prepared.value as PreparedDatasetArtifact | null
+    if (series?.kind !== 'prepared-time-series' || !Array.isArray(series.columns)
+      || parsed.data.timeSeriesRuns.some((run) => !timeSeriesRunMatches(run, series))) {
+      return err({ kind: 'invalid-snapshot', detail: 'A time-series run does not belong to the prepared time series in this project.' })
+    }
+  }
   const stationarity = upgradeStationarityTransformRecord(parsed.data.stationarity)
   if (!stationarity.ok) return stationarity
   let profile: DatasetProfile | null = null

@@ -11,6 +11,7 @@ import type { EstimationRunArtifact, EstimationRunId } from './estimation'
 import type { SensitivityRunArtifact, SensitivityRunId } from './sensitivity'
 import type { CounterfactualRunArtifact, CounterfactualRunId } from './counterfactual'
 import type { SurvivalRunArtifact, SurvivalRunId } from './survival'
+import { timeSeriesRunMatches, type TimeSeriesRun, type TimeSeriesRunId } from './timeSeries'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { PersistedProject } from './persistence'
@@ -129,6 +130,7 @@ export type Workflow =
       readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
       /** Standalone time-to-event analyses; these do not depend on a causal study or estimate. */
       readonly survivalRuns: readonly SurvivalRunArtifact[]
+      readonly timeSeriesRuns: readonly TimeSeriesRun[]
     }
 
 export type DerivedRecipe = Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>
@@ -169,6 +171,9 @@ export type WorkflowEvent =
   | { readonly type: 'counterfactual-run-deleted'; readonly run: CounterfactualRunId }
   | { readonly type: 'survival-run-created'; readonly run: SurvivalRunArtifact }
   | { readonly type: 'survival-run-deleted'; readonly run: SurvivalRunId }
+  | { readonly type: 'time-series-run-created'; readonly run: TimeSeriesRun }
+  | { readonly type: 'time-series-run-deleted'; readonly run: TimeSeriesRunId }
+  | { readonly type: 'count-series-model-deleted'; readonly run: CountSeriesModelArtifact['id'] }
   | { readonly type: 'source-cleared' }
   | { readonly type: 'project-reopened'; readonly snapshot: PersistedProject }
   | { readonly type: 'project-restored'; readonly file: File }
@@ -302,6 +307,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           sensitivityRuns: snapshot.sensitivityRuns,
           counterfactualRuns: snapshot.counterfactualRuns,
           survivalRuns: snapshot.survivalRuns,
+          timeSeriesRuns: snapshot.timeSeriesRuns,
         }
       }
       if (event.type === 'sql-inputs-chosen' && state.restore === null) {
@@ -358,6 +364,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           sensitivityRuns: [],
           counterfactualRuns: [],
           survivalRuns: [],
+          timeSeriesRuns: [],
         }
       }
       if (event.type === 'profile-failed' && event.request === state.request) {
@@ -377,7 +384,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [] }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
@@ -390,7 +397,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         return { ...state, grangerEvidence: [...state.grangerEvidence, event.evidence] }
       }
       if (event.type === 'count-series-model-created'
-        && state.prepared !== null
+        && state.prepared?.kind === 'prepared-time-series'
         && event.artifact.preparedDataset === state.prepared.id) {
         return { ...state, countSeriesModels: [...state.countSeriesModels, event.artifact] }
       }
@@ -484,6 +491,17 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'survival-run-deleted') {
         return { ...state, survivalRuns: state.survivalRuns.filter((run) => run.id !== event.run) }
+      }
+      if (event.type === 'time-series-run-created'
+        && state.prepared?.kind === 'prepared-time-series'
+        && timeSeriesRunMatches(event.run, state.prepared)) {
+        return { ...state, timeSeriesRuns: [...state.timeSeriesRuns, event.run] }
+      }
+      if (event.type === 'time-series-run-deleted') {
+        return { ...state, timeSeriesRuns: state.timeSeriesRuns.filter((run) => run.id !== event.run) }
+      }
+      if (event.type === 'count-series-model-deleted') {
+        return { ...state, countSeriesModels: state.countSeriesModels.filter((run) => run.id !== event.run) }
       }
       return state
     default:

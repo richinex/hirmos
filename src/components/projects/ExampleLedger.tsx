@@ -1,16 +1,11 @@
+import { useState } from 'react'
 import { Icon } from '@/components/Icon'
-import { iconControl, num, table, td, th, tr } from '@/components/ui/recipes'
+import { Select } from '@/components/ui/Select'
+import { button, field, iconControl, num, table, td, th } from '@/components/ui/recipes'
 import { EXAMPLE_COLLECTIONS, EXAMPLE_QUESTIONS, type ShippedExample } from '@/domain/example'
+import { browseExamples, type ExampleSort } from '@/domain/exampleBrowser'
 import type { SavedProjectHeader } from '@/domain/persistence'
-import { ExampleGlyph } from './ExampleGlyph'
 import { OpenControl } from './OpenControl'
-
-interface Group {
-  readonly key: string
-  readonly title: string
-  readonly note: string
-  readonly items: readonly ShippedExample[]
-}
 
 interface Props {
   readonly examples: readonly ShippedExample[]
@@ -22,152 +17,120 @@ interface Props {
   readonly onDelete: (header: SavedProjectHeader) => void
 }
 
-const groupExamples = (examples: readonly ShippedExample[]): readonly Group[] => [
-  ...EXAMPLE_COLLECTIONS.map((collection) => ({
-    key: `collection:${collection.id}`, title: collection.title, note: collection.purpose,
-    items: examples.filter((example) => example.collection === collection.id),
-  })),
-  ...EXAMPLE_QUESTIONS.map((question) => ({
-    key: `question:${question.id}`, title: question.title, note: question.when,
-    items: examples.filter((example) => example.collection === null && example.question === question.id),
-  })),
-].filter((group) => group.items.length > 0)
-
-/**
- * The shipped examples, grouped by the collection they belong to and then by the question they answer.
- * Wide enough, they read as one ledger: the question as a spanning left column, then the glyph, the
- * name, the design, the data shape and size, and the estimates recorded. Narrower, each group becomes
- * a heading over a list, so a phone shows the name first and never scrolls sideways.
- */
+/** A compact property table on desktop and a text-first list at narrow widths. */
 export function ExampleLedger(props: Props) {
-  const groups = groupExamples(props.examples)
+  const [query, setQuery] = useState('')
+  const [shape, setShape] = useState<string | null>(null)
+  const [sort, setSort] = useState<ExampleSort>('catalog')
+  const shapes = [...new Set(props.examples.map(example => example.shape))]
+  const examples = browseExamples(props.examples, { query, shape, sort })
+  const groups = [
+    ...EXAMPLE_COLLECTIONS.map(group => ({ key: group.id, title: group.title, note: group.purpose, items: examples.filter(example => example.collection === group.id) })),
+    ...EXAMPLE_QUESTIONS.map(group => ({ key: group.id, title: group.title, note: group.when, items: examples.filter(example => example.collection === null && example.question === group.id) })),
+  ].filter(group => group.items.length > 0)
+  const clear = () => { setQuery(''); setShape(null); setSort('catalog') }
+
   return (
-    <div className="@container/examples">
-      {/* Written out in full so Tailwind finds the classes: from 56rem the ledger's fixed columns fit with at most a small sideways scroll. */}
-      <div className="hidden @4xl/examples:block"><Ledger {...props} groups={groups} /></div>
-      <div className="@4xl/examples:hidden"><Sections {...props} groups={groups} /></div>
+    <div className="example-browser @container/examples space-y-3" data-testid="example-browser">
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="min-w-0 flex-1 basis-60">
+          <span className="sr-only">Search examples</span>
+          <input type="search" className={field()} placeholder="Search examples" value={query} onChange={event => setQuery(event.target.value)} />
+        </label>
+        <label className="min-w-0 flex-1 basis-44 @lg/examples:flex-none">
+          <span className="sr-only">Data structure</span>
+          <Select className={field()} value={shape ?? ''} onChange={event => {
+            const value = event.target.value
+            if (value === '' || shapes.includes(value)) setShape(value === '' ? null : value)
+          }}>
+            <option value="">All data structures</option>
+            {shapes.map(value => <option key={value} value={value}>{value}</option>)}
+          </Select>
+        </label>
+        <label className="min-w-0 flex-1 basis-40 @lg/examples:flex-none">
+          <span className="sr-only">Sort examples</span>
+          <Select className={field()} value={sort} onChange={event => {
+            const value = event.target.value
+            if (value === 'catalog' || value === 'name') setSort(value)
+          }}>
+            <option value="catalog">Catalog order</option>
+            <option value="name">Name A–Z</option>
+          </Select>
+        </label>
+      </div>
+      {examples.length === 0 ? (
+        <div className="py-6 text-body text-muted">
+          <p className="m-0">No examples match these filters.</p>
+          <button type="button" className={button('outline', 'mt-3')} onClick={clear}>Clear filters</button>
+        </div>
+      ) : (
+        <>
+          <div className="hidden overflow-x-auto @4xl/examples:block [--table-surface:var(--color-stage)]">
+            <table className={table + ' example-table'} aria-label="Examples">
+              <thead><tr>
+                <th scope="col" className={th('w-[30%] px-2.5')}>Example</th>
+                <th scope="col" className={th('w-[29%] px-2.5')}>Approach</th>
+                <th scope="col" className={th('px-2.5')}>Data</th>
+                <th scope="col" className={th('w-24 whitespace-normal px-2.5 text-right')}>Estimation runs</th>
+                <th scope="col" className={th('px-2.5')}>Actions</th>
+              </tr></thead>
+              <tbody>{examples.map(example => {
+                const copy = props.saved.find(entry => entry.id === example.id) ?? null
+                return <tr key={example.id} className="border-b border-line hover:bg-well">
+                  <td className={td('px-2.5 py-2.5')}>
+                    <span className="block whitespace-normal font-medium text-ink">{example.name}</span>
+                    <span className={num('mt-1 block whitespace-normal break-all text-label text-faint')}>{copy === null ? example.sourceName : `saved ${props.formatSaved(copy.savedAt)}`}</span>
+                  </td>
+                  <td className={td('whitespace-normal px-2.5 py-2.5 text-muted')}>{example.approach}</td>
+                  <td className={td('px-2.5 py-2.5')}><ShapeLabel shape={example.shape} /><span className={num('mt-1 block whitespace-normal text-label text-faint')}>{example.size}</span></td>
+                  <td className={td(num('px-2.5 py-2.5 text-right text-muted'))}>{copy === null ? example.estimationRuns : copy.estimationRuns}</td>
+                  <td className={td('px-2.5 py-2.5')}><div className="flex items-center gap-1">
+                    <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
+                    <CopyControls {...props} example={example} copy={copy} />
+                  </div></td>
+                </tr>
+              })}</tbody>
+            </table>
+          </div>
+          <div className="space-y-5 @4xl/examples:hidden">
+            {groups.map(group => <section key={group.key} aria-label={group.title}>
+              <h4 className="mb-1 mt-0 text-body font-medium text-ink">{group.title}</h4>
+              <p className="mb-2 mt-0 text-label text-faint">{group.note}</p>
+              <ul className="m-0 list-none divide-y divide-line border-y border-line p-0">
+                {group.items.map(example => {
+                  const copy = props.saved.find(entry => entry.id === example.id) ?? null
+                  const count = copy === null ? example.estimationRuns : copy.estimationRuns
+                  return <li key={example.id} className="py-3">
+                    <div className="flex items-start gap-3">
+                      <div className="min-w-0 flex-1"><span className="block text-body font-medium text-ink">{example.name}</span><span className="mt-1 block text-label text-muted">{example.approach}</span></div>
+                      <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><ShapeLabel shape={example.shape} /><span className={num('text-label text-faint')}>{example.size} · {count} estimation {count === 1 ? 'run' : 'runs'}</span></div>
+                    <div className="mt-1 flex flex-wrap items-center gap-2"><span className={num('min-w-0 flex-1 break-all text-label text-faint')}>{copy === null ? example.sourceName : `saved ${props.formatSaved(copy.savedAt)}`}</span><CopyControls {...props} example={example} copy={copy} /></div>
+                  </li>
+                })}
+              </ul>
+            </section>)}
+          </div>
+        </>
+      )}
+      <p role="status" className={num('m-0 text-label text-faint')}>{examples.length} of {props.examples.length} examples</p>
     </div>
   )
 }
 
-const stored = (saved: readonly SavedProjectHeader[], example: ShippedExample): SavedProjectHeader | null =>
-  saved.find((entry) => entry.id === example.id) ?? null
+function ShapeLabel({ shape }: { readonly shape: string }) {
+  return <span className="example-shape" data-shape={shape}>{shape}</span>
+}
 
-/** The controls a stored copy carries beyond Open; as placeholders where no copy exists so table columns align. */
-function CopyControls({ example, copy, placeholders, onReset, onExport, onDelete }: {
+function CopyControls({ example, copy, onReset, onExport, onDelete }: {
   readonly example: ShippedExample
   readonly copy: SavedProjectHeader | null
-  readonly placeholders: boolean
 } & Pick<Props, 'onReset' | 'onExport' | 'onDelete'>) {
-  if (copy === null) {
-    if (!placeholders) return null
-    return (
-      <>
-        <span aria-hidden className={iconControl('quiet', 'invisible')} />
-        <span aria-hidden className={iconControl('quiet', 'invisible')} />
-        <span aria-hidden className={iconControl('danger', 'invisible')} />
-      </>
-    )
-  }
-  return (
-    <>
-      <button type="button" className={iconControl('quiet')} aria-label={`Reset ${example.name}`} title="Put the example back as shipped, discarding changes to this copy" onClick={() => onReset(example)}><Icon name="restart_alt" size={14} /></button>
-      <button type="button" className={iconControl('quiet')} aria-label={`Export ${example.name}`} title="Export this copy as a bundle, without the source file" onClick={() => onExport(example.id)}><Icon name="download" size={14} /></button>
-      <button type="button" className={iconControl('danger')} aria-label={`Delete ${example.name}`} title="Delete this copy" onClick={() => onDelete(copy)}><Icon name="delete" size={14} /></button>
-    </>
-  )
-}
-
-function Ledger({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelete }: Props & { readonly groups: readonly Group[] }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-hair">
-      {/* Fixed columns that sum to the reading width: auto layout gave the longest wrapping text the least room. */}
-      <table className={`${table} table-fixed`} aria-label="Examples">
-        <thead>
-          <tr>
-            <th className={th('w-[160px] px-2.5')}>Question</th>
-            <th className={th('w-14 px-2.5')}><span className="sr-only">Kind</span></th>
-            <th className={th('px-2.5')}>Example</th>
-            <th className={th('w-[160px] px-2.5')}>Approach</th>
-            <th className={th('w-[124px] px-2.5')}>Data</th>
-            <th className={th('w-[96px] whitespace-normal px-2.5 text-right')}>Estimation runs</th>
-            <th className={th('w-[200px] px-2.5')}><span className="sr-only">Actions</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((group) => group.items.map((example, index) => {
-            const copy = stored(saved, example)
-            return (
-              <tr key={example.id} className={tr('static', 'border-t border-line')}>
-                {index === 0 && (
-                  <td rowSpan={group.items.length} className={td('whitespace-normal border-r border-line px-2.5 text-muted')}>
-                    <span className="block font-medium text-ink">{group.title}</span>
-                    <span className="mt-0.5 block text-label text-faint">{group.note}</span>
-                  </td>
-                )}
-                <td className={td('w-14 px-2.5')}><ExampleGlyph kind={example.glyph} /></td>
-                <td className={td('px-2.5')}>
-                  <span className="block whitespace-normal text-ink">{example.name}</span>
-                  <span className={num('block whitespace-normal break-all text-label text-faint')}>
-                    {copy === null ? example.sourceName : `saved ${formatSaved(copy.savedAt)}`}
-                  </span>
-                </td>
-                <td className={td('max-w-[28ch] whitespace-normal px-2.5 text-muted')}>{example.approach}</td>
-                <td className={td(num('px-2.5 text-faint'))}>
-                  <span className="block truncate">{example.shape}</span>
-                  <span className="block whitespace-normal">{example.size}</span>
-                </td>
-                <td className={td(num('px-2.5 text-right text-faint'))}>{copy === null ? example.estimationRuns : copy.estimationRuns}</td>
-                <td className={td('px-2.5')}>
-                  <span className="flex items-center gap-1.5">
-                    <OpenControl name={example.name} onOpen={() => onOpen(example)} />
-                    <CopyControls example={example} copy={copy} placeholders onReset={onReset} onExport={onExport} onDelete={onDelete} />
-                  </span>
-                </td>
-              </tr>
-            )
-          }))}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function Sections({ groups, saved, formatSaved, onOpen, onReset, onExport, onDelete }: Props & { readonly groups: readonly Group[] }) {
-  const estimationRuns = (count: number) => `${count} estimation ${count === 1 ? 'run' : 'runs'}`
-  return (
-    <div className="flex flex-col gap-5">
-      {groups.map((group) => (
-        <section key={group.key} aria-label={group.title} className="flex flex-col gap-2">
-          <div>
-            <h4 className="m-0 text-body font-medium text-ink">{group.title}</h4>
-            <p className="m-0 mt-0.5 text-label text-faint">{group.note}</p>
-          </div>
-          <ul className="m-0 list-none divide-y divide-line rounded-lg border border-hair bg-panel p-0">
-            {group.items.map((example) => {
-              const copy = stored(saved, example)
-              const count = copy === null ? example.estimationRuns : copy.estimationRuns
-              return (
-                <li key={example.id} className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 px-3 py-2">
-                  <ExampleGlyph kind={example.glyph} />
-                  <div className="min-w-0">
-                    <span className="block text-ink">{example.name}</span>
-                    <span className="block text-label text-muted">{example.approach}</span>
-                    <span className={num('block text-label text-faint')}>{example.shape} · {example.size}{count > 0 ? ` · ${estimationRuns(count)}` : ''}</span>
-                  </div>
-                  <OpenControl name={example.name} onOpen={() => onOpen(example)} />
-                  {copy !== null && (
-                    <span className="col-start-2 col-end-4 flex items-center gap-1.5">
-                      <span className={num('mr-auto text-label text-faint')}>saved {formatSaved(copy.savedAt)}</span>
-                      <CopyControls example={example} copy={copy} placeholders={false} onReset={onReset} onExport={onExport} onDelete={onDelete} />
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ))}
-    </div>
-  )
+  if (copy === null) return null
+  return <>
+    <button type="button" className={iconControl('quiet')} aria-label={`Reset ${example.name}`} title="Put the example back as shipped, discarding changes to this copy" onClick={() => onReset(example)}><Icon name="restart_alt" size={14} /></button>
+    <button type="button" className={iconControl('quiet')} aria-label={`Export ${example.name}`} title="Export this copy as a bundle, without the source file" onClick={() => onExport(example.id)}><Icon name="download" size={14} /></button>
+    <button type="button" className={iconControl('danger')} aria-label={`Delete ${example.name}`} title="Delete this copy" onClick={() => onDelete(copy)}><Icon name="delete" size={14} /></button>
+  </>
 }

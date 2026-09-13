@@ -4,6 +4,10 @@
 use crate::pss_tables;
 use nalgebra::{DMatrix, DVector};
 
+pub mod multivariate;
+pub mod multipliers;
+pub mod diagnostics;
+
 /// `scipy.stats.norm.cdf`.
 fn norm_cdf(x: f64) -> f64 {
     spec_math::cephes64::ndtr(x)
@@ -59,19 +63,19 @@ impl Ols {
     }
 }
 
-fn ols(x: &DMatrix<f64>, y: &DVector<f64>) -> Ols {
-    let fit = crate::ols::Ols::fit(x, y);
+fn try_ols(x: &DMatrix<f64>, y: &DVector<f64>) -> Result<Ols, crate::ols::OlsError> {
+    let fit = crate::ols::Ols::try_fit(x, y)?;
     let nobs = fit.nobs;
     let df_model = fit.rank;
     let scale = fit.ssr / (nobs - df_model) as f64;
     let cov_params = fit.xtx_inverse() * scale;
-    Ols {
+    Ok(Ols {
         params: fit.params,
         cov_params,
         resid: fit.resid,
         nobs,
         df_model,
-    }
+    })
 }
 
 fn numpy_lstsq(x: &DMatrix<f64>, y: &DVector<f64>) -> DVector<f64> {
@@ -82,12 +86,6 @@ fn numpy_lstsq(x: &DMatrix<f64>, y: &DVector<f64>) -> DVector<f64> {
         .coefficients
         .column(0)
         .into_owned()
-}
-
-/// Column `lag` of `lagmat(col, max_lag, original="in")`: NaN rows are simply not reachable
-/// because everything is trimmed by `hold_back` afterwards.
-fn lagged(col: &[f64], lag: usize, row: usize) -> f64 {
-    col[row - lag]
 }
 
 pub struct ArdlSpec {
@@ -106,92 +104,27 @@ pub struct OrderSelection {
 }
 
 pub fn ardl_select_order(
-    y: &[f64],
-    maxlag: usize,
-    x: &[f64],
-    maxorder: usize,
-    ic: &str,
-    trend: Trend,
+    y: &[f64], maxlag: usize, x: &[f64], maxorder: usize, ic: &str, trend: Trend,
 ) -> OrderSelection {
-    let n = y.len();
-    let hold_back = maxlag.max(maxorder);
-    let rows = n - hold_back;
-
-    let det = trend.in_sample(n);
-    let always = DMatrix::from_fn(rows, det.ncols(), |r, c| det[(hold_back + r, c)]);
-    // Endog block holds lags 1..=maxlag, the exog block lags 0..=maxorder.
-    let endog_block = DMatrix::from_fn(rows, maxlag, |r, c| lagged(y, c + 1, hold_back + r));
-    let exog_block = DMatrix::from_fn(rows, maxorder + 1, |r, c| lagged(x, c, hold_back + r));
-    let mut yv = DVector::from_fn(rows, |r, _| y[hold_back + r]);
-
-    // Frisch-Waugh: the deterministics are partialled out once instead of per candidate.
-    let mut blocks = [endog_block, exog_block];
-    let always_df = always.ncols();
-    if always_df > 0 {
-        let pinv = crate::linalg::pseudo_inverse(&always, 1e-15)
-            .expect("ARDL deterministic projection")
-            .matrix;
-        for block in blocks.iter_mut() {
-            *block -= &always * (&pinv * &*block);
-        }
-        yv -= &always * (&pinv * &yv);
-    }
-    let [endog_block, exog_block] = blocks;
-
-    let compute_ics = |x: &DMatrix<f64>| -> (f64, f64, f64) {
-        let resid = if x.ncols() > 0 {
-            &yv - x * numpy_lstsq(x, &yv)
-        } else {
-            yv.clone()
-        };
-        let nobs = resid.len() as f64;
-        let sigma2 = resid.iter().map(|v| v * v).sum::<f64>() / nobs;
-        let llf = -nobs * ((2.0 * std::f64::consts::PI * sigma2).ln() + 1.0) / 2.0;
-        let df = (always_df + x.ncols() + 1) as f64;
-        (
-            -2.0 * llf + 2.0 * df,
-            -2.0 * llf + nobs.ln() * df,
-            -2.0 * llf + 2.0 * nobs.ln().ln() * df,
-        )
-    };
-
-    let index = match ic {
-        "aic" => 0,
-        "bic" => 1,
-        "hqic" => 2,
+    use multivariate::search::{Criterion, Search};
+    let criterion = match ic {
+        "aic" => Criterion::Aic, "bic" => Criterion::Bic, "hqic" => Criterion::Hqic,
         other => panic!("unknown information criterion {other}"),
     };
-    let mut grid = Vec::new();
-    let mut best = f64::INFINITY;
-    let mut best_key = (0usize, None);
-    // itertools.product over the endog count then the exog count, both counting from zero.
-    for p in 0..=maxlag {
-        for q in 0..=maxorder + 1 {
-            let cand = DMatrix::from_fn(rows, p + q, |r, c| {
-                if c < p {
-                    endog_block[(r, c)]
-                } else {
-                    exog_block[(r, c - p)]
-                }
-            });
-            let (aic, bic, hqic) = compute_ics(&cand);
-            let dl = if q == 0 { None } else { Some(q - 1) };
-            grid.push((p, dl, aic, bic, hqic));
-            let val = [aic, bic, hqic][index];
-            if val < best {
-                best = val;
-                best_key = (p, dl);
-            }
-        }
-    }
+    let predictors = [x.to_vec()];
+    let input = multivariate::Input::new(y, &predictors, &[]).expect("ARDL aligned finite inputs");
+    let search = Search::new(maxlag, vec![maxorder], trend, None, criterion, usize::MAX).expect("ARDL search size");
+    let selection = search.run(&input, |_, _| true).expect("ARDL order search");
     OrderSelection {
-        ar_lag: best_key.0,
-        dl_lag: best_key.1,
-        grid,
+        ar_lag: selection.specification.outcome_lag(),
+        dl_lag: selection.specification.predictor_lags()[0],
+        grid: selection.candidates.into_iter().map(|c| (c.outcome_lag, c.predictor_lags[0], c.aic, c.bic, c.hqic)).collect(),
     }
 }
 
 pub struct Uecm {
+    design: DMatrix<f64>,
+    pub terms: Vec<multivariate::Term>,
     pub n_det: usize,
     pub n_levels: usize,
     pub ardl_order: Vec<usize>,
@@ -205,6 +138,25 @@ pub struct Uecm {
 }
 
 impl Uecm {
+    /// statsmodels UECMResults.ci_resids: the normalized level combination on all rows.
+    pub fn cointegrating_residuals(&self, y: &[f64], x: &[f64], trend: Trend) -> Vec<f64> {
+        self.cointegrating_residuals_columns(y, &[x], trend)
+    }
+
+    /// Included predictor columns in fitted coefficient order; fixed regressors are excluded.
+    pub fn cointegrating_residuals_columns(&self, y: &[f64], x: &[&[f64]], trend: Trend) -> Vec<f64> {
+        assert_eq!(self.n_levels, x.len() + 1);
+        assert!(x.iter().all(|column| column.len() == y.len()));
+        assert_eq!(self.n_det, trend.n_det());
+        let det = trend.in_sample(y.len());
+        let base = self.fit.params[self.n_det];
+        let coefficients = self.fit.params.rows(0, self.n_det + self.n_levels) / base;
+        (0..y.len()).map(|row| {
+            let deterministic = (0..self.n_det).map(|col| det[(row, col)] * coefficients[col]).sum::<f64>();
+            deterministic + y[row] + x.iter().enumerate().map(|(col, values)| values[row] * coefficients[self.n_det + 1 + col]).sum::<f64>()
+        }).collect()
+    }
+
     /// `results.df_resid`, built from `reported_nobs` rather than the design.
     pub fn reported_df_resid(&self) -> f64 {
         (self.reported_nobs - self.fit.df_model) as f64
@@ -213,49 +165,10 @@ impl Uecm {
 
 /// `UECM(y, p, x, q, trend).fit()` for one exogenous column.
 pub fn uecm(y: &[f64], p: usize, x: &[f64], q: usize, trend: Trend) -> Uecm {
-    assert!(
-        q >= 1,
-        "all included exog variables must have a lag length >= 1"
-    );
-    let n = y.len();
-    let hold_back = p.max(q).max(1);
-    let rows = n - hold_back;
-    let n_det = trend.n_det();
-    let dlag = p.saturating_sub(1);
-    // The exog differences keep lags 0..q-1, which is `order[:-1]`.
-    let n_dexog = q;
-    let n_cols = n_det + 2 + dlag + n_dexog;
-
-    let det = trend.in_sample(n);
-    let dy = |i: usize| y[i] - y[i - 1];
-    let dx = |i: usize| x[i] - x[i - 1];
-
-    let design = DMatrix::from_fn(rows, n_cols, |r, c| {
-        let i = hold_back + r;
-        if c < n_det {
-            det[(i, c)]
-        } else if c == n_det {
-            y[i - 1]
-        } else if c == n_det + 1 {
-            x[i - 1]
-        } else if c < n_det + 2 + dlag {
-            dy(i - (c - n_det - 1))
-        } else {
-            dx(i - (c - n_det - 2 - dlag))
-        }
-    });
-    let target = DVector::from_fn(rows, |r, _| dy(hold_back + r));
-    let fit = ols(&design, &target);
-    let fitted = &design * &fit.params;
-    let reported_resid = (0..rows).map(|r| y[hold_back + r] - fitted[r]).collect();
-    Uecm {
-        n_det,
-        n_levels: 2,
-        ardl_order: vec![p, q],
-        fit,
-        reported_resid,
-        reported_nobs: n - p,
-    }
+    let predictors = [x.to_vec()];
+    let input = multivariate::Input::new(y, &predictors, &[]).expect("UECM aligned finite inputs");
+    let specification = multivariate::Specification::new(p, vec![Some(q)], trend, None).expect("UECM lag specification");
+    multivariate::fit_uecm(&input, &specification).expect("UECM fitting")
 }
 
 pub struct CointegratingVector {
@@ -345,8 +258,8 @@ pub fn pss_pvalue(stat: f64, k: usize, case: usize, i1: bool) -> f64 {
     1.0 - norm_cdf(value)
 }
 
-/// `bounds_test(case)` with the asymptotic critical values.
-pub fn bounds_test(model: &Uecm, case: usize) -> BoundsTest {
+/// The joint level-restriction F statistic, without a critical-value calibration.
+pub fn bounds_statistic(model: &Uecm, case: usize) -> f64 {
     let nvar = model.ardl_order.len();
     let rest: Vec<usize> = match case {
         1 => (0..nvar).collect(),
@@ -362,9 +275,13 @@ pub fn bounds_test(model: &Uecm, case: usize) -> BoundsTest {
     let quad = (coef.transpose()
         * crate::linalg::inverse(&vcv).expect("restriction covariance")
         * &coef)[0];
-    let stat = quad / r as f64;
+    quad / r as f64
+}
 
-    let k = nvar;
+/// `bounds_test(case)` with the asymptotic critical values.
+pub fn bounds_test(model: &Uecm, case: usize) -> BoundsTest {
+    let stat = bounds_statistic(model, case);
+    let k = model.ardl_order.len();
     let lower = pss_tables::crit_vals(k, case, false).expect("PSS key is tabulated");
     let upper = pss_tables::crit_vals(k, case, true).expect("PSS key is tabulated");
     BoundsTest {

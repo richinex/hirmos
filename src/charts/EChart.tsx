@@ -31,9 +31,9 @@ const selectsRange = (option: EChartsCoreOption): boolean => Reflect.get(rootOf(
 const finePointer = (): boolean => window.matchMedia('(pointer: fine)').matches
 
 /** Ask the chart to show a range, or everything. */
-const applyZoom = (chart: EChartsType, target: ZoomTarget): void => {
-  if (target === WHOLE_AXIS) chart.dispatchAction({ type: 'dataZoom', dataZoomIndex: 0, start: 0, end: 100 })
-  else chart.dispatchAction({ type: 'dataZoom', dataZoomIndex: 0, startValue: target.start, endValue: target.end })
+const applyZoom = (chart: EChartsType, target: ZoomTarget, silent = false): void => {
+  if (target === WHOLE_AXIS) chart.dispatchAction({ type: 'dataZoom', dataZoomIndex: 0, start: 0, end: 100 }, { silent })
+  else chart.dispatchAction({ type: 'dataZoom', dataZoomIndex: 0, startValue: target.start, endValue: target.end }, { silent })
 }
 
 const takeBrushCursor = (chart: EChartsType): void =>
@@ -56,12 +56,12 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
   const host = useRef<HTMLDivElement>(null)
   const chart = useRef<EChartsType | null>(null)
   const latestOption = useRef(option)
-  const latest = useRef({ onReady, onWindow })
+  const latest = useRef({ onReady, onWindow, wanted })
   const history = useRef<ZoomHistory>(EMPTY_ZOOM_HISTORY)
   const [failed, setFailed] = useState(false)
   const [mounted, setMounted] = useState(false)
   latestOption.current = option
-  latest.current = { onReady, onWindow }
+  latest.current = { onReady, onWindow, wanted }
 
   useEffect(() => {
     let cancelled = false
@@ -74,6 +74,7 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
         const instance = createChart(element)
         chart.current = instance
         instance.setOption(latestOption.current, { notMerge: true })
+        if (latest.current.wanted !== undefined) applyZoom(instance, latest.current.wanted ?? WHOLE_AXIS, true)
         if (selectsRange(latestOption.current) && finePointer()) takeBrushCursor(instance)
         instance.on('datazoom', () => latest.current.onWindow?.(visibleWindow(instance)))
         instance.on('brushEnd', (event) => {
@@ -117,6 +118,9 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
     const instance = chart.current
     if (instance === null) return
     instance.setOption(option, { notMerge: true })
+    // Replacing options (for example on a theme change) must not discard the controlled window.
+    // Restoring it is silent: only a user's zoom should notify the other linked charts.
+    if (latest.current.wanted !== undefined) applyZoom(instance, latest.current.wanted ?? WHOLE_AXIS, true)
     // A fresh option drops the brush cursor with everything else, so it is taken again.
     if (selectsRange(option) && finePointer()) takeBrushCursor(instance)
   }, [option])
@@ -128,7 +132,7 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
     if (instance === null || wanted === undefined) return
     const shown = visibleWindow(instance)
     const same = wanted === null ? shown === null : shown !== null && shown.start === wanted.start && shown.end === wanted.end
-    if (!same) applyZoom(instance, wanted ?? WHOLE_AXIS)
+    if (!same) applyZoom(instance, wanted ?? WHOLE_AXIS, true)
   }, [wanted])
 
   const stepBack = () => {

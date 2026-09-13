@@ -38,13 +38,25 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
 }) {
   const figure = size === 'hero' ? 'text-metric' : size === 'compact' ? 'text-title' : 'text-heading'
   return (
-    // Its own container, so a tile squeezed by the grid sheds the context line rather than wrapping it.
-    <div className={cn('@container bg-well', frame === 'card' && 'rounded-lg border border-hair', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
+    <div data-size={size} className={cn('@container metric-tile', frame === 'card' ? 'metric-card' : 'bg-well', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
       <span className={labelCn('block text-muted')}>{label}</span>
-      <p className={cn('mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
-      {context && <p className={num('mb-0 mt-1 text-body text-bone @max-[11rem]:hidden')}>{context}</p>}
+      <div className="metric-card-values">
+        <p className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
+        {context && <p className={num('metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]')}>{context}</p>}
+      </div>
     </div>
   )
+}
+
+/** The same summary-card layout across analyses; lists retain their semantic wrapper. */
+export function MetricGrid({children,as:Element='div',className,label,testId}: {
+  readonly children:ReactNode
+  readonly as?:'div'|'ul'
+  readonly className?:string
+  readonly label?:string
+  readonly testId?:string
+}) {
+  return <Element className={cn('metric-cards',className)} aria-label={label} data-testid={testId}>{children}</Element>
 }
 
 /** The hero estimate: the estimand sentence, the figure, its named interval, and the scale line. */

@@ -66,7 +66,7 @@ test('the standalone survival chapter renders in desktop and phone workbenches',
   await openExample(page, phone ? 'AI adoption, company-wide' : 'Seat-belt law and road deaths')
   await openSurvivalChapter(page, phone)
 
-  await expect(page.getByRole('heading', { name: 'Time until an event' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Survival analysis', exact: true })).toBeVisible()
   await expect(page.getByText('09 · Survival analysis')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Run survival analysis' })).toBeVisible()
   await expect(page.locator('main#stage')).toHaveCSS('display', 'flex')
@@ -161,7 +161,7 @@ test('runs right-censored flexsurv on the exact breast-cancer package data', asy
     .getByRole('navigation', { name: 'Workspace chapters' })
     .getByRole('button', { name: /Results/ })
     .click()
-  await expect(page.getByRole('heading', { name: 'Review the complete analysis' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible()
   await expect(page.getByRole('combobox', { name: 'Survival run' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Weibull AFT' }).first()).toBeVisible()
 })

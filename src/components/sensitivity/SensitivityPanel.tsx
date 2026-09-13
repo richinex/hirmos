@@ -1,3 +1,4 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Orb } from '@/components/ui/Orb'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -10,15 +11,14 @@ import { useChartTheme } from '@/charts/theme'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
-import { MetricTile } from '@/components/ui/figures'
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, chapterIntro, field, fieldLabel, figureGrid, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldLabel, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
 import { DATA_SUBSET_REFUTER_METHOD_ID, LJUNG_BOX_METHOD_ID, PLACEBO_REFUTER_METHOD_ID, RANDOM_COMMON_CAUSE_REFUTER_METHOD_ID,
   DML_REFUTATION_METHOD_ID,
@@ -189,13 +189,13 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">Perturbation probes on {lowerFirst(estimandSentence(study))}</h3>
       <p className="m-0 text-body text-muted">Original linear back-door estimate <span className={num('text-ink')}>{formatStatistic('raw', evidence.estimate).text}</span>. Interpret each diagnostic according to its stated perturbation and reference value.</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} context="sensitivity-check" className="mt-3" />
-      <ul className={figureGrid('m-0 mt-3 list-none p-0 @2xl/panel:grid-cols-3')} aria-label="Refuters">
+      <MetricGrid as="ul" className="m-0 mt-3" label="Refuters">
         {run.refuters.map((fact) => (
           <li key={fact.id}>
             <MetricTile label={fact.id === 'placebo' ? 'Placebo treatment' : fact.id === 'data-subset' ? `Data subset · ${Math.round(evidence.subsetFraction * 100)}%` : 'Random common cause'} size="compact" frame="cell" className="h-full" value={formatStatistic('raw', fact.refuted)} context={refuterInterpretation(fact)} />
           </li>
         ))}
-      </ul>
+      </MetricGrid>
       <span className={label('mt-4 block text-faint')}>Residual diagnostics</span>
       <ul className="m-0 mt-1 list-none divide-y divide-hair border-y border-hair p-0" aria-label="Residual diagnostics">
         {run.diagnostics.map((fact) => <li key={fact.id} className="py-2 text-body text-muted">{fact.reading}</li>)}
@@ -252,11 +252,11 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
       <p className="m-0 text-body text-muted">Rows vary the simulated effect on treatment assignment. Columns vary the simulated outcome shift. Each cell reports a refitted linear back-door estimate. Original estimate: <span className={num('text-ink')}>{formatStatistic('raw', evidence.originalEffect).text}</span>.</p>
       <ResultInterpretation interpretation={interpretSensitivityResult(run)} context="sensitivity-check" className="mt-3" />
       {flat.length === 1 && <Alert tone="info" live={false} className="mt-3"><p className="m-0">The inferred strengths collapsed to one point because a single observed common cause bounds them. Set explicit ranges to sweep a grid.</p></Alert>}
-      <div className={figureGrid('mt-3 @2xl/panel:grid-cols-3')} aria-label="Grid facts">
+      <MetricGrid className="mt-3" label="Grid facts">
         <MetricTile label="Smallest effect" size="compact" frame="cell" value={formatStatistic('raw', least)} context="over the grid" />
         <MetricTile label="Largest effect" size="compact" frame="cell" value={formatStatistic('raw', most)} context="over the grid" />
         <MetricTile label="Sign changes" size="compact" frame="cell" value={formatCount(flips)} context={`of ${formatCount(flat.length).text} cells`} />
-      </div>
+      </MetricGrid>
       <EChart option={option} label="Refitted effect over simulated confounder strengths" className="mt-3 h-[300px]" testId="unobserved-grid" />
       <details className={well('mt-3 px-3 py-2 text-body')}>
         <summary className="cursor-pointer text-ink">Run details</summary>
@@ -386,8 +386,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   const stage = (
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>{chapterLabel('sensitivity')}</span>
-        <h2 id="sensitivity-title" className="mb-2 mt-2 text-heading text-ink">Assess sensitivity to assumptions</h2>
+        <ChapterHeading id="sensitivity-title" className="mb-2">Sensitivity</ChapterHeading>
         <p className={chapterIntro}>A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
 

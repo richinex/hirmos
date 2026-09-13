@@ -1,3 +1,4 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useMemo, useReducer, useState } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { SurvivalRunResult, survivalFamilyLabel, survivalRunSummary } from '@/components/survival/SurvivalRunResult'
@@ -8,12 +9,11 @@ import { Orb } from '@/components/ui/Orb'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { button, chapterIntro, field, fieldHint, fieldLabel, label, num, panel, sectionTitle } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldHint, fieldLabel, num, panel, sectionTitle } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { RunActivity } from '@/domain/activity'
 import { isNumericDuckDbType, type ColumnId, type ColumnSelection, type DatasetProfile, type NumericColumnSelection } from '@/domain/dataset'
 import { assertNever, err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import {
   describeSurvivalRefusal,
@@ -1625,8 +1625,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
   const stage = (
     <section aria-labelledby="survival-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>{chapterLabel('survival')}</span>
-        <h2 id="survival-title" className="mb-2 mt-2 text-heading text-ink">Time until an event</h2>
+        <ChapterHeading id="survival-title" className="mb-2">Survival analysis</ChapterHeading>
         <p className={chapterIntro}>Use survival analysis when the outcome is the time until an event. Fit an event-time distribution, compare two observed groups during follow-up, or estimate transitions between states. A row with no observed event by the end of follow-up is right-censored at its recorded duration. These analyses do not require a DAG and are not added to the causal-estimation ledger.</p>
       </div>
 

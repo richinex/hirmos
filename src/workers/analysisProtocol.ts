@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence, type ArdlModelRequest } from '@/domain/ardlModel'
 import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
@@ -732,6 +733,14 @@ export type AnalysisWorkerCommand =
       readonly seed: number
     }
   | {
+      readonly kind: 'ardl-model'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly model: ArdlModelRequest
+    }
+  | {
       readonly kind: 'ardl-pss'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -745,6 +754,7 @@ export type AnalysisWorkerCommand =
     }
   | {
       readonly kind: 'vecm'
+      readonly forecastSteps?: number | null
       readonly request: WorkerRequestId
       readonly values: Float64Array
       readonly rows: number
@@ -1046,6 +1056,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'double-ml-succeeded'; readonly request: WorkerRequestId; readonly result: DoubleMlEvidence }
   | { readonly kind: 't-learner-succeeded'; readonly request: WorkerRequestId; readonly result: TLearnerEvidence }
   | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
+  | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
   | { readonly kind: 'panel-intervention-succeeded'; readonly request: WorkerRequestId; readonly result: PanelInterventionEvidence }
@@ -1778,6 +1789,14 @@ const commandSchema = z.discriminatedUnion('kind', [
     seed: z.number().int().nonnegative(),
   }).strict(),
   z.object({
+    kind: z.literal('ardl-model'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(2).max(64),
+    model: ardlModelRequestSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('ardl-pss'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -1791,6 +1810,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('vecm'),
+    forecastSteps: z.number().int().min(1).max(200).nullable().optional(),
     request: requestSchema,
     values: z.instanceof(Float64Array),
     rows: z.number().int().positive(),
@@ -2091,6 +2111,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('double-ml-succeeded'), request: requestSchema, result: doubleMlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('t-learner-succeeded'), request: requestSchema, result: tLearnerEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('panel-intervention-succeeded'), request: requestSchema, result: panelInterventionEvidenceSchema }).strict(),
@@ -2398,6 +2419,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'ardl-succeeded') {
     const result = ardlEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'ardl-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'ardl-model-succeeded') {
+    const result = ardlModelEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'ardl-model-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'vecm-succeeded') {
     const result = vecmEvidenceSchema.safeParse(parsed.data.result)

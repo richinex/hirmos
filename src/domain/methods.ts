@@ -362,38 +362,21 @@ const COUNT_SERIES_INTERVENTION_SCAN: MethodDefinition = {
   id: COUNT_SERIES_INTERVENTION_SCAN_METHOD_ID,
   name: 'Negative-binomial INGARCH diagnostic',
   family: 'diagnostic',
-  summary: 'Fits a negative-binomial count time-series model and scans a user-selected date range for the point, decaying, or persistent intervention shape with the largest score statistic.',
+  summary: 'Fits a negative-binomial model to a count series and searches the selected date range for a temporary, fading or persistent change.',
   caveats: [
     {
       id: caveatId('count-scan-regular-count-series'),
       category: 'sampling-structure',
-      requirement: 'The selected series contains non-negative integer counts observed on a regular time grid.',
-      consequenceIfUnmet: 'The count distribution or the meaning of the selected lags does not match the observations.',
+      requirement: 'Use non-negative whole-number counts recorded at regular intervals.',
+      consequenceIfUnmet: 'The model is not suitable for these values or their timing.',
       sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', 'Journal of Statistical Software 82(5), §2')],
-    },
-    {
-      id: caveatId('count-scan-user-specification'),
-      category: 'functional-form',
-      requirement: 'The mean link, past-count lags, past-mean lags, candidate window, and intervention shape are modelling choices; compare plausible specifications rather than treating the defaults as selected by the data.',
-      consequenceIfUnmet: 'The strongest date can be a feature of the chosen model specification rather than a stable feature of the series.',
-      sources: [
-        paper('Interventions in INGARCH processes (Fokianos and Fried, 2010)', 'Journal of Time Series Analysis 31(3), 210–225'),
-        paper('Interventions in log-linear Poisson autoregression (Fokianos and Fried, 2012)', 'Statistical Modelling 12(4), 299–322'),
-      ],
     },
     {
       id: caveatId('count-scan-stable-recursion'),
       category: 'stationarity-and-dynamics',
-      requirement: 'Inspect whether the fitted conditional-mean recursion is stable and describes the dependence in the analysis window.',
-      consequenceIfUnmet: 'The score profile can reflect omitted dynamics or a changing baseline rather than the selected intervention shape.',
+      requirement: 'Check that the fitted model is stable and accounts for how counts depend on earlier observations.',
+      consequenceIfUnmet: 'An apparent change may reflect patterns the model missed.',
       sources: [paper('tscount: An R Package for Analysis of Count Time Series Following Generalized Linear Models (Liboschik, Fokianos and Fried, 2017)', 'Journal of Statistical Software 82(5), §§2–3')],
-    },
-    {
-      id: caveatId('count-scan-no-bootstrap-inference'),
-      category: 'interpretation',
-      requirement: 'The displayed maximum is a candidate location under the fitted model. This non-bootstrap scan does not provide a p-value and does not establish that an intervention occurred.',
-      consequenceIfUnmet: 'A ranking statistic is reported as a confirmed event or a causal effect.',
-      sources: [paper('Interventions in log-linear Poisson autoregression (Fokianos and Fried, 2012)', 'Statistical Modelling 12(4), 299–322')],
     },
   ],
 }
@@ -1863,12 +1846,12 @@ const ARDL_PSS: MethodDefinition = {
   id: ARDL_PSS_METHOD_ID,
   name: 'ARDL long run',
   family: 'estimation',
-  summary: 'An error-correction form with AIC-chosen lags; the cointegrating vector gives the long-run effect and the bounds test says whether a level relation exists.',
+  summary: 'Models an outcome using its earlier values and current and earlier predictor values. For eligible lag orders, an error-correction form tests for a long-run relationship.',
   caveats: [
     {
       id: caveatId('ardl-orders-assessed'),
       category: 'stationarity-and-dynamics',
-      requirement: 'Treatment and outcome are each I(0) or I(1); an I(2) or unresolved series is refused.',
+      requirement: 'Use series that are stationary in levels or after first differencing. Assess their order of integration in Data studio before interpreting the bounds test.',
       consequenceIfUnmet: 'The bounds critical values do not cover an I(2) regressor.',
       sources: [PSS_2001, hirmos('src/domain/stationarityAssessment.ts#assessStationarity')],
     },
@@ -1882,14 +1865,14 @@ const ARDL_PSS: MethodDefinition = {
     {
       id: caveatId('ardl-single-regressor'),
       category: 'identification',
-      requirement: 'One regressor is fitted, so the identified adjustment set must be empty.',
-      consequenceIfUnmet: 'A confounder left out biases the long-run coefficient.',
+      requirement: 'Include the predictors needed to represent the proposed long-run relationship. Distinguish distributed-lag predictors from fixed regressors such as policy indicators.',
+      consequenceIfUnmet: 'An omitted predictor can change the fitted long-run relationship.',
       sources: [statsmodels('statsmodels/tsa/ardl/model.py#UECM'), hirmos('crates/causal-core/src/ardl.rs')],
     },
     {
       id: caveatId('ardl-bounds-reading'),
       category: 'interpretation',
-      requirement: 'Above the I(1) bound a level relation exists; below the I(0) bound none does; between them the test is inconclusive.',
+      requirement: 'A statistic above the upper bound supports a level relationship. Below the lower bound, the test does not support one; between the bounds, the result is inconclusive.',
       consequenceIfUnmet: 'A long-run coefficient is reported without a level relation.',
       sources: [PSS_2001, statsmodels('statsmodels/tsa/ardl/model.py#UECM.bounds_test')],
     },
@@ -1907,7 +1890,7 @@ const VECM: MethodDefinition = {
   id: VECM_METHOD_ID,
   name: 'VECM',
   family: 'estimation',
-  summary: 'Johansen rank selection and maximum-likelihood error-correction fit; with one relation the outcome-normalised vector gives the long-run effect.',
+  summary: 'Fits long-run equilibrium relationships and estimates how changes in the series respond to departures from them.',
   caveats: [
     {
       id: caveatId('vecm-all-i1'),
@@ -1926,7 +1909,7 @@ const VECM: MethodDefinition = {
     {
       id: caveatId('vecm-single-relation'),
       category: 'interpretation',
-      requirement: 'A long-run effect is read only at rank one; more relations are reported as matrices.',
+      requirement: 'A single long-run relationship is interpreted only at rank one; multiple relationships are reported as coefficient matrices.',
       consequenceIfUnmet: 'A column from a multi-relation cointegrating matrix is incorrectly interpreted as a unique long-run effect.',
       sources: [statsmodels('statsmodels/tsa/vector_ar/vecm.py#VECM.fit')],
     },
@@ -2404,6 +2387,7 @@ export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REF
 export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
+export const TIME_SERIES_METHODS = { ardl: ARDL_PSS, vecm: VECM } as const
 export const COUNT_SERIES_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [COUNT_SERIES_INTERVENTION_SCAN]
 export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [PC_STABLE, FCI, DIRECT_LINGAM]
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [

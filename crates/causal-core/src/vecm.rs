@@ -6,6 +6,8 @@ use crate::coint::coint_johansen;
 use crate::{least_squares, linalg};
 use nalgebra::{DMatrix, DVector};
 
+pub mod forecast;
+
 fn norm_sf(x: f64) -> f64 {
     0.5 * libm::erfc(x / std::f64::consts::SQRT_2)
 }
@@ -89,6 +91,12 @@ pub fn select_coint_rank(
 }
 
 pub struct VecmResult {
+    forecast_history: Vec<Vec<f64>>,
+    sample_length: usize,
+    deterministic: String,
+    /// beta' y[t-1], including restricted deterministic terms; rows are relationships.
+    /// Column zero belongs to input row k_ar_diff, not the following outcome row.
+    pub cointegrating_residuals: DMatrix<f64>,
     pub alpha: DMatrix<f64>,
     /// The endogenous rows of the cointegration matrix, identity-normalised on top.
     pub beta: DMatrix<f64>,
@@ -150,7 +158,7 @@ pub fn vecm_fit(
         delta_x_rows.push(vec![1.0; t]);
     }
     if deterministic.contains("lo") {
-        delta_x_rows.push((0..t).map(|j| (p + j) as f64).collect());
+        delta_x_rows.push((0..t).map(|j| (p + j + 1) as f64).collect());
     }
     let delta_x = DMatrix::from_fn(delta_x_rows.len(), t, |i, j| delta_x_rows[i][j]);
 
@@ -239,6 +247,10 @@ pub fn vecm_fit(
     }
 
     VecmResult {
+        forecast_history: endog[t_tot-p..].to_vec(),
+        sample_length: t_tot,
+        deterministic: deterministic.to_owned(),
+        cointegrating_residuals: b_y,
         alpha,
         beta: beta_full.rows(0, k).into_owned(),
         det_coef_coint: beta_full.rows(k, dim - k).into_owned(),

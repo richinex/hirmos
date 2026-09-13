@@ -1,3 +1,4 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -12,17 +13,16 @@ import type { VisibleWindow } from '@/charts/window'
 import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
-import { MetricTile } from '@/components/ui/figures'
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { Formula } from '@/components/ui/Formula'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, chapterIntro, field, fieldLabel, figureGrid, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldLabel, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { DEFAULT_DYNAMIC_LINEAR_SCM, DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualConfiguration, type CounterfactualRunArtifact, type DynamicCounterfactualUncertainty } from '@/domain/counterfactual'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import { COUNTERFACTUAL_METHODS, DYNAMIC_LINEAR_SCM_METHOD_ID, LINEAR_SCM_METHOD_ID, methodDefinition } from '@/domain/methods'
 import { stationaryMarksFromGraph } from '@/domain/estimation'
 import { frequencyUnit, type PreparedDatasetArtifact } from '@/domain/preprocessing'
@@ -185,7 +185,7 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
     <>
       <h3 className="mb-1 mt-2 text-title font-medium text-ink">What {study.outcome.name} would have been with {study.treatment.name} set to {view.interventions[1]} instead of {view.interventions[0]}</h3>
       <p className="m-0 text-body text-muted">{run.kind === 'linear-scm-run' ? `For each ${stepLabel}, the model infers disturbance terms from the observed values and predicts both treatment worlds.` : `The model recovers the observed innovation at each time point, preserves the factual history through row ${view.firstStep - 1}, and replays both treatment worlds through the recorded lagged graph.`} The difference is conditional on the fitted structural equations.</p>
-      <div className={figureGrid('mt-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Counterfactual summary">
+      <MetricGrid className="mt-3" label="Counterfactual summary">
         <MetricTile label={constant ? 'Effect for every row' : run.kind === 'dynamic-linear-scm-run' ? 'Average horizon effect' : 'Average individual effect'} size="compact" frame="cell" value={formatStatistic('raw', view.averageEffect)} context={constant ? 'the same for all rows: a linear model with exact abduction gives coefficient × change' : uncertainty === null ? `SD across ${stepLabel}s ${formatStatistic('sd', sd).text}` : `${Math.round(uncertainty.confidenceLevel * 100)}% block-bootstrap CI [${formatStatistic('raw', uncertainty.averageInterval[0]).text}, ${formatStatistic('raw', uncertainty.averageInterval[1]).text}]`} />
         {constant
           ? <MetricTile label="Rows" size="compact" frame="cell" value={formatCount(view.observations)} context="one model-implied outcome pair per observation" />
@@ -194,7 +194,7 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
             : <MetricTile label="Share positive" size="compact" frame="cell" value={formatStatistic('score', view.sharePositive)} context={`of ${formatCount(view.observations).text} ${stepLabel}s`} />}
         <MetricTile label="Interventions" size="compact" frame="cell" value={formatWords(`${view.interventions[0]} → ${view.interventions[1]}`)} context={view.detail} />
         <MetricTile label="Equations" size="compact" frame="cell" value={formatCount(run.evidence.equations.length)} context={`order ${run.evidence.order.map((node) => run.nodes[node]?.name ?? node).join(' → ')}`} />
-      </div>
+      </MetricGrid>
       <ResultInterpretation interpretation={interpretCounterfactualResult(run, study, stepLabel)} className="mt-3" />
       <ExpandableChart option={option} label={`${study.outcome.name} observed and under both interventions`} className="mt-3 h-[260px]" testId="counterfactual-paths" window={window} onWindow={setWindow} />
       {effectOption !== null && <ExpandableChart window={window} onWindow={setWindow} option={effectOption} label={`${study.outcome.name} counterfactual contrast with pointwise block-bootstrap interval`} className="mt-3 h-[240px]" testId="counterfactual-effect-interval" />}
@@ -399,8 +399,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
   const stage = (
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>{chapterLabel('counterfactual')}</span>
-        <h2 id="counterfactual-title" className="mb-2 mt-2 text-heading text-ink">Estimate counterfactual outcomes</h2>
+        <ChapterHeading id="counterfactual-title" className="mb-2">Counterfactuals</ChapterHeading>
         <p className={chapterIntro}>A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
       </div>
       <section className={panel('p-(--panel-space)')} aria-labelledby="counterfactual-setup-title">

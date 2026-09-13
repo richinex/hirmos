@@ -1,3 +1,4 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
@@ -19,18 +20,17 @@ import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Formula } from '@/components/ui/Formula'
 import { RunFold } from '@/components/ui/RunFold'
-import { FigureParts, MetricTile } from '@/components/ui/figures'
+import { FigureParts, MetricGrid, MetricTile } from '@/components/ui/figures'
 import { EstimateHeadline, headlineFigure, scaleOf } from '@/components/results/EstimateHeadline'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, chapterIntro, field, fieldHint, fieldLabel, figureGrid, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldHint, fieldLabel, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import {
   additive,
   adjustmentLabels,
@@ -91,7 +91,7 @@ const ESTIMATOR_GROUP_LABELS: Readonly<Record<EstimatorGroupId, string>> = {
   'adjusted-outcome': 'Adjustment',
   'identified-functional': 'Identified',
   'graph-adjusted-temporal': 'Temporal graph',
-  'dynamic-time-series': 'Dynamics',
+  'dynamic-time-series': 'Count intervention',
   'intervention-comparison': 'Interventions',
 }
 
@@ -605,7 +605,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   const restated = tiles.find((tile) => tile.label === 'Adjustment set' && tile.value.text === adjustmentValue.text)
 
   return (
-    <div className={figureGrid('mt-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4')} aria-label="Diagnostics">
+    <MetricGrid className="mt-4" label="Diagnostics">
       <MetricTile
         label={run.kind === 'panel-intervention-run' ? 'Comparison design' : run.kind === 'frontdoor-two-stage-run' ? 'Stage adjustments' : run.kind === 'instrumental-variable-run' ? 'Covariates' : run.estimate.adjustment.kind === 'structural-parent-model' ? 'Structural model' : 'Adjustment set'}
         size="compact"
@@ -614,7 +614,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         context={run.kind === 'panel-intervention-run' ? 'This design does not use a DAG adjustment set.' : restated?.context}
       />
       {tiles.filter((tile) => tile !== restated).map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
-    </div>
+    </MetricGrid>
   )
 }
 
@@ -780,7 +780,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const [adjustmentDraft, setAdjustmentDraft] = useState<ExplicitAdjustmentMemberDraft>(CLOSED_ADJUSTMENT_DRAFT)
   const [state, dispatch] = useReducer(step, null, (): State => {
     // The controls open as the latest recorded run set them, so a reopened project shows the analysis it holds.
-    const latest = runs.at(-1) ?? null
+    const latest = runs.filter((run) => ESTIMATOR_GROUPS.some((group) => group.estimators.includes(run.configuration.kind))).at(-1) ?? null
     const recorded = latest === null ? null : identified.find((candidate) => candidate.id === latest.identification) ?? null
     const selection = estimationSelection(recorded ?? identified.at(-1) ?? null, studies, prepared)
     return {
@@ -902,7 +902,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const eligibilityByEstimator = useMemo<ReadonlyMap<EstimatorId, MethodEligibility>>(() => {
     const evaluations = new Map<EstimatorId, MethodEligibility>()
     if (identification === null) return evaluations
-    for (const estimator of ESTIMATOR_IDS) {
+    for (const estimator of ESTIMATOR_GROUPS.flatMap((group) => group.estimators)) {
       const definition = methodDefinition(methodIdOf(estimator))
       if (!definition.ok) continue
       evaluations.set(estimator, evaluateEstimatorEligibility(definition.value, {
@@ -1634,8 +1634,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const stage = (
     <section aria-labelledby="estimation-title" className="@container/panel flex flex-col gap-5">
       <div>
-        <span className={label('text-faint')}>{chapterLabel('estimation')}</span>
-        <h2 id="estimation-title" className="mb-2 mt-2 text-heading text-ink">Estimate the identified effect</h2>
+        <ChapterHeading id="estimation-title" className="mb-2">Estimation</ChapterHeading>
         <p className={chapterIntro}>Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 

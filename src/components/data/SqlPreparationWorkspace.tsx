@@ -1,13 +1,13 @@
+import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { embed } from '@duckdb/duckdb-wasm-shell'
 import { Terminal, type ITheme } from 'xterm'
 import shellModule from '@duckdb/duckdb-wasm-shell/dist/shell_bg.wasm?url'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldHint, label, literal, num, prose } from '@/components/ui/recipes'
+import { button, field, fieldHint, literal, num, prose } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import { assertNever, isNonEmpty, type NonEmptyArray } from '@/domain/dop'
-import { chapterLabel } from '@/domain/navigation'
 import { PREPARED_VIEW, type SqlPreparationInput, type SqlViewName } from '@/domain/sqlPreparation'
 import type { SelectedSource, SqlResume } from '@/domain/workflow'
 import {
@@ -305,8 +305,7 @@ export function SqlShell({ inputs, resume, onPrepared, onCleared }: SqlShellProp
   return (
     <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:grid-rows-[auto_1fr] lg:gap-x-8 lg:gap-y-4" aria-labelledby="sql-workspace-title">
       <div className="min-w-0">
-        <span className={label('text-signal')}>{chapterLabel('data')}</span>
-        <h2 id="sql-workspace-title" className="mb-3 mt-3 text-heading text-ink">Prepare with SQL</h2>
+        <ChapterHeading id="sql-workspace-title" className="mb-3">Prepare with SQL</ChapterHeading>
         <p className={prose('mb-4 mt-0 text-faint')}>Create one or more views, refresh the list, and choose the view that becomes the analysis source. The input files are not changed.</p>
 
         <p className="m-0 text-body font-medium text-ink">Input tables</p>

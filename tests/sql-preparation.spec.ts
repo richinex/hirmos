@@ -56,7 +56,7 @@ test('materializes a declared multi-file SQL view through the ordinary profile p
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/prepared with SQL · analysis_rows · 2 inputs/)).toBeVisible()
   await page.getByRole('button', { name: 'Inspect data' }).click()
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('group_name')
   expect(warnings).not.toContain('using deprecated parameters for the initialization function; pass a single object instead')
 })
@@ -70,7 +70,7 @@ test('reopens a project built by the SQL step from its input files', async ({ pa
   await page.getByRole('button', { name: 'Use selected view' }).click()
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Inspect data' }).click()
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
   await page.waitForTimeout(1500)
 
   await page.goto('/app')
@@ -81,7 +81,7 @@ test('reopens a project built by the SQL step from its input files', async ({ pa
     { name: 'measurements.csv', mimeType: 'text/csv', buffer: Buffer.from('id,value\n1,10\n2,20\n') },
     { name: 'groups.csv', mimeType: 'text/csv', buffer: Buffer.from('id,group_name\n1,A\n2,B\n') },
   ])
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 60_000 })
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 60_000 })
   await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('group_name')
 })
 
@@ -102,8 +102,8 @@ test('reopens the console on the source it made, with its views and output view 
   await page.getByRole('button', { name: 'Use selected view' }).click()
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Inspect data' }).click()
-  await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('Rows', { exact: true }).locator('..')).toContainText('1')
+  await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByLabel('Dataset size').getByText('rows', { exact: true }).locator('..')).toContainText('1')
 
   await page.getByRole('button', { name: 'Edit SQL' }).click()
   await expect(page.getByRole('alertdialog')).toContainText('Editing replaces the prepared dataset and removes the current analysis.')

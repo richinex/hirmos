@@ -525,6 +525,50 @@ button[aria-busy="true"]::after {
    text wraps inside a zero-width sensor column that is a size container, and the moment that column is
    taller than one line the fade appears over the clipped single-line copy the reader sees. A row sets
    `--smart-truncate-surface` to its own background so the fade matches it. */
+/* Card content arrangement adapted from KieranWebDev/time-tracking-dashboard-react:
+   ActivityCard's title / primary value / supporting value, and responsive card grid.
+   Theme tokens and intrinsic heights replace its fixed heights and category artwork. */
+
+/* Projects: the approved Notion-style property table. Category colours do not use the live-result signal. */
+.example-table th:not(:last-child), .example-table td:not(:last-child) { border-right: 1px solid var(--color-line); }
+.example-shape { display: inline-block; border-radius: 3px; padding: 2px 6px; font-size: var(--text-label); line-height: 1.4; white-space: nowrap; color: var(--color-muted); background: var(--color-well); }
+.example-shape[data-shape="time series"] { color: #50613d; background: #e7eddd; }
+.example-shape[data-shape="panel"] { color: #425b76; background: #e3eaf0; }
+.example-shape[data-shape="cross-section"] { color: #765838; background: #efe5d9; }
+.example-shape[data-shape="spells"] { color: #665477; background: #ebe4f0; }
+[data-theme="dark"] .example-shape[data-shape="time series"] { color: #c2d2ab; background: #303a28; }
+[data-theme="dark"] .example-shape[data-shape="panel"] { color: #b8cde1; background: #2c3845; }
+[data-theme="dark"] .example-shape[data-shape="cross-section"] { color: #e1c5a6; background: #40342a; }
+[data-theme="dark"] .example-shape[data-shape="spells"] { color: #d4c1e2; background: #3b3045; }
+@media (pointer: coarse) { .example-browser button { min-width: 44px; min-height: 44px; } }
+
+.metric-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; list-style: none; padding: 0; }
+.metric-cards > * { min-width: 0; }
+.metric-card, .metric-cards > .metric-tile, .metric-cards > li > .metric-tile { min-width: 0; border: 0; border-radius: 15px; background: var(--color-stage); padding: 1.75rem 1.5rem; }
+.metric-card-values { min-width: 0; }
+.metric-card .metric-card-values, .metric-cards .metric-card-values { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem 1rem; margin-top: .75rem; }
+.metric-card .metric-card-number, .metric-cards .metric-card-number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: var(--text-heading); font-weight: 400; margin: 0; }
+.metric-card-context { min-width: 0; }
+.metric-card .metric-card-context, .metric-cards .metric-card-context { margin: 0; }
+@container panel (min-width: 34rem) {
+  .metric-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container panel (min-width: 44rem) {
+  .metric-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.875rem; }
+  .metric-cards .metric-card-values { flex-direction: column; align-items: flex-start; gap: .75rem; }
+  .metric-cards .metric-tile:not([data-size="compact"]) .metric-card-number { font-size: var(--text-metric); }
+}
+.metric-tile[data-size="compact"] .metric-card-number { font-size: var(--text-title); line-height: 1.35; }
+
+.equation-columns { display: grid; min-width: 0; gap: 2rem 3rem; }
+.equation-group { display: grid; min-width: 0; align-content: start; gap: .75rem; }
+@container (min-width: 44rem) {
+  .equation-columns[data-paired="true"] { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: .75rem; }
+  @supports (grid-template-rows: subgrid) {
+    .equation-columns[data-paired="true"] > .equation-group { grid-row: span 3; grid-template-rows: subgrid; }
+  }
+}
+
 .smart-truncate { --smart-truncate-fade-width: 14px; --smart-truncate-surface: var(--color-panel); display: block; min-width: 0; max-width: 100%; }
 .smart-truncate__frame { display: block; min-width: 0; max-width: 100%; block-size: 1lh; overflow: hidden; }
 .smart-truncate__grid { display: grid; grid-template-columns: minmax(0, max-content) 0; align-items: start; min-width: 0; max-width: 100%; }
@@ -540,8 +584,8 @@ button[aria-busy="true"]::after {
 .seam-h::before { inset: -4px 0; }
 .seam:hover, .seam[data-separator="active"] { background: var(--color-edge); }
 .seam:focus-visible { outline: 2px solid var(--color-signal); outline-offset: 0; }
-.seam-v { cursor: col-resize; }
-.seam-h { cursor: row-resize; }
+.seam-v { width: 1px; cursor: col-resize; }
+.seam-h { height: 1px; cursor: row-resize; }
 
 /* A typeset formula wraps like a sentence: KaTeX sets nowrap, and lifting it lets inline maths break
    after top-level relations and operators. The block is positioned so KaTeX's clipped MathML twin

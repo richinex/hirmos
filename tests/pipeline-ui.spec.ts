@@ -174,7 +174,7 @@ test.describe('pipeline canvas', () => {
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByText(/built with a pipeline · 4 blocks · 2 inputs/)).toBeVisible()
     await page.getByRole('button', { name: 'Inspect data' }).click()
-    await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('region')
     await page.waitForTimeout(1500)
 
@@ -183,7 +183,7 @@ test.describe('pipeline canvas', () => {
     await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
     await expect(page.getByText(/which the pipeline created from cities.csv/)).toBeVisible()
     await page.locator('input[type="file"][multiple]').setInputFiles(files())
-    await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('region')
   })
 
@@ -239,7 +239,7 @@ test.describe('pipeline canvas', () => {
     await useAsSource(page).click()
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 60_000 })
     await page.getByRole('button', { name: 'Inspect data' }).click()
-    await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 60_000 })
+    await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('population')
   })
 
@@ -353,7 +353,7 @@ test.describe('pipeline canvas', () => {
     await useAsSource(page).click()
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: 'Inspect data' }).click()
-    await expect(page.getByRole('heading', { name: 'Data profile' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('region')
 
     // Back from the profile: a confirm, since what was built from this source goes with it.

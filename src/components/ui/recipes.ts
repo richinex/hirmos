@@ -195,7 +195,7 @@ export const chip = (extra?: string): string => cn('inline-block rounded-md bord
  * twice around the same thing, and the inner one stops meaning anything. Where a component would
  * land its own surface inside this one, reach for its `frame` escape hatch instead.
  */
-export const panel = (extra?: string): string => cn('rounded-xl border border-hair bg-panel [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
+export const panel = (extra?: string): string => cn('rounded-xl border border-hair bg-panel [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
 
 /**
  * A recessed area inside a panel: a control group, a figure, a quoted reading.
@@ -229,10 +229,10 @@ export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px]
 /** A data table: the caps tier for headers, hairline rows, comfortable 32px body rows unless a density is applied; figure cells add `text-right`. */
 export const table = 'w-full border-collapse text-left text-body'
 
-/** A header cell. Sticky, on the well, set in sentence case and carried by weight rather than capitals,
+/** A header cell. Sticky and opaque on its table's surface, carried by weight rather than capitals,
  *  because a header may be a phrase ("Zivot-Andrews p, constant and trend"). `p-0` when a sort button fills it. */
 export const th = (extra?: string): string =>
-  cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-well px-3.5 py-2 text-left text-label font-medium text-muted', extra)
+  cn('sticky top-0 z-(--z-sticky) whitespace-nowrap border-b border-hair bg-[var(--table-surface,var(--color-stage))] px-3.5 py-2 text-left text-label font-medium text-muted', extra)
 
 /** A body row. `action` rows fill on hover and focus; `selected` is a surface, never a colour or a weight.
  *  A row whose menu or expander is open stays filled, so the reader keeps which row they are acting on. */

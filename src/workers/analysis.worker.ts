@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { ardlModelResponseSchema } from '@/domain/ardlModel'
 import { parseMulticollinearityEvidence } from '@/domain/multicollinearity'
 import { parseGrangerSsrEvidence } from '@/domain/granger'
 /// <reference lib="webworker" />
@@ -368,8 +369,10 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed }
     case 'ardl-pss':
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
+    case 'ardl-model':
+      return { kind: 'ardlModel', rows: command.rows, columns: command.columns, model: command.model }
     case 'vecm':
-      return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex }
+      return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex, forecastSteps: command.forecastSteps ?? null }
     case 'synthetic-control':
       return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
     case 'panel-intervention':
@@ -767,6 +770,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = ardlEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'ardl-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'ardl-model': {
+        const result = ardlModelResponseSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'ardl-model-succeeded', request: command.request, result: result.data.evidence })
         return
       }
       case 'vecm': {

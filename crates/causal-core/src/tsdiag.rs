@@ -6,7 +6,7 @@ use crate::{least_squares, linalg, ols::Ols};
 use nalgebra::{DMatrix, DVector};
 
 /// Upper tail of the chi-square distribution, as `scipy.stats.chi2.sf`.
-fn chi2_sf(x: f64, df: f64) -> f64 {
+pub(crate) fn chi2_sf(x: f64, df: f64) -> f64 {
     spec_math::cephes64::igamc(df / 2.0, x / 2.0)
 }
 

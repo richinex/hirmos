@@ -6,7 +6,7 @@ import { useChartTheme } from '@/charts/theme'
 import type { VisibleWindow } from '@/charts/window'
 import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
-import { MetricTile } from '@/components/ui/figures'
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
 import { caption, label, num } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
@@ -350,7 +350,7 @@ function RatioForest({ rows, ratioName, confidence, testId }: { readonly rows: r
 }
 
 function Tiles({ children }: { readonly children: ReactNode }) {
-  return <div className="mt-4 grid gap-px overflow-hidden rounded-lg border border-hair bg-hair sm:grid-cols-3">{children}</div>
+  return <MetricGrid className="mt-4" testId="survival-summary-cards">{children}</MetricGrid>
 }
 
 const coxStandardErrorLabel = (method: CoxRegressionEvidence['standardErrors']): string => {

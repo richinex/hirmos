@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { isNumericDuckDbType } from '@/domain/dataset'
-import { chapterLabel } from '@/domain/navigation'
 import type { SelectedSource } from '@/domain/workflow'
 import { FigureParts } from '@/components/ui/figures'
 import { Icon } from '@/components/Icon'
-import { figureGrid, iconControl, label, literal, num } from '@/components/ui/recipes'
+import { iconControl, literal, num } from '@/components/ui/recipes'
 import { formatCount } from '@/lib/format/number'
 import { PreviewTable } from './PreviewTable'
 import { SchemaTable } from './SchemaTable'
@@ -33,24 +32,21 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
   ]
   return (
     <section className="rise @container/studio flex w-full flex-col gap-5" aria-labelledby="data-profile-title">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <span className={label('text-faint')}>{chapterLabel('data')}</span>
-          <h2 id="data-profile-title" className="mb-0 mt-2 text-heading text-ink">Data profile</h2>
-          <p className="mb-0 mt-1 flex items-center gap-1 text-body text-muted">
-            <span>{profile.source.fileName}</span>
+      <header className="flex min-w-0 flex-wrap items-center justify-between gap-x-6 gap-y-3">
+        <div className="flex min-w-0 max-w-full items-center gap-2">
+          <Icon name="description" size={22} className="text-muted" />
+          <h2 id="data-profile-title" className="m-0 min-w-0 text-heading text-ink [overflow-wrap:anywhere]">{profile.source.fileName}</h2>
             {source.recipe.kind !== 'uploaded-file' && onEditSource !== null && (
               <button type="button" className={iconControl('quiet', 'h-7 w-7')} aria-label={source.recipe.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'} title={source.recipe.kind === 'sql-derived' ? 'Edit the SQL that made this source' : 'Edit the pipeline that made this source'} onClick={onEditSource}>
                 <Icon name="edit" size={15} />
               </button>
             )}
-          </p>
         </div>
-        <dl aria-label="Dataset size" className={figureGrid('m-0 w-full grid-cols-3 @2xl/studio:w-auto')}>
+        <dl aria-label="Dataset size" className="m-0 flex flex-wrap items-center gap-x-5 gap-y-2 text-label">
           {sizeFigures.map(({ name, figure }) => (
-            <div key={name} className="bg-panel px-3 py-2">
-              <dt className={label('text-faint')}>{name}</dt>
-              <dd className={num('m-0 mt-1 text-title leading-none tracking-tight text-ink')} title={figure.exact}><FigureParts value={figure} /></dd>
+            <div key={name} className="flex items-baseline gap-1">
+              <dt className="text-muted">{name.toLowerCase()}</dt>
+              <dd className={num('order-first m-0 text-ink')} title={figure.exact}><FigureParts value={figure} /></dd>
             </div>
           ))}
         </dl>

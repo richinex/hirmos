@@ -1,12 +1,17 @@
-import { useMemo, useState } from 'react'
-import { EChart } from '@/charts/EChart'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useRunActivity } from '@/lib/useRunActivity'
+import type { RunActivity } from '@/domain/activity'
+import { ExpandableChart } from '@/charts/ExpandableChart'
+import type { VisibleWindow } from '@/charts/window'
+import { TimeSeriesEquation } from './TimeSeriesEquation'
+import { Orb } from '@/components/ui/Orb'
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { countSeriesFitOption, interventionScoreOption } from '@/charts/data/countSeriesModel'
 import { useChartTheme } from '@/charts/theme'
-import { MethodCaveats } from '@/components/MethodCaveats'
 import { LagListField } from '@/components/ui/LagListField'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, label, num, prose, well } from '@/components/ui/recipes'
+import { button, field, fieldLabel, fieldHint, label, num, panel, sectionTitle, well } from '@/components/ui/recipes'
 import {
   describeCountSeriesReadiness,
   newCountSeriesModelId,
@@ -16,10 +21,9 @@ import {
 } from '@/domain/countSeries'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import type { NonEmptyArray } from '@/domain/dop'
-import { COUNT_SERIES_DIAGNOSTIC_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
-import { formatCount, formatStatistic } from '@/lib/format/number'
+import { formatCount, formatStatistic, formatWords } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
@@ -30,6 +34,7 @@ type Job =
 
 function ResultCharts({ artifact }: { readonly artifact: CountSeriesModelArtifact }) {
   const theme = useChartTheme()
+  const [window, setWindow] = useState<VisibleWindow | null>(null)
   const observed = useMemo(
     () => artifact.result.fittedMeans.map((mean, index) => mean + (artifact.result.residuals[index] ?? 0)),
     [artifact.result.fittedMeans, artifact.result.residuals],
@@ -38,16 +43,16 @@ function ResultCharts({ artifact }: { readonly artifact: CountSeriesModelArtifac
     () => countSeriesFitOption({ name: artifact.outcome.name, observed, fitted: artifact.result.fittedMeans, strongestReferencePoint: artifact.result.strongestReferencePoint }, theme),
     [artifact.outcome.name, artifact.result.fittedMeans, artifact.result.strongestReferencePoint, observed, theme],
   )
-  const scan = useMemo(() => interventionScoreOption({ candidates: artifact.result.candidates }, theme), [artifact.result.candidates, theme])
+  const scan = useMemo(() => interventionScoreOption({ candidates: artifact.result.candidates, observations: observed.length }, theme), [artifact.result.candidates, observed.length, theme])
   return (
-    <div className="mt-3 grid gap-3 @3xl/panel:grid-cols-2">
-      <div className="rounded-lg border border-hair bg-panel p-3"><span className={label('text-faint')}>Observed counts and fitted conditional mean</span><EChart option={fit} label={`${artifact.outcome.name}, observed and fitted counts`} className="mt-1 h-56" /></div>
-      <div className="rounded-lg border border-hair bg-panel p-3"><span className={label('text-faint')}>Unknown-date score profile</span><EChart option={scan} label={`${artifact.outcome.name}, intervention score by candidate date`} className="mt-1 h-56" /></div>
+    <div className="mt-3 grid min-w-0 gap-3">
+      <div data-testid="count-fit-plot" className="min-w-0 rounded-lg border border-hair bg-panel p-3"><span className={label('text-faint')}>Observed counts and fitted conditional mean</span><ExpandableChart option={fit} window={window} onWindow={setWindow} label={`${artifact.outcome.name}, observed and fitted counts`} className="mt-1 h-72" /></div>
+      <div data-testid="count-score-plot" className="min-w-0 rounded-lg border border-hair bg-panel p-3"><span className={label('text-faint')}>Unknown-date score profile</span><ExpandableChart option={scan} window={window} onWindow={setWindow} label={`${artifact.outcome.name}, intervention score by candidate date`} className="mt-1 h-64" /></div>
     </div>
   )
 }
 
-function CountSeriesRecord({ artifact, open }: { readonly artifact: CountSeriesModelArtifact; readonly open: boolean }) {
+export function CountSeriesRecord({ artifact, open }: { readonly artifact: CountSeriesModelArtifact; readonly open: boolean }) {
   const strongest = artifact.result.candidates.find((candidate) => candidate.referencePoint === artifact.result.strongestReferencePoint)
   return (
     <li>
@@ -58,14 +63,15 @@ function CountSeriesRecord({ artifact, open }: { readonly artifact: CountSeriesM
           <span className={num('float-right text-micro text-faint')}>{formatTime(artifact.createdAt)}</span>
         </summary>
         <div className="border-t border-hair px-3 py-3">
-          <dl className="m-0 grid gap-3 @md/panel:grid-cols-2 @3xl/panel:grid-cols-4">
-            <div><dt className={label('text-faint')}>Strongest candidate</dt><dd className={num('m-0 mt-1 text-title text-ink')}>row {artifact.result.strongestReferencePoint + 1}</dd></div>
-            <div><dt className={label('text-faint')}>Score statistic</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatStatistic('raw', strongest?.scoreStatistic ?? Number.NaN).text}</dd></div>
-            <div><dt className={label('text-faint')}>Negative-binomial size</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatStatistic('raw', artifact.result.size).text}</dd></div>
-            <div><dt className={label('text-faint')}>Log likelihood</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatStatistic('raw', artifact.result.logLikelihood).text}</dd></div>
-          </dl>
+          <MetricGrid label="Count-model summary">
+            <MetricTile label="Strongest candidate" value={formatWords(`row ${artifact.result.strongestReferencePoint + 1}`)} />
+            <MetricTile label="Score statistic" value={formatStatistic('raw', strongest?.scoreStatistic ?? Number.NaN)} />
+            <MetricTile label="Negative-binomial size" value={formatStatistic('raw', artifact.result.size)} />
+            <MetricTile label="Log likelihood" value={formatStatistic('raw', artifact.result.logLikelihood)} />
+          </MetricGrid>
           <p className="mb-0 mt-3 text-body text-muted">The maximum locates the date most compatible with the selected intervention shape under this fitted count model. The non-bootstrap scan does not report a p-value, and the date is not evidence of a causal intervention.</p>
           <ResultCharts artifact={artifact} />
+          <TimeSeriesEquation run={artifact} />
           <p className={num('mb-0 mt-3 text-label text-faint')}>Parameters: {artifact.result.parameters.map((value) => formatStatistic('raw', value).text).join(' · ')} · dispersion {formatStatistic('raw', artifact.result.dispersion).text} · {formatCount(artifact.result.observations).text} observations</p>
         </div>
       </details>
@@ -73,12 +79,14 @@ function CountSeriesRecord({ artifact, open }: { readonly artifact: CountSeriesM
   )
 }
 
-export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifact }: {
+export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifact, onActivity, selector }: {
+  readonly selector: ReactNode
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>
   readonly artifacts: readonly CountSeriesModelArtifact[]
   readonly onArtifact: (artifact: CountSeriesModelArtifact) => void
+  readonly onActivity?: (activity: RunActivity | null) => void
 }) {
   const columns = profile.columns.filter((column) => prepared.columns.includes(column.id) && isNumericDuckDbType(column.duckdbType))
   const [outcome, setOutcome] = useState<ColumnId | null>(null)
@@ -89,6 +97,7 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
   const [candidateEnd, setCandidateEnd] = useState(Math.max(1, Math.floor(prepared.observations * 0.8)))
   const [delta, setDelta] = useState(1)
   const [job, setJob] = useState<Job>({ kind: 'idle' })
+  useRunActivity(onActivity, job.kind === 'running' ? { label: 'Count-series scan', progress: null } : null)
 
   const run = async () => {
     if (outcome === null) { setJob({ kind: 'failed', detail: 'Choose the count series to model.' }); return }
@@ -109,7 +118,11 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
         candidateReferencePoints,
         delta,
       }, (progress) => setJob({ kind: 'running', phase: progress.stage }))
-      if (!result.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+      if (!result.ok) {
+        const detail = describeAnalysisWorkerProblem(result.error)
+        setJob({ kind: 'failed', detail: detail.includes('DispersionNotEstimable') ? 'The negative-binomial dispersion could not be estimated for this specification. Review the count variation and selected lags.' : detail })
+        return
+      }
       const selected = matrix.value.columns[0]
       if (selected === undefined) { setJob({ kind: 'failed', detail: 'The prepared matrix omitted the selected count series.' }); return }
       onArtifact({
@@ -128,10 +141,12 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
   }
 
   return (
-    <section aria-labelledby="count-series-title">
-      <h4 id="count-series-title" className="m-0 text-body font-medium text-ink">Count-series model and intervention scan</h4>
-      <p className={prose('mb-0 mt-1 text-faint')}>Fit a negative-binomial INGARCH model, then scan a specified point, decaying, or persistent intervention shape over a candidate date range. This is model assessment and event detection, not causal effect estimation.</p>
-      <div className="mt-3 grid items-start gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+    <section className="flex flex-col gap-5" aria-labelledby="count-series-title">
+      <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
+      {selector}
+      <h3 id="count-series-title" className="mb-0 mt-3 text-body font-medium text-ink">Negative-binomial count model</h3>
+      <p className={`${fieldHint} mb-0 mt-1 max-w-[65ch]`}>Fit a count model and search the selected range for a temporary, fading or persistent change.</p>
+      <fieldset disabled={job.kind === 'running'} className="m-0 mt-4 grid min-w-0 items-start gap-4 border-0 p-0 @lg/panel:grid-cols-2"><legend className="sr-only">Count model specification</legend>
         <label className="block"><span className={fieldLabel}>Count series</span><Select className={field('text', 'mt-1')} value={outcome ?? ''} onChange={(event) => setOutcome(event.target.value === '' ? null : event.target.value as ColumnId)}><option value="">Choose series</option>{columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}</Select></label>
         <div><span className={fieldLabel}>Mean link</span><SegmentedControl className="mt-1" ariaLabel="Count-series mean link" value={link} onChange={setLink} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>
         <LagListField label="Past count lags" lags={pastObservationLags} onChange={setPastObservationLags} />
@@ -140,15 +155,16 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
         <label className="block"><span className={fieldLabel}>Candidate end row</span><input type="number" min={2} max={prepared.observations} className={field('text', 'mt-1')} value={candidateEnd + 1} onChange={(event) => setCandidateEnd(Math.max(1, Math.floor(Number(event.target.value) || 2) - 1))} /></label>
         <div><span className={fieldLabel}>Intervention shape</span><SegmentedControl className="mt-1" ariaLabel="Count-series intervention shape" value={delta === 0 ? 'point' : delta === 1 ? 'persistent' : 'decaying'} onChange={(kind) => setDelta(kind === 'point' ? 0 : kind === 'persistent' ? 1 : 0.8)} options={[{ value: 'point', label: 'Point' }, { value: 'decaying', label: 'Decaying' }, { value: 'persistent', label: 'Persistent' }]} /></div>
         {delta > 0 && delta < 1 && <label className="block"><span className={fieldLabel}>Decay δ</span><input type="number" min={0.01} max={0.99} step={0.01} className={field('text', 'mt-1')} value={delta} onChange={(event) => setDelta(Math.max(0.01, Math.min(0.99, Number(event.target.value) || 0.8)))} /></label>}
-      </div>
+      </fieldset>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" className={button('quiet')} aria-busy={job.kind === 'running'} disabled={outcome === null || job.kind === 'running'} onClick={() => void run()}>Fit and scan</button>
-        {job.kind === 'running' && <span role="status" className="text-body text-faint">{job.phase}</span>}
+        <button type="button" className={button('signal')} aria-busy={job.kind === 'running'} disabled={outcome === null} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit and scan</button>
+        <span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label="Count model running" />}</span>
+        <span role="status" className="sr-only">{job.kind === 'running' ? job.phase : ''}</span>
         {job.kind === 'failed' && <span role="alert" className="text-body text-danger">{job.detail}</span>}
       </div>
-      <p className="mb-0 mt-2 text-body text-faint">The scan follows tscount’s non-bootstrap score procedure. It reports the maximum statistic and no p-value; use it to inspect a fitted model, not to assert that an intervention occurred.</p>
-      <MethodCaveats methods={COUNT_SERIES_DIAGNOSTIC_METHODS} />
-      {artifacts.length > 0 && <ul className="m-0 mt-4 list-none space-y-2 p-0">{[...artifacts].reverse().map((artifact, index) => <CountSeriesRecord key={artifact.id} artifact={artifact} open={index === 0} />)}</ul>}
+      </section>
+      {artifacts.length > 0 && <h3 className={`${sectionTitle} m-0`}>Results</h3>}
+      {artifacts.slice(-1).map((artifact) => <ul key={artifact.id} className="m-0 list-none p-0"><CountSeriesRecord artifact={artifact} open /></ul>)}
     </section>
   )
 }

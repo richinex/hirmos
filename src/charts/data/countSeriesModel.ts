@@ -1,6 +1,6 @@
 import type { EChartsCoreOption } from 'echarts/core'
 import { formatStatistic } from '@/lib/format/number'
-import { axisLabelStyle, baseOption, gridAuto, legend, tooltip, valueAxis } from '../grammar'
+import { axisLabelStyle, baseOption, gridAuto, legend, rangeSelection, tooltip, valueAxis } from '../grammar'
 import type { ChartTheme } from '../theme'
 
 export function countSeriesFitOption(view: {
@@ -12,7 +12,8 @@ export function countSeriesFitOption(view: {
   return {
     ...baseOption(theme, `${view.name}: observed counts and fitted INGARCH conditional means across ${view.observed.length} reference points.`),
     // The legend goes above the plot so it does not print over the axis name at the foot, and the plot starts low enough that the scan-date label prints between the two rather than over the legend.
-    grid: gridAuto({ top: 48, bottom: 44 }),
+    grid: gridAuto({ top: 48, bottom: 78 }),
+    ...rangeSelection(theme),
     legend: { ...legend(theme, ['observed', 'fitted mean']), bottom: 'auto', top: 0 },
     tooltip: { ...tooltip(theme, 'axis'), axisPointer: { type: 'line', lineStyle: { color: theme.muted, type: 'dashed' } } },
     xAxis: { type: 'value', min: 1, max: Math.max(2, view.observed.length), minInterval: 1, name: 'reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
@@ -26,11 +27,13 @@ export function countSeriesFitOption(view: {
 
 export function interventionScoreOption(view: {
   readonly candidates: readonly { readonly referencePoint: number; readonly scoreStatistic: number }[]
+  readonly observations: number
 }, theme: ChartTheme): EChartsCoreOption {
   const strongest = view.candidates.reduce((best, candidate) => candidate.scoreStatistic > best.scoreStatistic ? candidate : best)
   return {
     ...baseOption(theme, `Unknown-date intervention score scan across ${view.candidates.length} candidate reference points; the maximum is at ${strongest.referencePoint + 1}.`),
     grid: gridAuto({ bottom: 28 }),
+    ...rangeSelection(theme, 0, { slider: false }),
     tooltip: {
       ...tooltip(theme, 'axis'),
       formatter: (raw: unknown) => {
@@ -41,7 +44,7 @@ export function interventionScoreOption(view: {
         return `reference point ${Number(data[0])}<br/>score statistic <strong>${formatStatistic('raw', Number(data[1])).text}</strong>`
       },
     },
-    xAxis: { type: 'value', minInterval: 1, name: 'candidate reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
+    xAxis: { type: 'value', min: 1, max: Math.max(2, view.observations), minInterval: 1, name: 'candidate reference point', nameLocation: 'middle', nameGap: 22, nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize }, axisLine: { lineStyle: { color: theme.hair } }, axisTick: { show: false }, axisLabel: axisLabelStyle(theme), splitLine: { show: false } },
     yAxis: { ...valueAxis(theme, 'score statistic'), scale: true },
     series: [{ type: 'line', name: 'score statistic', data: view.candidates.map((candidate) => [candidate.referencePoint + 1, candidate.scoreStatistic]), symbol: 'circle', symbolSize: 3, lineStyle: { color: theme.ink, width: 1.2 }, itemStyle: { color: theme.ink }, markPoint: { symbolSize: 28, label: { color: theme.panel, fontFamily: theme.font, fontSize: theme.labelSize, formatter: String(strongest.referencePoint + 1) }, itemStyle: { color: theme.signal }, data: [{ coord: [strongest.referencePoint + 1, strongest.scoreStatistic] }] } }],
   }

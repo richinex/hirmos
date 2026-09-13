@@ -96,6 +96,7 @@ mod dag_check;
 mod discovery;
 mod dynamic_counterfactual;
 mod estimation;
+mod ardl_model;
 mod identification;
 mod matrix;
 mod preparation;
@@ -898,6 +899,7 @@ pub fn run_analysis(
             att,
             seed,
         ),
+        AnalysisCommand::ArdlModel { rows, columns, model } => ardl_model::fit(values, rows, columns, model),
         AnalysisCommand::ArdlPss {
             rows,
             columns,
@@ -917,7 +919,8 @@ pub fn run_analysis(
             deterministic,
             significance,
             break_index,
-        } => vecm(
+            forecast_steps,
+        } => estimation::vecm_with_forecast(
             values,
             rows,
             columns,
@@ -926,6 +929,7 @@ pub fn run_analysis(
             deterministic,
             significance,
             break_index,
+            forecast_steps,
         ),
         AnalysisCommand::SyntheticControl {
             rows,

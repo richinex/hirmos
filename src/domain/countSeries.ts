@@ -37,7 +37,9 @@ export const countSeriesInterventionScanEvidenceSchema = z.object({
   }).strict()).min(1),
   strongestReferencePoint: z.number().int().nonnegative(),
   delta: z.number().finite().min(0).max(1),
-}).strict()
+}).strict().refine((evidence) => evidence.parameters.length === 1 + evidence.pastObservationLags.length + evidence.pastMeanLags.length, {
+  message: 'The coefficient count must match the intercept and selected count and mean lags.',
+})
 
 export type CountSeriesInterventionScanEvidence = z.infer<typeof countSeriesInterventionScanEvidenceSchema>
 

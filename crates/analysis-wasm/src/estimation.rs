@@ -1585,6 +1585,10 @@ pub(crate) fn ardl_pss(
     let bounds = bounds_test(&model, case);
     Ok(AnalysisResult::ArdlPss {
         observations: rows,
+        long_run: ArdlLongRun::Recorded {
+            departures: model.cointegrating_residuals(&y, &x, trend_kind),
+            observed: y,
+        },
         trend,
         case,
         ar_lag: p,
@@ -1611,6 +1615,17 @@ pub(crate) fn vecm(
     significance: usize,
     break_index: Option<usize>,
 ) -> Result<AnalysisResult, String> {
+    vecm_with_forecast(values, rows, columns, endogenous, max_lags, deterministic, significance, break_index, None)
+}
+
+pub(crate) fn vecm_with_forecast(
+    values: &[f64], rows: usize, columns: usize, endogenous: &[usize],
+    max_lags: usize, deterministic: VecmDeterministic, significance: usize,
+    break_index: Option<usize>, forecast_steps: Option<usize>,
+) -> Result<AnalysisResult, String> {
+    if forecast_steps.is_some_and(|steps| steps == 0 || steps > 200) {
+        return Err("Choose between 1 and 200 forecast periods.".to_owned());
+    }
     validate_dense_matrix("VECM", values, rows, columns)?;
     if endogenous.len() < 2 || endogenous.iter().any(|&column| column >= columns) {
         return Err("VECM needs at least two endogenous columns inside the matrix".to_owned());
@@ -1666,7 +1681,9 @@ pub(crate) fn vecm(
     };
     if rank == 0 {
         return Ok(AnalysisResult::Vecm {
+            forecast: if forecast_steps.is_some() {VecmForecast::NotFitted} else {VecmForecast::NotRequested},
             observations: rows,
+            long_run: VecmLongRun::NotFitted,
             deterministic,
             k_ar_diff,
             rank,
@@ -1680,6 +1697,13 @@ pub(crate) fn vecm(
         });
     }
     let fit = vecm_fit(&endog, k_ar_diff, rank, code);
+    let forecast = match forecast_steps {
+        None => VecmForecast::NotRequested,
+        Some(steps) => {
+            let forecast = fit.forecast(steps, 0.95).map_err(|_| "The fitted VECM could not produce finite forecasts.".to_owned())?;
+            VecmForecast::Recorded {confidence:0.95,mean:forecast.mean,lower:forecast.lower,upper:forecast.upper,covariance:forecast.covariance.iter().map(to_rows).collect()}
+        }
+    };
     // beta is identity-normalised on top, so with the outcome first the long-run effect of the
     // second variable is the negated second row of the first relation.
     let long_run_effect = if rank == 1 && fit.beta.nrows() >= 2 {
@@ -1688,7 +1712,12 @@ pub(crate) fn vecm(
         None
     };
     Ok(AnalysisResult::Vecm {
+        forecast,
         observations: rows,
+        long_run: VecmLongRun::Recorded {
+            start_row: k_ar_diff,
+            departures: to_rows(&fit.cointegrating_residuals),
+        },
         deterministic,
         k_ar_diff,
         rank,
