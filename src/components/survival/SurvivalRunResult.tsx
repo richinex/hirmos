@@ -665,7 +665,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           </Tiles>
           <Interpretation run={run}
             bottomLine={<>With the other covariates held fixed, a 1-unit higher {first.parameter} multiplies the expected time to the event by {statistic(first.timeRatio)}, a {formatPercent(change, { precision: 1 }).text} {direction} time. At the covariate means the fitted median time is {statistic(evidence.median)} and the event-free probability at {statistic(lastTime)} is {formatPercent(lastSurvival).text}.</>}
-            uncertainty={<>The {confidence}% interval for this time ratio is {statistic(first.timeRatioInterval[0])} to {statistic(first.timeRatioInterval[1])}. The intervals come from the inverse of the penalised Hessian at the fit, as lifelines reports them. The penalty of {statistic(evidence.penalizer)} shrinks the coefficients toward zero, so the log likelihood, AIC and BIC are those of the penalised fit.</>}
+            uncertainty={<>The {confidence}% interval for this time ratio is {statistic(first.timeRatioInterval[0])} to {statistic(first.timeRatioInterval[1])}. These intervals are calculated for the penalised model. The penalty of {statistic(evidence.penalizer)} shrinks the coefficients toward zero, so the log likelihood, AIC and BIC are those of the penalised fit.</>}
             mustBeTrue={<>The log of the duration must follow the {penalizedAftFamilyLabel(evidence.family)} family, shifted by the covariates through the location parameter. Censoring must not depend on an unrecorded reason that also predicts the event. These time ratios describe associations unless a separate causal design supports an effect interpretation.</>}
           />
           <div className="mt-4">

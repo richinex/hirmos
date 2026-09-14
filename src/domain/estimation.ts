@@ -1606,8 +1606,8 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (identification.kind !== 'identified') violate(`${prefix}-identified-adjustment`, 'No measured back-door adjustment set was found, so there is no identified set for the nuisance learners.')
       else if (nuisance.length === 0) violate(`${prefix}-identified-adjustment`, 'The identified adjustment set is empty; double machine learning needs covariates to partial out. Use the adjusted linear regression, or target the effect within groups of a modifier.')
       else satisfy(`${prefix}-identified-adjustment`, `Nuisance learners see ${nuisance.map((variable) => variable.name).join(', ')}.`)
-      if (panel) violate(`${prefix}-independent-rows`, 'The rows are a panel; shuffled folds would split a unit across folds, and unit-blocked cross-fitting is not ported yet.')
-      else if (timeSeries) violate(`${prefix}-independent-rows`, 'The rows are a time series and the folds are shuffled; blocked or rolling cross-fitting is not ported yet.')
+      if (panel) violate(`${prefix}-independent-rows`, 'The rows are a panel; shuffled folds would split a unit across folds, and cross-fitting that keeps each unit together is not available.')
+      else if (timeSeries) violate(`${prefix}-independent-rows`, 'The rows are a time series and the folds are shuffled; cross-fitting with time blocks or rolling windows is not available.')
       else satisfy(`${prefix}-independent-rows`, 'The prepared dataset holds independent rows, so shuffled folds are valid.')
       if (configuration.kind === 'dml-irm') {
         if (context.treatmentIsBinary === null) leave('dml-irm-binary-treatment', 'The treatment column has not been read yet; it is checked when the run starts.')

@@ -64,6 +64,6 @@ export function ForestResult({ run }: { readonly run: Extract<SurvivalRunArtifac
     <ExpandableChart className="mt-4" style={{ height: Math.max(180, rows.length * 30 + 70) }} label="Permutation importance" testId="survival-forest-importance" option={importanceOption(importance, theme)} />
     <ExpandableChart className="mt-4 h-[280px]" label="Forest event-free probability" testId="survival-forest-survival" option={survivalCurvesOption([survival], 'follow-up time', theme, { stepped: true })} />
     <ExpandableChart className="mt-4 h-[280px]" label="Forest cumulative hazard" testId="survival-forest-hazard" option={comparisonMeasureOption([hazard], 'cumulative hazard', theme, true)} />
-    <p className={caption('mt-2')}>Source: ranger survival trees. The forest averages the trees’ cumulative hazards and converts that average to survival probability. The plotted profile uses all fitted trees; the concordance and permutation importance use out-of-bag observations.</p>
+    <p className={caption('mt-2')}>The forest averages the trees’ cumulative hazards and converts that average to survival probability. The plotted profile uses all fitted trees; the concordance and permutation importance use out-of-bag observations.</p>
   </>
 }

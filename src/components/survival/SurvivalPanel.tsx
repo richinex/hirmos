@@ -857,12 +857,12 @@ const analysisType = (kind: Draft['kind']): AnalysisType => {
     }
     case 'penalized-aft': return {
       name: 'Penalised AFT',
-      summary: 'Fit a Weibull or log-logistic accelerated failure-time model the way lifelines does: the covariates act on the location parameter with an intercept, the ancillary parameter is an intercept alone, and an L2 penalty on the standardised coefficients holds the fit stable. Coefficients are reported as time ratios.',
+      summary: 'Estimate how covariates are associated with shorter or longer time to an event, using a Weibull or log-logistic model. A penalty shrinks the coefficients toward zero. Results are reported as time ratios.',
       requirements: [
         { holds: 'Every duration is above zero; the model takes the logarithm of each one.', otherwise: 'the fit is refused.' },
         { holds: 'The event flag is 1 when the event occurred and 0 when follow-up ended first.', otherwise: 'events and right-censoring are reversed.' },
         { holds: 'The log of the duration follows the chosen family, shifted by the covariates.', otherwise: 'the time ratios do not describe the covariate associations.' },
-        { holds: 'The penalty is the one the study specifies; lifelines applies it to coefficients scaled by their sample standard deviation.', otherwise: 'the estimates are shrunk by a different amount than the study reports.' },
+        { holds: 'Use the penalty specified for the study. It is applied after covariates are scaled by their sample standard deviations.', otherwise: 'the estimates are shrunk by a different amount than the study reports.' },
       ],
     }
     case 'cox-regression': return {
@@ -1326,7 +1326,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
         <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency })} />
         <div>
-          <ParameterLabel label="Tied events" help="Use discrete handling when event times are recorded in discrete units such as years or minutes. Smoothed handling follows the lifelines NelsonAalenFitter default." />
+          <ParameterLabel label="Tied events" help="Use discrete handling when event times are recorded in discrete units such as years or minutes. Smoothed handling accounts for tied events one at a time, reducing the number at risk after each event." />
           <SegmentedControl size="sm" ariaLabel="Nelson-Aalen tied events" value={draft.ties} onChange={(ties) => configure({ ...draft, ties })} options={[{ value: 'discrete', label: 'Discrete' }, { value: 'smoothed', label: 'Smoothed' }]} />
         </div>
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
@@ -1350,7 +1350,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           </Select>
         </label>
         <label className="block">
-          <ParameterLabel label="Penalty" help="lifelines' penalizer: an L2 penalty on the coefficients after each column is divided by its sample standard deviation. Zero fits without a penalty." />
+          <ParameterLabel label="Penalty" help="An L2 penalty shrinks coefficients toward zero after covariates are scaled by their sample standard deviations. Use zero to fit without a penalty." />
           <input className={field('text', 'mt-1 w-full')} type="number" min={0} step="any" value={draft.penalizer} aria-label="AFT penalizer" onChange={(event) => configure({ ...draft, penalizer: Number(event.target.value) })} />
         </label>
         <label className="block">
@@ -1591,7 +1591,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           : draft.kind === 'cox-regression'
           ? 'Choose at least one covariate. The columns selected for the event-time row roles cannot also be covariates.'
           : draft.kind === 'penalized-aft'
-            ? 'Choose at least one covariate. Each enters the location parameter on the log time scale; lifelines fits them in alphabetical order with the intercept last, and so does this run.'
+            ? 'Choose at least one covariate. Covariates affect the time to an event; the shape parameter is shared across observations.'
             : 'Each enters the model on the log hazard or log time scale. The columns already chosen as times or the event cannot be covariates.'
         return (
           <div>

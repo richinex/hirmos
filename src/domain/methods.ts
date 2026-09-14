@@ -997,7 +997,7 @@ const OCSE: MethodDefinition = {
     {
       id: caveatId('ocse-corrected-semantics'),
       category: 'computation',
-      requirement: 'Duplicate target self-lags already in the conditioning set are excluded, unlike the reference package.',
+      requirement: 'Duplicate target self-lags already in the conditioning set are excluded.',
       consequenceIfUnmet: 'Duplicate self-lags are counted in the conditioning set.',
       sources: [hirmos('crates/causal-core/src/ocse.rs#discover_network')],
     },

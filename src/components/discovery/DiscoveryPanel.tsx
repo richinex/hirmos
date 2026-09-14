@@ -391,7 +391,7 @@ function ConstraintDiscoveryControls({
           </Select>
         </div>
         <div className="text-body text-ink">
-          <ParameterLabel label="Maximum depth" help="Limits the largest conditioning set tested during skeleton discovery. Automatic follows the reference implementation until no larger set is available." htmlFor="constraint-depth" />
+          <ParameterLabel label="Maximum depth" help="Limits the largest conditioning set tested during skeleton discovery. Automatic continues until no larger conditioning set is available." htmlFor="constraint-depth" />
           <Select id="constraint-depth" className={field('text', 'mt-1')} value={configuration.maxDepth ?? 'automatic'} onChange={(event) => onChange({ ...configuration, maxDepth: event.target.value === 'automatic' ? null : Number(event.target.value) })}>
             <option value="automatic">Automatic</option>
             {[0, 1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}

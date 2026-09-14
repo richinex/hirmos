@@ -67,7 +67,7 @@ test('the standalone survival chapter renders in desktop and phone workbenches',
   await openSurvivalChapter(page, phone)
 
   await expect(page.getByRole('heading', { name: 'Survival analysis', exact: true })).toBeVisible()
-  await expect(page.getByText('09 · Survival analysis')).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Run survival analysis' })).toBeVisible()
   await expect(page.locator('main#stage')).toHaveCSS('display', 'flex')
   await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toHaveCSS('scrollbar-width', 'none')

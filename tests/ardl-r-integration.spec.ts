@@ -69,7 +69,7 @@ for (const mode of ['rHorizontal','rGrid','rFixed'] as const) {
     await page.getByRole('navigation',{name:'Workspace chapters'}).getByRole('button',{name:/Time-series analysis/}).click()
     await page.getByRole('radio',{name:'ARDL',exact:true}).click()
     await choose(page,'Outcome series','w')
-    const label={rHorizontal:'Horizontal search',rGrid:'Constrained grid',rFixed:'Specify lags (R ARDL)'}[mode]
+    const label={rHorizontal:'Horizontal search',rGrid:'Constrained grid',rFixed:'Specify lags with diagnostics'}[mode]
     await page.getByRole('radio',{name:label,exact:true}).click()
     await page.getByRole('spinbutton',{name:mode==='rFixed'?'Outcome lag':'Maximum outcome lag',exact:true}).fill(String(mode==='rFixed'?input.order[0]:6))
     for(const [i,name] of names.slice(1,5).entries()) {

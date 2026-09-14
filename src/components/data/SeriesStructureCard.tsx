@@ -74,7 +74,7 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
       <ExpandableChart option={option} label={`${facts.name} with PELT change points`} className="mt-2 h-[180px]" testId="change-points" />
       <div className="mt-3 border-t border-hair pt-3">
         <span className="text-body font-medium text-ink">Lag correlation</span>
-        <p className="mb-0 mt-1 text-label text-muted">ACF compares the series with its earlier values. PACF measures the remaining relation at each lag after shorter lags are accounted for. The shaded 95% reference bands follow the notebook defaults. These plots describe temporal dependence; they do not establish causal arrows.</p>
+        <p className="mb-0 mt-1 text-label text-muted">ACF compares the series with its earlier values. PACF measures the remaining relation at each lag after shorter lags are accounted for. The shaded regions show approximate 95% reference bands. These plots describe temporal dependence; they do not establish causal arrows.</p>
         <ExpandableChart option={correlation} label={`${facts.name} ACF and PACF`} className="mt-2 h-[430px]" testId="acf-pacf" />
       </div>
     </li>
