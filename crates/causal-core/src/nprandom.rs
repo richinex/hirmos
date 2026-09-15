@@ -268,12 +268,21 @@ impl NpRng {
 }
 
 /// The legacy MT19937 behind numpy's global RandomState, seeded via init_genrand.
+#[derive(Clone)]
 pub struct Mt19937 {
     key: [u32; 624],
     pos: usize,
 }
 
 impl Mt19937 {
+    /// Restore NumPy's recorded key array and position; normal caching is separate.
+    pub fn from_state(key:&[u32],position:usize)->Option<Self> {
+        if key.len()!=624 || position>624 {return None;}
+        Some(Self {key:key.try_into().ok()?,pos:position})
+    }
+
+    pub fn state(&self)->(&[u32;624],usize) {(&self.key,self.pos)}
+
     pub fn seeded(seed: u32) -> Self {
         let mut key = [0u32; 624];
         key[0] = seed;

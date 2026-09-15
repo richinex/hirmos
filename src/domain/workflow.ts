@@ -1,6 +1,10 @@
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import type { DagDocument } from './dag'
+import { EMPTY_ROOT_CAUSE, rootCauseRunSchema, type RootCauseRun, type RootCauseWorkspace } from './rootCauseAnalysis'
+import { rootCauseCheckRecordSchema, type RootCauseCheckRecord } from './rootCauseAnalysis'
+import { matchesRootCauseGraph } from './rootCause'
+import { selectedRootCauseGraph, type RootCauseSelection } from './rootCause'
 import type { DagCheckArtifact } from './dagValidation'
 import type { DiscoveryRunArtifact } from './discovery'
 import { deleteDiscoveryRun, type DeletableDiscoveryRun } from './discoveryLifecycle'
@@ -131,6 +135,7 @@ export type Workflow =
       /** Standalone time-to-event analyses; these do not depend on a causal study or estimate. */
       readonly survivalRuns: readonly SurvivalRunArtifact[]
       readonly timeSeriesRuns: readonly TimeSeriesRun[]
+      readonly rootCause: RootCauseWorkspace
     }
 
 export type DerivedRecipe = Exclude<SourceRecipe, { readonly kind: 'uploaded-file' }>
@@ -138,6 +143,10 @@ export interface SqlResume { readonly statement: string; readonly outputView: Sq
 export interface PipelineResume { readonly graph: PipelineGraph; readonly inputs: readonly SqlPreparationInput[] }
 
 export type WorkflowEvent =
+  | { readonly type: 'root-cause-selected'; readonly selection: RootCauseSelection }
+  | { readonly type: 'root-cause-run-created'; readonly run: RootCauseRun }
+  | { readonly type: 'root-cause-checks-created'; readonly record: RootCauseCheckRecord }
+  | { readonly type: 'root-cause-run-deleted'; readonly id: string }
   | { readonly type: 'project-name-changed'; readonly value: string }
   | { readonly type: 'project-submitted' }
   | { readonly type: 'file-selected'; readonly file: File }
@@ -308,6 +317,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           counterfactualRuns: snapshot.counterfactualRuns,
           survivalRuns: snapshot.survivalRuns,
           timeSeriesRuns: snapshot.timeSeriesRuns,
+          rootCause: snapshot.rootCause,
         }
       }
       if (event.type === 'sql-inputs-chosen' && state.restore === null) {
@@ -365,6 +375,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
           counterfactualRuns: [],
           survivalRuns: [],
           timeSeriesRuns: [],
+          rootCause: EMPTY_ROOT_CAUSE,
         }
       }
       if (event.type === 'profile-failed' && event.request === state.request) {
@@ -384,7 +395,26 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       }
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       if (event.type === 'prepared-dataset-created') {
-        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [] }
+        return { ...state, prepared: event.artifact, stationarity: null, grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [], rootCause: EMPTY_ROOT_CAUSE }
+      }
+      if (event.type === 'root-cause-selected') {
+        if (state.prepared === null || !selectedRootCauseGraph(event.selection, state.dagDocuments, state.prepared).ok) return state
+        return { ...state, rootCause: { ...state.rootCause, selection: event.selection } }
+      }
+      if (event.type === 'root-cause-run-created') {
+        if (state.prepared === null || !rootCauseRunSchema.safeParse(event.run).success) return state
+        const graph = selectedRootCauseGraph(event.run.graph, state.dagDocuments, state.prepared)
+        if (!graph.ok || !matchesRootCauseGraph(graph.value, event.run.model)) return state
+        return { ...state, rootCause: { ...state.rootCause, runs: [...state.rootCause.runs, event.run] } }
+      }
+      if (event.type === 'root-cause-checks-created') {
+        if (state.prepared === null || !rootCauseCheckRecordSchema.safeParse(event.record).success) return state
+        const graph = selectedRootCauseGraph(event.record.graph, state.dagDocuments, state.prepared)
+        if (!graph.ok || !matchesRootCauseGraph(graph.value, event.record.model)) return state
+        return { ...state, rootCause: { ...state.rootCause, checks: [...state.rootCause.checks, event.record] } }
+      }
+      if (event.type === 'root-cause-run-deleted') {
+        return { ...state, rootCause: { ...state.rootCause, runs: state.rootCause.runs.filter((run) => run.id !== event.id) } }
       }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null

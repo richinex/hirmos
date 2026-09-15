@@ -1,5 +1,4 @@
 import { Icon } from '@/components/Icon'
-import { SmartTruncate } from '@/components/ui/SmartTruncate'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
@@ -11,7 +10,7 @@ interface MethodCaveatsProps {
   readonly methods: NonEmptyArray<MethodDefinition>
   readonly eligibility?: MethodEligibility | null
   readonly identification?: Identification | null
-  /** Folds that belong in the same list ahead of the methods, sharing its rules and dividers. */
+  /** Folds that belong in the same list ahead of the methods. */
   readonly leading?: React.ReactNode
 }
 
@@ -31,10 +30,10 @@ export function RequirementsFold({ name, tally: tallyText = null, open = false, 
 }) {
   return (
     <details className="group" open={open}>
-      <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-md py-2 text-body transition-colors [--smart-truncate-surface:var(--color-panel)] hover:bg-well hover:[--smart-truncate-surface:var(--color-well)] [&::-webkit-details-marker]:hidden">
+      <summary className="grid cursor-pointer list-none grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2 gap-y-1 rounded-md py-2 text-body transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
         <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
-        <SmartTruncate text={name} className="min-w-0 flex-1 font-medium text-ink" />
-        {tallyText !== null && <span className="ml-auto whitespace-nowrap text-label text-faint">{tallyText}</span>}
+        <span className="min-w-0 break-words font-medium text-ink">{name}</span>
+        {tallyText !== null && <span className="col-start-2 text-label text-faint">{tallyText}</span>}
       </summary>
       {children}
       {works.length > 0 && <p className="mb-2 mt-2 text-label text-faint">Literature: {works.join('; ')}</p>}
@@ -102,9 +101,9 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
   // Without an evaluator (diagnostics, identification methods) a status column is noise: the method reads as prose.
   const evaluated = eligibility !== null && eligibility !== undefined
   return (
-    <section className="mt-4 border-t border-hair pt-4" aria-label="Method requirements">
+    <section className="mt-6" aria-label="Method requirements">
       {identification !== null && <IdentificationRecord identification={identification} />}
-      <div className="divide-y divide-hair border-y border-hair first:border-t-0">
+      <div className="space-y-4">
         {leading}
         {methods.map((method) => {
           return (
@@ -115,7 +114,7 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
                 </p>
               )}
               {evaluated && method.summary.length > 0 && <p className={prose('mb-2 mt-0 text-muted')}>{method.summary}</p>}
-              {evaluated && <ol className="m-0 list-none divide-y divide-line p-0">
+              {evaluated && <ol className="m-0 list-none space-y-2 p-0">
                 {[...conditions(method), ...readingRules(method)].map((caveat) => {
                   const reading = caveat.category === 'interpretation'
                   const evaluation = reading ? undefined : evaluations.get(caveat.id)

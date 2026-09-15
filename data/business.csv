@@ -1,0 +1,10 @@
+quarter,segment,region,revenue_usd,yoy_growth_pct,gross_margin_pct,net_churn_pct,new_customers,arr_target_usd
+Q1 2025,Enterprise,North America,3200000,15,74,6,42,30000000
+Q2 2025,Enterprise,North America,3600000,18,73,7,51,30000000
+Q3 2025,Enterprise,North America,4200000,22,72,7,63,30000000
+Q1 2025,SMB,North America,1100000,8,61,12,310,30000000
+Q2 2025,SMB,North America,1250000,11,62,10,340,30000000
+Q3 2025,SMB,North America,1400000,14,63,9,375,30000000
+Q1 2025,Enterprise,EMEA,1800000,9,70,8,21,30000000
+Q2 2025,Enterprise,EMEA,2050000,12,71,8,28,30000000
+Q3 2025,Enterprise,EMEA,2400000,17,71,7,33,30000000

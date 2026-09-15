@@ -46,7 +46,7 @@ export function ColumnSeriesPane({ column, description, stepLabel }: {
     <div className="flex h-full flex-col px-3 py-2">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <p className={caption('m-0')}>{column.name} by {stepLabel}</p>
-        <p className={num('m-0 text-label text-faint')}>{formatCount(series.values.length, { noun: `${stepLabel}s` }).text}{series.missingCells > 0 ? ` · ${formatCount(series.missingCells).text} missing` : ''}</p>
+        <p className={num('m-0 flex flex-wrap gap-x-4 text-label text-faint')}><span>{formatCount(series.values.length, { noun: `${stepLabel}s` }).text}</span>{series.missingCells > 0 && <span>{formatCount(series.missingCells).text} missing</span>}</p>
       </div>
       {/* The figures describe what the chart shows: narrow the chart and they narrow with it. */}
       <dl aria-label={`Summary of `} className={figureGrid('my-1.5 shrink-0 grid-cols-4')}>

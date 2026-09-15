@@ -20,6 +20,7 @@ import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Formula } from '@/components/ui/Formula'
 import { RunFold } from '@/components/ui/RunFold'
+import { RunMeta } from '@/components/ui/RunMeta'
 import { FigureParts, MetricGrid, MetricTile } from '@/components/ui/figures'
 import { EstimateHeadline, headlineFigure, scaleOf } from '@/components/results/EstimateHeadline'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
@@ -664,7 +665,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
         curve,
       }, theme)
   }, [curves, curveIndex, adjustmentVariables, study.outcome.name, study.treatment.name, theme])
-  const stamp = `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''} · ${formatTime(run.createdAt)}`
+  const stamp = <RunMeta>{[describeEstimator(run.configuration.kind), ...(run.kind === 'backdoor-linear-run' ? [describeCovariance(run.configuration.covariance)] : []), formatTime(run.createdAt)]}</RunMeta>
   // A grouped effect draws each group's interval on the shared axis, the whole-population average last.
   const groupChart = useMemo(() => (estimate.effect.kind === 'byGroup'
     ? runComparisonOption([
@@ -1799,7 +1800,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       id="estimation"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
-      bottom={{ title: `Runs · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
+      bottom={{ title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
     />
     </>
   )

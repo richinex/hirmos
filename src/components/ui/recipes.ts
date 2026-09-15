@@ -11,9 +11,8 @@ import { cn } from '@/lib/utils'
  * too, so nothing here sets an outline; the `focus:border-*` tints complement that ring.
  */
 
-/** `signal` is the one affirmative action on a surface, so a panel never has two (index.css rule 2), and
- * it is the one pill-shaped button: the shape alone says "this is the thing to do next". Every other tone
- * keeps the control radius, including `danger`, which is a destructive action and not the next step.
+/** Action buttons share the control radius. Fill and colour distinguish emphasis, not silhouette.
+ * `signal` marks the affirmative action; `danger` marks a destructive action.
  * `soft` is the signal wash for a control that is live but not the primary action. `outline` is the
  * ordinary action, `quiet` the dismissive one, and `mono` the small-caps drafting-label register used by
  * the eval and compile chrome. */
@@ -29,7 +28,7 @@ const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-hi
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
  * remains "not ready"; a busy button keeps focus so nothing jumps when the run ends. */
-const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-full border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-10'
+const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
   signal: cn('bg-signal px-4', FILLED),
@@ -55,13 +54,13 @@ export const button = (tone: ButtonTone = 'outline', extra?: string, size: Butto
 /** Segmented-control segment. Selected is a surface, never a signal fill. */
 export const segment = (active: boolean, extra?: string): string =>
   cn(
-    'rounded-md border px-3 py-1.5 text-body transition-colors',
+    'rounded-md border px-3 py-1.5 text-body transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11',
     active ? 'border-edge bg-raised text-ink' : 'border-transparent text-muted hover:text-ink',
     extra,
   )
 
 /** Compact actions inside headers, answer footers and toolbars. These deliberately keep a quiet visual
- * footprint while giving the glyph a 32px target, promoted to 40px on coarse pointers by construction.
+ * footprint while giving the glyph a 32px target, promoted to 44px on coarse pointers by construction.
  * A transparent border is always present so selecting an action never changes its geometry. */
 export type ChromeTone = 'quiet' | 'selected' | 'signal' | 'danger'
 
@@ -74,7 +73,7 @@ const CHROME_TONE: Record<ChromeTone, string> = {
 
 export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'grid h-8 w-8 shrink-0 place-items-center rounded-full border pointer-coarse:h-10 pointer-coarse:w-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'grid h-8 w-8 shrink-0 place-items-center rounded-full border pointer-coarse:h-11 pointer-coarse:w-11 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
     extra,
   )
@@ -83,7 +82,7 @@ export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string 
  * as one control family even when some actions need labels and others only need a familiar glyph. */
 export const chromeAction = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-label pointer-coarse:min-h-10 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 text-label pointer-coarse:min-h-11 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
     extra,
   )
@@ -91,11 +90,10 @@ export const chromeAction = (tone: ChromeTone = 'quiet', extra?: string): string
 /** A filter facet. Until something is chosen its border is dashed, which says "nothing set here" without a
  * badge or a colour; chosen is the raised surface with a solid edge, the same selection the rest of the
  * chrome uses. Counts and words inside it stay in the label register. The control radius, like the
- * segmented control: a choice among a few options has one shape, and the pill belongs to the primary
- * action alone. */
+ * segmented control and action buttons share this control radius. */
 export const facet = (active: boolean, extra?: string): string =>
   cn(
-    'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-10 transition-colors',
+    'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 transition-colors',
     label(),
     active ? 'border-solid border-edge bg-raised text-ink' : 'border-dashed border-hair text-faint hover:border-edge hover:text-muted',
     extra,
@@ -105,7 +103,7 @@ export const facet = (active: boolean, extra?: string): string =>
  * the facet and the segmented control. */
 export const pill = (active: boolean, extra?: string): string =>
   cn(
-    'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-10 transition-colors',
+    'min-h-8 rounded-md border px-2.5 pointer-coarse:min-h-11 pointer-coarse:min-w-11 transition-colors',
     label(),
     active ? 'border-edge bg-raised text-ink' : 'border-hair text-faint hover:text-muted',
     extra,
@@ -117,7 +115,7 @@ export const pill = (active: boolean, extra?: string): string =>
  *  the affordance at 3:1, and the placeholder is italic so it never reads as an entered value. */
 export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string =>
   cn(
-    'w-full rounded-full border border-control bg-well px-3 py-1.5 text-body text-ink placeholder:italic placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint',
+    'w-full rounded-md border border-control bg-well px-3 py-1.5 text-body text-ink placeholder:italic placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint pointer-coarse:min-h-11',
     variant === 'mono' && 'font-mono',
     extra,
   )
@@ -205,17 +203,16 @@ export const panel = (extra?: string): string => cn('rounded-xl border border-ha
  */
 export const well = (extra?: string): string => cn('rounded-lg border border-hair bg-well [--panel-space:--spacing(3)] @max-md/panel:[--panel-space:--spacing(2)]', extra)
 
-/** A hairline-joined grid of figure cells: the 1px gaps draw the rules, so the cells carry no borders of their own. */
-export const figureGrid = (extra?: string): string => cn('grid gap-px overflow-hidden rounded-lg border border-hair bg-hair', extra)
+/** Compact summaries retain their column layout on the same surface as MetricGrid. */
+export const figureGrid = (extra?: string): string => cn('numeric-surface numeric-compact grid min-w-0', extra)
 
 /** Text colour for a machine-state verdict, from the status ramp; muted for a state that is neither good nor bad. */
 export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 
-/** A section title inside a chapter: "Examples", "Discovery methods", "Diagnostics". The paper's section
- *  head, bold sans in the muted grey with a square marker before it, in sentence case. The marker is
- *  what makes it a section head rather than a name, so a heading that names a thing (a column, a run, a
- *  document) does not take it. The chapter title above stays in ink and takes no marker. */
-export const sectionTitle = "text-title font-medium text-muted text-balance before:mr-2 before:inline-block before:align-[0.15em] before:text-[0.6em] before:content-['■']"
+/** Section headings use type hierarchy, without decorative markers. */
+export const sectionTitle = 'text-title font-medium text-muted text-balance'
+export const resultTitle = 'text-heading font-medium text-ink text-balance'
+export const resultSurface = (extra?: string): string => panel(cn('result-surface p-(--panel-space)', extra))
 
 /** The title of a floating surface: panel, drawer or sheet.
  *

@@ -3,6 +3,7 @@ import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
+import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
@@ -180,10 +181,10 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
   const sd = Math.sqrt(view.effects.reduce((sum, value) => sum + (value - view.averageEffect) ** 2, 0) / Math.max(1, view.effects.length - 1))
   // A linear model with exact abduction gives every row the same difference: the coefficient times the change in treatment.
   const constant = run.kind === 'linear-scm-run' && run.evidence.observationNoise === null && Math.max(...view.effects) - Math.min(...view.effects) < 1e-9 * Math.max(1, Math.abs(view.averageEffect))
-  const stamp = `${view.model} · ${view.detail} · ${formatTime(run.createdAt)}`
+  const stamp = <RunMeta>{[view.model, view.detail, formatTime(run.createdAt)]}</RunMeta>
   const record = (
     <>
-      <h3 className="mb-1 mt-2 text-title font-medium text-ink">What {study.outcome.name} would have been with {study.treatment.name} set to {view.interventions[1]} instead of {view.interventions[0]}</h3>
+      <h3 className="mb-1 mt-2 text-heading font-medium text-ink text-balance">What {study.outcome.name} would have been with {study.treatment.name} set to {view.interventions[1]} instead of {view.interventions[0]}</h3>
       <p className="m-0 text-body text-muted">{run.kind === 'linear-scm-run' ? `For each ${stepLabel}, the model infers disturbance terms from the observed values and predicts both treatment worlds.` : `The model recovers the observed innovation at each time point, preserves the factual history through row ${view.firstStep - 1}, and replays both treatment worlds through the recorded lagged graph.`} The difference is conditional on the fitted structural equations.</p>
       <MetricGrid className="mt-3" label="Counterfactual summary">
         <MetricTile label={constant ? 'Effect for every row' : run.kind === 'dynamic-linear-scm-run' ? 'Average horizon effect' : 'Average individual effect'} size="compact" frame="cell" value={formatStatistic('raw', view.averageEffect)} context={constant ? 'the same for all rows: a linear model with exact abduction gives coefficient × change' : uncertainty === null ? `SD across ${stepLabel}s ${formatStatistic('sd', sd).text}` : `${Math.round(uncertainty.confidenceLevel * 100)}% block-bootstrap CI [${formatStatistic('raw', uncertainty.averageInterval[0]).text}, ${formatStatistic('raw', uncertainty.averageInterval[1]).text}]`} />
@@ -602,7 +603,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
       id="counterfactual"
       stage={stage}
       inspector={{ title: 'Study and method requirements', body: inspector }}
-      bottom={{ title: `Runs · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+      bottom={{ title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>
   )

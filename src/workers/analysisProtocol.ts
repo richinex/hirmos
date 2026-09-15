@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { rootCauseRequestSchema, rootCauseEvidenceSchema, type RootCauseRequest, type RootCauseEvidence } from '@/domain/rootCauseAnalysis'
+import { rootCauseCheckRequestSchema, rootCauseChecksSchema, type RootCauseCheckRequest, type RootCauseChecks } from '@/domain/rootCauseAnalysis'
 import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence, type ArdlModelRequest } from '@/domain/ardlModel'
 import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
@@ -733,6 +735,13 @@ export type AnalysisWorkerCommand =
       readonly seed: number
     }
   | {
+      readonly kind: 'root-cause'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: RootCauseRequest
+    }
+  | { readonly kind: 'root-cause-checks'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: RootCauseCheckRequest }
+  | {
       readonly kind: 'ardl-model'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1056,6 +1065,8 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'double-ml-succeeded'; readonly request: WorkerRequestId; readonly result: DoubleMlEvidence }
   | { readonly kind: 't-learner-succeeded'; readonly request: WorkerRequestId; readonly result: TLearnerEvidence }
   | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
+  | { readonly kind: 'root-cause-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseEvidence }
+  | { readonly kind: 'root-cause-checks-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseChecks }
   | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
@@ -1789,6 +1800,11 @@ const commandSchema = z.discriminatedUnion('kind', [
     seed: z.number().int().nonnegative(),
   }).strict(),
   z.object({
+    kind: z.literal('root-cause'), request: requestSchema,
+    values: z.instanceof(Float64Array), model: rootCauseRequestSchema,
+  }).strict(),
+  z.object({ kind: z.literal('root-cause-checks'), request: requestSchema, values: z.instanceof(Float64Array), model: rootCauseCheckRequestSchema }).strict(),
+  z.object({
     kind: z.literal('ardl-model'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -2111,6 +2127,8 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('double-ml-succeeded'), request: requestSchema, result: doubleMlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('t-learner-succeeded'), request: requestSchema, result: tLearnerEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('root-cause-succeeded'), request: requestSchema, result: rootCauseEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('root-cause-checks-succeeded'), request: requestSchema, result: rootCauseChecksSchema }).strict(),
   z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
@@ -2423,6 +2441,14 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'ardl-model-succeeded') {
     const result = ardlModelEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'ardl-model-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'root-cause-succeeded') {
+    const result = rootCauseEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'root-cause-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'root-cause-checks-succeeded') {
+    const result = rootCauseChecksSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'root-cause-checks-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'vecm-succeeded') {
     const result = vecmEvidenceSchema.safeParse(parsed.data.result)

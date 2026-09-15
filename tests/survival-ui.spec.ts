@@ -80,7 +80,7 @@ test('does not expose an implementation error when a no-covariate example run is
   await openSurvivalChapter(page, false)
 
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
-  await expect(page.getByRole('alert').or(page.getByText('Survival runs · 1'))).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('alert').or(page.getByText('Survival runs (1)'))).toBeVisible({ timeout: 120_000 })
   await expect(page.getByText(/isNonEmpty|ReferenceError/)).toHaveCount(0)
 })
 
@@ -102,7 +102,7 @@ test('runs ComparisonSurv on the exact crossing-curves package data and records 
   await expect(page.getByText('Fixed-time interval calculations').first()).toBeVisible()
   await expect(page.getByText('Peto–Peto modified Gehan–Wilcoxon').first()).toBeVisible()
   await expect(page.getByRole('region', { name: 'Interpretation' }).first()).toContainText('a difference of −8.64 pp')
-  await expect(page.getByText('Survival runs · 1')).toBeVisible()
+  await expect(page.getByText('Survival runs (1)')).toBeVisible()
   await expect(page.getByRole('table', { name: 'Number at risk' })).toBeVisible()
 
   await page.getByRole('radio', { name: 'Event-free time' }).click()
@@ -155,7 +155,7 @@ test('runs right-censored flexsurv on the exact breast-cancer package data', asy
 
   await expect(page.getByRole('heading', { name: 'Weibull AFT' }).first()).toBeVisible({ timeout: 120_000 })
   await expect(page.getByText('686 observations · 299 events').first()).toBeVisible()
-  await expect(page.getByText('Survival runs · 1')).toBeVisible()
+  await expect(page.getByText('Survival runs (1)')).toBeVisible()
 
   await page
     .getByRole('navigation', { name: 'Workspace chapters' })
@@ -188,7 +188,7 @@ test('runs start-stop and multi-state flexsurv on the exact bosms3 package data'
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
   await expect(page.getByText('Multi-state survival').first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('Survival runs · 2')).toBeVisible()
+  await expect(page.getByText('Survival runs (2)')).toBeVisible()
   await bodyText(page, 'For observations starting in state 1')
 
   await page.getByRole('radio', { name: 'Transitions' }).click()
@@ -217,7 +217,7 @@ test('runs start-stop Cox regression through the worker and records its diagnost
   await expect(page.getByRole('region', { name: 'Covariate estimates' }).first()).toContainText('feature_active')
   await expect(page.getByTestId('cox-forest').first()).toBeVisible()
   await expect(page.getByTestId('cox-baseline-survival').first()).toBeVisible()
-  await expect(page.getByText('Survival runs · 1')).toBeVisible()
+  await expect(page.getByText('Survival runs (1)')).toBeVisible()
 })
 
 test('fits a shared gamma frailty as survival does on the kidney data', async ({ page }, testInfo) => {
@@ -267,7 +267,7 @@ test('fits a penalised Weibull AFT as lifelines does on the kidney data', async 
   await expect(page.getByTestId('aft-forest').first()).toBeVisible()
   await bodyText(page, '682')
   await bodyText(page, '0.662')
-  await expect(page.getByText('Survival runs · 1')).toBeVisible()
+  await expect(page.getByText('Survival runs (1)')).toBeVisible()
 })
 
 test('converts longitudinal state observations before fitting the multi-state model', async ({ page }, testInfo) => {

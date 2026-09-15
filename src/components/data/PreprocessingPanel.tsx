@@ -4,6 +4,7 @@ import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { useReducer, useState, type ReactNode } from 'react'
 import { Icon } from '@/components/Icon'
+import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Alert } from '@/components/ui/Alert'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { SeriesStructureCard } from './SeriesStructureCard'
@@ -599,16 +600,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               <span className={label('text-faint')}>Variables</span>
               <h3 id="variables-title" className={cn(sectionTitle, 'mb-0 mt-1')}>Select analysis columns</h3>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" className={button('quiet')} aria-label="Select all columns" title="Select all columns" onClick={() => numericColumns.forEach((column) => { if (column.id !== currentTime && column.id !== currentUnit && !selectedIds.includes(column.id)) dispatch({ type: 'variable-toggled', column: column.id }) })}>
-                <Icon name="select_all" size={15} className="@md/card:hidden" />
-                <span className="hidden @md/card:inline">Select all</span>
-              </button>
-              <button type="button" className={button('quiet')} aria-label="Clear selected columns" title="Clear selected columns" onClick={() => selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))}>
-                <Icon name="deselect" size={15} className="@md/card:hidden" />
-                <span className="hidden @md/card:inline">Clear</span>
-              </button>
-            </div>
+            <SelectionActions
+              selectLabel="Select all columns"
+              clearLabel="Clear selected columns"
+              onSelectAll={() => numericColumns.forEach((column) => { if (column.id !== currentTime && column.id !== currentUnit && !selectedIds.includes(column.id)) dispatch({ type: 'variable-toggled', column: column.id }) })}
+              onClear={() => selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))}
+            />
           </div>
           <div className="grid max-h-40 gap-1 overflow-y-auto @md/card:grid-cols-2">
             {numericColumns.map((column) => {

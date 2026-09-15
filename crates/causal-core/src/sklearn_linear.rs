@@ -58,6 +58,55 @@ pub fn fit_sklearn_linear_regression(
     target: &DVector<f64>,
     tolerance: f64,
 ) -> Result<SklearnLinearFit, SklearnLinearError> {
+    fit_with_means(predictors, target, tolerance, MeanOrder::Sequential)
+}
+
+/// Dense column-contiguous inputs, as produced by the GCM pandas column selection.
+pub fn fit_sklearn_fortran(
+    predictors: &DMatrix<f64>,
+    target: &DVector<f64>,
+    tolerance: f64,
+) -> Result<SklearnLinearFit, SklearnLinearError> {
+    fit_with_means(predictors, target, tolerance, MeanOrder::NumpyContiguous)
+}
+
+#[derive(Clone, Copy)]
+enum MeanOrder {
+    Sequential,
+    NumpyContiguous,
+}
+
+pub(crate) fn predict_fortran(
+    predictors: &DMatrix<f64>,
+    coefficients: &DVector<f64>,
+    intercept: f64,
+) -> DVector<f64> {
+    use crate::lapack_dgelsd::blas::{dgemv, Transpose};
+    let mut values = DVector::zeros(predictors.nrows());
+    dgemv(
+        Transpose::None,
+        predictors.nrows(),
+        predictors.ncols(),
+        1.0,
+        predictors.as_slice(),
+        predictors.nrows().max(1),
+        coefficients.as_slice(),
+        1,
+        0.0,
+        values.as_mut_slice(),
+        1,
+    )
+    .expect("fitted coefficients match the validated predictor matrix");
+    values.add_scalar_mut(intercept);
+    values
+}
+
+fn fit_with_means(
+    predictors: &DMatrix<f64>,
+    target: &DVector<f64>,
+    tolerance: f64,
+    order: MeanOrder,
+) -> Result<SklearnLinearFit, SklearnLinearError> {
     let observations = predictors.nrows();
     if observations == 0 {
         return Err(SklearnLinearError::EmptyObservations);
@@ -76,11 +125,14 @@ pub fn fit_sklearn_linear_regression(
         return Err(SklearnLinearError::NonFinite);
     }
 
-    let target_mean = target.iter().sum::<f64>() / observations as f64;
+    let mean = |values: &[f64]| match order {
+        MeanOrder::Sequential => values.iter().sum::<f64>() / observations as f64,
+        MeanOrder::NumpyContiguous => crate::numpy_reduce::numpy_mean(values),
+    };
+    let target_mean = mean(target.as_slice());
     let predictor_means = DVector::from_iterator(
         predictors.ncols(),
-        (0..predictors.ncols())
-            .map(|column| predictors.column(column).iter().sum::<f64>() / observations as f64),
+        (0..predictors.ncols()).map(|column| mean(predictors.column(column).as_slice())),
     );
     let mut centered_predictors = predictors.clone();
     for column in 0..centered_predictors.ncols() {
@@ -93,18 +145,21 @@ pub fn fit_sklearn_linear_regression(
     let (coefficients, rank, singular_values, singular_value_cutoff) = if predictors.ncols() == 0 {
         (DVector::zeros(0), 0, DVector::zeros(0), 0.0)
     } else {
-        let targets = DMatrix::from_column_slice(observations, 1, centered_target.as_slice());
-        let solution = crate::least_squares::solve(&centered_predictors, &targets, tolerance)
-            .map_err(|_| SklearnLinearError::SvdSolve)?;
-        (
-            solution.coefficients.column(0).into_owned(),
-            solution.rank,
-            solution.singular_values,
-            solution.cutoff,
-        )
+    let fit = crate::least_squares::solve(
+        &centered_predictors,
+        &DMatrix::from_column_slice(observations, 1, centered_target.as_slice()),
+        tolerance,
+    )
+    .map_err(|_| SklearnLinearError::SvdSolve)?;
+    (fit.coefficients.column(0).into_owned(), fit.rank, fit.singular_values, fit.cutoff)
     };
     let intercept = target_mean - predictor_means.dot(&coefficients);
-    let predictions = predictors * &coefficients + DVector::from_element(observations, intercept);
+    let predictions = match order {
+        MeanOrder::Sequential => {
+            predictors * &coefficients + DVector::from_element(observations, intercept)
+        }
+        MeanOrder::NumpyContiguous => predict_fortran(predictors, &coefficients, intercept),
+    };
     let residuals = target - &predictions;
     let residual_scale = (residuals.dot(&residuals) / observations as f64).sqrt();
 

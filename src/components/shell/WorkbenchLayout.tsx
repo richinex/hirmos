@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/ui/Sheet'
-import { iconControl, panelTitle } from '@/components/ui/recipes'
+import { iconControl, label, panelTitle } from '@/components/ui/recipes'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { useShellLayout } from './useShellLayout'
@@ -14,6 +14,8 @@ export interface WorkbenchPane {
   readonly controls?: ReactNode
   /** Initial height in pixels for the bottom pane; ignored for the inspector. */
   readonly defaultSize?: number
+  /** Start with only the bottom header visible. */
+  readonly defaultCollapsed?: boolean
 }
 
 function PaneHeader({ id, title, controls, collapse }: {
@@ -29,7 +31,7 @@ function PaneHeader({ id, title, controls, collapse }: {
           `text-nowrap` replaces the recipe's balanced wrapping, which would otherwise win over the clip,
           because `text-wrap: balance` also sets the wrap mode back to wrapping. The real text stays in the
           heading, so its accessible name and a test's text query both see it. */}
-      <h2 id={id} className={cn(panelTitle, 'm-0 min-w-0 truncate text-nowrap')} title={title}>{title}</h2>
+      <h2 id={id} className={label('m-0 min-w-0 truncate text-nowrap text-ink')} title={title}>{title}</h2>
       <div className="flex items-center gap-1.5">
         {!collapse?.collapsed && controls}
         {collapse && (
@@ -59,8 +61,10 @@ type PhonePane = 'inspector' | 'bottom'
  * so the default request is a no-op.
  */
 const PaneRequestContext = createContext<(pane: PhonePane) => void>(() => {})
+const PaneCloseContext = createContext<() => void>(() => {})
 
 export const useOpenPane = (): ((pane: PhonePane) => void) => useContext(PaneRequestContext)
+export const useClosePane = (): (() => void) => useContext(PaneCloseContext)
 
 /**
  * The pane openers share the segmented control's `track` form: a raised track, each name in its own
@@ -95,6 +99,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
   const [open, setOpen] = useState<PhonePane | null>(null)
   return (
     <PaneRequestContext.Provider value={setOpen}>
+    <PaneCloseContext.Provider value={() => setOpen(null)}>
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="panel-scroll min-h-0 flex-1 overflow-y-auto">
         <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'px-4 py-5')}>{stage}</div>
@@ -111,7 +116,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
       {inspector && (
         <Sheet open={open === 'inspector'} onClose={() => setOpen(null)} title={inspector.title}>
           {inspector.controls && <div className="mb-2 flex justify-end">{inspector.controls}</div>}
-          {inspector.body}
+          <div className="inspector-content">{inspector.body}</div>
         </Sheet>
       )}
       {bottom && (
@@ -121,6 +126,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
         </Sheet>
       )}
     </div>
+    </PaneCloseContext.Provider>
     </PaneRequestContext.Provider>
   )
 }
@@ -155,7 +161,7 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
   const shell = useShellLayout()
   const bottomRef = usePanelRef()
   const inspectorRef = usePanelRef()
-  const [bottomCollapsed, setBottomCollapsed] = useState(false)
+  const [bottomCollapsed, setBottomCollapsed] = useState(bottom?.defaultCollapsed ?? false)
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false)
   const toggle = (ref: ReturnType<typeof usePanelRef>, collapsed: boolean) => {
     const panel = ref.current
@@ -205,7 +211,7 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
                 collapsedSize={PANE_HEADER_HEIGHT + 1}
                 minSize={120}
                 maxSize="50%"
-                defaultSize={bottom.defaultSize ?? 240}
+                defaultSize={bottom.defaultCollapsed ? PANE_HEADER_HEIGHT + 1 : bottom.defaultSize ?? 240}
                 onResize={(size) => { if (size.inPixels > 0) setBottomCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 2) }}
                 className="flex flex-col border-t border-line bg-column [container-type:size] [container-name:layout_bottom]"
               >
@@ -239,7 +245,7 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
               ) : (
                 <>
                   <PaneHeader id={`${id}-inspector-title`} title={inspector.title} controls={inspector.controls} collapse={{ collapsed: false, onToggle: () => toggle(inspectorRef, false), icon: { open: 'right_panel_close', closed: 'right_panel_open' } }} />
-                  <div className="panel-scroll min-h-0 flex-1 overflow-y-auto p-3">{inspector.body}</div>
+                  <div className="inspector-content panel-scroll min-h-0 flex-1 overflow-y-auto p-3">{inspector.body}</div>
                 </>
               )}
             </aside>

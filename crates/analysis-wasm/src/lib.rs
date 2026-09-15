@@ -93,6 +93,8 @@ use missingness::{resolve_missingness, MissingnessExecution, MissingnessResoluti
 
 mod counterfactual;
 mod dag_check;
+mod root_cause;
+mod root_cause_checks;
 mod discovery;
 mod dynamic_counterfactual;
 mod estimation;
@@ -138,6 +140,10 @@ pub fn run_analysis(
         );
     };
     let result = match command {
+        AnalysisCommand::RootCause { request } => root_cause::run(request, values, &progress)
+            .map(|evidence| AnalysisResult::RootCause { evidence }),
+        AnalysisCommand::RootCauseChecks { request } => root_cause_checks::run(request, values, &progress)
+            .map(|evidence| AnalysisResult::RootCauseChecks { evidence }),
         AnalysisCommand::StationarityBattery => stationarity_battery(values),
         AnalysisCommand::Multicollinearity {
             rows,

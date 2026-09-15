@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./themes.css";
 
 /* Hirmos — lime on black, set like a paper.
    ------------------------------------------------------------------------
@@ -52,8 +53,8 @@
       weights, regular and bold, so `font-medium` is tokenised to 600 and resolves to bold on both; the
       paper itself uses no third weight.
 
-   Everything else is a neutral ramp. TWO THEMES: dark (default, black ground) and light (paper
-   ground), switched by :root[data-theme=...] with a pre-paint boot script in index.html.
+   The original dark and light palettes live here; additional palettes live in themes.css.
+   All use :root[data-theme=...] with a pre-paint boot script in index.html.
 
    Elevation is NOT drop shadows: `.lift` is an inset top-edge highlight, `.float` a theme-aware shadow
    for surfaces that leave the plane. Components carry no `shadow-*` utilities. */
@@ -542,22 +543,27 @@ button[aria-busy="true"]::after {
 [data-theme="dark"] .example-shape[data-shape="spells"] { color: #d4c1e2; background: #3b3045; }
 @media (pointer: coarse) { .example-browser button { min-width: 44px; min-height: 44px; } }
 
-.metric-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; list-style: none; padding: 0; }
+.numeric-surface { border-radius: 12px; background: color-mix(in srgb, var(--color-stage) 94%, var(--color-ink)); }
+.metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1.5rem 2rem; list-style: none; padding: 1.5rem; }
+.numeric-compact { gap: 1rem; padding: .875rem; }
+.numeric-compact > * { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; overflow-wrap: anywhere; }
+.result-surface { display: flex; min-width: 0; flex-direction: column; gap: 1.5rem; }
+.inspector-content section > h3 { margin-block: 0 .5rem; }
+.inspector-content section > p { margin-block: .5rem 0; }
+@media (max-width: 640px) {
+  .metric-cards { gap: 1rem; padding: 1rem; }
+  .result-surface { gap: 1rem; }
+}
+.observation-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr)); gap: 1rem 1.5rem; }
 .metric-cards > * { min-width: 0; }
-.metric-card, .metric-cards > .metric-tile, .metric-cards > li > .metric-tile { min-width: 0; border: 0; border-radius: 15px; background: var(--color-stage); padding: 1.75rem 1.5rem; }
+.metric-card { min-width: 0; border: 0; border-radius: 12px; background: var(--color-stage); padding: 1.5rem 1.75rem; }
+.metric-cards > .metric-tile, .metric-cards > li > .metric-tile { min-width: 0; border: 0; border-radius: 0; background: transparent; padding: 0; }
 .metric-card-values { min-width: 0; }
-.metric-card .metric-card-values, .metric-cards .metric-card-values { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: .5rem 1rem; margin-top: .75rem; }
+.metric-card .metric-card-values, .metric-cards .metric-card-values { display: flex; flex-direction: column; align-items: flex-start; gap: .625rem; margin-top: .625rem; }
 .metric-card .metric-card-number, .metric-cards .metric-card-number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: var(--text-heading); font-weight: 400; margin: 0; }
 .metric-card-context { min-width: 0; }
 .metric-card .metric-card-context, .metric-cards .metric-card-context { margin: 0; }
-@container panel (min-width: 34rem) {
-  .metric-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-@container panel (min-width: 44rem) {
-  .metric-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.875rem; }
-  .metric-cards .metric-card-values { flex-direction: column; align-items: flex-start; gap: .75rem; }
-  .metric-cards .metric-tile:not([data-size="compact"]) .metric-card-number { font-size: var(--text-metric); }
-}
+.metric-cards .metric-tile[data-size="hero"] .metric-card-number { font-size: var(--text-metric); }
 .metric-tile[data-size="compact"] .metric-card-number { font-size: var(--text-title); line-height: 1.35; }
 
 .equation-columns { display: grid; min-width: 0; gap: 2rem 3rem; }

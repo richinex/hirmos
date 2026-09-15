@@ -6,7 +6,7 @@ import { longRunOption } from '@/charts/data/longRun'
 import { useChartTheme } from '@/charts/theme'
 import { Select } from '@/components/ui/Select'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
-import { field, fieldLabel, panel, table, td, th } from '@/components/ui/recipes'
+import { field, fieldLabel, resultSurface, resultTitle, table, td, th } from '@/components/ui/recipes'
 import { formatStatistic } from '@/lib/format/number'
 import { TimeSeriesEquation } from './TimeSeriesEquation'
 import type { VisibleWindow } from '@/charts/window'
@@ -90,7 +90,7 @@ function MultiplierPlot({run}:{readonly run:Run}) {
     {title:`Response to a sustained increase in ${name}`,series:[{name:'Cumulative multiplier',values:curve.cumulative}]},
   ]
   return <section className="min-w-0 space-y-3" aria-label="ARDL multipliers"><label><span className={fieldLabel}>Multiplier predictor</span><Select className={field('text','mt-1')} value={selected} onChange={e=>setSelected(Number(e.target.value))}>{curves.map((c,i)=><option key={i} value={i}>{c.term.kind==='predictor'?run.predictors[c.term.column]?.name:'Predictor'}</option>)}</Select></label>
-    {figures.map((figure,i)=><div key={figure.title} className="min-w-0 rounded-lg border border-hair p-3"><h4 className="m-0 text-label text-ink">{figure.title}</h4><ExpandableChart label={figure.title} option={longRunOption({...figure,axis,startRow:0,slider:i===0,zero:true},theme)} className="h-72" window={window} onWindow={setWindow} /></div>)}
+    {figures.map((figure,i)=><div key={figure.title} className="min-w-0 pt-3"><h4 className="m-0 text-label text-ink">{figure.title}</h4><ExpandableChart label={figure.title} option={longRunOption({...figure,axis,startRow:0,slider:i===0,zero:true},theme)} className="h-72" window={window} onWindow={setWindow} /></div>)}
     <p className="m-0 text-label text-muted">The horizontal axis counts periods after a 1-unit increase. Other predictors are held unchanged. The first plot has pointwise {number(result.confidence * 100)}% confidence limits; no interval is calculated for the cumulative response. These are model-based responses, not identified causal effects.</p></section>
 }
 
@@ -100,7 +100,7 @@ export function ArdlModelResult({run}:{readonly run:Run}) {
   const longRun=e.longRun
   const bounds=longRun.kind==='recorded'?longRun.boundsCritical[1]:undefined
   const finding=longRun.kind==='unavailable'?reasons[longRun.reason]:longRun.kind==='uncalibrated'?'The level relationship is estimated, but no bounds-test conclusion is reported without critical bounds.':bounds===undefined?'Bounds critical values are unavailable.':longRun.boundsStatistic>bounds[1]?'The bounds test supports a long-run level relationship at the 5% level.':longRun.boundsStatistic<bounds[0]?'The bounds test does not support a long-run level relationship at the 5% level.':'The bounds test is inconclusive at the 5% level.'
-  return <section className={panel('flex min-w-0 flex-col gap-4 p-(--panel-space)')} aria-label="Time-series result"><h3 className="m-0 text-title text-ink">ARDL · {run.outcome.name}</h3>
+  return <section className={resultSurface()} aria-label="Time-series result"><h3 className={`${resultTitle} m-0`}>ARDL · {run.outcome.name}</h3>
     <ResultInterpretation interpretation={{kind:'result-interpretation',statements:[{kind:'magnitude',text:`The model uses ${e.outcomeLag} earlier outcome values and ${e.predictorLags.filter(q=>q!==null).length} retained predictors. ${finding}`}]}} />
     <p className="m-0 text-body text-muted">{e.fittedRows} fitted observations from {e.observations} prepared observations. {run.specification.orders.kind==='fixed'||run.specification.orders.kind==='rFixed'?'Lag orders were specified before fitting.':'Lag orders were selected by the recorded search.'}</p>
     <div className="overflow-x-auto"><table className={table} aria-label="ARDL coefficients"><thead><tr><th className={th()}>Term</th><th className={th()}>Coefficient</th><th className={th()}>Standard error</th></tr></thead><tbody>{e.coefficients.map((term,i)=><tr key={i}><td className={td()}>{coefficientName(term,run)}</td><td className={td()}>{number(e.params[i]!)}</td><td className={td()}>{number(Math.sqrt(e.covariance[i]![i]!))}</td></tr>)}</tbody></table></div>
@@ -110,7 +110,7 @@ export function ArdlModelResult({run}:{readonly run:Run}) {
     {longRun.kind!=='unavailable'&&run.plotTime!==undefined&&<div className="space-y-3">{[
       {title:'Observed outcome and estimated long-run level',zero:false,series:[{name:run.outcome.name,values:e.observed},{name:'Estimated long-run level',values:e.observed.map((y,i)=>y-longRun.departures[i]!)}]},
       {title:'Departure from the estimated long-run level',zero:true,series:[{name:'Departure',values:longRun.departures}]},
-    ].map((figure,i)=><div key={figure.title} className="min-w-0 rounded-lg border border-hair p-3"><h4 className="m-0 text-label text-ink">{figure.title}</h4><ExpandableChart label={figure.title} option={longRunOption({...figure,axis:run.plotTime!,startRow:0,slider:i===0},theme)} className="h-72" window={window} onWindow={setWindow} /></div>)}</div>}
+    ].map((figure,i)=><div key={figure.title} className="min-w-0 pt-3"><h4 className="m-0 text-label text-ink">{figure.title}</h4><ExpandableChart label={figure.title} option={longRunOption({...figure,axis:run.plotTime!,startRow:0,slider:i===0},theme)} className="h-72" window={window} onWindow={setWindow} /></div>)}</div>}
     <MultiplierPlot run={run} />
     {e.forecast.kind==='recorded'&&<section className="min-w-0 space-y-3" aria-label="ARDL forecast"><h4 className="m-0 text-body text-ink">Forecast with supplied future values</h4><ExpandableChart label="ARDL forecast" className="h-80" option={longRunOption({title:'ARDL forecast',axis:{kind:'ordinal',values:e.forecast.mean.map((_,i)=>i+1)},startRow:0,slider:true,zero:false,series:[{name:'Forecast',values:e.forecast.mean},{name:`Lower ${number(e.forecast.confidence * 100)}% limit`,values:e.forecast.interval.map(v=>v[0])},{name:`Upper ${number(e.forecast.confidence * 100)}% limit`,values:e.forecast.interval.map(v=>v[1])}]},theme)} /><p className="m-0 text-label text-muted">Period 1 is the next period after the prepared sample. These {number(e.forecast.confidence * 100)}% prediction limits account for future innovations conditional on the fitted coefficients and supplied predictor values. They do not include uncertainty in those future values or in the estimated coefficients.</p></section>}
     <TimeSeriesEquation run={run} />

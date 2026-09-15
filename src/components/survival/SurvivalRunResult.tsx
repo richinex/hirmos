@@ -222,26 +222,20 @@ const petoPValue = (evidence: ComparisonSurvivalEvidence): number | null => {
 
 function AtRiskTable({ diagnostics, truncationTime }: { readonly diagnostics: RecordedComparisonDiagnostics; readonly truncationTime: number }) {
   const times = Array.from({ length: 5 }, (_, index) => truncationTime * index / 4)
+  const rows = [
+    { group: 'Group 0', counts: times.map((time) => atRiskAt(diagnostics.groupZero.atRisk, time)) },
+    { group: 'Group 1', counts: times.map((time) => atRiskAt(diagnostics.groupOne.atRisk, time)) },
+  ]
+  const columns: readonly EvidenceColumn<typeof rows[number]>[] = [
+    { id: 'group', header: 'Group', value: (row) => row.group },
+    ...times.map((time, index): EvidenceColumn<typeof rows[number]> => ({
+      id: `time-${index}`, header: statistic(time), align: 'right',
+      value: (row) => row.counts[index], format: (_, row) => formatCount(row.counts[index]).text,
+    })),
+  ]
   return (
-    <div className="mt-2 overflow-x-auto">
-      <table className="w-full min-w-[420px] border-collapse text-label text-muted" aria-label="Number at risk">
-        <thead>
-          <tr className="border-b border-hair">
-            <th className="px-2 py-1 text-left font-medium">Number at risk</th>
-            {times.map((time) => <th key={time} className="px-2 py-1 text-right font-normal tabular-nums">{statistic(time)}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th className="px-2 py-1 text-left font-medium text-ink">Group 0</th>
-            {times.map((time) => <td key={time} className="px-2 py-1 text-right tabular-nums">{formatCount(atRiskAt(diagnostics.groupZero.atRisk, time)).text}</td>)}
-          </tr>
-          <tr>
-            <th className="px-2 py-1 text-left font-medium text-signal">Group 1</th>
-            {times.map((time) => <td key={time} className="px-2 py-1 text-right tabular-nums">{formatCount(atRiskAt(diagnostics.groupOne.atRisk, time)).text}</td>)}
-          </tr>
-        </tbody>
-      </table>
+    <div className="mt-2">
+      <EvidenceTable title="Number at risk" rows={rows} columns={columns} rowKey={(row) => row.group} noun="group" empty="No risk counts." frame="none" exportName="survival-number-at-risk" />
     </div>
   )
 }
@@ -831,14 +825,18 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
 
   return (
     <article aria-labelledby={`survival-run-${run.id}`}>
-      <details className={`group rounded-xl border bg-panel ${current ? 'border-edge' : 'border-hair'}`} open={open}>
-        <summary className="flex cursor-pointer list-none items-start gap-3 rounded-xl py-4 pl-4 pr-4 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+      <details className={`group ${current ? 'rounded-xl border border-edge bg-panel' : ''}`} open={open}>
+        <summary className={`flex cursor-pointer list-none items-start gap-3 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden ${current ? 'rounded-xl p-4' : 'py-1.5'}`}>
           <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
-          <div className="min-w-0 flex-1">
+          {current ? <div className="min-w-0 flex-1">
             <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
-            <h3 id={`survival-run-${run.id}`} className="mb-1 mt-1 text-title font-medium text-ink">{heading.title}</h3>
+            <h3 id={`survival-run-${run.id}`} className="mb-1 mt-1 text-heading font-medium text-ink text-balance">{heading.title}</h3>
             <p className="m-0 text-body text-faint">{heading.meta} · {summary.figure} · <span className={num()}>{formatTime(run.createdAt)}</span></p>
-          </div>
+          </div> : <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h3 id={`survival-run-${run.id}`} className={caption('m-0 text-ink')}>{survivalRunLabel(run)}</h3>
+            <span className={num('text-label text-ink')}>{summary.figure}</span>
+            <time dateTime={run.createdAt} className={num('ml-auto text-label text-faint')}>{formatTime(run.createdAt)}</time>
+          </div>}
           {onDelete !== undefined && (
             <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent text-faint transition-colors hover:bg-well hover:text-danger" aria-label={`Delete ${summary.method} run`} title="Delete this run" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}>
               <Icon name="delete" size={16} />

@@ -829,6 +829,8 @@ pub(crate) enum IdentifiedDiscreteResult {
     deny_unknown_fields
 )]
 pub(crate) enum AnalysisCommand {
+    RootCause { request: crate::root_cause::Request },
+    RootCauseChecks { request: crate::root_cause_checks::Request },
     ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
     StationarityBattery,
     Multicollinearity {
@@ -1994,6 +1996,8 @@ pub(crate) enum DagFalsificationEvidence {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum AnalysisResult {
+    RootCause { evidence: crate::root_cause::Evidence },
+    RootCauseChecks { evidence: crate::root_cause_checks::Evidence },
     ArdlModel { evidence: crate::ardl_model::Evidence },
     DiscreteStateRefused {
         query: DiscreteStateQuery,

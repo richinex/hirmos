@@ -1,6 +1,5 @@
 import type { ResultInterpretation as ResultInterpretationModel } from '@/domain/resultInterpretation'
 import { assertNever, isNonEmpty, type NonEmptyArray } from '@/domain/dop'
-import { well } from './recipes'
 import { prose } from '@/components/ui/recipes'
 
 type StatementKind = ResultInterpretationModel['statements'][number]['kind']
@@ -56,11 +55,11 @@ export function ResultInterpretation({ interpretation, className = '', context =
   })
 
   return (
-    <section className={well(`px-3 py-3 ${className}`.trim())} aria-label="Interpretation">
+    <section className={`py-3 ${className}`.trim()} aria-label="Interpretation">
       <h4 className="m-0 text-faint text-label font-medium">{interpretationTitle(context)}</h4>
-      <div className="mt-3 space-y-3">
-        {sections.map((section, sectionIndex) => (
-          <section key={section.kind} className={sectionIndex === 0 ? '' : 'border-t border-hair pt-3'}>
+      <div className="mt-4 space-y-5">
+        {sections.map((section) => (
+          <section key={section.kind}>
             <h5 className="m-0 text-label font-medium text-bone">{sectionLabel(section.kind)}</h5>
             <div className="mt-1 space-y-1.5">
               {section.statements.map((statement, statementIndex) => (

@@ -3,6 +3,7 @@ import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type Col
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { cellPadding, countLine, DensityToggle, FilterField, ROW_HEIGHT, SortHeader, TableShell, useTableDensity } from '@/components/table/primitives'
 import { Icon } from '@/components/Icon'
+import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { button, literal, num, table as tableCn, td, tdText, tr } from '@/components/ui/recipes'
 import { fontFor, lineCountAt, lineHeightFor, useTextMetricsVersion } from '@/lib/textMetrics'
 import { toCsv } from '@/lib/csv'
@@ -49,8 +50,9 @@ const wraps = (meta: CellMeta): boolean => meta.align !== 'right' && !meta.mono
 /** Horizontal padding of a body cell, `px-3.5` either side. */
 const CELL_INSET = 28
 
-export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel' }: {
+export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel' }: {
   readonly title: string
+  readonly help?: string
   readonly rows: readonly Row[]
   readonly columns: readonly EvidenceColumn<Row>[]
   readonly rowKey: (row: Row, index: number) => string
@@ -205,6 +207,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
     <TableShell
       title={title}
       titleId={titleId}
+      titleHelp={help === undefined ? undefined : <ParameterHelp label={title} help={help} />}
       frame={frame}
       maxHeight={maxHeight}
       scrollRef={scrollRef}
@@ -220,7 +223,7 @@ export function EvidenceTable<Row>({ title, rows, columns, rowKey, noun, empty, 
       )}
       count={countLine(visible.length, total ?? rows.length, noun, sortText)}
     >
-      <table ref={tableRef} className={cn(tableCn, 'tabular-nums')} aria-rowcount={virtualised ? modelRows.length + 1 : undefined}>
+      <table ref={tableRef} className={cn(tableCn, 'tabular-nums')} aria-labelledby={titleId} aria-rowcount={virtualised ? modelRows.length + 1 : undefined}>
         <thead>
           {table.getHeaderGroups().map((group) => (
             <tr key={group.id}>

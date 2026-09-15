@@ -1,13 +1,14 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-export type ThemeName = 'dark' | 'light'
+export type ThemeName = 'dark' | 'light' | 'soft-dark'
 
 /** What the user picked: a concrete theme, or 'system' (follow the OS, live). */
 export type ThemeChoice = ThemeName | 'system'
 
 const KEY = 'hirmos-theme'
-export const THEMES: readonly ThemeName[] = ['dark', 'light']
+export const THEMES: readonly ThemeName[] = ['dark', 'light', 'soft-dark']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
+export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', light: 'Light', 'soft-dark': 'Soft UI Dark', system: 'System' }
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 
@@ -55,12 +56,11 @@ export function useTheme(): {
     return () => cancelAnimationFrame(frame)
   }, [theme, choice])
 
-  const next = CYCLE[(CYCLE.indexOf(choice) + 1) % CYCLE.length]
   return {
     theme,
     choice,
-    next,
+    next: CYCLE[(CYCLE.indexOf(choice) + 1) % CYCLE.length],
     setChoice,
-    cycle: () => setChoice((current) => CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length]),
+    cycle: () => setChoice(current => CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length]),
   }
 }

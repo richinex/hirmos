@@ -8,7 +8,7 @@ import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { useShellLayout } from '@/components/shell/useShellLayout'
 import { button, chromeAction, field, fieldHint, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
-import { useTheme, type ThemeChoice } from '@/components/ui/useTheme'
+import { useTheme, THEME_LABELS, type ThemeChoice } from '@/components/ui/useTheme'
 import { formatDay, formatTimestamp } from '@/lib/format/date'
 import { formatBytes } from '@/lib/format/number'
 import { DataStudio } from '@/components/data/DataStudio'
@@ -53,6 +53,7 @@ import { cn } from '@/lib/utils'
 
 const loadDagWorkspace = () => import('@/components/dag/DagWorkspace')
 const loadSurvivalPanel = () => import('@/components/survival/SurvivalPanel')
+const loadRootCausePanel = () => import('@/components/root-cause/RootCausePanel')
 const loadTimeSeriesPanel = () => import('@/components/time-series/TimeSeriesPanel')
 const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
 const loadEstimationPanel = () => import('@/components/estimation/EstimationPanel')
@@ -65,6 +66,7 @@ const loadPipelineWorkspace = () => import('@/components/data/pipeline/PipelineW
 /** One loader per lazy chapter, shared with the nav prefetch so a hover warms the chunk `lazy` will ask for. */
 const PANEL_LOADERS: Partial<Record<ChapterId, () => Promise<unknown>>> = {
   survival: loadSurvivalPanel,
+  'root-cause': loadRootCausePanel,
   'time-series': loadTimeSeriesPanel,
   dag: loadDagWorkspace,
   study: loadStudyDesignPanel,
@@ -83,6 +85,7 @@ const prefetchChapter = (chapter: ChapterId): void => {
 const DagWorkspace = lazy(async () => ({ default: (await loadDagWorkspace()).DagWorkspace }))
 
 const SurvivalPanel = lazy(async () => ({ default: (await loadSurvivalPanel()).SurvivalPanel }))
+const RootCausePanel = lazy(async () => ({ default: (await loadRootCausePanel()).RootCausePanel }))
 const TimeSeriesPanel = lazy(async () => ({ default: (await loadTimeSeriesPanel()).TimeSeriesPanel }))
 
 const StudyDesignPanel = lazy(async () => ({ default: (await loadStudyDesignPanel()).StudyDesignPanel }))
@@ -107,11 +110,8 @@ type Chapter = Omit<ChapterEntry, 'status'>
 
 const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
 
-/** The icon previews the next stop in the theme cycle, so the button reads as "switch to". */
 const THEME_ICON: Record<ThemeChoice, string> = {
-  dark: 'dark_mode',
-  light: 'light_mode',
-  system: 'brightness_auto',
+  dark: 'dark_mode', light: 'light_mode', 'soft-dark': 'dark_mode', system: 'brightness_auto',
 }
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
@@ -470,6 +470,7 @@ function App() {
     if (chapter === 'projects') return workflow.kind === 'awaiting-project'
     if (chapter === 'data') return project !== null
     if (chapter === 'survival') return workflow.kind === 'profiled' && workflow.prepared !== null
+    if (chapter === 'root-cause') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'time-series') return workflow.kind === 'profiled' && workflow.prepared?.kind === 'prepared-time-series'
     if (chapter === 'discovery') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
@@ -477,7 +478,7 @@ function App() {
     if (chapter === 'estimation') return identifiedStudy
     if (chapter === 'sensitivity') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
-    if (chapter === 'results') return workflow.kind === 'profiled' && (workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
+    if (chapter === 'results') return workflow.kind === 'profiled' && (workflow.rootCause.runs.length > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
     return false
   }
 
@@ -490,6 +491,7 @@ function App() {
       case 'survival': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
+      case 'root-cause': return !prepared || workflow.kind !== 'profiled' ? 'locked' : workflow.rootCause.runs.length > 0 ? 'done' : workflow.rootCause.selection === null ? 'not-started' : 'in-progress'
       case 'discovery': return !prepared ? 'locked' : workflow.discoveryRuns.length > 0 ? 'done' : 'not-started'
       case 'dag': return !prepared
         ? 'locked'
@@ -508,7 +510,7 @@ function App() {
       case 'counterfactual': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
         ? 'locked'
         : workflow.counterfactualRuns.length > 0 ? 'done' : 'not-started'
-      case 'results': return workflow.kind !== 'profiled' || (workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
+      case 'results': return workflow.kind !== 'profiled' || (workflow.rootCause.runs.length + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
       default: return chapter
     }
   }
@@ -616,13 +618,9 @@ function App() {
             </span>
           </button>
         )}
-        <button
-          type="button"
-          onClick={theme.cycle}
-          aria-label="Change theme"
-          title={`Theme: ${theme.choice}. Switch to ${theme.next}`}
-          className={iconControl('quiet', 'text-muted')}
-        >
+        <button type="button" onClick={theme.cycle} aria-label="Change theme"
+          title={`Theme: ${THEME_LABELS[theme.choice]}. Switch to ${THEME_LABELS[theme.next]}`}
+          className={iconControl('quiet', 'text-muted')}>
           <Icon name={THEME_ICON[theme.next]} size={16} />
         </button>
       </div>
@@ -640,7 +638,7 @@ function App() {
       onClose={() => setEditConfirm(null)}
     />
   )
-  const fullBleed = workflow.kind === 'pipeline-opened' || profiled !== null && ['data', 'time-series', 'survival', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
+  const fullBleed = workflow.kind === 'pipeline-opened' || profiled !== null && ['data', 'time-series', 'survival', 'root-cause', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
   // Every chart export names the project it came from.
   const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
@@ -982,10 +980,21 @@ function App() {
                         onDocumentRevised={(document) => dispatch({ type: 'dag-document-revised', document })}
                         onCheck={(check) => dispatch({ type: 'dag-check-created', check })}
                         onUseForStudy={() => navigateToChapter('study')}
+                        onUseForRootCause={(selection) => { dispatch({ type: 'root-cause-selected', selection }); navigateToChapter('root-cause') }}
                         studyDraft={workflow.studyDraft}
                         onStudyDraftChanged={(draft) => dispatch({ type: 'study-draft-changed', draft })}
                       />
                     </Suspense>
+                    </ChapterBoundary>
+                  )}
+                  {activeChapter === 'root-cause' && workflow.prepared !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
+                      <Suspense fallback={<ChapterSkeleton label="Loading root-cause analysis…" />}>
+                        <RootCausePanel key={`${workflow.prepared.id}:${workflow.rootCause.selection?.dagRevision ?? ''}`} source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}
+                          documents={workflow.dagDocuments} workspace={workflow.rootCause} onGraph={() => navigateToChapter('dag')}
+                          onRun={(run) => dispatch({ type: 'root-cause-run-created', run })} onDelete={(id) => dispatch({ type: 'root-cause-run-deleted', id })}
+                          onChecks={(record) => dispatch({ type: 'root-cause-checks-created', record })} />
+                      </Suspense>
                     </ChapterBoundary>
                   )}
                   {activeChapter === 'study' && workflow.prepared !== null && (
@@ -1113,6 +1122,7 @@ function App() {
                         survivalRuns={workflow.survivalRuns}
                         timeSeriesRuns={workflow.timeSeriesRuns}
                         countSeriesModels={workflow.countSeriesModels}
+                        rootCauseRuns={workflow.rootCause.runs}
                       />
                     </Suspense>
                     </ChapterBoundary>

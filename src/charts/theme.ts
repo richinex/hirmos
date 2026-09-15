@@ -43,8 +43,6 @@ export function variableColour(theme: ChartTheme, name: string): string {
   return seriesColour(theme, hash >>> 0)
 }
 
-const LIGHT_THEMES = new Set(['light'])
-
 const FALLBACK: ChartTheme = {
   name: 'dark',
   ink: '#f2f2f0',
@@ -96,7 +94,7 @@ export function readChartTheme(): ChartTheme {
     ok: colour('--color-ok', FALLBACK.ok),
     warn: colour('--color-warn', FALLBACK.warn),
     danger: colour('--color-danger', FALLBACK.danger),
-    categorical: LIGHT_THEMES.has(name) ? LIGHT_CATEGORICAL_RAMP : CATEGORICAL_RAMP,
+    categorical: root.colorScheme === 'light' ? LIGHT_CATEGORICAL_RAMP : CATEGORICAL_RAMP,
     font: colour('--font-sans', FALLBACK.font),
     mono: colour('--font-mono', FALLBACK.mono),
     labelSize: lengthPixels(root, '--text-label', FALLBACK.labelSize),

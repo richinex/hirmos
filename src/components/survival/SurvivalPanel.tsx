@@ -1,4 +1,5 @@
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { SelectionActions } from '@/components/ui/SelectionActions'
 import { useMemo, useReducer, useState } from 'react'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { SurvivalRunResult, survivalFamilyLabel, survivalRunSummary } from '@/components/survival/SurvivalRunResult'
@@ -1595,15 +1596,11 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
             : 'Each enters the model on the log hazard or log time scale. The columns already chosen as times or the event cannot be covariates.'
         return (
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className={fieldLabel}>Covariates</span>
-              <div className="flex items-center gap-2">
-                <button type="button" className={button('quiet')} onClick={() => configure({ ...draft, covariates: columns.filter((column) => !roles.includes(column.id)).map((column) => column.id) })}>Select all</button>
-                <button type="button" className={button('quiet')} onClick={() => configure({ ...draft, covariates: [] })}>Clear</button>
-              </div>
-            </div>
+            <span className={fieldLabel}>Covariates</span>
             <p className={cn(fieldHint, 'mb-2 max-w-[65ch]')}>{help}</p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5" role="group" aria-label="Covariates">{columns.map((column) => {
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5" role="group" aria-label="Covariates">
+              <SelectionActions compact selectLabel="Select all covariates" clearLabel="Clear selected covariates" onSelectAll={() => configure({ ...draft, covariates: columns.filter((column) => !roles.includes(column.id)).map((column) => column.id) })} onClear={() => configure({ ...draft, covariates: [] })} />
+              {columns.map((column) => {
               const reserved = roles.includes(column.id)
               return <label key={column.id} className={cn('flex items-center gap-2 text-body', reserved ? 'text-faint' : 'text-ink')}><input type="checkbox" disabled={reserved} checked={draft.covariates.includes(column.id)} onChange={() => {
                 if (reserved) return
@@ -1658,14 +1655,14 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
   )
 
   const inspector = (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <section aria-labelledby="survival-type-title">
         <h3 id="survival-type-title" className="mb-2 mt-1 text-body font-medium text-ink">{type.name}</h3>
         <p className={cn(fieldHint, 'mt-0')}>{type.summary}</p>
       </section>
-      <section className="border-t border-hair pt-3" aria-label="Method requirements">
+      <section aria-label="Method requirements">
         <h3 className="m-0 text-body font-medium text-ink">Requirements</h3>
-        <ul className="m-0 mt-2 list-none space-y-2 p-0">
+        <ul className="m-0 mt-2 list-none space-y-4 p-0">
           {type.requirements.map((requirement) => (
             <li key={requirement.holds} className="text-body">
               <p className="m-0 text-ink">{requirement.holds}</p>
@@ -1674,12 +1671,12 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           ))}
         </ul>
       </section>
-      <section className="border-t border-hair pt-3">
+      <section>
         <h3 className="m-0 text-body font-medium text-ink">Prepared data</h3>
-        <dl className="m-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body">
+        <dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-body">
           <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{formatCount(prepared.observations).text}</dd>
           <dt className="text-faint">Columns</dt><dd className={num('m-0 text-ink')}>{formatCount(columns.length).text}</dd>
-          <dt className="text-faint">Source</dt><dd className="m-0 truncate text-ink">{source.name}</dd>
+          <dt className="text-faint">Source</dt><dd className="m-0 break-words text-ink">{source.name}</dd>
         </dl>
       </section>
     </div>
@@ -1698,7 +1695,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
 
   return (
     <>
-      <WorkbenchLayout id="survival" stage={stage} inspector={{ title: 'Data and method requirements', body: inspector }} bottom={{ title: `Survival runs · ${runs.length}`, body: ledger, defaultSize: 150 }} />
+      <WorkbenchLayout id="survival" stage={stage} inspector={{ title: 'Data and method requirements', body: inspector }} bottom={{ title: `Survival runs (${runs.length})`, body: ledger, defaultSize: 150 }} />
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete this survival run?"

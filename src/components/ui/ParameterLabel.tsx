@@ -14,7 +14,7 @@ export function ParameterHelp({ label, help }: { readonly label: string; readonl
           without any sign that it does something. The cursor is left to the app's rule for buttons. */}
       <button
         type="button"
-        className="grid size-5 shrink-0 place-items-center rounded text-faint transition-colors hover:text-ink pointer-coarse:size-9"
+        className="grid size-5 shrink-0 place-items-center rounded text-faint transition-colors hover:text-ink pointer-coarse:size-11"
         aria-label={`About ${label}`}
       >
         <Icon name="info" size={14} />

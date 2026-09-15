@@ -12,7 +12,7 @@
       document.documentElement.dataset.surface = location.pathname === '/' ? 'landing' : 'workbench'
       try {
         var t = localStorage.getItem('hirmos-theme')
-        var known = ['dark', 'light']
+        var known = ['dark', 'light', 'soft-dark']
         if (known.indexOf(t) === -1) {
           t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         }

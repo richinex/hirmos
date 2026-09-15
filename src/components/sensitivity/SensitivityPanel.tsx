@@ -3,6 +3,7 @@ import { Orb } from '@/components/ui/Orb'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
+import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
 import { useMemo, useReducer, useState } from 'react'
 import { EChart } from '@/charts/EChart'
@@ -105,10 +106,10 @@ const refuterInterpretation = (fact: RefuterFact): string => {
 
 function DmlRefutationCard({ run, estimation, study, current, onDelete }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'dml-refutation-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly onDelete?: () => void }) {
   const { evidence } = run
-  const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · order ${evidence.order.join(' → ')} · ${formatTime(run.createdAt)}`
+  const stamp = <RunMeta>{[describeEstimator(estimation.configuration.kind), `Seed ${evidence.seed}`, `Order ${evidence.order.join(' → ')}`, formatTime(run.createdAt)]}</RunMeta>
   if (!current) {
     return (
-      <RunFold title="Double machine learning probe batch" figure={`placebo ${formatStatistic('raw', evidence.placebo.refutedEffect).text} · robustness ${formatStatistic('score', evidence.sensitivity.robustnessValue).text}`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+      <RunFold title="Double machine learning probe batch" figure={<RunMeta>{[`Placebo ${formatStatistic('raw', evidence.placebo.refutedEffect).text}`, `Robustness ${formatStatistic('score', evidence.sensitivity.robustnessValue).text}`]}</RunMeta>} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
         <DmlRefutationRecord run={run} study={study} />
       </RunFold>
     )
@@ -163,10 +164,10 @@ function DmlRefutationRecord({ run, study }: { readonly run: Extract<Sensitivity
 
 function RefutationCard({ run, estimation, study, current, onDelete }: { readonly run: Extract<SensitivityRunArtifact, { readonly kind: 'linear-refutation-run' }>; readonly estimation: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly onDelete?: () => void }) {
   const { evidence } = run
-  const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · ${formatCount(evidence.simulations).text} simulations · ${formatTime(run.createdAt)}`
+  const stamp = <RunMeta>{[describeEstimator(estimation.configuration.kind), `Seed ${evidence.seed}`, `${formatCount(evidence.simulations).text} simulations`, formatTime(run.createdAt)]}</RunMeta>
   if (!current) {
     return (
-      <RunFold title="Perturbation and residual probes" figure={`placebo ${formatStatistic('raw', evidence.placeboEffect).text} · subset ${formatStatistic('raw', evidence.subsetEffect).text}`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+      <RunFold title="Perturbation and residual probes" figure={<RunMeta>{[`Placebo ${formatStatistic('raw', evidence.placeboEffect).text}`, `Subset ${formatStatistic('raw', evidence.subsetEffect).text}`]}</RunMeta>} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
         <RefutationRecord run={run} study={study} />
       </RunFold>
     )
@@ -245,7 +246,7 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
     scale: 'signed',
     quantity: 'refitted effect',
   }, theme), [evidence, theme])
-  const stamp = `${describeEstimator(estimation.configuration.kind)} · seed ${evidence.seed} · ${formatTime(run.createdAt)}`
+  const stamp = <RunMeta>{[describeEstimator(estimation.configuration.kind), `Seed ${evidence.seed}`, formatTime(run.createdAt)]}</RunMeta>
   const record = (
     <>
       <h3 className={cn(sectionTitle, 'mb-1 mt-2')}>Simulated unmeasured confounder</h3>
@@ -538,7 +539,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       id="sensitivity"
       stage={stage}
       inspector={{ title: 'Estimate and method requirements', body: inspector }}
-      bottom={{ title: `Probes · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+      bottom={{ title: `Probes (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>
   )

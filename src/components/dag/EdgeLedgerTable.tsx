@@ -89,6 +89,7 @@ export function EdgeLedgerTable({ document, selectedEdge, onSelectEdge }: {
   return (
     <TableShell
       title="Arrows"
+      titleHidden
       titleId={titleId}
       frame="none"
       maxHeight="max-h-none"

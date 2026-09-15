@@ -9,7 +9,7 @@ import { assertNever, err, ok, type Result } from '@/domain/dop'
  * together for a purpose and can be removed as a unit.
  */
 
-export type ExampleQuestion = 'intervention' | 'effect' | 'discovery' | 'set' | 'time'
+export type ExampleQuestion = 'intervention' | 'effect' | 'discovery' | 'set' | 'time' | 'root-cause'
 
 export interface ExampleQuestionEntry {
   readonly id: ExampleQuestion
@@ -19,6 +19,7 @@ export interface ExampleQuestionEntry {
 }
 
 export const EXAMPLE_QUESTIONS: readonly [ExampleQuestionEntry, ...ExampleQuestionEntry[]] = [
+  { id: 'root-cause', title: 'RCA', when: 'Use a causal model to attribute unusual observations or changes between datasets to individual variables, and estimate outcomes under specified interventions.' },
   { id: 'intervention', title: 'Did an intervention change the outcome?', when: 'Compare outcomes after the intervention with an estimate of what would have happened without it. That estimate may use earlier outcome patterns, unaffected comparison units, or both.' },
   { id: 'effect', title: 'Given a causal model, what is the effect of X on Y?', when: 'Use the model to identify an estimand, then estimate it from observed data under the stated assumptions.' },
   { id: 'discovery', title: 'What causal structures are compatible with the evidence?', when: 'Use discovery as exploratory evidence, then assess the result against domain knowledge, latent-variable assumptions, and method requirements.' },
@@ -60,6 +61,13 @@ export interface ShippedExample {
 const id = (value: string): SavedProjectHeader['id'] => value as SavedProjectHeader['id']
 
 export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = [
+  {
+    id: id('b8b5903d-29ce-462e-a655-5b3b18f08c4b'),
+    name: 'Microservices: why did the website slow down?',
+    sourceName: 'baseline.csv',
+    bundleUrl: '/examples/microservices-rca.hirmos.json',
+    question: 'root-cause', approach: 'Unusual request, distribution change and shift intervention', shape: 'cross-section', size: '10,000 baseline requests', estimationRuns: 0, glyph: 'dag', collection: null,
+  },
   {
     id: id('d95e0c7b-44ec-4dee-a929-784cfd923eeb'),
     name: 'Seat-belt law and road deaths',

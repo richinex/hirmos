@@ -6,7 +6,7 @@
 
 #![allow(dead_code, unused_imports, unused_parens)]
 
-mod blas;
+pub(crate) mod blas;
 mod divide_conquer;
 pub(crate) mod reduction;
 

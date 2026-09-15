@@ -78,7 +78,7 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   await page.getByRole('checkbox', { name: 'y', exact: true }).check()
   await page.getByRole('button', { name: 'Fit VECM', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toHaveCount(1, { timeout: 60_000 })
-  await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toContainText('VECM · x, y')
+  await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toContainText('VECM for x, y')
   await expect(page.getByTestId('long-run-charts').filter({ visible: true }).locator('[_echarts_instance_]')).toHaveCount(1)
   await page.getByTestId('long-run-charts').filter({ visible: true }).scrollIntoViewIfNeeded()
   await page.screenshot({ path: info.outputPath('vecm.png') })

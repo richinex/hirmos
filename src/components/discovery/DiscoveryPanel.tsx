@@ -839,7 +839,7 @@ function ResultCard({ run, method, title, meta, current, children }: {
         <span className={label('text-signal')}>Current result · {method}</span>
         <span className={num('text-micro text-faint')}>{formatTime(run.createdAt)}</span>
       </div>
-      <h3 id={`run-${run.id}`} className="mb-2 mt-1 text-title font-medium text-ink">{title}</h3>
+      <h3 id={`run-${run.id}`} className="mb-2 mt-1 text-heading font-medium text-ink text-balance">{title}</h3>
       {body}
     </article>
   )
@@ -910,7 +910,7 @@ function TimeGraphResult({ run, current }: { readonly current: boolean; readonly
   )
   const variableNames = useMemo(() => run.variables.map((variable) => variable.name), [run])
   const isLpcmci = run.kind === 'lpcmci-run'
-  const methodLabel = isLpcmci ? 'LPCMCI · ParCorr' : 'PCMCI+ · ParCorr'
+  const methodLabel = isLpcmci ? 'LPCMCI with ParCorr' : 'PCMCI+ with ParCorr'
   const resultTitle = isLpcmci ? 'Latent-aware partial ancestral graph evidence' : 'Stationary lag-graph evidence'
   const tableLabel = isLpcmci ? 'LPCMCI raw evidence' : 'PCMCI+ raw evidence'
   return (
@@ -968,7 +968,7 @@ function JpcmciResult({ run, current }: { readonly current: boolean; readonly ru
     }
   }
   return (
-    <ResultCard run={run} current={current} method="J-PCMCI+ · ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<>{run.result.datasets} units × {run.result.periods} periods · {run.result.observedVariables} observed variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
+    <ResultCard run={run} current={current} method="J-PCMCI+ with ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<>{run.result.datasets} units × {run.result.periods} periods · {run.result.observedVariables} observed variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="J-PCMCI+ joint structure" />
@@ -1024,7 +1024,7 @@ function RpcmciResult({ run, current }: { readonly current: boolean; readonly ru
       run={run}
      
       current={current}
-      method="RPCMCI · ParCorr"
+      method="RPCMCI with ParCorr"
       title={<>Regime-dependent lag-graph evidence</>}
       meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.numRegimes} regimes · lags {run.result.tauMin}–{run.result.tauMax} · graph alpha {run.result.alphaLevel}</>}
     >
@@ -1080,7 +1080,7 @@ function CdnotsResult({ run, current }: { readonly current: boolean; readonly ru
   }))))
   const context = run.result.contextVariables.length === 0 ? 'no time-context node' : run.result.contextVariables.join(' + ')
   return (
-    <ResultCard run={run} current={current} method={`${method} · ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.observedVariables} observed variables · maximum lag {run.result.maxLag} · {context}</>}>
+    <ResultCard run={run} current={current} method={`${method} with ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.observedVariables} observed variables · maximum lag {run.result.maxLag} · {context}</>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} structure`} />
@@ -2171,7 +2171,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       id="discovery"
       stage={stage}
       inspector={{ title: 'Prepared dataset and method requirements', body: inspector }}
-      bottom={{ title: `Runs · ${runs.length}`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+      bottom={{ title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
   )
 }

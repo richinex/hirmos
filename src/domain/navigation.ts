@@ -11,13 +11,14 @@ export const CHAPTER_IDS = [
   'estimation',
   'sensitivity',
   'counterfactual',
+  'root-cause',
   'survival',
   'results',
 ] as const
 
 export type ChapterId = (typeof CHAPTER_IDS)[number]
 
-const CHAPTER_SECTION_TITLES = ['Set up', 'Time series', 'Model', 'Estimate', 'Time to event', 'Report'] as const
+const CHAPTER_SECTION_TITLES = ['Set up', 'Time series', 'Model', 'Estimate', 'Root cause', 'Time to event', 'Report'] as const
 type ChapterSectionTitle = (typeof CHAPTER_SECTION_TITLES)[number]
 
 export interface ChapterMetadata {
@@ -38,6 +39,7 @@ export const CHAPTER_METADATA = {
   estimation: { name: 'Estimation', shortName: 'Estimate', icon: 'query_stats', section: 'Estimate' },
   sensitivity: { name: 'Sensitivity', shortName: 'Sensitivity', icon: 'fact_check', section: 'Estimate' },
   counterfactual: { name: 'Counterfactuals', shortName: 'What if', icon: 'alt_route', section: 'Estimate' },
+  'root-cause': { name: 'Root-cause analysis', shortName: 'Root cause', icon: 'root_cause', section: 'Root cause' },
   survival: { name: 'Survival analysis', shortName: 'Survival', icon: 'vital_signs', section: 'Time to event' },
   results: { name: 'Results', shortName: 'Results', icon: 'monitoring', section: 'Report' },
 } as const satisfies Readonly<Record<ChapterId, ChapterMetadata>>

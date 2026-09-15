@@ -94,11 +94,6 @@ fn median_kernel_precision(matrix: &DMatrix<f64>) -> f64 {
     1.0 / (width * width)
 }
 
-fn gaussian_gram(matrix: &DMatrix<f64>) -> DMatrix<f64> {
-    let precision = median_kernel_precision(matrix);
-    gaussian_gram_with_precision(matrix, precision)
-}
-
 fn gaussian_gram_with_precision(matrix: &DMatrix<f64>, precision: f64) -> DMatrix<f64> {
     DMatrix::from_fn(matrix.nrows(), matrix.nrows(), |left, right| {
         let squared = (0..matrix.ncols())
@@ -134,11 +129,11 @@ fn gamma_survival(statistic: f64, mean: f64, variance: f64) -> Result<f64, KciEr
     Ok(spec_math::cephes64::igamc(shape, statistic / scale).clamp(0.0, 1.0))
 }
 
-fn unconditional(x: &DMatrix<f64>, y: &DMatrix<f64>) -> Result<KciResult, KciError> {
+fn unconditional(x: &DMatrix<f64>, y: &DMatrix<f64>, width: &mut impl FnMut(&DMatrix<f64>)->f64) -> Result<KciResult, KciError> {
     // KCI_UInd chooses its median width on the incoming values and only then
     // standardises the values used to build the Gram matrix.
-    let x_precision = median_kernel_precision(x);
-    let y_precision = median_kernel_precision(y);
+    let x_precision = width(x);
+    let y_precision = width(y);
     let x = zscore(x);
     let y = zscore(y);
     let kx = center(&gaussian_gram_with_precision(&x, x_precision));
@@ -316,6 +311,7 @@ fn conditional(
     x: &DMatrix<f64>,
     y: &DMatrix<f64>,
     z: &DMatrix<f64>,
+    width: &mut impl FnMut(&DMatrix<f64>)->f64,
 ) -> Result<KciResult, KciError> {
     let x = zscore(x);
     let y = zscore(y);
@@ -327,9 +323,9 @@ fn conditional(
             0.5 * z[(row, column - x.ncols())]
         }
     });
-    let kx = center(&gaussian_gram(&xz));
-    let ky = center(&gaussian_gram(&y));
-    let kz = center(&gaussian_gram(&z));
+    let kx = center(&gaussian_gram_with_precision(&xz,width(&xz)));
+    let ky = center(&gaussian_gram_with_precision(&y,width(&y)));
+    let kz = center(&gaussian_gram_with_precision(&z,width(&z)));
     let n = x.nrows();
     let epsilon = 1e-3;
     let regularized = kz + DMatrix::identity(n, n) * epsilon;
@@ -377,6 +373,23 @@ pub fn kernel_conditional_independence(
     y: &DMatrix<f64>,
     z: Option<&DMatrix<f64>>,
 ) -> Result<KciResult, KciError> {
+    median_test(x,y,z,&mut median_kernel_precision)
+}
+
+/// The pinned causal-learn 0.1.4.8 median-width subset, with explicit random state.
+pub fn kernel_conditional_independence_with_rng(
+    x:&DMatrix<f64>,y:&DMatrix<f64>,z:Option<&DMatrix<f64>>,rng:&mut crate::nprandom::Mt19937,
+)->Result<KciResult,KciError> {
+    median_test(x,y,z,&mut |matrix:&DMatrix<f64>| {
+        if matrix.nrows()<=1000 {return median_kernel_precision(matrix);}
+        let order=rng.permutation(matrix.nrows());
+        let subset=DMatrix::from_fn(1000,matrix.ncols(),|r,c|matrix[(order[r],c)]);
+        median_kernel_precision(&subset)
+    })
+}
+
+fn median_test(x:&DMatrix<f64>,y:&DMatrix<f64>,z:Option<&DMatrix<f64>>,
+    width:&mut impl FnMut(&DMatrix<f64>)->f64)->Result<KciResult,KciError> {
     if x.nrows() == 0 || y.nrows() == 0 {
         return Err(KciError::EmptySample);
     }
@@ -398,7 +411,7 @@ pub fn kernel_conditional_independence(
     }
     let z = z.map(remove_constant_columns);
     match z.as_ref() {
-        Some(conditioning) if conditioning.ncols() > 0 => conditional(&x, &y, conditioning),
-        _ => unconditional(&x, &y),
+        Some(conditioning) if conditioning.ncols() > 0 => conditional(&x, &y, conditioning,width),
+        _ => unconditional(&x, &y,width),
     }
 }

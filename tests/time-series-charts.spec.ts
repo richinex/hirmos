@@ -46,8 +46,11 @@ test('count plots share one time window through theme changes and expansion', as
     }).filter(Boolean)
   })
   await expect.poll(ranges).toEqual([[90, 110], [90, 110]])
-  await page.getByRole('button', { name: 'Change theme', exact: true }).click()
-  await expect.poll(ranges).toEqual([[90, 110], [90, 110]])
+  for (let index = 0; index < 4; index++) {
+    await page.getByRole('button', { name: 'Change theme', exact: true }).click()
+    await expect.poll(ranges).toEqual([[90, 110], [90, 110]])
+    await page.screenshot({ path: info.outputPath(`theme-${index}-plots.png`) })
+  }
   await page.getByTestId('count-fit-plot').filter({ visible: true }).getByRole('button', { name: /floating window/ }).click()
   await expect.poll(ranges).toEqual([[90, 110], [90, 110], [90, 110]])
   await page.getByRole('button', { name: 'Close the floating window', exact: true }).click()

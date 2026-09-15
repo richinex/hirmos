@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { EMPTY_ROOT_CAUSE, rootCauseWorkspaceSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
 import type { DagCheckArtifact } from './dagValidation'
@@ -57,6 +58,7 @@ export interface PersistedProject {
   readonly counterfactualRuns: readonly CounterfactualRunArtifact[]
   readonly survivalRuns: readonly SurvivalRunArtifact[]
   readonly timeSeriesRuns: readonly TimeSeriesRun[]
+  readonly rootCause: RootCauseWorkspace
 }
 
 /** The lines a project list shows without opening the record. */
@@ -96,7 +98,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
       if (workflow.restore !== null) return null
       return {
         kind: 'hirmos-project', version: 1, savedAt, origin: workflow.origin, project: workflow.project, source: null, profile: null, prepared: null, stationarity: null,
-        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [],
+        grangerEvidence: [], countSeriesModels: [], discoveryRuns: [], dagDocuments: [], dagChecks: [], interventionQueries: [], studyDraft: EMPTY_STUDY_DRAFT, studies: [], identifications: [], estimationRuns: [], sensitivityRuns: [], counterfactualRuns: [], survivalRuns: [], timeSeriesRuns: [], rootCause: EMPTY_ROOT_CAUSE,
       }
     case 'sql-inputs-chosen':
     case 'pipeline-opened':
@@ -130,6 +132,7 @@ export function snapshotWorkflow(workflow: Workflow, savedAt: string): Persisted
         counterfactualRuns: workflow.counterfactualRuns,
         survivalRuns: workflow.survivalRuns,
         timeSeriesRuns: workflow.timeSeriesRuns,
+        rootCause: workflow.rootCause,
       }
     default: return null
   }
@@ -209,6 +212,7 @@ const envelopeSchema = z.object({
   counterfactualRuns: z.array(artifact),
   survivalRuns: z.array(artifact).default([]),
   timeSeriesRuns: z.array(timeSeriesRunSchema).default([]),
+  rootCause: rootCauseWorkspaceSchema.default(EMPTY_ROOT_CAUSE),
 })
 type ParsedEnvelope = z.output<typeof envelopeSchema>
 

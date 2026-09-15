@@ -274,7 +274,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
             data-segment-option
             title={option.title}
             className={cn(
-              'relative grid cursor-pointer place-items-center whitespace-nowrap border border-transparent transition-colors duration-(--motion-fast) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal pointer-coarse:min-h-10',
+              'relative grid cursor-pointer place-items-center whitespace-nowrap border border-transparent transition-colors duration-(--motion-fast) has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-signal pointer-coarse:min-h-11',
               form === 'line' ? 'rounded-sm' : 'rounded-md',
               SIZE[form][size],
               fill && 'min-w-0 flex-1 basis-0 truncate text-center',

@@ -13,7 +13,7 @@ type Figure = { readonly title: string; readonly startRow: number; readonly seri
 function Figures({ figures, axis }: { readonly figures: readonly Figure[]; readonly axis: PlotTime }) {
   const theme = useChartTheme()
   const [window, setWindow] = useState<VisibleWindow | null>(null)
-  return <div className="grid min-w-0 gap-3" data-testid="long-run-charts">{figures.map((figure, i) => <div key={figure.title} className="min-w-0 rounded-lg border border-hair bg-panel p-3">
+  return <div className="grid min-w-0 gap-6" data-testid="long-run-charts">{figures.map((figure, i) => <div key={figure.title} className="min-w-0">
     <h4 className={label('m-0 text-faint')}>{figure.title}</h4>
     <ExpandableChart option={longRunOption({ ...figure, axis, slider: i === 0 }, theme)} label={figure.title} className="mt-1 h-72" window={window} onWindow={setWindow} />
   </div>)}</div>

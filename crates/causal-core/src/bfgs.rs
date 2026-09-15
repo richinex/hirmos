@@ -2,10 +2,11 @@
 //! is fitted with `method="bfgs"`. The line search is `line_search_wolfe1`, which drives the
 //! same MINPACK `dcsrch` the L-BFGS-B port uses.
 //!
-//! The `line_search_wolfe2` fallback is not ported. `BfgsResult::line_search_failed` reports
-//! whether scipy would have reached for it.
+//! `fmin_bfgs` retains the earlier Wolfe-1-only contract. `fmin_bfgs_complete`
+//! also tries SciPy's Wolfe-2 fallback; results retain its invocation count.
 
 use crate::lbfgsb::{Dcsrch, SrchTask};
+mod wolfe2;
 
 #[derive(Clone, Debug)]
 pub enum BfgsEvaluation {
@@ -23,6 +24,7 @@ pub struct BfgsResult {
     /// scipy's `warnflag`: 0 success, 1 maxiter, 2 line search or loss of precision.
     pub warnflag: u8,
     pub line_search_failed: bool,
+    pub wolfe2_calls: usize,
     /// Ordered objective and gradient calls, including their evaluation points.
     pub evaluations: Vec<BfgsEvaluation>,
 }
@@ -165,6 +167,23 @@ where
     F: Fn(&[f64]) -> f64,
     G: Fn(&[f64]) -> Vec<f64>,
 {
+    minimize(f,g,x0,gtol,maxiter,SearchMode::Wolfe1)
+}
+
+/// SciPy BFGS with its Wolfe-2 fallback enabled. Existing callers retain Wolfe-1 only.
+pub fn fmin_bfgs_complete<F, G>(f: F, g: G, x0: &[f64], gtol: f64, maxiter: usize) -> BfgsResult
+where
+    F: Fn(&[f64]) -> f64,
+    G: Fn(&[f64]) -> Vec<f64>,
+{
+    minimize(f,g,x0,gtol,maxiter,SearchMode::WithFallback)
+}
+
+#[derive(Clone,Copy)]
+enum SearchMode {Wolfe1,WithFallback}
+
+fn minimize<F,G>(f:F,g:G,x0:&[f64],gtol:f64,maxiter:usize,mode:SearchMode)->BfgsResult
+where F:Fn(&[f64])->f64,G:Fn(&[f64])->Vec<f64> {
     let n = x0.len();
     let mut ev = Counted {
         f: &f,
@@ -190,13 +209,14 @@ where
     let mut k = 0;
     let mut warnflag = 0u8;
     let mut line_search_failed = false;
+    let mut wolfe2_calls = 0;
     let mut gnorm = norm_inf(&gfk);
 
     while gnorm > gtol && k < maxiter {
         let pk: Vec<f64> = (0..n)
             .map(|i| -(0..n).map(|j| hk[i * n + j] * gfk[j]).sum::<f64>())
             .collect();
-        let ls = line_search_wolfe1(
+        let mut ls = line_search_wolfe1(
             &mut ev,
             &xk,
             &pk,
@@ -209,6 +229,10 @@ where
             amax,
             xtol,
         );
+        if ls.stp.is_none() && matches!(mode, SearchMode::WithFallback) {
+            wolfe2_calls += 1;
+            ls = wolfe2::search(&mut ev,&xk,&pk,&gfk,old_fval,old_old_fval,c1,c2,amax);
+        }
         let alpha = match ls.stp {
             Some(a) => a,
             None => {
@@ -290,6 +314,7 @@ where
         nit: k,
         warnflag,
         line_search_failed,
+        wolfe2_calls,
         evaluations,
     }
 }

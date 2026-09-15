@@ -1,0 +1,15 @@
+These fixtures were copied unchanged from the local rust-causal-transpile
+oracle/fixtures directory on 2026-09-15 to satisfy existing include_str! paths:
+lapack_triangular.json, lapack_dgelsy.json, lapack_rq.json, slsqp.json.
+
+The companion reproductions/clsa/data/aft-optimizer.json was copied unchanged
+from the matching path in that repository.
+
+Known check failure, not waived:
+slsqp::tests::checked_slsqp_constraints_and_limits_match_scipy
+case "incompatible", maxiter=1, parameter 0:
+Rust 1.9999999999986093; oracle 2.000000000000556.
+The difference exceeds the existing 2e-13 relative/absolute-scaled tolerance.
+Reproduced in both debug and release in the current worktree, and in an
+isolated archive of Hirmos commit 7e54e11 with the same fixtures. No numerical
+implementation or test tolerance was changed to suppress the discrepancy.

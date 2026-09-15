@@ -31,7 +31,7 @@ function Stat({ name, value, tone = 'ink' }: { readonly name: string; readonly v
   )
 }
 
-/** The hairline stat list: cells separated by the `hair` colour showing through a 1px gap. */
+/** A compact definition list on the shared numeric surface. */
 function StatList({ children }: { readonly children: React.ReactNode }) {
   return <dl className={figureGrid('m-0 grid-cols-2 @max-[300px]/inspector:grid-cols-1')}>{children}</dl>
 }

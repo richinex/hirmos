@@ -1,0 +1,25 @@
+/* Soft UI colour adaptations; see docs/explanations/additional-themes.md. */
+:root[data-theme='soft-dark'] {
+  color-scheme: dark;
+  --color-stage: #222222;
+  --color-column: #222222;
+  --color-panel: #222222;
+  --color-well: #2c2c2c;
+  --color-raised: #2c2c2c;
+  --color-line: #353535;
+  --color-hair: #444444;
+  --color-edge: #626262;
+  --color-control: #999999;
+  --color-ink: #F7F8F9;
+  --color-bone: #dddddd;
+  --color-muted: #bcbcbc;
+  --color-faint: #aaaaaa;
+  --color-dim: #444444;
+  --color-signal: #aaa3ff;
+  --color-signal-ink: #222222;
+  --color-signal-line: #7A71FB;
+  --color-rail: #222222;
+  --color-rail-ink: #F7F8F9;
+  --color-rail-faint: #aaaaaa;
+  --color-rail-signal: #aaa3ff;
+}

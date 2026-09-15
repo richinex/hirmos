@@ -9,7 +9,7 @@ import { TimeSeriesEquation } from './TimeSeriesEquation'
 import { LongRunCharts } from './LongRunCharts'
 import { ArdlModelResult } from './ArdlModelResult'
 import { VecmForecastChart } from './VecmForecastChart'
-import { panel, table, td, th } from '@/components/ui/recipes'
+import { resultSurface, resultTitle, table, td, th } from '@/components/ui/recipes'
 
 const number = (value: number) => formatStatistic('raw', value).text
 
@@ -45,5 +45,5 @@ export function TimeSeriesRunResult({ run }: { readonly run: TimeSeriesRun }) {
       default: return assertNever(run)
     }
   })()
-  return <section className={panel('flex flex-col gap-4 p-(--panel-space) text-body text-muted')} aria-label="Time-series result"><h3 className="m-0 text-title text-ink">{timeSeriesRunLabel(run)}</h3>{content}<LongRunCharts key={run.id} run={run} />{run.kind==='vecm'&&<VecmForecastChart run={run} />}<TimeSeriesEquation run={run} /><p className="m-0 text-label text-faint">{run.evidence.observations} observations · {formatTime(run.createdAt)}</p></section>
+  return <section className={resultSurface('text-body text-muted')} aria-label="Time-series result"><h3 className={`${resultTitle} m-0`}>{timeSeriesRunLabel(run)}</h3>{content}<LongRunCharts key={run.id} run={run} />{run.kind==='vecm'&&<VecmForecastChart run={run} />}<TimeSeriesEquation run={run} /><p className="m-0 text-label text-faint">{run.evidence.observations} observations · {formatTime(run.createdAt)}</p></section>
 }

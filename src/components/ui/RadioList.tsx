@@ -62,7 +62,7 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
               key={option.value}
               title={option.title}
               className={cn(
-                'relative grid grid-cols-[auto_1fr] items-start gap-x-2.5 rounded-md border px-2.5 py-1.5 transition-colors duration-(--motion-fast)',
+                'relative grid grid-cols-[auto_1fr] items-start gap-x-2.5 rounded-md border px-2.5 py-1.5 transition-colors duration-(--motion-fast) pointer-coarse:min-h-11',
                 option.disabled ? 'cursor-not-allowed text-faint' : 'cursor-pointer',
                 chosen ? 'border-edge bg-raised' : 'border-transparent hover:border-hair',
               )}

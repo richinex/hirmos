@@ -11,13 +11,13 @@ use nalgebra::DMatrix;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct CiKey {
+pub(crate) struct CiKey {
     pair: (usize, usize),
     given: Vec<usize>,
 }
 
 impl CiKey {
-    fn new(x: usize, y: usize, given: &[usize]) -> Self {
+    pub(crate) fn new(x: usize, y: usize, given: &[usize]) -> Self {
         let pair = if x <= y { (x, y) } else { (y, x) };
         let mut given = given.to_vec();
         given.sort_unstable();

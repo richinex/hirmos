@@ -1,5 +1,6 @@
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { RunFold } from '@/components/ui/RunFold'
+import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
 import { CausalHierarchy } from './CausalHierarchy'
 import { useId, useMemo, useReducer } from 'react'
@@ -285,7 +286,7 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
   if (!current) {
     // History rows fold to one line in the studies drawer; only the newest record keeps the stage.
     return (
-      <RunFold title={title} figure={ledgerLabel(result)} stamp={`${study.dagName} · ${formatTime(study.createdAt)}`}>
+      <RunFold title={title} figure={ledgerLabel(result)} stamp={<RunMeta>{[study.dagName, formatTime(study.createdAt)]}</RunMeta>}>
         {body}
       </RunFold>
     )
@@ -662,7 +663,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
           ? (
             <li key={study.id} className="flex flex-wrap items-baseline justify-between gap-2 px-3 py-1.5">
               <span className="text-ink">{estimandSentence(study)}</span>
-              <span className={num('text-micro text-faint')}>pending · {study.dagName} · {formatTime(study.createdAt)}</span>
+              <span className={num('text-label text-faint')}><RunMeta>{['Pending', study.dagName, formatTime(study.createdAt)]}</RunMeta></span>
             </li>
           )
           : (
@@ -684,7 +685,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       id="study"
       stage={stage}
       inspector={{ title: 'Graph, roles, and method requirements', body: inspector }}
-      bottom={{ title: `Studies · ${studies.length}`, body: ledger, defaultSize: 150 }}
+      bottom={{ title: `Studies (${studies.length})`, body: ledger, defaultSize: 150 }}
     />
   )
 }

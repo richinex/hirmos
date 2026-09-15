@@ -95,16 +95,18 @@ export function EChart({ option, label, className = 'h-[260px]', style, testId, 
       resize = new ResizeObserver(() => {
         if (!sized()) return
         if (chart.current === null) mount()
-        else chart.current.resize()
+        else if (chart.current.getWidth() !== element.clientWidth || chart.current.getHeight() !== element.clientHeight) chart.current.resize()
       })
       resize.observe(element)
       if (sized()) mount()
       // Every label decision — overlap hiding, truncation, the grid's shrink-to-fit — is computed from
       // text measured through an offscreen canvas, and cached. Measured before the webfont arrives, those
       // are fallback metrics that are never revisited, so re-lay out once the real face has loaded.
-      void document.fonts?.ready.then(() => {
-        if (!cancelled && chart.current !== null) chart.current.resize()
-      })
+      if (document.fonts?.status === 'loading') {
+        void document.fonts.ready.then(() => {
+          if (!cancelled && chart.current !== null) chart.current.resize()
+        })
+      }
     }).catch(() => { if (!cancelled) setFailed(true) })
     return () => {
       cancelled = true

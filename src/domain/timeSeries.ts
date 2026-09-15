@@ -134,9 +134,9 @@ export function parseTimeSeriesRun(value: unknown): Result<TimeSeriesRun, string
 
 export const timeSeriesRunLabel = (run: TimeSeriesRun): string => {
   switch (run.kind) {
-    case 'ardl-model': return `ARDL · ${run.outcome.name}`
-    case 'ardl': return `ARDL · ${run.outcome.name} and ${run.predictor.name}`
-    case 'vecm': return `VECM · ${run.variables.map((variable) => variable.name).join(', ')}`
+    case 'ardl-model': return `ARDL for ${run.outcome.name}`
+    case 'ardl': return `ARDL for ${run.outcome.name} and ${run.predictor.name}`
+    case 'vecm': return `VECM for ${run.variables.map((variable) => variable.name).join(', ')}`
     default: return assertNever(run)
   }
 }

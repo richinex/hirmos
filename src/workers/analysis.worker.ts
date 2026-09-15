@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { ardlModelResponseSchema } from '@/domain/ardlModel'
+import { rootCauseResponseSchema } from '@/domain/rootCauseAnalysis'
+import { rootCauseChecksResponseSchema } from '@/domain/rootCauseAnalysis'
 import { parseMulticollinearityEvidence } from '@/domain/multicollinearity'
 import { parseGrangerSsrEvidence } from '@/domain/granger'
 /// <reference lib="webworker" />
@@ -371,6 +373,10 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
     case 'ardl-model':
       return { kind: 'ardlModel', rows: command.rows, columns: command.columns, model: command.model }
+    case 'root-cause':
+      return { kind: 'rootCause', request: command.model }
+    case 'root-cause-checks':
+      return { kind: 'rootCauseChecks', request: command.model }
     case 'vecm':
       return { kind: 'vecm', rows: command.rows, columns: command.columns, endogenous: command.endogenous, maxLags: command.maxLags, deterministic: command.deterministic, significance: command.significance, breakIndex: command.breakIndex, forecastSteps: command.forecastSteps ?? null }
     case 'synthetic-control':
@@ -776,6 +782,18 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = ardlModelResponseSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'ardl-model-succeeded', request: command.request, result: result.data.evidence })
+        return
+      }
+      case 'root-cause': {
+        const result = rootCauseResponseSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'root-cause-succeeded', request: command.request, result: result.data.evidence })
+        return
+      }
+      case 'root-cause-checks': {
+        const result = rootCauseChecksResponseSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'root-cause-checks-succeeded', request: command.request, result: result.data.evidence })
         return
       }
       case 'vecm': {

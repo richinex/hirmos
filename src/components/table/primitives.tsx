@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { facet, literal, num, panel, rowPadding, sectionTitle, segment, tableFoot, th } from '@/components/ui/recipes'
+import { facet, literal, num, panel, rowPadding, segment, tableFoot, th } from '@/components/ui/recipes'
 import type { HistogramBins } from '@/domain/dataset'
 import type { TableDensity } from '@/domain/shellLayout'
 import { formatCount } from '@/lib/format/number'
@@ -35,9 +35,10 @@ export function DensityToggle({ density, onChange }: { readonly density: TableDe
   )
 }
 
-export function TableShell({ title, titleId, toolbar, lead, count, foot, children, className, scrollRef, collapsible = false, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]', frame = 'panel' }: {
+export function TableShell({ title, titleId, titleHelp, toolbar, lead, count, foot, children, className, scrollRef, collapsible = false, titleHidden = false, maxHeight = 'max-h-[clamp(240px,52cqb,560px)]', frame = 'panel' }: {
   readonly title: string
   readonly titleId: string
+  readonly titleHelp?: ReactNode
   /** Search, facets, chips: the row under the title. */
   readonly toolbar?: ReactNode
   readonly lead?: ReactNode
@@ -47,6 +48,8 @@ export function TableShell({ title, titleId, toolbar, lead, count, foot, childre
   readonly children: ReactNode
   readonly className?: string
   readonly scrollRef?: React.RefObject<HTMLDivElement | null>
+  /** The parent pane supplies the visible heading; retain this table's accessible name. */
+  readonly titleHidden?: boolean
   /** Let the title fold the body away, for a table read once and then kept out of the way. */
   readonly collapsible?: boolean
   readonly maxHeight?: string
@@ -64,20 +67,20 @@ export function TableShell({ title, titleId, toolbar, lead, count, foot, childre
   return (
     <section className={cn('flex min-h-0 min-w-0 flex-col overflow-hidden', frame === 'panel' && panel(), className)} aria-labelledby={titleId}>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-hair px-3.5 py-2">
-        {collapsible ? (
+        <div className="flex min-w-0 items-center gap-1">{collapsible ? (
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
             aria-expanded={open}
             aria-controls={`${titleId}-body`}
-            className={cn(sectionTitle, '-mx-1 flex items-center gap-1.5 rounded px-1 transition-colors hover:text-muted')}
+            className="-mx-1 flex items-center gap-1.5 rounded px-1 text-body font-medium text-ink transition-colors hover:text-muted"
           >
             <Icon name="expand_more" size={14} className={cn('shrink-0 transition-transform duration-(--motion-fast)', open && 'rotate-180')} />
             <span id={titleId}>{title}</span>
           </button>
         ) : (
-          <h3 id={titleId} className={cn(sectionTitle, 'm-0')}>{title}</h3>
-        )}
+          <h3 id={titleId} className={titleHidden ? 'sr-only' : 'm-0 text-body font-medium text-ink'}>{title}</h3>
+        )}{titleHelp}</div>
         {toolbar && !folded && <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
       </div>
       {!folded && lead}

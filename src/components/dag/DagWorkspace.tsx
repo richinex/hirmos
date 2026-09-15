@@ -1,4 +1,5 @@
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { Orb } from '@/components/ui/Orb'
 import { Alert } from '@/components/ui/Alert'
 import { Select } from '@/components/ui/Select'
@@ -62,6 +63,8 @@ import { analyseDagCausalFlow, type DagCausalFlow } from '@/domain/dagFlow'
 import { EMPTY_STUDY_DRAFT, type StudyDesignDraft } from '@/domain/study'
 import { EvidenceInspector } from './EvidenceInspector'
 
+import { prepareRootCauseGraph, type RootCauseSelection } from '@/domain/rootCause'
+
 interface DagWorkspaceProps {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -76,6 +79,7 @@ interface DagWorkspaceProps {
   readonly onCheck: (check: DagCheckArtifact) => void
   /** Opens Study Design; offered only on a structurally valid revision. */
   readonly onUseForStudy: () => void
+  readonly onUseForRootCause: (selection: RootCauseSelection) => void
   /** The treatment and outcome being bound, shared with Study Design. */
   readonly studyDraft: StudyDesignDraft
   readonly onStudyDraftChanged: (draft: StudyDesignDraft) => void
@@ -391,10 +395,11 @@ function AdjustmentSentence({ document, flow }: { readonly document: DagDocument
   }
 }
 
-function ValidationPanel({ document, flow, onUseForStudy, onSelectEdge }: {
+function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onSelectEdge }: {
   readonly document: DagDocument
   readonly flow: DagCausalFlow | null
   readonly onUseForStudy: () => void
+  readonly onUseForRootCause: (() => void) | null
   readonly onSelectEdge: (edge: DagEdgeId) => void
 }) {
   const plan = useMemo(() => planDagImplications(document), [document])
@@ -436,17 +441,20 @@ function ValidationPanel({ document, flow, onUseForStudy, onSelectEdge }: {
         </div>
       )}
       {flow !== null && (
-        <div className="mt-3 border-t border-hair pt-3" aria-label="Adjustment">
+        <div className="mt-6" aria-label="Adjustment">
           <span className="block text-label text-faint">Back-door paths</span>
           <div className="mt-1"><AdjustmentSentence document={document} flow={flow} /></div>
           {flow.laggedArrows > 0 && <p className="mb-0 mt-1 text-label text-faint">{flow.laggedArrows} lagged arrow{flow.laggedArrows === 1 ? '' : 's'} left to CausalEffects; this reads the same-period graph.</p>}
           <PathList document={document} flow={flow} />
         </div>
       )}
-      {validation.kind === 'structurally-valid' && (
-        <button type="button" className={button('signal', 'mt-3')} onClick={onUseForStudy}>Use for study</button>
-      )}
-      <div className="mt-3 border-t border-hair pt-3 text-body text-muted">
+      <div role="group" aria-label="Use this graph" className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap empty:hidden">
+        {validation.kind === 'structurally-valid' && (
+          <button type="button" className={button('outline')} onClick={onUseForStudy}>Use for study</button>
+        )}
+        {onUseForRootCause !== null && <button type="button" className={button('outline')} onClick={onUseForRootCause}>Use for root-cause analysis</button>}
+      </div>
+      <div className="mt-6 text-body text-muted">
         {plan.kind === 'test' && (
           <details>
             <summary className="text-ink">{plan.implications.length} testable graph implication{plan.implications.length === 1 ? '' : 's'}</summary>
@@ -558,7 +566,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
     : 'Testing graph implications…'
 
   return (
-    <section className="border-t border-hair pt-4" aria-labelledby="graph-check-title">
+    <section className="pt-4" aria-labelledby="graph-check-title">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h3 id="graph-check-title" className="m-0 text-body font-medium text-ink">Graph checks</h3>
@@ -643,6 +651,7 @@ export function DagWorkspace({
   onDocumentRevised,
   onCheck,
   onUseForStudy,
+  onUseForRootCause,
   studyDraft,
   onStudyDraftChanged, source, interventionQueries, onInterventionQuery }: DagWorkspaceProps) {
   const [state, dispatch] = useReducer(stepDagWorkspace, documents, initialState)
@@ -864,22 +873,24 @@ export function DagWorkspace({
           {documents.map((candidate) => <button key={candidate.id} type="button" className={segment(candidate.id === document.id)} aria-pressed={candidate.id === document.id} onClick={() => dispatch({ type: 'document-selected', document: candidate.id, latestRun: latestRunId(discoveryRuns) })}>{candidate.name}</button>)}
         </div>
       )}
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h3 className="mb-1 mt-0 text-title font-medium text-ink">{document.name}</h3>
-          <p className="m-0 text-label text-faint">Active revision {document.history.length + 1} of {document.history.length + document.future.length + 1} · {document.audit.length} retained · {describeDagOrigin(document.origin)}</p>
+          <p className="m-0 text-label text-faint">{describeDagOrigin(document.origin)}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="DAG actions">
-          <div className="flex overflow-hidden rounded-lg border border-hair bg-panel" aria-label="DAG revision controls">
-            <button type="button" disabled={document.history.length === 0} className={button('quiet', 'rounded-none border-0')} onClick={() => moveRevision(document, 'undo')} aria-label="Undo DAG revision" title="Undo DAG revision"><Icon name="undo" size={15} /></button>
-            <button type="button" disabled={document.future.length === 0} className={button('quiet', 'rounded-none border-0 border-l border-hair')} onClick={() => moveRevision(document, 'redo')} aria-label="Redo DAG revision" title="Redo DAG revision"><Icon name="redo" size={15} /></button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-4" role="toolbar" aria-label="DAG actions">
+          <div className="flex basis-full items-center gap-2 sm:basis-auto" role="group" aria-label="DAG revision controls">
+            <button type="button" disabled={document.history.length === 0} className={button('quiet')} onClick={() => moveRevision(document, 'undo')} aria-label="Undo DAG revision" title="Undo DAG revision"><Icon name="undo" size={15} /></button>
+            <span className="whitespace-nowrap text-label tabular-nums text-muted">Revision {document.history.length + 1} of {document.history.length + document.future.length + 1}</span>
+            <button type="button" disabled={document.future.length === 0} className={button('quiet')} onClick={() => moveRevision(document, 'redo')} aria-label="Redo DAG revision" title="Redo DAG revision"><Icon name="redo" size={15} /></button>
+            <ParameterHelp label="revision history" help={`${document.audit.length} revisions retained. Undo and redo change the active revision without deleting retained revisions.`} />
           </div>
           <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'latent-variable-add-requested' })}><Icon name="add" size={14} /> Unmeasured variable</button>
           <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'new-document-requested' })}>Create a DAG</button>
         </div>
       </div>
       {/* A fixed label width keeps the two selects aligned whether they sit side by side or wrap onto their own lines. */}
-      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2" role="group" aria-label="Study binding">
+      <div className="mb-6 flex flex-wrap items-center gap-3" role="group" aria-label="Study binding">
         <label className="flex items-center gap-3 text-body text-ink"><span className="w-20 shrink-0">Treatment</span>
           <Select aria-label="Treatment" className={field('text', 'w-40')} value={boundTreatment ?? ''} onChange={(event) => bind('treatment', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
             <option value="">Choose</option>
@@ -929,7 +940,7 @@ export function DagWorkspace({
   )
 
   const addEdgeForm = (
-    <section className="border-t border-hair pt-4" aria-labelledby="add-edge-title">
+    <section className="pt-4" aria-labelledby="add-edge-title">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 id="add-edge-title" className="m-0 text-body font-medium text-ink">Add an arrow or use the editor</h3>
         {(state.cause !== null || state.effect !== null || state.rationale.length > 0) && <button type="button" className="text-label text-muted hover:text-ink" onClick={() => dispatch({ type: 'edge-draft-cancelled' })}>Clear the draft</button>}
@@ -965,13 +976,14 @@ export function DagWorkspace({
     </button>
   )
 
+  const rootCause = prepareRootCauseGraph(document, prepared)
   const inspector = (
     <div className="flex flex-col gap-4">
-      <ValidationPanel document={document} flow={flow} onUseForStudy={() => { if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id }); onUseForStudy() }} onSelectEdge={(edge) => { setInspectorTab('selection'); selectEdge(document, edge) }} />
+      <ValidationPanel document={document} flow={flow} onUseForStudy={() => { if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id }); onUseForStudy() }} onUseForRootCause={rootCause.ok ? () => onUseForRootCause({ dagDocument: rootCause.value.dagDocument, dagRevision: rootCause.value.dagRevision, preparedDataset: rootCause.value.preparedDataset }) : null} onSelectEdge={(edge) => { setInspectorTab('selection'); selectEdge(document, edge) }} />
       <GraphCheckPanel source={source} profile={profile} prepared={prepared} document={document} checks={checks} onCheck={onCheck} />
       {inspectorTab === 'selection' && (
         selectedEdge !== null && selectedEdgeDraft !== null ? (
-          <aside className="border-t border-hair pt-4" aria-labelledby="selected-edge-title">
+          <aside className="pt-4" aria-labelledby="selected-edge-title">
             <h3 id="selected-edge-title" className="mb-1 mt-0 text-body font-medium text-ink">{nameOfDagNode(document, selectedEdge.cause)} → {nameOfDagNode(document, selectedEdge.effect)}</h3>
             <p className={`m-0 text-body ${selectedEdge.support.kind === 'unstated' ? 'text-warn' : 'text-faint'}`}>{describeTiming(selectedEdge.timing)} · {describeSupport(selectedEdge.support)}</p>
             <form className="mt-3" onSubmit={(event) => { event.preventDefault(); saveSelectedEdgeDetails(document) }}>
@@ -1035,7 +1047,7 @@ export function DagWorkspace({
         controls: <div className="flex gap-1">{tab('selection', 'ads_click', 'Selection')}{tab('evidence', 'schema', 'Evidence')}{tab('intervene', 'bolt', 'Intervene')}</div>,
         body: inspector,
       }}
-      bottom={{ title: `Arrows · ${document.current.graph.edges.length}`, body: ledger, defaultSize: 150 }}
+      bottom={{ title: `Arrows (${document.current.graph.edges.length})`, body: ledger, defaultSize: 150 }}
     />
   )
 }

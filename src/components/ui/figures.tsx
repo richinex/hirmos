@@ -32,7 +32,7 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
   readonly value: Formatted
   readonly context?: ReactNode
   readonly size?: 'hero' | 'default' | 'compact'
-  /** `cell` drops the tile's own border for a hairline-joined grid, where the container's 1px gaps draw the rules. */
+  /** `cell` is for a value inside a group that supplies its surface. */
   readonly frame?: 'card' | 'cell'
   readonly className?: string
 }) {
@@ -48,7 +48,7 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
   )
 }
 
-/** The same summary-card layout across analyses; lists retain their semantic wrapper. */
+/** Related numeric summaries share one surface; lists retain their semantic wrapper. */
 export function MetricGrid({children,as:Element='div',className,label,testId}: {
   readonly children:ReactNode
   readonly as?:'div'|'ul'
@@ -56,7 +56,7 @@ export function MetricGrid({children,as:Element='div',className,label,testId}: {
   readonly label?:string
   readonly testId?:string
 }) {
-  return <Element className={cn('metric-cards',className)} aria-label={label} data-testid={testId}>{children}</Element>
+  return <Element className={cn('numeric-surface metric-cards',className)} aria-label={label} data-testid={testId}>{children}</Element>
 }
 
 /** The hero estimate: the estimand sentence, the figure, its named interval, and the scale line. */

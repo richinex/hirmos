@@ -998,6 +998,16 @@ export function runDmlRefutationBatch(values: Float64Array, rows: number, column
   return post('dml-refutation-succeeded', { kind: 'dml-refutation-batch', request, values, rows, columns, ...design }, values)
 }
 
+export function runRootCause(values: Float64Array, model: import('@/domain/rootCauseAnalysis').RootCauseRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/rootCauseAnalysis').RootCauseEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('root-cause-succeeded', { kind: 'root-cause', request, values, model }, values, onProgress)
+}
+
+export function checkRootCause(values: Float64Array, model: import('@/domain/rootCauseAnalysis').RootCauseCheckRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/rootCauseAnalysis').RootCauseChecks, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('root-cause-checks-succeeded', { kind: 'root-cause-checks', request, values, model }, values, onProgress)
+}
+
 export function runArdlModel(values: Float64Array, rows: number, columns: number, model: import('@/domain/ardlModel').ArdlModelRequest): Promise<Result<import('@/domain/ardlModel').ArdlModelEvidence, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
   return post('ardl-model-succeeded', { kind: 'ardl-model', request, values, rows, columns, model }, values)
