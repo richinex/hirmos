@@ -8,7 +8,7 @@ export type ThemeChoice = ThemeName | 'system'
 const KEY = 'hirmos-theme'
 export const THEMES: readonly ThemeName[] = ['dark', 'light', 'soft-dark']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
-export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', light: 'Light', 'soft-dark': 'Soft UI Dark', system: 'System' }
+export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', light: 'Soft UI Light', 'soft-dark': 'Soft UI Dark', system: 'System' }
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 

@@ -460,43 +460,7 @@ button[aria-busy="true"]::after {
 :root[data-theme="light"] { --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.10); }
 .float { box-shadow: var(--shadow-float), inset 0 1px 0 var(--color-highlight); }
 
-/* LIGHT — the same page on paper: a warm-white stage, true-white surfaces, black ink, neutral hairlines.
-   The signal is the lime darkened along its own hue to an olive that reads as text on white (5:1), so the
-   two themes share one answer colour rather than two. */
-:root[data-theme="light"] {
-  --color-stage: #F6F6F2;        /* paper canvas */
-  --color-panel: #FFFFFF;        /* chrome and cards: true white */
-  --color-column: #FAFAF7;       /* conversation column */
-  --color-well: #FFFFFF;         /* input / inset */
-  --color-raised: #EBEBE5;       /* active nav, selected tab */
-
-  --color-line: #E8E8E3;         /* structural divider */
-  --color-hair: #DCDCD5;         /* control border */
-  --color-edge: #C2C2BA;         /* emphasised border */
-  --color-control: #8E8E86;      /* input boundary, 3:1 on the well */
-
-  --color-ink: #0A0A0A;          /* black ink, as printed */
-  --color-bone: #3D3D3A;         /* secondary text */
-  --color-muted: #5F5F5B;        /* labels, section titles — ≥4.5:1 on raised; darker than faint so a label outranks its hint */
-  --color-faint: #6A6A66;        /* SMALLEST TEXT — ≥4.5:1 on every ground incl. raised */
-  --color-dim: #D6D6D0;          /* NON-TEXT ONLY */
-
-  --color-signal: #4D7C0F;       /* the lime, darkened to read on paper. THE answer colour. */
-  --color-signal-ink: #FFFFFF;
-  --color-signal-line: #C5E29A;
-
-  --color-ok: #0F766E;           /* teal, kept off the olive signal */
-  --color-info: #2160A6;
-  --color-warn: #8A5B00;
-  --color-danger: #B3312F;
-
-  --color-highlight: rgba(255, 255, 255, 0.9);
-
-  --color-rail: #0A0A0A;         /* ink on paper */
-  --color-rail-dim: #3A3A3A;
-}
-
-:root[data-theme="light"] body { background: #F6F6F2; }
+/* Light and Soft UI Dark palettes are defined in themes.css. */
 
 /* Reduced motion removes MOVEMENT, not feedback.
    WCAG 2.3.3 is about motion animation: things that travel, scale, spin or slide. A colour change on

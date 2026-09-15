@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const themes = [
-  ['dark', 'Dark'], ['light', 'Light'], ['soft-dark', 'Soft UI Dark'],
+  ['dark', 'Dark'], ['light', 'Soft UI Light'], ['soft-dark', 'Soft UI Dark'],
 ] as const
 
 test('themes preserve preference, readable tokens and chart palette mode', async ({ page }, info) => {
@@ -11,6 +11,16 @@ test('themes preserve preference, readable tokens and chart palette mode', async
     await page.getByRole('button', { name: 'Change theme', exact: true }).click()
     await expect(page.getByRole('dialog', { name: 'Choose theme' })).toHaveCount(0)
     await expect(page.locator('html')).toHaveAttribute('data-theme', id)
+    await expect.poll(() => page.evaluate(() => {
+      const css = getComputedStyle(document.documentElement)
+      const href = document.querySelector<HTMLLinkElement>('link[rel=icon]')!.href
+      const svg = new DOMParser().parseFromString(decodeURIComponent(href.split(',')[1] ?? ''), 'image/svg+xml')
+      return svg.querySelector('g')?.getAttribute('fill') === css.getPropertyValue('--color-signal').trim()
+    })).toBe(true)
+    const mark = page.locator('svg g[fill="var(--color-signal)"]').first()
+    const fill = await mark.evaluate(el => getComputedStyle(el).fill)
+    const expectedFill = await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color='var(--color-signal)'; document.body.append(probe); const value=getComputedStyle(probe).color; probe.remove(); return value })
+    expect(fill).toBe(expectedFill)
     await expect(page.getByRole('button', { name: 'Change theme', exact: true })).toHaveAttribute('title', new RegExp(`Theme: ${label}`))
     const audit = await page.evaluate(async () => {
       const css = getComputedStyle(document.documentElement)
