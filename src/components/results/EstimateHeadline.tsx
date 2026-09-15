@@ -116,6 +116,9 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
       <figure className="m-0" data-testid={testId}>
         <figcaption className="text-title text-ink">{sentence}</figcaption>
         <RowEffectTable effect={estimate.effect} />
+        {estimate.interval.kind !== 'none' && <p className="mb-0 mt-2 text-body text-muted">
+          The {formatPercent(estimate.interval.level, { precision: 0 }).text} confidence interval for the average effect is {formatStatistic('raw', estimate.interval.lower).text} to {formatStatistic('raw', estimate.interval.upper).text}.
+        </p>}
         {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}
         <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
       </figure>

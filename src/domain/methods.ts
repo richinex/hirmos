@@ -1780,7 +1780,7 @@ const T_LEARNER: MethodDefinition = {
     {
       id: caveatId('t-learner-no-interval'),
       category: 'finite-sample',
-      requirement: 'The effects are points without intervals: an interval would need the two forests refitted on resampled rows, which is not offered.',
+      requirement: 'Optional bootstrap intervals refit both forests on resampled independent rows. Row intervals are pointwise, not simultaneous; the average-effect interval uses a conservative standard-error bound.',
       consequenceIfUnmet: 'The spread between rows is read as heterogeneity when part of it is sampling noise in two forests.',
       sources: [ECONML_TLEARNER, KUNZEL_2019],
     },

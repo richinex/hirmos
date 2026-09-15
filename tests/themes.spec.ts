@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 const themes = [
-  ['dark', 'Dark'], ['light', 'Soft UI Light'], ['soft-dark', 'Soft UI Dark'],
+  ['dark', 'Dark'], ['light', 'Soft UI Light'], ['soft-dark', 'Soft UI Dark'], ['original-light', 'Original Light'],
 ] as const
 
 test('themes preserve preference, readable tokens and chart palette mode', async ({ page }, info) => {

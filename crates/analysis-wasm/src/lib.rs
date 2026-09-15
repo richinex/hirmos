@@ -94,6 +94,7 @@ use missingness::{resolve_missingness, MissingnessExecution, MissingnessResoluti
 mod counterfactual;
 mod dag_check;
 mod root_cause;
+mod gcm_effects;
 mod root_cause_checks;
 mod discovery;
 mod dynamic_counterfactual;
@@ -140,6 +141,8 @@ pub fn run_analysis(
         );
     };
     let result = match command {
+        AnalysisCommand::GcmEffects { request } => gcm_effects::run(request, values, &progress)
+            .map(|evidence| AnalysisResult::GcmEffects { evidence }),
         AnalysisCommand::RootCause { request } => root_cause::run(request, values, &progress)
             .map(|evidence| AnalysisResult::RootCause { evidence }),
         AnalysisCommand::RootCauseChecks { request } => root_cause_checks::run(request, values, &progress)
@@ -884,7 +887,8 @@ pub fn run_analysis(
             outcome,
             adjustment,
             seed,
-        } => t_learner(values, rows, columns, treatment, outcome, &adjustment, seed),
+            uncertainty,
+        } => t_learner_with_uncertainty(values, rows, columns, treatment, outcome, &adjustment, seed, uncertainty),
         AnalysisCommand::DmlRefutationBatch {
             rows,
             columns,

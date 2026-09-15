@@ -2,6 +2,33 @@
 
 use super::*;
 
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum BootstrapMethod { Percentile, Pivot, Normal }
+
+#[derive(Default, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum TLearnerUncertainty {
+    #[default]
+    None,
+    Bootstrap { samples: usize, seed: u32, level: f64, method: BootstrapMethod },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BootstrapAverage {
+    pub interval: [f64; 2],
+    pub standard_error_bound: f64,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum TLearnerUncertaintyEvidence {
+    None,
+    Bootstrap { samples: usize, seed: u32, level: f64, method: BootstrapMethod,
+        intervals: Vec<[f64; 2]>, standard_errors: Vec<f64>, average: BootstrapAverage },
+}
+
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum ArdlLongRun {
@@ -830,6 +857,7 @@ pub(crate) enum IdentifiedDiscreteResult {
 )]
 pub(crate) enum AnalysisCommand {
     RootCause { request: crate::root_cause::Request },
+    GcmEffects { request: crate::gcm_effects::Request },
     RootCauseChecks { request: crate::root_cause_checks::Request },
     ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
     StationarityBattery,
@@ -1243,6 +1271,8 @@ pub(crate) enum AnalysisCommand {
         adjustment: Vec<usize>,
         /// Seeds both forests, as the reference clones one estimator per arm.
         seed: u32,
+        #[serde(default)]
+        uncertainty: TLearnerUncertainty,
     },
     DmlRefutationBatch {
         rows: usize,
@@ -1997,6 +2027,7 @@ pub(crate) enum DagFalsificationEvidence {
 )]
 pub(crate) enum AnalysisResult {
     RootCause { evidence: crate::root_cause::Evidence },
+    GcmEffects { evidence: crate::gcm_effects::Evidence },
     RootCauseChecks { evidence: crate::root_cause_checks::Evidence },
     ArdlModel { evidence: crate::ardl_model::Evidence },
     DiscreteStateRefused {
@@ -2578,6 +2609,7 @@ pub(crate) enum AnalysisResult {
         effects: Vec<f64>,
         /// The mean of the row effects, EconML's `ate`.
         average: f64,
+        uncertainty: TLearnerUncertaintyEvidence,
     },
     ArdlPss {
         observations: usize,

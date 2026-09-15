@@ -1,3 +1,33 @@
+/* The original paper palette, retained alongside the Soft UI adaptations. */
+:root[data-theme='original-light'] {
+  color-scheme: light;
+  --color-stage: #F6F6F2;
+  --color-panel: #FFFFFF;
+  --color-column: #FAFAF7;
+  --color-well: #FFFFFF;
+  --color-raised: #EBEBE5;
+  --color-line: #E8E8E3;
+  --color-hair: #DCDCD5;
+  --color-edge: #C2C2BA;
+  --color-control: #8E8E86;
+  --color-ink: #0A0A0A;
+  --color-bone: #3D3D3A;
+  --color-muted: #5F5F5B;
+  --color-faint: #6A6A66;
+  --color-dim: #D6D6D0;
+  --color-signal: #4D7C0F;
+  --color-signal-ink: #FFFFFF;
+  --color-signal-line: #C5E29A;
+  --color-ok: #0F766E;
+  --color-info: #2160A6;
+  --color-warn: #8A5B00;
+  --color-danger: #B3312F;
+  --color-highlight: rgba(255,255,255,.9);
+  --color-rail: #0A0A0A;
+  --color-rail-dim: #3A3A3A;
+  --shadow-lift: 0 0 0 1px rgb(0 0 0 / .05), 0 1px 2px -1px rgb(0 0 0 / .06);
+  --shadow-float: 0 18px 48px rgba(0,0,0,.10);
+}
 /* Soft UI colour adaptations; see docs/explanations/additional-themes.md. */
 :root[data-theme='soft-dark'] {
   color-scheme: dark;

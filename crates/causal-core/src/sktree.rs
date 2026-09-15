@@ -795,6 +795,14 @@ pub fn fit_forest(
     n_classes: Option<usize>,
     seed: u32,
 ) -> RandomForest {
+    fit_forest_with_rng(x_rows, y, n_estimators, min_samples_leaf, n_classes, &mut Mt19937::seeded(seed))
+}
+
+/// Fit using the caller's NumPy random state.
+pub fn fit_forest_with_rng(
+    x_rows: &[Vec<f64>], y: &[f64], n_estimators: usize,
+    min_samples_leaf: usize, n_classes: Option<usize>, forest_rs: &mut Mt19937,
+) -> RandomForest {
     let n_samples = x_rows.len();
     let n_features = x_rows[0].len();
     let x32: Vec<f32> = x_rows
@@ -812,7 +820,6 @@ pub fn fit_forest(
         min_samples_split: 2,
     };
 
-    let mut forest_rs = Mt19937::seeded(seed);
     let tree_seeds: Vec<u32> = (0..n_estimators)
         .map(|_| forest_rs.randint(2147483647) as u32)
         .collect();

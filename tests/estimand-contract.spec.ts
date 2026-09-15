@@ -182,7 +182,7 @@ test('binds a per-row effect to the T-learner alone, and refuses it for an avera
     const prepared = { kind: 'prepared-cross-section', observations: 4, columns: ['price', 'sales', 'w'] }
     const identification = { result: { kind: 'identified', adjustment: { kind: 'canonical', variables: [covariate] } } }
     const configuration = estimation.defaultConfiguration('t-learner', prepared, perRow)
-    const evidence = { kind: 'tLearner', observations: 4, controlRows: 2, treatedRows: 2, seed: 7, trees: 200, minLeaf: 5, effects: [1, 2, 3, 4], average: 2.5 }
+    const evidence = { kind: 'tLearner', observations: 4, controlRows: 2, treatedRows: 2, seed: 7, trees: 200, minLeaf: 5, effects: [1, 2, 3, 4], average: 2.5, uncertainty: { kind: 'none' } }
     const bound = estimation.causalEstimateFrom(perRow, identification, { kind: 't-learner-run', configuration, evidence })
     const refused = estimation.causalEstimateFrom(average, identification, { kind: 't-learner-run', configuration, evidence })
     const tLearner = methods.methodDefinition(estimation.methodIdOf('t-learner'))

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { gcmEffectsRunSchema } from './gcmEffects'
 import { rootCauseSelectionSchema } from './rootCause'
 
 const index = z.number().int().nonnegative()
@@ -125,6 +126,6 @@ export const rootCauseCheckRecordSchema = z.object({
 export type RootCauseCheckRequest = z.infer<typeof rootCauseCheckRequestSchema>
 export type RootCauseChecks = z.infer<typeof rootCauseChecksSchema>
 export type RootCauseCheckRecord = z.infer<typeof rootCauseCheckRecordSchema>
-export const rootCauseWorkspaceSchema = z.object({ selection: rootCauseSelectionSchema.nullable(), runs: z.array(rootCauseRunSchema), checks: z.array(rootCauseCheckRecordSchema).default([]) }).strict()
+export const rootCauseWorkspaceSchema = z.object({ selection: rootCauseSelectionSchema.nullable(), runs: z.array(rootCauseRunSchema), checks: z.array(rootCauseCheckRecordSchema).default([]), effects: z.array(gcmEffectsRunSchema).default([]) }).strict()
 export type RootCauseWorkspace = z.infer<typeof rootCauseWorkspaceSchema>
-export const EMPTY_ROOT_CAUSE: RootCauseWorkspace = { selection: null, runs: [], checks: [] }
+export const EMPTY_ROOT_CAUSE: RootCauseWorkspace = { selection: null, runs: [], checks: [], effects: [] }

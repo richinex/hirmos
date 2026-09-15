@@ -720,6 +720,7 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly adjustment: readonly number[]
       readonly seed: number
+      readonly uncertainty: TLearnerUncertainty
     }
   | {
       readonly kind: 'dml-refutation-batch'
@@ -741,6 +742,7 @@ export type AnalysisWorkerCommand =
       readonly model: RootCauseRequest
     }
   | { readonly kind: 'root-cause-checks'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: RootCauseCheckRequest }
+  | { readonly kind: 'gcm-effects'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: GcmEffectsRequest }
   | {
       readonly kind: 'ardl-model'
       readonly request: WorkerRequestId
@@ -1067,6 +1069,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
   | { readonly kind: 'root-cause-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseEvidence }
   | { readonly kind: 'root-cause-checks-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseChecks }
+  | { readonly kind: 'gcm-effects-succeeded'; readonly request: WorkerRequestId; readonly result: GcmEffectsEvidence }
   | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
@@ -1785,6 +1788,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     outcome: z.number().int().nonnegative(),
     adjustment: z.array(z.number().int().nonnegative()).min(1),
     seed: z.number().int().nonnegative(),
+    uncertainty: tLearnerUncertaintySchema,
   }).strict(),
   z.object({
     kind: z.literal('dml-refutation-batch'),
@@ -1804,6 +1808,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     values: z.instanceof(Float64Array), model: rootCauseRequestSchema,
   }).strict(),
   z.object({ kind: z.literal('root-cause-checks'), request: requestSchema, values: z.instanceof(Float64Array), model: rootCauseCheckRequestSchema }).strict(),
+  z.object({ kind: z.literal('gcm-effects'), request: requestSchema, values: z.instanceof(Float64Array), model: gcmEffectsRequestSchema }).strict(),
   z.object({
     kind: z.literal('ardl-model'),
     request: requestSchema,
@@ -2129,6 +2134,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('root-cause-succeeded'), request: requestSchema, result: rootCauseEvidenceSchema }).strict(),
   z.object({ kind: z.literal('root-cause-checks-succeeded'), request: requestSchema, result: rootCauseChecksSchema }).strict(),
+  z.object({ kind: z.literal('gcm-effects-succeeded'), request: requestSchema, result: gcmEffectsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
@@ -2446,6 +2452,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = rootCauseEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'root-cause-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
+  if (parsed.data.kind === 'gcm-effects-succeeded') {
+    const result = gcmEffectsEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'gcm-effects-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
   if (parsed.data.kind === 'root-cause-checks-succeeded') {
     const result = rootCauseChecksSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'root-cause-checks-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
@@ -2513,3 +2523,5 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     ? ok({ kind: 'stationarity-succeeded', request: request.value, result: result.value })
     : err({ kind: 'invalid-event', detail: result.error.detail })
 }
+import { tLearnerUncertaintySchema, type TLearnerUncertainty } from '@/domain/tLearner'
+import { gcmEffectsRequestSchema, gcmEffectsEvidenceSchema, type GcmEffectsRequest, type GcmEffectsEvidence } from '@/domain/gcmEffects'

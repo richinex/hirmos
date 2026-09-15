@@ -1426,6 +1426,48 @@ pub(crate) fn t_learner(
         min_leaf: FOREST_MIN_LEAF,
         effects,
         average,
+        uncertainty: TLearnerUncertaintyEvidence::None,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn t_learner_with_uncertainty(
+    values: &[f64], rows: usize, columns: usize, treatment: usize, outcome: usize,
+    adjustment: &[usize], seed: u32, uncertainty: TLearnerUncertainty,
+) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::tlearner::bootstrap;
+    use std::num::NonZeroUsize;
+    let (samples, bootstrap_seed, level, method) = match uncertainty {
+        TLearnerUncertainty::None => return t_learner(values, rows, columns, treatment, outcome, adjustment, seed),
+        TLearnerUncertainty::Bootstrap { samples, seed, level, method } => (samples, seed, level, method),
+    };
+    if !(2..=1000).contains(&samples) {
+        return Err("Choose between 2 and 1,000 bootstrap samples.".into());
+    }
+    let confidence = bootstrap::Confidence::new(level)
+        .ok_or("The confidence level must be between zero and one.")?;
+    let (data, _, y) = design_columns("T-learner", values, rows, columns, treatment, outcome, adjustment)?;
+    if adjustment.is_empty() { return Err("Choose at least one adjustment variable or effect modifier.".into()); }
+    let x: Vec<Vec<f64>> = (0..rows).map(|r| adjustment.iter().map(|&c| data[(r,c)]).collect()).collect();
+    let d: Vec<f64> = (0..rows).map(|r| data[(r,treatment)]).collect();
+    let fitted = bootstrap::fit(&x, &y, &d, &x,
+        &bootstrap::Forest { trees: NonZeroUsize::new(FOREST_TREES).unwrap(), min_leaf: NonZeroUsize::new(FOREST_MIN_LEAF).unwrap(), seed },
+        &bootstrap::Bootstrap { samples: NonZeroUsize::new(samples).unwrap(), seed: bootstrap_seed, confidence,
+            method: match method { BootstrapMethod::Percentile => bootstrap::IntervalMethod::Percentile,
+                BootstrapMethod::Pivot => bootstrap::IntervalMethod::Pivot, BootstrapMethod::Normal => bootstrap::IntervalMethod::Normal } })
+        .map_err(|error| match error {
+            bootstrap::Error::InvalidData => "The bootstrap inputs or calculated intervals are invalid.".to_string(),
+            bootstrap::Error::Fit(error) => format!("T-learner: {error}"),
+            bootstrap::Error::Resample { index, error } => format!("Bootstrap sample {} could not be fitted: {error}. No samples were silently replaced.", index + 1),
+        })?;
+    let treated_rows = d.iter().filter(|&&value| value == 1.).count();
+    Ok(AnalysisResult::TLearner {
+        observations: rows, control_rows: rows - treated_rows, treated_rows, seed,
+        trees: FOREST_TREES, min_leaf: FOREST_MIN_LEAF,
+        effects: fitted.effects, average: fitted.average.effect,
+        uncertainty: TLearnerUncertaintyEvidence::Bootstrap { samples, seed: bootstrap_seed, level, method,
+            intervals: fitted.intervals, standard_errors: fitted.standard_errors,
+            average: BootstrapAverage { interval: fitted.average.interval, standard_error_bound: fitted.average.standard_error_bound } },
     })
 }
 

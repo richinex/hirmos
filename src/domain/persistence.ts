@@ -10,6 +10,8 @@ import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import { brand, err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
+import { tLearnerEvidenceSchema } from './estimation'
+import { matchesTLearnerUncertainty, tLearnerUncertaintySchema } from './tLearner'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
@@ -290,6 +292,13 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
 
   const configuration = Reflect.get(value, 'configuration')
   const evidence = Reflect.get(value, 'evidence')
+  if (Reflect.get(value, 'kind') === 't-learner-run'
+    && typeof configuration === 'object' && configuration !== null
+    && typeof evidence === 'object' && evidence !== null) {
+    return { ...value, estimate: upgradedEstimate,
+      configuration: { uncertainty: { kind: 'none' }, ...configuration },
+      evidence: { uncertainty: { kind: 'none' }, ...evidence } }
+  }
   if (Reflect.get(value, 'kind') === 'synthetic-control-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null) {
@@ -457,6 +466,14 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const storedDraft = parsed.data.studyDraft as Partial<StudyDesignDraft>
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
+  for (const run of estimationRuns) {
+    if (run.kind !== 't-learner-run') continue
+    const evidence = tLearnerEvidenceSchema.safeParse(run.evidence)
+    const settings = z.object({ kind: z.literal('t-learner'), seed: z.number().int().min(0).max(0xffffffff), uncertainty: tLearnerUncertaintySchema }).strict().safeParse(run.configuration)
+    if (!evidence.success || !settings.success || !matchesTLearnerUncertainty(settings.data.uncertainty, evidence.data.uncertainty)) {
+      return err({ kind: 'invalid-snapshot', detail: 'The saved T-learner result does not match its uncertainty settings.' })
+    }
+  }
   const survivalRuns = parsed.data.survivalRuns.map((run) => upgradeSurvivalRunRecord(run))
   const identifications = parsed.data.identifications.map((identification) => upgradeIdentificationRecord(identification))
   const project: Project = {

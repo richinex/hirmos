@@ -4,10 +4,10 @@
 //! the outcome model per arm on that arm's rows alone, and reads the constant marginal effect at a
 //! query row as the treated model's prediction minus the control model's. The two models are clones
 //! of one estimator, so they share the random state and differ only in the rows they see. EconML
-//! offers an interval only through bootstrap inference, which is not ported: the effect is a point
-//! per row.
+//! offers intervals through bootstrap inference, implemented in the bootstrap module.
 
 use crate::sktree::{fit_forest, RandomForest};
+pub mod bootstrap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 

@@ -5,6 +5,7 @@ pub mod bootstrap;
 pub mod independence;
 pub mod distribution_change;
 pub mod model;
+pub mod generative;
 pub mod metrics;
 pub mod evaluation;
 pub mod falsification;

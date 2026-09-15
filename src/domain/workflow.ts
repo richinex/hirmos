@@ -1,9 +1,9 @@
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
 import type { DagDocument } from './dag'
-import { EMPTY_ROOT_CAUSE, rootCauseRunSchema, type RootCauseRun, type RootCauseWorkspace } from './rootCauseAnalysis'
-import { rootCauseCheckRecordSchema, type RootCauseCheckRecord } from './rootCauseAnalysis'
-import { matchesRootCauseGraph } from './rootCause'
+import { EMPTY_ROOT_CAUSE, type RootCauseRun, type RootCauseWorkspace, type RootCauseCheckRecord } from './rootCauseAnalysis'
+import type { GcmEffectsRun } from './gcmEffects'
+import { bindRootCauseRecord, appendRootCauseRecord } from './rootCauseRecords'
 import { selectedRootCauseGraph, type RootCauseSelection } from './rootCause'
 import type { DagCheckArtifact } from './dagValidation'
 import type { DiscoveryRunArtifact } from './discovery'
@@ -143,6 +143,8 @@ export interface SqlResume { readonly statement: string; readonly outputView: Sq
 export interface PipelineResume { readonly graph: PipelineGraph; readonly inputs: readonly SqlPreparationInput[] }
 
 export type WorkflowEvent =
+  | { readonly type: 'gcm-effects-created'; readonly run: GcmEffectsRun }
+  | { readonly type: 'gcm-effects-deleted'; readonly id: string }
   | { readonly type: 'root-cause-selected'; readonly selection: RootCauseSelection }
   | { readonly type: 'root-cause-run-created'; readonly run: RootCauseRun }
   | { readonly type: 'root-cause-checks-created'; readonly record: RootCauseCheckRecord }
@@ -401,17 +403,17 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         if (state.prepared === null || !selectedRootCauseGraph(event.selection, state.dagDocuments, state.prepared).ok) return state
         return { ...state, rootCause: { ...state.rootCause, selection: event.selection } }
       }
-      if (event.type === 'root-cause-run-created') {
-        if (state.prepared === null || !rootCauseRunSchema.safeParse(event.run).success) return state
-        const graph = selectedRootCauseGraph(event.run.graph, state.dagDocuments, state.prepared)
-        if (!graph.ok || !matchesRootCauseGraph(graph.value, event.run.model)) return state
-        return { ...state, rootCause: { ...state.rootCause, runs: [...state.rootCause.runs, event.run] } }
+      switch (event.type) {
+        case 'root-cause-run-created':
+        case 'gcm-effects-created':
+        case 'root-cause-checks-created': {
+          const candidate = rootCauseRecord(event)
+          const accepted = bindRootCauseRecord(candidate, state.dagDocuments, state.prepared)
+          return accepted.ok ? { ...state, rootCause: appendRootCauseRecord(state.rootCause, accepted.value) } : state
+        }
       }
-      if (event.type === 'root-cause-checks-created') {
-        if (state.prepared === null || !rootCauseCheckRecordSchema.safeParse(event.record).success) return state
-        const graph = selectedRootCauseGraph(event.record.graph, state.dagDocuments, state.prepared)
-        if (!graph.ok || !matchesRootCauseGraph(graph.value, event.record.model)) return state
-        return { ...state, rootCause: { ...state.rootCause, checks: [...state.rootCause.checks, event.record] } }
+      if (event.type === 'gcm-effects-deleted') {
+        return { ...state, rootCause: { ...state.rootCause, effects: state.rootCause.effects.filter((run) => run.id !== event.id) } }
       }
       if (event.type === 'root-cause-run-deleted') {
         return { ...state, rootCause: { ...state.rootCause, runs: state.rootCause.runs.filter((run) => run.id !== event.id) } }
@@ -590,5 +592,15 @@ export function datasetProfileProblemDetail(problem: DatasetProfileProblem): str
     case 'worker-unavailable': return problem.detail
     case 'worker-protocol-failed': return problem.detail
     default: return assertNever(problem)
+  }
+}
+type RootCauseRecordEvent = Extract<WorkflowEvent, { readonly type: 'root-cause-run-created' | 'gcm-effects-created' | 'root-cause-checks-created' }>
+
+function rootCauseRecord(event: RootCauseRecordEvent) {
+  switch (event.type) {
+    case 'root-cause-run-created': return { kind: 'run', record: event.run } as const
+    case 'gcm-effects-created': return { kind: 'effects', record: event.run } as const
+    case 'root-cause-checks-created': return { kind: 'checks', record: event.record } as const
+    default: return assertNever(event)
   }
 }

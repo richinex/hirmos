@@ -8,6 +8,8 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { EstimateHeadline } from '@/components/results/EstimateHeadline'
 import { SurvivalRunResult, survivalRunLabel } from '@/components/survival/SurvivalRunResult'
 import { RootCauseRunResult } from '@/components/root-cause/RootCauseRunResult'
+import { GcmEffectResult } from '@/components/root-cause/GcmEffectsPanel'
+import type { GcmEffectsRun } from '@/domain/gcmEffects'
 import type { RootCauseRun } from '@/domain/rootCauseAnalysis'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { Formula } from '@/components/ui/Formula'
@@ -246,7 +248,7 @@ const resultIntroduction = (view: ResultView): string => {
   }
 }
 
-export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns, timeSeriesRuns, countSeriesModels, rootCauseRuns }: {
+export function ResultsPanel({ source, profile, prepared, stationarity, documents, studies, identifications, estimationRuns, sensitivityRuns, counterfactualRuns, survivalRuns, timeSeriesRuns, countSeriesModels, rootCauseRuns, gcmEffects }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -261,9 +263,10 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   readonly timeSeriesRuns: readonly TimeSeriesRun[]
   readonly countSeriesModels: readonly CountSeriesModelArtifact[]
   readonly rootCauseRuns: readonly RootCauseRun[]
+  readonly gcmEffects: readonly GcmEffectsRun[]
 }) {
   const hasTimeSeries = timeSeriesRuns.length + countSeriesModels.length > 0
-  const hasRootCause = rootCauseRuns.length > 0
+  const hasRootCause = rootCauseRuns.length + gcmEffects.length > 0
   const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause))
   const activeView = availableResultView(view, estimationRuns, survivalRuns, hasTimeSeries, hasRootCause)
   const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
@@ -282,7 +285,10 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
 
   const body = (() => {
     switch (activeView.kind) {
-      case 'root-cause': return <div className="space-y-6">{[...rootCauseRuns].reverse().map((run) => <article key={run.id}><p className="mb-2 text-label text-muted">{run.comparison.name} · {formatTime(run.createdAt)}</p><RootCauseRunResult run={run} /></article>)}</div>
+      case 'root-cause': return <div className="space-y-6">
+        {[...rootCauseRuns].reverse().map((run) => <article key={run.id}><div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-label text-muted"><span>{run.comparison.name}</span><time>{formatTime(run.createdAt)}</time></div><RootCauseRunResult run={run} /></article>)}
+        {[...gcmEffects].reverse().map(run => <GcmEffectResult key={run.id} run={run} />)}
+      </div>
       case 'time-series': return <><div className="space-y-4">{[...timeSeriesRuns].reverse().map((run) => <TimeSeriesRunResult key={run.id} run={run} />)}</div><ul className="list-none space-y-4 p-0">{[...countSeriesModels].reverse().map((artifact) => <CountSeriesRecord key={artifact.id} artifact={artifact} open />)}</ul></>
       case 'estimation': {
         const run = estimationRuns.find((candidate) => candidate.id === activeView.selected) ?? null

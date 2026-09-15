@@ -1,14 +1,14 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-export type ThemeName = 'dark' | 'light' | 'soft-dark'
+export type ThemeName = 'dark' | 'light' | 'soft-dark' | 'original-light'
 
 /** What the user picked: a concrete theme, or 'system' (follow the OS, live). */
 export type ThemeChoice = ThemeName | 'system'
 
 const KEY = 'hirmos-theme'
-export const THEMES: readonly ThemeName[] = ['dark', 'light', 'soft-dark']
+export const THEMES: readonly ThemeName[] = ['dark', 'light', 'soft-dark', 'original-light']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
-export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', light: 'Soft UI Light', 'soft-dark': 'Soft UI Dark', system: 'System' }
+export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', light: 'Soft UI Light', 'soft-dark': 'Soft UI Dark', 'original-light': 'Original Light', system: 'System' }
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 

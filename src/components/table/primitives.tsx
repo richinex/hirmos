@@ -18,6 +18,9 @@ import { cn } from '@/lib/utils'
 /** Row pitch per density, hairline included; the recipes' `rowPadding` is derived to hit it exactly. */
 export const ROW_HEIGHT: Record<TableDensity, number> = { compact: 24, comfortable: 32 }
 
+// Touch controls reserve 44px for the target and 6px for the density track's border and padding.
+const toolbarHeight = 'min-h-6 pointer-coarse:min-h-[3.125rem]'
+
 /** Cell padding that lands the row on the density's height with 12px body text and its 1px hairline. */
 export const cellPadding = (density: TableDensity): string => rowPadding[density]
 
@@ -28,7 +31,7 @@ export function useTableDensity(): readonly [TableDensity, (density: TableDensit
 
 export function DensityToggle({ density, onChange }: { readonly density: TableDensity; readonly onChange: (density: TableDensity) => void }) {
   return (
-    <div className="flex gap-0.5 rounded-md border border-hair bg-panel p-0.5" role="group" aria-label="Row density">
+    <div className={cn('flex shrink-0 gap-0.5 rounded-md border border-hair bg-panel p-0.5', toolbarHeight)} role="group" aria-label="Row density">
       <button type="button" className={segment(density === 'comfortable', 'h-[18px] px-1.5 py-0')} aria-pressed={density === 'comfortable'} title="Comfortable rows" aria-label="Comfortable rows" onClick={() => onChange('comfortable')}><Icon name="density_medium" size={13} /></button>
       <button type="button" className={segment(density === 'compact', 'h-[18px] px-1.5 py-0')} aria-pressed={density === 'compact'} title="Compact rows" aria-label="Compact rows" onClick={() => onChange('compact')}><Icon name="density_small" size={13} /></button>
     </div>
@@ -139,7 +142,7 @@ export function FilterField({ value, onChange, placeholder, label: fieldLabel, c
 }) {
   const input = useRef<HTMLInputElement>(null)
   return (
-    <div className={cn('flex min-w-0 items-center gap-2 rounded-full border border-hair bg-well px-2.5 py-[2px] focus-within:border-signal/60', className)}>
+    <div className={cn('flex min-w-0 items-center gap-2 rounded-full border border-hair bg-well px-2.5 py-[2px] focus-within:border-signal/60', toolbarHeight, className)}>
       <Icon name="search" size={13} className="shrink-0 text-faint" />
       <input
         ref={input}
@@ -150,10 +153,10 @@ export function FilterField({ value, onChange, placeholder, label: fieldLabel, c
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => { if (event.key === 'Escape' && value.length > 0) { event.preventDefault(); onChange('') } }}
-        className="min-w-0 flex-1 bg-transparent text-body text-ink outline-none placeholder:text-faint [&::-webkit-search-cancel-button]:hidden"
+        className="min-w-0 flex-1 appearance-none bg-transparent text-body text-ink outline-none placeholder:text-faint pointer-coarse:min-h-11 [&::-webkit-search-cancel-button]:hidden"
       />
       {value.length > 0 && (
-        <button type="button" aria-label={`Clear ${fieldLabel.toLowerCase()}`} className="grid h-5 w-5 shrink-0 place-items-center text-faint hover:text-ink" onClick={() => { onChange(''); input.current?.focus() }}>
+        <button type="button" aria-label={`Clear ${fieldLabel.toLowerCase()}`} className="grid h-[18px] w-5 shrink-0 place-items-center text-faint hover:text-ink pointer-coarse:h-11 pointer-coarse:w-11" onClick={() => { onChange(''); input.current?.focus() }}>
           <Icon name="close" size={12} />
         </button>
       )}
@@ -179,7 +182,7 @@ export function FacetPills({ facets, onToggle, label: groupLabel }: { readonly f
           aria-pressed={entry.active}
           disabled={entry.count === 0 && !entry.active}
           onClick={() => onToggle(entry.id)}
-          className={facet(entry.active, 'min-h-6 px-2 py-0 disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-8')}
+          className={facet(entry.active, cn(toolbarHeight, 'px-2 py-0 disabled:cursor-not-allowed disabled:opacity-50'))}
         >
           {entry.text} <span className={num('text-faint')}>{entry.count}</span>
         </button>

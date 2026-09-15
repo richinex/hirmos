@@ -986,6 +986,7 @@ export interface TLearnerDesign {
   readonly outcome: number
   readonly adjustment: readonly number[]
   readonly seed: number
+  readonly uncertainty: import('@/domain/tLearner').TLearnerUncertainty
 }
 
 export function runTLearner(values: Float64Array, rows: number, columns: number, design: TLearnerDesign): Promise<TLearnerOutcome> {
@@ -1001,6 +1002,11 @@ export function runDmlRefutationBatch(values: Float64Array, rows: number, column
 export function runRootCause(values: Float64Array, model: import('@/domain/rootCauseAnalysis').RootCauseRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/rootCauseAnalysis').RootCauseEvidence, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
   return post('root-cause-succeeded', { kind: 'root-cause', request, values, model }, values, onProgress)
+}
+
+export function runGcmEffects(values: Float64Array, model: import('@/domain/gcmEffects').GcmEffectsRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/gcmEffects').GcmEffectsEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('gcm-effects-succeeded', { kind: 'gcm-effects', request, values, model }, values, onProgress)
 }
 
 export function checkRootCause(values: Float64Array, model: import('@/domain/rootCauseAnalysis').RootCauseCheckRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/rootCauseAnalysis').RootCauseChecks, AnalysisWorkerProblem>> {

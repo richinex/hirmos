@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchesTLearnerUncertainty, tLearnerUncertaintyEvidenceSchema } from './tLearner'
 import { vecmForecastSchema } from './vecmForecast'
 import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
 import type { ColumnId } from './dataset'
@@ -157,6 +158,7 @@ export interface TLearnerConfiguration {
   readonly kind: 't-learner'
   /** One seed for both outcome forests. */
   readonly seed: number
+  readonly uncertainty: import('./tLearner').TLearnerUncertainty
 }
 
 export interface ArdlConfiguration {
@@ -317,7 +319,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'negative-binomial-ingarch': return { kind: estimator, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], horizon: 12, controlValue: 0, treatmentValue: 1, schedule: { kind: 'persistent' } }
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
     case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
-    case 't-learner': return { kind: estimator, seed: 7 }
+    case 't-learner': return { kind: estimator, seed: 7, uncertainty: { kind: 'none' } }
     case 'ardl-pss': return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
     case 'vecm': return { kind: estimator, maxLags: 4, deterministic: 'co', significance: 95, breakIndex: null }
     case 'synthetic-control': {
@@ -557,7 +559,16 @@ export const tLearnerEvidenceSchema = z.object({
   effects: z.array(z.number().finite()).min(1),
   /** The mean of the row effects, EconML's `ate`. */
   average: z.number().finite(),
-}).strict()
+  uncertainty: tLearnerUncertaintyEvidenceSchema.default({ kind: 'none' }),
+}).strict().superRefine((value, context) => {
+  if (value.controlRows + value.treatedRows !== value.observations || value.effects.length !== value.observations) {
+    context.addIssue({ code: 'custom', message: 'Treatment groups and row effects must match the observation count.' })
+  }
+  const uncertainty = value.uncertainty
+  if (uncertainty.kind === 'bootstrap' && (uncertainty.intervals.length !== value.observations || uncertainty.standardErrors.length !== value.observations)) {
+    context.addIssue({ code: 'custom', message: 'Each row effect must have one interval and standard error.' })
+  }
+})
 
 export type TLearnerEvidence = z.infer<typeof tLearnerEvidenceSchema>
 
@@ -1642,7 +1653,9 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       leave('t-learner-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio; a row with no nearby rows in one arm carries an extrapolated effect.')
       leave('t-learner-row-effect-reading', 'Each row’s effect is the average for rows with its covariate values; it is not that row’s own observed counterfactual.')
       satisfy('t-learner-learner-settings', `The run records 200 trees, minimum leaf 5, and learner seed ${configuration.seed} for both arms.`)
-      satisfy('t-learner-no-interval', 'The run reports each row’s effect as a point and no interval.')
+      satisfy('t-learner-no-interval', configuration.uncertainty.kind === 'none'
+        ? 'Uncertainty was not requested. The run reports point estimates.'
+        : `Both forests are refitted on ${configuration.uncertainty.samples} resampled datasets. Row intervals are pointwise; the average uses a conservative standard-error bound. Resampling assumes independent observations.`)
       break
     }
     case 'ardl-pss': {
@@ -2005,12 +2018,15 @@ export function causalEstimateFrom(
       if (study.estimand.kind !== 'conditional-average-treatment-effect-per-row') return null
       const { evidence } = run
       if (!isNonEmpty(evidence.effects) || evidence.effects.length !== evidence.observations) return null
+      if (!matchesTLearnerUncertainty(run.configuration.uncertainty, evidence.uncertainty)) return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'perRow', overall: evidence.average, effects: evidence.effects },
-        interval: { kind: 'none', reason: 'Each row’s effect is a point. No interval is reported: one would need the two forests refitted on resampled rows many times over, and that is not offered.' },
-        standardError: null,
+        interval: evidence.uncertainty.kind === 'none'
+          ? { kind: 'none', reason: 'Uncertainty was not requested. Choose bootstrap intervals to estimate it.' }
+          : { kind: 'confidence', level: evidence.uncertainty.level, lower: evidence.uncertainty.average.interval[0], upper: evidence.uncertainty.average.interval[1] },
+        standardError: evidence.uncertainty.kind === 'none' ? null : evidence.uncertainty.average.standardErrorBound,
         adjustment,
         sample: { observations: evidence.observations, parameters: 0, degreesOfFreedom: null },
       }

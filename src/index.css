@@ -349,8 +349,8 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
 :root[data-theme="dark"] .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
 :root[data-theme="dark"] .mac-terminal-title { color: #B4B4B4; }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
-  :root:not([data-theme="light"]) .mac-terminal-title { color: #B4B4B4; }
+  :root:not([data-theme="light"]):not([data-theme="original-light"]) .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
+  :root:not([data-theme="light"]):not([data-theme="original-light"]) .mac-terminal-title { color: #B4B4B4; }
 }
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -426,7 +426,7 @@ button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([a
   width: 14px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent));
 }
-:root[data-theme="light"] .bar-live::after {
+:root:is([data-theme="light"], [data-theme="original-light"]) .bar-live::after {
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent), transparent);
 }
 @media (prefers-reduced-motion: reduce) { .bar-live::after { animation: none; opacity: 0; } }

@@ -3,7 +3,9 @@ import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayou
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { Orb } from '@/components/ui/Orb'
+import { ActionRow, type Job } from './ActionRow'
+import { GcmEffectsPanel } from './GcmEffectsPanel'
+import type { GcmEffectsRun } from '@/domain/gcmEffects'
 import { Icon } from '@/components/Icon'
 import { formatTime } from '@/lib/format/date'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
@@ -24,24 +26,7 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { selectSource, describeSourceSelectionProblem, describeDatasetProfileProblem, type SelectedSource } from '@/domain/workflow'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
-type Analysis = 'anomaly' | 'change' | 'intervention'
-type Action = 'analysis' | 'checks'
-type Job = { readonly kind: 'idle' } | { readonly kind: 'running'; readonly action: Action; readonly stage: string } | { readonly kind: 'failed'; readonly action: Action; readonly detail: string }
-
-function ActionRow({ job, action, disabled = false, onRun, onCancel }: { readonly job: Job; readonly action: Action; readonly disabled?: boolean; readonly onRun: () => void; readonly onCancel: () => void }) {
-  const active = job.kind !== 'idle' && job.action === action ? job : null
-  return <div className="mt-4" data-testid={`${action}-actions`}>
-    <div className="flex flex-wrap items-center gap-3">
-      <button type="button" className={button('signal')} disabled={disabled || job.kind === 'running'} aria-busy={active?.kind === 'running'} onClick={onRun}>{action === 'checks' ? 'Check fitted model' : 'Run analysis'}</button>
-      {active?.kind === 'running' && <>
-        <Orb state="solving" aria-label={action === 'checks' ? 'Model checks running' : 'Root-cause analysis running'} />
-        <button type="button" className={button('quiet')} onClick={onCancel}>{action === 'checks' ? 'Cancel check' : 'Cancel run'}</button>
-        <span role="status" className="min-w-0 flex-1 truncate text-label text-muted" title={active.stage}>{active.stage}</span>
-      </>}
-    </div>
-    {active?.kind === 'failed' && <p role="alert" className="mt-2 text-body text-warn">{active.detail}</p>}
-  </div>
-}
+type Analysis = 'anomaly' | 'change' | 'intervention' | 'effects'
 interface Props {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -52,12 +37,15 @@ interface Props {
   readonly onRun: (run: RootCauseRun) => void
   readonly onChecks: (record: RootCauseCheckRecord) => void
   readonly onDelete: (id: string) => void
+  readonly onEffects: (run: GcmEffectsRun) => void
+  readonly onDeleteEffects: (id: string) => void
 }
 
 const analyses = [
   { value: 'anomaly', label: 'Unusual observation' },
   { value: 'change', label: 'Distribution change' },
   { value: 'intervention', label: 'Shift intervention' },
+  { value: 'effects', label: 'Intervention effects' },
 ] as const
 
 function RunHistory({ runs, selected, onSelect, onDelete }: {
@@ -82,7 +70,7 @@ function RunHistory({ runs, selected, onSelect, onDelete }: {
   </ul>
 }
 
-const descriptions: Record<Analysis, { readonly title: string; readonly summary: string; readonly dataLabel: string; readonly dataHint: string }> = {
+const descriptions: Record<Exclude<Analysis, 'effects'>, { readonly title: string; readonly summary: string; readonly dataLabel: string; readonly dataHint: string }> = {
   anomaly: {
     title: 'Explain an unusual observation',
     summary: 'Estimate how each variable contributes to an unusual target value. The prepared data provides the baseline for comparison.',
@@ -130,7 +118,7 @@ export function RootCausePanel(props: Props) {
     && record.graph.dagRevision === props.workspace.selection?.dagRevision
     && record.graph.preparedDataset === props.prepared.id)
   const checked = checks.at(-1)
-  const description = descriptions[analysis]
+  const description = descriptions[analysis === 'effects' ? 'anomaly' : analysis]
   const document = props.documents.find((entry) => entry.id === props.workspace.selection?.dagDocument)
   const savedRandom = [...checks, ...props.workspace.runs.filter((record) => record.graph.dagRevision === props.workspace.selection?.dagRevision)].find((record) => record.id === randomSource)?.evidence.random
 
@@ -156,6 +144,7 @@ export function RootCausePanel(props: Props) {
   }
 
   const run = async () => {
+    if (analysis === 'effects') return
     if (!graph.ok || (!enteringValues && file === null) || !confirmed || target === '') return
     const current = ++attempt.current
     setJob({ kind: 'running', action: 'analysis', stage: 'Preparing root-cause analysis' })
@@ -242,6 +231,12 @@ export function RootCausePanel(props: Props) {
     <section><h3 className="m-0 text-body font-medium text-ink">Uncertainty</h3><p className={fieldHint}>Intervals show the {Number(((1 - (replay?.upperQuantile ?? 0.95)) * 100).toPrecision(12))}th and {(replay?.upperQuantile ?? 0.95) * 100}th percentiles across refitted estimates. Anomaly contributions are scores, not changes in the target’s units.</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Prepared data</h3><dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-body"><dt className="text-faint">Source</dt><dd className="m-0 break-all text-ink">{props.source.name}</dd><dt className="text-faint">Rows</dt><dd className="m-0 tabular-nums text-ink">{props.prepared.observations.toLocaleString()}</dd></dl></section>
   </div>
+  if (analysis === 'effects' && graph.ok) return <GcmEffectsPanel
+    source={props.source} profile={props.profile} prepared={props.prepared}
+    graph={graph.value} name={document?.name ?? 'Causal graph'} runs={props.workspace.effects}
+    onRun={props.onEffects} onDelete={props.onDeleteEffects} onGraph={props.onGraph}
+    navigation={<SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={setAnalysis} />}
+  />
   return <WorkbenchLayout id="root-cause" inspector={{ title: 'Data and method requirements', body: requirements }}
     bottom={{ title: `Run history (${props.workspace.runs.length})`, defaultCollapsed: true, body: <RunHistory runs={props.workspace.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section aria-labelledby="root-cause-title" className="@container/panel flex flex-col gap-5">

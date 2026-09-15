@@ -368,13 +368,15 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'double-ml':
       return { kind: 'doubleMl', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed, groups: command.groups }
     case 't-learner':
-      return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed }
+      return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, uncertainty: command.uncertainty }
     case 'ardl-pss':
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
     case 'ardl-model':
       return { kind: 'ardlModel', rows: command.rows, columns: command.columns, model: command.model }
     case 'root-cause':
       return { kind: 'rootCause', request: command.model }
+    case 'gcm-effects':
+      return { kind: 'gcmEffects', request: command.model }
     case 'root-cause-checks':
       return { kind: 'rootCauseChecks', request: command.model }
     case 'vecm':
@@ -790,6 +792,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'root-cause-succeeded', request: command.request, result: result.data.evidence })
         return
       }
+      case 'gcm-effects': {
+        const result = gcmEffectsResponseSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'gcm-effects-succeeded', request: command.request, result: result.data.evidence })
+        return
+      }
       case 'root-cause-checks': {
         const result = rootCauseChecksResponseSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
@@ -880,3 +888,4 @@ self.onmessage = (message: MessageEvent<unknown>) => {
     }
   })()
 }
+import { gcmEffectsResponseSchema } from '@/domain/gcmEffects'

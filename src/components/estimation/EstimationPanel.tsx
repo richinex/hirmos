@@ -1,4 +1,6 @@
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { TLearnerUncertainty } from './TLearnerUncertainty'
+import { TLearnerIntervals } from './TLearnerIntervals'
 import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
@@ -694,6 +696,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
           <ExpandableChart option={rowChart} label={`Distribution of the per-row effect of ${study.treatment.name} on ${study.outcome.name}`} className="h-[220px]" testId="row-effects" />
         </div>
       )}
+      {run.kind === 't-learner-run' && <TLearnerIntervals evidence={run.evidence} />}
       {chart !== null && (
         <div className="mt-3">
           {ghosts.length > 0 && (
@@ -1076,7 +1079,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...inputs]
           const matrix = await materialise(columns)
           if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the T-learner fits one outcome model per arm and needs a 0/1 treatment.` }); return }
-          const evidence = await analysis.runTLearner(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: inputs.map((_, index) => index + 2), seed: configuration.seed })
+          const evidence = await analysis.runTLearner(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: inputs.map((_, index) => index + 2), seed: configuration.seed, uncertainty: configuration.uncertainty })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 't-learner-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1359,7 +1362,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
             <label className="block"><ParameterLabel className={fieldLabel} label="Learner seed" help={ESTIMATION_PARAMETER_HELP.tLearner.learnerSeed} /><input type="number" min={0} aria-label="Learner seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>One random forest per treatment arm on the adjustment variables, 200 trees, minimum leaf 5. Each row’s effect is the treated forest’s prediction minus the control forest’s at that row; no interval is reported.</p>
+            <TLearnerUncertainty value={configuration.uncertainty} onChange={(uncertainty) => configure({ ...configuration, uncertainty })} />
+            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>One random forest per treatment arm, with 200 trees and a minimum leaf size of 5. Bootstrap intervals refit both forests on resampled rows and take longer to calculate.</p>
           </div>
         )
       case 'ardl-pss':

@@ -111,7 +111,7 @@ type Chapter = Omit<ChapterEntry, 'status'>
 const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
 
 const THEME_ICON: Record<ThemeChoice, string> = {
-  dark: 'dark_mode', light: 'light_mode', 'soft-dark': 'dark_mode', system: 'brightness_auto',
+  dark: 'dark_mode', light: 'wb_twilight', 'soft-dark': 'dark_mode', 'original-light': 'light_mode', system: 'brightness_auto',
 }
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
@@ -478,7 +478,7 @@ function App() {
     if (chapter === 'estimation') return identifiedStudy
     if (chapter === 'sensitivity') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
-    if (chapter === 'results') return workflow.kind === 'profiled' && (workflow.rootCause.runs.length > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
+    if (chapter === 'results') return workflow.kind === 'profiled' && ((workflow.rootCause.runs.length + workflow.rootCause.effects.length) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
     return false
   }
 
@@ -491,7 +491,7 @@ function App() {
       case 'survival': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
-      case 'root-cause': return !prepared || workflow.kind !== 'profiled' ? 'locked' : workflow.rootCause.runs.length > 0 ? 'done' : workflow.rootCause.selection === null ? 'not-started' : 'in-progress'
+      case 'root-cause': return !prepared || workflow.kind !== 'profiled' ? 'locked' : (workflow.rootCause.runs.length + workflow.rootCause.effects.length) > 0 ? 'done' : workflow.rootCause.selection === null ? 'not-started' : 'in-progress'
       case 'discovery': return !prepared ? 'locked' : workflow.discoveryRuns.length > 0 ? 'done' : 'not-started'
       case 'dag': return !prepared
         ? 'locked'
@@ -510,7 +510,7 @@ function App() {
       case 'counterfactual': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
         ? 'locked'
         : workflow.counterfactualRuns.length > 0 ? 'done' : 'not-started'
-      case 'results': return workflow.kind !== 'profiled' || (workflow.rootCause.runs.length + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
+      case 'results': return workflow.kind !== 'profiled' || ((workflow.rootCause.runs.length + workflow.rootCause.effects.length) + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
       default: return chapter
     }
   }
@@ -993,6 +993,7 @@ function App() {
                         <RootCausePanel key={`${workflow.prepared.id}:${workflow.rootCause.selection?.dagRevision ?? ''}`} source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}
                           documents={workflow.dagDocuments} workspace={workflow.rootCause} onGraph={() => navigateToChapter('dag')}
                           onRun={(run) => dispatch({ type: 'root-cause-run-created', run })} onDelete={(id) => dispatch({ type: 'root-cause-run-deleted', id })}
+                          onEffects={(run) => dispatch({ type: 'gcm-effects-created', run })} onDeleteEffects={(id) => dispatch({ type: 'gcm-effects-deleted', id })}
                           onChecks={(record) => dispatch({ type: 'root-cause-checks-created', record })} />
                       </Suspense>
                     </ChapterBoundary>
@@ -1123,6 +1124,7 @@ function App() {
                         timeSeriesRuns={workflow.timeSeriesRuns}
                         countSeriesModels={workflow.countSeriesModels}
                         rootCauseRuns={workflow.rootCause.runs}
+                        gcmEffects={workflow.rootCause.effects}
                       />
                     </Suspense>
                     </ChapterBoundary>
