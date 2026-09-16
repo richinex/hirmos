@@ -5,7 +5,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { outcomePathsOption } from '@/charts/counterfactual/outcomePaths'
 import { counterfactualEffectPathOption } from '@/charts/counterfactual/effectPath'
@@ -35,26 +35,11 @@ import { interpretCounterfactualResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime } from '@/lib/format/date'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { emptyCounterfactualDraft, emptyDynamicCounterfactualDraft, type CounterfactualEvent } from '@/domain/counterfactualDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { cn } from '@/lib/utils'
-
-interface State {
-  readonly identification: IdentificationId | null
-  readonly configuration: CounterfactualConfiguration
-}
-
-type Event =
-  | { readonly type: 'identification-chosen'; readonly identification: IdentificationId | null }
-  | { readonly type: 'configured'; readonly configuration: CounterfactualConfiguration }
-
-const step = (state: State, event: Event): State => {
-  switch (event.type) {
-    case 'identification-chosen': return { ...state, identification: event.identification }
-    case 'configured': return { ...state, configuration: event.configuration }
-    default: return assertNever(event)
-  }
-}
 
 const texName = (name: string): string =>
   `\\text{${name.replace(/[\\{}$&#_%^~]/g, (character) => (character === '\\' ? '\\textbackslash{}' : character === '^' || character === '~' ? `\\${character}{}` : `\\${character}`))}}`
@@ -243,15 +228,9 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
   readonly onDeleteRun: (run: CounterfactualRunArtifact['id']) => void
 }) {
   const identified = identifications.filter((identification) => identification.result.kind === 'identified')
-  const [state, dispatch] = useReducer(step, null, (): State => {
-    // The controls open as the latest recorded run set them, so a reopened project shows the query it holds.
-    const latest = runs.at(-1) ?? null
-    const recorded = latest === null ? null : identified.find((candidate) => candidate.id === latest.identification) ?? null
-    return {
-      identification: recorded?.id ?? identified.at(-1)?.id ?? null,
-      configuration: latest !== null && recorded !== null ? latest.configuration : prepared.kind === 'prepared-time-series' ? DEFAULT_DYNAMIC_LINEAR_SCM : DEFAULT_LINEAR_SCM,
-    }
-  })
+  const state = useWorkflow(store => store.counterfactualDraft?.prepared === prepared.id ? store.counterfactualDraft.draft : prepared.kind === 'prepared-time-series' ? emptyDynamicCounterfactualDraft : emptyCounterfactualDraft)
+  const change = useWorkflow(store => store.changeCounterfactual)
+  const dispatch = (event: CounterfactualEvent) => change(prepared.id, event)
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
   const study = identification === null ? null : studies.find((candidate) => candidate.id === identification.study) ?? null
   const selectedRevision = study === null ? null : documents.find((document) => document.id === study.dagDocument)?.audit.find((revision) => revision.id === study.dagRevision) ?? null

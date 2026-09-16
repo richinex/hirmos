@@ -1,15 +1,9 @@
+import { createStore } from 'zustand/vanilla'
 import type * as duckdb from '@duckdb/duckdb-wasm'
 import { err, ok, type Result } from '@/domain/dop'
-import type { PipelineBlockId, PipelineStep } from '@/domain/pipeline'
+import type { PipelineBlockId } from '@/domain/pipeline'
 import { parsePythonEvent, type PythonCommand, type PythonEvent, type PythonInput } from '@/workers/pythonProtocol'
 import type { ScriptFailure, ScriptRun, ScriptRuntime } from './pipeline'
-
-/**
- * The page side of the Python worker: one worker for the page, started on the first script run or
- * on request, its state observable by the inspector. A script
- * step's inputs are read out of DuckDB as Arrow, run in the worker, and the result registered back
- * into DuckDB as the step's view.
- */
 
 export type PythonRuntimeState =
   | { readonly kind: 'idle' }
@@ -26,140 +20,139 @@ export interface ActivePythonRun {
 /** A script that runs this long is taken for a runaway and stopped. */
 export const PYTHON_RUN_LIMIT_MS = 5 * 60_000
 
-type ScriptStep = Extract<PipelineStep, { readonly kind: 'script' }>
 type RunEvent = Extract<PythonEvent, { readonly kind: 'ran' | 'run-failed' }>
 
-let worker: Worker | null = null
-let state: PythonRuntimeState = { kind: 'idle' }
-let active: ActivePythonRun | null = null
-const listeners = new Set<() => void>()
-const pending = new Map<string, (event: RunEvent) => void>()
 
-const notify = (): void => { for (const listener of listeners) listener() }
-const setState = (next: PythonRuntimeState): void => { state = next; notify() }
-const setActive = (next: ActivePythonRun | null): void => { active = next; notify() }
-
-export const pythonRuntimeState = (): PythonRuntimeState => state
-export const activePythonRun = (): ActivePythonRun | null => active
-
-export const subscribePythonRuntime = (listener: () => void): (() => void) => {
-  listeners.add(listener)
-  return () => { listeners.delete(listener) }
+interface RuntimeSnapshot {
+  readonly runtime: PythonRuntimeState
+  readonly active: (ActivePythonRun & { readonly request: string }) | null
 }
 
-const failAll = (detail: string): void => {
-  for (const [request, resolve] of pending) resolve({ kind: 'run-failed', request, detail, stdout: '' })
-  pending.clear()
-}
-
-/** Stops whatever is running by discarding the worker; the next script starts a fresh runtime. */
-const recycle = (detail: string): void => {
-  failAll(detail)
-  worker?.terminate()
-  worker = null
-  setActive(null)
-  setState({ kind: 'idle' })
-}
-
-/** Cancelling discards the worker and starts a fresh one at once, so the next run does not pay the load. */
-export const cancelPythonRun = (): void => {
-  if (active === null) return
-  recycle('The script was cancelled.')
-  warmPythonRuntime()
-}
-
-const pythonWorker = (): Worker => {
-  if (worker !== null) return worker
-  const created = new Worker(new URL('../workers/python.worker.ts', import.meta.url), { type: 'module', name: 'hirmos-python' })
-  created.onmessage = (message: MessageEvent<unknown>) => {
-    const parsed = parsePythonEvent(message.data)
-    if (!parsed.ok) { failAll(parsed.error.detail); setState({ kind: 'failed', detail: parsed.error.detail }); return }
-    const event = parsed.value
-    switch (event.kind) {
-      case 'loading': setState({ kind: 'loading', detail: event.detail }); return
-      case 'ready': setState({ kind: 'ready', python: event.python }); return
-      case 'start-failed': setState({ kind: 'failed', detail: event.detail }); failAll(event.detail); return
-      case 'ran':
-      case 'run-failed': {
-        const resolve = pending.get(event.request)
-        pending.delete(event.request)
-        resolve?.(event)
-        return
-      }
-      default: { const exhaustive: never = event; return exhaustive }
-    }
-  }
-  const stopped = (detail: string) => {
-    failAll(detail)
-    created.terminate()
-    if (worker === created) worker = null
-    setActive(null)
-    setState({ kind: 'failed', detail })
-  }
-  created.onerror = (event) => stopped(event.message || 'the Python worker stopped')
-  created.onmessageerror = () => stopped('the Python worker sent a message the page could not read')
-  worker = created
-  return created
-}
-
-const send = (command: PythonCommand, transfer: readonly ArrayBuffer[] = []): void => { pythonWorker().postMessage(command, [...transfer]) }
-
-/** Start loading the runtime before the first script needs it. */
-export const warmPythonRuntime = (): void => {
-  if (state.kind === 'idle' || state.kind === 'failed') { setState({ kind: 'loading', detail: 'Loading Python' }); send({ kind: 'start' }) }
-}
-
-const identifier = (value: string): string => `"${value.replaceAll('"', '""')}"`
-
-/** Read raw IPC bytes without decoding and re-encoding them through JavaScript Arrow. */
+const identifier = (value: string): string => '"' + value.replaceAll('"', '""') + '"'
 const arrowOf = async (connection: duckdb.AsyncDuckDBConnection, view: string): Promise<PythonInput> => ({
   format: 'arrow-file',
-  bytes: await connection.useUnsafe((bindings, id) => bindings.runQuery(id, `SELECT * FROM ${identifier(view)}`)),
+  bytes: await connection.useUnsafe((bindings, id) => bindings.runQuery(id, 'SELECT * FROM ' + identifier(view))),
 })
 
-export const pythonScriptRuntime = (): ScriptRuntime => ({
-  async run(step: ScriptStep, connection): Promise<Result<ScriptRun, ScriptFailure>> {
-    const request = crypto.randomUUID()
-    let inputs: PythonInput[]
-    try {
-      inputs = await Promise.all(step.inputs.map((view) => arrowOf(connection, view)))
-    } catch (cause) {
-      return err({ detail: `the inputs could not be handed to Python: ${cause instanceof Error ? cause.message : String(cause)}`, stdout: '' })
+/** Owns one worker and its pending requests; snapshots contain status, never Arrow buffers. */
+export function createPythonRuntime(makeWorker: () => Worker = () => new Worker(new URL('../workers/python.worker.ts', import.meta.url), { type: 'module', name: 'hirmos-python' })) {
+  const store = createStore<RuntimeSnapshot>(() => ({ runtime: { kind: 'idle' }, active: null }))
+  let worker: Worker | null = null
+  let closed = false
+  const pending = new Map<string, (event: RunEvent) => void>()
+  const current = (request: string) => !closed && store.getState().active?.request === request
+  const failAll = (detail: string) => {
+    const waiting = [...pending]
+    pending.clear()
+    for (const [request, resolve] of waiting) resolve({ kind: 'run-failed', request, detail, stdout: '' })
+  }
+  const recycle = (detail: string, runtime: PythonRuntimeState = { kind: 'idle' }) => {
+    const previous = worker
+    worker = null
+    previous?.terminate()
+    failAll(detail)
+    store.setState({ active: null, runtime })
+  }
+  const pythonWorker = (): Worker => {
+    if (closed) throw new Error('The script session was closed.')
+    if (worker !== null) return worker
+    const created = makeWorker()
+    worker = created
+    const stopped = (detail: string) => {
+      if (worker !== created) return
+      recycle(detail, { kind: 'failed', detail })
     }
-    setActive({ step: step.id, startedAt: Date.now() })
-    const limit = window.setTimeout(() => {
-      if (!pending.has(request)) return
-      recycle('The script ran for more than five minutes and was stopped.')
-      warmPythonRuntime()
-    }, PYTHON_RUN_LIMIT_MS)
-    const event = await new Promise<RunEvent>((resolve) => {
-      pending.set(request, resolve)
-      send({ kind: 'run', request, code: step.code, inputs }, inputs.map((input) => input.bytes.buffer as ArrayBuffer))
-    })
-    window.clearTimeout(limit)
-    if (active?.step === step.id) setActive(null)
-    if (event.kind === 'run-failed') return err({ detail: event.detail, stdout: event.stdout })
-    if (event.columns.length === 0) return err({ detail: 'prepared has no columns', stdout: event.stdout })
-    const staging = `script_result_${request.replaceAll('-', '')}`
-    try {
-      // Validate insertion before replacing the last successful result. A failed
-      // conversion must not leave a partially populated result behind.
-      await connection.insertArrowFromIPCStream(event.prepared.bytes, { name: staging })
-      const table = `script_${step.id.replaceAll('"', '')}`
-      await connection.query('BEGIN TRANSACTION')
-      try {
-        await connection.query(`CREATE OR REPLACE TABLE ${identifier(table)} AS SELECT * FROM ${identifier(staging)}`)
-        await connection.query(`CREATE OR REPLACE VIEW ${identifier(step.view)} AS SELECT * FROM ${identifier(table)}`)
-        await connection.query('COMMIT')
-      } catch (cause) {
-        await connection.query('ROLLBACK')
-        throw cause
+    created.onmessage = (message: MessageEvent<unknown>) => {
+      if (worker !== created || closed) return
+      const parsed = parsePythonEvent(message.data)
+      if (!parsed.ok) { stopped(parsed.error.detail); return }
+      const event = parsed.value
+      switch (event.kind) {
+        case 'loading': store.setState({ runtime: { kind: 'loading', detail: event.detail } }); return
+        case 'ready': store.setState({ runtime: { kind: 'ready', python: event.python } }); return
+        case 'start-failed': stopped(event.detail); return
+        case 'ran': case 'run-failed': {
+          const resolve = pending.get(event.request)
+          pending.delete(event.request)
+          resolve?.(event)
+          return
+        }
+        default: { const exhaustive: never = event; return exhaustive }
       }
-      return ok({ stdout: event.stdout })
-    } catch (cause) {
-      return err({ detail: `prepared could not be read back: ${cause instanceof Error ? cause.message : String(cause)}`, stdout: event.stdout })
-    } finally {
-      await connection.query(`DROP TABLE IF EXISTS ${identifier(staging)}`).catch(() => undefined)
     }
-  },
-})
+    created.onerror = event => stopped(event.message || 'The Python worker stopped.')
+    created.onmessageerror = () => stopped('The Python worker sent an unreadable message.')
+    return created
+  }
+  const send = (command: PythonCommand, transfer: readonly ArrayBuffer[] = []) => pythonWorker().postMessage(command, [...transfer])
+  const warm = () => {
+    if (closed) return
+    const state = store.getState().runtime
+    if (state.kind !== 'idle' && state.kind !== 'failed') return
+    store.setState({ runtime: { kind: 'loading', detail: 'Loading Python' } })
+    try { send({ kind: 'start' }) } catch (cause) { recycle(String(cause), { kind: 'failed', detail: String(cause) }) }
+  }
+  const cancel = () => {
+    if (store.getState().active === null) return
+    recycle('The script was cancelled.')
+    warm()
+  }
+  const scripts: ScriptRuntime = {
+    async run(step, connection): Promise<Result<ScriptRun, ScriptFailure>> {
+      if (closed) return err({ detail: 'The script session was closed.', stdout: '' })
+      if (store.getState().active !== null) return err({ detail: 'Another script is running in this session.', stdout: '' })
+      const request = crypto.randomUUID()
+      store.setState({ active: { request, step: step.id, startedAt: Date.now() } })
+      try {
+        let inputs: PythonInput[]
+        try { inputs = await Promise.all(step.inputs.map(view => arrowOf(connection, view))) }
+        catch (cause) { return err({ detail: 'The inputs could not be handed to Python: ' + String(cause), stdout: '' }) }
+        if (!current(request)) return err({ detail: 'The script was cancelled or its session closed.', stdout: '' })
+        const limit = window.setTimeout(() => {
+          if (!pending.has(request)) return
+          recycle('The script ran for more than five minutes and was stopped.')
+          warm()
+        }, PYTHON_RUN_LIMIT_MS)
+        const event = await new Promise<RunEvent>(resolve => {
+          pending.set(request, resolve)
+          try { send({ kind: 'run', request, code: step.code, inputs }, inputs.map(input => input.bytes.buffer as ArrayBuffer)) }
+          catch (cause) { recycle(String(cause), { kind: 'failed', detail: String(cause) }) }
+        })
+        window.clearTimeout(limit)
+        if (event.kind === 'run-failed') return err({ detail: event.detail, stdout: event.stdout })
+        if (!current(request)) return err({ detail: 'The script was cancelled or its session closed.', stdout: event.stdout })
+        if (event.columns.length === 0) return err({ detail: 'prepared has no columns', stdout: event.stdout })
+        const staging = `script_result_${request.replaceAll('-', '')}`
+        try {
+          // Validate insertion before replacing the last successful result. A failed
+          // conversion must not leave a partially populated result behind.
+          await connection.insertArrowFromIPCStream(event.prepared.bytes, { name: staging })
+          if (!current(request)) throw new Error('The script was cancelled or its session closed.')
+          const table = `script_${step.id.replaceAll('"', '')}`
+          await connection.query('BEGIN TRANSACTION')
+          try {
+            await connection.query(`CREATE OR REPLACE TABLE ${identifier(table)} AS SELECT * FROM ${identifier(staging)}`)
+            await connection.query(`CREATE OR REPLACE VIEW ${identifier(step.view)} AS SELECT * FROM ${identifier(table)}`)
+            if (!current(request)) throw new Error('The script was cancelled or its session closed.')
+            await connection.query('COMMIT')
+          } catch (cause) {
+            await connection.query('ROLLBACK')
+            throw cause
+          }
+          return current(request) ? ok({ stdout: event.stdout }) : err({ detail: 'The script session was closed.', stdout: event.stdout })
+        } catch (cause) {
+          return err({ detail: `prepared could not be read back: ${cause instanceof Error ? cause.message : String(cause)}`, stdout: event.stdout })
+        } finally {
+          await connection.query(`DROP TABLE IF EXISTS ${identifier(staging)}`).catch(() => undefined)
+        }
+      } finally {
+        if (current(request)) store.setState({ active: null })
+      }
+    },
+  }
+  return {
+    store, scripts, warm, cancel,
+    activate: () => { closed = false },
+    dispose: () => { closed = true; recycle('The script session was closed.') },
+  }
+}

@@ -2,13 +2,18 @@ import { createStore } from 'zustand/vanilla'
 import type { Redundancy, TemporalStructure } from './diagnostics'
 import { initialPreprocessingDraft, stepPreprocessing, type PreprocessingDraft, type PreprocessingEvent } from './preprocessing'
 import type { DatasetProfileId } from './dataset'
-import type { BackdoorIdentificationEvidence, StudySpecification } from './study'
+import { estimableIdentification, type BackdoorIdentificationEvidence, type StudySpecification } from './study'
 import type { PreparedDatasetVersionId } from './preprocessing'
 import { initialDiagnosticDraft, stepDiagnosticDraft, type DiagnosticDraft, type DiagnosticEvent } from './diagnosticDraft'
 import { INITIAL_WORKFLOW, stepWorkflow, type Workflow, type WorkflowEvent } from './workflow'
 import { initialDiscoverySessionFor, stepDiscoverySession, type DiscoverySession, type DiscoverySessionEvent } from './discovery'
 import { retainCausalModelDrafts, sameCausalSelection, stepCausalModelDraft, type CausalModelDraft, type CausalModelEvent } from './causalModelDraft'
 import type { RootCauseSelection } from './rootCause'
+import { retainSensitivityDraft, stepSensitivityDraft, type SensitivitySession, type SensitivityEvent } from './sensitivityDraft'
+import { retainCounterfactualDraft, stepCounterfactualDraft, type CounterfactualSession, type CounterfactualEvent } from './counterfactualDraft'
+import { retainSurvivalDraft, type SurvivalSession, type Draft as SurvivalDraft } from './survivalDraft'
+import { retainEstimationDraft, stepEstimationDraft, type EstimationSession, type EstimationEvent } from './estimationDraft'
+import { retainTimeSeriesDraft, stepTimeSeriesDraft, type TimeSeriesDraft, type TimeSeriesEvent } from './timeSeriesDraft'
 
 interface AdjustmentDecision {
   readonly study: StudySpecification
@@ -21,6 +26,16 @@ function decisionApplies(decision: AdjustmentDecision, workflow: Workflow): bool
 }
 
 interface State {
+  readonly timeSeriesDraft: TimeSeriesDraft | null
+  readonly changeTimeSeries: (prepared: PreparedDatasetVersionId, event: TimeSeriesEvent) => void
+  readonly estimationDraft: EstimationSession | null
+  readonly changeEstimation: (prepared: PreparedDatasetVersionId, event: EstimationEvent) => void
+  readonly survivalDraft: SurvivalSession | null
+  readonly changeSurvival: (prepared: PreparedDatasetVersionId, draft: SurvivalDraft) => void
+  readonly counterfactualDraft: CounterfactualSession | null
+  readonly changeCounterfactual: (prepared: PreparedDatasetVersionId, event: CounterfactualEvent) => void
+  readonly sensitivityDraft: SensitivitySession | null
+  readonly changeSensitivity: (prepared: PreparedDatasetVersionId, event: SensitivityEvent) => void
   readonly causalModelDrafts: readonly CausalModelDraft[]
   readonly changeCausalModel: (graph: RootCauseSelection, event: CausalModelEvent) => void
   readonly diagnosticDraft: DiagnosticDraft | null
@@ -43,6 +58,32 @@ interface State {
 
 export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
   return createStore<State>(set => ({
+    timeSeriesDraft: retainTimeSeriesDraft(null, initial),
+    changeTimeSeries: (prepared, event) => set(state => state.timeSeriesDraft?.prepared === prepared ? { timeSeriesDraft: stepTimeSeriesDraft(state.timeSeriesDraft, event) } : state),
+    estimationDraft: retainEstimationDraft(null, initial),
+    changeEstimation: (prepared, event) => set(state => {
+      const current = state.estimationDraft
+      if (current === null || current.prepared !== prepared || state.workflow.kind !== 'profiled') return state
+      if (event.type === 'identification-chosen' && event.selection.identification !== null && !state.workflow.identifications.some(item => item.id === event.selection.identification && estimableIdentification(item.result))) return state
+      const draft = stepEstimationDraft(current.draft, event)
+      return draft === current.draft ? state : { estimationDraft: { prepared, draft } }
+    }),
+    survivalDraft: retainSurvivalDraft(null, initial),
+    changeSurvival: (prepared, draft) => set(state => state.survivalDraft?.prepared === prepared ? { survivalDraft: { prepared, draft } } : state),
+    counterfactualDraft: retainCounterfactualDraft(null, initial),
+    changeCounterfactual: (prepared, event) => set(state => {
+      const current = state.counterfactualDraft
+      if (current === null || current.prepared !== prepared || state.workflow.kind !== 'profiled') return state
+      if (event.type === 'identification-chosen' && event.identification !== null && !state.workflow.identifications.some(item => item.id === event.identification && item.result.kind === 'identified')) return state
+      return { counterfactualDraft: { prepared, draft: stepCounterfactualDraft(current.draft, event) } }
+    }),
+    sensitivityDraft: retainSensitivityDraft(null, initial),
+    changeSensitivity: (prepared, event) => set(state => {
+      const current = state.sensitivityDraft
+      if (current === null || current.prepared !== prepared || state.workflow.kind !== 'profiled') return state
+      if (event.type === 'run-chosen' && event.run !== null && !state.workflow.estimationRuns.some(run => run.id === event.run)) return state
+      return { sensitivityDraft: { prepared, draft: stepSensitivityDraft(current.draft, event) } }
+    }),
     causalModelDrafts: retainCausalModelDrafts([], initial),
     changeCausalModel: (graph, event) => set(state => {
       const current = state.causalModelDrafts.find(draft => sameCausalSelection(draft.graph, graph))
@@ -109,8 +150,13 @@ export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
           : state.workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id && state.diagnosticDraft?.prepared === workflow.prepared.id ? state.diagnosticDraft
           : initialDiagnosticDraft(workflow.prepared)
         const sameProject = state.workflow.kind === 'profiled' && workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id
+        const sensitivityDraft = retainSensitivityDraft(sameProject ? state.sensitivityDraft : null, workflow)
+        const counterfactualDraft = retainCounterfactualDraft(sameProject ? state.counterfactualDraft : null, workflow)
+        const survivalDraft = retainSurvivalDraft(sameProject ? state.survivalDraft : null, workflow)
+        const estimationDraft = retainEstimationDraft(sameProject ? state.estimationDraft : null, workflow)
+        const timeSeriesDraft = retainTimeSeriesDraft(sameProject ? state.timeSeriesDraft : null, workflow)
         const causalModelDrafts = retainCausalModelDrafts(sameProject ? state.causalModelDrafts : [], workflow)
-        return { workflow, discovery, temporalStructure, redundancy, preprocessing, adjustmentDecision, diagnosticDraft, causalModelDrafts }
+        return { workflow, discovery, temporalStructure, redundancy, preprocessing, adjustmentDecision, diagnosticDraft, causalModelDrafts, sensitivityDraft, counterfactualDraft, survivalDraft, estimationDraft, timeSeriesDraft }
       })
     },
   }))

@@ -1,3 +1,5 @@
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { initialEstimationDraft, estimationSelection, samePanelBinding, sameStudyDataBinding, type EstimationEvent, type PanelBinding, type StudyDataBinding } from '@/domain/estimationDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { SelectionActions } from '@/components/ui/SelectionActions'
@@ -10,7 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
 import { LagListField } from '@/components/ui/LagListField'
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { histogramOption } from '@/charts/data/histogram'
@@ -44,14 +46,11 @@ import {
   boundsReading,
   causalEstimateFrom,
   contemporaneousAdjustmentVariables,
-  defaultConfiguration,
-  defaultEstimatorFor,
   describeCovariance,
   describeDiscreteStatePreparations,
   describeEstimator,
   describeInstrumentalVariableRoute, dmlNuisanceInputs,
   ESTIMATOR_GROUPS,
-  ESTIMATOR_IDS,
   evaluateEstimatorEligibility,
   headlineValue,
   intervalTypeOf,
@@ -75,9 +74,7 @@ import { describeSeriesTransform, frequencyUnit, seriesTransformFor, type Prepar
 import type { SensitivityRunArtifact } from '@/domain/sensitivity'
 import {
   assessPanelInterventionLayout,
-  type PanelInterventionLayout,
   type PanelInterventionPreflight,
-  type PanelLongMatrix,
 } from '@/domain/panel'
 import { describeIdentificationStrategy, estimableIdentification, estimandSentence, identifiedInstruments, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
@@ -101,9 +98,6 @@ const ESTIMATOR_GROUP_LABELS: Readonly<Record<EstimatorGroupId, string>> = {
   'dynamic-time-series': 'Count intervention',
   'intervention-comparison': 'Interventions',
 }
-
-const estimatorGroupFor = (estimator: EstimatorId) =>
-  ESTIMATOR_GROUPS.find((group) => group.estimators.includes(estimator)) ?? ESTIMATOR_GROUPS[0]
 
 const adjustmentFromEstimator = (estimator: TotalEffectEstimator): CausalEffectsAdjustment => estimator.kind === 'wrightParents'
   ? { kind: 'optimal' }
@@ -162,104 +156,12 @@ const describeAdjustmentProblems = (
   }
 }).join(' ')
 
-interface PanelBinding {
-  readonly prepared: PreparedDatasetArtifact['id']
-  readonly unit: ColumnId
-  readonly time: ColumnId
-  readonly outcome: ColumnId
-  readonly treatment: ColumnId
-}
-
-interface StudyDataBinding {
-  readonly prepared: PreparedDatasetArtifact['id']
-  readonly dagRevision: StudySpecification['dagRevision']
-  readonly treatment: ColumnId
-  readonly outcome: ColumnId
-}
-
-type StudyDataPreflightJob =
-  | { readonly kind: 'not-required' }
-  | { readonly kind: 'loading'; readonly binding: StudyDataBinding }
-  | { readonly kind: 'ready'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean; readonly observedGraphIsBinary: boolean }
-  | { readonly kind: 'failed'; readonly binding: StudyDataBinding; readonly detail: string }
-
-type PanelPreflightJob =
-  | { readonly kind: 'not-required' }
-  | { readonly kind: 'loading'; readonly binding: PanelBinding }
-  | { readonly kind: 'ready'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
-  | { readonly kind: 'refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
-
-/** The identification the panel works from, with the estimator that fits it and fresh defaults for every estimator. */
-interface EstimationSelection {
-  readonly identification: IdentificationId | null
-  readonly estimator: EstimatorId
-  readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>>
-}
-
-const estimationSelection = (identification: IdentificationArtifact | null, studies: readonly StudySpecification[], prepared: PreparedDatasetArtifact): EstimationSelection => {
-  const study = studies.find((candidate) => candidate.id === identification?.study) ?? null
-  return {
-    identification: identification?.id ?? null,
-    estimator: defaultEstimatorFor(identification?.result ?? null, prepared, study),
-    configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, study)])) as Record<EstimatorId, EstimatorConfiguration>,
-  }
-}
-
-interface State extends EstimationSelection {
-  readonly panelPreflight: PanelPreflightJob
-  readonly studyDataPreflight: StudyDataPreflightJob
-}
-
-type Event =
-  | { readonly type: 'identification-chosen'; readonly selection: EstimationSelection }
-  | { readonly type: 'estimator-chosen'; readonly estimator: EstimatorId }
-  | { readonly type: 'configured'; readonly configuration: EstimatorConfiguration }
-  | { readonly type: 'panel-preflight-not-required' }
-  | { readonly type: 'panel-preflight-started'; readonly binding: PanelBinding }
-  | { readonly type: 'panel-preflight-succeeded'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
-  | { readonly type: 'panel-preflight-refused'; readonly binding: PanelBinding; readonly problem: Extract<PanelInterventionPreflight, { readonly kind: 'refused' }>['problem'] }
-  | { readonly type: 'study-data-preflight-not-required' }
-  | { readonly type: 'study-data-preflight-started'; readonly binding: StudyDataBinding }
-  | { readonly type: 'study-data-preflight-succeeded'; readonly binding: StudyDataBinding; readonly treatmentIsBinary: boolean; readonly outcomeIsCount: boolean; readonly observedGraphIsBinary: boolean }
-  | { readonly type: 'study-data-preflight-failed'; readonly binding: StudyDataBinding; readonly detail: string }
-
-const step = (state: State, event: Event): State => {
-  switch (event.type) {
-    case 'identification-chosen': return { ...state, ...event.selection }
-    case 'estimator-chosen': return { ...state, estimator: event.estimator }
-    case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration } }
-    case 'panel-preflight-not-required': return { ...state, panelPreflight: { kind: 'not-required' } }
-    case 'panel-preflight-started': return { ...state, panelPreflight: { kind: 'loading', binding: event.binding } }
-    case 'panel-preflight-succeeded': return { ...state, panelPreflight: { kind: 'ready', binding: event.binding, matrix: event.matrix, layout: event.layout } }
-    case 'panel-preflight-refused': return { ...state, panelPreflight: { kind: 'refused', binding: event.binding, problem: event.problem } }
-    case 'study-data-preflight-not-required': return { ...state, studyDataPreflight: { kind: 'not-required' } }
-    case 'study-data-preflight-started': return { ...state, studyDataPreflight: { kind: 'loading', binding: event.binding } }
-    case 'study-data-preflight-succeeded': return { ...state, studyDataPreflight: { kind: 'ready', binding: event.binding, treatmentIsBinary: event.treatmentIsBinary, outcomeIsCount: event.outcomeIsCount, observedGraphIsBinary: event.observedGraphIsBinary } }
-    case 'study-data-preflight-failed': return { ...state, studyDataPreflight: { kind: 'failed', binding: event.binding, detail: event.detail } }
-    default: return assertNever(event)
-  }
-}
-
-
 const intervalText = (estimate: CausalEstimate): string => {
   if (estimate.interval.kind === 'none') return 'none'
   const figure = formatInterval(headlineValue(estimate.effect), estimate.interval.lower, estimate.interval.upper, intervalTypeOf(estimate.interval), scaleOf(estimate))
   return `[${figure.bounds.lower}, ${figure.bounds.upper}]`
 }
 
-
-const samePanelBinding = (left: PanelBinding, right: PanelBinding): boolean =>
-  left.prepared === right.prepared
-  && left.unit === right.unit
-  && left.time === right.time
-  && left.outcome === right.outcome
-  && left.treatment === right.treatment
-
-const sameStudyDataBinding = (left: StudyDataBinding, right: StudyDataBinding): boolean =>
-  left.prepared === right.prepared
-  && left.dagRevision === right.dagRevision
-  && left.treatment === right.treatment
-  && left.outcome === right.outcome
 
 const eligibilityHint = (eligibility: MethodEligibility): string => {
   switch (eligibility.kind) {
@@ -777,20 +679,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const chartTheme = useChartTheme()
   const [pendingDelete, setPendingDelete] = useState<EstimationRunArtifact | null>(null)
   const [adjustmentDraft, setAdjustmentDraft] = useState<ExplicitAdjustmentMemberDraft>(CLOSED_ADJUSTMENT_DRAFT)
-  const [state, dispatch] = useReducer(step, null, (): State => {
-    // The controls open as the latest recorded run set them, so a reopened project shows the analysis it holds.
-    const latest = runs.filter((run) => ESTIMATOR_GROUPS.some((group) => group.estimators.includes(run.configuration.kind))).at(-1) ?? null
-    const recorded = latest === null ? null : identified.find((candidate) => candidate.id === latest.identification) ?? null
-    const selection = estimationSelection(recorded ?? identified.at(-1) ?? null, studies, prepared)
-    return {
-      ...selection,
-      ...(latest !== null && recorded !== null ? { estimator: latest.configuration.kind, configurations: { ...selection.configurations, [latest.configuration.kind]: latest.configuration } } : {}),
-      panelPreflight: { kind: 'not-required' },
-      studyDataPreflight: { kind: 'not-required' },
-    }
-  })
-  const [visibleEstimatorGroup, setVisibleEstimatorGroup] = useState<EstimatorGroupId>(() => estimatorGroupFor(state.estimator).id)
-  useEffect(() => setVisibleEstimatorGroup(estimatorGroupFor(state.estimator).id), [state.estimator])
+  const empty = useMemo(() => initialEstimationDraft(prepared, studies, [], []), [prepared, studies])
+  const state = useWorkflow(store => store.estimationDraft?.prepared === prepared.id ? store.estimationDraft.draft : empty)
+  const change = useWorkflow(store => store.changeEstimation)
+  const dispatch = (event: EstimationEvent) => change(prepared.id, event)
+  const visibleEstimatorGroup = state.group
+  const setVisibleEstimatorGroup = (group: EstimatorGroupId) => dispatch({ type: 'group-chosen', group })
   const visibleGroup = ESTIMATOR_GROUPS.find((group) => group.id === visibleEstimatorGroup) ?? ESTIMATOR_GROUPS[0]
   const selectedEstimatorIsVisible = visibleGroup.estimators.includes(state.estimator)
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null

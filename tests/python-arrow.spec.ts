@@ -5,11 +5,12 @@ test('Script Arrow transport preserves typed values and refuses lossy results', 
   await page.goto('/app')
   const results = await page.evaluate(async () => {
     const { isolatedDuckDbEngine } = await import(new URL('/src/data/duckdb.ts', location.href).href) as typeof import('../src/data/duckdb')
-    const { pythonScriptRuntime } = await import(new URL('/src/data/pythonRuntime.ts', location.href).href) as typeof import('../src/data/pythonRuntime')
+    const { createPythonRuntime } = await import(new URL('/src/data/pythonRuntime.ts', location.href).href) as typeof import('../src/data/pythonRuntime')
     const { pipelineBlockId } = await import(new URL('/src/domain/pipeline.ts', location.href).href) as typeof import('../src/domain/pipeline')
     const { db } = await isolatedDuckDbEngine()
     const connection = await db.connect()
-    const runtime = pythonScriptRuntime()
+    const session = createPythonRuntime()
+    const runtime = session.scripts
     const findings: { name: string; error?: string; different?: number; schemaEqual?: boolean }[] = []
     const cases: Record<string, string> = {
       booleans: 'SELECT * FROM (VALUES (true),(false),(NULL::BOOLEAN))t(x)',
@@ -63,7 +64,7 @@ test('Script Arrow transport preserves typed values and refuses lossy results', 
       const changed = await run('prepared=pd.DataFrame({"replacement":["ok"]})')
       findings.push({ name: 'changed-columns', ...(changed.ok ? { different: (await queryRows('SELECT replacement FROM script_output'))[0]!.replacement === 'ok' ? 0 : 1 } : { error: changed.error.detail }) })
       return findings
-    } finally { await connection.close(); await db.terminate() }
+    } finally { session.dispose(); await connection.close(); await db.terminate() }
   })
   await test.info().attach('typed-round-trips', { body: JSON.stringify(results, null, 2), contentType: 'application/json' })
   for (const result of results) {

@@ -4,6 +4,7 @@ import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { JobsProvider } from '@/analysis/JobsProvider'
 import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
+import { PreparationProvider } from '@/components/data/PreparationProvider'
 import { Icon } from '@/components/Icon'
 import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
@@ -198,8 +199,11 @@ function App() {
       return replayed.ok ? replayed : err(data.describeSqlPreparationProblem(replayed.error))
     }
     const [data, python] = await Promise.all([import('@/data/pipeline'), import('@/data/pythonRuntime')])
-    const replayed = await data.replayPipelineRecipe(recipe, files, python.pythonScriptRuntime())
-    return replayed.ok ? replayed : err(data.describePipelineRunProblem(replayed.error, (id) => id))
+    const runtime = python.createPythonRuntime()
+    try {
+      const replayed = await data.replayPipelineRecipe(recipe, files, runtime.scripts)
+      return replayed.ok ? replayed : err(data.describePipelineRunProblem(replayed.error, (id) => id))
+    } finally { runtime.dispose() }
   }
 
   // The editor that made a derived source opens on it again, with its files when the page still holds them.
@@ -1114,5 +1118,5 @@ function App() {
 }
 
 export default function Workbench() {
-  return <WorkflowProvider><App /></WorkflowProvider>
+  return <WorkflowProvider><PreparationProvider><App /></PreparationProvider></WorkflowProvider>
 }

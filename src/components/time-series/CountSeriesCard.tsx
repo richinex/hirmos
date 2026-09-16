@@ -1,3 +1,6 @@
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { useTimeSeriesDraft } from './useTimeSeriesDraft'
+import type { CountDraft } from '@/domain/timeSeriesDraft'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
@@ -19,11 +22,9 @@ import {
   describeCountSeriesReadiness,
   newCountSeriesModelId,
   readyCountSeriesSpecification,
-  type CountSeriesLink,
   type CountSeriesModelArtifact,
 } from '@/domain/countSeries'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
-import type { NonEmptyArray } from '@/domain/dop'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatCount, formatStatistic, formatWords } from '@/lib/format/number'
@@ -88,13 +89,15 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
   readonly onActivity?: (activity: RunActivity | null) => void
 }) {
   const columns = profile.columns.filter((column) => prepared.columns.includes(column.id) && isNumericDuckDbType(column.duckdbType))
-  const [outcome, setOutcome] = useState<ColumnId | null>(null)
-  const [link, setLink] = useState<CountSeriesLink>('identity')
-  const [pastObservationLags, setPastObservationLags] = useState<NonEmptyArray<number>>([1])
-  const [pastMeanLags, setPastMeanLags] = useState<NonEmptyArray<number>>([1])
-  const [candidateStart, setCandidateStart] = useState(Math.max(1, Math.floor(prepared.observations * 0.2)))
-  const [candidateEnd, setCandidateEnd] = useState(Math.max(1, Math.floor(prepared.observations * 0.8)))
-  const [delta, setDelta] = useState(1)
+  const { outcome, link, pastObservationLags, pastMeanLags, candidateStart, candidateEnd, delta } = useTimeSeriesDraft(prepared.id, state => state.count)
+  const change = useWorkflow(state => state.changeTimeSeries)
+  const setOutcome = (value: CountDraft['outcome']) => change(prepared.id, { type: 'count', field: 'outcome', value })
+  const setLink = (value: CountDraft['link']) => change(prepared.id, { type: 'count', field: 'link', value })
+  const setPastObservationLags = (value: CountDraft['pastObservationLags']) => change(prepared.id, { type: 'count', field: 'pastObservationLags', value })
+  const setPastMeanLags = (value: CountDraft['pastMeanLags']) => change(prepared.id, { type: 'count', field: 'pastMeanLags', value })
+  const setCandidateStart = (value: CountDraft['candidateStart']) => change(prepared.id, { type: 'count', field: 'candidateStart', value })
+  const setCandidateEnd = (value: CountDraft['candidateEnd']) => change(prepared.id, { type: 'count', field: 'candidateEnd', value })
+  const setDelta = (value: CountDraft['delta']) => change(prepared.id, { type: 'count', field: 'delta', value })
   const session = useJob('time-series:counts')
   const { job } = session
   useRunActivity(onActivity, job.kind === 'running' ? { label: 'Count-series scan', progress: null } : null)

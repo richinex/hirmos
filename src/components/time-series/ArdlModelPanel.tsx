@@ -1,11 +1,14 @@
-import { useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { useTimeSeriesDraft } from './useTimeSeriesDraft'
+import type { ArdlDraft, Mode } from '@/domain/timeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { z } from 'zod'
 import { ardlModelRequestSchema } from '@/domain/ardlModel'
-import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun, type ArdlTerms } from '@/domain/timeSeries'
+import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun } from '@/domain/timeSeries'
 import { assertNever, isNonEmpty } from '@/domain/dop'
-import { isNumericDuckDbType, type ColumnId } from '@/domain/dataset'
+import { isNumericDuckDbType } from '@/domain/dataset'
 import { TIME_SERIES_METHODS } from '@/domain/methods'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Select } from '@/components/ui/Select'
@@ -20,11 +23,8 @@ import { TimeSeriesHistory } from './TimeSeriesHistory'
 import { TimeSeriesRequirements } from './TimeSeriesRequirements'
 import { TimeSeriesRunResult } from './TimeSeriesRunResult'
 
-type Role = {readonly kind: 'unused'} | {readonly kind: 'predictor'; readonly lag: string} | {readonly kind: 'fixed'}
-type Future = {readonly kind: 'none'} | {readonly kind: 'scenario'; readonly columns: Readonly<Record<string, string>>}
 const numeric = (text: string) => text.trim() === '' ? NaN : Number(text)
 const futureValues = (text: string) => text.trim() === '' ? [] : text.trim().split(/[\s,;]+/).map(numeric)
-type Mode = 'fixed' | 'search' | 'rFixed' | 'rHorizontal' | 'rGrid'
 function ordersFor(mode: Mode, p: number, q: number[], starting: number[], fixed: (number | null)[], minimum: number) {
   switch (mode) {
     case 'fixed': case 'rFixed': return { kind: mode, outcomeLag: p, predictorLags: q }
@@ -37,19 +37,21 @@ function ordersFor(mode: Mode, p: number, q: number[], starting: number[], fixed
 
 export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector: ReactNode}) {
   const columns = props.profile.columns.filter(c => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType))
-  const [outcome, setOutcome] = useState<ColumnId | null>(null)
-  const [roles, setRoles] = useState<Readonly<Record<string, Role>>>({})
-  const [mode, setMode] = useState<Mode>('search')
-  const [starting, setStarting] = useState<Readonly<Record<string,string>>>({})
-  const [fixedOrders, setFixedOrders] = useState<Readonly<Record<string,string>>>({})
-  const [minimum, setMinimum] = useState('1')
+  const { outcome, roles, mode, starting, fixedOrders, minimum, outcomeLag, holdBack, terms, horizon, future } = useTimeSeriesDraft(props.prepared.id, state => state.ardl)
+  const change = useWorkflow(state => state.changeTimeSeries)
+  const setOutcome = (value: ArdlDraft['outcome']) => change(props.prepared.id, { type: 'ardl', field: 'outcome', value })
+  const setRoles = (value: ArdlDraft['roles']) => change(props.prepared.id, { type: 'ardl', field: 'roles', value })
+  const setMode = (value: ArdlDraft['mode']) => change(props.prepared.id, { type: 'ardl', field: 'mode', value })
+  const setStarting = (value: ArdlDraft['starting']) => change(props.prepared.id, { type: 'ardl', field: 'starting', value })
+  const setFixedOrders = (value: ArdlDraft['fixedOrders']) => change(props.prepared.id, { type: 'ardl', field: 'fixedOrders', value })
+  const setMinimum = (value: ArdlDraft['minimum']) => change(props.prepared.id, { type: 'ardl', field: 'minimum', value })
+  const setOutcomeLag = (value: ArdlDraft['outcomeLag']) => change(props.prepared.id, { type: 'ardl', field: 'outcomeLag', value })
+  const setHoldBack = (value: ArdlDraft['holdBack']) => change(props.prepared.id, { type: 'ardl', field: 'holdBack', value })
+  const setTerms = (value: ArdlDraft['terms']) => change(props.prepared.id, { type: 'ardl', field: 'terms', value })
+  const setHorizon = (value: ArdlDraft['horizon']) => change(props.prepared.id, { type: 'ardl', field: 'horizon', value })
+  const setFuture = (value: ArdlDraft['future']) => change(props.prepared.id, { type: 'ardl', field: 'future', value })
   const searching = mode !== 'fixed' && mode !== 'rFixed'
   const constrained = mode === 'rHorizontal' || mode === 'rGrid'
-  const [outcomeLag, setOutcomeLag] = useState('2')
-  const [holdBack, setHoldBack] = useState('')
-  const [terms, setTerms] = useState<ArdlTerms>('constant')
-  const [horizon, setHorizon] = useState('12')
-  const [future, setFuture] = useState<Future>({kind: 'none'})
   const session = useJob('time-series:ardl-model')
   const { job } = session
   useRunActivity(props.onActivity, job.kind === 'running' ? {label: 'ARDL', progress: null} : null)

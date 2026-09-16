@@ -1,13 +1,14 @@
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { activePythonRun, pythonRuntimeState, subscribePythonRuntime, type ActivePythonRun, type PythonRuntimeState } from '@/data/pythonRuntime'
+import { useEffect, useState } from 'react'
+import { useStore } from 'zustand'
+import type { ActivePythonRun, PythonRuntimeState } from '@/data/pythonRuntime'
+import { usePythonSession } from './PythonProvider'
 import type { PipelineBlockId } from '@/domain/pipeline'
 
-export const usePythonRuntime = (): PythonRuntimeState => useSyncExternalStore(subscribePythonRuntime, pythonRuntimeState)
+export const usePythonRuntime = (): PythonRuntimeState => useStore(usePythonSession().store, state => state.runtime)
 
 /** The script run in progress for this block, if any, with its elapsed time ticking once a second. */
 export function usePythonRun(step: PipelineBlockId): { readonly run: ActivePythonRun; readonly elapsedMs: number } | null {
-  const active = useSyncExternalStore(subscribePythonRuntime, activePythonRun)
-  const run = active !== null && active.step === step ? active : null
+  const run = useStore(usePythonSession().store, state => state.active?.step === step ? state.active : null)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
     if (run === null) return

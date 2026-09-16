@@ -29,7 +29,7 @@ const giveFile = async (page: Page, id: string, file: { name: string; mimeType: 
   if (phone) await expect(page.getByRole('dialog', { name: 'Input file' })).toBeVisible()
   await page.getByLabel('File for this card').setInputFiles(file)
   if (phone) {
-    await expect(block(page, id)).toContainText(/rows ·|failed/, { timeout: 30_000 })
+    await expect(block(page, id)).toContainText(/rows,|failed/, { timeout: 30_000 })
     await page.keyboard.press('Escape')
     await expect(page.locator('[data-vaul-overlay]')).toHaveCount(0)
   }
@@ -39,13 +39,13 @@ const startPipeline = async (page: Page, both = true) => {
   await openEditor(page)
   const [cities, regions] = files()
   await giveFile(page, 'input-1', cities!)
-  await expect(block(page, 'input-1')).toContainText('4 rows · 3 columns', { timeout: 30_000 })
+  await expect(block(page, 'input-1')).toContainText('4 rows, 3 columns', { timeout: 30_000 })
   if (!both) return
   await page.getByRole('toolbar', { name: 'Add a block' }).getByRole('button', { name: 'Input file', exact: true }).click()
   const added = page.locator('[data-testid^="block-input-"]').last()
   const id = (await added.getAttribute('data-testid'))!.replace('block-', '')
   await giveFile(page, id, regions!)
-  await expect(block(page, id)).toContainText('4 rows · 2 columns', { timeout: 30_000 })
+  await expect(block(page, id)).toContainText('4 rows, 2 columns', { timeout: 30_000 })
   return id
 }
 
@@ -90,7 +90,7 @@ test.describe('pipeline canvas', () => {
     await expect(page.getByTestId('block-status')).toHaveText('Not run yet: needs 1 input wired in; it has 0.')
 
     await wire(page, 'input-1', filter)
-    await expect(block(page, filter)).toContainText('4 rows · 3 columns')
+    await expect(block(page, filter)).toContainText('4 rows, 3 columns')
     await expect(page.getByRole('region', { name: 'Filter rows' }).getByRole('table')).toBeVisible()
     await expect(page.getByRole('region', { name: 'Filter rows' }).getByRole('table').locator('tbody tr')).toHaveCount(4)
     // A raw preview shows whole numbers as written, with no thousands grouping.
@@ -101,13 +101,13 @@ test.describe('pipeline canvas', () => {
     await pick(page, 'Condition 1 test', 'is at least')
     await page.getByLabel('Condition 1 value').fill('300000')
     await expect(block(page, filter)).toContainText('population ≥ 300000')
-    await expect(block(page, filter)).toContainText('3 rows · 3 columns')
+    await expect(block(page, filter)).toContainText('3 rows, 3 columns')
     await expect(page.getByRole('region', { name: 'Filter rows' }).getByRole('table').locator('tbody tr')).toHaveCount(3)
     await page.getByText('As SQL').click()
     await expect(page.getByTestId('block-sql')).toHaveText('SELECT * FROM "cities" WHERE "population" >= 300000')
 
     await wire(page, filter, 'output')
-    await expect(block(page, 'output')).toContainText('3 rows · 3 columns')
+    await expect(block(page, 'output')).toContainText('3 rows, 3 columns')
     await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } })
     await expect(page.getByTestId('pipeline-incomplete')).toHaveCount(0)
     await expect(useAsSource(page)).toBeEnabled()
@@ -151,8 +151,8 @@ test.describe('pipeline canvas', () => {
     await expect(useAsSource(page)).toBeDisabled()
 
     await page.getByLabel('Derived column 1 expression').fill('population / 1000')
-    await expect(block(page, derive)).toContainText('4 rows · 4 columns')
-    await expect(block(page, sort)).toContainText('4 rows · 4 columns')
+    await expect(block(page, derive)).toContainText('4 rows, 4 columns')
+    await expect(block(page, sort)).toContainText('4 rows, 4 columns')
     await expect(useAsSource(page)).toBeEnabled()
   })
 
@@ -165,21 +165,21 @@ test.describe('pipeline canvas', () => {
     await page.getByRole('button', { name: 'Add a key' }).click()
     await pick(page, 'Key 1 in Input file cities', 'id')
     await pick(page, 'Key 1 in Input file regions', 'id')
-    await expect(block(page, join)).toContainText('4 rows · 4 columns')
+    await expect(block(page, join)).toContainText('4 rows, 4 columns')
     await expect(page.getByRole('region', { name: 'Join' }).getByRole('table')).toContainText('Pays de la Loire')
 
     await wire(page, join, 'output')
     await expect(useAsSource(page)).toBeEnabled()
     await useAsSource(page).click()
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(/built with a pipeline · 4 blocks · 2 inputs/)).toBeVisible()
+    await expect(page.getByText(/built with a pipeline, 4 blocks, 2 inputs/)).toBeVisible()
     await page.getByRole('button', { name: 'Inspect data' }).click()
     await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('region')
     await page.waitForTimeout(1500)
 
     await page.goto('/app')
-    await page.getByRole('list', { name: 'Projects' }).getByRole('button', { name: 'Open' }).first().click()
+    await page.getByRole('button', { name: 'Open Pipeline', exact: true }).filter({ visible: true }).click()
     await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
     await expect(page.getByText(/which the pipeline created from cities.csv/)).toBeVisible()
     await page.locator('input[type="file"][multiple]').setInputFiles(files())
@@ -201,7 +201,7 @@ test.describe('pipeline canvas', () => {
     await expect(union.locator('[data-handleid^="in-"]')).toHaveCount(2)
     await wire(page, regions, unionId, 1)
     await expect(union.locator('[data-handleid^="in-"]')).toHaveCount(3)
-    await expect(union).toContainText('8 rows · 4 columns')
+    await expect(union).toContainText('8 rows, 4 columns')
 
     await union.click()
     await page.getByRole('button', { name: 'Remove block' }).click()
@@ -213,14 +213,14 @@ test.describe('pipeline canvas', () => {
     test.setTimeout(240_000)
     await startPipeline(page)
     const script = await addBlock(page, 'Script', 'script')
-    await expect(page.getByTestId('python-runtime')).toContainText('pandas · numpy', { timeout: 180_000 })
+    await expect(page.getByTestId('python-runtime')).toContainText(/pandas.*numpy/, { timeout: 180_000 })
     await wire(page, 'input-1', script)
-    await expect(block(page, script)).toContainText('4 rows · 3 columns', { timeout: 60_000 })
+    await expect(block(page, script)).toContainText('4 rows, 3 columns', { timeout: 60_000 })
 
     const editor = page.getByTestId('python-editor')
     const set = async (code: string) => { await editor.locator('.cm-content').click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace'); await page.keyboard.type(code) }
     await set('df = inputs[0]\ndf["thousands"] = df["population"] / 1000\nprepared = df[df["population"] >= 300000]\n')
-    await expect(block(page, script)).toContainText('3 rows · 4 columns', { timeout: 60_000 })
+    await expect(block(page, script)).toContainText('3 rows, 4 columns', { timeout: 60_000 })
     await expect(page.getByRole('region', { name: 'Script' }).getByRole('table')).toContainText('thousands')
     await expect(page.getByRole('region', { name: 'Script' }).getByRole('table')).toContainText('Lyon')
 
@@ -232,7 +232,7 @@ test.describe('pipeline canvas', () => {
     await expect(page.getByTestId('block-status')).toContainText("line 2: SyntaxError: '(' was never closed", { timeout: 60_000 })
 
     await set('print("grouping")\nprepared = inputs[0].groupby("id")["population"].sum()\n')
-    await expect(block(page, script)).toContainText('4 rows · 2 columns', { timeout: 60_000 })
+    await expect(block(page, script)).toContainText('4 rows, 2 columns', { timeout: 60_000 })
     await expect(page.getByTestId('block-stdout')).toHaveText('grouping')
     await wire(page, script, 'output')
     await expect(useAsSource(page)).toBeEnabled({ timeout: 60_000 })
@@ -247,21 +247,21 @@ test.describe('pipeline canvas', () => {
     test.setTimeout(240_000)
     await startPipeline(page)
     const script = await addBlock(page, 'Script', 'script')
-    await expect(page.getByTestId('python-runtime')).toContainText('pandas · numpy', { timeout: 180_000 })
+    await expect(page.getByTestId('python-runtime')).toContainText(/pandas.*numpy/, { timeout: 180_000 })
     const editor = page.getByTestId('python-editor')
     const set = async (code: string) => { await editor.locator('.cm-content').click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace'); await page.keyboard.type(code) }
     await set('import time\ntime.sleep(60)\nprepared = inputs[0]\n')
     await wire(page, 'input-1', script)
     await block(page, script).click()
     await expect(page.getByRole('button', { name: 'Cancel run' })).toBeVisible({ timeout: 30_000 })
-    await expect(block(page, script)).toContainText('running ·')
+    await expect(block(page, script)).toContainText('running')
     await expect(page.getByTestId('block-status')).toHaveText('Running.')
     await page.getByRole('button', { name: 'Cancel run' }).click()
     await expect(block(page, script)).toContainText('failed', { timeout: 30_000 })
     await expect(page.getByTestId('block-status')).toContainText('The script was cancelled.')
-    await expect(page.getByTestId('python-runtime')).toContainText('pandas · numpy', { timeout: 180_000 })
+    await expect(page.getByTestId('python-runtime')).toContainText(/pandas.*numpy/, { timeout: 180_000 })
     await set('prepared = inputs[0].head(3)\n')
-    await expect(block(page, script)).toContainText('3 rows · 3 columns', { timeout: 60_000 })
+    await expect(block(page, script)).toContainText('3 rows, 3 columns', { timeout: 60_000 })
   })
 
   test('keeps each condition row with its own element when one is removed', async ({ page }) => {
@@ -332,7 +332,7 @@ test.describe('pipeline canvas', () => {
     await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(4)
     await expect(page.locator('.react-flow__edge')).toHaveCount(3)
-    await expect(block(page, join)).toContainText('4 rows · 4 columns', { timeout: 30_000 })
+    await expect(block(page, join)).toContainText('4 rows, 4 columns', { timeout: 30_000 })
     await block(page, join).click()
     await expect(page.getByRole('combobox', { name: 'Key 1 in Input file cities' })).toContainText('id')
 
@@ -349,7 +349,7 @@ test.describe('pipeline canvas', () => {
     await pick(page, 'Condition 1 column', 'population')
     await pick(page, 'Condition 1 test', 'is at least')
     await page.getByLabel('Condition 1 value').fill('300000')
-    await expect(block(page, filter)).toContainText('3 rows · 4 columns')
+    await expect(block(page, filter)).toContainText('3 rows, 4 columns')
     await useAsSource(page).click()
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
     await page.getByRole('button', { name: 'Inspect data' }).click()
@@ -362,7 +362,7 @@ test.describe('pipeline canvas', () => {
     await page.getByRole('button', { name: 'Edit and remove' }).click()
     await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(5)
-    await expect(block(page, filter)).toContainText('3 rows · 4 columns', { timeout: 30_000 })
+    await expect(block(page, filter)).toContainText('3 rows, 4 columns', { timeout: 30_000 })
     await useAsSource(page).click()
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
 
@@ -375,7 +375,7 @@ test.describe('pipeline canvas', () => {
     await page.locator('input[type="file"][multiple]').setInputFiles(files())
     await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(5)
-    await expect(block(page, filter)).toContainText('3 rows · 4 columns', { timeout: 30_000 })
+    await expect(block(page, filter)).toContainText('3 rows, 4 columns', { timeout: 30_000 })
   })
 
   test('edits a script block in a Python editor with line numbers', async ({ page }) => {

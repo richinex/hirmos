@@ -6,24 +6,18 @@ import { Alert } from '@/components/ui/Alert'
 import { button, caption, chromeAction, label, literal, num, prose } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
-import { blockLabel, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineGraph, type PipelineNode, type RowTest } from '@/domain/pipeline'
+import { blockLabel, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineNode, type RowTest } from '@/domain/pipeline'
 import type { SqlPreparationInput } from '@/domain/sourceInputs'
-import { selectDerivedSource, type PipelineResume, type SelectedSource } from '@/domain/workflow'
+import { type PipelineResume, type SelectedSource } from '@/domain/workflow'
 import {
-  addPipelineInput,
-  closePipeline,
-  describePipelineRunProblem,
-  materializePipeline,
-  openPipeline,
   previewBlock,
-  removePipelineInput,
-  runPipeline,
   type BlockOutcome,
   type BlockPreview,
-  type PipelineRun,
-  type PipelineSession,
 } from '@/data/pipeline'
-import { pythonScriptRuntime } from '@/data/pythonRuntime'
+import { PythonProvider } from './PythonProvider'
+import { useStore } from 'zustand'
+import { usePipelineSession } from '../PreparationProvider'
+import { createPipelineSession, type PipelineController } from './pipelineSession'
 import { formatBytes, formatCount } from '@/lib/format/number'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
@@ -33,18 +27,7 @@ import { BlockSettings, blockSqlText, preloadPythonEditor } from './BlockSetting
 import { usePythonRun } from './usePythonRun'
 import { BLOCK_DRAG_TYPE, blockIcon, PALETTE_GROUPS, type PaletteKind } from './blockIcons'
 import { PipelineCanvas } from './PipelineCanvas'
-import { addBlock, addInputBlock, configureBlock, connect, describeConnectionRefusal, indexGraph, initialGraph, inputsOf, moveBlock, placeFor, removeBlock, removeEdge, tidyGraph, type ConnectionRefusal, type GraphIndex } from './pipelineWorkspaceModel'
-
-type SessionState =
-  | { readonly kind: 'opening' }
-  | { readonly kind: 'ready'; readonly live: PipelineSession }
-  | { readonly kind: 'failed'; readonly detail: string }
-
-type RunState =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'ran'; readonly result: PipelineRun }
-  | { readonly kind: 'refused'; readonly detail: string }
-
+import { addBlock, addInputBlock, configureBlock, connect, describeConnectionRefusal, indexGraph, inputsOf, moveBlock, placeFor, removeEdge, tidyGraph, type ConnectionRefusal, type GraphIndex } from './pipelineWorkspaceModel'
 
 const testWord = (test: RowTest): string => {
   switch (test) {
@@ -106,68 +89,38 @@ const summarise = (block: PipelineBlock): string => {
   }
 }
 
-export function PipelineWorkspace({ resume, onPrepared }: {
+type Props = {
   /** A graph and its files to start from, when the canvas reopens on a source it made. */
   readonly resume: PipelineResume | null
   readonly onPrepared: (source: SelectedSource) => void
-}) {
-  const [graph, setGraph] = useState<PipelineGraph>(() => resume === null ? initialGraph([]) : resume.graph)
-  // The files the session holds, mirrored into state so the inspector re-renders when a card takes or drops one.
-  const [files, setFiles] = useState<readonly SqlPreparationInput[]>(() => resume === null ? [] : resume.inputs)
+}
+
+export function PipelineWorkspace(props: Props) {
+  const create = useCallback(() => createPipelineSession(props.resume), [props.resume])
+  const controller = usePipelineSession(props.resume, create)
+  if (controller === null) return null
+  return <PythonProvider runtime={controller.python}><PipelineEditor {...props} controller={controller} /></PythonProvider>
+}
+
+function PipelineEditor({ onPrepared, controller }: Props & { readonly controller: PipelineController }) {
+  const graph = useStore(controller.store, state => state.graph)
+  const files = useStore(controller.store, state => state.files)
+  const session = useStore(controller.store, state => state.session)
+  const run = useStore(controller.store, state => state.run)
+  const choosing = useStore(controller.store, state => state.choosing)
+  const materializing = useStore(controller.store, state => state.materializing)
+  const setGraph = controller.setGraph
   const [selected, setSelected] = useState<PipelineBlockId | null>(null)
-  const [session, setSession] = useState<SessionState>({ kind: 'opening' })
-  const [run, setRun] = useState<RunState>({ kind: 'idle' })
   const [preview, setPreview] = useState<BlockPreview | null>(null)
   const [refusal, setRefusal] = useState<string | null>(null)
-  const [materializing, setMaterializing] = useState<{ readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }>({ kind: 'idle' })
   const index = useMemo(() => indexGraph(graph), [graph])
   const isMobile = useIsMobile()
-
-  const sessionReady = useRef<Promise<PipelineSession | null>>(Promise.resolve(null))
-  useEffect(() => {
-    let cancelled = false
-    let opened: PipelineSession | null = null
-    sessionReady.current = openPipeline(resume === null ? [] : resume.inputs, pythonScriptRuntime()).then((result) => {
-      if (cancelled) { if (result.ok) void closePipeline(result.value); return null }
-      if (!result.ok) { setSession({ kind: 'failed', detail: describePipelineRunProblem(result.error, String) }); return null }
-      opened = result.value
-      setSession({ kind: 'ready', live: result.value })
-      return result.value
-    })
-    return () => { cancelled = true; if (opened !== null) void closePipeline(opened) }
-  }, [resume])
 
   const nameOf = useCallback((id: PipelineBlockId): string => {
     const node = index.nodes.get(id)
     if (node === undefined) return id
     return node.block.kind === 'input' && node.block.file.kind === 'chosen' ? `${blockLabel('input')} ${node.block.file.alias}` : blockLabel(node.block.kind)
   }, [index])
-
-  // What the pipeline computes: the blocks and the arrows, not where the cards sit. Moving a card must not rerun DuckDB.
-  const semantics = useMemo(() => JSON.stringify({ nodes: graph.nodes.map((node) => [node.id, node.block]), edges: graph.edges }), [graph])
-  const latest = useRef({ graph, nameOf })
-  useEffect(() => { latest.current = { graph, nameOf } }, [graph, nameOf])
-
-  // A change to the semantics reruns the pipeline after a short pause, so typing in a field does not run it per keystroke.
-  // Runs queue behind one another and a run overtaken while it waited is dropped, so two edits close together never
-  // race on the same view names in DuckDB.
-  const runVersion = useRef(0)
-  const runQueue = useRef<Promise<void>>(Promise.resolve())
-  useEffect(() => {
-    if (session.kind !== 'ready') return
-    const live = session.live
-    const version = runVersion.current + 1
-    runVersion.current = version
-    const handle = window.setTimeout(() => {
-      runQueue.current = runQueue.current.then(async () => {
-        if (runVersion.current !== version) return
-        const result = await runPipeline(live, latest.current.graph)
-        if (runVersion.current !== version) return
-        setRun(result.ok ? { kind: 'ran', result: result.value } : { kind: 'refused', detail: describePipelineRunProblem(result.error, latest.current.nameOf) })
-      })
-    }, 250)
-    return () => window.clearTimeout(handle)
-  }, [semantics, session])
 
   const outcomes = useMemo(() => run.kind === 'ran' ? run.result.outcomes : new Map<PipelineBlockId, BlockOutcome>(), [run])
   const viewOf = useCallback((id: PipelineBlockId): string | null => run.kind === 'ran' ? run.result.views.get(id) ?? null : null, [run])
@@ -188,38 +141,23 @@ export function PipelineWorkspace({ resume, onPrepared }: {
   const summaries = useMemo(() => new Map(graph.nodes.map((node) => [node.id, summarise(node.block)])), [graph.nodes])
 
   const add = useCallback((kind: PaletteKind, position?: { readonly x: number; readonly y: number }) => {
-    const current = latest.current.graph
+    const current = controller.store.getState().graph
     const added = kind === 'input'
       ? addInputBlock(position === undefined ? current : { ...current })
       : addBlock(current, kind, position ?? placeFor(current, selected))
     setGraph(position === undefined || kind !== 'input' ? added.graph : moveBlock(added.graph, added.id, position))
     setSelected(added.id)
-  }, [selected])
+  }, [selected, controller, setGraph])
 
-  // A card takes a file: the session registers it, and a file the card held before is dropped once the new one is in.
-  const [choosing, setChoosing] = useState<{ readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }>({ kind: 'idle' })
-  const chooseFile = useCallback(async (id: PipelineBlockId, file: File) => {
-    setChoosing({ kind: 'busy' })
-    // A file chosen before DuckDB has opened waits for it rather than being dropped.
-    const live = await sessionReady.current
-    if (live === null) { setChoosing({ kind: 'refused', detail: 'DuckDB could not start, so the file cannot be read.' }); return }
-    const previous = latest.current.graph.nodes.find((node) => node.id === id)?.block
-    const added = await addPipelineInput(live, file)
-    if (!added.ok) { setChoosing({ kind: 'refused', detail: describePipelineRunProblem(added.error, latest.current.nameOf) }); return }
-    setGraph((current) => configureBlock(current, id, { kind: 'input', file: { kind: 'chosen', alias: added.value.alias } }))
-    if (previous?.kind === 'input' && previous.file.kind === 'chosen') await removePipelineInput(live, previous.file.alias)
-    setFiles([...live.inputs])
-    setChoosing({ kind: 'idle' })
-  }, [])
-  const dropBlock = useCallback((id: PipelineBlockId) => {
-    const node = latest.current.graph.nodes.find((candidate) => candidate.id === id)
-    setGraph((current) => removeBlock(current, id))
-    setSelected((current) => current === id ? null : current)
-    if (session.kind === 'ready' && node?.block.kind === 'input' && node.block.file.kind === 'chosen') {
-      void removePipelineInput(session.live, node.block.file.alias).then(() => setFiles([...session.live.inputs]))
-    }
-  }, [session])
-  const tidy = useCallback(() => { void tidyGraph(latest.current.graph).then((tidied) => setGraph(tidied)) }, [])
+  const chooseFile = controller.chooseFile
+  const dropBlock = (id: PipelineBlockId) => {
+    controller.dropBlock(id)
+    setSelected(current => current === id ? null : current)
+  }
+  const tidy = useCallback(() => {
+    const graph = controller.store.getState().graph
+    void tidyGraph(graph).then(tidied => { if (controller.store.getState().graph === graph) setGraph(tidied) })
+  }, [controller, setGraph])
   const refuse = (refusal: ConnectionRefusal | null) => setRefusal(refusal === null ? null : describeConnectionRefusal(refusal))
   useEffect(() => {
     if (refusal === null) return
@@ -228,14 +166,8 @@ export function PipelineWorkspace({ resume, onPrepared }: {
   }, [refusal])
 
   const adoptAsSource = async () => {
-    if (session.kind !== 'ready') return
-    setMaterializing({ kind: 'busy' })
-    const output = await materializePipeline(session.live, graph)
-    if (!output.ok) { setMaterializing({ kind: 'refused', detail: describePipelineRunProblem(output.error, nameOf) }); return }
-    const source = selectDerivedSource(output.value.file, output.value.recipe)
-    if (!source.ok) { setMaterializing({ kind: 'refused', detail: `The output could not be used as a source: ${source.error.kind}` }); return }
-    setMaterializing({ kind: 'idle' })
-    onPrepared(source.value)
+    const source = await controller.adopt()
+    if (source !== null && controller.active()) onPrepared(source)
   }
 
   const completeProblem = run.kind === 'ran' && !run.result.complete.ok ? describePipelineProblem(run.result.complete.error, nameOf) : null

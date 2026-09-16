@@ -1,3 +1,4 @@
+import { chapter } from './examples/support'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
@@ -38,11 +39,11 @@ test('T-learner bootstrap runs through Estimation and exports row intervals', as
   await page.getByRole('radio', { name: 'Independent observations' }).check()
   for (const name of ['T', 'Y', 'x0', 'x1']) await page.getByRole('checkbox', { name, exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
-  await navigation.getByRole('button', { name: /DAG workspace/ }).click()
+  await chapter(page, /DAG workspace/)
   await page.getByRole('button', { name: /^Substantive knowledge/ }).click()
   await page.getByLabel('DAG name').fill('T-learner verification')
   await page.getByRole('button', { name: 'Create DAG draft' }).click()
+  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Inspector', exact: true }).click()
   const choose = async (label: string, name: string) => {
     await page.getByRole('combobox', { name: label, exact: true }).click()
     await page.getByRole('option', { name, exact: true }).click()
@@ -52,7 +53,12 @@ test('T-learner bootstrap runs through Estimation and exports row intervals', as
     await page.getByRole('textbox', { name: /Rationale/ }).first().fill('Adjustment graph for testing both covariates in the fitted forest models.')
     await page.getByRole('button', { name: 'Add the arrow' }).click()
   }
-  await navigation.getByRole('button', { name: /Study design/ }).click()
+  if (info.project.name === 'mobile-chromium') {
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Inspector', exact: true })).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Expand chapter list', exact: true })).toBeVisible()
+  }
+  await chapter(page, /Study design/)
   await choose('Causal graph', 'T-learner verification')
   await choose('Treatment', 'T'); await choose('Outcome', 'Y')
   await page.getByRole('radio', { name: /Each row, given its covariates/ }).check()
@@ -60,10 +66,15 @@ test('T-learner bootstrap runs through Estimation and exports row intervals', as
   await page.getByRole('radio', { name: /Observed choice/ }).check()
   await page.getByRole('textbox', { name: 'Assignment sentence' }).fill('This verification study adjusts for x0 and x1.')
   await page.getByRole('button', { name: 'Identify the effect' }).click()
-  await navigation.getByRole('button', { name: /Estimation/ }).click()
+  await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: 'Bootstrap intervals', exact: true }).check()
   await page.getByLabel('Learner seed', { exact: true }).fill('7')
   await page.getByLabel('Bootstrap samples', { exact: true }).fill('20')
+  await chapter(page, /DAG workspace/)
+  await chapter(page, /Estimation/)
+  await expect(page.getByRole('radio', { name: 'Bootstrap intervals', exact: true })).toBeChecked()
+  await expect(page.getByLabel('Learner seed', { exact: true })).toHaveValue('7')
+  await expect(page.getByLabel('Bootstrap samples', { exact: true })).toHaveValue('20')
   await page.getByRole('button', { name: /^Run T-learner/ }).click()
   await expect(page.getByText('Current estimate', { exact: true })).toBeVisible({ timeout: 90000 })
   const saved = async () => page.evaluate(async () => {

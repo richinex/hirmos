@@ -8,7 +8,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, caption, field, fieldLabel, iconControl, literal, num } from '@/components/ui/recipes'
 import { blockSql, conditionWithTest, measureWithFunction, type AggregateFunction, type AggregateMeasure, type JoinKind, type PipelineBlock, type PipelineBlockId, type PipelineNode, type RowCondition, type RowTest } from '@/domain/pipeline'
 import type { PreviewColumn } from '@/data/pipeline'
-import { cancelPythonRun, warmPythonRuntime } from '@/data/pythonRuntime'
+import { usePythonSession } from './PythonProvider'
 import { formatDuration } from '@/lib/format/number'
 import { usePythonRun, usePythonRuntime } from './usePythonRun'
 import { assertNever } from '@/domain/dop'
@@ -218,15 +218,16 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
 
 /** The runtime's state under the editor, and the run in progress with a way to stop it; opening a script block starts the download, so the first run does not wait for it. */
 function PythonRuntimeLine({ step }: { readonly step: PipelineBlockId }) {
+  const runtime = usePythonSession()
   const state = usePythonRuntime()
   const running = usePythonRun(step)
-  useEffect(() => { warmPythonRuntime() }, [])
+  useEffect(() => { runtime.warm() }, [runtime])
   if (running !== null) {
     return (
       <div className="flex items-center gap-3" data-testid="python-runtime" aria-busy>
         <Orb state="working" aria-label="Script running" />
         <span className={num('text-label text-muted')}><Metadata><span>Running</span><span>{formatDuration(running.elapsedMs).text}</span></Metadata></span>
-        <button type="button" className={button('quiet', undefined, 'sm')} onClick={cancelPythonRun}>Cancel run</button>
+        <button type="button" className={button('quiet', undefined, 'sm')} onClick={runtime.cancel}>Cancel run</button>
       </div>
     )
   }

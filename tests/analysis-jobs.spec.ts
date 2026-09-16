@@ -17,6 +17,7 @@ test('a sensitivity probe completes after leaving its chapter', async ({ page },
   await page.goto('/app')
   await page.getByRole('button', { name: 'Open A simulated process with a collider', exact: true }).filter({ visible: true }).click()
   await chapter(page, /Sensitivity/)
+  await page.getByRole('spinbutton', { name: /^Seed/ }).fill('91')
   const mobile = info.project.name === 'mobile-chromium'
   const history = page.getByRole(mobile ? 'button' : 'heading', { name: /^Probes \(/ })
   const title = mobile ? await history.getAttribute('aria-label') : await history.textContent()
@@ -27,6 +28,7 @@ test('a sensitivity probe completes after leaving its chapter', async ({ page },
   await chapter(page, /DAG workspace/)
   await expect(page.getByRole('heading', { name: 'DAG workspace', exact: true })).toBeVisible()
   await chapter(page, /Sensitivity/)
+  await expect(page.getByRole('spinbutton', { name: /^Seed/ })).toHaveValue('91')
   if (mobile) await expect(history).toHaveAttribute('aria-label', `Probes (${before + 1})`, { timeout: 60_000 })
   else await expect(history).toHaveText(`Probes (${before + 1})`, { timeout: 60_000 })
   await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toHaveCount(0)

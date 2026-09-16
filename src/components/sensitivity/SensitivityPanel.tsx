@@ -5,7 +5,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
-import { useMemo, useReducer, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { emptySensitivityDraft, type SensitivityEvent } from '@/domain/sensitivityDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { EChart } from '@/charts/EChart'
@@ -28,9 +30,6 @@ import { DATA_SUBSET_REFUTER_METHOD_ID, LJUNG_BOX_METHOD_ID, PLACEBO_REFUTER_MET
   DML_SENSITIVITY_METHODS, REFUTER_METHODS, SENSITIVITY_DIAGNOSTIC_METHODS, SHAPIRO_WILK_METHOD_ID, UNOBSERVED_COMMON_CAUSE_METHOD_ID } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import {
-  DEFAULT_DML_REFUTATION,
-  DEFAULT_REFUTATION,
-  DEFAULT_UNOBSERVED,
   describeProbe,
   kappaValues,
   newSensitivityRunId,
@@ -52,26 +51,6 @@ import type { RunActivity } from '@/domain/activity'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretSensitivityResult } from '@/domain/resultInterpretation'
 import { cn } from '@/lib/utils'
-
-interface State {
-  readonly estimationRun: EstimationRunId | null
-  readonly probe: SensitivityProbe
-  readonly configurations: Readonly<Record<SensitivityProbe, SensitivityConfiguration>>
-}
-
-type Event =
-  | { readonly type: 'run-chosen'; readonly run: EstimationRunId | null }
-  | { readonly type: 'probe-chosen'; readonly probe: SensitivityProbe }
-  | { readonly type: 'configured'; readonly configuration: SensitivityConfiguration }
-
-const step = (state: State, event: Event): State => {
-  switch (event.type) {
-    case 'run-chosen': return { ...state, estimationRun: event.run }
-    case 'probe-chosen': return { ...state, probe: event.probe }
-    case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration } }
-    default: return assertNever(event)
-  }
-}
 
 const PROBES: NonEmptyArray<SensitivityProbe> = ['linear-refutation', 'unobserved-confounding', 'dml-refutation']
 
@@ -293,17 +272,9 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   readonly onRun: (run: SensitivityRunArtifact) => void
   readonly onDeleteRun: (run: SensitivityRunArtifact['id']) => void
 }) {
-  const [state, dispatch] = useReducer(step, null, (): State => {
-    // The controls open as the latest recorded probe set them, so a reopened project shows the check it holds.
-    const latest = runs.at(-1) ?? null
-    const probed = latest === null ? null : estimationRuns.find((run) => run.id === latest.estimationRun) ?? null
-    const defaults: State['configurations'] = { 'linear-refutation': DEFAULT_REFUTATION, 'unobserved-confounding': DEFAULT_UNOBSERVED, 'dml-refutation': DEFAULT_DML_REFUTATION }
-    return {
-      estimationRun: probed?.id ?? [...estimationRuns].reverse().find((run) => run.kind === 'backdoor-linear-run')?.id ?? estimationRuns.at(-1)?.id ?? null,
-      probe: latest !== null && probed !== null ? latest.configuration.kind : 'linear-refutation',
-      configurations: latest !== null && probed !== null ? { ...defaults, [latest.configuration.kind]: latest.configuration } : defaults,
-    }
-  })
+  const state = useWorkflow(store => store.sensitivityDraft?.prepared === prepared.id ? store.sensitivityDraft.draft : emptySensitivityDraft)
+  const change = useWorkflow(store => store.changeSensitivity)
+  const dispatch = (event: SensitivityEvent) => change(prepared.id, event)
   const estimation = estimationRuns.find((run) => run.id === state.estimationRun) ?? null
   const study = estimation === null ? null : studies.find((candidate) => candidate.id === estimation.study) ?? null
   const configuration = state.configurations[state.probe]
@@ -415,10 +386,10 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
             <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               {configuration.kind === 'linear-refutation' && (
                 <>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Simulations" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.simulations} /><input type="number" min={1} max={2000} className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(1, Math.min(2000, Number(event.target.value) || 1)) })} /></label>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Subset fraction" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.subsetFraction} /><input type="number" step="0.05" min={0.15} max={0.95} className={field('text', 'mt-1')} value={configuration.subsetFraction} onChange={(event) => configure({ ...configuration, subsetFraction: Math.max(0.15, Math.min(0.95, Number(event.target.value) || 0.8)) })} /></label>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.seed} /><input type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Ljung–Box lags" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.ljungBoxLags} /><input type="number" min={1} max={200} className={field('text', 'mt-1')} value={configuration.ljungBoxLags} onChange={(event) => configure({ ...configuration, ljungBoxLags: Math.max(1, Math.min(200, Number(event.target.value) || 1)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Simulations" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.simulations} /><input aria-label="Simulations" type="number" min={1} max={2000} className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(1, Math.min(2000, Number(event.target.value) || 1)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Subset fraction" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.subsetFraction} /><input aria-label="Subset fraction" type="number" step="0.05" min={0.15} max={0.95} className={field('text', 'mt-1')} value={configuration.subsetFraction} onChange={(event) => configure({ ...configuration, subsetFraction: Math.max(0.15, Math.min(0.95, Number(event.target.value) || 0.8)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.seed} /><input aria-label="Seed" type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Ljung–Box lags" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.ljungBoxLags} /><input aria-label="Ljung–Box lags" type="number" min={1} max={200} className={field('text', 'mt-1')} value={configuration.ljungBoxLags} onChange={(event) => configure({ ...configuration, ljungBoxLags: Math.max(1, Math.min(200, Number(event.target.value) || 1)) })} /></label>
                 </>
               )}
               {configuration.kind === 'dml-refutation' && (
@@ -429,7 +400,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               )}
               {configuration.kind === 'unobserved-confounding' && (
                 <>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.unobservedConfounding.seed} /><input type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.unobservedConfounding.seed} /><input aria-label="Seed" type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
                   {(['kappaT', 'kappaY'] as const).map((axis) => {
                     const range = configuration[axis]
                     const title = axis === 'kappaT' ? 'Treatment flip strength' : 'Outcome shift strength'

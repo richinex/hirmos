@@ -1,3 +1,6 @@
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { useTimeSeriesDraft } from './useTimeSeriesDraft'
+import type { LongRunDraft, TimeSeriesDraft } from '@/domain/timeSeriesDraft'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
@@ -16,7 +19,7 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, chapterIntro, field, fieldLabel, fieldHint, panel, sectionTitle } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun, timeSeriesRunLabel, type ArdlTerms, type TimeSeriesRun, type TimeSeriesRunId } from '@/domain/timeSeries'
+import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun, type ArdlTerms, type TimeSeriesRun, type TimeSeriesRunId } from '@/domain/timeSeries'
 import type { CountSeriesModelArtifact, CountSeriesModelId } from '@/domain/countSeries'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
@@ -48,15 +51,16 @@ export function TimeSeriesHeading() {
 
 function LongRunModel({ model, selector, ...props }: Props & { readonly model: Model; readonly selector: ReactNode }) {
   const columns = props.profile.columns.filter((c) => props.prepared.columns.includes(c.id) && isNumericDuckDbType(c.duckdbType))
-  const previous = props.runs.filter((run): run is Exclude<TimeSeriesRun, {kind: 'ardl-model'}> => run.kind === model).at(-1)
-  const [selected, setSelected] = useState<readonly ColumnId[]>(() => previous === undefined ? [] : previous.kind === 'ardl' ? [previous.outcome.id, previous.predictor.id] : previous.variables.map((variable) => variable.id))
-  const [maxLag, setMaxLag] = useState(() => previous === undefined ? 2 : previous.kind === 'ardl' ? previous.specification.maxLag : previous.specification.maxLags)
-  const [terms, setTerms] = useState<ArdlTerms>(() => previous?.kind === 'ardl' ? previous.specification.terms : 'constant')
-  const [deterministic, setDeterministic] = useState<'n' | 'co' | 'ci' | 'coli'>(() => previous?.kind === 'vecm' ? previous.specification.deterministic : 'ci')
-  const [significance, setSignificance] = useState<90 | 95 | 99>(() => previous?.kind === 'vecm' ? previous.specification.significance : 95)
+  const { selected, maxLag, terms, deterministic, significance, forecastSteps } = useTimeSeriesDraft(props.prepared.id, state => state.longRun[model])
+  const change = useWorkflow(state => state.changeTimeSeries)
+  const setSelected = (value: LongRunDraft['selected']) => change(props.prepared.id, { type: 'long-run', field: 'selected', value, model })
+  const setMaxLag = (value: LongRunDraft['maxLag']) => change(props.prepared.id, { type: 'long-run', field: 'maxLag', value, model })
+  const setTerms = (value: LongRunDraft['terms']) => change(props.prepared.id, { type: 'long-run', field: 'terms', value, model })
+  const setDeterministic = (value: LongRunDraft['deterministic']) => change(props.prepared.id, { type: 'long-run', field: 'deterministic', value, model })
+  const setSignificance = (value: LongRunDraft['significance']) => change(props.prepared.id, { type: 'long-run', field: 'significance', value, model })
+  const setForecastSteps = (value: LongRunDraft['forecastSteps']) => change(props.prepared.id, { type: 'long-run', field: 'forecastSteps', value, model })
   const session = useJob(`time-series:${model}`)
   const { job } = session
-  const [forecastSteps,setForecastSteps]=useState('')
   useRunActivity(props.onActivity, job.kind === 'running' ? { label: model.toUpperCase(), progress: null } : null)
   const runs = props.runs.filter((run) => run.kind === model)
   const minimumRows = model === 'ardl' ? 6 * (maxLag + 1) + 10 : (maxLag + 2) * selected.length * 3 + 10
@@ -137,7 +141,9 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
 }
 
 export function TimeSeriesPanel(props: Props) {
-  const [analysis, setAnalysis] = useState<'count' | Model>('count')
+  const analysis = useTimeSeriesDraft(props.prepared.id, state => state.analysis)
+  const change = useWorkflow(state => state.changeTimeSeries)
+  const setAnalysis = (analysis: TimeSeriesDraft['analysis']) => change(props.prepared.id, { type: 'analysis', analysis })
   const [busy, setBusy] = useState(false)
   const report = props.onActivity
   const onActivity = useCallback((activity: RunActivity | null) => { setBusy(activity !== null); report?.(activity) }, [report])
