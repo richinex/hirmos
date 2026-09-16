@@ -1,9 +1,8 @@
-import { Metadata } from '@/components/ui/Metadata'
 import { useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
-import { button, field, iconControl, num, table, td, th } from '@/components/ui/recipes'
-import { EXAMPLE_COLLECTIONS, EXAMPLE_QUESTIONS, type ShippedExample } from '@/domain/example'
+import { button, field, iconControl, num } from '@/components/ui/recipes'
+import { type ShippedExample } from '@/domain/example'
 import { browseExamples, type ExampleSort } from '@/domain/exampleBrowser'
 import type { SavedProjectHeader } from '@/domain/persistence'
 import { OpenControl } from './OpenControl'
@@ -18,17 +17,13 @@ interface Props {
   readonly onDelete: (header: SavedProjectHeader) => void
 }
 
-/** A compact property table on desktop and a text-first list at narrow widths. */
+/** Responsive example cards keep actions and source information with each analysis. */
 export function ExampleLedger(props: Props) {
   const [query, setQuery] = useState('')
   const [shape, setShape] = useState<string | null>(null)
   const [sort, setSort] = useState<ExampleSort>('catalog')
   const shapes = [...new Set(props.examples.map(example => example.shape))]
   const examples = browseExamples(props.examples, { query, shape, sort })
-  const groups = [
-    ...EXAMPLE_COLLECTIONS.map(group => ({ key: group.id, title: group.title, note: group.purpose, items: examples.filter(example => example.collection === group.id) })),
-    ...EXAMPLE_QUESTIONS.map(group => ({ key: group.id, title: group.title, note: group.when, items: examples.filter(example => example.collection === null && example.question === group.id) })),
-  ].filter(group => group.items.length > 0)
   const clear = () => { setQuery(''); setShape(null); setSort('catalog') }
 
   return (
@@ -65,55 +60,24 @@ export function ExampleLedger(props: Props) {
           <button type="button" className={button('outline', 'mt-3')} onClick={clear}>Clear filters</button>
         </div>
       ) : (
-        <>
-          <div className="hidden overflow-x-auto @4xl/examples:block [--table-surface:var(--color-stage)]">
-            <table className={table + ' example-table'} aria-label="Examples">
-              <thead><tr>
-                <th scope="col" className={th('w-[30%] px-2.5')}>Example</th>
-                <th scope="col" className={th('w-[29%] px-2.5')}>Approach</th>
-                <th scope="col" className={th('px-2.5')}>Data</th>
-                <th scope="col" className={th('w-24 whitespace-normal px-2.5 text-right')}>Estimation runs</th>
-                <th scope="col" className={th('px-2.5')}>Actions</th>
-              </tr></thead>
-              <tbody>{examples.map(example => {
-                const copy = props.saved.find(entry => entry.id === example.id) ?? null
-                return <tr key={example.id} className="border-b border-line hover:bg-well">
-                  <td className={td('px-2.5 py-2.5')}>
-                    <span className="block whitespace-normal font-medium text-ink">{example.name}</span>
-                    <span className={num('mt-1 block whitespace-normal break-all text-label text-faint')}>{copy === null ? example.sourceName : `saved ${props.formatSaved(copy.savedAt)}`}</span>
-                  </td>
-                  <td className={td('whitespace-normal px-2.5 py-2.5 text-muted')}>{example.approach}</td>
-                  <td className={td('px-2.5 py-2.5')}><ShapeLabel shape={example.shape} /><span className={num('mt-1 block whitespace-normal text-label text-faint')}>{example.size}</span></td>
-                  <td className={td(num('px-2.5 py-2.5 text-right text-muted'))}>{copy === null ? example.estimationRuns : copy.estimationRuns}</td>
-                  <td className={td('px-2.5 py-2.5')}><div className="flex items-center gap-1">
-                    <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
-                    <CopyControls {...props} example={example} copy={copy} />
-                  </div></td>
-                </tr>
-              })}</tbody>
-            </table>
-          </div>
-          <div className="space-y-5 @4xl/examples:hidden">
-            {groups.map(group => <section key={group.key} aria-label={group.title}>
-              <h4 className="mb-1 mt-0 text-body font-medium text-ink">{group.title}</h4>
-              <p className="mb-2 mt-0 text-label text-faint">{group.note}</p>
-              <ul className="m-0 list-none divide-y divide-line border-y border-line p-0">
-                {group.items.map(example => {
-                  const copy = props.saved.find(entry => entry.id === example.id) ?? null
-                  const count = copy === null ? example.estimationRuns : copy.estimationRuns
-                  return <li key={example.id} className="py-3">
-                    <div className="flex items-start gap-3">
-                      <div className="min-w-0 flex-1"><span className="block text-body font-medium text-ink">{example.name}</span><span className="mt-1 block text-label text-muted">{example.approach}</span></div>
-                      <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><ShapeLabel shape={example.shape} /><span className={num('text-label text-faint')}><Metadata><span>{example.size}</span><span>{count} estimation {count === 1 ? 'run' : 'runs'}</span></Metadata></span></div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2"><span className={num('min-w-0 flex-1 break-all text-label text-faint')}>{copy === null ? example.sourceName : `saved ${props.formatSaved(copy.savedAt)}`}</span><CopyControls {...props} example={example} copy={copy} /></div>
-                  </li>
-                })}
-              </ul>
-            </section>)}
-          </div>
-        </>
+        <ul className="example-cards" aria-label="Examples">
+          {examples.map(example => {
+            const copy = props.saved.find(entry => entry.id === example.id) ?? null
+            const count = copy === null ? example.estimationRuns : copy.estimationRuns
+            return <li key={example.id} className="example-card">
+              <div className="flex items-center justify-between gap-3">
+                <ShapeLabel shape={example.shape} />
+                <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
+              </div>
+              <div className="space-y-2"><h3>{example.name}</h3><p>{example.approach}</p></div>
+              <div className="example-card-meta"><span>{example.size}</span><span className="tabular-nums">{count} estimation {count === 1 ? 'run' : 'runs'}</span></div>
+              <div className="example-card-footer">
+                <span className="example-card-source" title={example.sourceName}>{copy === null ? example.sourceName : 'Saved ' + props.formatSaved(copy.savedAt)}</span>
+                <CopyControls {...props} example={example} copy={copy} />
+              </div>
+            </li>
+          })}
+        </ul>
       )}
       <p role="status" className={num('m-0 text-label text-faint')}>{examples.length} of {props.examples.length} examples</p>
     </div>

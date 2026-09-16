@@ -28,13 +28,13 @@ const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-hi
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
  * remains "not ready"; a busy button keeps focus so nothing jumps when the run ends. */
-const BUTTON_BASE = 'inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+const BUTTON_BASE = 'dashboard-button inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
-  signal: cn('bg-signal px-4', FILLED),
+  signal: cn('dashboard-primary bg-signal px-4', FILLED),
   soft: SIGNAL_WASH,
   danger: cn('bg-danger', FILLED),
-  outline: 'border border-hair text-ink hover:border-edge',
+  outline: 'border border-hair bg-panel text-ink shadow-sm hover:border-edge',
   quiet: 'border border-hair text-muted hover:text-ink',
   // Named for its register, not its typeface: the label voice, at button size.
   mono: 'border border-hair text-label font-medium text-muted hover:border-edge hover:text-ink',
@@ -44,7 +44,7 @@ const BUTTON_TONE: Record<ButtonTone, string> = {
 export type ButtonSize = 'sm' | 'md'
 
 const BUTTON_SIZE: Record<ButtonSize, string> = {
-  sm: 'px-2.5 py-1 text-label',
+  sm: 'dashboard-button-sm px-2.5 py-1 text-label',
   md: 'px-3 py-1.5 text-body',
 }
 
@@ -73,7 +73,7 @@ const CHROME_TONE: Record<ChromeTone, string> = {
 
 export const iconControl = (tone: ChromeTone = 'quiet', extra?: string): string =>
   cn(
-    'grid h-8 w-8 shrink-0 place-items-center rounded-full border pointer-coarse:h-11 pointer-coarse:w-11 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
+    'grid h-8 w-8 shrink-0 place-items-center rounded-lg border pointer-coarse:h-11 pointer-coarse:w-11 transition-colors duration-(--motion-fast) disabled:cursor-not-allowed disabled:text-dim disabled:hover:bg-transparent',
     CHROME_TONE[tone],
     extra,
   )
@@ -115,7 +115,7 @@ export const pill = (active: boolean, extra?: string): string =>
  *  the affordance at 3:1, and the placeholder is italic so it never reads as an entered value. */
 export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string =>
   cn(
-    'w-full rounded-md border border-control bg-well px-3 py-1.5 text-body text-ink placeholder:italic placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint pointer-coarse:min-h-11',
+    'dashboard-field w-full rounded-md border border-control bg-well px-3 py-1.5 text-body text-ink placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint pointer-coarse:min-h-11',
     variant === 'mono' && 'font-mono',
     extra,
   )
@@ -193,7 +193,7 @@ export const chip = (extra?: string): string => cn('inline-block rounded-md bord
  * twice around the same thing, and the inner one stops meaning anything. Where a component would
  * land its own surface inside this one, reach for its `frame` escape hatch instead.
  */
-export const panel = (extra?: string): string => cn('rounded-xl border border-hair bg-panel [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
+export const panel = (extra?: string): string => cn('rounded-xl border border-line bg-panel shadow-sm [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
 
 /**
  * A recessed area inside a panel: a control group, a figure, a quoted reading.

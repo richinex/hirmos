@@ -7,7 +7,7 @@ import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
-import { button, chapterIntro, field, fieldLabel, fieldHint, panel, sectionTitle, resultSurface, resultTitle } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldLabel, fieldHint, iconControl, panel, sectionTitle, resultSurface, resultTitle } from '@/components/ui/recipes'
 import { downloadText } from '@/data/bundleFiles'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { runComparisonOption } from '@/charts/estimation/runComparison'
@@ -80,7 +80,7 @@ function History({ runs, selected, onSelect, onDelete }: { readonly runs: readon
     {[...runs].reverse().map(run => <li key={run.id} className={`flex min-w-0 items-center gap-2 rounded-md px-2 ${selected === run.id ? 'bg-well' : ''}`}>
       <button type="button" className="flex min-h-10 min-w-0 flex-1 items-center gap-3 rounded-md text-left focus-visible:outline-2 focus-visible:outline-signal" aria-pressed={selected === run.id} onClick={() => { onSelect(run.id); close() }}>
         <span className="min-w-0 flex-1 truncate text-body text-ink">{run.model.names[run.model.treatment]} → {run.model.names[run.model.outcome]}</span><time className="shrink-0 text-label tabular-nums text-faint">{formatTime(run.createdAt)}</time>
-      </button><button type="button" className={button('quiet', 'shrink-0', 'sm')} aria-label="Delete intervention effect run" onClick={() => onDelete(run.id)}><Icon name="delete" size={16} /></button>
+      </button><button type="button" className={iconControl('danger')} aria-label="Delete intervention effect run" onClick={() => onDelete(run.id)}><Icon name="delete" size={16} /></button>
     </li>)}
   </ul>
 }

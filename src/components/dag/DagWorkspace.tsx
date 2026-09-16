@@ -446,7 +446,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
           <PathList document={document} flow={flow} />
         </div>
       )}
-      <div role="group" aria-label="Use this graph" className="mt-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap empty:hidden">
+      <div role="group" aria-label="Use this graph" className="mt-3 grid grid-cols-1 auto-rows-fr gap-3 empty:hidden">
         {validation.kind === 'structurally-valid' && (
           <button type="button" className={button('outline')} onClick={onUseForStudy}>Use for study</button>
         )}
@@ -578,17 +578,17 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
           <h3 id="graph-check-title" className="m-0 text-body font-medium text-ink">Graph checks</h3>
           <p className="mb-0 mt-1 text-label text-faint">Test the conditional independences implied by this revision against the prepared data.</p>
         </div>
-        {plan.kind === 'test' && (
-          <button type="button" className={button('outline')} disabled={job.kind === 'running' || session.blocked} onClick={() => void run()}>
-            {job.kind === 'running' ? 'Running…' : current === undefined ? 'Run checks' : 'Run again'}
-          </button>
-        )}
       </div>
-      {job.kind === 'running' && (
-        <div className="mt-2 flex items-center gap-2">
-          <Orb state="weaving" aria-label="Graph checks running" />
-          <p role="status" className="m-0 text-label text-muted">{progressText}</p>
-          <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>
+      {plan.kind === 'test' && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button type="button" className={button('outline', 'w-full')} disabled={job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>
+            {current === undefined ? 'Run checks' : 'Run again'}
+          </button>
+          {job.kind === 'running' && <>
+            <Orb state="weaving" aria-label="Graph checks running" />
+            <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>
+            <p role="status" className="m-0 basis-full text-label text-muted">{progressText}</p>
+          </>}
         </div>
       )}
       <JobNotice job={job} />

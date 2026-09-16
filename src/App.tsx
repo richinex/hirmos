@@ -555,22 +555,21 @@ function App() {
 
   const header = (
     <>
-      <div className="flex min-w-0 items-center">
+      <div className="flex min-w-0 items-center gap-4">
         {/* The round toggle sits in the corner above the rail: two bars that turn into a cross while the lobe is out. */}
         <button
           type="button"
           data-rail-toggle
-          className={cn(
-            'relative h-10 w-10 shrink-0 rounded-full bg-rail transition-opacity hover:opacity-85',
-            'before:absolute before:left-3 before:h-[2px] before:w-4 before:rounded-full before:bg-rail-ink before:transition-[top,transform] before:duration-(--motion-base) before:content-[""]',
-            'after:absolute after:left-3 after:h-[2px] after:w-4 after:rounded-full after:bg-rail-ink after:transition-[top,transform] after:duration-(--motion-base) after:content-[""]',
-            navOpen ? 'before:top-[19px] before:rotate-[135deg] after:top-[19px] after:-rotate-[135deg]' : 'before:top-[15px] after:top-[23px]',
-          )}
+          className={iconControl('quiet', 'dashboard-menu')}
           aria-label={navOpen ? 'Collapse chapter list' : 'Expand chapter list'}
           aria-expanded={navOpen}
           title={`${navOpen ? 'Collapse' : 'Expand'} chapter list (⌘B)`}
           onClick={() => setNavOpen((open) => !open)}
-        />
+        ><Icon name={navOpen ? 'left_panel_close' : 'left_panel_open'} size={20} /></button>
+        <span className="dashboard-breadcrumb min-w-0 truncate text-body text-muted">
+          {project !== null && <span className="hidden min-w-0 items-center sm:inline-flex"><span className="truncate">{project.name}</span><Icon name="chevron_right" size={16} className="mx-2" /></span>}
+          <span className="font-medium text-ink">{activeName}</span>
+        </span>
       </div>
       <div className="flex min-w-0 items-center gap-1.5">
         {storageFailure !== null && (
@@ -636,13 +635,12 @@ function App() {
                 <p role="status" className={well('mb-4 px-3 py-2 text-body text-muted')}>{exampleNotice}</p>
               )}
               {workflow.kind === 'awaiting-project' && (
-                <section className="rise my-auto w-full max-w-6xl" aria-labelledby="new-analysis-title">
-                  <ChapterHeading id="new-analysis-title" className="mb-6">Create an analysis</ChapterHeading>
-                  <form onSubmit={createProject} className="max-w-md space-y-3">
+                <section className="projects-dashboard w-full" aria-labelledby="new-analysis-title">
+                  <ChapterHeading id="new-analysis-title" className="mb-6">Projects</ChapterHeading>
+                  <form onSubmit={createProject} className="project-create">
                     <label className="block">
                       <span className="mb-1.5 block text-body font-medium text-ink">Project name</span>
                       <input
-                        autoFocus
                         value={workflow.nameDraft}
                         onChange={(event) => dispatch({ type: 'project-name-changed', value: event.target.value })}
                         className={field('text')}
@@ -659,7 +657,7 @@ function App() {
                       <button type="button" className={button('outline')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open an exported file</button>
                     </div>
                   </form>
-                  <section className="mt-8" aria-labelledby="projects-title">
+                  <section className="mt-8" aria-labelledby="projects-title" hidden={yours.length === 0 && reopenProblem === null && importProblem === null}>
                     <h3 id="projects-title" className={cn(sectionTitle, 'mb-2')}>Your projects</h3>
                     {reopenProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{reopenProblem}</p>}
                     {importProblem !== null && <p role="alert" className="mb-3 text-body text-danger">{importProblem}</p>}

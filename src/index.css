@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./themes.css";
+@import "./dashboard.css";
 
 /* Shallow face/depth treatment inspired by UI Buttons' 3D button 2.
    Only mobile workbench openers use this class; shared control dimensions stay unchanged. */
@@ -275,7 +276,7 @@ label:has(> input[type='radio']) {
 button:disabled { cursor: not-allowed; }
 /* Physical press: a 1px settle on :active. Transform-only, so it costs nothing. Controls disabled
    through aria-disabled (kept focusable so their reason stays reachable) must not depress either. */
-button:not(:disabled):not([aria-disabled='true']):active, [role='button']:not([aria-disabled='true']):active { transform: translateY(1px); }
+button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active, [role='button']:not([aria-disabled='true']):active { transform: translateY(1px); }
 /* One keyboard-focus contract for the whole app: signal ring at 2px offset — the DEFAULT for every
    focusable thing, including text fields (they were missing, so no input or textarea in the app had a
    focus ring at all; those are the controls a keyboard user spends the most time in).

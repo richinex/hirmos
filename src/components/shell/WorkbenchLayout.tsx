@@ -28,7 +28,7 @@ function PaneHeader({ id, title, controls, collapse }: {
   readonly collapse?: { readonly collapsed: boolean; readonly onToggle: () => void; readonly icon: { readonly open: string; readonly closed: string } }
 }) {
   return (
-    <div className="flex h-9 shrink-0 select-none items-center justify-between gap-2 border-b border-hair px-3">
+    <div className="workbench-pane-header flex h-9 shrink-0 select-none items-center justify-between gap-2 border-b border-hair px-3">
       {/* One line, whatever the pane width: the title clips rather than wrapping into the 36px header.
           `text-nowrap` replaces the recipe's balanced wrapping, which would otherwise win over the clip,
           because `text-wrap: balance` also sets the wrap mode back to wrapping. The real text stays in the
@@ -98,7 +98,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
     <PaneCloseContext.Provider value={() => setOpen(null)}>
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="panel-scroll min-h-0 flex-1 overflow-y-auto">
-        <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'px-4 py-5')}>{stage}</div>
+        <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'workbench-stage px-4 py-5')}>{stage}</div>
       </div>
       {(inspector || bottom) && (
         <div className="shrink-0 bg-panel px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
@@ -191,10 +191,10 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
     <div ref={host} className="flex min-w-0 flex-1">
       {measured && (
     <Group orientation="horizontal" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged} className="min-w-0 flex-1">
-      <Panel id="stage" minSize={440} className="flex min-w-0 flex-col">
+      <Panel id="stage" minSize={320} className="flex min-w-0 flex-col">
         <Group orientation="vertical">
           <Panel id="canvas" minSize={200} className={cn('flex min-h-0 flex-col [container-type:size] [container-name:layout]', stageScroll ? 'panel-scroll overflow-y-auto' : 'overflow-hidden')}>
-            <div className={cn('flex w-full flex-col', stageScroll ? 'min-h-full' : 'h-full min-h-0', stagePadding && 'px-5 py-6')}>{stage}</div>
+            <div className={cn('flex w-full flex-col', stageScroll ? 'min-h-full' : 'h-full min-h-0', stagePadding && 'workbench-stage px-5 py-6')}>{stage}</div>
           </Panel>
           {bottom && (
             <>
@@ -229,7 +229,7 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
             maxSize={520}
             defaultSize={320}
             onResize={(size) => { if (size.inPixels > 0) setInspectorCollapsed(size.inPixels <= PANE_HEADER_HEIGHT + 5) }}
-            className="flex flex-col border-l border-line bg-panel [container-type:size] [container-name:layout_inspector]"
+            className="workbench-inspector flex flex-col border-l border-line bg-panel [container-type:size] [container-name:layout_inspector]"
           >
             <aside aria-labelledby={`${id}-inspector-title`} className="flex min-h-0 flex-1 flex-col">
               {inspectorCollapsed ? (

@@ -9,7 +9,7 @@ import { Icon } from '@/components/Icon'
 import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
-import { caption, label, num } from '@/components/ui/recipes'
+import { caption, iconControl, label, num } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
 import type { ComparisonSurvivalEvidence, ConversionDifference, ConversionRate, CoxRegressionEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, SurvivalRunArtifact } from '@/domain/survival'
 import { formatCount, formatEstimate, formatP, formatPercent, formatStatistic } from '@/lib/format/number'
@@ -839,7 +839,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <time dateTime={run.createdAt} className={num('ml-auto text-label text-faint')}>{formatTime(run.createdAt)}</time>
           </div>}
           {onDelete !== undefined && (
-            <button type="button" className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-transparent text-faint transition-colors hover:bg-well hover:text-danger" aria-label={`Delete ${summary.method} run`} title="Delete this run" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}>
+            <button type="button" className={iconControl('danger')} aria-label={`Delete ${summary.method} run`} title="Delete this run" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}>
               <Icon name="delete" size={16} />
             </button>
           )}

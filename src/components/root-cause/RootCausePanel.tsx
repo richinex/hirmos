@@ -20,7 +20,7 @@ import { RootCauseSettings } from './RootCauseSettings'
 import { RootCauseData } from './RootCauseData'
 import { GraphDetails } from './GraphDetails'
 import { readObservation } from '@/domain/observation'
-import { button, caption, chapterIntro, field, fieldLabel, fieldHint, panel, sectionTitle } from '@/components/ui/recipes'
+import { button, caption, chapterIntro, field, fieldLabel, fieldHint, iconControl, panel, sectionTitle } from '@/components/ui/recipes'
 import { mapNonEmpty, isNonEmpty } from '@/domain/dop'
 import { describeRootCauseGraphProblem, selectedRootCauseGraph } from '@/domain/rootCause'
 import { rootCauseRequestSchema, rootCauseRunSchema, type RootCauseRun, type RootCauseWorkspace, type RootCauseRequest } from '@/domain/rootCauseAnalysis'
@@ -73,7 +73,7 @@ function RunHistory({ runs, selected, onSelect, onDelete }: {
           <span className={caption('min-w-0 flex-1 truncate text-ink')}>{name}</span>
           <time className="shrink-0 text-label tabular-nums text-faint" dateTime={run.createdAt}>{formatTime(run.createdAt)}</time>
         </button>
-        <button type="button" className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-faint hover:bg-well hover:text-danger" aria-label={`Delete ${run.comparison.name} run`} title="Delete this run" onClick={() => onDelete(run.id)}><Icon name="delete" size={16} /></button>
+        <button type="button" className={iconControl('danger')} aria-label={`Delete ${run.comparison.name} run`} title="Delete this run" onClick={() => onDelete(run.id)}><Icon name="delete" size={16} /></button>
       </li>
     })}
   </ul>
