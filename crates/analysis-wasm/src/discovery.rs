@@ -1851,6 +1851,7 @@ mod tests {
             | AnalysisCommand::DoubleMl { .. }
             | AnalysisCommand::TLearner { .. }
             | AnalysisCommand::GcmEffects { .. }
+            | AnalysisCommand::GcmInfluence { .. }
             | AnalysisCommand::DmlRefutationBatch { .. }
             | AnalysisCommand::ArdlPss { .. }
             | AnalysisCommand::Vecm { .. }

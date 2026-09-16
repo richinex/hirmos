@@ -93,6 +93,7 @@ export type PreparationJob =
 
 export type StationarityJob =
   | { readonly kind: 'idle' }
+  | { readonly kind: 'cancelled' }
   | { readonly kind: 'running'; readonly completed: number; readonly total: number }
   | { readonly kind: 'failed'; readonly detail: string }
   | { readonly kind: 'succeeded'; readonly evidence: StationarityEvidenceArtifact }
@@ -198,6 +199,7 @@ export interface StationarityEvidenceArtifact {
 }
 
 export type PreprocessingEvent =
+  | { readonly type: 'diagnostics-cleared' }
   | { readonly type: 'regular-series-selected' }
   | { readonly type: 'cross-section-selected' }
   | { readonly type: 'regular-panel-selected' }
@@ -217,6 +219,7 @@ export type PreprocessingEvent =
   | { readonly type: 'preparation-failed'; readonly detail: string }
   | { readonly type: 'preparation-succeeded'; readonly artifact: PreparedDatasetArtifact }
   | { readonly type: 'diagnostics-started'; readonly total: number }
+  | { readonly type: 'diagnostics-cancelled' }
   | { readonly type: 'diagnostic-completed' }
   | { readonly type: 'diagnostics-failed'; readonly detail: string }
   | { readonly type: 'diagnostics-succeeded'; readonly evidence: StationarityEvidenceArtifact }
@@ -421,6 +424,10 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
       return { ...state, preparation: { kind: 'succeeded', artifact: event.artifact }, stationarity: { kind: 'idle' } }
     case 'diagnostics-started':
       return { ...state, stationarity: { kind: 'running', completed: 0, total: event.total } }
+    case 'diagnostics-cleared':
+      return { ...state, stationarity: { kind: 'idle' } }
+    case 'diagnostics-cancelled':
+      return { ...state, stationarity: { kind: 'cancelled' } }
     case 'diagnostic-completed':
       return state.stationarity.kind === 'running'
         ? { ...state, stationarity: { ...state.stationarity, completed: Math.min(state.stationarity.completed + 1, state.stationarity.total) } }

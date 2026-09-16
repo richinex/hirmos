@@ -105,8 +105,8 @@ export interface DagCausalFlow {
 const contemporaneous = (graph: EditableDag): readonly DirectedDagEdge[] =>
   graph.edges.filter((edge) => edge.timing.kind === 'contemporaneous' && edge.cause !== edge.effect)
 
-const reachable = (edges: readonly DirectedDagEdge[], start: DagNodeId, direction: 'forward' | 'backward'): Set<DagNodeId> => {
-  const out = new Set<DagNodeId>()
+export const reachable = <Id extends string | number>(edges: readonly { readonly cause: Id; readonly effect: Id }[], start: Id, direction: 'forward' | 'backward'): Set<Id> => {
+  const out = new Set<Id>()
   const frontier = [start]
   while (frontier.length > 0) {
     const current = frontier.pop()

@@ -48,15 +48,25 @@ export function rootCauseOption(run: RootCauseRun, theme: ChartTheme): EChartsCo
   const rows = rootCauseBars(run)
   const kind = run.evidence.outcome.kind
   const measure = kind === 'anomaly' ? 'Anomaly attribution score' : kind === 'change' ? 'Contribution to the mean change' : `Mean ${run.model.names[run.model.target]}`
+  return contributionOption(rows, measure, theme)
+}
+
+export interface ContributionBar {
+  readonly name: string
+  readonly estimate: number
+  readonly interval: readonly [number, number] | null
+}
+
+export function contributionOption(rows: readonly ContributionBar[], measure: string, theme: ChartTheme, valueLabel = 'Estimate'): EChartsCoreOption {
   const number = (value: number) => formatStatistic('raw', value).text
   return {
-    ...baseOption(theme, `${measure}. Bars preserve signed estimates; lines show refit percentile bounds.`),
+    ...baseOption(theme, `${measure}. Bars show estimates.${rows.some(row => row.interval !== null) ? ' Lines show refit percentile bounds.' : ''}`),
     grid: gridAuto({ bottom: 48 }),
     tooltip: { ...tooltip(theme), formatter: (raw: unknown) => {
       const index = raw !== null && typeof raw === 'object' ? Number(Reflect.get(raw, 'dataIndex')) : -1
       const row = rows[index]
       if (row === undefined) return ''
-      return `${escapeHtml(row.name)}<br/>Estimate: ${number(row.estimate)}${row.interval === null ? '' : `<br/>Percentile bounds: ${number(row.interval[0])} to ${number(row.interval[1])}`}`
+      return `${escapeHtml(row.name)}<br/>${escapeHtml(valueLabel)}: ${number(row.estimate)}${row.interval === null ? '' : `<br/>Percentile bounds: ${number(row.interval[0])} to ${number(row.interval[1])}`}`
     } },
     xAxis: { ...valueAxis(theme, measure), nameLocation: 'middle', nameGap: 28 },
     yAxis: { type: 'category', inverse: true, data: rows.map((row) => row.name), axisLabel: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize, width: 150, overflow: 'truncate' }, axisLine: { show: false }, axisTick: { show: false } },

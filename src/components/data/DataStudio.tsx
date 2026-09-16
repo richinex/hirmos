@@ -7,6 +7,7 @@ import { ColumnProfilePane } from './ColumnProfilePane'
 import { ColumnSeriesPane } from './ColumnSeriesPane'
 import { DataProfileView } from './DataProfileView'
 import { useColumnProfile } from './useColumnProfile'
+import { PreparedDataSummary } from './PreparedDataSummary'
 
 /** The Data Studio chapter: schema and preview on the stage, the selected column described beside and below. */
 export function DataStudio({ source, profile, prepared, onEditSource, children }: {
@@ -30,8 +31,8 @@ export function DataStudio({ source, profile, prepared, onEditSource, children }
           {children}
         </DataProfileView>
       )}
-      inspector={{ title: 'Column profile', body: <ColumnProfilePane profile={profile} column={selected} description={description} /> }}
-      bottom={{ title: 'Series', body: <ColumnSeriesPane column={selected} description={description} stepLabel={stepLabel} /> }}
+      inspector={{ trigger: { label: 'Profile', icon: 'query_stats' }, title: 'Column profile', body: <>{prepared !== null && <PreparedDataSummary prepared={prepared} profile={profile} />}<ColumnProfilePane profile={profile} column={selected} description={description} /></> }}
+      bottom={{ trigger: { label: 'Series', icon: 'show_chart' }, title: 'Series', body: <ColumnSeriesPane column={selected} description={description} stepLabel={stepLabel} /> }}
     />
   )
 }

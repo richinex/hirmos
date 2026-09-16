@@ -538,8 +538,8 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     <WorkbenchLayout
       id="sensitivity"
       stage={stage}
-      inspector={{ title: 'Estimate and method requirements', body: inspector }}
-      bottom={{ title: `Probes (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Estimate and method requirements', body: inspector }}
+      bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Probes (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>
   )

@@ -70,7 +70,7 @@ use hirmos_causal_core::tsdiag::ljung_box;
 use hirmos_causal_core::var_lingam::{direct_lingam_with_progress, run_var_lingam};
 use hirmos_causal_core::vecm::{chow_break, select_coint_rank, vecm_fit, vecm_select_order};
 use hirmos_causal_core::{
-    adfuller, kpss, zivot_andrews, AdfResult, KpssResult, Regression, ZaModel, ZaResult,
+    adfuller, kpss, AdfResult, KpssResult, Regression, ZaModel, ZaResult,
 };
 use hirmos_causal_core::{
     backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_conditional_outcomes,
@@ -95,6 +95,7 @@ mod counterfactual;
 mod dag_check;
 mod root_cause;
 mod gcm_effects;
+mod gcm_influence;
 mod root_cause_checks;
 mod discovery;
 mod dynamic_counterfactual;
@@ -143,6 +144,8 @@ pub fn run_analysis(
     let result = match command {
         AnalysisCommand::GcmEffects { request } => gcm_effects::run(request, values, &progress)
             .map(|evidence| AnalysisResult::GcmEffects { evidence }),
+        AnalysisCommand::GcmInfluence { request } => gcm_influence::run(request, values, &progress)
+            .map(|evidence| AnalysisResult::GcmInfluence { evidence }),
         AnalysisCommand::RootCause { request } => root_cause::run(request, values, &progress)
             .map(|evidence| AnalysisResult::RootCause { evidence }),
         AnalysisCommand::RootCauseChecks { request } => root_cause_checks::run(request, values, &progress)

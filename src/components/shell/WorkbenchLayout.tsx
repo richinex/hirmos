@@ -2,13 +2,15 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Group, Panel, Separator, useDefaultLayout, usePanelRef } from 'react-resizable-panels'
 import { Icon } from '@/components/Icon'
 import { Sheet } from '@/components/ui/Sheet'
-import { iconControl, label, panelTitle } from '@/components/ui/recipes'
+import { button, iconControl, label, panelTitle } from '@/components/ui/recipes'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 import { useShellLayout } from './useShellLayout'
 
 export interface WorkbenchPane {
   readonly title: string
+  /** Short mobile action label; the sheet and accessible name retain the full title. */
+  readonly trigger?: { readonly label: string; readonly icon: string }
   readonly body: ReactNode
   /** Rendered in the pane header beside the title: tabs, counts, a close control. */
   readonly controls?: ReactNode
@@ -66,25 +68,19 @@ const PaneCloseContext = createContext<() => void>(() => {})
 export const useOpenPane = (): ((pane: PhonePane) => void) => useContext(PaneRequestContext)
 export const useClosePane = (): (() => void) => useContext(PaneCloseContext)
 
-/**
- * The pane openers share the segmented control's `track` form: a raised track, each name in its own
- * column, a hairline between them. They are buttons that open dialogs rather than radios setting a
- * value, so the control is drawn here with the same classes instead of borrowed. The open pane's name
- * lifts to the panel surface for as long as its sheet is up.
- */
-const PANE_TRACK = 'flex w-full rounded-lg bg-raised p-0.5'
-const PANE_OPENER = 'min-w-0 flex-1 basis-0 truncate rounded-md border border-transparent px-3 py-1 text-body transition-colors duration-(--motion-fast) pointer-coarse:min-h-10'
-
-function PaneOpener({ title, open, onOpen }: { readonly title: string; readonly open: boolean; readonly onOpen: () => void }) {
+/** Independent actions open contextual sheets; they do not select a workbench mode. */
+function PaneOpener({ pane, icon, open, onOpen }: { readonly pane: WorkbenchPane; readonly icon: string; readonly open: boolean; readonly onOpen: () => void }) {
   return (
     <button
       type="button"
-      className={cn(PANE_OPENER, open ? 'lift bg-panel font-medium text-ink' : 'text-muted hover:text-ink')}
+      className={button('outline', cn('min-w-0 w-full whitespace-normal text-center', open ? 'bg-well text-ink' : 'bg-panel text-muted'))}
+      aria-label={pane.title}
       aria-haspopup="dialog"
       aria-expanded={open}
       onClick={onOpen}
     >
-      {title}
+      <Icon name={pane.trigger?.icon ?? icon} size={18} />
+      <span className="min-w-0 [overflow-wrap:anywhere]">{pane.trigger?.label ?? pane.title}</span>
     </button>
   )
 }
@@ -105,11 +101,10 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
         <div className={cn('flex min-h-full w-full flex-col', stagePadding && 'px-4 py-5')}>{stage}</div>
       </div>
       {(inspector || bottom) && (
-        <div className="shrink-0 border-t border-line bg-panel px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
-          <div className={PANE_TRACK} role="group" aria-label="Panes">
-            {inspector && <PaneOpener title={inspector.title} open={open === 'inspector'} onOpen={() => setOpen('inspector')} />}
-            {inspector && bottom && <span aria-hidden className={cn('my-1.5 w-px shrink-0 self-stretch bg-edge/60 transition-opacity duration-(--motion-fast)', open !== null && 'opacity-0')} />}
-            {bottom && <PaneOpener title={bottom.title} open={open === 'bottom'} onOpen={() => setOpen('bottom')} />}
+        <div className="shrink-0 bg-panel px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+          <div className={cn('grid items-stretch gap-2', inspector && bottom ? 'grid-cols-2' : 'grid-cols-1')} role="group" aria-label="Panes">
+            {inspector && <PaneOpener pane={inspector} icon="tune" open={open === 'inspector'} onOpen={() => setOpen('inspector')} />}
+            {bottom && <PaneOpener pane={bottom} icon="bottom_panel_open" open={open === 'bottom'} onOpen={() => setOpen('bottom')} />}
           </div>
         </div>
       )}

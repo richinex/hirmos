@@ -1,6 +1,6 @@
 //! v0.14 distribution-change attribution with the notebook's mean difference.
 
-use super::{independence::mechanism_change,model::{FittedModel,Graph,ModelError},
+use super::{independence::mechanism_change,model::{FittedModel,Graph,ModelError,MechanismSpec,Assignment},
     shapley::{estimate_with_distributions,DistributionExecution,Method,ShapleyError}};
 use crate::{kci::KciError,nprandom::Mt19937,numpy_reduce::numpy_mean,pcmciplus::bh_values};
 use nalgebra::DMatrix;
@@ -30,6 +30,38 @@ pub struct DistributionChange {
 pub fn distribution_change(graph:&Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,target:usize,
     count:NonZeroUsize,execution:DistributionExecution<'_>,rng:&mut Mt19937,cache:&mut Option<f64>)
     ->Result<DistributionChange,ChangeError> {
+    distribution_change_using(graph,old,new,target,count,execution,rng,cache,
+        |graph,_,old,new,changed,_|FittedModel::fit_changed(graph,old,new,changed))
+}
+
+/// Refit the supplied mechanisms; no automatic mechanism selection is implied.
+pub fn distribution_change_with(graph:&Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,target:usize,
+    specs:&[MechanismSpec],count:NonZeroUsize,execution:DistributionExecution<'_>,rng:&mut Mt19937,cache:&mut Option<f64>)
+    ->Result<DistributionChange,ChangeError> {
+    if specs.len()!=graph.names().len() {return Err(ChangeError::Model(ModelError::Shape));}
+    for (node,spec) in specs.iter().enumerate() {
+        let root=graph.parents(node).unwrap().is_empty();
+        if root==matches!(spec,MechanismSpec::Additive {..}) {return Err(ChangeError::Model(ModelError::Mechanism));}
+    }
+    distribution_change_using(graph,old,new,target,count,execution,rng,cache,|graph,nodes,old,new,changed,_| {
+        let selected:Vec<_>=nodes.iter().map(|&node|specs[node]).collect();
+        FittedModel::fit_changed_with(graph,old,new,changed,&selected)
+    })
+}
+
+/// Reuse assigned model classes when testing and refitting changed mechanisms.
+pub fn distribution_change_assigned(assignment:&Assignment,old:&DMatrix<f64>,new:&DMatrix<f64>,target:usize,
+    count:NonZeroUsize,execution:DistributionExecution<'_>,rng:&mut Mt19937,cache:&mut Option<f64>)
+    ->Result<DistributionChange,ChangeError> {
+    let ancestors=assignment.ancestors(target).map_err(ChangeError::Model)?;
+    distribution_change_using(assignment.graph(),old,new,target,count,execution,rng,cache,
+        |_,_,old,new,changed,rng|ancestors.fit_changed(old,new,changed,rng))
+}
+
+fn distribution_change_using(graph:&Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,target:usize,
+    count:NonZeroUsize,execution:DistributionExecution<'_>,rng:&mut Mt19937,cache:&mut Option<f64>,
+    fit:impl FnOnce(Graph,&[usize],&DMatrix<f64>,&DMatrix<f64>,&[bool],&mut Mt19937)->Result<(FittedModel,FittedModel),ModelError>)
+    ->Result<DistributionChange,ChangeError> {
     if old.ncols()!=graph.names().len() || new.ncols()!=graph.names().len() {
         return Err(ChangeError::Model(ModelError::Shape));
     }
@@ -55,7 +87,7 @@ pub fn distribution_change(graph:&Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,targ
         (p_values[node]<=((rank+1) as f64/nodes.len() as f64)*0.05).then_some(rank)).last();
     let mut changed=vec![false;nodes.len()];
     if let Some(last)=last {for &node in &order[..=last] {changed[node]=true;}}
-    let (before,after)=FittedModel::fit_changed(graph,&old,&new,&changed).map_err(ChangeError::Model)?;
+    let (before,after)=fit(graph,&nodes,&old,&new,&changed,rng).map_err(ChangeError::Model)?;
     let mut attribution=mean_change_of_graphs(&before,&after,target,count,execution,rng,cache)?;
     for node in &mut attribution.nodes {*node=nodes[*node];}
     let mechanisms=nodes.iter().enumerate().map(|(i,&node)|MechanismChange {

@@ -187,6 +187,17 @@ fn interp(x: f64, xp: &[f64], fp: &[f64]) -> f64 {
 
 /// zivot_andrews(x, trim=0.15, maxlag, regression, autolag="AIC").
 pub fn zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> ZaResult {
+    try_zivot_andrews(x, maxlag, model).expect("Zivot–Andrews auxiliary regression")
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ZaError {
+    RankDeficient,
+    DecompositionFailed,
+}
+
+/// Checked entry point for callers that must report a refused auxiliary fit.
+pub fn try_zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> Result<ZaResult, ZaError> {
     let trim = 0.15;
     let nobs = x.len();
     let adf_reg = Regression::Ct;
@@ -250,7 +261,15 @@ pub fn zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> ZaResu
                 }
             }
         }
-        let stat = Ols::fit(&exog, &y).tvalues()[basecols - 1];
+        let stat = if bp == start_period + 1 {
+            let fit = Ols::try_fit(&exog, &y).map_err(|_| ZaError::DecompositionFailed)?;
+            if fit.rank < cols {
+                return Err(ZaError::RankDeficient);
+            }
+            fit.tvalues()[basecols - 1]
+        } else {
+            quick_ols(&exog, &y)?[basecols - 1]
+        };
         if stat < best_stat {
             best_stat = stat;
             best_bp = bp;
@@ -271,11 +290,23 @@ pub fn zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> ZaResu
         interp(10.0, &pcnts, &stats),
     ];
 
-    ZaResult {
+    Ok(ZaResult {
         stat: best_stat,
         pvalue,
         crit,
         baselags,
         bpidx: best_bp - 1,
-    }
+    })
+}
+
+/// Statsmodels ZivotAndrewsUnitRoot._quick_ols; the first candidate checks rank.
+fn quick_ols(x: &DMatrix<f64>, y: &DVector<f64>) -> Result<DVector<f64>, ZaError> {
+    let inverse = crate::linalg::inverse(&(x.transpose() * x))
+        .map_err(|_| ZaError::DecompositionFailed)?;
+    let coefficients = &inverse * (x.transpose() * y);
+    let residuals = y - x * &coefficients;
+    let variance = residuals.dot(&residuals) / (x.nrows() - x.ncols()) as f64;
+    Ok(DVector::from_iterator(x.ncols(), (0..x.ncols()).map(|i| {
+        coefficients[i] / (variance * inverse[(i, i)]).sqrt()
+    })))
 }

@@ -5,6 +5,8 @@ import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ActionRow, type Job } from './ActionRow'
 import { GcmEffectsPanel } from './GcmEffectsPanel'
+import { GcmInfluencePanel } from './GcmInfluencePanel'
+import type { GcmInfluenceRun } from '@/domain/gcmInfluence'
 import type { GcmEffectsRun } from '@/domain/gcmEffects'
 import { Icon } from '@/components/Icon'
 import { formatTime } from '@/lib/format/date'
@@ -26,7 +28,7 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { selectSource, describeSourceSelectionProblem, describeDatasetProfileProblem, type SelectedSource } from '@/domain/workflow'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
-type Analysis = 'anomaly' | 'change' | 'intervention' | 'effects'
+type Analysis = 'anomaly' | 'change' | 'intervention' | 'effects' | 'intrinsic' | 'arrows'
 interface Props {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -39,6 +41,8 @@ interface Props {
   readonly onDelete: (id: string) => void
   readonly onEffects: (run: GcmEffectsRun) => void
   readonly onDeleteEffects: (id: string) => void
+  readonly onInfluence: (run: GcmInfluenceRun) => void
+  readonly onDeleteInfluence: (id: string) => void
 }
 
 const analyses = [
@@ -46,6 +50,8 @@ const analyses = [
   { value: 'change', label: 'Distribution change' },
   { value: 'intervention', label: 'Shift intervention' },
   { value: 'effects', label: 'Intervention effects' },
+  { value: 'intrinsic', label: 'Variance contributions' },
+  { value: 'arrows', label: 'Arrow strengths' },
 ] as const
 
 function RunHistory({ runs, selected, onSelect, onDelete }: {
@@ -70,7 +76,7 @@ function RunHistory({ runs, selected, onSelect, onDelete }: {
   </ul>
 }
 
-const descriptions: Record<Exclude<Analysis, 'effects'>, { readonly title: string; readonly summary: string; readonly dataLabel: string; readonly dataHint: string }> = {
+const descriptions: Record<'anomaly' | 'change' | 'intervention', { readonly title: string; readonly summary: string; readonly dataLabel: string; readonly dataHint: string }> = {
   anomaly: {
     title: 'Explain an unusual observation',
     summary: 'Estimate how each variable contributes to an unusual target value. The prepared data provides the baseline for comparison.',
@@ -106,6 +112,7 @@ export function RootCausePanel(props: Props) {
   const [shifts, setShifts] = useState<Readonly<Record<string, string>>>(() => previous?.model.query.kind === 'intervention' && graph.ok ? Object.fromEntries(previous.model.query.shifts.map((shift) => [graph.value.nodes[shift.node]!.id, String(shift.amount)])) : {})
   const [repetitions, setRepetitions] = useState(previous?.model.repetitions ?? 10)
   const [samples, setSamples] = useState(previous === undefined || previous.model.query.kind === 'intervention' ? 3000 : previous.model.query.samples)
+  const [changeFitting, setChangeFitting] = useState<'halfNormalLinear' | 'automaticFull'>(previous?.model.query.kind === 'change' ? previous.model.query.fitting.kind : 'halfNormalLinear')
   const [seed, setSeed] = useState(previous?.model.random.kind === 'seed' ? previous.model.random.seed : 0)
   const [randomSource, setRandomSource] = useState('seed')
   const [replay, setReplay] = useState<RootCauseRequest | null>(null)
@@ -114,11 +121,13 @@ export function RootCausePanel(props: Props) {
   const attempt = useRef(0)
   useEffect(() => () => { attempt.current += 1 }, [])
   const latest = props.workspace.runs.find((run) => run.id === selected) ?? props.workspace.runs.at(-1)
+  const effectiveFitting = replay?.query.kind === 'change' ? replay.query.fitting.kind : changeFitting
+  const checkFitting = analysis === 'change' && effectiveFitting === 'automaticFull' ? 'automatic' : 'halfNormalLinear'
   const checks = props.workspace.checks.filter((record) => record.graph.dagDocument === props.workspace.selection?.dagDocument
     && record.graph.dagRevision === props.workspace.selection?.dagRevision
-    && record.graph.preparedDataset === props.prepared.id)
+    && record.graph.preparedDataset === props.prepared.id && record.model.fitting === checkFitting)
   const checked = checks.at(-1)
-  const description = descriptions[analysis === 'effects' ? 'anomaly' : analysis]
+  const description = descriptions[analysis === 'effects' || analysis === 'intrinsic' || analysis === 'arrows' ? 'anomaly' : analysis]
   const document = props.documents.find((entry) => entry.id === props.workspace.selection?.dagDocument)
   const savedRandom = [...checks, ...props.workspace.runs.filter((record) => record.graph.dagRevision === props.workspace.selection?.dagRevision)].find((record) => record.id === randomSource)?.evidence.random
 
@@ -130,7 +139,7 @@ export function RootCausePanel(props: Props) {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { checkRootCause }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(graph.value.nodes, (node) => node.column))
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
-      const model = rootCauseCheckRequestSchema.parse({ names: graph.value.nodes.map((node) => node.name), edges: graph.value.edges, rows: data.value.rowCount, seed, scope: 'fitted' })
+      const model = rootCauseCheckRequestSchema.parse({ names: graph.value.nodes.map((node) => node.name), edges: graph.value.edges, rows: data.value.rowCount, seed, scope: 'fitted', fitting: checkFitting })
       if (current !== attempt.current) return
       const result = await checkRootCause(data.value.values, model, (progress) => { if (current === attempt.current) setJob({ kind: 'running', action: 'checks', stage: progress.stage }) })
       if (current !== attempt.current) return
@@ -144,7 +153,7 @@ export function RootCausePanel(props: Props) {
   }
 
   const run = async () => {
-    if (analysis === 'effects') return
+    if (analysis === 'effects' || analysis === 'intrinsic' || analysis === 'arrows') return
     if (!graph.ok || (!enteringValues && file === null) || !confirmed || target === '') return
     const current = ++attempt.current
     setJob({ kind: 'running', action: 'analysis', stage: 'Preparing causal model analysis' })
@@ -172,7 +181,7 @@ export function RootCausePanel(props: Props) {
       if (!baseline.ok) throw new Error(describePreparedMaterialisationProblem(baseline.error))
       const fitting = analysis === 'intervention' ? observed.value : baseline.value
       const query = analysis === 'anomaly' ? { kind: analysis, samples } : analysis === 'change'
-        ? { kind: analysis, rows: observed.value.rowCount, samples, execution: { kind: 'independentJobs' } }
+        ? { kind: analysis, rows: observed.value.rowCount, samples, execution: { kind: 'independentJobs' }, fitting: { kind: changeFitting } }
         : { kind: analysis, rows: observed.value.rowCount, order: profile.value.columns.flatMap((column) => {
           const index = graph.value.nodes.findIndex((node) => node.name === column.name)
           return index < 0 ? [] : [index]
@@ -183,7 +192,7 @@ export function RootCausePanel(props: Props) {
       const model = rootCauseRequestSchema.safeParse(replay ?? {
         names: graph.value.nodes.map((node) => node.name), edges: graph.value.edges,
         rows: fitting.rowCount, target: Number(target), repetitions,
-        upperQuantile: 0.95, fraction: analysis === 'change' ? 0.6 : 0.75,
+        upperQuantile: 0.95, fraction: analysis === 'change' ? (changeFitting === 'automaticFull' ? 1 : 0.6) : 0.75,
         random: randomSource === 'seed' ? { kind: 'seed', seed } : { kind: 'resume', state: savedRandom }, query,
       })
       if (!model.success) throw new Error(model.error.issues.map((issue) => issue.message).join(' '))
@@ -226,19 +235,26 @@ export function RootCausePanel(props: Props) {
   const requirements = <div className="space-y-6">
     <section><h3 className="m-0 text-body font-medium text-ink">Understanding model checks</h3><p className={fieldHint}>KL divergence measures the difference between observed and model-generated distributions. Lower values indicate closer agreement. CRPS assesses predictive distributions; lower values indicate better predictions.</p><p className={fieldHint}>Noise-independence checks test whether a variable’s estimated noise is independent of its parent variables. A rejected check suggests that the fitted relationship needs review. Passing a graph check does not remove that concern.</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Causal assumptions</h3><p className={fieldHint}>The graph represents the assumed causal relationships. Every variable must be observed, and the model assumes that its noise terms are independent.</p></section>
-    <section><h3 className="m-0 text-body font-medium text-ink">Fitted model</h3><p className={fieldHint}>Variables without parents use half-normal distributions. Other variables use linear regressions with empirical noise.</p></section>
+    <section><h3 className="m-0 text-body font-medium text-ink">Fitted model</h3><p className={fieldHint}>{analysis === 'change' && changeFitting === 'automaticFull' ? 'Variables without parents use their observed distributions. For each remaining variable, cross-validation compares linear regression, quadratic regression where applicable, and gradient boosting. Whole-number outcomes use discrete additive noise. The selected model classes are retained across repeated estimates, using all observations.' : 'Variables without parents use half-normal distributions. Other variables use linear regressions with empirical noise.'}</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Analysis data</h3><p className={fieldHint}>{analysis === 'intervention' ? 'The model is fitted to the analysis file. A shift changes the selected variable by the specified amount and samples its downstream variables again.' : 'The prepared dataset represents baseline behaviour. The analysis file must use the same variable definitions, units and transformations.'}</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Uncertainty</h3><p className={fieldHint}>Intervals show the {Number(((1 - (replay?.upperQuantile ?? 0.95)) * 100).toPrecision(12))}th and {(replay?.upperQuantile ?? 0.95) * 100}th percentiles across refitted estimates. Anomaly contributions are scores, not changes in the target’s units.</p></section>
     <section><h3 className="m-0 text-body font-medium text-ink">Prepared data</h3><dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-body"><dt className="text-faint">Source</dt><dd className="m-0 break-all text-ink">{props.source.name}</dd><dt className="text-faint">Rows</dt><dd className="m-0 tabular-nums text-ink">{props.prepared.observations.toLocaleString()}</dd></dl></section>
   </div>
+  if ((analysis === 'intrinsic' || analysis === 'arrows') && graph.ok) return <GcmInfluencePanel
+    key={`${graph.value.dagRevision}-${analysis}`} analysis={analysis}
+    source={props.source} profile={props.profile} prepared={props.prepared}
+    graph={graph.value} name={document?.name ?? 'Causal graph'} runs={props.workspace.influences}
+    onRun={props.onInfluence} onDelete={props.onDeleteInfluence} onGraph={props.onGraph}
+    navigation={<SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={setAnalysis} />}
+  />
   if (analysis === 'effects' && graph.ok) return <GcmEffectsPanel
     source={props.source} profile={props.profile} prepared={props.prepared}
     graph={graph.value} name={document?.name ?? 'Causal graph'} runs={props.workspace.effects}
     onRun={props.onEffects} onDelete={props.onDeleteEffects} onGraph={props.onGraph}
     navigation={<SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={setAnalysis} />}
   />
-  return <WorkbenchLayout id="root-cause" inspector={{ title: 'Data and method requirements', body: requirements }}
-    bottom={{ title: `Run history (${props.workspace.runs.length})`, defaultCollapsed: true, body: <RunHistory runs={props.workspace.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
+  return <WorkbenchLayout id="root-cause" inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: requirements }}
+    bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Run history (${props.workspace.runs.length})`, defaultCollapsed: true, body: <RunHistory runs={props.workspace.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section aria-labelledby="root-cause-title" className="@container/panel flex flex-col gap-5">
       <div><ChapterHeading id="root-cause-title" className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Explain an unusual observation, attribute a change between datasets, or estimate outcomes after specified changes to variables.</p></div>
       {!graph.ok ? <section className={panel('space-y-4 p-(--panel-space)')} aria-label="Root-cause graph selection">
@@ -254,6 +270,7 @@ export function RootCausePanel(props: Props) {
           <legend className="sr-only">Root-cause specification</legend>
           <div hidden={replay !== null}><SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={(value) => { setAnalysis(value); setSamples(value === 'change' ? 2000 : 3000) }} /></div>
           <div><h3 className={`${sectionTitle} m-0`}>{description.title}</h3><p className={`${fieldHint} max-w-[65ch]`}>{description.summary}</p></div>
+          {analysis === 'change' && replay === null && <label><ParameterLabel className={fieldLabel} label="Conditional models" help="Automatic selection compares prediction errors across five held-out folds and retains the selected model classes. Linear models use half-normal root distributions and refit sampled subsets." /><Select aria-label="Conditional models" className={field('text', 'mt-1')} value={changeFitting} onChange={event => setChangeFitting(event.target.value as typeof changeFitting)}><option value="halfNormalLinear">Linear models</option><option value="automaticFull">Automatic selection</option></Select></label>}
           {analysis === 'anomaly' && <SegmentedControl ariaLabel="Observation input" value={observationMode} options={[{ value: 'values', label: 'Enter values' }, { value: 'file', label: 'Upload file' }]} onChange={value => { setObservationMode(value); setConfirmed(false) }} size="md" />}
           <div data-testid="root-cause-inputs" className="grid min-w-0 grid-cols-1 items-start gap-4 @lg/panel:grid-cols-2">
             <label hidden={replay !== null}><span className={fieldLabel}>Target variable</span><Select className={field('text', 'mt-1')} value={target} onChange={(event) => setTarget(event.target.value)}><option value="">Choose target</option>{graph.value.nodes.map((node, index) => <option key={node.id} value={index}>{node.name}</option>)}</Select></label>
@@ -272,7 +289,7 @@ export function RootCausePanel(props: Props) {
         </fieldset>
         <ActionRow job={job} action="analysis" disabled={(!enteringValues && file === null) || !confirmed || target === ''} onRun={() => void run()} onCancel={() => void cancel()} />
         </section>
-        {latest !== undefined && <div className="space-y-4"><h3 className={`${sectionTitle} m-0`}>Results</h3><RootCauseRunResult run={latest} /></div>}
+        {latest !== undefined && <div className="space-y-4"><h3 className={`${sectionTitle} m-0`}>Results</h3><RootCauseRunResult key={latest.id} run={latest} /></div>}
         <section className={panel('space-y-4 p-(--panel-space)')} aria-label="Model assessment">
           <div><h3 className={`${sectionTitle} m-0`}>Model assessment</h3><p className={`${fieldHint} max-w-[65ch]`}>Check prediction performance, fitted distributions and noise independence against the prepared data.</p></div>
           <RootCauseData graph={graph.value} source={props.source} profile={props.profile} prepared={props.prepared} />

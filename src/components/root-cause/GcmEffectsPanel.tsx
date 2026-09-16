@@ -137,8 +137,8 @@ export function GcmEffectsPanel(props: Props) {
     <section><h3 className="m-0 text-body font-medium">Simulation uncertainty</h3><p className={fieldHint}>The forests are fitted once. Percentile ranges describe repeated intervention simulations, not bootstrap refitting or simultaneous coverage. The central estimate is the geometric median of the simulation vectors.</p></section>
     {latest && <section><h3 className="m-0 text-body font-medium">Summary calculation</h3><p className={fieldHint}>{optimizerMessages[latest.evidence.optimizer.status]}</p></section>}
   </div>
-  return <WorkbenchLayout id="root-cause" inspector={{ title: 'Data and method requirements', body: requirements }}
-    bottom={{ title: `Run history (${props.runs.length})`, defaultCollapsed: true, body: <History runs={props.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
+  return <WorkbenchLayout id="root-cause" inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: requirements }}
+    bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Run history (${props.runs.length})`, defaultCollapsed: true, body: <History runs={props.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section className="@container/panel flex flex-col gap-5">
       <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Estimate intervention effects using the prepared data and the recorded causal graph.</p></div>
       <section className={panel('p-(--panel-space)')} aria-label="Intervention effects setup">

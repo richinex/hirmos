@@ -3,6 +3,7 @@ import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from '.
 import type { DagDocument } from './dag'
 import { EMPTY_ROOT_CAUSE, type RootCauseRun, type RootCauseWorkspace, type RootCauseCheckRecord } from './rootCauseAnalysis'
 import type { GcmEffectsRun } from './gcmEffects'
+import type { GcmInfluenceRun } from './gcmInfluence'
 import { bindRootCauseRecord, appendRootCauseRecord } from './rootCauseRecords'
 import { selectedRootCauseGraph, type RootCauseSelection } from './rootCause'
 import type { DagCheckArtifact } from './dagValidation'
@@ -145,6 +146,8 @@ export interface PipelineResume { readonly graph: PipelineGraph; readonly inputs
 export type WorkflowEvent =
   | { readonly type: 'gcm-effects-created'; readonly run: GcmEffectsRun }
   | { readonly type: 'gcm-effects-deleted'; readonly id: string }
+  | { readonly type: 'gcm-influence-created'; readonly run: GcmInfluenceRun }
+  | { readonly type: 'gcm-influence-deleted'; readonly id: string }
   | { readonly type: 'root-cause-selected'; readonly selection: RootCauseSelection }
   | { readonly type: 'root-cause-run-created'; readonly run: RootCauseRun }
   | { readonly type: 'root-cause-checks-created'; readonly record: RootCauseCheckRecord }
@@ -164,6 +167,7 @@ export type WorkflowEvent =
   | { readonly type: 'profile-failed'; readonly request: ImportRequestId; readonly problem: DatasetProfileProblem }
   | { readonly type: 'prepared-dataset-created'; readonly artifact: PreparedDatasetArtifact }
   | { readonly type: 'stationarity-evidence-created'; readonly evidence: StationarityEvidenceArtifact }
+  | { readonly type: 'stationarity-evidence-cleared' }
   | { readonly type: 'granger-evidence-created'; readonly evidence: GrangerEvidenceArtifact }
   | { readonly type: 'count-series-model-created'; readonly artifact: CountSeriesModelArtifact }
   | { readonly type: 'discovery-run-created'; readonly artifact: DiscoveryRunArtifact }
@@ -406,6 +410,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       switch (event.type) {
         case 'root-cause-run-created':
         case 'gcm-effects-created':
+        case 'gcm-influence-created':
         case 'root-cause-checks-created': {
           const candidate = rootCauseRecord(event)
           const accepted = bindRootCauseRecord(candidate, state.dagDocuments, state.prepared)
@@ -415,9 +420,13 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'gcm-effects-deleted') {
         return { ...state, rootCause: { ...state.rootCause, effects: state.rootCause.effects.filter((run) => run.id !== event.id) } }
       }
+      if (event.type === 'gcm-influence-deleted') {
+        return { ...state, rootCause: { ...state.rootCause, influences: state.rootCause.influences.filter((run) => run.id !== event.id) } }
+      }
       if (event.type === 'root-cause-run-deleted') {
         return { ...state, rootCause: { ...state.rootCause, runs: state.rootCause.runs.filter((run) => run.id !== event.id) } }
       }
+      if (event.type === 'stationarity-evidence-cleared') return { ...state, stationarity: null }
       if (event.type === 'stationarity-evidence-created'
         && state.prepared !== null
         && event.evidence.preparedDataset === state.prepared.id) {
@@ -594,12 +603,13 @@ export function datasetProfileProblemDetail(problem: DatasetProfileProblem): str
     default: return assertNever(problem)
   }
 }
-type RootCauseRecordEvent = Extract<WorkflowEvent, { readonly type: 'root-cause-run-created' | 'gcm-effects-created' | 'root-cause-checks-created' }>
+type RootCauseRecordEvent = Extract<WorkflowEvent, { readonly type: 'root-cause-run-created' | 'gcm-effects-created' | 'gcm-influence-created' | 'root-cause-checks-created' }>
 
 function rootCauseRecord(event: RootCauseRecordEvent) {
   switch (event.type) {
     case 'root-cause-run-created': return { kind: 'run', record: event.run } as const
     case 'gcm-effects-created': return { kind: 'effects', record: event.run } as const
+    case 'gcm-influence-created': return { kind: 'influence', record: event.run } as const
     case 'root-cause-checks-created': return { kind: 'checks', record: event.record } as const
     default: return assertNever(event)
   }

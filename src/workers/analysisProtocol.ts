@@ -743,6 +743,7 @@ export type AnalysisWorkerCommand =
     }
   | { readonly kind: 'root-cause-checks'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: RootCauseCheckRequest }
   | { readonly kind: 'gcm-effects'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: GcmEffectsRequest }
+  | { readonly kind: 'gcm-influence'; readonly request: WorkerRequestId; readonly values: Float64Array; readonly model: GcmInfluenceRequest }
   | {
       readonly kind: 'ardl-model'
       readonly request: WorkerRequestId
@@ -1070,6 +1071,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'root-cause-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseEvidence }
   | { readonly kind: 'root-cause-checks-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseChecks }
   | { readonly kind: 'gcm-effects-succeeded'; readonly request: WorkerRequestId; readonly result: GcmEffectsEvidence }
+  | { readonly kind: 'gcm-influence-succeeded'; readonly request: WorkerRequestId; readonly result: GcmInfluenceEvidence }
   | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
@@ -1809,6 +1811,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('root-cause-checks'), request: requestSchema, values: z.instanceof(Float64Array), model: rootCauseCheckRequestSchema }).strict(),
   z.object({ kind: z.literal('gcm-effects'), request: requestSchema, values: z.instanceof(Float64Array), model: gcmEffectsRequestSchema }).strict(),
+  z.object({ kind: z.literal('gcm-influence'), request: requestSchema, values: z.instanceof(Float64Array), model: gcmInfluenceRequestSchema }).strict(),
   z.object({
     kind: z.literal('ardl-model'),
     request: requestSchema,
@@ -2135,6 +2138,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('root-cause-succeeded'), request: requestSchema, result: rootCauseEvidenceSchema }).strict(),
   z.object({ kind: z.literal('root-cause-checks-succeeded'), request: requestSchema, result: rootCauseChecksSchema }).strict(),
   z.object({ kind: z.literal('gcm-effects-succeeded'), request: requestSchema, result: gcmEffectsEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('gcm-influence-succeeded'), request: requestSchema, result: gcmInfluenceEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
@@ -2456,6 +2460,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = gcmEffectsEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'gcm-effects-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
+  if (parsed.data.kind === 'gcm-influence-succeeded') {
+    const result = gcmInfluenceEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'gcm-influence-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
   if (parsed.data.kind === 'root-cause-checks-succeeded') {
     const result = rootCauseChecksSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'root-cause-checks-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
@@ -2525,3 +2533,4 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
 }
 import { tLearnerUncertaintySchema, type TLearnerUncertainty } from '@/domain/tLearner'
 import { gcmEffectsRequestSchema, gcmEffectsEvidenceSchema, type GcmEffectsRequest, type GcmEffectsEvidence } from '@/domain/gcmEffects'
+import { gcmInfluenceRequestSchema, gcmInfluenceEvidenceSchema, type GcmInfluenceRequest, type GcmInfluenceEvidence } from '@/domain/gcmInfluence'

@@ -4,8 +4,8 @@ use hirmos_causal_core::{
     gcm::{
         anomaly::attribute_anomalies,
         bootstrap::{confidence_intervals, fit_and_compute, ConfidenceLevel, SubsetFraction},
-        distribution_change::distribution_change,
-        model::Graph,
+        distribution_change::{distribution_change, distribution_change_assigned},
+        model::{Assignment, Graph},
         shapley::{DistributionExecution, Execution, ProcessBatches},
     },
     nprandom::Mt19937,
@@ -31,9 +31,21 @@ pub(crate) struct Request {
 
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
-enum Random {
+pub(crate) enum Random {
     Seed { seed: u32 },
     Resume { state: RandomState },
+}
+
+impl Random {
+    pub(crate) fn restore(self) -> Result<(Mt19937, Option<f64>), String> {
+        match self {
+            Self::Seed { seed } => Ok((Mt19937::seeded(seed), None)),
+            Self::Resume { state } => {
+                if state.normal.is_some_and(|value| !value.is_finite()) { return Err("The saved random state is invalid.".into()); }
+                Ok((Mt19937::from_state(&state.keys, state.position).ok_or("The saved random state is invalid.")?, state.normal))
+            }
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
@@ -48,8 +60,21 @@ pub(crate) struct RandomState {
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
 enum Query {
     Anomaly { samples: NonZeroUsize },
-    Change { rows: NonZeroUsize, samples: NonZeroUsize, execution: ChangeExecution },
+    Change { rows: NonZeroUsize, samples: NonZeroUsize, execution: ChangeExecution, #[serde(default)] fitting: ChangeFitting },
     Intervention { rows: NonZeroUsize, order: Vec<usize>, shifts: Vec<Shift> },
+}
+
+#[derive(Default, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+enum ChangeFitting {
+    #[default]
+    HalfNormalLinear,
+    AutomaticFull,
+}
+
+enum FittedChange {
+    HalfNormalLinear,
+    Automatic(Assignment),
 }
 
 #[derive(Deserialize)]
@@ -81,9 +106,16 @@ impl ChangePlan {
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum Outcome {
     Anomaly { nodes: Vec<usize>, summary: Summary },
-    Change { nodes: Vec<usize>, summary: Summary },
+    Change { nodes: Vec<usize>, summary: Summary, means: ObservedMeans },
     Intervention { target: usize, nodes: Vec<usize>, observed_mean: f64, summary: Summary },
 }
+
+#[derive(Serialize)]
+pub(crate) struct Mean { node: usize, baseline: f64, comparison: f64 }
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum ObservedMeans { Recorded { values: Vec<Mean> } }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -126,12 +158,15 @@ pub(crate) fn run(
     if matches!(query, Query::Change { .. }) && (query_rows as f64 * fraction) < 1.0 {
         return Err("The comparison fitting fraction leaves no observations.".into());
     }
-    let (mut rng, mut cache) = match random {
-        Random::Seed { seed } => (Mt19937::seeded(seed), None),
-        Random::Resume { state } => {
-            if state.normal.is_some_and(|value| !value.is_finite()) { return Err("The saved random state is invalid.".into()); }
-            (Mt19937::from_state(&state.keys, state.position).ok_or("The saved random state is invalid.")?, state.normal)
+    let (mut rng, mut cache) = random.restore()?;
+    let fitted_change = match &query {
+        Query::Change { fitting: ChangeFitting::AutomaticFull, .. } => {
+            if fraction != 1.0 { return Err("Automatic full-data fitting uses every observation; set the fitting fraction to one.".into()); }
+            progress("Selecting conditional models", 0, repetitions.get());
+            FittedChange::Automatic(Assignment::select(graph.clone(), &baseline, Execution::Isolated, &mut rng)
+                .map_err(|error| format!("Conditional model selection failed: {error:?}"))?)
         }
+        _ => FittedChange::HalfNormalLinear,
     };
     let mut nodes = graph.ancestors(target).map_err(|_| "The target is not in the graph.")?;
     if matches!(query, Query::Anomaly { .. }) {
@@ -180,11 +215,16 @@ pub(crate) fn run(
                 Ok::<_, hirmos_causal_core::gcm::model::ModelError>(nodes.iter().map(|&node| numpy_mean(predictions.column(node).as_slice())).collect())
             }).map_err(|error| format!("Intervention fitting failed: {error:?}"))?,
             Query::Change { samples, .. } => {
-                let old_order = rng.permutation(baseline.nrows());
-                let new_order = rng.permutation(observed.nrows());
-                let old = DMatrix::from_fn((baseline.nrows() as f64 * fraction) as usize, columns, |r, c| baseline[(old_order[r], c)]);
-                let new = DMatrix::from_fn((observed.nrows() as f64 * fraction) as usize, columns, |r, c| observed[(new_order[r], c)]);
-                let change = distribution_change(&graph, &old, &new, target, *samples, change_plan.at(completed), rng, cache)
+                let change = match &fitted_change {
+                    FittedChange::HalfNormalLinear => {
+                        let old_order = rng.permutation(baseline.nrows());
+                        let new_order = rng.permutation(observed.nrows());
+                        let old = DMatrix::from_fn((baseline.nrows() as f64 * fraction) as usize, columns, |r, c| baseline[(old_order[r], c)]);
+                        let new = DMatrix::from_fn((observed.nrows() as f64 * fraction) as usize, columns, |r, c| observed[(new_order[r], c)]);
+                        distribution_change(&graph, &old, &new, target, *samples, change_plan.at(completed), rng, cache)
+                    }
+                    FittedChange::Automatic(assignment) => distribution_change_assigned(assignment, &baseline, &observed, target, *samples, change_plan.at(completed), rng, cache),
+                }
                     .map_err(|error| format!("Distribution comparison failed: {error:?}"))?;
                 align(&nodes, &change.attribution.nodes, &change.attribution.contributions)?
             }
@@ -202,7 +242,7 @@ pub(crate) fn run(
     };
     let outcome = match query {
         Query::Anomaly { .. } => Outcome::Anomaly { nodes, summary },
-        Query::Change { .. } => Outcome::Change { nodes, summary },
+        Query::Change { .. } => Outcome::Change { nodes, summary, means: ObservedMeans::Recorded { values: (0..columns).map(|node| Mean { node, baseline: numpy_mean(baseline.column(node).as_slice()), comparison: numpy_mean(observed.column(node).as_slice()) }).collect() } },
         Query::Intervention { .. } => Outcome::Intervention { target, nodes, observed_mean: numpy_mean(observed.column(target).as_slice()), summary },
     };
     Ok(Evidence { outcome, random: RandomState { keys: rng.state().0.to_vec(), position: rng.state().1, normal: cache } })

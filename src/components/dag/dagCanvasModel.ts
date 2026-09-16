@@ -32,15 +32,19 @@ const MARGIN = 34
 export type DagLayoutOrientation = 'across' | 'down'
 
 export function layoutEditableDag(graph: EditableDag, orientation: DagLayoutOrientation = 'across', size: DagCardSize = DEFAULT_CARD_SIZE): readonly DagNodePlacement[] {
+  return layoutDirectedGraph(graph.nodes, graph.edges, orientation, size)
+}
+
+export function layoutDirectedGraph<Id extends string>(nodes: readonly { readonly id: Id }[], edges: readonly { readonly cause: Id; readonly effect: Id }[], orientation: DagLayoutOrientation = 'across', size: DagCardSize = DEFAULT_CARD_SIZE): readonly { readonly id: Id; readonly x: number; readonly y: number }[] {
   const layout = new dagre.graphlib.Graph()
   layout.setGraph({ rankdir: orientation === 'across' ? 'LR' : 'TB', nodesep: ROW_GAP, ranksep: COLUMN_GAP, marginx: MARGIN, marginy: MARGIN })
   layout.setDefaultEdgeLabel(() => ({}))
-  for (const node of graph.nodes) layout.setNode(node.id, { width: size.width, height: size.height })
-  for (const edge of graph.edges) {
+  for (const node of nodes) layout.setNode(node.id, { width: size.width, height: size.height })
+  for (const edge of edges) {
     if (edge.cause !== edge.effect) layout.setEdge(edge.cause, edge.effect)
   }
   dagre.layout(layout)
-  return graph.nodes.map((node) => {
+  return nodes.map((node) => {
     const placed = layout.node(node.id)
     return { id: node.id, x: placed.x - size.width / 2, y: placed.y - size.height / 2 }
   })

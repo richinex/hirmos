@@ -5,10 +5,12 @@ import type { PreparedDatasetArtifact } from './preprocessing'
 import { matchesRootCauseGraph, selectedRootCauseGraph, type RootCauseGraphProblem } from './rootCause'
 import { rootCauseRunSchema, rootCauseCheckRecordSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
 import { gcmEffectsRunSchema } from './gcmEffects'
+import { gcmInfluenceRunSchema } from './gcmInfluence'
 
 const recordSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('run'), record: rootCauseRunSchema }).strict(),
   z.object({ kind: z.literal('effects'), record: gcmEffectsRunSchema }).strict(),
+  z.object({ kind: z.literal('influence'), record: gcmInfluenceRunSchema }).strict(),
   z.object({ kind: z.literal('checks'), record: rootCauseCheckRecordSchema }).strict(),
 ])
 
@@ -44,6 +46,7 @@ export function appendRootCauseRecord(workspace: RootCauseWorkspace, value: Boun
   switch (value.kind) {
     case 'run': return { ...workspace, runs: [...workspace.runs, value.record] }
     case 'effects': return { ...workspace, effects: [...workspace.effects, value.record] }
+    case 'influence': return { ...workspace, influences: [...workspace.influences, value.record] }
     case 'checks': return { ...workspace, checks: [...workspace.checks, value.record] }
     default: return assertNever(value)
   }

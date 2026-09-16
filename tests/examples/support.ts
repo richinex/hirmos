@@ -55,7 +55,7 @@ export const prepare = async (page: Page, options: {
     for (const column of options.columns) await page.getByRole('checkbox', { name: column, exact: true }).first().check()
   }
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await bodyText(page, structure.prepared)
+  await expect(page.getByRole('heading', { name: 'Build a DAG or run discovery', exact: true })).toBeVisible()
 }
 
 export const addArrow = async (page: Page, cause: string, effect: string, rationale: string, lag?: number): Promise<void> => {

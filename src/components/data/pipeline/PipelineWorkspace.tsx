@@ -331,6 +331,7 @@ export function PipelineWorkspace({ resume, onPrepared }: {
         : (
           <div className="min-h-0 flex-1 overflow-auto p-3">
             <EvidenceTable
+              appearance="data"
               title={selectedNode === null ? 'Block' : blockLabel(selectedNode.block.kind)}
               rows={previewRows}
               columns={previewColumns}

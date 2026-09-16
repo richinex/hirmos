@@ -683,8 +683,8 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
     <WorkbenchLayout
       id="study"
       stage={stage}
-      inspector={{ title: 'Graph, roles, and method requirements', body: inspector }}
-      bottom={{ title: `Studies (${studies.length})`, body: ledger, defaultSize: 150 }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Graph, roles, and method requirements', body: inspector }}
+      bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Studies (${studies.length})`, body: ledger, defaultSize: 150 }}
     />
   )
 }

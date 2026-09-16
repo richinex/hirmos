@@ -50,7 +50,7 @@ const wraps = (meta: CellMeta): boolean => meta.align !== 'right' && !meta.mono
 /** Horizontal padding of a body cell, `px-3.5` either side. */
 const CELL_INSET = 28
 
-export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel' }: {
+export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, empty, filters, total, exportName, maxHeight = 'max-h-96', frame = 'panel', appearance = 'minimal' }: {
   readonly title: string
   readonly help?: string
   readonly rows: readonly Row[]
@@ -69,6 +69,8 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
   readonly maxHeight?: string
   /** `none` where the table already sits inside a card of the same fill. */
   readonly frame?: 'panel' | 'none'
+  /** Pipeline previews retain data-table chrome; analytical evidence uses quiet rules. */
+  readonly appearance?: 'minimal' | 'data'
 }) {
   const titleId = useId()
   const scrollRef = useRef<HTMLDivElement | null>(null)
@@ -205,6 +207,7 @@ export function EvidenceTable<Row>({ title, help, rows, columns, rowKey, noun, e
 
   return (
     <TableShell
+      className={appearance === 'minimal' ? 'evidence-minimal' : undefined}
       title={title}
       titleId={titleId}
       titleHelp={help === undefined ? undefined : <ParameterHelp label={title} help={help} />}

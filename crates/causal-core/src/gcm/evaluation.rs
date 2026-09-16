@@ -5,7 +5,7 @@ use super::{
     metrics::{
         empirical_crps, marginal_kl, prediction_metrics, variance, MetricError, PredictionMetrics,
     },
-    model::{FittedModel, Graph, ModelError},
+    model::{FittedModel, Graph, ModelError,Assignment,Mechanism},
     shapley::Execution,
 };
 use crate::{dml::kfold_shuffled, nprandom::Mt19937, numpy_reduce::numpy_mean};
@@ -85,6 +85,19 @@ pub fn mechanism_performance(
     rng: &mut Mt19937,
     cache: &mut Option<f64>,
 ) -> Result<Vec<NodePerformance>, EvaluationError> {
+    mechanism_performance_using(graph,data,folds,execution,rng,cache,&|node,training,_|FittedModel::fit_mechanism(graph,node,training))
+}
+
+/// Refit the selected predictor in each fold; do not replace it with linear regression.
+pub fn assigned_performance(assignment:&Assignment,data:&DMatrix<f64>,folds:NonZeroUsize,
+    execution:Execution,rng:&mut Mt19937,cache:&mut Option<f64>)->Result<Vec<NodePerformance>,EvaluationError> {
+    mechanism_performance_using(assignment.graph(),data,folds,execution,rng,cache,
+        &|node,training,rng|assignment.fit_node(node,training,rng))
+}
+
+fn mechanism_performance_using(graph:&Graph,data:&DMatrix<f64>,folds:NonZeroUsize,execution:Execution,
+    rng:&mut Mt19937,cache:&mut Option<f64>,fit:&impl Fn(usize,&DMatrix<f64>,&mut Mt19937)->Result<Mechanism,ModelError>)
+    ->Result<Vec<NodePerformance>,EvaluationError> {
     if folds.get() < 2 || folds.get() > data.nrows() {
         return Err(EvaluationError::Folds);
     }
@@ -102,7 +115,7 @@ pub fn mechanism_performance(
             Execution::Serial => {
                 *rng = Mt19937::seeded(seed);
                 *cache = None;
-                node_performance(graph, data, node, folds.get(), rng, cache, None)
+                node_performance(graph, data, node, folds.get(), rng, cache, None,fit)
             }
             Execution::Isolated => node_performance(
                 graph,
@@ -115,6 +128,7 @@ pub fn mechanism_performance(
                     &mut distribution_rng.clone(),
                     &mut distribution_cache.clone(),
                 )),
+                fit,
             ),
         }?;
         result.push(performance);
@@ -216,6 +230,7 @@ fn node_performance(
     rng: &mut Mt19937,
     cache: &mut Option<f64>,
     mut root_state: Option<(&mut Mt19937, &mut Option<f64>)>,
+    fit:&impl Fn(usize,&DMatrix<f64>,&mut Mt19937)->Result<Mechanism,ModelError>,
 ) -> Result<NodePerformance, EvaluationError> {
     let parents = graph.parents(node).unwrap();
     let mut kl = Vec::new();
@@ -226,12 +241,12 @@ fn node_performance(
     for (train, test) in kfold_shuffled(data.nrows(), folds, rng) {
         let training = DMatrix::from_fn(train.len(), data.ncols(), |r, c| data[(train[r], c)]);
         let mechanism =
-            FittedModel::fit_mechanism(graph, node, &training).map_err(EvaluationError::Model)?;
+            fit(node,&training,rng).map_err(EvaluationError::Model)?;
         let observed: Vec<_> = test.iter().map(|&r| data[(r, node)]).collect();
         if parents.is_empty() {
-            let samples = match root_state.as_mut() {
-                Some((rng, cache)) => mechanism.draw_noise(test.len(), rng, cache),
-                None => mechanism.draw_noise(test.len(), rng, cache),
+            let samples = match (&mechanism,root_state.as_mut()) {
+                (Mechanism::HalfNormal{..},Some((rng, cache))) => mechanism.draw_noise(test.len(), rng, cache),
+                _ => mechanism.draw_noise(test.len(), rng, cache),
             };
             kl.push(marginal_kl(samples.as_slice(), &observed).map_err(EvaluationError::Metric)?);
             continue;
@@ -249,14 +264,14 @@ fn node_performance(
         for (row, &outcome) in observed.iter().enumerate() {
             let repeated = DMatrix::from_fn(100, parents.len(), |_, c| parent_values[(row, c)]);
             let samples =
-                (mechanism.predict(&repeated) + mechanism.draw_noise(100, rng, cache)) / scale;
+                (mechanism.predict(&repeated).map_err(EvaluationError::Model)? + mechanism.draw_noise(100, rng, cache)) / scale;
             scores.push(
                 empirical_crps(samples.as_slice(), outcome / scale)
                     .map_err(EvaluationError::Metric)?,
             );
         }
         crps.push(numpy_mean(&scores));
-        let metrics = prediction_metrics(&observed, mechanism.predict(&parent_values).as_slice())
+        let metrics = prediction_metrics(&observed, mechanism.predict(&parent_values).map_err(EvaluationError::Model)?.as_slice())
             .map_err(EvaluationError::Metric)?;
         mse.push(metrics.mse);
         nmse.push(metrics.nmse);

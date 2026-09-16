@@ -210,8 +210,8 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
           <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
           <FilterField value={searchDraft} onChange={setSearchDraft} placeholder="Search all columns" label="Search rows" className="min-w-0 flex-1 sm:w-44" />
           <details className="relative shrink-0">
-            <summary className={cn(facet(hidden.size > 0, 'flex min-h-6 cursor-pointer list-none items-center gap-1 whitespace-nowrap px-2 py-0 pointer-coarse:min-h-[3.125rem]'))}>
-              <Icon name="view_column" size={13} /> Columns <span className={num('text-faint')}>{visibleColumns.length} of {profile.columns.length}</span>
+            <summary aria-label={`Choose visible columns, ${visibleColumns.length} of ${profile.columns.length} shown`} title={`Choose visible columns, ${visibleColumns.length} of ${profile.columns.length} shown`} className={cn(facet(hidden.size > 0, 'flex min-h-8 min-w-8 cursor-pointer list-none items-center justify-center px-2 py-0 pointer-coarse:min-h-[3.125rem] pointer-coarse:min-w-[3.125rem]'))}>
+              <Icon name="view_column" size={18} />
             </summary>
             <div className="float absolute right-0 top-full z-20 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-edge bg-panel p-2">
               <ul className="m-0 list-none space-y-1 p-0" aria-label="Shown columns">

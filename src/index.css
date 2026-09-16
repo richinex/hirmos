@@ -508,7 +508,7 @@ button[aria-busy="true"]::after {
 @media (pointer: coarse) { .example-browser button { min-width: 44px; min-height: 44px; } }
 
 .numeric-surface { border-radius: 12px; background: color-mix(in srgb, var(--color-stage) 94%, var(--color-ink)); }
-.metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1.5rem 2rem; list-style: none; padding: 1.5rem; }
+.metric-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1.25rem 1.75rem; list-style: none; padding: 1.125rem 1.25rem; }
 .numeric-compact { gap: 1rem; padding: .875rem; }
 .numeric-compact > * { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; overflow-wrap: anywhere; }
 .result-surface { display: flex; min-width: 0; flex-direction: column; gap: 1.5rem; }
@@ -526,9 +526,25 @@ button[aria-busy="true"]::after {
 .metric-card .metric-card-values, .metric-cards .metric-card-values { display: flex; flex-direction: column; align-items: flex-start; gap: .625rem; margin-top: .625rem; }
 .metric-card .metric-card-number, .metric-cards .metric-card-number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: var(--text-heading); font-weight: 400; margin: 0; }
 .metric-card-context { min-width: 0; }
+.metric-cards.stationarity-metrics { padding: .5rem .75rem; gap: .5rem 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
+.stationarity-metrics .metric-card-number { font-size: var(--text-title); }
 .metric-card .metric-card-context, .metric-cards .metric-card-context { margin: 0; }
 .metric-cards .metric-tile[data-size="hero"] .metric-card-number { font-size: var(--text-metric); }
 .metric-tile[data-size="compact"] .metric-card-number { font-size: var(--text-title); line-height: 1.35; }
+
+/* Compact values and labels share a baseline; supporting text keeps its own row.
+   Restrict this to grouped metrics: standalone estimates and data profiles retain their layout. */
+.metric-cards .metric-tile:not([data-size="hero"]) { display: flex; flex-wrap: wrap; align-content: start; align-items: baseline; gap: .375rem .75rem; }
+.metric-cards .metric-tile:not([data-size="hero"]) .metric-card-values { display: contents; }
+.metric-cards .metric-tile:not([data-size="hero"]) .metric-card-number { order: 1; flex: 0 1 auto; line-height: 1.25; }
+.metric-cards .metric-tile:not([data-size="hero"]) .metric-card-label { order: 2; flex: 1 1 5rem; min-width: 0; overflow-wrap: anywhere; }
+.metric-cards .metric-tile:not([data-size="hero"]) .metric-card-context { order: 3; flex: 1 0 100%; font-size: var(--text-label); line-height: 1.5; }
+
+/* Preserve the one-pixel row pitch used by virtualisation without drawing a rule.
+   Sticky headers remain opaque on the surrounding surface, not a separate header fill. */
+.evidence-minimal > div:first-child, .evidence-minimal > p:last-child,
+.evidence-minimal table th, .evidence-minimal table tbody tr { border-color: transparent; }
+.evidence-minimal table th { background: var(--table-surface, var(--color-panel)); }
 
 .equation-columns { display: grid; min-width: 0; gap: 2rem 3rem; }
 .equation-group { display: grid; min-width: 0; align-content: start; gap: .75rem; }

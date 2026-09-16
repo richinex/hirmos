@@ -1009,6 +1009,11 @@ export function runGcmEffects(values: Float64Array, model: import('@/domain/gcmE
   return post('gcm-effects-succeeded', { kind: 'gcm-effects', request, values, model }, values, onProgress)
 }
 
+export function runGcmInfluence(values: Float64Array, model: import('@/domain/gcmInfluence').GcmInfluenceRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/gcmInfluence').GcmInfluenceEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('gcm-influence-succeeded', { kind: 'gcm-influence', request, values, model }, values, onProgress)
+}
+
 export function checkRootCause(values: Float64Array, model: import('@/domain/rootCauseAnalysis').RootCauseCheckRequest, onProgress?: (progress: AnalysisProgress) => void): Promise<Result<import('@/domain/rootCauseAnalysis').RootCauseChecks, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
   return post('root-cause-checks-succeeded', { kind: 'root-cause-checks', request, values, model }, values, onProgress)

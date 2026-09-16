@@ -377,6 +377,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'rootCause', request: command.model }
     case 'gcm-effects':
       return { kind: 'gcmEffects', request: command.model }
+    case 'gcm-influence':
+      return { kind: 'gcmInfluence', request: command.model }
     case 'root-cause-checks':
       return { kind: 'rootCauseChecks', request: command.model }
     case 'vecm':
@@ -798,6 +800,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'gcm-effects-succeeded', request: command.request, result: result.data.evidence })
         return
       }
+      case 'gcm-influence': {
+        const result = gcmInfluenceResponseSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'gcm-influence-succeeded', request: command.request, result: result.data.evidence })
+        return
+      }
       case 'root-cause-checks': {
         const result = rootCauseChecksResponseSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
@@ -889,3 +897,4 @@ self.onmessage = (message: MessageEvent<unknown>) => {
   })()
 }
 import { gcmEffectsResponseSchema } from '@/domain/gcmEffects'
+import { gcmInfluenceResponseSchema } from '@/domain/gcmInfluence'

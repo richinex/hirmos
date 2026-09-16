@@ -8,7 +8,8 @@ use crate::{
 };
 use nalgebra::{DMatrix, DVector};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use super::shapley::DistributionRandom;
+use super::{shapley::DistributionRandom, additive::{AdditiveError, AdditiveModel, Empirical, Features, Output}};
+use super::{selection::{select,Selection},shapley::Execution};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ModelError {
@@ -17,6 +18,72 @@ pub enum ModelError {
     NonFinite,
     Regression,
     UnknownNode,
+    Mechanism,
+    Additive(AdditiveError),
+}
+
+/// Root distributions and conditional mechanisms are distinct specifications.
+#[derive(Clone, Copy, Debug)]
+pub enum MechanismSpec {
+    HalfNormal,
+    Empirical,
+    Additive { features: Features, output: Output },
+}
+
+#[derive(Clone)]
+pub enum AssignedNode {
+    Empirical,
+    Additive { selection: Selection, output: Output },
+}
+
+/// The selected mechanisms belong to this graph, not an interchangeable spec vector.
+pub struct Assignment { graph:Graph, nodes:Vec<AssignedNode> }
+impl Assignment {
+    pub fn select(graph:Graph,data:&DMatrix<f64>,execution:Execution,rng:&mut Mt19937)->Result<Self,ModelError> {
+        graph.validate(data)?;
+        if data.nrows()==0 {return Err(ModelError::Shape);}
+        let mut assigned=BTreeMap::new();
+        for &node in graph.order() {
+            let parents=graph.parents(node).ok_or(ModelError::UnknownNode)?;
+            let assignment=if parents.is_empty() {AssignedNode::Empirical} else {
+                let x=DMatrix::from_fn(data.nrows(),parents.len(),|r,c|data[(r,parents[c])]);
+                let y=data.column(node).into_owned();
+                let selection=select(&x,&y,execution,rng).map_err(|_|ModelError::Regression)?;
+                let output=if y.iter().all(|v|v.fract()==0.) {Output::Discrete}else{Output::Continuous};
+                AssignedNode::Additive {selection,output}
+            };
+            assigned.insert(node,assignment);
+        }
+        let nodes=assigned.into_values().collect();
+        Ok(Self {graph,nodes})
+    }
+    pub fn nodes(&self)->&[AssignedNode] {&self.nodes}
+    pub fn graph(&self)->&Graph {&self.graph}
+    pub fn ancestors(&self,target:usize)->Result<Self,ModelError> {
+        let (graph,mapping)=self.graph.ancestor_graph(target)?;
+        Ok(Self {graph,nodes:mapping.iter().map(|&n|self.nodes[n].clone()).collect()})
+    }
+    pub(crate) fn fit_node(&self,node:usize,data:&DMatrix<f64>,rng:&mut Mt19937)->Result<Mechanism,ModelError> {
+        match &self.nodes[node] {
+            AssignedNode::Empirical=>Empirical::fit(data.column(node).into_owned()).map(Mechanism::Empirical).map_err(ModelError::Additive),
+            AssignedNode::Additive {selection,output}=>{
+                let parents=self.graph.parents(node).ok_or(ModelError::UnknownNode)?;
+                let x=DMatrix::from_fn(data.nrows(),parents.len(),|r,c|data[(r,parents[c])]);
+                AdditiveModel::fit_selected(&x,&data.column(node).into_owned(),selection.best(),*output,rng)
+                    .map(Mechanism::Additive).map_err(ModelError::Additive)
+            }
+        }
+    }
+    pub fn fit(&self,data:&DMatrix<f64>,rng:&mut Mt19937)->Result<FittedModel,ModelError> {
+        self.graph.validate(data)?;
+        if data.nrows()==0 {return Err(ModelError::Shape);}
+        let mechanisms=(0..self.nodes.len()).map(|node|self.fit_node(node,data,rng)).collect::<Result<_,_>>()?;
+        Ok(FittedModel {graph:self.graph.clone(),mechanisms})
+    }
+    pub fn fit_changed(&self,old:&DMatrix<f64>,new:&DMatrix<f64>,changed:&[bool],rng:&mut Mt19937)
+        ->Result<(FittedModel,FittedModel),ModelError> {
+        FittedModel::fit_changed_using(self.graph.clone(),old,new,changed,|_,node,data|self.fit_node(node,data,rng))
+    }
 }
 
 /// Graph order is supplied separately from column labels; parent columns are label-sorted.
@@ -101,6 +168,8 @@ impl Graph {
 
 #[derive(Clone)]
 pub(crate) enum Mechanism {
+    Empirical(Empirical),
+    Additive(AdditiveModel),
     HalfNormal {
         location: f64,
         scale: f64,
@@ -115,6 +184,8 @@ pub(crate) enum Mechanism {
 impl Mechanism {
     pub(crate) fn draw_noise(&self,count:usize,rng:&mut Mt19937,cache:&mut Option<f64>)->DVector<f64> {
         match self {
+            Self::Empirical(model)=>model.draw(count,rng),
+            Self::Additive(model)=>model.draw_noise(count,rng),
             Self::HalfNormal {location,scale}=>DVector::from_iterator(count,(0..count).map(|_| {
                 if *scale==0.0 {*location} else {rng.standard_normal(cache).abs()*scale+location}
             })),
@@ -122,10 +193,11 @@ impl Mechanism {
         }
     }
 
-    pub(crate) fn predict(&self,parents:&DMatrix<f64>)->DVector<f64> {
+    pub(crate) fn predict(&self,parents:&DMatrix<f64>)->Result<DVector<f64>,ModelError> {
         match self {
-            Self::HalfNormal {..}=>DVector::zeros(parents.nrows()),
-            Self::Linear {coefficients,intercept,..}=>predict_fortran(parents,coefficients,*intercept),
+            Self::HalfNormal {..}|Self::Empirical(_)=>Ok(DVector::zeros(parents.nrows())),
+            Self::Additive(model)=>model.predict(parents).map_err(ModelError::Additive),
+            Self::Linear {coefficients,intercept,..}=>Ok(predict_fortran(parents,coefficients,*intercept)),
         }
     }
 }
@@ -172,9 +244,9 @@ impl FittedModel {
                 continue;
             }
             let mut values = match self.mechanisms[node] {
-                Mechanism::HalfNormal { .. } => samples.column(node).into_owned(),
-                Mechanism::Linear { .. } => {
-                    self.prediction(node, &samples)
+                Mechanism::HalfNormal { .. }|Mechanism::Empirical(_) => samples.column(node).into_owned(),
+                Mechanism::Linear { .. }|Mechanism::Additive(_) => {
+                    self.prediction(node, &samples)?
                         + self.draw_noise(node, samples.nrows(), rng, &mut None)
                 }
             };
@@ -195,6 +267,31 @@ impl FittedModel {
             mechanisms.push(Self::fit_mechanism(&graph,node,data)?);
         }
         Ok(Self { graph, mechanisms })
+    }
+
+    /// Fit an explicit mechanism specification without automatic model selection.
+    pub fn fit_with(graph: Graph, data: &DMatrix<f64>, specs: &[MechanismSpec]) -> Result<Self, ModelError> {
+        graph.validate(data)?;
+        if data.nrows()==0 || specs.len()!=graph.names.len() { return Err(ModelError::Shape); }
+        let mechanisms = specs.iter().enumerate().map(|(node, &spec)| Self::fit_spec(&graph,node,data,spec))
+            .collect::<Result<Vec<_>,_>>()?;
+        Ok(Self { graph, mechanisms })
+    }
+
+    fn fit_spec(graph: &Graph, node: usize, data: &DMatrix<f64>, spec: MechanismSpec) -> Result<Mechanism, ModelError> {
+        let root = graph.dag.parents[node].is_empty();
+        match spec {
+            MechanismSpec::HalfNormal if root => Self::fit_mechanism(graph,node,data),
+            MechanismSpec::Empirical if root => Empirical::fit(data.column(node).into_owned())
+                .map(Mechanism::Empirical).map_err(ModelError::Additive),
+            MechanismSpec::Additive { features, output } if !root => {
+                let parents = &graph.dag.parents[node];
+                let x = DMatrix::from_fn(data.nrows(),parents.len(),|r,c|data[(r,parents[c])]);
+                AdditiveModel::fit(&x,&data.column(node).into_owned(),features,output)
+                    .map(Mechanism::Additive).map_err(ModelError::Additive)
+            }
+            _ => Err(ModelError::Mechanism),
+        }
     }
 
     pub(crate) fn fit_mechanism(graph:&Graph,node:usize,data:&DMatrix<f64>)->Result<Mechanism,ModelError> {
@@ -227,6 +324,17 @@ impl FittedModel {
     /// Unchanged mechanisms share a fit to pooled rows; changed ones are fitted separately.
     pub(crate) fn fit_changed(graph:Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,changed:&[bool])
         ->Result<(Self,Self),ModelError> {
+        Self::fit_changed_using(graph,old,new,changed,Self::fit_mechanism)
+    }
+
+    pub fn fit_changed_with(graph:Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,changed:&[bool],specs:&[MechanismSpec])
+        ->Result<(Self,Self),ModelError> {
+        if specs.len()!=graph.names.len() {return Err(ModelError::Shape);}
+        Self::fit_changed_using(graph,old,new,changed,|graph,node,data|Self::fit_spec(graph,node,data,specs[node]))
+    }
+
+    fn fit_changed_using(graph:Graph,old:&DMatrix<f64>,new:&DMatrix<f64>,changed:&[bool],
+        mut fit:impl FnMut(&Graph,usize,&DMatrix<f64>)->Result<Mechanism,ModelError>) ->Result<(Self,Self),ModelError> {
         graph.validate(old)?;
         graph.validate(new)?;
         if old.nrows()==0 || new.nrows()==0 || changed.len()!=graph.names.len() {return Err(ModelError::Shape);}
@@ -237,10 +345,10 @@ impl FittedModel {
         let mut after=Vec::new();
         for (node,&changed) in changed.iter().enumerate() {
             if changed {
-                before.push(Self::fit_mechanism(&graph,node,old)?);
-                after.push(Self::fit_mechanism(&graph,node,new)?);
+                before.push(fit(&graph,node,old)?);
+                after.push(fit(&graph,node,new)?);
             } else {
-                let pooled=Self::fit_mechanism(&graph,node,&joint)?;
+                let pooled=fit(&graph,node,&joint)?;
                 before.push(pooled.clone());
                 after.push(pooled);
             }
@@ -252,19 +360,30 @@ impl FittedModel {
         &self.graph
     }
 
-    fn prediction(&self, node: usize, data: &DMatrix<f64>) -> DVector<f64> {
+    /// Retain fitted ancestors without fitting again or consuming random draws.
+    pub fn ancestor_model(&self,target:usize)->Result<(Self,Vec<usize>),ModelError> {
+        let (graph,nodes)=self.graph.ancestor_graph(target)?;
+        let mechanisms=nodes.iter().map(|&node|self.mechanisms[node].clone()).collect();
+        Ok((Self {graph,mechanisms},nodes))
+    }
+
+    /// Parent columns must follow the graph's label-sorted parent order.
+    pub fn conditional_samples(&self,node:usize,parents:&DMatrix<f64>,rng:&mut Mt19937)
+        ->Result<DVector<f64>,ModelError> {
+        let columns=self.graph.parents(node).ok_or(ModelError::UnknownNode)?;
+        if columns.is_empty() || columns.len()!=parents.ncols() {return Err(ModelError::Shape);}
+        if parents.iter().any(|v|!v.is_finite()) {return Err(ModelError::NonFinite);}
+        let noise=self.mechanisms[node].draw_noise(parents.nrows(),rng,&mut None);
         match &self.mechanisms[node] {
-            Mechanism::HalfNormal { .. } => DVector::zeros(data.nrows()),
-            Mechanism::Linear {
-                coefficients,
-                intercept,
-                ..
-            } => {
-                let parents = &self.graph.dag.parents[node];
-                let x = DMatrix::from_fn(data.nrows(), parents.len(), |r, c| data[(r, parents[c])]);
-                predict_fortran(&x, coefficients, *intercept)
-            }
+            Mechanism::Additive(model)=>model.evaluate(parents,&noise).map_err(ModelError::Additive),
+            _=>Ok(self.mechanisms[node].predict(parents)?+noise),
         }
+    }
+
+    fn prediction(&self, node: usize, data: &DMatrix<f64>) -> Result<DVector<f64>,ModelError> {
+        let parents = &self.graph.dag.parents[node];
+        let x = DMatrix::from_fn(data.nrows(), parents.len(), |r, c| data[(r, parents[c])]);
+        self.mechanisms[node].predict(&x)
     }
 
     /// Recover noise while retaining the graph's explicit column order.
@@ -272,8 +391,14 @@ impl FittedModel {
         self.graph.validate(data)?;
         let mut noise = data.clone();
         for &node in &self.graph.order {
-            if let Mechanism::Linear { .. } = self.mechanisms[node] {
-                noise.set_column(node, &(data.column(node) - self.prediction(node, data)));
+            if !self.graph.dag.parents[node].is_empty() {
+                let parents=&self.graph.dag.parents[node];
+                let x=DMatrix::from_fn(data.nrows(),parents.len(),|r,c|data[(r,parents[c])]);
+                let values=match &self.mechanisms[node] {
+                    Mechanism::Additive(model)=>model.estimate_noise(&x,&data.column(node).into_owned()).map_err(ModelError::Additive)?,
+                    _=>data.column(node)-self.prediction(node,data)?,
+                };
+                noise.set_column(node, &values);
             }
         }
         Ok(noise)
@@ -283,8 +408,14 @@ impl FittedModel {
         self.graph.validate(noise)?;
         let mut data = noise.clone();
         for &node in &self.graph.order {
-            if let Mechanism::Linear { .. } = self.mechanisms[node] {
-                data.set_column(node, &(self.prediction(node, &data) + noise.column(node)));
+            if !self.graph.dag.parents[node].is_empty() {
+                let parents=&self.graph.dag.parents[node];
+                let x=DMatrix::from_fn(data.nrows(),parents.len(),|r,c|data[(r,parents[c])]);
+                let values=match &self.mechanisms[node] {
+                    Mechanism::Additive(model)=>model.evaluate(&x,&noise.column(node).into_owned()).map_err(ModelError::Additive)?,
+                    _=>self.prediction(node,&data)?+noise.column(node),
+                };
+                data.set_column(node, &values);
             }
         }
         Ok(data)
@@ -341,11 +472,11 @@ impl FittedModel {
             };
             noise.set_column(node, &drawn);
             match &model.mechanisms[node] {
-                Mechanism::HalfNormal { .. } => {
+                Mechanism::HalfNormal { .. }|Mechanism::Empirical(_) => {
                     data.set_column(node, &noise.column(node));
                 }
-                Mechanism::Linear { .. } => {
-                    data.set_column(node, &(model.prediction(node, &data) + noise.column(node)));
+                Mechanism::Linear { .. }|Mechanism::Additive(_) => {
+                    data.set_column(node, &(model.prediction(node, &data)? + noise.column(node)));
                 }
             }
         }

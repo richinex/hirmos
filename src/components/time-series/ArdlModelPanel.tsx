@@ -82,8 +82,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
       props.onRun(saved.value); setJob({kind:'idle'})
     } catch (error: unknown) {setJob({kind:'failed',detail:error instanceof Error?error.message:String(error)})}
   }
-  return <WorkbenchLayout id="time-series-ardl" bottom={{title:`Time-series runs (${runs.length})`,defaultSize:150,body:<TimeSeriesHistory entries={runs} onDelete={run=>props.onDeleteRun(run.id)} />}}
-    inspector={{title:'Data and method requirements',body:<TimeSeriesRequirements method={TIME_SERIES_METHODS.ardl} prepared={props.prepared} source={props.source.name} />}}
+  return <WorkbenchLayout id="time-series-ardl" bottom={{trigger: { label: 'History', icon: 'history' }, title:`Time-series runs (${runs.length})`,defaultSize:150,body:<TimeSeriesHistory entries={runs} onDelete={run=>props.onDeleteRun(run.id)} />}}
+    inspector={{trigger: { label: 'Requirements', icon: 'fact_check' }, title:'Data and method requirements',body:<TimeSeriesRequirements method={TIME_SERIES_METHODS.ardl} prepared={props.prepared} source={props.source.name} />}}
     stage={<section className="@container/panel flex flex-col gap-5"><TimeSeriesHeading /><section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
       {props.selector}<h3 className="mb-1 mt-3 text-body font-medium text-ink">Autoregressive distributed lag model</h3><p className={`${fieldHint} mb-4`}>Estimate how an outcome relates to its earlier values and to current and earlier values of other series.</p>
       <fieldset disabled={job.kind==='running'} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">ARDL specification</legend>

@@ -858,6 +858,7 @@ pub(crate) enum IdentifiedDiscreteResult {
 pub(crate) enum AnalysisCommand {
     RootCause { request: crate::root_cause::Request },
     GcmEffects { request: crate::gcm_effects::Request },
+    GcmInfluence { request: crate::gcm_influence::Request },
     RootCauseChecks { request: crate::root_cause_checks::Request },
     ArdlModel { rows: usize, columns: usize, model: crate::ardl_model::Request },
     StationarityBattery,
@@ -2028,6 +2029,7 @@ pub(crate) enum DagFalsificationEvidence {
 pub(crate) enum AnalysisResult {
     RootCause { evidence: crate::root_cause::Evidence },
     GcmEffects { evidence: crate::gcm_effects::Evidence },
+    GcmInfluence { evidence: crate::gcm_influence::Evidence },
     RootCauseChecks { evidence: crate::root_cause_checks::Evidence },
     ArdlModel { evidence: crate::ardl_model::Evidence },
     DiscreteStateRefused {

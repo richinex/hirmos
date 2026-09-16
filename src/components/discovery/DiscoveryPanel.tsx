@@ -2171,8 +2171,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     <WorkbenchLayout
       id="discovery"
       stage={stage}
-      inspector={{ title: 'Prepared dataset and method requirements', body: inspector }}
-      bottom={{ title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Prepared dataset and method requirements', body: inspector }}
+      bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
   )
 }

@@ -1,9 +1,13 @@
+import { MetricGrid, MetricTile } from '@/components/ui/figures'
+import { resultSurface } from '@/components/ui/recipes'
 import { Metadata } from '@/components/ui/Metadata'
 import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { useReducer, useState, type ReactNode } from 'react'
+import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import { cancelAnalysisRuns } from '@/analysis/client'
+import { Orb } from '@/components/ui/Orb'
 import { Icon } from '@/components/Icon'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Alert } from '@/components/ui/Alert'
@@ -13,7 +17,7 @@ import { GrangerCard } from './GrangerCard'
 import { PreparedSeriesPreview } from './PreparedSeriesPreview'
 import { MulticollinearityCard } from './MulticollinearityCard'
 import type { GrangerEvidenceArtifact } from '@/domain/granger'
-import { describeResolutionRecord, type MissingnessResolutionRecord } from '@/domain/missingness'
+import type { MissingnessResolutionRecord } from '@/domain/missingness'
 import { button, field, fieldLabel, label, num, panel, prose, sectionTitle, table, td, th, tr, well } from '@/components/ui/recipes'
 import { cellPadding, SortHeader, useTableDensity } from '@/components/table/primitives'
 import { createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
@@ -23,8 +27,8 @@ import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
-  describeSeriesTransform,
   describeReadinessProblem,
+  describeSeriesTransform,
   initialPreprocessingDraft,
   newPreparedDatasetVersionId,
   newStationarityEvidenceId,
@@ -43,7 +47,7 @@ import {
   type VariableStationarityEvidence,
 } from '@/domain/preprocessing'
 import { assessStationarity, decisiveEvidence, describeStationarityAssessment, describeStationarityConflict, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
-import { describeSeasonalAdjustment, seasonalPeriodOf } from '@/domain/seasonal'
+import { seasonalPeriodOf } from '@/domain/seasonal'
 import type { SelectedSource } from '@/domain/workflow'
 import type { PreparedMatrix } from '@/data/prepared'
 import { formatP, formatStatistic } from '@/lib/format/number'
@@ -52,7 +56,6 @@ import type { MulticollinearitySelection } from '@/domain/multicollinearity'
 import {
   aggregationFor,
   aggregationsForColumns,
-  describeResampling,
   describeResamplingProblem,
   effectiveFrequency,
   resampledMatrixFromEvidence,
@@ -65,6 +68,7 @@ interface PreprocessingPanelProps {
   readonly profile: DatasetProfile
   readonly onPrepared: (artifact: PreparedDatasetArtifact) => void
   readonly onStationarityEvidence: (evidence: StationarityEvidenceArtifact) => void
+  readonly onClearStationarityEvidence: () => void
   /** The recorded battery, so a reopened project shows the diagnostic as done before the panel runs one. */
   readonly stationarity: StationarityEvidenceArtifact | null
   /** The workflow's prepared version, so a reopened project shows its diagnostics before the form is touched. */
@@ -147,18 +151,21 @@ const ruleLabel = (ref: StationarityTestRef): string => {
 }
 
 /** The interpreted route for one series with the tests that decided it. */
-function StationarityVerdict({ assessment }: { readonly assessment: StationarityAssessment }) {
+function StationarityVerdict({ assessment, transform }: { readonly assessment: StationarityAssessment; readonly transform: SeriesTransform }) {
   const described = describeStationarityAssessment(assessment)
-  const decisive = decisiveEvidence(assessment)
+  const stationaryLabel = {
+    levels: 'The saved series appears stationary.',
+    difference: 'The first-differenced series appears stationary.',
+    'linear-detrend': 'The detrended series appears stationary.',
+  } satisfies Record<SeriesTransform['kind'], string>
+  const verdict = assessment.kind === 'levelStationary' ? stationaryLabel[transform.kind] : described.verdict
   // An inconclusive verdict is only actionable with the disagreement that produced it: which
   // specification the two tests fell out over, and which way each of them went.
   const conflicts = assessment.kind === 'inconclusive' ? assessment.conflicts.map(describeStationarityConflict) : []
   return (
-    <div className="min-w-[14rem]" aria-label={`Verdict for ${described.verdict}`}>
-      <span className={`text-body font-medium ${TONE_CLASS[described.tone]}`}>{described.verdict}</span>
+    <div className="min-w-0" aria-label={`Verdict: ${verdict}`}>
+      <span className={`text-body font-medium ${TONE_CLASS[described.tone]}`}>{verdict}</span>
       {conflicts.map((conflict) => <span key={conflict} className="block text-label text-warn">{conflict}</span>)}
-      <span className="block text-label text-faint">{described.route}</span>
-      <span className={num('block text-micro text-faint')}>{decisive.map(ruleLabel).join('; ')}</span>
     </div>
   )
 }
@@ -313,7 +320,14 @@ function preparedArtifact(
   }
 }
 
-export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence }: PreprocessingPanelProps) {
+export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, onClearStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence }: PreprocessingPanelProps) {
+  const diagnostics = useRef<AbortController | null>(null)
+  const [testSelection, setTestSelection] = useState<{ readonly prepared: string; readonly columns: readonly ColumnId[] } | null>(null)
+  useEffect(() => () => {
+    if (diagnostics.current === null) return
+    diagnostics.current.abort()
+    cancelAnalysisRuns()
+  }, [])
   const [diagnostic, setDiagnostic] = useState<Diagnostic>('multicollinearity')
   const [multicollinearityChecked, setMulticollinearityChecked] = useState(false)
   const [structureChecked, setStructureChecked] = useState(false)
@@ -323,7 +337,6 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     initialPreprocessingDraft,
   )
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
-  const [stationarityOpen, setStationarityOpen] = useState(true)
   const [savedRecipe, setSavedRecipe] = useState<string | null>(null)
   const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
@@ -333,6 +346,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   // The version this panel just made, or the one the project reopened with.
   const preparedCurrent = draft.preparation.kind === 'succeeded' ? draft.preparation.artifact : preparedVersion
   const preparedTimeSeries = preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series' ? preparedCurrent : null
+  const testColumns = preparedTimeSeries !== null && testSelection?.prepared === preparedTimeSeries.id
+    ? testSelection.columns.filter(column => preparedTimeSeries.columns.includes(column)) : []
+  const selectTestColumns = (columns: readonly ColumnId[]) => {
+    if (preparedTimeSeries !== null) setTestSelection({ prepared: preparedTimeSeries.id, columns })
+  }
   const stationarityEvidence: StationarityEvidenceArtifact | null = draft.stationarity.kind === 'succeeded'
     ? draft.stationarity.evidence
     : stationarity !== null && preparedCurrent !== null && stationarity.preparedDataset === preparedCurrent.id ? stationarity : null
@@ -449,15 +467,20 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   }
 
   const runDiagnostics = async () => {
-    if (preparedTimeSeries === null) return
+    if (preparedTimeSeries === null || diagnostics.current !== null || !isNonEmpty(testColumns)) return
+    const controller = new AbortController()
+    diagnostics.current = controller
+    const { signal } = controller
     const prepared = preparedTimeSeries
-    dispatch({ type: 'diagnostics-started', total: prepared.columns.length })
+    dispatch({ type: 'diagnostics-started', total: testColumns.length })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runStationarityBattery }] = await Promise.all([
         import('@/data/prepared'),
         import('@/analysis/client'),
       ])
-      const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
+      if (signal.aborted) return
+      const matrix = await materialisePrepared(source, profile, prepared, testColumns)
+      if (signal.aborted) return
       if (!matrix.ok) {
         dispatch({ type: 'diagnostics-failed', detail: describePreparedMaterialisationProblem(matrix.error) })
         return
@@ -466,24 +489,14 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       const evidence: VariableStationarityEvidence[] = []
       for (const [columnIndex, column] of matrix.value.columns.entries()) {
         const start = columnIndex * matrix.value.rowCount
-        const levels = matrix.value.values.slice(start, start + matrix.value.rowCount)
-        const levelsBattery = await runStationarityBattery(levels.slice())
-        if (!levelsBattery.ok) {
-          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(levelsBattery.error)}` })
+        const savedValues = matrix.value.values.slice(start, start + matrix.value.rowCount)
+        const saved = await runStationarityBattery(savedValues)
+        if (signal.aborted) return
+        if (!saved.ok) {
+          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(saved.error)}` })
           return
         }
-        const differencedBattery = await runStationarityBattery(transformSeries(levels, { kind: 'difference', order: 1 }))
-        const differenced = differencedBattery.ok ? differencedBattery.value : null
-        const viewed = draft.diagnosticTransform.kind === 'levels'
-          ? ok(levelsBattery.value)
-          : draft.diagnosticTransform.kind === 'difference' && differenced !== null
-            ? ok(differenced)
-            : await runStationarityBattery(transformSeries(levels, draft.diagnosticTransform))
-        if (!viewed.ok) {
-          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(viewed.error)}` })
-          return
-        }
-        evidence.push({ column: column.id, result: viewed.value, levels: levelsBattery.value, differenced, assessment: assessStationarity(levelsBattery.value, differenced) })
+        evidence.push({ column: column.id, result: saved.value, levels: saved.value, differenced: null, assessment: assessStationarity(saved.value, null) })
         dispatch({ type: 'diagnostic-completed' })
       }
       if (!isNonEmpty(evidence)) {
@@ -491,25 +504,49 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         return
       }
       const [firstEvidence] = evidence
-      const stationarityEvidence: StationarityEvidenceArtifact = {
+      const completedEvidence: StationarityEvidenceArtifact = {
         kind: 'stationarity-evidence',
         id: newStationarityEvidenceId(),
         preparedDataset: prepared.id,
         observations: firstEvidence.result.observations,
-        diagnosticTransform: draft.diagnosticTransform,
-        variables: evidence,
+        diagnosticTransform: { kind: 'levels' },
+        variables: [firstEvidence, ...evidence.slice(1), ...(stationarityEvidence?.variables.filter(previous => !evidence.some(next => next.column === previous.column)) ?? [])],
       }
       dispatch({
         type: 'diagnostics-succeeded',
-        evidence: stationarityEvidence,
+        evidence: completedEvidence,
       })
-      onStationarityEvidence(stationarityEvidence)
+      onStationarityEvidence(completedEvidence)
     } catch (cause: unknown) {
+      if (signal.aborted) return
       dispatch({
         type: 'diagnostics-failed',
         detail: cause instanceof Error ? cause.message : String(cause),
       })
+    } finally {
+      if (diagnostics.current === controller) diagnostics.current = null
     }
+  }
+
+  const cancelDiagnostics = () => {
+    diagnostics.current?.abort()
+    diagnostics.current = null
+    cancelAnalysisRuns()
+    dispatch({ type: 'diagnostics-cancelled' })
+  }
+
+  const clearDiagnostics = () => {
+    dispatch({ type: 'diagnostics-cleared' })
+    onClearStationarityEvidence()
+  }
+
+  const deleteDiagnostic = (column: ColumnId) => {
+    if (stationarityEvidence === null) return
+    const variables = stationarityEvidence.variables.filter(value => value.column !== column)
+    if (!isNonEmpty(variables)) { clearDiagnostics(); return }
+    const evidence = { ...stationarityEvidence, id: newStationarityEvidenceId(), variables }
+    dispatch({ type: 'diagnostics-succeeded', evidence })
+    onStationarityEvidence(evidence)
   }
 
   const diagnosticOptions: readonly { readonly value: Diagnostic; readonly label: ReactNode }[] = [
@@ -786,7 +823,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     </label>
                     <div className="mt-3 rounded-md border border-hair" role="group" aria-label="Aggregation by column">
                       <div className="border-b border-hair px-3 py-1.5 text-label text-faint">Choose sum for interval totals; use mean for rates or measurements.</div>
-                      <div className="divide-y divide-hair">
+                      <div className="space-y-2">
                         {selectedIds.map((column) => (
                           <label key={column} className="flex items-center justify-between gap-3 px-3 py-2 text-body text-ink">
                             <span>{columnName(column)}</span>
@@ -853,9 +890,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   </div>
                 )}
               </div>
-              <div className="mt-4 border-t border-hair pt-3">
-                <div className="rounded-md border border-line" role="group" aria-label="Transformations by column">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hair px-3 py-1.5">
+              <div className="mt-4 pt-3">
+                <div role="group" aria-label="Transformations by column">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5">
                     <span className="text-body text-muted">All columns</span>
                     <div className="flex flex-wrap items-center gap-1 pr-[5px]" role="group" aria-label="Set transformation for all selected columns">
                       {TRANSFORMS.map((transform) => (
@@ -878,6 +915,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                           </div>
                           <SegmentedControl
                             size="sm"
+                            wrap
+                            frame="none"
                             ariaLabel={`Transformation for ${name}`}
                             value={selected.kind}
                             onChange={(next) => {
@@ -904,15 +943,6 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         )}
       </div>
 
-      {preparedCurrent !== null && (
-        <p role="status" className="mb-0 mt-4 flex flex-wrap items-center gap-1.5 text-body text-muted"><Metadata><span><Icon name="check_circle" size={14} className="text-ok" />
-          {preparedCurrent.kind === 'prepared-time-series' ? 'Prepared time series' : preparedCurrent.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'}</span><span><span className={num()}>{preparedCurrent.observations.toLocaleString()} rows</span>
-          {describeResolutionRecord(preparedCurrent.resolution) !== null && <><Metadata className="ml-3"><span>{describeResolutionRecord(preparedCurrent.resolution)}</span></Metadata></>}
-          {preparedCurrent.kind === 'prepared-time-series' && describeResampling(preparedCurrent.resampling, columnName) !== null && <><Metadata className="ml-3"><span>{describeResampling(preparedCurrent.resampling, columnName)}</span></Metadata></>}
-          {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName) !== null && <><Metadata className="ml-3"><span>{describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName)}</span></Metadata></>}
-          {preparedCurrent.kind === 'prepared-time-series' && preparedCurrent.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <><Metadata className="ml-3"><span>{preparedCurrent.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</span></Metadata></>}
-          {preparedCurrent.kind === 'prepared-panel' && <><Metadata className="ml-3"><span>{preparedCurrent.panel.units.toLocaleString()} units × {preparedCurrent.panel.periods.toLocaleString()} periods</span></Metadata></>}</span></Metadata></p>
-      )}
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
       {(preparedCurrent !== null || timeSeriesSelected) && (
@@ -938,97 +968,55 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
-            <p className={prose('mb-0 mt-1 text-faint')}>A stationary process has stable probabilistic behavior over time after accounting for the deterministic terms in the test. ADF tests a unit root as its null; KPSS tests stationarity as its null. Hirmos reads them together because either test alone can be inconclusive. Zivot–Andrews allows one structural break.</p>
-            <p className={prose('mb-0 mt-1 text-faint')}>Hirmos reports I(1) only when the values in levels support unit-root behavior and their first difference supports stationarity. The prepared data are not changed unless first differencing is saved as a transformation.</p>
+            <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
+              <p className={prose('m-0 text-faint')}>A stationary process has stable probabilistic behavior over time after accounting for the deterministic terms in the test. ADF tests a unit root as its null; KPSS tests stationarity as its null. Hirmos reads them together because either test alone can be inconclusive. Zivot–Andrews allows one structural break.</p>
+              <p className={prose('m-0 text-faint')}>These tests assess the saved values. To test a different transformation, change it above and create a new prepared dataset version.</p>
+            </div>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />
+          <fieldset disabled={draft.stationarity.kind === 'running'} className="mt-4 min-w-0 border-0 p-0" aria-label="Stationarity variables">
+            <legend className={fieldLabel}>Variables to test</legend>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="m-0 text-body text-faint">Only selected variables are tested. The prepared dataset is unchanged.</p>
+              <SelectionActions compact selectLabel="Select all stationarity variables" clearLabel="Clear stationarity variables"
+                onSelectAll={() => selectTestColumns(preparedTimeSeries?.columns ?? [])} onClear={() => selectTestColumns([])} />
+            </div>
+            <div className="grid gap-1 @md/panel:grid-cols-2 @3xl/panel:grid-cols-3">
+              {(preparedTimeSeries?.columns ?? []).map(column => <label key={column} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-ink hover:bg-well">
+                <input type="checkbox" checked={testColumns.includes(column)} onChange={() => selectTestColumns(testColumns.includes(column) ? testColumns.filter(id => id !== column) : [...testColumns, column])} />
+                <span className="min-w-0 break-words">{columnName(column)}</span>
+              </label>)}
+            </div>
+          </fieldset>
           <div className="mt-3">
-            <span className={fieldLabel}>Run the tests on</span>
-            <p className={prose('mb-0 mt-1 text-faint')}>This moves the reported statistics only. The verdict is read from the values in levels and their first difference either way, because integration order is a property of the series rather than of the scale it is inspected on.</p>
-            <RadioList frame="none"
-              className="mt-2"
-              legend="Run the stationarity tests on"
-              legendHidden
-              value={draft.diagnosticTransform.kind}
-              onChange={(next) => {
-                const selected = TRANSFORMS.find((candidate) => candidate.value.kind === next)
-                if (selected) dispatch({ type: 'diagnostic-transform-selected', transform: selected.value })
-              }}
-              options={TRANSFORMS.map((transform) => ({
-                value: transform.value.kind,
-                label: transform.value.kind === 'levels' ? 'Values as prepared' : transform.value.kind === 'difference' ? 'Their first difference' : 'Their linear detrend',
-                hint: transform.value.kind === 'levels'
-                  ? 'Test the data exactly as saved.'
-                  : transform.value.kind === 'difference'
-                    ? 'Test period-to-period changes; shows whether one difference is enough.'
-                    : 'Test deviations from a fitted straight-line trend.',
-              }))}
-            />
-            <div className="mt-3">
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
                 type="button"
-                className={button('quiet')}
-                disabled={preparedTimeSeries === null}
+                className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
+                disabled={preparedTimeSeries === null || testColumns.length === 0 || draft.stationarity.kind === 'running'}
                 aria-busy={draft.stationarity.kind === 'running'}
                 onClick={draft.stationarity.kind === 'running' ? undefined : () => void runDiagnostics()}
               >
                 Run stationarity tests
               </button>
+              {draft.stationarity.kind === 'running' && <>
+                <Orb state="solving" aria-label="Stationarity tests running" />
+                <button type="button" className={button('quiet')} onClick={cancelDiagnostics}>Cancel tests</button>
+                <span role="status" className="sr-only">{draft.stationarity.completed} of {draft.stationarity.total} variables completed</span>
+              </>}
             </div>
           </div>
           {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
-          {stationarityEvidence !== null && (
-          <div className="mt-4 rounded-md border border-line">
-            <button
-              type="button"
-              onClick={() => setStationarityOpen((value) => !value)}
-              aria-expanded={stationarityOpen}
-              className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
-            >
-              <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-(--motion-fast) ${stationarityOpen ? 'rotate-180' : ''}`} />
-              <span className="flex flex-wrap items-center gap-2"><Metadata><span><Icon name="check_circle" size={14} className="text-ok" />
-                Stationarity tests</span><span>{stationarityEvidence.variables.length} variables</span><span>{stationarityEvidence.observations.toLocaleString()} rows</span><span>{
-                  stationarityEvidence.diagnosticTransform.kind === 'levels'
-                    ? 'prepared values'
-                    : stationarityEvidence.diagnosticTransform.kind === 'difference'
-                      ? 'first difference of prepared values'
-                      : 'linear detrend of prepared values'
-                }</span></Metadata></span>
-            </button>
-            <div className="grid transition-[grid-template-rows] duration-(--motion-base)" style={{ gridTemplateRows: stationarityOpen ? '1fr' : '0fr' }}>
-            <div className="overflow-hidden">
-            <div className="border-t border-hair px-2.5 pb-3">
-            <div className="figure-strip overflow-x-auto">
-            <table className={table}>
-              <thead>
-                <tr>
-                  <th className={th()}>Variable</th>
-                  <th className={th('text-right')}><Metadata><span>ADF p</span><span>constant</span></Metadata></th>
-                  <th className={th('text-right')}><Metadata><span>KPSS p</span><span>constant</span></Metadata></th>
-                  <th className={th('text-right')}><Metadata><span>Zivot–Andrews p</span><span>constant and trend</span></Metadata></th>
-                  <th className={th()} title="Integration order is a property of the series, so it is read from the values in levels and their first difference whichever scale the columns show."><Metadata><span>Verdict</span><span>from levels and first difference</span></Metadata></th>
-                </tr>
-              </thead>
-              <tbody>
-                {stationarityEvidence.variables.map((evidence) => {
-                  const column = profile.columns.find((candidate) => candidate.id === evidence.column)
-                  return (
-                    <tr key={evidence.column} className={tr()}>
-                      <td className={td(cn('text-ink', cellPadding(density)))}>{column?.name ?? evidence.column}</td>
-                      <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{pValue(evidence.result.adf.constant.pValue)}</td>
-                      <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{pValue(evidence.result.kpss.constant.pValue)}</td>
-                      <td className={td(cn(num('text-right text-muted'), cellPadding(density)))}>{pValue(evidence.result.zivotAndrews.levelAndTrend.pValue)}</td>
-                      <td className={td(cn('max-w-none whitespace-normal', cellPadding(density)))}><StationarityVerdict assessment={evidence.assessment} /></td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          {draft.stationarity.kind === 'cancelled' && <Alert tone="info" className="mt-3"><p className="m-0">Stationarity tests cancelled. No new results were saved.</p></Alert>}
+          {stationarityEvidence !== null && <section className="mt-5 space-y-4" aria-label="Stationarity results">
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="m-0 text-title font-medium">Results</h4>
+              <button type="button" className={button('quiet')} disabled={draft.stationarity.kind === 'running'} onClick={clearDiagnostics}>Clear results</button>
             </div>
-            <div className="mt-4 space-y-2" role="region" aria-label="Stationarity raw evidence">
-              {stationarityEvidence.variables.map((evidence) => {
-                const column = profile.columns.find((candidate) => candidate.id === evidence.column)
-                const result = evidence.result
+            {stationarityEvidence.variables.map(evidence => {
+              const column = profile.columns.find(candidate => candidate.id === evidence.column)
+              const name = column?.name ?? String(evidence.column)
+              const result = evidence.result
                 const rows = [
                   {
                     name: 'ADF (constant)',
@@ -1080,19 +1068,27 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.levelAndTrend.criticalValues),
                   },
                 ] as const
-                return (
-                  <details key={evidence.column} className={well('px-3 py-2')}>
-                    <summary className="cursor-pointer text-body font-medium text-ink"><Metadata><span>{column?.name ?? evidence.column}</span><span>test statistics</span></Metadata></summary>
-                    <TestStatisticsTable rows={rows} density={density} />
-                  </details>
-                )
-              })}
-            </div>
-            </div>
-            </div>
-            </div>
-          </div>
-          )}
+              return <article key={evidence.column} className={resultSurface('space-y-2 p-3')} aria-label={`Stationarity result for ${name}`}>
+                <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <div className="min-w-0">
+                    <h5 className="m-0 break-words text-body font-medium text-ink">{name}</h5>
+                    <p className="m-0 text-label text-faint">{result.observations.toLocaleString()} rows{preparedTimeSeries === null ? '' : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}</p>
+                  </div>
+                  <StationarityVerdict assessment={evidence.assessment} transform={preparedTimeSeries === null ? { kind: 'levels' } : seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column)} />
+                  <button type="button" className={button('quiet')} aria-label={`Delete stationarity result for ${name}`} disabled={draft.stationarity.kind === 'running'} onClick={() => deleteDiagnostic(evidence.column)}><Icon name="delete" size={15} />Delete</button>
+                </header>
+                <MetricGrid className="stationarity-metrics" label={`Stationarity p-values for ${name}`}>
+                  <MetricTile label="ADF p-value" value={formatP(result.adf.constant.pValue)} context="Constant" size="compact" />
+                  <MetricTile label="KPSS p-value" value={formatP(result.kpss.constant.pValue)} context="Constant" size="compact" />
+                  <MetricTile label="Zivot–Andrews p-value" value={formatP(result.zivotAndrews.levelAndTrend.pValue)} context="Constant and trend" size="compact" />
+                </MetricGrid>
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted [&::-webkit-details-marker]:hidden"><Icon name="chevron_right" size={16} className="transition-transform group-open:rotate-90" />Test details for {name}</summary>
+                  <div className="mt-3 overflow-x-auto"><TestStatisticsTable rows={rows} density={density} /></div>
+                </details>
+              </article>
+            })}
+          </section>}
           </div>
           <div hidden={diagnostic !== 'structure'} className="mt-4 border-t border-hair pt-4">
             {preparedTimeSeries !== null

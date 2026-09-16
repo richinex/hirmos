@@ -1,23 +1,24 @@
 import { z } from 'zod'
 import { gcmEffectsRunSchema } from './gcmEffects'
+import { gcmInfluenceRunSchema } from './gcmInfluence'
+import { gcmRandomSchema as random, gcmRandomStateSchema as randomState } from './gcmRandom'
 import { rootCauseSelectionSchema } from './rootCause'
 
 const index = z.number().int().nonnegative()
 const count = z.number().int().positive()
 const finite = z.number().finite()
 const uint32 = z.number().int().min(0).max(0xffffffff)
-const randomState = z.object({ keys: z.array(uint32).length(624), position: index.max(624), normal: finite.nullable() }).strict()
-const random = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('seed'), seed: uint32 }).strict(),
-  z.object({ kind: z.literal('resume'), state: randomState }).strict(),
-])
 const execution = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('independentJobs') }).strict(),
   z.object({ kind: z.literal('recordedBatches'), repetitions: z.array(z.array(z.array(z.array(z.boolean()).min(1)).min(1)).min(1)).min(1) }).strict(),
 ])
+const changeFitting = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('halfNormalLinear') }).strict(),
+  z.object({ kind: z.literal('automaticFull') }).strict(),
+])
 const query = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('anomaly'), samples: count }).strict(),
-  z.object({ kind: z.literal('change'), rows: count, samples: count, execution }).strict(),
+  z.object({ kind: z.literal('change'), rows: count, samples: count, execution, fitting: changeFitting.default({ kind: 'halfNormalLinear' }) }).strict(),
   z.object({ kind: z.literal('intervention'), rows: count, order: z.array(index).min(1), shifts: z.array(z.object({ node: index, amount: finite }).strict()).min(1) }).strict(),
 ])
 
@@ -34,6 +35,7 @@ export const rootCauseRequestSchema = z.object({
   switch (request.query.kind) {
     case 'anomaly': break
     case 'change':
+      if (request.query.fitting.kind === 'automaticFull' && (request.fraction !== 1 || request.rows < 5 || request.query.rows < 5)) fail('Automatic model selection requires at least five observations in each dataset and uses all rows.')
       if (Math.floor(request.query.rows * request.fraction) === 0) fail('The comparison fitting fraction leaves no observations.')
       if (request.query.execution.kind === 'recordedBatches' && request.query.execution.repetitions.length !== request.repetitions) fail('Supply one batch plan per repetition.')
       break
@@ -60,7 +62,10 @@ const summary = z.object({
 export const rootCauseEvidenceSchema = z.object({
   outcome: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('anomaly'), nodes: z.array(index).min(1), summary }).strict(),
-    z.object({ kind: z.literal('change'), nodes: z.array(index).min(1), summary }).strict(),
+    z.object({ kind: z.literal('change'), nodes: z.array(index).min(1), summary, means: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('notRecorded') }).strict(),
+      z.object({ kind: z.literal('recorded'), values: z.array(z.object({ node: index, baseline: finite, comparison: finite }).strict()).min(1) }).strict(),
+    ]).default({ kind: 'notRecorded' }) }).strict(),
     z.object({ kind: z.literal('intervention'), target: index, nodes: z.array(index).min(1), observedMean: finite, summary }).strict(),
   ]),
   random: randomState,
@@ -87,12 +92,16 @@ export const rootCauseRunSchema = z.object({
   if (run.comparison.rows !== expectedRows) context.addIssue({ code: 'custom', message: 'The recorded comparison row count differs from the request.' })
   if (outcome.summary.quantiles[1] !== run.model.upperQuantile) context.addIssue({ code: 'custom', message: 'The result percentiles differ from the requested percentiles.' })
   const nodes = outcome.nodes
+  if (outcome.kind === 'change' && outcome.means.kind === 'recorded') {
+    const reported = outcome.means.values.map(entry => entry.node)
+    if (reported.length !== run.model.names.length || new Set(reported).size !== reported.length || reported.some(node => node >= run.model.names.length)) context.addIssue({ code: 'custom', message: 'Observed means must cover each graph variable once.' })
+  }
   if (run.model.query.kind === 'intervention' && JSON.stringify(nodes) !== JSON.stringify(run.model.query.order)) context.addIssue({ code: 'custom', message: 'Intervention summaries must retain the requested variable order.' })
   if (nodes.some((node) => node >= run.model.names.length)) context.addIssue({ code: 'custom', message: 'The result refers to an unknown variable.' })
   if (run.evidence.outcome.summary.replicates.length !== run.model.repetitions) context.addIssue({ code: 'custom', message: 'The result has a different repetition count.' })
 })
 export type RootCauseRun = z.infer<typeof rootCauseRunSchema>
-export const rootCauseCheckRequestSchema = z.object({ names: z.array(z.string().min(1)).min(1), edges: z.array(z.tuple([index, index])), rows: count.min(5), seed: uint32, scope: z.enum(['full', 'fitted']).optional() }).strict()
+export const rootCauseCheckRequestSchema = z.object({ names: z.array(z.string().min(1)).min(1), edges: z.array(z.tuple([index, index])), rows: count.min(5), seed: uint32, scope: z.enum(['full', 'fitted']).optional(), fitting: z.enum(['halfNormalLinear', 'automatic']).default('halfNormalLinear') }).strict()
 const probability = finite.min(0).max(1)
 const graphCheck = z.object({
   order: z.array(index).min(1),
@@ -126,6 +135,9 @@ export const rootCauseCheckRecordSchema = z.object({
 export type RootCauseCheckRequest = z.infer<typeof rootCauseCheckRequestSchema>
 export type RootCauseChecks = z.infer<typeof rootCauseChecksSchema>
 export type RootCauseCheckRecord = z.infer<typeof rootCauseCheckRecordSchema>
-export const rootCauseWorkspaceSchema = z.object({ selection: rootCauseSelectionSchema.nullable(), runs: z.array(rootCauseRunSchema), checks: z.array(rootCauseCheckRecordSchema).default([]), effects: z.array(gcmEffectsRunSchema).default([]) }).strict()
+export const rootCauseWorkspaceSchema = z.object({ selection: rootCauseSelectionSchema.nullable(), runs: z.array(rootCauseRunSchema), checks: z.array(rootCauseCheckRecordSchema).default([]), effects: z.array(gcmEffectsRunSchema).default([]), influences: z.array(gcmInfluenceRunSchema).default([]) }).strict()
 export type RootCauseWorkspace = z.infer<typeof rootCauseWorkspaceSchema>
-export const EMPTY_ROOT_CAUSE: RootCauseWorkspace = { selection: null, runs: [], checks: [], effects: [] }
+export function causalModelRunCount(workspace: RootCauseWorkspace): number {
+  return workspace.runs.length + workspace.effects.length + workspace.influences.length
+}
+export const EMPTY_ROOT_CAUSE: RootCauseWorkspace = { selection: null, runs: [], checks: [], effects: [], influences: [] }

@@ -1,4 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '@/components/Icon'
@@ -479,7 +480,7 @@ function App() {
     if (chapter === 'estimation') return identifiedStudy
     if (chapter === 'sensitivity') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
-    if (chapter === 'results') return workflow.kind === 'profiled' && ((workflow.rootCause.runs.length + workflow.rootCause.effects.length) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
+    if (chapter === 'results') return workflow.kind === 'profiled' && (causalModelRunCount(workflow.rootCause) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
     return false
   }
 
@@ -492,7 +493,7 @@ function App() {
       case 'survival': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
-      case 'root-cause': return !prepared || workflow.kind !== 'profiled' ? 'locked' : (workflow.rootCause.runs.length + workflow.rootCause.effects.length) > 0 ? 'done' : workflow.rootCause.selection === null ? 'not-started' : 'in-progress'
+      case 'root-cause': return !prepared || workflow.kind !== 'profiled' ? 'locked' : causalModelRunCount(workflow.rootCause) > 0 ? 'done' : workflow.rootCause.selection === null ? 'not-started' : 'in-progress'
       case 'discovery': return !prepared ? 'locked' : workflow.discoveryRuns.length > 0 ? 'done' : 'not-started'
       case 'dag': return !prepared
         ? 'locked'
@@ -511,7 +512,7 @@ function App() {
       case 'counterfactual': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
         ? 'locked'
         : workflow.counterfactualRuns.length > 0 ? 'done' : 'not-started'
-      case 'results': return workflow.kind !== 'profiled' || ((workflow.rootCause.runs.length + workflow.rootCause.effects.length) + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
+      case 'results': return workflow.kind !== 'profiled' || (causalModelRunCount(workflow.rootCause) + workflow.estimationRuns.length + workflow.survivalRuns.length + workflow.timeSeriesRuns.length + workflow.countSeriesModels.length === 0) ? 'locked' : 'done'
       default: return chapter
     }
   }
@@ -903,6 +904,7 @@ function App() {
                         profile={workflow.profile}
                         onPrepared={(artifact) => dispatch({ type: 'prepared-dataset-created', artifact })}
                         onStationarityEvidence={(evidence) => dispatch({ type: 'stationarity-evidence-created', evidence })}
+                        onClearStationarityEvidence={() => dispatch({ type: 'stationarity-evidence-cleared' })}
                         stationarity={workflow.stationarity}
                         preparedVersion={workflow.prepared}
                         grangerEvidence={workflow.grangerEvidence}
@@ -995,6 +997,7 @@ function App() {
                           documents={workflow.dagDocuments} workspace={workflow.rootCause} onGraph={() => navigateToChapter('dag')}
                           onRun={(run) => dispatch({ type: 'root-cause-run-created', run })} onDelete={(id) => dispatch({ type: 'root-cause-run-deleted', id })}
                           onEffects={(run) => dispatch({ type: 'gcm-effects-created', run })} onDeleteEffects={(id) => dispatch({ type: 'gcm-effects-deleted', id })}
+                          onInfluence={(run) => dispatch({ type: 'gcm-influence-created', run })} onDeleteInfluence={(id) => dispatch({ type: 'gcm-influence-deleted', id })}
                           onChecks={(record) => dispatch({ type: 'root-cause-checks-created', record })} />
                       </Suspense>
                     </ChapterBoundary>
@@ -1126,6 +1129,7 @@ function App() {
                         countSeriesModels={workflow.countSeriesModels}
                         rootCauseRuns={workflow.rootCause.runs}
                         gcmEffects={workflow.rootCause.effects}
+                        gcmInfluences={workflow.rootCause.influences}
                       />
                     </Suspense>
                     </ChapterBoundary>

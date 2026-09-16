@@ -1,12 +1,16 @@
 //! Default v0.14 model evaluation, in its original random-state order.
-use hirmos_causal_core::{gcm::{evaluation::{self, NodePerformance}, falsification::{self, Validation, Verdict}, model::{FittedModel, Graph}, shapley::Execution}, nprandom::Mt19937};
+use hirmos_causal_core::{gcm::{evaluation::{self, NodePerformance}, falsification::{self, Validation, Verdict}, model::{Assignment, FittedModel, Graph}, shapley::Execution}, nprandom::Mt19937};
 use nalgebra::DMatrix;
 use serde::{Deserialize, Serialize};
 use std::num::NonZeroUsize;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct Request { names: Vec<String>, edges: Vec<(usize, usize)>, rows: NonZeroUsize, seed: u32, #[serde(default)] scope: Scope }
+pub(crate) struct Request { names: Vec<String>, edges: Vec<(usize, usize)>, rows: NonZeroUsize, seed: u32, #[serde(default)] scope: Scope, #[serde(default)] fitting: Fitting }
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum Fitting { #[default] HalfNormalLinear, Automatic }
 
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,12 +72,22 @@ pub(crate) fn run(request: Request, values: &[f64], progress: &impl Fn(&'static 
     let graph = Graph::new(request.names, &request.edges).map_err(|error| format!("Invalid model graph: {error:?}"))?;
     super::matrix::validate_dense_matrix("Root-cause model checks", values, request.rows.get(), graph.names().len())?;
     let data = DMatrix::from_column_slice(request.rows.get(), graph.names().len(), values);
-    let model = FittedModel::fit(graph, &data).map_err(|error| format!("Model fitting failed: {error:?}"))?;
     let mut rng = Mt19937::seeded(request.seed);
     let mut cache = None;
+    let assignment = match request.fitting {
+        Fitting::HalfNormalLinear => None,
+        Fitting::Automatic => Some(Assignment::select(graph.clone(), &data, Execution::Isolated, &mut rng).map_err(|error| format!("Model selection failed: {error:?}"))?),
+    };
+    let model = match &assignment {
+        None => FittedModel::fit(graph, &data),
+        Some(assignment) => assignment.fit(&data, &mut rng),
+    }.map_err(|error| format!("Model fitting failed: {error:?}"))?;
     let stages = match request.scope { Scope::Full => 4, Scope::Fitted => 3 };
     progress("Model performance", 0, stages);
-    let mechanisms = evaluation::mechanism_performance(model.graph(), &data, NonZeroUsize::new(5).unwrap(), Execution::Isolated, &mut rng, &mut cache).map_err(|error| format!("Model performance failed: {error:?}"))?;
+    let mechanisms = match &assignment {
+        None => evaluation::mechanism_performance(model.graph(), &data, NonZeroUsize::new(5).unwrap(), Execution::Isolated, &mut rng, &mut cache),
+        Some(assignment) => evaluation::assigned_performance(assignment, &data, NonZeroUsize::new(5).unwrap(), Execution::Isolated, &mut rng, &mut cache),
+    }.map_err(|error| format!("Model performance failed: {error:?}"))?;
     progress("Noise independence", 1, stages);
     let invertibility = evaluation::invertibility(&model, &data, Execution::Isolated, &mut rng, &mut cache).map_err(|error| format!("Noise independence failed: {error:?}"))?;
     progress("Generated distribution", 2, stages);

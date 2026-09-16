@@ -112,8 +112,8 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
   <div className="mt-4 flex items-center gap-3"><button type="button" className={button('signal')} disabled={!ready} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button><span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label={`${model.toUpperCase()} running`} />}</span></div></>
 
   return <WorkbenchLayout id={`time-series-${model}`}
-    bottom={{ title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} /> }}
-    inspector={{ title: 'Data and method requirements', body: <TimeSeriesRequirements method={TIME_SERIES_METHODS[model]} prepared={props.prepared} source={props.source.name} /> }}
+    bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} /> }}
+    inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={TIME_SERIES_METHODS[model]} prepared={props.prepared} source={props.source.name} /> }}
     stage={<section className="@container/panel flex flex-col gap-5">
       <TimeSeriesHeading />
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
@@ -138,7 +138,7 @@ export function TimeSeriesPanel(props: Props) {
   const selector = <SegmentedControl variant="line" size="sm" ariaLabel="Time-series analysis type" value={analysis} onChange={setAnalysis} disabled={busy} options={[{ value: 'count', label: 'Count models' }, { value: 'ardl', label: 'ARDL' }, { value: 'vecm', label: 'VECM' }]} />
   if (analysis === 'ardl') return <ArdlModelPanel {...props} selector={selector} onActivity={onActivity} />
   if (analysis === 'vecm') return <LongRunModel key={analysis} {...props} model={analysis} selector={selector} onActivity={onActivity} />
-  return <WorkbenchLayout id="time-series-count" bottom={{ title: `Count-model runs (${props.counts.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={props.counts} onDelete={(entry) => props.onDeleteCount(entry.id)} /> }} inspector={{ title: 'Data and method requirements', body: <TimeSeriesRequirements method={COUNT_SERIES_DIAGNOSTIC_METHODS[0]} prepared={props.prepared} source={props.source.name} /> }} stage={<section className="@container/panel flex flex-col gap-5">
+  return <WorkbenchLayout id="time-series-count" bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Count-model runs (${props.counts.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={props.counts} onDelete={(entry) => props.onDeleteCount(entry.id)} /> }} inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={COUNT_SERIES_DIAGNOSTIC_METHODS[0]} prepared={props.prepared} source={props.source.name} /> }} stage={<section className="@container/panel flex flex-col gap-5">
     <TimeSeriesHeading />
     <CountSeriesCard selector={selector} source={props.source} profile={props.profile} prepared={props.prepared} artifacts={props.counts} onArtifact={props.onCount} onActivity={onActivity} />
   </section>} />

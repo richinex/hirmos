@@ -603,8 +603,8 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
     <WorkbenchLayout
       id="counterfactual"
       stage={stage}
-      inspector={{ title: 'Study and method requirements', body: inspector }}
-      bottom={{ title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Study and method requirements', body: inspector }}
+      bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>
   )

@@ -40,7 +40,7 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
   const figure = size === 'hero' ? 'text-metric' : size === 'compact' ? 'text-title' : 'text-heading'
   return (
     <div data-size={size} className={cn('@container metric-tile', frame === 'card' ? 'metric-card' : 'bg-well', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
-      <span className={labelCn('block text-muted')}>{label}</span>
+      <span className={labelCn('metric-card-label block text-muted')}>{label}</span>
       <div className="metric-card-values">
         <p className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
         {context && <p className={num('metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]')}>{context}</p>}
