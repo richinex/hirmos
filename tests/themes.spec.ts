@@ -1,8 +1,18 @@
 import { expect, test } from '@playwright/test'
 
 const themes = [
-  ['dark', 'Mosaic Dark'], ['light', 'Mosaic Light'], ['soft-dark', 'Repohistory Dark'], ['original-light', 'Repohistory Light'],
+  ['dark', 'Dark'], ['original-light', 'Original Light'],
 ] as const
+
+test('removed Soft UI preferences resolve to remaining palettes', async ({ page }) => {
+  for (const [saved, expected] of [['soft-dark', 'dark'], ['light', 'original-light']]) {
+    await page.addInitScript(value => localStorage.setItem('hirmos-theme', value), saved)
+    await page.goto('/app/projects')
+    await expect(page.locator('.example-card').first()).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', expected)
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('hirmos-theme'))).toBe(expected)
+  }
+})
 
 test('themes preserve preference, readable tokens and chart palette mode', async ({ page }, info) => {
   await page.emulateMedia({ colorScheme: 'dark' })
@@ -22,7 +32,7 @@ test('themes preserve preference, readable tokens and chart palette mode', async
     const expectedFill = await page.evaluate(() => { const probe = document.createElement('span'); probe.style.color='var(--color-signal)'; document.body.append(probe); const value=getComputedStyle(probe).color; probe.remove(); return value })
     expect(fill).toBe(expectedFill)
     await expect(page.getByRole('button', { name: 'Change theme', exact: true })).toHaveAttribute('title', new RegExp(`Theme: ${label}`))
-    const expectedFont = label.startsWith('Repohistory') ? 'Geist' : 'Inter'
+    const expectedFont = (id === 'original-light') ? 'Geist' : 'Inter'
     expect(await page.locator('.chapter-heading').evaluate(el => getComputedStyle(el).fontFamily)).toContain(expectedFont)
     const audit = await page.evaluate(async () => {
       const css = getComputedStyle(document.documentElement)
@@ -35,6 +45,8 @@ test('themes preserve preference, readable tokens and chart palette mode', async
       const contrasts = ['stage','panel','well','raised'].flatMap(bg => ['ink','bone','muted','faint'].map(fg => ({ pair:`${fg}/${bg}`, ratio:ratio(fg,bg) })))
       contrasts.push({pair:'signal/panel',ratio:ratio('signal','panel')})
       contrasts.push({pair:'signal-ink/signal',ratio:ratio('signal-ink','signal')})
+      contrasts.push({pair:'primary-ink/primary',ratio:ratio('primary-ink','primary')})
+      contrasts.push({pair:'primary-ink/primary-hover',ratio:ratio('primary-ink','primary-hover')})
       const charts = await import(new URL('/src/charts/theme.ts', location.href).href)
       const chartTheme = charts.readChartTheme()
       return { contrasts, mode: css.colorScheme, palette: chartTheme.categorical, font: chartTheme.font, labelSize: chartTheme.labelSize, light: charts.LIGHT_CATEGORICAL_RAMP, dark: charts.CATEGORICAL_RAMP }
@@ -53,7 +65,7 @@ test('themes preserve preference, readable tokens and chart palette mode', async
   await page.emulateMedia({ colorScheme: 'dark' })
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await page.emulateMedia({ colorScheme: 'light' })
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'original-light')
 })
 
 test('saved palettes apply before the React entry point loads', async ({ page }) => {

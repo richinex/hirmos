@@ -111,7 +111,7 @@ type Chapter = Omit<ChapterEntry, 'status'>
 const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
 
 const THEME_ICON: Record<ThemeChoice, string> = {
-  dark: 'dark_mode', light: 'wb_twilight', 'soft-dark': 'dark_mode', 'original-light': 'light_mode', system: 'brightness_auto',
+  dark: 'dark_mode', 'original-light': 'light_mode', system: 'brightness_auto',
 }
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {

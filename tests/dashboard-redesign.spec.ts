@@ -23,7 +23,7 @@ for (const screen of [
       }
     })
     expect(metrics).toEqual({ heading: screen.heading, cardTitle: 18, body: 14, metadata: 12, padding: 24, columns: screen.columns, overflow: 0 })
-    for (const theme of ['light', 'dark']) {
+    for (const theme of ['original-light', 'dark']) {
       await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
       await page.waitForTimeout(250)
       await page.screenshot({ path: info.outputPath(`projects-${screen.width}-${theme}.png`) })
@@ -32,6 +32,7 @@ for (const screen of [
 }
 
 test('dashboard cards, responsive navigation and prepared data remain usable', async ({ page }, info) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
   await page.goto('/app/projects')
   await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
   await page.evaluate(() => document.fonts.ready)

@@ -1,20 +1,20 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-export type ThemeName = 'dark' | 'light' | 'soft-dark' | 'original-light'
+export type ThemeName = 'dark' | 'original-light'
 
 /** What the user picked: a concrete theme, or 'system' (follow the OS, live). */
 export type ThemeChoice = ThemeName | 'system'
 
 const KEY = 'hirmos-theme'
-export const THEMES: readonly ThemeName[] = ['dark', 'light', 'soft-dark', 'original-light']
+export const THEMES: readonly ThemeName[] = ['dark', 'original-light']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
-export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Mosaic Dark', light: 'Mosaic Light', 'soft-dark': 'Repohistory Dark', 'original-light': 'Repohistory Light', system: 'System' }
+export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', 'original-light': 'Original Light', system: 'System' }
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 
 /** The OS preference resolves to one of the two faces; the boot script in index.html applies the same rule. */
 const systemTheme = (): ThemeName =>
-  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'original-light'
 
 const subscribeOsTheme = (notify: () => void): (() => void) => {
   const query = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -37,6 +37,8 @@ export function useTheme(): {
   const [choice, setChoice] = useState<ThemeChoice>(() => {
     try {
       const stored = localStorage.getItem(KEY)
+      if (stored === 'soft-dark') return 'dark'
+      if (stored === 'light') return 'original-light'
       if (stored === 'system' || isTheme(stored)) return stored
     } catch { /* private mode */ }
     return 'system'

@@ -1,115 +1,44 @@
-/* Reference families: Mosaic (Inter, slate surfaces) and Repohistory (Geist,
-   neutral surfaces). Existing keys retain saved preferences. Text and input
-   boundaries use contrast-tested shades where the reference is too faint. */
+/* Earlier Hirmos colors, with the dashboard layout and typography retained. */
 :root[data-theme] {
   --font-sans: 'Inter Variable', Inter, sans-serif;
   --font-serif: var(--font-sans);
-  --color-rail: var(--color-panel);
-  --color-rail-ink: var(--color-ink);
-  --color-rail-faint: var(--color-muted);
-  --color-rail-dim: var(--color-faint);
-  --color-rail-signal: var(--color-signal);
-  --color-rail-ok: var(--color-ok);
-  --color-rail-info: var(--color-info);
-  --color-rail-danger: var(--color-danger);
-  --shadow-lift: 0 1px 2px rgb(0 0 0 / .05);
+  --color-primary: var(--color-signal);
+  --color-brand: var(--color-signal);
+  --color-primary-ink: var(--color-signal-ink);
+  --color-primary-hover: var(--color-signal);
   --dashboard-shadow: 0 1px 2px rgb(0 0 0 / .05);
 }
-:root:is([data-theme='dark'], [data-theme='soft-dark']) {
-  color-scheme: dark;
-  --color-ok: #5eead4;
-  --color-info: #93c5fd;
-  --color-warn: #fcd34d;
-  --color-danger: #fca5a5;
-  --color-highlight: rgba(255,255,255,.06);
-  --shadow-float: 0 18px 48px rgb(0 0 0 / .4);
-}
-:root:is([data-theme='light'], [data-theme='original-light']) {
-  color-scheme: light;
-  --color-ok: #0f766e;
-  --color-info: #2160a6;
-  --color-warn: #805400;
-  --color-danger: #b3312f;
-  --color-highlight: rgba(255,255,255,.6);
-  --shadow-float: 0 18px 48px rgb(0 0 0 / .12);
-}
-:root[data-theme='dark'] {
-  --color-stage: #111827;
-  --color-panel: #1f2937;
-  --color-column: #182130;
-  --color-well: #182130;
-  --color-raised: #374151;
-  --color-line: #374151;
-  --color-hair: #4b5563;
-  --color-edge: #6b7280;
-  --color-control: #929fb3;
-  --color-ink: #f9fafb;
-  --color-bone: #e5e7eb;
-  --color-muted: #c0c7d2;
-  --color-faint: #b0bac9;
-  --color-dim: #4b5563;
-  --color-signal: #b7acff;
-  --color-signal-ink: #1c1357;
-  --color-signal-line: #5d47de;
-}
-:root[data-theme='light'] {
-  --color-stage: #f3f4f6;
-  --color-panel: #ffffff;
-  --color-column: #f9fafb;
-  --color-well: #f9fafb;
-  --color-raised: #eef0f4;
-  --color-line: #e5e7eb;
-  --color-hair: #d1d5db;
-  --color-edge: #9ca3af;
-  --color-control: #7d8795;
-  --color-ink: #1f2937;
-  --color-bone: #374151;
-  --color-muted: #4b5563;
-  --color-faint: #596579;
-  --color-dim: #d1d5db;
-  --color-signal: #5d47de;
-  --color-signal-ink: #ffffff;
-  --color-signal-line: #d2cbff;
-}
-:root:is([data-theme='soft-dark'], [data-theme='original-light']) {
-  --font-sans: 'Geist Variable', Geist, sans-serif;
-  --font-serif: var(--font-sans);
-}
-:root[data-theme='soft-dark'] {
-  --color-stage: #0a0a0a;
-  --color-panel: #171717;
-  --color-column: #101010;
-  --color-well: #171717;
-  --color-raised: #262626;
-  --color-line: #292929;
-  --color-hair: #363636;
-  --color-edge: #525252;
-  --color-control: #8a8a8a;
-  --color-ink: #fafafa;
-  --color-bone: #e5e5e5;
-  --color-muted: #b3b3b3;
-  --color-faint: #a3a3a3;
-  --color-dim: #404040;
-  --color-signal: #ebebeb;
-  --color-signal-ink: #171717;
-  --color-signal-line: #525252;
-}
+:root[data-theme='dark'] { color-scheme: dark; }
 :root[data-theme='original-light'] {
-  --color-stage: #ffffff;
-  --color-panel: #ffffff;
-  --color-column: #fafafa;
-  --color-well: #f5f5f5;
-  --color-raised: #f0f0f0;
-  --color-line: #e5e5e5;
-  --color-hair: #d4d4d4;
-  --color-edge: #a3a3a3;
-  --color-control: #858585;
-  --color-ink: #0a0a0a;
-  --color-bone: #262626;
-  --color-muted: #525252;
-  --color-faint: #666666;
-  --color-dim: #d4d4d4;
-  --color-signal: #171717;
-  --color-signal-ink: #fafafa;
-  --color-signal-line: #a3a3a3;
+  --font-sans: 'Geist Variable', Geist, sans-serif;
+}
+/* Original Hirmos light palette. */
+:root[data-theme='original-light'] {
+  color-scheme: light;
+  --color-stage: #F6F6F2;
+  --color-panel: #FFFFFF;
+  --color-column: #FAFAF7;
+  --color-well: #FFFFFF;
+  --color-raised: #EBEBE5;
+  --color-line: #E8E8E3;
+  --color-hair: #DCDCD5;
+  --color-edge: #C2C2BA;
+  --color-control: #8E8E86;
+  --color-ink: #0A0A0A;
+  --color-bone: #3D3D3A;
+  --color-muted: #5F5F5B;
+  --color-faint: #6A6A66;
+  --color-dim: #D6D6D0;
+  --color-signal: #4D7C0F;
+  --color-signal-ink: #FFFFFF;
+  --color-signal-line: #C5E29A;
+  --color-ok: #0F766E;
+  --color-info: #2160A6;
+  --color-warn: #8A5B00;
+  --color-danger: #B3312F;
+  --color-highlight: rgba(255,255,255,.9);
+  --color-rail: #0A0A0A;
+  --color-rail-dim: #3A3A3A;
+  --shadow-lift: 0 0 0 1px rgb(0 0 0 / .05), 0 1px 2px -1px rgb(0 0 0 / .06);
+  --shadow-float: 0 18px 48px rgba(0,0,0,.10);
 }

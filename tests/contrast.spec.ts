@@ -8,7 +8,7 @@ import { expect, test } from '@playwright/test'
  * stylesheet, so `var()` chains and per-theme overrides resolve exactly as the browser resolves them.
  */
 
-const THEMES = ['dark', 'light', 'soft-dark', 'original-light'] as const
+const THEMES = ['dark', 'original-light'] as const
 
 /** Every surface a reader can meet text on. */
 const GROUNDS = ['--color-stage', '--color-panel', '--color-column', '--color-well', '--color-raised'] as const
