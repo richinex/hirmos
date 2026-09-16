@@ -36,7 +36,7 @@ export function RootCauseData({ graph, source, profile, prepared }: { readonly g
       <fieldset>
         <legend className="mb-2 font-medium">Variables to plot</legend>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <SelectionActions compact selectLabel="Select all variables" clearLabel="Clear selected variables" onSelectAll={() => setSelected(data.columns.map((column) => column.name))} onClear={() => setSelected([])} />
+          <SelectionActions selectLabel="Select all variables" clearLabel="Clear selected variables" onSelectAll={() => setSelected(data.columns.map((column) => column.name))} onClear={() => setSelected([])} />
           {data.columns.map((column) => <label key={column.name} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={selected.includes(column.name)} onChange={() => setSelected((current) => current.includes(column.name) ? current.filter((name) => name !== column.name) : [...current, column.name])} />{column.name}</label>)}
         </div>
       </fieldset>

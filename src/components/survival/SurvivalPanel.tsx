@@ -1600,7 +1600,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
             <span className={fieldLabel}>Covariates</span>
             <p className={cn(fieldHint, 'mb-2 max-w-[65ch]')}>{help}</p>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5" role="group" aria-label="Covariates">
-              <SelectionActions compact selectLabel="Select all covariates" clearLabel="Clear selected covariates" onSelectAll={() => configure({ ...draft, covariates: columns.filter((column) => !roles.includes(column.id)).map((column) => column.id) })} onClear={() => configure({ ...draft, covariates: [] })} />
+              <SelectionActions selectLabel="Select all covariates" clearLabel="Clear selected covariates" onSelectAll={() => configure({ ...draft, covariates: columns.filter((column) => !roles.includes(column.id)).map((column) => column.id) })} onClear={() => configure({ ...draft, covariates: [] })} />
               {columns.map((column) => {
               const reserved = roles.includes(column.id)
               return <label key={column.id} className={cn('flex items-center gap-2 text-body', reserved ? 'text-faint' : 'text-ink')}><input type="checkbox" disabled={reserved} checked={draft.covariates.includes(column.id)} onChange={() => {

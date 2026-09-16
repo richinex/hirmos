@@ -978,7 +978,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             <legend className={fieldLabel}>Variables to test</legend>
             <div className="mb-2 flex items-center justify-between gap-3">
               <p className="m-0 text-body text-faint">Only selected variables are tested. The prepared dataset is unchanged.</p>
-              <SelectionActions compact selectLabel="Select all stationarity variables" clearLabel="Clear stationarity variables"
+              <SelectionActions selectLabel="Select all stationarity variables" clearLabel="Clear stationarity variables"
                 onSelectAll={() => selectTestColumns(preparedTimeSeries?.columns ?? [])} onClear={() => selectTestColumns([])} />
             </div>
             <div className="grid gap-1 @md/panel:grid-cols-2 @3xl/panel:grid-cols-3">

@@ -1,3 +1,4 @@
+import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { TLearnerUncertainty } from './TLearnerUncertainty'
@@ -1415,10 +1416,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <ParameterLabel className={fieldLabel} label="Donor series" help={ESTIMATION_PARAMETER_HELP.syntheticControl.donorSeries} />
                 {controlCandidates.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <button type="button" className={button('quiet')} onClick={() => configure({ ...configuration, donors: controlCandidates.map((column) => column.id) })}>Select all</button>
-                    <button type="button" className={button('quiet')} onClick={() => configure({ ...configuration, donors: [] })}>Clear</button>
-                  </div>
+                  <SelectionActions selectLabel="Select all donor series" clearLabel="Clear selected donor series"
+                    onSelectAll={() => configure({ ...configuration, donors: controlCandidates.map((column) => column.id) })}
+                    onClear={() => configure({ ...configuration, donors: [] })} />
                 )}
               </div>
               <div className="mt-1 flex flex-wrap gap-2" role="group" aria-label="Donor series">

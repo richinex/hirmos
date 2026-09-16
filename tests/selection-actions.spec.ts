@@ -21,6 +21,10 @@ test('survival shares select-all and clear actions without selecting reserved co
   const covariates = setup.getByRole('group', { name: 'Covariates', exact: true })
   for (const analysis of ['Cox regression', 'Aalen regression', 'Survival forest']) {
     await setup.getByRole('radio', { name: analysis, exact: true }).check()
+    const selectText = covariates.getByRole('button', { name: 'Select all covariates' }).getByText('Select all', { exact: true })
+    const clearText = covariates.getByRole('button', { name: 'Clear selected covariates' }).getByText('Clear', { exact: true })
+    await expect(selectText).toBeVisible({ visible: (page.viewportSize()?.width ?? 0) >= 768 })
+    await expect(clearText).toBeVisible({ visible: (page.viewportSize()?.width ?? 0) >= 768 })
     await covariates.getByRole('button', { name: 'Select all covariates' }).click()
     await expect(covariates.locator('input:checked')).toHaveCount(await covariates.locator('input:not(:disabled)').count())
     await expect(covariates.locator('input:disabled:checked')).toHaveCount(0)
