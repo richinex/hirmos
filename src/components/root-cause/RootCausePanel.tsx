@@ -6,6 +6,8 @@ import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ActionRow } from './ActionRow'
 import { GcmEffectsPanel } from './GcmEffectsPanel'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { emptyCausalInputs, sameCausalSelection, type CausalAnalysis, type CausalModelEvent } from '@/domain/causalModelDraft'
 import { GcmInfluencePanel } from './GcmInfluencePanel'
 import type { GcmInfluenceRun } from '@/domain/gcmInfluence'
 import type { GcmEffectsRun } from '@/domain/gcmEffects'
@@ -29,7 +31,7 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { selectSource, describeSourceSelectionProblem, describeDatasetProfileProblem, type SelectedSource } from '@/domain/workflow'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
-type Analysis = 'anomaly' | 'change' | 'intervention' | 'effects' | 'intrinsic' | 'arrows'
+type Analysis = CausalAnalysis
 interface Props {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -101,22 +103,34 @@ const descriptions: Record<'anomaly' | 'change' | 'intervention', { readonly tit
 export function RootCausePanel(props: Props) {
   const fields = useId()
   const graph = selectedRootCauseGraph(props.workspace.selection, props.documents, props.prepared)
-  const previous = props.workspace.runs.filter((run) => run.graph.dagRevision === props.workspace.selection?.dagRevision).at(-1)
-  const [analysis, setAnalysis] = useState<Analysis>(previous?.model.query.kind ?? 'anomaly')
-  const [target, setTarget] = useState(previous === undefined ? '' : String(previous.model.target))
-  const [file, setFile] = useState<File | null>(null)
-  const [observationMode, setObservationMode] = useState<'values' | 'file'>('values')
-  const [observationDraft, setObservationDraft] = useState<Readonly<Record<string, string>>>(() => graph.ok && previous?.observation !== undefined ? Object.fromEntries(graph.value.nodes.map((node, index) => [node.id, String(previous.observation![index])])) : {})
+  const draft = useWorkflow(state => state.causalModelDrafts.find(candidate => props.workspace.selection !== null && sameCausalSelection(candidate.graph, props.workspace.selection)))
+  const analysis = draft?.analysis ?? 'anomaly'
+  const change = useWorkflow(state => state.changeCausalModel)
+  const update = (event: CausalModelEvent) => {
+    if (props.workspace.selection !== null) change(props.workspace.selection, event)
+  }
+  const setAnalysis = (analysis: Analysis) => {
+    if (props.workspace.selection !== null) change(props.workspace.selection, { type: 'analysis', analysis })
+  }
+  const target = draft?.attribution.target ?? ''
+  const setTarget = (value: string) => update({ type: 'attribution', field: 'target', value })
+  const { file, observationMode, observationDraft, shifts, confirmed, replay } = draft?.inputs ?? emptyCausalInputs
+  const setFile = (file: File) => update({ type: 'file', file })
+  const setObservationMode = (mode: 'values' | 'file') => update({ type: 'observation-mode', mode })
+  const setConfirmed = (confirmed: boolean) => update({ type: 'confirm', confirmed })
+  const setReplay = (model: RootCauseRequest | null) => update({ type: 'replay', model })
   const enteringValues = analysis === 'anomaly' && observationMode === 'values'
   const fileInput = useRef<HTMLInputElement>(null)
-  const [confirmed, setConfirmed] = useState(false)
-  const [shifts, setShifts] = useState<Readonly<Record<string, string>>>(() => previous?.model.query.kind === 'intervention' && graph.ok ? Object.fromEntries(previous.model.query.shifts.map((shift) => [graph.value.nodes[shift.node]!.id, String(shift.amount)])) : {})
-  const [repetitions, setRepetitions] = useState(previous?.model.repetitions ?? 10)
-  const [samples, setSamples] = useState(previous === undefined || previous.model.query.kind === 'intervention' ? 3000 : previous.model.query.samples)
-  const [changeFitting, setChangeFitting] = useState<'halfNormalLinear' | 'automaticFull'>(previous?.model.query.kind === 'change' ? previous.model.query.fitting.kind : 'halfNormalLinear')
-  const [seed, setSeed] = useState(previous?.model.random.kind === 'seed' ? previous.model.random.seed : 0)
-  const [randomSource, setRandomSource] = useState('seed')
-  const [replay, setReplay] = useState<RootCauseRequest | null>(null)
+  const repetitions = draft?.attribution.repetitions ?? 10
+  const samples = draft?.attribution.samples ?? 3000
+  const changeFitting = draft?.attribution.changeFitting ?? 'halfNormalLinear'
+  const seed = draft?.attribution.seed ?? 0
+  const randomSource = draft?.attribution.randomSource ?? 'seed'
+  const setRepetitions = (value: number) => update({ type: 'attribution', field: 'repetitions', value })
+  const setSamples = (value: number) => update({ type: 'attribution', field: 'samples', value })
+  const setChangeFitting = (value: 'halfNormalLinear' | 'automaticFull') => update({ type: 'attribution', field: 'changeFitting', value })
+  const setSeed = (value: number) => update({ type: 'attribution', field: 'seed', value })
+  const setRandomSource = (value: string) => update({ type: 'attribution', field: 'randomSource', value })
   const session = useJob(`root-cause:${props.workspace.selection?.dagRevision ?? ''}`)
   const { job } = session
   const [selected, setSelected] = useState<string | null>(null)
@@ -137,7 +151,9 @@ export function RootCausePanel(props: Props) {
     if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { checkRootCause }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(graph.value.nodes, (node) => node.column))
+      if (!session.current(current)) return
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
       const model = rootCauseCheckRequestSchema.parse({ names: graph.value.nodes.map((node) => node.name), edges: graph.value.edges, rows: data.value.rowCount, seed, scope: 'fitted', fitting: checkFitting })
       if (!session.current(current)) return
@@ -161,6 +177,7 @@ export function RootCausePanel(props: Props) {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { profileSource, materializeNumericColumns }, { runRootCause }] = await Promise.all([
         import('@/data/prepared'), import('@/data/duckdb'), import('@/analysis/client'),
       ])
+      if (!session.current(current)) return
       const entered = enteringValues ? readObservation(graph.value, observationDraft) : null
       if (entered !== null && !entered.ok) throw new Error(entered.error)
       const inputFile = entered?.ok ? new File([entered.value.csv], 'entered-observation.csv', { type: 'text/csv' }) : file
@@ -168,16 +185,19 @@ export function RootCausePanel(props: Props) {
       const source = selectSource(inputFile)
       if (!source.ok) throw new Error(describeSourceSelectionProblem(source.error))
       const profile = await profileSource(source.value)
+      if (!session.current(current)) return
       if (!profile.ok) throw new Error(describeDatasetProfileProblem(profile.error))
       const columns = graph.value.nodes.map((node) => profile.value.columns.find((column) => column.name === node.name)?.id)
       if (columns.some((column) => column === undefined)) throw new Error('The analysis file must contain every graph variable, with the same column names.')
       const included = columns.filter((column) => column !== undefined)
       if (!isNonEmpty(included)) throw new Error('Choose at least one graph variable.')
       const observed = await materializeNumericColumns(source.value, profile.value, included)
+      if (!session.current(current)) return
       if (!observed.ok) throw new Error('The analysis columns could not be read as numeric values.')
       if (observed.value.missingCells > 0) throw new Error('Resolve missing values in the analysis file before running this model.')
       if (analysis === 'anomaly' && observed.value.rowCount !== 1) throw new Error('For an unusual-observation analysis, supply exactly one observation.')
       const baseline = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(graph.value.nodes, (node) => node.column))
+      if (!session.current(current)) return
       if (!baseline.ok) throw new Error(describePreparedMaterialisationProblem(baseline.error))
       const fitting = analysis === 'intervention' ? observed.value : baseline.value
       const query = analysis === 'anomaly' ? { kind: analysis, samples } : analysis === 'change'
@@ -262,20 +282,20 @@ export function RootCausePanel(props: Props) {
           <legend className="sr-only">Root-cause specification</legend>
           <div><h3 className={`${sectionTitle} m-0`}>{description.title}</h3><p className={`${fieldHint} max-w-[65ch]`}>{description.summary}</p></div>
           {analysis === 'change' && replay === null && <label><ParameterLabel className={fieldLabel} label="Conditional models" help="Automatic selection compares prediction errors across five held-out folds and retains the selected model classes. Linear models use half-normal root distributions and refit sampled subsets." /><Select aria-label="Conditional models" className={field('text', 'mt-1')} value={changeFitting} onChange={event => setChangeFitting(event.target.value as typeof changeFitting)}><option value="halfNormalLinear">Linear models</option><option value="automaticFull">Automatic selection</option></Select></label>}
-          {analysis === 'anomaly' && <SegmentedControl ariaLabel="Observation input" value={observationMode} options={[{ value: 'values', label: 'Enter values' }, { value: 'file', label: 'Upload file' }]} onChange={value => { setObservationMode(value); setConfirmed(false) }} size="md" />}
+          {analysis === 'anomaly' && <SegmentedControl ariaLabel="Observation input" value={observationMode} options={[{ value: 'values', label: 'Enter values' }, { value: 'file', label: 'Upload file' }]} onChange={setObservationMode} size="md" />}
           <div data-testid="root-cause-inputs" className="grid min-w-0 grid-cols-1 items-start gap-4 @lg/panel:grid-cols-2">
             <label hidden={replay !== null}><span className={fieldLabel}>Target variable</span><Select className={field('text', 'mt-1')} value={target} onChange={(event) => setTarget(event.target.value)}><option value="">Choose target</option>{graph.value.nodes.map((node, index) => <option key={node.id} value={index}>{node.name}</option>)}</Select></label>
-            <div hidden={enteringValues} className="min-w-0"><span className={fieldLabel}>{description.dataLabel}</span><input ref={fileInput} aria-label={description.dataLabel} className="hidden" type="file" accept=".csv,.tsv,.parquet" onChange={(event) => { const chosen = event.target.files?.[0]; if (chosen !== undefined) { setFile(chosen); setConfirmed(false) } }} /><div className="mt-1 flex flex-wrap items-center gap-2"><button type="button" className={button('outline')} onClick={() => fileInput.current?.click()}>{file === null ? 'Choose file' : 'Replace file'}</button>{file !== null && <span className="min-w-0 break-all text-label text-muted">{file.name}</span>}</div><p className={fieldHint}>{description.dataHint} Use the graph’s column names.</p></div>
+            <div hidden={enteringValues} className="min-w-0"><span className={fieldLabel}>{description.dataLabel}</span><input ref={fileInput} aria-label={description.dataLabel} className="hidden" type="file" accept=".csv,.tsv,.parquet" onChange={(event) => { const chosen = event.target.files?.[0]; if (chosen !== undefined) { setFile(chosen) } }} /><div className="mt-1 flex flex-wrap items-center gap-2"><button type="button" className={button('outline')} onClick={() => fileInput.current?.click()}>{file === null ? 'Choose file' : 'Replace file'}</button>{file !== null && <span className="min-w-0 break-all text-label text-muted">{file.name}</span>}</div><p className={fieldHint}>{description.dataHint} Use the graph’s column names.</p></div>
           </div>
-          {enteringValues && <fieldset className="m-0 min-w-0 space-y-3 border-0 p-0"><legend className={fieldLabel}>Observed values</legend><p className={fieldHint}>Enter the values recorded for the observation you want to explain, including the target.</p><div className="observation-fields">{graph.value.nodes.map((node, index) => <label key={node.id} className="flex min-w-0 flex-col justify-end gap-1.5"><span className="min-w-0 break-words text-body">{node.name}{String(index) === target && <span className="ml-2 text-label text-muted">Target</span>}</span><input aria-label={`Observed ${node.name}`} className={field('text', 'min-w-0 w-full tabular-nums')} type="text" inputMode="decimal" value={observationDraft[node.id] ?? ''} onChange={event => { setObservationDraft(current => ({ ...current, [node.id]: event.target.value })); setConfirmed(false) }} /></label>)}</div></fieldset>}
-          {analysis === 'intervention' && replay === null && <fieldset className="m-0 min-w-0 space-y-3 border-0 p-0"><legend className={fieldLabel}>Changes to simulate</legend><p className={`${fieldHint} max-w-[65ch]`}>Enter a positive amount to increase a variable or a negative amount to decrease it. Leave other variables blank.</p><div className="grid gap-4 @lg/panel:grid-cols-2">{graph.value.nodes.map((node) => <label key={node.id}><span className={fieldLabel}>Shift in {node.name}</span><input className={field('text', 'mt-1')} type="number" step="any" value={shifts[node.id] ?? ''} placeholder="Leave unchanged" onChange={(event) => setShifts((current) => ({ ...current, [node.id]: event.target.value }))} /></label>)}</div></fieldset>}
+          {enteringValues && <fieldset className="m-0 min-w-0 space-y-3 border-0 p-0"><legend className={fieldLabel}>Observed values</legend><p className={fieldHint}>Enter the values recorded for the observation you want to explain, including the target.</p><div className="observation-fields">{graph.value.nodes.map((node, index) => <label key={node.id} className="flex min-w-0 flex-col justify-end gap-1.5"><span className="min-w-0 break-words text-body">{node.name}{String(index) === target && <span className="ml-2 text-label text-muted">Target</span>}</span><input aria-label={`Observed ${node.name}`} className={field('text', 'min-w-0 w-full tabular-nums')} type="text" inputMode="decimal" value={observationDraft[node.id] ?? ''} onChange={event => update({ type: 'observation', node: node.id, value: event.target.value })} /></label>)}</div></fieldset>}
+          {analysis === 'intervention' && replay === null && <fieldset className="m-0 min-w-0 space-y-3 border-0 p-0"><legend className={fieldLabel}>Changes to simulate</legend><p className={`${fieldHint} max-w-[65ch]`}>Enter a positive amount to increase a variable or a negative amount to decrease it. Leave other variables blank.</p><div className="grid gap-4 @lg/panel:grid-cols-2">{graph.value.nodes.map((node) => <label key={node.id}><span className={fieldLabel}>Shift in {node.name}</span><input className={field('text', 'mt-1')} type="number" step="any" value={shifts[node.id] ?? ''} placeholder="Leave unchanged" onChange={event => update({ type: 'shift', node: node.id, value: event.target.value })} /></label>)}</div></fieldset>}
           <details hidden={replay !== null} className="pt-2 text-body"><summary className="cursor-pointer font-medium text-ink">Sampling settings</summary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
             <div><ParameterLabel className={fieldLabel} htmlFor={`${fields}-repetitions`} label="Refitted estimates" help="Number of times the model is refitted to sampled observations to calculate the summary and percentile bounds." /><input id={`${fields}-repetitions`} className={field('text', 'mt-1')} type="number" min={1} value={repetitions} onChange={(event) => setRepetitions(Number(event.target.value))} /></div>
             <div><ParameterLabel className={fieldLabel} htmlFor={`${fields}-seed`} label="Random seed" help="Starting value for random sampling when starting a new random sequence." /><input id={`${fields}-seed`} className={field('text', 'mt-1')} type="number" min={0} value={seed} onChange={(event) => setSeed(Number(event.target.value))} /></div>
             <div><ParameterLabel className={fieldLabel} htmlFor={`${fields}-sequence`} label="Analysis random sequence" help="Start fresh from the seed, or continue sampling from the saved random state of an earlier check or analysis." /><Select id={`${fields}-sequence`} className={field('text', 'mt-1')} value={randomSource} onChange={(event) => setRandomSource(event.target.value)}><option value="seed">Start from the random seed</option>{checks.map((record, index) => <option key={record.id} value={record.id}>Continue after model check {index + 1}</option>)}{props.workspace.runs.filter((record) => record.graph.dagRevision === props.workspace.selection?.dagRevision).map((record, index) => <option key={record.id} value={record.id}>Continue after analysis {index + 1}</option>)}</Select></div>
             {analysis !== 'intervention' && <div><ParameterLabel className={fieldLabel} htmlFor={`${fields}-samples`} label="Distribution samples" help="Number of generated observations used to approximate the model distributions in each attribution calculation." /><input id={`${fields}-samples`} className={field('text', 'mt-1')} type="number" min={1} value={samples} onChange={(event) => setSamples(Number(event.target.value))} /></div>}
           </div></details>
-          <RootCauseSettings graph={graph.value} value={replay} onChange={(settings) => { setReplay(settings); if (settings !== null) { setAnalysis(settings.query.kind); setTarget(String(settings.target)); setConfirmed(false) } }} />
+          <RootCauseSettings graph={graph.value} value={replay} onChange={setReplay} />
           <label className="flex max-w-[75ch] items-start gap-2 text-body"><input className="mt-0.5 shrink-0" type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />{enteringValues ? 'These values use the same units and transformations as the prepared data.' : 'The selected file uses the same variable definitions, units and transformations as the prepared data.'}</label>
         </fieldset>
         <ActionRow job={job} action="analysis" disabled={session.blocked || (!enteringValues && file === null) || !confirmed || target === ''} onRun={() => void run()} onCancel={cancel} />

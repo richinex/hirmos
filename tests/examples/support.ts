@@ -17,8 +17,13 @@ export const choose = async (page: Page, label: string, option: string): Promise
   await page.getByRole('option', { name: option, exact: true }).click()
 }
 
-export const chapter = (page: Page, name: RegExp) =>
-  page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name }).click()
+export const chapter = async (page: Page, name: RegExp) => {
+  const toggle = page.getByRole('button', { name: 'Expand chapter list' })
+  if (await toggle.isVisible()) await toggle.click()
+  const destination = page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name })
+  await expect(destination).not.toHaveAttribute('aria-disabled', 'true')
+  await destination.click()
+}
 
 /** Wait for text anywhere on the page; large files make the prepared banner slow to arrive. */
 export const bodyText = (page: Page, text: string, timeout = 180_000) =>

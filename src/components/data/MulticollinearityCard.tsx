@@ -29,22 +29,25 @@ type Availability =
 
 const nameAt = (matrix: PreparedMatrix, index: number): string => matrix.columns[index]?.name ?? `Variable ${index + 1}`
 
-export function MulticollinearityCard({ source, profile, prepared, onSelection, onResult }: {
+export function MulticollinearityCard({ source, profile, prepared, onSelection }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
   readonly onSelection: (selection: MulticollinearitySelection) => void
-  readonly onResult?: () => void
 }) {
   const theme = useChartTheme()
-  const [correlationThreshold, setCorrelationThreshold] = useState(0.9)
-  const [vifThreshold, setVifThreshold] = useState(10)
-  const [pair, setPair] = useState<readonly [number, number]>([0, 1])
+  const settings = useWorkflow(state => state.diagnosticDraft?.prepared === prepared.id ? state.diagnosticDraft.redundancy : null)
+  const change = useWorkflow(state => state.changeDiagnostic)
   const session = useJob('redundancy')
   const { job } = session
   const result = useWorkflow(state => state.redundancy?.prepared === prepared.id ? state.redundancy : null)
   const record = useWorkflow(state => state.recordRedundancy)
   const [selectionProblem, setSelectionProblem] = useState<string | null>(null)
+  if (settings === null) throw new Error('Redundancy diagnostics require the current prepared dataset.')
+  const { correlation: correlationThreshold, vif: vifThreshold, pair } = settings
+  const setCorrelationThreshold = (value: number) => change(prepared.id, { type: 'correlation', value })
+  const setVifThreshold = (value: number) => change(prepared.id, { type: 'vif', value })
+  const setPair = (value: readonly [number, number]) => change(prepared.id, { type: 'pair', value })
   const availability: Availability = prepared.observations < 3
     ? { kind: 'unavailable', reason: 'At least three prepared rows are required.' }
     : prepared.columns.length < 2 || prepared.columns.length > 64
@@ -83,7 +86,6 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
       setPair(firstCluster === undefined ? [0, 1] : [firstCluster[0] ?? 0, firstCluster[1] ?? 1])
       record({ prepared: prepared.id, matrix: matrix.value, evidence: result.value })
       session.finish(id)
-      onResult?.()
     } catch (cause: unknown) {
       session.fail(id, cause instanceof Error ? cause.message : String(cause))
     }

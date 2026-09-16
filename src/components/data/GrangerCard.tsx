@@ -1,5 +1,6 @@
 import { Metadata } from '@/components/ui/Metadata'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useWorkflow } from '@/components/WorkflowProvider'
 import { EChart } from '@/charts/EChart'
 import { pValueBarsOption } from '@/charts/discovery/pValueBars'
 import { useChartTheme } from '@/charts/theme'
@@ -96,9 +97,14 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
   /** Inside the Diagnostics card: no border of its own, body-weight heading. */
   readonly embedded?: boolean
 }) {
-  const [candidateCause, setCandidateCause] = useState<ColumnId | null>(null)
-  const [target, setTarget] = useState<ColumnId | null>(null)
-  const [maxLag, setMaxLag] = useState<GrangerLag>(4)
+  const draft = useWorkflow(state => state.diagnosticDraft?.kind === 'series' && state.diagnosticDraft.prepared === prepared.id ? state.diagnosticDraft.granger : null)
+  const change = useWorkflow(state => state.changeDiagnostic)
+  const candidateCause = draft?.cause ?? null
+  const target = draft?.target ?? null
+  const maxLag = draft?.maxLag ?? 4
+  const setCandidateCause = (column: ColumnId | null) => change(prepared.id, { type: 'granger-column', role: 'cause', column })
+  const setTarget = (column: ColumnId | null) => change(prepared.id, { type: 'granger-column', role: 'target', column })
+  const setMaxLag = (value: GrangerLag) => change(prepared.id, { type: 'granger-lag', value })
   const session = useJob('granger')
   const { job } = session
   const method = methodDefinition(GRANGER_SSR_F_METHOD_ID)

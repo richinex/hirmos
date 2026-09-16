@@ -3,6 +3,12 @@ import type { Redundancy, TemporalStructure } from './diagnostics'
 import { initialPreprocessingDraft, stepPreprocessing, type PreprocessingDraft, type PreprocessingEvent } from './preprocessing'
 import type { DatasetProfileId } from './dataset'
 import type { BackdoorIdentificationEvidence, StudySpecification } from './study'
+import type { PreparedDatasetVersionId } from './preprocessing'
+import { initialDiagnosticDraft, stepDiagnosticDraft, type DiagnosticDraft, type DiagnosticEvent } from './diagnosticDraft'
+import { INITIAL_WORKFLOW, stepWorkflow, type Workflow, type WorkflowEvent } from './workflow'
+import { initialDiscoverySessionFor, stepDiscoverySession, type DiscoverySession, type DiscoverySessionEvent } from './discovery'
+import { retainCausalModelDrafts, sameCausalSelection, stepCausalModelDraft, type CausalModelDraft, type CausalModelEvent } from './causalModelDraft'
+import type { RootCauseSelection } from './rootCause'
 
 interface AdjustmentDecision {
   readonly study: StudySpecification
@@ -13,10 +19,12 @@ function decisionApplies(decision: AdjustmentDecision, workflow: Workflow): bool
   if (workflow.kind !== 'profiled' || workflow.prepared?.id !== decision.study.preparedDataset) return false
   return workflow.dagDocuments.some(document => document.id === decision.study.dagDocument && document.current.id === decision.study.dagRevision)
 }
-import { INITIAL_WORKFLOW, stepWorkflow, type Workflow, type WorkflowEvent } from './workflow'
-import { initialDiscoverySessionFor, stepDiscoverySession, type DiscoverySession, type DiscoverySessionEvent } from './discovery'
 
 interface State {
+  readonly causalModelDrafts: readonly CausalModelDraft[]
+  readonly changeCausalModel: (graph: RootCauseSelection, event: CausalModelEvent) => void
+  readonly diagnosticDraft: DiagnosticDraft | null
+  readonly changeDiagnostic: (prepared: PreparedDatasetVersionId, event: DiagnosticEvent) => void
   readonly adjustmentDecision: AdjustmentDecision | null
   readonly offerAdjustment: (decision: AdjustmentDecision) => void
   readonly clearAdjustment: (study: StudySpecification['id']) => void
@@ -35,6 +43,19 @@ interface State {
 
 export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
   return createStore<State>(set => ({
+    causalModelDrafts: retainCausalModelDrafts([], initial),
+    changeCausalModel: (graph, event) => set(state => {
+      const current = state.causalModelDrafts.find(draft => sameCausalSelection(draft.graph, graph))
+      if (current === undefined) return state
+      const next = stepCausalModelDraft(current, event)
+      return { causalModelDrafts: state.causalModelDrafts.map(draft => draft === current ? next : draft) }
+    }),
+    diagnosticDraft: initial.kind === 'profiled' && initial.prepared !== null ? initialDiagnosticDraft(initial.prepared) : null,
+    changeDiagnostic: (prepared, event) => set(state => {
+      if (state.workflow.kind !== 'profiled' || state.workflow.prepared?.id !== prepared || state.diagnosticDraft === null) return state
+      const diagnosticDraft = stepDiagnosticDraft(state.diagnosticDraft, event, state.workflow.prepared)
+      return diagnosticDraft === state.diagnosticDraft ? state : { diagnosticDraft }
+    }),
     adjustmentDecision: null,
     offerAdjustment: decision => set(state => decisionApplies(decision, state.workflow) ? { adjustmentDecision: decision } : state),
     clearAdjustment: study => set(state => state.adjustmentDecision?.study.id === study ? { adjustmentDecision: null } : state),
@@ -84,7 +105,12 @@ export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
           : state.workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id && state.preprocessing?.profile === workflow.profile.id ? state.preprocessing
           : { profile: workflow.profile.id, draft: initialPreprocessingDraft(workflow.profile), savedRecipe: null }
         const adjustmentDecision = event.type !== 'study-draft-changed' && state.adjustmentDecision !== null && decisionApplies(state.adjustmentDecision, workflow) ? state.adjustmentDecision : null
-        return { workflow, discovery, temporalStructure, redundancy, preprocessing, adjustmentDecision }
+        const diagnosticDraft = workflow.kind !== 'profiled' || workflow.prepared === null ? null
+          : state.workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id && state.diagnosticDraft?.prepared === workflow.prepared.id ? state.diagnosticDraft
+          : initialDiagnosticDraft(workflow.prepared)
+        const sameProject = state.workflow.kind === 'profiled' && workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id
+        const causalModelDrafts = retainCausalModelDrafts(sameProject ? state.causalModelDrafts : [], workflow)
+        return { workflow, discovery, temporalStructure, redundancy, preprocessing, adjustmentDecision, diagnosticDraft, causalModelDrafts }
       })
     },
   }))

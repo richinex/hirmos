@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { sameCausalSelection } from '@/domain/causalModelDraft'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
@@ -94,16 +96,13 @@ function QuantileGroups({ value, onChange }: { readonly value: Quantiles; readon
 
 export function GcmEffectsPanel(props: Props) {
   const previous = props.runs.filter(run => run.graph.dagRevision === props.graph.dagRevision).at(-1)
-  const [model, setModel] = useState<GcmEffectsRequest>(() => previous?.model ?? ({
-    names: props.graph.nodes.map(node => node.name), edges: props.graph.edges.map(edge => [edge[0], edge[1]]),
-    rows: props.prepared.observations, treatment: 0, outcome: 1, trees: 100, minLeaf: 1, fitSeed: 0, simulationSeed: 47,
-    repetitions: 100, upperQuantile: 0.95, grouping: { kind: 'none' },
-    mechanisms: props.graph.nodes.map((_, i) => !props.graph.edges.some(([, child]) => child === i) ? { kind: 'empirical' }
-      : i === 0 ? { kind: 'classifier', classes: 2 } : { kind: 'regression' }),
-  }))
+  const model = useWorkflow(state => state.causalModelDrafts.find(candidate => sameCausalSelection(candidate.graph, props.graph))?.effects)
+  const change = useWorkflow(state => state.changeCausalModel)
+  const setModel = (model: GcmEffectsRequest) => change(props.graph, { type: 'effects', model })
   const session = useJob(`effects:${props.graph.dagRevision}`)
   const { job } = session
   const [selected, setSelected] = useState<string | null>(null)
+  if (model === undefined) throw new Error('Intervention effects require settings for the selected graph revision.')
   const latest = props.runs.find(run => run.id === selected) ?? previous
   const busy = job.kind === 'running'
   const run = async () => {
@@ -111,7 +110,9 @@ export function GcmEffectsPanel(props: Props) {
     if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runGcmEffects }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(props.graph.nodes, node => node.column))
+      if (!session.current(current)) return
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
       const request = gcmEffectsRequestSchema.safeParse({ ...model, rows: data.value.rowCount })
       if (!request.success) throw new Error(request.error.issues.map(issue => issue.message).join(' '))

@@ -3,7 +3,7 @@ import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import type { SeriesFacts } from '@/domain/diagnostics'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { lagCorrelationOption } from '@/charts/data/lagCorrelation'
 import { changePointsOption } from '@/charts/sensitivity/changePoints'
@@ -72,20 +72,23 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
 }
 
 /** PELT, STL strengths, and notebook-compatible ACF/PACF for every prepared series. */
-export function SeriesStructureCard({ source, profile, prepared, embedded = false, onResult }: {
+export function SeriesStructureCard({ source, profile, prepared, embedded = false }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: Extract<PreparedDatasetArtifact, { readonly kind: 'prepared-time-series' }>
   /** Inside the Diagnostics card: no border of its own, body-weight heading. */
   readonly embedded?: boolean
-  readonly onResult?: () => void
 }) {
   const session = useJob('series-structure')
   const { job } = session
   const result = useWorkflow(state => state.temporalStructure?.prepared === prepared.id ? state.temporalStructure : null)
   const record = useWorkflow(state => state.recordTemporalStructure)
-  const [minSize, setMinSize] = useState(4)
-  const [maxLag, setMaxLag] = useState(40)
+  const temporal = useWorkflow(state => state.diagnosticDraft?.kind === 'series' && state.diagnosticDraft.prepared === prepared.id ? state.diagnosticDraft.temporal : null)
+  const change = useWorkflow(state => state.changeDiagnostic)
+  if (temporal === null) throw new Error('Temporal diagnostics require the current prepared time series.')
+  const { minSize, maxLag } = temporal
+  const setMinSize = (value: number) => change(prepared.id, { type: 'min-size', value })
+  const setMaxLag = (value: number) => change(prepared.id, { type: 'max-lag', value })
   const period = seasonalPeriodOf(prepared.sampling.frequency)
 
   const run = async () => {
@@ -113,7 +116,6 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
       }
       record({ prepared: prepared.id, period, minSize, maxLag: correlationMaxLag, series })
       session.finish(id)
-      onResult?.()
     } catch (cause: unknown) {
       session.fail(id, cause instanceof Error ? cause.message : String(cause))
     }

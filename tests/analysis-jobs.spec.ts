@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
+import { chapter } from './examples/support'
 
-test('a sensitivity probe completes after leaving its chapter', async ({ page }) => {
+test('a sensitivity probe completes after leaving its chapter', async ({ page }, info) => {
   test.setTimeout(90_000)
   await page.addInitScript(() => {
     const post = Worker.prototype.postMessage
@@ -15,17 +16,19 @@ test('a sensitivity probe completes after leaving its chapter', async ({ page })
   })
   await page.goto('/app')
   await page.getByRole('button', { name: 'Open A simulated process with a collider', exact: true }).filter({ visible: true }).click()
-  const chapters = page.getByRole('navigation', { name: 'Workspace chapters' })
-  await chapters.getByRole('button', { name: /Sensitivity/ }).click()
-  const history = page.getByRole('heading', { name: /^Probes \(/ })
-  const before = Number((await history.textContent())?.match(/\d+/)?.[0])
+  await chapter(page, /Sensitivity/)
+  const mobile = info.project.name === 'mobile-chromium'
+  const history = page.getByRole(mobile ? 'button' : 'heading', { name: /^Probes \(/ })
+  const title = mobile ? await history.getAttribute('aria-label') : await history.textContent()
+  const before = Number(title?.match(/\d+/)?.[0])
   expect(Number.isFinite(before)).toBe(true)
   await page.getByRole('button', { name: 'Run perturbation and residual probes', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toBeVisible()
-  await chapters.getByRole('button', { name: /DAG workspace/ }).click()
+  await chapter(page, /DAG workspace/)
   await expect(page.getByRole('heading', { name: 'DAG workspace', exact: true })).toBeVisible()
-  await chapters.getByRole('button', { name: /Sensitivity/ }).click()
-  await expect(history).toHaveText(`Probes (${before + 1})`, { timeout: 60_000 })
+  await chapter(page, /Sensitivity/)
+  if (mobile) await expect(history).toHaveAttribute('aria-label', `Probes (${before + 1})`, { timeout: 60_000 })
+  else await expect(history).toHaveText(`Probes (${before + 1})`, { timeout: 60_000 })
   await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toHaveCount(0)
 })
 
@@ -154,8 +157,7 @@ test('variance run survives analysis tabs and chapter navigation', async ({ page
   test.setTimeout(90_000)
   await page.goto('/app')
   await page.getByRole('button', { name: 'Open Microservices: why did the website slow down?', exact: true }).filter({ visible: true }).click()
-  const chapters = page.getByRole('navigation', { name: 'Workspace chapters' })
-  await chapters.getByRole('button', { name: /Causal model analysis/ }).click()
+  await chapter(page, /Causal model analysis/)
   await page.getByRole('radio', { name: 'Variance contributions', exact: true }).check()
   await page.getByRole('combobox', { name: 'Influence target' }).click()
   await page.getByRole('option', { name: 'Website', exact: true }).click()
@@ -165,9 +167,10 @@ test('variance run survives analysis tabs and chapter navigation', async ({ page
   await expect(page.getByRole('button', { name: 'Run analysis', exact: true })).toBeDisabled()
   await page.getByRole('radio', { name: 'Variance contributions', exact: true }).check()
   await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toBeVisible()
-  await chapters.getByRole('button', { name: /DAG workspace/ }).click()
-  await chapters.getByRole('button', { name: /Causal model analysis/ }).click()
-  await page.getByRole('radio', { name: 'Variance contributions', exact: true }).check()
+  await chapter(page, /DAG workspace/)
+  await chapter(page, /Causal model analysis/)
+  await expect(page.getByRole('radio', { name: 'Variance contributions', exact: true })).toBeChecked()
+  await expect(page.getByRole('combobox', { name: 'Influence target' })).toContainText('Website')
   await expect(page.getByRole('button', { name: 'Cancel run', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Cancel run', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('The analysis was cancelled.')

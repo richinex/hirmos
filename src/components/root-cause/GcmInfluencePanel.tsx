@@ -1,5 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { sameCausalSelection } from '@/domain/causalModelDraft'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
@@ -28,10 +30,6 @@ const titles: Record<Analysis, string> = { intrinsic: 'Intrinsic variance contri
 const descriptions: Record<Analysis, string> = {
   intrinsic: 'Estimate how each variable’s own variation contributes to differences in the target, including contributions transmitted through downstream variables.',
   arrows: 'Estimate how variation in each direct parent contributes to target variation when the other parents are held fixed.',
-}
-const defaults: Record<Analysis, GcmInfluenceRequest['query']> = {
-  intrinsic: { kind: 'intrinsic', training: 100_000, randomization: 250, baseline: 1000 },
-  arrows: { kind: 'arrows', conditional: 2000, maxRuns: 5000, tolerance: 0.01 },
 }
 const number = (value: number) => formatStatistic('raw', value).text
 interface Props {
@@ -89,12 +87,22 @@ function History({ runs, selected, onSelect, onDelete }: { readonly runs: readon
 
 export function GcmInfluencePanel(props: Props) {
   const previous = props.runs.filter(run => run.graph.dagRevision === props.graph.dagRevision && run.model.query.kind === props.analysis).at(-1)
-  const [target, setTarget] = useState(previous === undefined ? '' : String(previous.model.target))
-  const [query, setQuery] = useState(previous?.model.query ?? defaults[props.analysis])
-  const [seed, setSeed] = useState(previous?.model.random.kind === 'seed' ? previous.model.random.seed : 0)
+  const draft = useWorkflow(state => state.causalModelDrafts.find(candidate => sameCausalSelection(candidate.graph, props.graph))?.[props.analysis])
+  const change = useWorkflow(state => state.changeCausalModel)
   const session = useJob(`influence:${props.graph.dagRevision}:${props.analysis}`)
   const { job } = session
   const [selected, setSelected] = useState<string | null>(null)
+  if (draft === undefined) throw new Error('Causal influence requires settings for the selected graph revision.')
+  const { target, query, seed } = draft
+  const update = (target: string, query: GcmInfluenceRequest['query'], seed: number) => {
+    switch (query.kind) {
+      case 'intrinsic': change(props.graph, { type: 'intrinsic', draft: { target, query, seed } }); return
+      case 'arrows': change(props.graph, { type: 'arrows', draft: { target, query, seed } }); return
+    }
+  }
+  const setTarget = (value: string) => update(value, query, seed)
+  const setQuery = (value: GcmInfluenceRequest['query']) => update(target, value, seed)
+  const setSeed = (value: number) => update(target, query, value)
   const latest = props.runs.find(run => run.id === selected) ?? previous
   const busy = job.kind === 'running'
   const run = async () => {
@@ -102,7 +110,9 @@ export function GcmInfluencePanel(props: Props) {
     if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runGcmInfluence }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(props.graph.nodes, node => node.column))
+      if (!session.current(current)) return
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
       const request = gcmInfluenceRequestSchema.parse({ names: props.graph.nodes.map(node => node.name), edges: props.graph.edges, rows: data.value.rowCount, target: Number(target), random: { kind: 'seed', seed }, query })
       if (!session.current(current)) return

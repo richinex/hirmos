@@ -328,10 +328,14 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const saveRecipe = useWorkflow(state => state.saveRecipe)
   const session = useJob('stationarity')
   const { job } = session
-  const [testSelection, setTestSelection] = useState<{ readonly prepared: string; readonly columns: readonly ColumnId[] } | null>(null)
-  const [diagnostic, setDiagnostic] = useState<Diagnostic>('multicollinearity')
-  const [multicollinearityChecked, setMulticollinearityChecked] = useState(false)
-  const [structureChecked, setStructureChecked] = useState(false)
+  const diagnostics = useWorkflow(state => state.diagnosticDraft)
+  const changeDiagnostic = useWorkflow(state => state.changeDiagnostic)
+  const multicollinearityChecked = useWorkflow(state => state.redundancy !== null && state.redundancy.prepared === preparedVersion?.id)
+  const structureChecked = useWorkflow(state => state.temporalStructure !== null && state.temporalStructure.prepared === preparedVersion?.id)
+  const diagnostic = diagnostics?.view ?? 'multicollinearity'
+  const setDiagnostic = (view: Diagnostic) => {
+    if (preparedVersion !== null) changeDiagnostic(preparedVersion.id, { type: 'view', view })
+  }
   if (preprocessing === null || preprocessing.profile !== profile.id) throw new Error('Preprocessing requires the current source profile.')
   const { draft, savedRecipe } = preprocessing
   const dispatch = (event: PreprocessingEvent) => changePreprocessing(profile.id, event)
@@ -343,10 +347,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
   const preparedCurrent = preparedVersion
   const preparedTimeSeries = preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series' ? preparedCurrent : null
-  const testColumns = preparedTimeSeries !== null && testSelection?.prepared === preparedTimeSeries.id
-    ? testSelection.columns.filter(column => preparedTimeSeries.columns.includes(column)) : []
+  const testColumns = diagnostics?.kind === 'series' && diagnostics.prepared === preparedTimeSeries?.id ? diagnostics.stationarity : []
   const selectTestColumns = (columns: readonly ColumnId[]) => {
-    if (preparedTimeSeries !== null) setTestSelection({ prepared: preparedTimeSeries.id, columns })
+    if (preparedTimeSeries !== null) changeDiagnostic(preparedTimeSeries.id, { type: 'stationarity', columns })
   }
   const stationarityEvidence = stationarity !== null && preparedCurrent !== null && stationarity.preparedDataset === preparedCurrent.id ? stationarity : null
   const panelSelected = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys'
@@ -951,7 +954,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           )}
           <div hidden={diagnostic !== 'multicollinearity'} className="mt-4 border-t border-hair pt-4">
             {preparedCurrent !== null
-              ? <MulticollinearityCard source={source} profile={profile} prepared={preparedCurrent} onSelection={applyMulticollinearitySelection} onResult={() => setMulticollinearityChecked(true)} />
+              ? <MulticollinearityCard source={source} profile={profile} prepared={preparedCurrent} onSelection={applyMulticollinearitySelection} />
               : null}
           </div>
           <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
@@ -1081,7 +1084,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           </div>
           <div hidden={diagnostic !== 'structure'} className="mt-4 border-t border-hair pt-4">
             {preparedTimeSeries !== null
-              ? <SeriesStructureCard embedded source={source} profile={profile} prepared={preparedTimeSeries} onResult={() => setStructureChecked(true)} />
+              ? <SeriesStructureCard embedded source={source} profile={profile} prepared={preparedTimeSeries} />
               : null}
           </div>
           <div hidden={diagnostic !== 'granger'} className="mt-4 border-t border-hair pt-4">
