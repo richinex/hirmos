@@ -287,21 +287,26 @@ export function analyseDagCausalFlow(graph: EditableDag, treatment: DagNodeId, o
   return { treatment, outcome, edges: flows, roles, paths, adjustment, laggedArrows, pathCapReached: raw.length >= PATH_CAP }
 }
 
-export function describeDagCausalRole(role: DagCausalRole): string {
+export function roleDetail(role: DagCausalRole): string | null {
   switch (role.kind) {
-    case 'treatment': return 'treatment'
-    case 'outcome': return 'outcome'
-    case 'confounder': return role.paths === 1 ? 'confounder · common cause on one open back-door path' : `confounder · common cause on ${role.paths} open back-door paths`
-    case 'backdoor-variable': return role.paths === 1 ? 'back-door variable · on one open back-door path' : `back-door variable · on ${role.paths} open back-door paths`
-    case 'mediator': return role.alsoCollider ? 'mediator and collider · adjusting would both remove part of the total effect and introduce collider bias' : 'mediator · carries part of the total effect; exclude it from total-effect adjustment'
-    case 'collider': return role.paths === 1 ? 'collider · adjusting would open a closed path and introduce collider bias' : `collider · adjusting would open ${role.paths} closed paths and introduce collider bias`
-    case 'post-treatment': return 'after treatment · keep out'
-    case 'outcome-predictor': return 'outcome predictor · not required to close a back-door path; may improve precision'
-    case 'pre-treatment': return 'before treatment · not on any path'
-    case 'unmeasured': return 'unmeasured'
-    case 'unrelated': return 'not connected to the effect'
+    case 'treatment':
+    case 'outcome':
+    case 'unmeasured': return null
+    case 'confounder': return role.paths === 1 ? 'Common cause on one open back-door path' : `Common cause on ${role.paths} open back-door paths`
+    case 'backdoor-variable': return role.paths === 1 ? 'On one open back-door path' : `On ${role.paths} open back-door paths`
+    case 'mediator': return role.alsoCollider ? 'Adjusting would both remove part of the total effect and introduce collider bias' : 'Carries part of the total effect; exclude it from total-effect adjustment'
+    case 'collider': return role.paths === 1 ? 'Adjusting would open a closed path and introduce collider bias' : `Adjusting would open ${role.paths} closed paths and introduce collider bias`
+    case 'post-treatment': return 'Keep out of adjustment'
+    case 'outcome-predictor': return 'Not required to close a back-door path; may improve precision'
+    case 'pre-treatment': return 'Not on any path'
+    case 'unrelated': return 'Not connected to the effect'
     default: return assertNever(role)
   }
+}
+
+export function describeDagCausalRole(role: DagCausalRole): string {
+  const detail = roleDetail(role)
+  return detail === null ? roleWord(role) : `${roleWord(role)}: ${detail}`
 }
 
 /** Short role word for a card label. */
@@ -311,7 +316,7 @@ export function roleWord(role: DagCausalRole): string {
     case 'outcome': return 'Outcome'
     case 'confounder': return 'Confounder'
     case 'backdoor-variable': return 'Back-door variable'
-    case 'mediator': return role.alsoCollider ? 'Mediator · collider' : 'Mediator'
+    case 'mediator': return role.alsoCollider ? 'Mediator and collider' : 'Mediator'
     case 'collider': return 'Collider'
     case 'post-treatment': return 'Post-treatment'
     case 'outcome-predictor': return 'Outcome predictor'

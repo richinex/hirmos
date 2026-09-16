@@ -290,7 +290,7 @@ export function summaryGraphOption(graph: SummaryGraph, theme: ChartTheme, metri
         const detail = Reflect.get(data, 'hirmos')
         if (detail === undefined || detail === null || typeof detail !== 'object') return ''
         const d = detail as { from: string; to: string; lags: readonly number[]; contemporaneous: boolean; strength: string; mark: string | null }
-        const when = [d.contemporaneous ? 'contemporaneous' : '', d.lags.length > 0 ? `lags ${d.lags.join(', ')}` : ''].filter((part) => part.length > 0).join(' · ')
+        const when = [d.contemporaneous ? 'contemporaneous' : '', d.lags.length > 0 ? `lags ${d.lags.join(', ')}` : ''].filter((part) => part.length > 0).join('; ')
         return `${escapeHtml(d.from)} ${escapeHtml(d.mark ?? '→')} ${escapeHtml(d.to)}<br/>${escapeHtml(when)}<br/>${escapeHtml(d.strength)}`
       },
     },

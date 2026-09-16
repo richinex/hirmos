@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { useMemo, useReducer, useState } from 'react'
@@ -899,7 +900,7 @@ const analysisType = (kind: Draft['kind']): AnalysisType => {
   }
 }
 
-function ColumnSelect({ title, value, columns, onChange }: { readonly title: string; readonly value: ColumnId | null; readonly columns: readonly ColumnSelection[]; readonly onChange: (value: ColumnId | null) => void }) {
+function ColumnSelect({ title, value, columns, onChange }: { readonly title: React.ReactNode; readonly value: ColumnId | null; readonly columns: readonly ColumnSelection[]; readonly onChange: (value: ColumnId | null) => void }) {
   return (
     <label className="block">
       <span className={fieldLabel}>{title}</span>
@@ -1308,7 +1309,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       case 'aalen':
       case 'survival-forest': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
-        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
         {draft.kind === 'survival-forest' ? <>
           <label className="block"><ParameterLabel label="Split rule" help="Log-rank selects the best eligible split. Extra trees tests one randomly chosen threshold per candidate covariate." /><Select className={field('text', 'mt-1')} value={draft.settings.splitRule} onChange={(event) => { const splitRule = event.target.value; if (splitRule === 'logRank' || splitRule === 'extraTrees') configure({ ...draft, settings: { ...draft.settings, splitRule } }) }}><option value="logRank">Log-rank</option><option value="extraTrees">Extra trees</option></Select></label>
           {FOREST_PARAMETERS.map(({ key, title, help }) => <label className="block" key={key}><ParameterLabel label={title} help={help} /><input aria-label={title} className={field('text', 'mt-1 w-full')} type="number" min={1} step={1} value={draft.settings[key]} onChange={(event) => configure({ ...draft, settings: { ...draft.settings, [key]: Number(event.target.value) } })} /></label>)}
@@ -1317,14 +1318,14 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       </>
       case 'right-censored': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
-        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
         <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency, covariates: withoutCovariate(draft.covariates, rowFrequency.kind === 'frequency-column' ? rowFrequency.column : null) })} />
         {familyOptions(draft.family, ['exponential', 'weibull', 'weibullPh', 'logNormal', 'gamma', 'gompertz', 'logLogistic', 'generalizedGamma', 'generalizedF'])}
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
       </>
       case 'nonparametric': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration })} />
-        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
+        <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
         <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency })} />
         <div>
           <ParameterLabel label="Tied events" help="Use discrete handling when event times are recorded in discrete units such as years or minutes. Smoothed handling accounts for tied events one at a time, reducing the number at risk after each event." />
@@ -1335,14 +1336,14 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       case 'start-stop': return <>
         <ColumnSelect title="Start time" value={draft.start} columns={columns} onChange={(start) => configure({ ...draft, start, covariates: withoutCovariate(draft.covariates, start) })} />
         <ColumnSelect title="Stop time" value={draft.stop} columns={columns} onChange={(stop) => configure({ ...draft, stop, covariates: withoutCovariate(draft.covariates, stop) })} />
-        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
         <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency, covariates: withoutCovariate(draft.covariates, rowFrequency.kind === 'frequency-column' ? rowFrequency.column : null) })} />
         {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
       </>
       case 'penalized-aft': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
-        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
+        <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
         <label className="block">
           <ParameterLabel label="Distribution" help="Weibull AFT: the log duration has a Gumbel-type error with a shape parameter; log-logistic AFT: a logistic error. Both report a time ratio per covariate, the multiplier on the duration for a one-unit increase." />
           <Select className={field('text', 'mt-1')} value={draft.family} onChange={(event) => changeFamily(event.target.value)}>
@@ -1420,7 +1421,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
               }
               return <>
                 <ColumnSelect title="Duration" value={observation.duration} columns={columns} onChange={(duration) => setObservation({ ...observation, duration })} />
-                <ColumnSelect title="Event · 1 observed, 0 censored" value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
+                <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
                 <div>
                   <ParameterLabel label="Shared frailty" help="A gamma frailty gives every observation in a group the same unobserved multiplier on its hazard, fitted as survival's frailty(group, distribution = 'gamma') with its penalised likelihood. Use it when observations are grouped, for example lines within a repository, and the group's own risk is not a covariate." />
                   <SegmentedControl size="sm" ariaLabel="Cox shared frailty" value={observation.frailty.kind} onChange={chooseFrailty} options={[{ value: 'none', label: 'None' }, { value: 'gamma', label: 'Gamma by group' }]} />
@@ -1451,7 +1452,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
                 <ColumnSelect title="Subject" value={observation.subject} columns={columns} onChange={(subject) => setObservation({ ...observation, subject })} />
                 <ColumnSelect title="Start time" value={observation.start} columns={columns} onChange={(start) => setObservation({ ...observation, start })} />
                 <ColumnSelect title="Stop time" value={observation.stop} columns={columns} onChange={(stop) => setObservation({ ...observation, stop })} />
-                <ColumnSelect title="Event · 1 observed, 0 censored" value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
+                <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
                 <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>Model-based standard errors are used for start–stop Cox regression.</p>
               </>
             }
@@ -1490,8 +1491,8 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
       }
       case 'two-group': return <>
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration })} />
-        <ColumnSelect title="Event · 1 observed, 0 censored" value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
-        <ColumnSelect title="Group · 0 or 1" value={draft.group} columns={columns} onChange={(group) => configure({ ...draft, group })} />
+        <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
+        <ColumnSelect title={<Metadata><span>Group</span><span className="font-normal text-faint">0 or 1</span></Metadata>} value={draft.group} columns={columns} onChange={(group) => configure({ ...draft, group })} />
         <label className="block">
           <ParameterLabel label="Compare through time" help="The follow-up time the restricted mean is taken to. Event-free time is averaged up to here, so the difference is in the duration column's units." />
           <input className={field('text', 'mt-1 w-full')} type="number" min={0.001} step="any" value={draft.truncationTime} aria-label="Compare through time" onChange={(event) => configure({ ...draft, truncationTime: Math.max(0.001, Number(event.target.value) || 10) })} />
@@ -1519,7 +1520,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
             case 'prepared-rows': return <>
               <ColumnSelect title="Start time" value={input.start} columns={columns} onChange={(start) => configure({ ...draft, input: { ...input, start } })} />
               <ColumnSelect title="Stop time" value={input.stop} columns={columns} onChange={(stop) => configure({ ...draft, input: { ...input, stop } })} />
-              <ColumnSelect title="Event · 1 transition, 0 censored" value={input.event} columns={columns} onChange={(event) => configure({ ...draft, input: { ...input, event } })} />
+              <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 transition, 0 censored</span></Metadata>} value={input.event} columns={columns} onChange={(event) => configure({ ...draft, input: { ...input, event } })} />
               <ColumnSelect title="Origin state" value={input.from} columns={columns} onChange={(from) => configure({ ...draft, input: { ...input, from } })} />
               <ColumnSelect title="Destination state" value={input.to} columns={columns} onChange={(to) => configure({ ...draft, input: { ...input, to } })} />
             </>
@@ -1545,7 +1546,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
                     }} />No time/status fields for this state</label>
                     {state.kind === 'recorded' && <>
                       <ColumnSelect title="Time reached or last followed" value={state.time} columns={columns} onChange={(time) => configure({ ...draft, input: { ...input, states: input.states.map((candidate, candidateIndex) => candidateIndex === index && candidate.kind === 'recorded' ? { ...candidate, time } : candidate) } })} />
-                      <ColumnSelect title="Reached · 1 yes, 0 censored" value={state.status} columns={columns} onChange={(status) => configure({ ...draft, input: { ...input, states: input.states.map((candidate, candidateIndex) => candidateIndex === index && candidate.kind === 'recorded' ? { ...candidate, status } : candidate) } })} />
+                      <ColumnSelect title={<Metadata><span>Reached</span><span className="font-normal text-faint">1 yes, 0 censored</span></Metadata>} value={state.status} columns={columns} onChange={(status) => configure({ ...draft, input: { ...input, states: input.states.map((candidate, candidateIndex) => candidateIndex === index && candidate.kind === 'recorded' ? { ...candidate, status } : candidate) } })} />
                     </>}
                   </fieldset>
                 ))}

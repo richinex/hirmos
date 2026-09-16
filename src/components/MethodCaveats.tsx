@@ -16,14 +16,14 @@ interface MethodCaveatsProps {
 
 /** The works behind a set of sources, each once. Implementation references stay in the method record and the manifest. */
 export const literatureOf = (sources: readonly MethodSource[]): readonly string[] =>
-  [...new Set(sources.flatMap((source) => (source.kind === 'paper' ? [`${source.title} · ${source.locator}`] : [])))]
+  [...new Set(sources.flatMap((source) => (source.kind === 'paper' ? [`${source.title}, ${source.locator}`] : [])))]
 
 const literature = (method: MethodDefinition): readonly string[] => literatureOf(method.caveats.flatMap((caveat) => caveat.sources))
 
 /** One disclosure row in the requirements panel: a name, an optional tally, the body, and the literature line. */
 export function RequirementsFold({ name, tally: tallyText = null, open = false, literature: works = [], children }: {
   readonly name: string
-  readonly tally?: string | null
+  readonly tally?: React.ReactNode
   readonly open?: boolean
   readonly literature?: readonly string[]
   readonly children: React.ReactNode
@@ -80,20 +80,27 @@ const evidenceText = (evaluation: CaveatEvaluation | undefined): string | null =
 const conditions = (method: MethodDefinition): readonly MethodCaveat[] => method.caveats.filter((caveat) => caveat.category !== 'interpretation')
 const readingRules = (method: MethodDefinition): readonly MethodCaveat[] => method.caveats.filter((caveat) => caveat.category === 'interpretation')
 
-/** "2 checked · 1 to review" for the disclosure row; the plain count when nothing was evaluated. */
-const tally = (method: MethodDefinition, evaluations: ReadonlyMap<string, CaveatEvaluation>): string => {
+const tallyStyle = {
+  satisfied: { icon: 'check_circle', label: 'checked', tone: 'text-ok' },
+  unresolved: { icon: 'help_outline', label: 'to review', tone: 'text-warn' },
+  violated: { icon: 'error', label: 'failed', tone: 'text-danger' },
+} as const satisfies Record<CaveatEvaluation['kind'], { readonly icon: string; readonly label: string; readonly tone: string }>
+
+const tally = (method: MethodDefinition, evaluations: ReadonlyMap<string, CaveatEvaluation>): React.ReactNode => {
   const counts = { satisfied: 0, unresolved: 0, violated: 0 }
   for (const caveat of conditions(method)) {
     const evaluation = evaluations.get(caveat.id)
     if (evaluation !== undefined) counts[evaluation.kind] += 1
   }
-  const parts = [
-    counts.satisfied > 0 ? `${counts.satisfied} checked` : null,
-    counts.unresolved > 0 ? `${counts.unresolved} to review` : null,
-    counts.violated > 0 ? `${counts.violated} fail${counts.violated === 1 ? 's' : ''}` : null,
-  ].filter((part): part is string => part !== null)
+  const statuses = (['satisfied', 'unresolved', 'violated'] as const).filter((kind) => counts[kind] > 0)
   const total = conditions(method).length
-  return parts.length === 0 ? `${total} condition${total === 1 ? '' : 's'}` : parts.join(' · ')
+  if (statuses.length === 0) return `${total} condition${total === 1 ? '' : 's'}`
+  return <span className="inline-flex flex-wrap items-center gap-x-4 gap-y-1" data-testid="requirement-tally">
+    {statuses.map((kind) => <span key={kind} className={`inline-flex items-center gap-1.5 whitespace-nowrap ${tallyStyle[kind].tone}`}>
+      <Icon name={tallyStyle[kind].icon} size={15} />
+      <span><span className="tabular-nums">{counts[kind]}</span> {tallyStyle[kind].label}</span>
+    </span>)}
+  </span>
 }
 
 export function MethodCaveats({ methods, eligibility = null, identification = null, leading = null }: MethodCaveatsProps) {

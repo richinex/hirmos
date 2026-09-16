@@ -3,6 +3,7 @@ import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { isNumericDuckDbType } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
 import { FigureParts } from '@/components/ui/figures'
+import { Metadata } from '@/components/ui/Metadata'
 import { Icon } from '@/components/Icon'
 import { iconControl, literal, num } from '@/components/ui/recipes'
 import { formatCount } from '@/lib/format/number'
@@ -59,8 +60,8 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
 
       {children}
 
-      <p className="m-0 truncate text-label text-faint" title={profile.source.fingerprint}>
-        SHA-256 <span className={literal()}>{profile.source.fingerprint.slice(0, 12)}</span> · DuckDB {profile.parser.engineVersion}
+      <p className="m-0 text-label text-faint" title={profile.source.fingerprint}>
+        <Metadata><span>SHA-256 <span className={literal()}>{profile.source.fingerprint.slice(0, 12)}</span></span><span>DuckDB {profile.parser.engineVersion}</span></Metadata>
       </p>
     </section>
   )

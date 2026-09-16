@@ -167,7 +167,7 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
         className="nodrag nopan"
         title={`Drag to draw an arrow from ${data.name}`}
       />
-      <span className={`${CARD_GRIP} relative z-10 line-clamp-3 cursor-grab whitespace-normal text-body font-medium text-ink [overflow-wrap:break-word] active:cursor-grabbing`} title={`${data.name} · drag to move`}>{data.name}</span>
+      <span className={`${CARD_GRIP} relative z-10 line-clamp-3 cursor-grab whitespace-normal text-body font-medium text-ink [overflow-wrap:break-word] active:cursor-grabbing`} title={`${data.name}, drag to move`}>{data.name}</span>
       <span className={label(`mt-0.5 truncate ${data.intervention === 'set' ? 'text-signal' : data.intervention === 'read' ? 'text-[var(--color-info)]' : 'text-faint'}`)} title={data.role ?? undefined}>{data.role ?? (data.kind === 'latent' ? 'Unmeasured' : 'Observed')}</span>
       <Handle
         type="target"
@@ -577,7 +577,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
           : edge.evidence.length > 0 ? 'var(--color-info)' : 'var(--color-muted)'
     const flowWords = edgeFlow === null ? '' : edgeFlow.biasing ? '; lies on an open biasing path' : edgeFlow.causal ? '; lies on a directed causal path' : '; not on an active treatment–outcome path'
     const timingLabel = edge.timing.kind === 'lagged' ? `t−${edge.timing.lag}` : ''
-    const edgeLabel = [timingLabel, unstated ? 'needs rationale' : ''].filter((part) => part.length > 0).join(' · ')
+    const edgeLabel = [timingLabel, unstated ? 'needs rationale' : ''].filter((part) => part.length > 0).join('; ')
     return {
       id: edge.id,
       type: 'dagEdge',

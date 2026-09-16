@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { TLearnerUncertainty } from './TLearnerUncertainty'
 import { TLearnerIntervals } from './TLearnerIntervals'
@@ -345,7 +346,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
         <div className="figure-strip overflow-x-auto">
           <table className="w-full border-collapse text-body" aria-label="Panel estimator comparison">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Estimator</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Estimate</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Placebo SE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">In-time placebo</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Noise level</th></tr></thead>
-            <tbody>{estimates.map(([name, estimate, placebo, inTime]) => <tr key={name}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{name}{name.startsWith('Synthetic difference') ? ' · primary' : ''}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.estimate).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{placebo === null ? '—' : placebo.kind === 'available' ? formatStatistic('raw', placebo.standardError).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{inTime === null ? '—' : inTime.kind === 'available' ? formatStatistic('raw', inTime.estimate).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.noiseLevel).text}</td></tr>)}</tbody>
+            <tbody>{estimates.map(([name, estimate, placebo, inTime]) => <tr key={name}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{name}{name.startsWith('Synthetic difference') ? <Metadata><span></span><span>primary</span></Metadata> : ''}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.estimate).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{placebo === null ? '—' : placebo.kind === 'available' ? formatStatistic('raw', placebo.standardError).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{inTime === null ? '—' : inTime.kind === 'available' ? formatStatistic('raw', inTime.estimate).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.noiseLevel).text}</td></tr>)}</tbody>
           </table>
         </div>
         {[evidence.syntheticControlPlacebo, evidence.syntheticDidPlacebo, evidence.syntheticControlInTime, evidence.syntheticDidInTime].some((item) => item.kind === 'unavailable') ? (
@@ -398,7 +399,7 @@ function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
 }
 
 function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
-  const tiles = ((): readonly { readonly label: string; readonly value: Formatted; readonly context?: string }[] => {
+  const tiles = ((): readonly { readonly label: string; readonly value: Formatted; readonly context?: React.ReactNode }[] => {
     switch (run.kind) {
       case 'frontdoor-two-stage-run': {
         const { evidence } = run
@@ -413,23 +414,23 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const { evidence } = run
         const instruments = evidence.instruments.map((index) => run.columns[index]?.name ?? String(index)).join(', ')
         return [
-          { label: 'Estimator route', value: formatWords(describeInstrumentalVariableRoute(evidence.route)), context: `${formatCount(evidence.instruments.length, { noun: 'instrument' }).text} · ${formatCount(evidence.params.length, { noun: 'coefficient' }).text}` },
+          { label: 'Estimator route', value: formatWords(describeInstrumentalVariableRoute(evidence.route)), context: <Metadata><span>{formatCount(evidence.instruments.length, { noun: 'instrument' }).text}</span><span>{formatCount(evidence.params.length, { noun: 'coefficient' }).text}</span></Metadata> },
           { label: 'Instruments', value: formatWords(instruments), context: `${formatCount(evidence.observations).text} rows` },
-          { label: 'Bootstrap SE', value: evidence.standardError === null ? formatWords('none') : formatStatistic('raw', evidence.standardError), context: evidence.uncertainty.kind === 'bootstrap' ? `${formatCount(evidence.uncertainty.simulations).text} resamples · seed ${evidence.uncertainty.seed}` : 'no bootstrap requested' },
+          { label: 'Bootstrap SE', value: evidence.standardError === null ? formatWords('none') : formatStatistic('raw', evidence.standardError), context: evidence.uncertainty.kind === 'bootstrap' ? <Metadata><span>{formatCount(evidence.uncertainty.simulations).text} resamples</span><span>seed {evidence.uncertainty.seed}</span></Metadata> : 'no bootstrap requested' },
         ]
       }
       case 'backdoor-linear-run': {
         const { evidence } = run
         return [
           { label: 'R squared', value: formatStatistic('score', evidence.rSquared), context: `${formatCount(evidence.parameters).text} parameters` },
-          { label: 'Residual SD', value: formatStatistic('sd', evidence.residualSd), context: `${formatCount(evidence.degreesOfFreedom).text} degrees of freedom · Durbin–Watson ${formatStatistic('raw', evidence.durbinWatson).text}` },
+          { label: 'Residual SD', value: formatStatistic('sd', evidence.residualSd), context: <Metadata><span>{formatCount(evidence.degreesOfFreedom).text} degrees of freedom</span><span>Durbin–Watson {formatStatistic('raw', evidence.durbinWatson).text}</span></Metadata> },
           { label: 'Newey–West bandwidth', value: formatCount(evidence.hacMaxLags, { noun: 'lag' }), context: `heteroskedasticity and autocorrelation consistent p ${formatP(evidence.hacPValue, { withLabel: false }).text}` },
         ]
       }
       case 'count-glm-run': {
         const { evidence } = run
         return [
-          { label: 'Coefficient', value: formatStatistic('raw', evidence.coefficient), context: `SE ${formatStatistic('raw', evidence.standardError).text} · p ${formatP(evidence.pValue, { withLabel: false }).text}` },
+          { label: 'Coefficient', value: formatStatistic('raw', evidence.coefficient), context: <Metadata><span>SE {formatStatistic('raw', evidence.standardError).text}</span><span>p {formatP(evidence.pValue, { withLabel: false }).text}</span></Metadata> },
           evidence.family === 'poisson'
             ? { label: 'Deviance', value: formatStatistic('raw', evidence.deviance ?? Number.NaN), context: `${formatCount(evidence.degreesOfFreedom).text} degrees of freedom` }
             : { label: 'Dispersion alpha', value: formatStatistic('raw', evidence.alpha ?? Number.NaN), context: `log likelihood ${formatStatistic('raw', evidence.logLikelihood ?? Number.NaN).text}` },
@@ -439,9 +440,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       case 'negative-binomial-ingarch-run': {
         const { evidence } = run
         return [
-          { label: 'Average path difference', value: formatStatistic('raw', evidence.averageEffect), context: `${formatCount(evidence.horizon).text} forecast periods · cumulative ${formatStatistic('raw', evidence.cumulativeEffect).text}` },
+          { label: 'Average path difference', value: formatStatistic('raw', evidence.averageEffect), context: <Metadata><span>{formatCount(evidence.horizon).text} forecast periods</span><span>cumulative {formatStatistic('raw', evidence.cumulativeEffect).text}</span></Metadata> },
           { label: 'Overdispersion', value: formatStatistic('raw', evidence.dispersion), context: `negative-binomial size ${formatStatistic('raw', evidence.size).text}` },
-          { label: 'Recursion', value: formatWords(`${evidence.link === 'identity' ? 'additive' : 'multiplicative'} · count lag ${evidence.pastObservationLags.join(', ')} · mean lag ${evidence.pastMeanLags.join(', ')}`), context: `${formatCount(evidence.iterations).text} optimizer iterations · ${evidence.functionEvaluations}/${evidence.gradientEvaluations} function/gradient evaluations` },
+          { label: 'Recursion', value: formatWords(`${evidence.link === 'identity' ? 'additive' : 'multiplicative'}, count lag ${evidence.pastObservationLags.join(', ')}, mean lag ${evidence.pastMeanLags.join(', ')}`), context: <Metadata><span>{formatCount(evidence.iterations).text} optimizer iterations</span><span>{evidence.functionEvaluations}/{evidence.gradientEvaluations} function/gradient evaluations</span></Metadata> },
         ]
       }
       case 'ardl-run': {
@@ -450,18 +451,18 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const [lower, upper] = evidence.boundsCritical[1] ?? [Number.NaN, Number.NaN]
         return [
           { label: 'Bounds test', value: formatWords(reading === 'level-relation' ? 'level relation' : reading === 'no-level-relation' ? 'no level relation' : 'inconclusive'), context: `F ${formatStatistic('raw', evidence.boundsStatistic).text} against 5% bounds ${formatStatistic('raw', lower).text} to ${formatStatistic('raw', upper).text}` },
-          { label: 'Bounds p', value: formatP(evidence.boundsPUpper, { withLabel: false }), context: `I(1) bound · I(0) bound p ${formatP(evidence.boundsPLower, { withLabel: false }).text}` },
-          { label: 'Lag orders', value: formatWords(`ARDL(${evidence.arLag}, ${evidence.dlLag})`), context: `AIC over ${formatCount(evidence.grid.length).text} candidates · ${evidence.trend === 'ct' ? 'constant and trend' : 'constant'} · case ${evidence.case}` },
+          { label: 'Bounds p', value: formatP(evidence.boundsPUpper, { withLabel: false }), context: <Metadata><span>I(1) bound</span><span>I(0) bound p {formatP(evidence.boundsPLower, { withLabel: false }).text}</span></Metadata> },
+          { label: 'Lag orders', value: formatWords(`ARDL(${evidence.arLag}, ${evidence.dlLag})`), context: <Metadata><span>AIC over {formatCount(evidence.grid.length).text} candidates</span><span>{evidence.trend === 'ct' ? 'constant and trend' : 'constant'}</span><span>case {evidence.case}</span></Metadata> },
         ]
       }
       case 'vecm-run': {
         const { evidence } = run
         return [
-          { label: 'Cointegration rank', value: formatCount(evidence.rank), context: `Johansen trace at ${['90', '95', '99'][evidence.significance] ?? ''}% · ${evidence.kArDiff} lagged differences` },
-          { label: 'Adjustment p', value: formatWords(evidence.pvaluesAlpha.map((row) => formatP(row[0] ?? Number.NaN, { withLabel: false }).text).join(' · ')), context: `alpha per equation · terms “${evidence.deterministic}”` },
+          { label: 'Cointegration rank', value: formatCount(evidence.rank), context: <Metadata><span>Johansen trace at {['90', '95', '99'][evidence.significance] ?? ''}%</span><span>{evidence.kArDiff} lagged differences</span></Metadata> },
+          { label: 'Adjustment p', value: formatWords(evidence.pvaluesAlpha.map((row) => formatP(row[0] ?? Number.NaN, { withLabel: false }).text).join('; ')), context: <Metadata><span>alpha per equation</span><span>terms “{evidence.deterministic}”</span></Metadata> },
           evidence.chow === null
             ? { label: 'Chow break', value: formatWords('not requested'), context: 'set a split after a row to test stability' }
-            : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: `F ${formatStatistic('raw', evidence.chow[0]).text} · split after row ${run.configuration.breakIndex}` },
+            : { label: 'Chow break', value: formatP(evidence.chow[1], { withLabel: false }), context: <Metadata><span>F {formatStatistic('raw', evidence.chow[0]).text}</span><span>split after row {run.configuration.breakIndex}</span></Metadata> },
         ]
       }
       case 'synthetic-control-run': {
@@ -475,13 +476,13 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
               .filter((donor) => donor.weight >= 0.0005)
               .sort((first, second) => second.weight - first.weight)
               .map((donor) => `${donor.name} ${formatStatistic('score', donor.weight).text}`)
-              .join(' · ')),
-            context: `${formatCount(evidence.weights.filter((weight) => weight >= 0.0005).length).text} of ${evidence.weights.length} donors carry weight · sum to one`,
+              .join('; ')),
+            context: <Metadata><span>{formatCount(evidence.weights.filter((weight) => weight >= 0.0005).length).text} of {evidence.weights.length} donors carry weight</span><span>sum to one</span></Metadata>,
           },
-          { label: 'Pre-period loss', value: formatStatistic('raw', evidence.loss), context: `${formatCount(evidence.nPre).text} pre rows · ${formatCount(evidence.iterations).text} active-set steps` },
+          { label: 'Pre-period loss', value: formatStatistic('raw', evidence.loss), context: <Metadata><span>{formatCount(evidence.nPre).text} pre rows</span><span>{formatCount(evidence.iterations).text} active-set steps</span></Metadata> },
           { label: 'Average post gap', value: formatStatistic('raw', evidence.att), context: `over ${formatCount(evidence.nPost).text} post rows` },
           evidence.crossFit.kind === 'available'
-            ? { label: 'Bias-corrected estimate', value: formatStatistic('raw', evidence.crossFit.att), context: `pre-period blocks left out in turn · SE ${formatStatistic('raw', evidence.crossFit.standardError).text} · ${formatInterval(evidence.crossFit.att, evidence.crossFit.confidenceInterval[0], evidence.crossFit.confidenceInterval[1], { kind: 'confidence', level: 0.95 }, additive).text} · p ${formatP(evidence.crossFit.pValue, { withLabel: false }).text}` }
+            ? { label: 'Bias-corrected estimate', value: formatStatistic('raw', evidence.crossFit.att), context: <Metadata><span>pre-period blocks left out in turn</span><span>SE {formatStatistic('raw', evidence.crossFit.standardError).text}</span><span>{formatInterval(evidence.crossFit.att, evidence.crossFit.confidenceInterval[0], evidence.crossFit.confidenceInterval[1], { kind: 'confidence', level: 0.95 }, additive).text}</span><span>p {formatP(evidence.crossFit.pValue, { withLabel: false }).text}</span></Metadata> }
             : { label: 'Bias-corrected estimate', value: formatWords('unavailable'), context: evidence.crossFit.reason },
           evidence.donorPlacebo.kind === 'available'
             ? { label: 'Donor placebo rank', value: formatP(evidence.donorPlacebo.pValue, { withLabel: false }), context: `compared with ${formatCount(evidence.donorPlacebo.nValidPlacebos).text} donors treated in turn; smaller means fewer donors looked as unusual` }
@@ -498,10 +499,10 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           .sort((left, right) => right.weight - left.weight)
           .slice(0, 3)
           .map(({ weight, unit }) => `${unit} ${formatStatistic('score', weight).text}`)
-          .join(' · ')
+          .join('; ')
         return [
-          { label: 'Method comparison', value: formatWords(`DID ${formatStatistic('raw', evidence.did.estimate).text} · synthetic control ${formatStatistic('raw', evidence.syntheticControl.estimate).text} · synthetic DID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: `synthetic DID chosen as the main result before fitting · ${formatCount(evidence.nPost).text} post periods` },
-          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated · ${evidence.controlUnits} comparison`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
+          { label: 'Method comparison', value: formatWords(`DID ${formatStatistic('raw', evidence.did.estimate).text}, synthetic control ${formatStatistic('raw', evidence.syntheticControl.estimate).text}, synthetic DID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: <Metadata><span>synthetic DID chosen as the main result before fitting</span><span>{formatCount(evidence.nPost).text} post periods</span></Metadata> },
+          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
           { label: 'Most influential comparison units', value: formatWords(topWeights || 'none'), context: 'largest synthetic-DID unit weights' },
         ]
       }
@@ -510,32 +511,32 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         // The bound estimate carries the effects as a non-empty list; the raw evidence only promises a list.
         const summary = run.estimate.effect.kind === 'perRow' ? summariseRowEffects(run.estimate.effect.effects) : null
         return [
-          { label: 'Arms', value: formatWords(`${formatCount(evidence.controlRows).text} control · ${formatCount(evidence.treatedRows).text} treated`), context: 'one outcome forest each' },
-          { label: 'Row effects', value: formatWords(summary === null ? 'none' : `${formatStatistic('raw', summary.minimum).text} to ${formatStatistic('raw', summary.maximum).text}`), context: summary === null ? '' : `median ${formatStatistic('raw', summary.median).text} · ${formatPercent(summary.positiveShare, { precision: 0 }).text} above zero` },
-          { label: 'Forests', value: formatWords(`${formatCount(evidence.trees).text} trees`), context: `minimum leaf ${evidence.minLeaf} · learner seed ${evidence.seed}` },
+          { label: 'Arms', value: formatWords(`${formatCount(evidence.controlRows).text} control, ${formatCount(evidence.treatedRows).text} treated`), context: 'one outcome forest each' },
+          { label: 'Row effects', value: formatWords(summary === null ? 'none' : `${formatStatistic('raw', summary.minimum).text} to ${formatStatistic('raw', summary.maximum).text}`), context: summary === null ? '' : <Metadata><span>median {formatStatistic('raw', summary.median).text}</span><span>{formatPercent(summary.positiveShare, { precision: 0 }).text} above zero</span></Metadata> },
+          { label: 'Forests', value: formatWords(`${formatCount(evidence.trees).text} trees`), context: <Metadata><span>minimum leaf {evidence.minLeaf}</span><span>learner seed {evidence.seed}</span></Metadata> },
         ]
       }
       case 'negbin-nuts-run': {
         const { evidence } = run
         return [
-          { label: 'Divergences', value: formatCount(evidence.divergences), context: `acceptance ${formatStatistic('score', evidence.acceptanceRate).text} · step ${formatStatistic('raw', evidence.stepSize).text}` },
-          { label: 'Rate ratio per SD', value: formatStatistic('raw', Math.exp(evidence.betaTreatmentMean)), context: `per standard deviation of ${run.columns[0]?.name ?? 'the treatment'} · beta ${formatStatistic('raw', evidence.betaTreatmentMean).text}, posterior sd ${formatStatistic('raw', evidence.betaTreatmentSd).text}` },
-          { label: 'Dispersion r', value: formatStatistic('raw', evidence.dispersionMean), context: `${formatCount(evidence.warmup).text} warmup · ${formatCount(evidence.samples).text} draws · seed ${evidence.seed}` },
+          { label: 'Divergences', value: formatCount(evidence.divergences), context: <Metadata><span>acceptance {formatStatistic('score', evidence.acceptanceRate).text}</span><span>step {formatStatistic('raw', evidence.stepSize).text}</span></Metadata> },
+          { label: 'Rate ratio per SD', value: formatStatistic('raw', Math.exp(evidence.betaTreatmentMean)), context: <Metadata><span>per standard deviation of {run.columns[0]?.name ?? 'the treatment'}</span><span>beta {formatStatistic('raw', evidence.betaTreatmentMean).text}, posterior sd {formatStatistic('raw', evidence.betaTreatmentSd).text}</span></Metadata> },
+          { label: 'Dispersion r', value: formatStatistic('raw', evidence.dispersionMean), context: <Metadata><span>{formatCount(evidence.warmup).text} warmup</span><span>{formatCount(evidence.samples).text} draws</span><span>seed {evidence.seed}</span></Metadata> },
         ]
       }
       case 'bayesian-gaussian-run': {
         const { evidence } = run
         return [
-          { label: 'Divergences', value: formatCount(evidence.divergences), context: `${formatCount(evidence.chains).text} chains · acceptance ${formatStatistic('score', evidence.acceptanceRate).text} · step ${formatStatistic('raw', evidence.stepSize).text}` },
-          { label: 'P(effect > 0)', value: formatStatistic('score', evidence.probabilityPositive), context: `posterior mean ${formatStatistic('raw', evidence.effectMean).text} · sd ${formatStatistic('raw', evidence.effectSd).text} · median ${formatStatistic('raw', evidence.effectMedian).text}` },
-          { label: 'Residual sd', value: formatStatistic('raw', evidence.sigmaMean), context: `${formatCount(evidence.warmup).text} warmup · ${formatCount(evidence.samples).text} draws per chain · seed ${evidence.seed}` },
+          { label: 'Divergences', value: formatCount(evidence.divergences), context: <Metadata><span>{formatCount(evidence.chains).text} chains</span><span>acceptance {formatStatistic('score', evidence.acceptanceRate).text}</span><span>step {formatStatistic('raw', evidence.stepSize).text}</span></Metadata> },
+          { label: 'P(effect > 0)', value: formatStatistic('score', evidence.probabilityPositive), context: <Metadata><span>posterior mean {formatStatistic('raw', evidence.effectMean).text}</span><span>sd {formatStatistic('raw', evidence.effectSd).text}</span><span>median {formatStatistic('raw', evidence.effectMedian).text}</span></Metadata> },
+          { label: 'Residual sd', value: formatStatistic('raw', evidence.sigmaMean), context: <Metadata><span>{formatCount(evidence.warmup).text} warmup</span><span>{formatCount(evidence.samples).text} draws per chain</span><span>seed {evidence.seed}</span></Metadata> },
         ]
       }
       case 'discrete-bn-run': {
         const { evidence } = run
         return [
-          { label: 'Treatment states', value: formatWords(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: `state budget ${evidence.bins} · counts ${evidence.stateCounts.join('/')}` },
-          { label: 'State preparation', value: formatWords(`${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'observedStates').length} observed · ${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'quantiles').length} quantile`), context: describeDiscreteStatePreparations(evidence.statePreparations) },
+          { label: 'Treatment states', value: formatWords(`${evidence.treatmentStates[0]} → ${evidence.treatmentStates[1]}`), context: <Metadata><span>state budget {evidence.bins}</span><span>counts {evidence.stateCounts.join('/')}</span></Metadata> },
+          { label: 'State preparation', value: formatWords(`${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'observedStates').length} observed, ${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'quantiles').length} quantile`), context: describeDiscreteStatePreparations(evidence.statePreparations) },
           { label: 'Expected outcome', value: formatWords(`${formatStatistic('raw', evidence.expectations[0]).text} → ${formatStatistic('raw', evidence.expectations[1]).text}`), context: 'under do(low) and do(high)' },
           ...(evidence.parentsAdjusted.join(', ') === adjustmentLabels(run.estimate.adjustment).join(', ') ? [] : [
   { label: 'Adjustment set', value: formatWords(evidence.parentsAdjusted.length === 0 ? 'none' : evidence.parentsAdjusted.join(', ')), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : evidence.minimalAdjustmentSet.join(', ')}` },
@@ -547,15 +548,15 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         return [
           { label: 'E[Y(1) | X=1]', value: formatStatistic('raw', evidence.treatedPotentialOutcomeMean), context: 'treated potential-outcome mean among treated rows' },
           { label: 'E[Y(0) | X=1]', value: formatStatistic('raw', evidence.untreatedPotentialOutcomeMean), context: 'untreated potential-outcome mean among treated rows' },
-          { label: 'ETT', value: formatStatistic('raw', evidence.effectOnTreated), context: `${formatCount(evidence.observations).text} rows · plug-in estimate` },
+          { label: 'ETT', value: formatStatistic('raw', evidence.effectOnTreated), context: <Metadata><span>{formatCount(evidence.observations).text} rows</span><span>plug-in estimate</span></Metadata> },
         ]
       }
       case 'double-ml-run': {
         const { evidence } = run
         return [
-          { label: 'Model', value: formatWords(evidence.model === 'plr' ? 'partially linear' : evidence.att ? 'interactive · effect on the treated' : 'interactive · average effect'), context: evidence.treatBinary ? 'binary treatment' : 'continuous treatment' },
+          { label: 'Model', value: formatWords(evidence.model === 'plr' ? 'partially linear' : evidence.att ? 'interactive (effect on the treated)' : 'interactive (average effect)'), context: evidence.treatBinary ? 'binary treatment' : 'continuous treatment' },
           { label: 'Standard error', value: formatStatistic('raw', evidence.standardError), context: 'sandwich, cross-fitted' },
-          { label: 'Fold seed', value: formatCount(evidence.seed), context: '5 folds · 200 trees · learner seed 7' },
+          { label: 'Fold seed', value: formatCount(evidence.seed), context: <Metadata><span>5 folds</span><span>200 trees</span><span>learner seed 7</span></Metadata> },
         ]
       }
       case 'causal-effects-run': {
@@ -565,11 +566,11 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           switch (evidence.fit.kind) {
             case 'unfitted': return []
             case 'invalidAdjustment': return []
-            case 'adjustedLinear': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `${adjustmentStrategyLabel(evidence.fit.selection)} · linear · τ max ${evidence.tauMax}` }]
-            case 'adjustedKnn': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: `${adjustmentStrategyLabel(evidence.fit.selection)} · ${evidence.fit.k}-neighbour · τ max ${evidence.tauMax}` }]
+            case 'adjustedLinear': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: <Metadata><span>{adjustmentStrategyLabel(evidence.fit.selection)}</span><span>linear</span><span>τ max {evidence.tauMax}</span></Metadata> }]
+            case 'adjustedKnn': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: <Metadata><span>{adjustmentStrategyLabel(evidence.fit.selection)}</span><span>{evidence.fit.k}-neighbour</span><span>τ max {evidence.tauMax}</span></Metadata> }]
             case 'wrightParents': return [
               { label: 'Direct effect', value: formatStatistic('raw', evidence.fit.directEffect), context: 'sum of direct path contrasts' },
-              { label: 'Indirect effect', value: formatStatistic('raw', evidence.fit.indirectEffect), context: `${evidence.fit.paths.length} directed paths · ${evidence.fit.coefficients.length} parent coefficients` },
+              { label: 'Indirect effect', value: formatStatistic('raw', evidence.fit.indirectEffect), context: <Metadata><span>{evidence.fit.paths.length} directed paths</span><span>{evidence.fit.coefficients.length} parent coefficients</span></Metadata> },
             ]
             default: return assertNever(evidence.fit)
           }
@@ -578,7 +579,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           ...fitTiles,
           { label: 'Predictions', value: formatWords(evidence.predictions.map((value) => formatStatistic('raw', value).text).join(' → ')), context: `at ${evidence.interventions[0]} and ${evidence.interventions[1]}` },
           { label: 'Fitted rows', value: formatCount(evidence.fittedObservations), context: evidence.mediators.length === 0 ? 'no mediators' : `${evidence.mediators.length} mediator nodes` },
-          ...(evidence.uncertainty.kind === 'bootstrap' ? [{ label: 'Bootstrap', value: formatCount(evidence.uncertainty.samples), context: `${Math.round(evidence.uncertainty.confidenceLevel * 100)}% percentile interval · block ${evidence.uncertainty.resolvedBlockLength} · seed ${evidence.uncertainty.seed}` }] : []),
+          ...(evidence.uncertainty.kind === 'bootstrap' ? [{ label: 'Bootstrap', value: formatCount(evidence.uncertainty.samples), context: <Metadata><span>{Math.round(evidence.uncertainty.confidenceLevel * 100)}% percentile interval</span><span>block {evidence.uncertainty.resolvedBlockLength}</span><span>seed {evidence.uncertainty.seed}</span></Metadata> }] : []),
         ]
       }
       case 'causal-impact-run': {
@@ -595,11 +596,11 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   const adjustmentValue = formatWords(run.kind === 'panel-intervention-run'
     ? 'Unit and time weights'
     : run.kind === 'frontdoor-two-stage-run'
-    ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')} · stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
+    ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}, stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
     : run.kind === 'instrumental-variable-run'
       ? 'None; the estimator uses no covariates'
     : run.estimate.adjustment.kind === 'structural-parent-model'
-      ? `${run.estimate.adjustment.coefficients} parent coefficients · ${run.estimate.adjustment.paths} directed paths`
+      ? `${run.estimate.adjustment.coefficients} parent coefficients, ${run.estimate.adjustment.paths} directed paths`
       : adjustmentLabels(run.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(run.estimate.adjustment).join(', '))
 
   // A method that reports the set it actually fitted names the same members as the recorded estimate
@@ -637,7 +638,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       outcome: study.outcome.name,
       points: estimate.effect.values,
       stepLabel,
-      ghost: ghostRun !== null && ghostRun.estimate.effect.kind === 'path' ? { name: `${describeEstimator(ghostRun.configuration.kind)} · ${formatTime(ghostRun.createdAt)}`, points: ghostRun.estimate.effect.values } : undefined,
+      ghost: ghostRun !== null && ghostRun.estimate.effect.kind === 'path' ? { name: `${describeEstimator(ghostRun.configuration.kind)}, ${formatTime(ghostRun.createdAt)}`, points: ghostRun.estimate.effect.values } : undefined,
     }, theme)
     : null), [estimate.effect, stepLabel, study.outcome.name, theme, ghostRun])
   // Runs recorded before the histogram was added carry no draws, so they keep the summary alone.
@@ -704,7 +705,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
               <p className={label('m-0 text-muted')}>Compare with</p>
               <Select aria-label="Compare with" className={field('text', 'w-64')} value={ghostId} onChange={(event) => setGhostId(event.target.value)}>
                 <option value="">No other run</option>
-                {ghosts.map((other) => <option key={other.id} value={String(other.id)}>{describeEstimator(other.configuration.kind)} · {formatTime(other.createdAt)}</option>)}
+                {ghosts.map((other) => <option key={other.id} value={String(other.id)}>{describeEstimator(other.configuration.kind)} — {formatTime(other.createdAt)}</option>)}
               </Select>
             </div>
           )}
@@ -802,7 +803,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
   const study = identification === null ? null : studies.find((candidate) => candidate.id === identification.study) ?? null
   const studyScale = prepared.kind === 'prepared-time-series' && study !== null
-    ? [study.treatment, study.outcome].map((variable) => `${variable.name}: ${describeSeriesTransform(seriesTransformFor(prepared.seriesTransforms, variable.column))}`).join(' · ')
+    ? [study.treatment, study.outcome].map((variable) => `${variable.name}: ${describeSeriesTransform(seriesTransformFor(prepared.seriesTransforms, variable.column))}`).join('; ')
     : null
   const document = study === null ? null : documents.find((candidate) => candidate.id === study.dagDocument) ?? null
   const configuration = state.configurations[state.estimator]
@@ -1447,7 +1448,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
             </div>
             {panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
-            {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted">Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units · {panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods · adoption at {panelPreflight.layout.adoption.label}.</p>}
+            {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted"><Metadata><span>Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units</span><span>{panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods</span><span>adoption at {panelPreflight.layout.adoption.label}.</span></Metadata></p>}
           </div>
         )
       case 'negbin-nuts':
@@ -1657,12 +1658,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => dispatch({ type: 'identification-chosen', selection: estimationSelection(identified.find((candidate) => candidate.id === event.target.value) ?? null, studies, prepared) })}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
-                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} · ${bound.dagName}`}</option>
+                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} — ${bound.dagName}`}</option>
                 })}
               </Select>
-                {identification !== null && identification.result.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
-                {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
-                {identification !== null && identifiedInstruments(identification.result) !== null && <span className={cn(fieldHint, 'block max-w-[65ch]')}>Instruments: {(identifiedInstruments(identification.result) ?? []).map((variable) => variable.name).join(', ')} · {formatCount(study?.population.observations ?? 0).text} rows</span>}
+                {identification !== null && identification.result.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
+                {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
+                {identification !== null && identifiedInstruments(identification.result) !== null && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Instruments: {(identifiedInstruments(identification.result) ?? []).map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
               </label>
               <div>
                 <SegmentedControl
@@ -1736,9 +1737,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Study binding">
               <dt className="text-faint">Treatment</dt><dd className="m-0 text-ink">{study.treatment.name}</dd>
               <dt className="text-faint">Outcome</dt><dd className="m-0 text-ink">{study.outcome.name}</dd>
-              <dt className="text-faint">Graph</dt><dd className="m-0 text-ink">{study.dagName} · <span className={literal()}>{study.dagRevision.slice(0, 8)}</span></dd>
+              <dt className="text-faint">Graph</dt><dd className="m-0 text-ink"><Metadata><span>{study.dagName}</span><span><span className={literal()}>{study.dagRevision.slice(0, 8)}</span></span></Metadata></dd>
               <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{describeIdentificationStrategy(identification.result)}</dd>
-              <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Independent'} · {formatCount(prepared.observations).text}</dd>
+              <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}><Metadata><span>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Independent'}</span><span>{formatCount(prepared.observations).text}</span></Metadata></dd>
               {studyScale !== null && <><dt className="text-faint">Analysis scale</dt><dd className="m-0 text-ink">{studyScale}</dd></>}
             </dl>
           </>
@@ -1757,7 +1758,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     const comparable = runs.filter((run) => run.study === identification?.study && run.estimate.effect.kind === 'additive')
     if (comparable.length < 2) return null
     const rows: RunComparisonRow[] = comparable.map((run, index) => ({
-      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? ` · ${describeCovariance(run.configuration.covariance)}` : ''} · ${formatTime(run.createdAt)}`,
+      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? `, ${describeCovariance(run.configuration.covariance)}` : ''}, ${formatTime(run.createdAt)}`,
       estimate: run.estimate.effect.kind === 'additive' ? run.estimate.effect.value : 0,
       lower: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.lower,
       upper: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.upper,

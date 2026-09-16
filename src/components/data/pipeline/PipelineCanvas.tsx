@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useCallback, useEffect, useMemo, useState, type DragEvent } from 'react'
 import {
   Background,
@@ -54,11 +55,11 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
   const failed = outcome?.kind === 'failed'
   const skipped = outcome?.kind === 'skipped'
   const foot = running !== null
-    ? <span className="flex items-center gap-1.5"><Orb state="working" aria-label="Script running" className="scale-75" />running · {formatDuration(running.elapsedMs).text}</span>
+    ? <span className="flex items-center gap-1.5"><Metadata><span><Orb state="working" aria-label="Script running" className="scale-75" />running</span><span>{formatDuration(running.elapsedMs).text}</span></Metadata></span>
     : outcome === undefined
       ? 'not run'
       : outcome.kind === 'ran'
-        ? `${formatCount(outcome.rowCount).text} rows · ${outcome.columns.length} ${outcome.columns.length === 1 ? 'column' : 'columns'}`
+        ? `${formatCount(outcome.rowCount).text} rows, ${outcome.columns.length} ${outcome.columns.length === 1 ? 'column' : 'columns'}`
         : outcome.kind === 'failed' ? 'failed' : outcome.kind === 'waiting' ? 'waiting' : 'not run'
   return (
     <div

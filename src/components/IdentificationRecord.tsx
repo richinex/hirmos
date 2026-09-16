@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { Icon } from '@/components/Icon'
 import { label, num } from '@/components/ui/recipes'
 import { assertNever } from '@/domain/dop'
@@ -146,10 +147,8 @@ export function IdentificationRecord({ identification }: { readonly identificati
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {headline}</p>
         <p className="mb-2 mt-1 text-body text-muted">{enabled}</p>
         <details className="group">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-            <Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
-            Show the full record · {plural(identification.basis.length, 'entry').replace('entrys', 'entries')}
-          </summary>
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden"><Metadata><span><Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
+            Show the full record</span><span>{plural(identification.basis.length, 'entry').replace('entrys', 'entries')}</span></Metadata></summary>
           <div className="mt-2 space-y-3">
             {assumed.length > 0 && <ul className="m-0 list-none space-y-2 p-0">{assumed.map((entry) => <OwnedRow key={entry.id} entry={entry} />)}</ul>}
             <ul className="m-0 list-none space-y-2 p-0">{derived.map((entry) => <DerivedRow key={entry.id} entry={entry} />)}</ul>
@@ -170,8 +169,8 @@ export function IdentificationRecord({ identification }: { readonly identificati
   const closers = [...new Set(paths.filter((entry) => entry.closure === 'adjustment').flatMap((entry) => entry.blockedAt))]
   const closersAreTheSet = closers.length === setNames.length && closers.every((name) => setNames.includes(name))
   const pathSummary = paths.length === 0
-    ? 'No open back-door path · no adjustment needed'
-    : `${plural(paths.length, 'back-door path')} · ${closersAreTheSet ? `blocked at ${closers.join(', ')}` : 'all blocked'}`
+    ? 'No open back-door path; no adjustment needed'
+    : `${plural(paths.length, 'back-door path')}, ${closersAreTheSet ? `blocked at ${closers.join(', ')}` : 'all blocked'}`
 
   return (
     <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
@@ -180,15 +179,13 @@ export function IdentificationRecord({ identification }: { readonly identificati
         <li className="flex items-center gap-2 text-ink"><Icon name="check_circle" size={16} className="text-ok" /> {pathSummary}</li>
         <li className={cn('flex items-center gap-2', missing > 0 ? 'text-warn' : 'text-muted')}>
           {missing > 0 && <Icon name="warning" size={16} />}
-          {plural(assumptions.length, 'assumption')} recorded · {missing > 0 ? `${missing} without rationale` : 'all with rationale'}
+          {plural(assumptions.length, 'assumption')} recorded, {missing > 0 ? `${missing} without rationale` : 'all with rationale'}
         </li>
         {qualification !== undefined && <li className="flex items-center gap-2 text-warn"><Icon name="warning" size={16} /> {qualification.statement.split(';')[0]}</li>}
       </ul>
       <details className="group mt-2">
-        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden">
-          <Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
-          Show the full record · {plural(basis.length, 'entry').replace('entrys', 'entries')}
-        </summary>
+        <summary className="flex cursor-pointer list-none items-center gap-1.5 text-body text-muted hover:text-ink [&::-webkit-details-marker]:hidden"><Metadata><span><Icon name="expand_more" size={14} className="transition-transform duration-(--motion-fast) group-open:rotate-180" />
+          Show the full record</span><span>{plural(basis.length, 'entry').replace('entrys', 'entries')}</span></Metadata></summary>
         <div className="mt-2 space-y-3">
           <div>
             <span className={label('block text-muted')}>Assumed by you</span>

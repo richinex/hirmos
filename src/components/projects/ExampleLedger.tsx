@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
@@ -105,7 +106,7 @@ export function ExampleLedger(props: Props) {
                       <div className="min-w-0 flex-1"><span className="block text-body font-medium text-ink">{example.name}</span><span className="mt-1 block text-label text-muted">{example.approach}</span></div>
                       <OpenControl name={example.name} onOpen={() => props.onOpen(example)} />
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><ShapeLabel shape={example.shape} /><span className={num('text-label text-faint')}>{example.size} · {count} estimation {count === 1 ? 'run' : 'runs'}</span></div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1"><ShapeLabel shape={example.shape} /><span className={num('text-label text-faint')}><Metadata><span>{example.size}</span><span>{count} estimation {count === 1 ? 'run' : 'runs'}</span></Metadata></span></div>
                     <div className="mt-1 flex flex-wrap items-center gap-2"><span className={num('min-w-0 flex-1 break-all text-label text-faint')}>{copy === null ? example.sourceName : `saved ${props.formatSaved(copy.savedAt)}`}</span><CopyControls {...props} example={example} copy={copy} /></div>
                   </li>
                 })}

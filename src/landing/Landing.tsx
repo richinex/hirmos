@@ -90,7 +90,7 @@ function EvidenceFigure() {
 export function Landing() {
   const root = useRef<HTMLElement>(null)
   useEffect(() => {
-    document.title = 'Hirmos · browser causal inference workbench'
+    document.title = 'Hirmos, browser causal inference workbench'
     return root.current === null ? undefined : choreographLanding(root.current)
   }, [])
   return (

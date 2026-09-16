@@ -64,12 +64,12 @@ const pValue = (value: number): string => value < 0.001 ? value.toExponential(2)
 const candidateLabel = (candidate: DiscoveryCandidate): string => {
   switch (candidate.kind) {
     case 'cross-sectional-endpoint': return candidate.mark
-    case 'endpoint-marked': return `${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
-    case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1} · ${candidate.mark}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
-    case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : ` · t−${candidate.lag}`}`
-    case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · t−${candidate.lag}`
-    case 'neural-lagged': return `${candidate.method === 'GRACE' ? 'gate' : 'score'} ${statistic(candidate.score)} · t−${candidate.lag}`
-    case 'neural-window': return `score ${statistic(candidate.score)} · ${candidate.context}-step window`
+    case 'endpoint-marked': return `${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
+    case 'regime-endpoint-marked': return `Regime ${candidate.regime + 1}, ${candidate.mark}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
+    case 'weighted-directed': return `w ${statistic(candidate.weight)}${candidate.lag === 0 ? '' : `, t−${candidate.lag}`}`
+    case 'lagged-information': return `CMI ${statistic(candidate.cmi)}, t−${candidate.lag}`
+    case 'neural-lagged': return `${candidate.method === 'GRACE' ? 'gate' : 'score'} ${statistic(candidate.score)}, t−${candidate.lag}`
+    case 'neural-window': return `score ${statistic(candidate.score)}, ${candidate.context}-step window`
     default: return assertNever(candidate)
   }
 }
@@ -81,16 +81,16 @@ const candidateDetail = (candidate: DiscoveryCandidate): string => {
         candidate.directness === null ? null : candidate.directness === 'definitelyDirect' ? 'definitely direct' : 'possibly direct',
         candidate.latentConfounding === null ? null : candidate.latentConfounding === 'excluded' ? 'latent confounding excluded' : 'latent confounding possible',
       ].filter((value): value is string => value !== null)
-      return [`mark ${candidate.mark}`, ...properties].join(' · ')
+      return [`mark ${candidate.mark}`, ...properties].join('; ')
     }
-    case 'endpoint-marked': return `mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
-    case 'regime-endpoint-marked': return `regime ${candidate.regime + 1} · mark ${candidate.mark} · p ${pValue(candidate.pValue)} · ParCorr ${statistic(candidate.statistic)}`
-    case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ' · contemporaneous' : ` · lag ${candidate.lag}`}`
-    case 'lagged-information': return `CMI ${statistic(candidate.cmi)} · p ${pValue(candidate.pValue)} · lag ${candidate.lag}`
+    case 'endpoint-marked': return `mark ${candidate.mark}, p ${pValue(candidate.pValue)}, ParCorr ${statistic(candidate.statistic)}`
+    case 'regime-endpoint-marked': return `regime ${candidate.regime + 1}, mark ${candidate.mark}, p ${pValue(candidate.pValue)}, ParCorr ${statistic(candidate.statistic)}`
+    case 'weighted-directed': return `weight ${statistic(candidate.weight)}${candidate.lag === 0 ? ', contemporaneous' : `, lag ${candidate.lag}`}`
+    case 'lagged-information': return `CMI ${statistic(candidate.cmi)}, p ${pValue(candidate.pValue)}, lag ${candidate.lag}`
     case 'neural-lagged': return candidate.method === 'GRACE'
-      ? `gate value ${statistic(candidate.score)} · lag ${candidate.lag}`
-      : `input-group norm ${statistic(candidate.score)} · lag ${candidate.lag}`
-    case 'neural-window': return `input-group norm ${statistic(candidate.score)} · ${candidate.context}-step history; no individual lag selected`
+      ? `gate value ${statistic(candidate.score)}, lag ${candidate.lag}`
+      : `input-group norm ${statistic(candidate.score)}, lag ${candidate.lag}`
+    case 'neural-window': return `input-group norm ${statistic(candidate.score)}, ${candidate.context}-step history; no individual lag selected`
     default: return assertNever(candidate)
   }
 }
@@ -146,7 +146,7 @@ export function EvidenceInspector({
             if (next !== undefined) onRunSelected(next.id)
           }}
         >
-          {runs.map((candidate, index) => <option key={candidate.id} value={candidate.id}>{methodTitle(candidate)} · {index + 1}</option>)}
+          {runs.map((candidate, index) => <option key={candidate.id} value={candidate.id}>{methodTitle(candidate)} — {index + 1}</option>)}
         </Select>
       </div>
       <EvidenceGraph view={view} selected={selectedCandidate?.run === run.id ? selectedCandidate : null} />

@@ -838,7 +838,7 @@ export const describeDiscreteStatePreparations = (
     default:
       return assertNever(preparation.strategy)
   }
-}).join(' · ')
+}).join('; ')
 
 export const discreteBnEvidenceSchema = z.object({
   kind: z.literal('discreteBnQuery'),

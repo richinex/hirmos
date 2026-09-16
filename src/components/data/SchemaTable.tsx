@@ -199,9 +199,11 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
       titleId={titleId}
       toolbar={(
         <>
-          <FilterField value={search} onChange={setSearch} placeholder="Find a column" label="Search columns" className="w-40 min-w-24 flex-[1_1_8rem]" />
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+            <FilterField value={search} onChange={setSearch} placeholder="Find a column" label="Search columns" className="min-w-0 flex-1 sm:w-40" />
+            <DensityToggle density={density} onChange={setDensity} />
+          </div>
           {hasTypeChoice && <FacetPills facets={facets} label="Column types" onToggle={(id) => setKinds((current) => { const next = new Set(current); if (next.has(id as ColumnKind)) next.delete(id as ColumnKind); else next.add(id as ColumnKind); return next })} />}
-          <DensityToggle density={density} onChange={setDensity} />
         </>
       )}
       count={countLine(visible.length, rows.length, 'column', sortText)}

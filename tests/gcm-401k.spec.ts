@@ -29,7 +29,7 @@ test('401k intervention effects reproduce the reference through the Run button',
     await page.getByRole('textbox', { name: /Rationale/ }).first().fill('Relationship specified in the preserved DoWhy v0.14 401(k) example.')
     await page.getByRole('button', { name: 'Add the arrow' }).click()
   }
-  await page.getByRole('button', { name: 'Use for root-cause analysis', exact: true }).click()
+  await page.getByRole('button', { name: 'Use for causal model analysis', exact: true }).click()
   await page.getByRole('radio', { name: 'Intervention effects', exact: true }).check()
   await page.getByRole('combobox', { name: 'Group effects by', exact: true }).click()
   await page.getByRole('option', { name: 'inc', exact: true }).click()

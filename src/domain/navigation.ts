@@ -18,7 +18,7 @@ export const CHAPTER_IDS = [
 
 export type ChapterId = (typeof CHAPTER_IDS)[number]
 
-const CHAPTER_SECTION_TITLES = ['Set up', 'Time series', 'Model', 'Estimate', 'Root cause', 'Time to event', 'Report'] as const
+const CHAPTER_SECTION_TITLES = ['Set up', 'Time series', 'Model', 'Estimate', 'Causal models', 'Time to event', 'Report'] as const
 type ChapterSectionTitle = (typeof CHAPTER_SECTION_TITLES)[number]
 
 export interface ChapterMetadata {
@@ -39,7 +39,7 @@ export const CHAPTER_METADATA = {
   estimation: { name: 'Estimation', shortName: 'Estimate', icon: 'query_stats', section: 'Estimate' },
   sensitivity: { name: 'Sensitivity', shortName: 'Sensitivity', icon: 'fact_check', section: 'Estimate' },
   counterfactual: { name: 'Counterfactuals', shortName: 'What if', icon: 'alt_route', section: 'Estimate' },
-  'root-cause': { name: 'Root-cause analysis', shortName: 'Root cause', icon: 'root_cause', section: 'Root cause' },
+  'root-cause': { name: 'Causal model analysis', shortName: 'Causal models', icon: 'root_cause', section: 'Causal models' },
   survival: { name: 'Survival analysis', shortName: 'Survival', icon: 'vital_signs', section: 'Time to event' },
   results: { name: 'Results', shortName: 'Results', icon: 'monitoring', section: 'Report' },
 } as const satisfies Readonly<Record<ChapterId, ChapterMetadata>>
@@ -51,11 +51,8 @@ export const CHAPTER_SECTIONS: readonly { readonly title: ChapterSectionTitle; r
     chapters: CHAPTER_IDS.filter((chapter) => CHAPTER_METADATA[chapter].section === title),
   }))
 
-/** The numbered heading uses the same order and name as the navigation rail. */
-export const chapterLabel = (chapter: ChapterId): string => {
-  const position = CHAPTER_IDS.indexOf(chapter) + 1
-  return `${String(position).padStart(2, '0')} · ${CHAPTER_METADATA[chapter].name}`
-}
+/** Headings and navigation use the same chapter name. */
+export const chapterLabel = (chapter: ChapterId): string => CHAPTER_METADATA[chapter].name
 
 const chapterSchema = z.enum(CHAPTER_IDS)
 

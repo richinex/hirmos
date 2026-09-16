@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
@@ -59,7 +60,7 @@ export function CountSeriesRecord({ artifact, open }: { readonly artifact: Count
       <details className={well()} open={open}>
         <summary className="cursor-pointer px-3 py-2 text-body text-ink">
           <span className="font-medium">{artifact.outcome.name}</span>
-          <span className={num('ml-3 text-label text-faint')}>{artifact.result.link === 'identity' ? 'additive' : 'multiplicative'} · count lags {artifact.result.pastObservationLags.join(', ')} · mean lags {artifact.result.pastMeanLags.join(', ')}</span>
+          <span className={num('ml-3 text-label text-faint')}><Metadata><span>{artifact.result.link === 'identity' ? 'additive' : 'multiplicative'}</span><span>count lags {artifact.result.pastObservationLags.join(', ')}</span><span>mean lags {artifact.result.pastMeanLags.join(', ')}</span></Metadata></span>
           <span className={num('float-right text-micro text-faint')}>{formatTime(artifact.createdAt)}</span>
         </summary>
         <div className="border-t border-hair px-3 py-3">
@@ -72,7 +73,7 @@ export function CountSeriesRecord({ artifact, open }: { readonly artifact: Count
           <p className="mb-0 mt-3 text-body text-muted">The maximum locates the date most compatible with the selected intervention shape under this fitted count model. The non-bootstrap scan does not report a p-value, and the date is not evidence of a causal intervention.</p>
           <ResultCharts artifact={artifact} />
           <TimeSeriesEquation run={artifact} />
-          <p className={num('mb-0 mt-3 text-label text-faint')}>Parameters: {artifact.result.parameters.map((value) => formatStatistic('raw', value).text).join(' · ')} · dispersion {formatStatistic('raw', artifact.result.dispersion).text} · {formatCount(artifact.result.observations).text} observations</p>
+          <p className={num('mb-0 mt-3 text-label text-faint')}><Metadata><span>Parameters: {artifact.result.parameters.map((value) => formatStatistic('raw', value).text).join('; ')}</span><span>dispersion {formatStatistic('raw', artifact.result.dispersion).text}</span><span>{formatCount(artifact.result.observations).text} observations</span></Metadata></p>
         </div>
       </details>
     </li>

@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
@@ -25,12 +26,12 @@ import { assertNever } from '@/domain/dop'
 import { lagGraphFromDag } from '@/domain/lagGraph'
 import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID, IDENTIFICATION_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
-import { roleWord, type DagCausalRole } from '@/domain/dagFlow'
+import { roleWord, roleDetail, type DagCausalRole } from '@/domain/dagFlow'
+import { IdentityRow } from '@/components/ui/IdentityRow'
 import {
   backdoorIdentificationCommand,
   describeIdentificationFailure,
   describeStudyDesignProblem,
-  describeVariableRole,
   estimableIdentification,
   estimandSentence,
   identifiedExpression,
@@ -140,7 +141,7 @@ function StudyRecord({ study, identification }: { readonly study: StudySpecifica
       <RecordList className="mt-2 text-label">
         <RecordRow term="Study"><span className={literal('text-muted')} title={study.id}>{study.id.slice(0, 8)}</span></RecordRow>
         <RecordRow term="Identification">{identification === null ? '—' : <span className={literal('text-muted')} title={identification.id}>{identification.id.slice(0, 8)}</span>}</RecordRow>
-        <RecordRow term="Graph">{study.dagName} · revision <span className={literal('text-muted')} title={study.dagRevision}>{study.dagRevision.slice(0, 8)}</span></RecordRow>
+        <RecordRow term="Graph">{study.dagName}, revision <span className={literal('text-muted')} title={study.dagRevision}>{study.dagRevision.slice(0, 8)}</span></RecordRow>
         <RecordRow term="Prepared dataset"><span className={literal('text-muted')} title={study.preparedDataset}>{study.preparedDataset.slice(0, 8)}</span></RecordRow>
         <RecordRow term="Created">{formatTimestamp(study.createdAt)}</RecordRow>
         <RecordRow term="Method">{identification?.method ?? '—'}</RecordRow>
@@ -176,12 +177,12 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
           </p>
           {result.adjustment.kind === 'minimal' && <p className="mb-0 mt-1 text-faint">Canonical set: {result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ') || 'none'}.</p>}
           <details className="mt-2 text-muted">
-            <summary className="cursor-pointer text-body text-ink">Minimal valid sets · {result.minimalAdjustmentSets.sets.length}</summary>
+            <summary className="cursor-pointer text-body text-ink"><Metadata><span>Minimal valid sets</span><span>{result.minimalAdjustmentSets.sets.length}</span></Metadata></summary>
             <ol className="mb-0 mt-1 pl-5">
               {result.minimalAdjustmentSets.sets.map((set, index) => (
                 <li key={set.map((variable) => variable.node).join('|') || 'empty'}>
                   {set.length === 0 ? 'No adjustment' : set.map((variable) => variable.name).join(', ')}
-                  <span className="text-faint"> · set {index + 1}</span>
+                  <span className="text-faint"><Metadata className="ml-3"><span>set {index + 1}</span></Metadata></span>
                 </li>
               ))}
             </ol>
@@ -240,7 +241,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
           </p>
           <p className="mb-0 mt-2 text-muted">The instrumental variable estimand does not rely on adjusting for all common causes. The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed, and the estimator makes a linearity assumption.</p>
           <details className="mt-2 text-muted">
-            <summary className="cursor-pointer text-body text-ink">Why no observational expression · {result.reasons.length}</summary>
+            <summary className="cursor-pointer text-body text-ink"><Metadata><span>Why no observational expression</span><span>{result.reasons.length}</span></Metadata></summary>
             {failureList(result.reasons)}
           </details>
         </Alert>
@@ -252,7 +253,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
             label={estimandSentence(study)}
             headline="No identifying expression was found"
             reason={<><p className="m-0">This record includes measured adjustment-set enumeration, the level-2 ID algorithm, and the instrument search.</p>{failureList(result.reasons)}<p className="mb-0 mt-2">Revise the graph only when its causal assumptions are incorrect. Otherwise identification requires additional measurements, study-design information, experimental distributions, or stronger assumptions.</p></>}
-            rule={`${identification.method} · ${study.dagName} r${study.dagRevision.slice(0, 8)}`}
+            rule={`${identification.method}, ${study.dagName} r${study.dagRevision.slice(0, 8)}`}
             actions={<button type="button" className={button('outline')} onClick={onOpenDag}>Review the graph</button>}
           />
         </div>
@@ -273,9 +274,7 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
   const title = estimandSentence(study)
   const body = (
     <>
-      <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility">
-        <span className="text-ink">{describeAssignmentKind(study.assignment.kind)} treatment</span> · {study.assignment.description} {describeStudyDesignCategory(studyDesignCategory(study))}
-      </p>
+      <p className="mb-0 mt-2 text-body text-muted" aria-label="Assignment and credibility"><Metadata><span><span className="text-ink">{describeAssignmentKind(study.assignment.kind)} treatment</span></span><span>{study.assignment.description} {describeStudyDesignCategory(studyDesignCategory(study))}</span></Metadata></p>
       <IdentificationOutcome study={study} identification={identification} onOpenDag={onOpenDag} />
       {current && estimableIdentification(result) && (
         <button type="button" className={button('signal', 'mt-4')} onClick={onContinue}>Continue to estimation</button>
@@ -298,7 +297,7 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
           <span className={label('text-signal')}>Current study</span>
           <h3 className="mb-0 mt-1 text-title font-medium text-ink">{title}</h3>
         </div>
-        <span className={num('text-micro text-faint')}>{formatCount(study.population.observations).text} rows · {study.dagName}</span>
+        <span className={num('text-micro text-faint')}><Metadata><span>{formatCount(study.population.observations).text} rows</span><span>{study.dagName}</span></Metadata></span>
       </div>
       {body}
     </article>
@@ -318,11 +317,11 @@ function AdjustmentSetChoicePanel({ study, evidence, onChoose }: {
       <div className="mt-3 grid gap-2">
         {evidence.result.minimalSets.map((set, ordinal) => (
           <button key={set.join('|')} type="button" className={button('outline', 'justify-start text-left')} onClick={() => onChoose({ kind: 'minimal', ordinal })}>
-            Minimal set {ordinal + 1} · {set.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') || 'no adjustment'}
+            Minimal set {ordinal + 1}, {set.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') || 'no adjustment'}
           </button>
         ))}
         <button type="button" className={button('quiet', 'justify-start text-left')} onClick={() => onChoose({ kind: 'canonical' })}>
-          Canonical set · {evidence.result.canonicalSet.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') || 'no adjustment'}
+          Canonical set, {evidence.result.canonicalSet.map((index) => study.graph.nodes[index]?.name ?? String(index)).join(', ') || 'no adjustment'}
         </button>
       </div>
       {evidence.result.truncated && <p className="mb-0 mt-2 text-body text-warn">The result limit was reached; additional minimal sets may exist.</p>}
@@ -498,7 +497,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                     >
                       <option value="">Choose a variable</option>
                       {modifierCandidates.map(({ node, role, allowed }) => (
-                        <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : ` · ${roleWord(role)}`}</option>
+                        <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : ` — ${roleWord(role)}`}</option>
                       ))}
                     </Select>
                   </label>
@@ -528,7 +527,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                           checked={state.draft.modifiers.includes(node.id)}
                           onChange={(event) => onDraftChanged({ ...draft, modifiers: event.target.checked ? [...draft.modifiers, node.id] : draft.modifiers.filter((id) => id !== node.id) })}
                         />
-                        <span>{node.name}{role === null ? '' : <span className="text-faint"> · {roleWord(role)}</span>}</span>
+                        <span>{node.name}{role === null ? '' : <span className="text-faint"><Metadata className="ml-3"><span>{roleWord(role)}</span></Metadata></span>}</span>
                       </label>
                     ))}
                     {modifierCandidates.length === 0 && <p className={cn(fieldHint, 'm-0')}>Choose a graph, treatment and outcome first.</p>}
@@ -569,11 +568,11 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         </fieldset>
         <dl className="mb-0 mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body" aria-label="Estimand and population">
           <dt className="text-faint">Estimand</dt>
-          <dd className="m-0 text-ink">{preview === null ? 'Average treatment effect · additive scale · total effect, mediators included' : describeEstimand(preview)}</dd>
+          <dd className="m-0 text-ink">{preview === null ? <Metadata><span>Average treatment effect</span><span>additive scale</span><span>total effect, mediators included</span></Metadata> : describeEstimand(preview)}</dd>
           <dt className="text-faint">Population</dt>
           <dd className={num('m-0 text-ink')}>All {formatCount(prepared.observations).text} rows</dd>
           <dt className="text-faint">Graph revision</dt>
-          <dd className="m-0 text-ink">{document === null ? '—' : <><span className={literal()}>{document.current.id.slice(0, 8)}</span> · {document.current.graph.edges.length} arrows{preview !== null && preview.graph.laggedArrows > 0 ? `, ${preview.graph.laggedArrows} lagged` : ''}</>}</dd>
+          <dd className="m-0 text-ink">{document === null ? '—' : <><Metadata><span><span className={literal()}>{document.current.id.slice(0, 8)}</span></span><span>{document.current.graph.edges.length} arrows{preview !== null && preview.graph.laggedArrows > 0 ? `, ${preview.graph.laggedArrows} lagged` : ''}</span></Metadata></>}</dd>
         </dl>
         {!readiness.ok && <Alert tone="danger" className="mt-3">{describeStudyDesignProblem(readiness.error)}</Alert>}
         {state.job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">Identification could not run: {state.job.detail}</p>}
@@ -629,8 +628,8 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
             <ul className="m-0 list-none divide-y divide-line border-t border-line p-0 text-body" aria-label="Variable roles">
               {roles.map(({ node, role }) => (
                 <li key={node.node} className="flex flex-col py-1.5">
-                  <span className="text-ink">{node.name} <span className="text-faint">· {roleWord(role)}</span></span>
-                  <span className="text-label text-faint">{describeVariableRole(role)}</span>
+                  <IdentityRow name={<span className="text-ink">{node.name}</span>}><span>{roleWord(role)}</span></IdentityRow>
+                  {roleDetail(role) !== null && <span className="mt-1 text-label text-faint">{roleDetail(role)}</span>}
                 </li>
               ))}
             </ul>

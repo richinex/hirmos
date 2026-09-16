@@ -54,7 +54,7 @@ export function ratioForestOption(
         const index = raw !== null && typeof raw === 'object' ? Number(Reflect.get(raw, 'dataIndex')) : Number.NaN
         const row = ordered[index]
         if (row === undefined) return ''
-        return `${escapeHtml(row.label)}<br/>${ratioName} <strong>${ratio(row.ratio)}</strong> · ${confidence}% interval ${ratio(row.interval[0])} to ${ratio(row.interval[1])}<br/>${formatP(row.pValue).text}`
+        return `${escapeHtml(row.label)}<br/>${ratioName} <strong>${ratio(row.ratio)}</strong><br/>${confidence}% interval ${ratio(row.interval[0])} to ${ratio(row.interval[1])}<br/>${formatP(row.pValue).text}`
       },
     },
     xAxis: {

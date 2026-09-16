@@ -1,4 +1,5 @@
 import { FigureParts, IntervalFigure } from '@/components/ui/figures'
+import { Metadata } from '@/components/ui/Metadata'
 import { label, num, td, th } from '@/components/ui/recipes'
 import { additive, headlineValue, intervalTypeOf, summariseRowEffects, type CausalEstimate } from '@/domain/estimation'
 import { formatCount, formatEstimate, formatPercent, formatStatistic, type EffectScale, type Formatted } from '@/lib/format/number'
@@ -70,7 +71,7 @@ function GroupEffectTable({ effect, interval, observations }: {
       <tbody>
         {effect.groups.map((group) => (
           <tr key={group.label}>
-            <td className={td('text-ink')}>{group.label}{group.fewObservations ? <span className="text-warn"> · few rows</span> : null}</td>
+            <td className={td('text-ink')}>{group.label}{group.fewObservations ? <span className="block text-label text-warn">Few rows</span> : null}</td>
             <td className={td(num('text-right text-ink'))}>{formatStatistic('raw', group.value).text}</td>
             <td className={td(num('text-right text-muted'))}>{bounds(group.interval.lower, group.interval.upper)}</td>
             <td className={td(num('text-right text-muted'))}>{formatCount(group.observations).text}</td>
@@ -143,13 +144,13 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
   }
   const figure = headlineFigure(estimate)
   const span = estimate.effect.kind === 'path'
-    ? `cumulative over ${formatCount(estimate.effect.values.length).text} post-intervention ${stepLabel}s · average ${formatStatistic('raw', estimate.effect.aggregate.average).text} per ${stepLabel} · `
+    ? `Cumulative over ${formatCount(estimate.effect.values.length).text} post-intervention ${stepLabel}s, averaging ${formatStatistic('raw', estimate.effect.aggregate.average).text} per ${stepLabel}.`
     : ''
   return (
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title text-ink">{sentence}</figcaption>
       <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${accent ? 'text-signal' : 'text-ink'}`)} title={figure.exact}><FigureParts value={figure} /></p>
-      <p className={num('mb-0 mt-1 text-body text-bone')}>{span}no interval · {sampleLine}</p>
+      <p className={num('mb-0 mt-1 text-body text-bone')}><Metadata>{span.length > 0 && <span>{span}</span>}<span>No interval</span><span>{sampleLine}</span></Metadata></p>
       {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}
       <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
     </figure>

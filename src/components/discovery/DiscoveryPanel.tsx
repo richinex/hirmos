@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
@@ -781,9 +782,9 @@ function NeuralControls({ configuration, onChange }: {
 
 function ResultEligibility({ eligibility }: { readonly eligibility: MethodEligibility }) {
   switch (eligibility.kind) {
-    case 'eligible': return <span className="text-ok">Available · {eligibility.satisfied.length} requirements checked</span>
-    case 'caution': return <span className="text-warn">Available · {eligibility.unresolved.length} requirements to review</span>
-    case 'refused': return <span className="text-danger">Unavailable · {eligibility.violations.length} requirements fail</span>
+    case 'eligible': return <span className="text-ok"><Metadata><span>Available</span><span>{eligibility.satisfied.length} requirements checked</span></Metadata></span>
+    case 'caution': return <span className="text-warn"><Metadata><span>Available</span><span>{eligibility.unresolved.length} requirements to review</span></Metadata></span>
+    case 'refused': return <span className="text-danger"><Metadata><span>Unavailable</span><span>{eligibility.violations.length} requirements fail</span></Metadata></span>
     default: return assertNever(eligibility)
   }
 }
@@ -836,7 +837,7 @@ function ResultCard({ run, method, title, meta, current, children }: {
   return (
     <article aria-labelledby={`run-${run.id}`} className="rounded-xl border border-edge bg-panel p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Current result · {method}</span>
+        <span className={label('text-signal')}><Metadata><span>Current result</span><span>{method}</span></Metadata></span>
         <span className={num('text-micro text-faint')}>{formatTime(run.createdAt)}</span>
       </div>
       <h3 id={`run-${run.id}`} className="mb-2 mt-1 text-heading font-medium text-ink text-balance">{title}</h3>
@@ -914,7 +915,7 @@ function TimeGraphResult({ run, current }: { readonly current: boolean; readonly
   const resultTitle = isLpcmci ? 'Latent-aware partial ancestral graph evidence' : 'Stationary lag-graph evidence'
   const tableLabel = isLpcmci ? 'LPCMCI raw evidence' : 'PCMCI+ raw evidence'
   return (
-    <ResultCard run={run} current={current} method={methodLabel} title={resultTitle} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
+    <ResultCard run={run} current={current} method={methodLabel} title={resultTitle} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.tauMax}</span><span>alpha {run.result.pcAlpha}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${methodLabel} structure`} />
@@ -968,7 +969,7 @@ function JpcmciResult({ run, current }: { readonly current: boolean; readonly ru
     }
   }
   return (
-    <ResultCard run={run} current={current} method="J-PCMCI+ with ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<>{run.result.datasets} units × {run.result.periods} periods · {run.result.observedVariables} observed variables · maximum lag {run.result.tauMax} · alpha {run.result.pcAlpha}</>}>
+    <ResultCard run={run} current={current} method="J-PCMCI+ with ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<><Metadata><span>{run.result.datasets} units × {run.result.periods} periods</span><span>{run.result.observedVariables} observed variables</span><span>maximum lag {run.result.tauMax}</span><span>alpha {run.result.pcAlpha}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="J-PCMCI+ joint structure" />
@@ -1026,7 +1027,7 @@ function RpcmciResult({ run, current }: { readonly current: boolean; readonly ru
       current={current}
       method="RPCMCI with ParCorr"
       title={<>Regime-dependent lag-graph evidence</>}
-      meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.numRegimes} regimes · lags {run.result.tauMin}–{run.result.tauMax} · graph alpha {run.result.alphaLevel}</>}
+      meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>{run.result.numRegimes} regimes</span><span>lags {run.result.tauMin}–{run.result.tauMax}</span><span>graph alpha {run.result.alphaLevel}</span></Metadata></>}
     >
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
@@ -1059,7 +1060,7 @@ function RpcmciResult({ run, current }: { readonly current: boolean; readonly ru
           figureColumn<typeof rows[number]>('value', 'ParCorr', (row) => row.value),
         ]}
       />
-      <p className="mb-0 mt-3 text-micro text-faint">{run.result.errorFreeAnnealings} of {run.result.maxAnneal} annealing runs completed without an optimisation error · switch threshold {run.result.switchThres} · transition budget {run.result.maxTransitions} · seed {run.result.seed}</p>
+      <p className="mb-0 mt-3 text-micro text-faint"><Metadata><span>{run.result.errorFreeAnnealings} of {run.result.maxAnneal} annealing runs completed without an optimisation error</span><span>switch threshold {run.result.switchThres}</span><span>transition budget {run.result.maxTransitions}</span><span>seed {run.result.seed}</span></Metadata></p>
     </ResultCard>
   )
 }
@@ -1080,7 +1081,7 @@ function CdnotsResult({ run, current }: { readonly current: boolean; readonly ru
   }))))
   const context = run.result.contextVariables.length === 0 ? 'no time-context node' : run.result.contextVariables.join(' + ')
   return (
-    <ResultCard run={run} current={current} method={`${method} with ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.observedVariables} observed variables · maximum lag {run.result.maxLag} · {context}</>}>
+    <ResultCard run={run} current={current} method={`${method} with ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.observedVariables} observed variables</span><span>maximum lag {run.result.maxLag}</span><span>{context}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} structure`} />
@@ -1117,7 +1118,7 @@ function GraceResult({ run, current }: { readonly current: boolean; readonly run
   const finalLoss = run.result.loss.at(-1)
   const finalRmse = run.result.rmse.at(-1)
   return (
-    <ResultCard run={run} current={current} method="GRACE" title={<>Gated lag-graph refinement</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · {run.result.epochs} epochs · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="GRACE" title={<>Gated lag-graph refinement</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.maxLag}</span><span>{run.result.epochs} epochs</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="GRACE retained relations" />
@@ -1153,7 +1154,7 @@ function DynotearsResult({ run, current }: { readonly current: boolean; readonly
   )
   const rows = weights.map((cell) => ({ key: `${cell.lag}:${cell.source}:${cell.target}`, source: run.variables[cell.source].name, target: run.variables[cell.target].name, lag: cell.lag, weight: cell.weight }))
   return (
-    <ResultCard run={run} current={current} method="DYNOTEARS" title={<>Sparse dynamic structural equation model weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.maxLag} · λW {run.result.lambdaW} · λA {run.result.lambdaA}</>}>
+    <ResultCard run={run} current={current} method="DYNOTEARS" title={<>Sparse dynamic structural equation model weights</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.maxLag}</span><span>λW {run.result.lambdaW}</span><span>λA {run.result.lambdaA}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="DYNOTEARS structure" />
@@ -1179,7 +1180,7 @@ function VarLingamResult({ run, current }: { readonly current: boolean; readonly
   const rows = weights.map((cell) => ({ key: `${cell.lag}:${cell.source}:${cell.target}`, source: run.variables[cell.source].name, target: run.variables[cell.target].name, lag: cell.lag, weight: cell.weight }))
   const order = run.result.causalOrder.map((index) => run.variables[index]?.name ?? String(index))
   return (
-    <ResultCard run={run} current={current} method="VAR-LiNGAM" title={<>Non-Gaussian structural vector autoregression weights</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · Bayesian information criterion lag {run.result.selectedLag} of at most {run.result.lags} · {run.result.prune ? 'adaptive-lasso pruned' : 'unpruned'}</>}>
+    <ResultCard run={run} current={current} method="VAR-LiNGAM" title={<>Non-Gaussian structural vector autoregression weights</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>Bayesian information criterion lag {run.result.selectedLag} of at most {run.result.lags}</span><span>{run.result.prune ? 'adaptive-lasso pruned' : 'unpruned'}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-1 mt-3 text-body text-muted">Contemporaneous causal order from residual non-Gaussianity:</p>
@@ -1209,7 +1210,7 @@ function DirectLingamResult({ run, current }: { readonly current: boolean; reado
   })))
   const order = run.result.causalOrder.map((index) => run.variables[index]?.name ?? String(index))
   return (
-    <ResultCard run={run} current={current} method="DirectLiNGAM" title={<>Linear non-Gaussian directed structure</>} meta={<>{formatCount(run.result.observations).text} independent observations · {run.result.variables} variables · adaptive-lasso adjacency</>}>
+    <ResultCard run={run} current={current} method="DirectLiNGAM" title={<>Linear non-Gaussian directed structure</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} independent observations</span><span>{run.result.variables} variables</span><span>adaptive-lasso adjacency</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-1 mt-3 text-body text-muted">Causal order inferred from non-Gaussianity:</p>
@@ -1237,7 +1238,7 @@ function DirectLingamResult({ run, current }: { readonly current: boolean; reado
 function OcseResult({ run, current }: { readonly current: boolean; readonly run: Extract<DiscoveryRunArtifact, { readonly kind: 'ocse-run' }> }) {
   const rows = run.result.edges.map((edge, index) => ({ key: `${edge.source}:${edge.target}:${edge.lag}:${index}`, source: run.variables[edge.source].name, target: run.variables[edge.target].name, lag: edge.lag, cmi: edge.cmi, pValue: edge.pValue }))
   return (
-    <ResultCard run={run} current={current} method="Optimal causation entropy" title={<>Conditional-information network evidence</>} meta={<>{formatCount(run.result.observations).text} rows · maximum lag {run.result.maxLag} · {run.result.method} conditional mutual information · {run.result.nShuffles} shuffles · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="Optimal causation entropy" title={<>Conditional-information network evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>maximum lag {run.result.maxLag}</span><span>{run.result.method} conditional mutual information</span><span>{run.result.nShuffles} shuffles</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label="oCSE structure" />
@@ -1284,7 +1285,7 @@ function ConstraintDiscoveryResult({ run, current }: {
   const method = run.kind === 'fci-run' ? 'FCI' : 'PC-stable'
   const graphName = run.kind === 'fci-run' ? 'Partial ancestral graph' : 'Completed partially directed acyclic graph'
   return (
-    <ResultCard run={run} current={current} method={method} title={<>{graphName}</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · {run.result.ciTest === 'fisherZ' ? 'Fisher Z' : 'KCI'} · α {run.result.alpha} · {run.result.ciTests.length} CI tests</>}>
+    <ResultCard run={run} current={current} method={method} title={<>{graphName}</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>{run.result.ciTest === 'fisherZ' ? 'Fisher Z' : 'KCI'}</span><span>α {run.result.alpha}</span><span>{run.result.ciTests.length} CI tests</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} ${graphName.toLowerCase()}`} />
@@ -1334,7 +1335,7 @@ function CmlpResult({ run, current }: { readonly current: boolean; readonly run:
     })),
   ))
   return (
-    <ResultCard run={run} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · maximum lag {run.result.lag} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.lag}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
@@ -1368,7 +1369,7 @@ function ClstmResult({ run, current }: { readonly current: boolean; readonly run
     active: run.result.summaryActive[source][target],
   })))
   return (
-    <ResultCard run={run} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<>{formatCount(run.result.observations).text} rows · {run.result.variables} variables · context {run.result.context} · {run.result.iterations} ISTA iterations · seed {run.result.seed}</>}>
+    <ResultCard run={run} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>context {run.result.context}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <RunRecord run={run} />
       <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
@@ -1849,13 +1850,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       <section aria-labelledby="prepared-input-title">
         <h3 id="prepared-input-title" className="mb-3 mt-0 text-body font-medium text-ink">Prepared dataset</h3>
         <dl className={figureGrid('m-0 grid-cols-2')}>
-          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Structure</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind === 'prepared-time-series' ? `Regular ${prepared.sampling.frequency} series` : prepared.kind === 'prepared-panel' ? `Panel · ${prepared.panel.units} units × ${prepared.panel.periods} periods` : 'Independent observations'}</dd></div>
+          <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Structure</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind === 'prepared-time-series' ? `Regular ${prepared.sampling.frequency} series` : prepared.kind === 'prepared-panel' ? <Metadata><span>Panel</span><span>{prepared.panel.units} units × {prepared.panel.periods} periods</span></Metadata> : 'Independent observations'}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Rows</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{formatCount(prepared.observations).text}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Variables</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{prepared.columns.length}</dd></div>
           <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Stationarity</dt><dd className="m-0 mt-1 text-body text-ink">{prepared.kind !== 'prepared-time-series' ? 'Not applicable' : stationarity === null ? 'Tests not run' : `${formatCount(stationarity.observations).text} rows tested`}</dd></div>
         </dl>
         {prepared.kind === 'prepared-time-series' && prepared.seriesTransforms.some((record) => record.transform.kind !== 'levels') && (
-          <p className="mb-0 mt-3 text-body text-muted"><span className={label('text-faint')}>Prepared scale</span><br />{prepared.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${profile.columns.find((column) => column.id === record.column)?.name ?? record.column}: ${describeSeriesTransform(record.transform)}`).join(' · ')}</p>
+          <p className="mb-0 mt-3 text-body text-muted"><span className={label('text-faint')}>Prepared scale</span><br />{prepared.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${profile.columns.find((column) => column.id === record.column)?.name ?? record.column}: ${describeSeriesTransform(record.transform)}`).join('; ')}</p>
         )}
         <p className={literal('mb-0 mt-3 break-all text-micro text-faint')}>Dataset version {prepared.id.slice(0, 8)}</p>
       </section>

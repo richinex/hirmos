@@ -147,7 +147,7 @@ export function RootCausePanel(props: Props) {
     if (analysis === 'effects') return
     if (!graph.ok || (!enteringValues && file === null) || !confirmed || target === '') return
     const current = ++attempt.current
-    setJob({ kind: 'running', action: 'analysis', stage: 'Preparing root-cause analysis' })
+    setJob({ kind: 'running', action: 'analysis', stage: 'Preparing causal model analysis' })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { profileSource, materializeNumericColumns }, { runRootCause }] = await Promise.all([
         import('@/data/prepared'), import('@/data/duckdb'), import('@/analysis/client'),
@@ -193,7 +193,7 @@ export function RootCausePanel(props: Props) {
       values.set(fitting.values)
       values.set(observed.value.values, fitting.values.length)
       if (current !== attempt.current) return
-      const result = await runRootCause(values, model.data, (progress) => { if (current === attempt.current) setJob({ kind: 'running', action: 'analysis', stage: `${progress.stage} · ${progress.completed} of ${progress.total}` }) })
+      const result = await runRootCause(values, model.data, (progress) => { if (current === attempt.current) setJob({ kind: 'running', action: 'analysis', stage: `${progress.stage}, ${progress.completed} of ${progress.total}` }) })
       if (current !== attempt.current) return
       if (!result.ok) throw new Error(describeAnalysisWorkerProblem(result.error))
       const recorded = rootCauseRunSchema.safeParse({
@@ -240,10 +240,10 @@ export function RootCausePanel(props: Props) {
   return <WorkbenchLayout id="root-cause" inspector={{ title: 'Data and method requirements', body: requirements }}
     bottom={{ title: `Run history (${props.workspace.runs.length})`, defaultCollapsed: true, body: <RunHistory runs={props.workspace.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section aria-labelledby="root-cause-title" className="@container/panel flex flex-col gap-5">
-      <div><ChapterHeading id="root-cause-title" className="mb-2">Root-cause analysis</ChapterHeading><p className={chapterIntro}>Explain an unusual observation, attribute a change between datasets, or estimate outcomes after specified changes to variables.</p></div>
+      <div><ChapterHeading id="root-cause-title" className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Explain an unusual observation, attribute a change between datasets, or estimate outcomes after specified changes to variables.</p></div>
       {!graph.ok ? <section className={panel('space-y-4 p-(--panel-space)')} aria-label="Root-cause graph selection">
         <h3 className={`${sectionTitle} m-0`}>{graph.error.kind === 'no-selection' ? 'Choose the causal graph' : 'Review the selected graph'}</h3>
-        <p className={`${fieldHint} max-w-[65ch]`}>{describeRootCauseGraphProblem(graph.error)} In the editor, select <strong className="font-medium text-ink">Use for root-cause analysis</strong> to return here with that revision selected.</p>
+        <p className={`${fieldHint} max-w-[65ch]`}>{describeRootCauseGraphProblem(graph.error)} In the editor, select <strong className="font-medium text-ink">Use for causal model analysis</strong> to return here with that revision selected.</p>
         <button type="button" className={button('signal')} onClick={props.onGraph}>Open DAG workspace</button>
       </section> : <>
         <section className={panel('p-(--panel-space)')} aria-label="Root-cause setup">

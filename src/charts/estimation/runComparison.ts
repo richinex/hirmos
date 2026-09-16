@@ -27,7 +27,7 @@ export function runComparisonOption(rows: readonly RunComparisonRow[], theme: Ch
         const row = rows[index]
         if (row === undefined) return ''
         const interval = row.lower === null || row.upper === null ? 'no interval' : `[${formatStatistic('raw', row.lower).text}, ${formatStatistic('raw', row.upper).text}]`
-        return `${row.label}<br/>estimate <strong>${formatStatistic('raw', row.estimate).text}</strong> · ${interval}`
+        return `${row.label}<br/>estimate <strong>${formatStatistic('raw', row.estimate).text}</strong><br/>${interval}`
       },
     },
     xAxis: {

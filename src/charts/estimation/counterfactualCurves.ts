@@ -64,7 +64,7 @@ export function counterfactualCurvesOption(view: CounterfactualCurvesView, theme
     },
     xAxis: {
       type: 'value',
-      name: curve.standardised ? `${view.covariate} · standardised` : view.covariate,
+      name: curve.standardised ? `${view.covariate}, standardised` : view.covariate,
       nameLocation: 'middle',
       nameGap: 24,
       nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },

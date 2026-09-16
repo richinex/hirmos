@@ -194,7 +194,7 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
   ].filter((clause): clause is string => clause !== null)
   const count = windows.total === null
     ? 'Loading rows…'
-    : `rows ${formatCount(shownFrom).text} to ${formatCount(shownTo).text} of ${formatCount(total).text}${total !== profile.rowCount ? ` (${formatCount(profile.rowCount).text} in the file)` : ''}${clauses.length > 0 ? ` · ${clauses.join(' · ')}` : ''}`
+    : `rows ${formatCount(shownFrom).text} to ${formatCount(shownTo).text} of ${formatCount(total).text}${total !== profile.rowCount ? ` (${formatCount(profile.rowCount).text} in the file)` : ''}${clauses.length > 0 ? `, ${clauses.join('; ')}` : ''}`
 
   // The column holds the grouped count in tabular figures, measured in the body face, inside 28px of padding.
   const rowNumberWidth = Math.max(48, Math.ceil(textWidth(formatCount(profile.rowCount).text, fontFor('body'))) + 28)
@@ -207,14 +207,10 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
       scrollRef={scrollRef}
       toolbar={(
         <>
-          <FilterField value={searchDraft} onChange={setSearchDraft} placeholder="Search all columns" label="Search rows" className="w-44" />
-          {filters.map((filter) => (
-            <Chip key={filterKey(filter)} removeLabel={`Remove filter ${describeFilter(filter, nameOf(filter.column))}`} onRemove={() => setFilters((current) => current.filter((candidate) => filterKey(candidate) !== filterKey(filter)))}>
-              {describeFilter(filter, nameOf(filter.column))}
-            </Chip>
-          ))}
-          <details className="relative">
-            <summary className={cn(facet(hidden.size > 0, 'flex min-h-6 cursor-pointer list-none items-center gap-1 px-2 py-0'))}>
+          <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+          <FilterField value={searchDraft} onChange={setSearchDraft} placeholder="Search all columns" label="Search rows" className="min-w-0 flex-1 sm:w-44" />
+          <details className="relative shrink-0">
+            <summary className={cn(facet(hidden.size > 0, 'flex min-h-6 cursor-pointer list-none items-center gap-1 whitespace-nowrap px-2 py-0 pointer-coarse:min-h-[3.125rem]'))}>
               <Icon name="view_column" size={13} /> Columns <span className={num('text-faint')}>{visibleColumns.length} of {profile.columns.length}</span>
             </summary>
             <div className="float absolute right-0 top-full z-20 mt-1 max-h-72 w-56 overflow-y-auto rounded-lg border border-edge bg-panel p-2">
@@ -236,6 +232,12 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
               {hidden.size > 0 && <button type="button" className={button('quiet', 'mt-2 w-full')} onClick={() => setHidden(new Set())}>Show all</button>}
             </div>
           </details>
+          </div>
+          {filters.map((filter) => (
+            <Chip key={filterKey(filter)} removeLabel={`Remove filter ${describeFilter(filter, nameOf(filter.column))}`} onRemove={() => setFilters((current) => current.filter((candidate) => filterKey(candidate) !== filterKey(filter)))}>
+              {describeFilter(filter, nameOf(filter.column))}
+            </Chip>
+          ))}
         </>
       )}
       count={count}

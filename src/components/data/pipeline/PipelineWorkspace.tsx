@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
@@ -97,8 +98,8 @@ const summarise = (block: PipelineBlock): string => {
     case 'derive-columns': return block.columns.length === 0 ? 'no new columns yet' : block.columns.map((c) => c.name || '?').join(', ')
     case 'join': return `${block.how}${block.keys.length === 0 ? '' : ` on ${block.keys.map((k) => k.left === k.right ? k.left : `${k.left} = ${k.right}`).join(', ')}`}`
     case 'union': return `by ${block.by}${block.distinct ? ', distinct' : ''}`
-    case 'aggregate': return `${block.groupBy.length === 0 ? 'all rows' : `by ${block.groupBy.join(', ')}`} · ${block.measures.map((m) => m.as || m.function).join(', ') || 'no measures yet'}`
-    case 'sort-limit': return `${block.sort.map((s) => `${s.column} ${s.direction === 'ascending' ? '↑' : '↓'}`).join(', ') || 'unsorted'}${block.limit === null ? '' : ` · first ${block.limit}`}`
+    case 'aggregate': return `${block.groupBy.length === 0 ? 'all rows' : `by ${block.groupBy.join(', ')}`}, ${block.measures.map((m) => m.as || m.function).join(', ') || 'no measures yet'}`
+    case 'sort-limit': return `${block.sort.map((s) => `${s.column} ${s.direction === 'ascending' ? '↑' : '↓'}`).join(', ') || 'unsorted'}${block.limit === null ? '' : `, first ${block.limit}`}`
     case 'script': return `${block.code.split('\n').filter((line) => line.trim().length > 0).length} lines`
     case 'output': return 'the source'
     default: return assertNever(block)
@@ -295,13 +296,13 @@ export function PipelineWorkspace({ resume, onPrepared }: {
     ? (
       <div className="space-y-3">
         <p className={prose('m-0 text-muted')}>Each block is one operation on a table. Select an Input file card and choose its file, wire it into blocks, and wire the last block into "Use as source". Select a block to set it up and to see its rows below.</p>
-        <p className={caption('m-0')}>{formatCount(graph.nodes.length).text} blocks · {formatCount(graph.edges.length).text} arrows</p>
+        <p className={caption('m-0')}><Metadata><span>{formatCount(graph.nodes.length).text} blocks</span><span>{formatCount(graph.edges.length).text} arrows</span></Metadata></p>
         {completeProblem !== null && <p className={caption('m-0 text-warn')} data-testid="pipeline-incomplete">{completeProblem}</p>}
         {files.length > 0 && (
           <div className="border-t border-hair pt-3">
             <span className={label('block text-muted')}>Files</span>
             <ul className="m-0 mt-1 list-none space-y-0.5 p-0">
-              {files.map((input) => <li key={input.alias} className="flex items-baseline gap-2 text-body text-ink"><span className={literal('truncate')}>{input.alias}</span><span className="ml-auto shrink-0 text-micro text-faint">{input.fileName} · {formatBytes(input.bytes)}</span></li>)}
+              {files.map((input) => <li key={input.alias} className="flex items-baseline gap-2 text-body text-ink"><span className={literal('truncate')}>{input.alias}</span><span className="ml-auto shrink-0 text-micro text-faint"><Metadata><span>{input.fileName}</span><span>{formatBytes(input.bytes)}</span></Metadata></span></li>)}
             </ul>
           </div>
         )}
@@ -398,7 +399,7 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
       {!(node.block.kind === 'input' && node.block.file.kind === 'empty') && <BlockStatus outcome={outcome} running={running !== null} />}
       {outcome?.kind === 'ran' && (
         <details className="group/schema">
-          <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Icon name="chevron_right" size={14} className="transition-transform group-open/schema:rotate-90" /> Columns · {outcome.columns.length}</summary>
+          <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Metadata><span><Icon name="chevron_right" size={14} className="transition-transform group-open/schema:rotate-90" /> Columns</span><span>{outcome.columns.length}</span></Metadata></summary>
           <ul className="m-0 mt-1.5 list-none space-y-0.5 p-0" data-testid="block-schema">
             {outcome.columns.map((column) => <li key={column.name} className="flex items-baseline gap-2 text-body"><span className={literal('truncate text-ink')}>{column.name}</span><span className="ml-auto shrink-0 text-micro text-faint">{column.type}</span></li>)}
           </ul>
@@ -463,7 +464,7 @@ function BlockStatus({ outcome, running }: { readonly outcome: BlockOutcome | un
   if (running) return <p className={caption('m-0')} data-testid="block-status">Running.</p>
   if (outcome === undefined) return <p className={caption('m-0')} data-testid="block-status">Not run yet.</p>
   switch (outcome.kind) {
-    case 'ran': return <p className={cn(label('m-0 text-muted'), num())} data-testid="block-status">{formatCount(outcome.rowCount).text} rows · {outcome.columns.length} {outcome.columns.length === 1 ? 'column' : 'columns'}</p>
+    case 'ran': return <p className={cn(label('m-0 text-muted'), num())} data-testid="block-status"><Metadata><span>{formatCount(outcome.rowCount).text} rows</span><span>{outcome.columns.length} {outcome.columns.length === 1 ? 'column' : 'columns'}</span></Metadata></p>
     case 'waiting': return <p className={caption('m-0')} data-testid="block-status">Not run yet: {outcome.detail}.</p>
     case 'skipped': return <p className={caption('m-0')} data-testid="block-status">Not run: a block before it failed.</p>
     case 'failed': return <Alert tone="danger" testId="block-status"><p className="m-0">{outcome.detail}</p></Alert>

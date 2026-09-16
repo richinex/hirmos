@@ -207,25 +207,25 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
   switch (run.kind) {
     case 'backdoor-linear-run':
     case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
-      ? `additive · ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group`
-      : `additive · ${outcome} per 1-unit increase in ${treatment}`
-    case 't-learner-run': return `additive · expected ${outcome} with ${treatment} set to 1 rather than 0, one estimate per row`
-    case 'frontdoor-two-stage-run': return `additive · expected ${outcome} with ${treatment} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}`
-    case 'instrumental-variable-run': return `additive · expected ${outcome} with ${treatment} set to 1 rather than 0`
-    case 'count-glm-run': return `expected-count ratio · expected ${outcome} per 1-unit increase in ${treatment}`
-    case 'negative-binomial-ingarch-run': return `additive forecast difference · expected ${outcome} count with ${treatment} at ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue} per ${stepLabel}`
-    case 'negbin-nuts-run': return `expected-count ratio · expected ${outcome} per 1-unit increase in ${treatment}`
-    case 'bayesian-gaussian-run': return `additive · expected ${outcome} with ${treatment} set to 1 rather than 0`
-    case 'ardl-run': return `additive · long-run ${outcome} per 1-unit increase in ${treatment}`
-    case 'vecm-run': return `long-run relation · ${outcome} relative to ${treatment}`
+      ? `Difference in ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group.`
+      : `Difference in ${outcome} per 1-unit increase in ${treatment}.`
+    case 't-learner-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0, estimated for each row.`
+    case 'frontdoor-two-stage-run': return `Difference in expected ${outcome} with ${treatment} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}.`
+    case 'instrumental-variable-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
+    case 'count-glm-run': return `Ratio of expected ${outcome} counts for a 1-unit increase in ${treatment}.`
+    case 'negative-binomial-ingarch-run': return `Difference in the forecast ${outcome} count per ${stepLabel}, with ${treatment} at ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}.`
+    case 'negbin-nuts-run': return `Ratio of expected ${outcome} counts for a 1-unit increase in ${treatment}.`
+    case 'bayesian-gaussian-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
+    case 'ardl-run': return `Long-run difference in ${outcome} per 1-unit increase in ${treatment}.`
+    case 'vecm-run': return `Long-run relationship between ${outcome} and ${treatment}.`
     case 'synthetic-control-run':
-    case 'causal-impact-run': return `additive · observed ${outcome} minus its estimated no-intervention outcome per ${stepLabel}`
-    case 'panel-intervention-run': return `additive · average difference over treated units and post-adoption periods`
-    case 'discrete-bn-run': return `additive · expected ${outcome} in the high rather than low ${treatment} state`
-    case 'binary-ett-run': return `additive · expected ${outcome} under treatment minus no treatment among treated rows`
+    case 'causal-impact-run': return `Observed ${outcome} minus its estimated no-intervention outcome per ${stepLabel}.`
+    case 'panel-intervention-run': return `Average difference over treated units and post-adoption periods.`
+    case 'discrete-bn-run': return `Difference in expected ${outcome} in the high rather than low ${treatment} state.`
+    case 'binary-ett-run': return `Expected ${outcome} under treatment minus no treatment among treated rows.`
     case 'causal-effects-run': {
       const treatmentTime = run.configuration.treatmentLag === 0 ? 't' : `t−${run.configuration.treatmentLag}`
-      return `additive · expected ${outcome} at t after setting ${treatment} at ${treatmentTime} from ${run.evidence.interventions[0]} to ${run.evidence.interventions[1]}`
+      return `Difference in expected ${outcome} at t after setting ${treatment} at ${treatmentTime} from ${run.evidence.interventions[0]} to ${run.evidence.interventions[1]}.`
     }
     default: return assertNever(run)
   }
@@ -249,7 +249,7 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
 export function resultSampleLine(run: EstimationRunArtifact): string {
   if (run.kind !== 'panel-intervention-run') return `n = ${formatCount(run.estimate.sample.observations).text}`
   const treatedCells = run.evidence.treatedUnits * run.evidence.nPost
-  return `${run.evidence.units.length} units × ${run.evidence.times.length} periods · average over ${treatedCells} treated-unit periods after adoption`
+  return `${run.evidence.units.length} units × ${run.evidence.times.length} periods; the average covers ${treatedCells} treated-unit periods after adoption`
 }
 
 /**

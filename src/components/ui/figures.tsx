@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Metadata } from './Metadata'
 import { label as labelCn, num, well } from './recipes'
 import { formatEstimate, formatInterval, type EffectScale, type Formatted, type IntervalType } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
@@ -89,9 +90,11 @@ export function IntervalFigure({ sentence, estimate, lower, upper, type, scale, 
         </span>
       </p>
       <p aria-hidden className={num('mb-0 mt-1 text-body text-bone')}>
-        [{figure.bounds.lower}, {figure.bounds.upper}] <span className="text-ink">{figure.typeLabel}</span>
-        {se !== null && <> · SE {se}</>}
-        {' · '}{sampleLine}
+        <Metadata>
+          <span>[{figure.bounds.lower}, {figure.bounds.upper}] <span className="text-ink">{figure.typeLabel}</span></span>
+          {se !== null && <span>SE {se}</span>}
+          <span>{sampleLine}</span>
+        </Metadata>
       </p>
       <p className={labelCn('mb-0 mt-2 text-muted')}>{scaleLine}</p>
     </figure>

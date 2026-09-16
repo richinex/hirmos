@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { boundsReading } from '@/domain/estimation'
 import { assertNever } from '@/domain/dop'
 import { timeSeriesRunLabel, type TimeSeriesRun } from '@/domain/timeSeries'
@@ -45,5 +46,5 @@ export function TimeSeriesRunResult({ run }: { readonly run: TimeSeriesRun }) {
       default: return assertNever(run)
     }
   })()
-  return <section className={resultSurface('text-body text-muted')} aria-label="Time-series result"><h3 className={`${resultTitle} m-0`}>{timeSeriesRunLabel(run)}</h3>{content}<LongRunCharts key={run.id} run={run} />{run.kind==='vecm'&&<VecmForecastChart run={run} />}<TimeSeriesEquation run={run} /><p className="m-0 text-label text-faint">{run.evidence.observations} observations · {formatTime(run.createdAt)}</p></section>
+  return <section className={resultSurface('text-body text-muted')} aria-label="Time-series result"><h3 className={`${resultTitle} m-0`}>{timeSeriesRunLabel(run)}</h3>{content}<LongRunCharts key={run.id} run={run} />{run.kind==='vecm'&&<VecmForecastChart run={run} />}<TimeSeriesEquation run={run} /><p className="m-0 text-label text-faint"><Metadata><span>{run.evidence.observations} observations</span><span>{formatTime(run.createdAt)}</span></Metadata></p></section>
 }

@@ -9,7 +9,7 @@ export function ActionRow({ job, action, disabled = false, onRun, onCancel }: { 
     <div className="flex flex-wrap items-center gap-3">
       <button type="button" className={button('signal')} disabled={disabled || job.kind === 'running'} aria-busy={active?.kind === 'running'} onClick={onRun}>{action === 'checks' ? 'Check fitted model' : 'Run analysis'}</button>
       {active?.kind === 'running' && <>
-        <Orb state="solving" aria-label={action === 'checks' ? 'Model checks running' : 'Root-cause analysis running'} />
+        <Orb state="solving" aria-label={action === 'checks' ? 'Model checks running' : 'Causal model analysis running'} />
         <button type="button" className={button('quiet')} onClick={onCancel}>{action === 'checks' ? 'Cancel check' : 'Cancel run'}</button>
         <span role="status" className="min-w-0 flex-1 truncate text-label text-muted" title={active.stage}>{active.stage}</span>
       </>}

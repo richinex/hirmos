@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
 import { Orb } from '@/components/ui/Orb'
@@ -368,7 +369,7 @@ function PathList({ document, flow }: { readonly document: DagDocument; readonly
         return (
           <li key={path.nodes.join('>')} className="flex flex-col py-1.5">
             <span className="text-ink">{path.nodes.map(name).join(' – ')}</span>
-            <span className={`text-label ${verdict.tone}`}>{path.type === 'causal' ? 'causal path' : 'back-door path'} · {verdict.text}</span>
+            <span className={`text-label ${verdict.tone}`}><Metadata><span>{path.type === 'causal' ? 'causal path' : 'back-door path'}</span><span>{verdict.text}</span></Metadata></span>
           </li>
         )
       })}
@@ -452,7 +453,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
         {validation.kind === 'structurally-valid' && (
           <button type="button" className={button('outline')} onClick={onUseForStudy}>Use for study</button>
         )}
-        {onUseForRootCause !== null && <button type="button" className={button('outline')} onClick={onUseForRootCause}>Use for root-cause analysis</button>}
+        {onUseForRootCause !== null && <button type="button" className={button('outline')} onClick={onUseForRootCause}>Use for causal model analysis</button>}
       </div>
       <div className="mt-6 text-body text-muted">
         {plan.kind === 'test' && (
@@ -561,8 +562,8 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
   const systematicTension = evidence !== undefined && evidence.uniformity.pValue < evidence.significanceLevel
   const progressText = job.kind === 'running' && job.progress !== null
     ? job.progress.stage === 'dag-permutations'
-      ? `Comparing relabeled graphs · ${job.progress.completed} of ${job.progress.total}`
-      : `Testing graph implications · ${job.progress.completed} of ${job.progress.total}`
+      ? `Comparing relabeled graphs, ${job.progress.completed} of ${job.progress.total}`
+      : `Testing graph implications, ${job.progress.completed} of ${job.progress.total}`
     : 'Testing graph implications…'
 
   return (
@@ -627,7 +628,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
               {evidence.falsification.kind === 'completed' ? (
                 <>
                   <span className="block text-label text-faint">Relabeled-graph comparison</span>
-                  <strong className="mt-1 block text-title font-medium tabular-nums text-ink">p<sub>LMC</sub> = {evidence.falsification.pValueLmc.toPrecision(3)} · p<sub>TPA</sub> = {evidence.falsification.pValueTpa.toPrecision(3)}</strong>
+                  <strong className="mt-1 block text-title font-medium tabular-nums text-ink"><Metadata><span>p<sub>LMC</sub> = {evidence.falsification.pValueLmc.toPrecision(3)}</span><span>p<sub>TPA</sub> = {evidence.falsification.pValueTpa.toPrecision(3)}</span></Metadata></strong>
                   <p className="mb-0 mt-1 text-label text-muted">p<sub>LMC</sub> is the share of relabeled graphs with no more local-Markov violations than this graph. p<sub>TPA</sub> is the share in the same Markov-equivalence class. {evidence.falsification.falsified ? 'This graph has more violations than enough distinguishable relabelings to be rejected at the recorded threshold.' : !evidence.falsification.falsifiable ? 'Too many relabelings are observationally equivalent for this comparison to evaluate the graph.' : 'This graph is distinguishable from most relabelings and is not worse than enough of them to be rejected.'}</p>
                 </>
               ) : (
@@ -949,7 +950,7 @@ export function DagWorkspace({
         <label className="min-w-0 text-body text-ink"><span className="sr-only">Proposed cause</span><Select aria-label="Proposed cause" className={field('text')} value={state.cause ?? ''} onChange={(event) => dispatch({ type: 'cause-selected', node: nodeFromValue(document, event.target.value) })}><option value="">Cause</option>{document.current.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</Select></label>
         <label className="min-w-0 text-body text-ink"><span className="sr-only">Proposed effect</span><Select aria-label="Proposed effect" className={field('text')} value={state.effect ?? ''} onChange={(event) => dispatch({ type: 'effect-selected', node: nodeFromValue(document, event.target.value) })}><option value="">Effect</option>{document.current.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</Select></label>
         {document.dataset.kind === 'time-series' ? (
-          <Select aria-label="Timing" className={field('text')} value={state.timing.kind} onChange={(event) => dispatch({ type: 'timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous · t</option><option value="lagged">Past cause · t−lag</option></Select>
+          <Select aria-label="Timing" className={field('text')} value={state.timing.kind} onChange={(event) => dispatch({ type: 'timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous (t)</option><option value="lagged">Past cause (t−lag)</option></Select>
         ) : null}
         {document.dataset.kind === 'time-series' && state.timing.kind === 'lagged'
           ? <input aria-label="Lag" className={field('text')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={state.timing.lag} onChange={(event) => dispatch({ type: 'lag-changed', value: event.target.value })} />
@@ -985,11 +986,11 @@ export function DagWorkspace({
         selectedEdge !== null && selectedEdgeDraft !== null ? (
           <aside className="pt-4" aria-labelledby="selected-edge-title">
             <h3 id="selected-edge-title" className="mb-1 mt-0 text-body font-medium text-ink">{nameOfDagNode(document, selectedEdge.cause)} → {nameOfDagNode(document, selectedEdge.effect)}</h3>
-            <p className={`m-0 text-body ${selectedEdge.support.kind === 'unstated' ? 'text-warn' : 'text-faint'}`}>{describeTiming(selectedEdge.timing)} · {describeSupport(selectedEdge.support)}</p>
+            <p className={`m-0 text-body ${selectedEdge.support.kind === 'unstated' ? 'text-warn' : 'text-faint'}`}><Metadata><span>{describeTiming(selectedEdge.timing)}</span><span>{describeSupport(selectedEdge.support)}</span></Metadata></p>
             <form className="mt-3" onSubmit={(event) => { event.preventDefault(); saveSelectedEdgeDetails(document) }}>
               {document.dataset.kind === 'time-series' && (
                 <div className="grid gap-3 @sm/inspector:grid-cols-2">
-                  <label className="text-body text-ink">Arrow timing<Select className={field('text', 'mt-1')} value={selectedEdgeDraft.timing.kind} onChange={(event) => dispatch({ type: 'selected-edge-timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous · t</option><option value="lagged">Past cause · t−lag</option></Select></label>
+                  <label className="text-body text-ink">Arrow timing<Select className={field('text', 'mt-1')} value={selectedEdgeDraft.timing.kind} onChange={(event) => dispatch({ type: 'selected-edge-timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous (t)</option><option value="lagged">Past cause (t−lag)</option></Select></label>
                   {selectedEdgeDraft.timing.kind === 'lagged' && <label className="text-body text-ink">Arrow lag<input className={field('text', 'mt-1')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={selectedEdgeDraft.timing.lag} onChange={(event) => dispatch({ type: 'selected-edge-lag-changed', value: event.target.value })} /></label>}
                 </div>
               )}

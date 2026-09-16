@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useState, type ReactNode } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { comparisonMeasureOption, hazardCurveOption, observedSurvivalOption, restrictedMeanOption, stateOccupancyOption, survivalCurvesOption, transitionMapOption, transitionMatrixOption } from '@/charts/survival/curves'
@@ -49,14 +50,14 @@ export const penalizedAftFamilyLabel = (family: 'weibull' | 'logLogistic'): stri
 export const survivalRunSummary = (run: SurvivalRunArtifact): { readonly method: string; readonly figure: string } => {
   switch (run.kind) {
     case 'right-censored-survival-run':
-    case 'start-stop-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `median ${formatStatistic('raw', run.evidence.median).text}` }
+    case 'start-stop-survival-run': return { method: `${survivalRunLabel(run)}, ${survivalFamilyLabel(run.evidence.family)}`, figure: `median ${formatStatistic('raw', run.evidence.median).text}` }
     case 'cox-regression-run': return { method: survivalRunLabel(run), figure: `hazard ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.hazardRatio ?? Number.NaN).text}` }
     case 'aalen-run': return { method: survivalRunLabel(run), figure: `fitted through ${statistic(run.evidence.lastTime)}` }
     case 'survival-forest-run': return { method: survivalRunLabel(run), figure: run.evidence.concordance.kind === 'recorded' ? `out-of-bag concordance ${statistic(run.evidence.concordance.result)}` : 'out-of-bag concordance unavailable' }
-    case 'penalized-aft-run': return { method: `${survivalRunLabel(run)} · ${penalizedAftFamilyLabel(run.evidence.family)}`, figure: `time ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.timeRatio ?? Number.NaN).text}` }
+    case 'penalized-aft-run': return { method: `${survivalRunLabel(run)}, ${penalizedAftFamilyLabel(run.evidence.family)}`, figure: `time ratio ${formatStatistic('raw', run.evidence.coefficients[0]?.timeRatio ?? Number.NaN).text}` }
     case 'nonparametric-survival-run': return { method: survivalRunLabel(run), figure: `event-free ${formatPercent(run.evidence.survival.at(-1) ?? Number.NaN).text}` }
     case 'two-group-survival-run': return { method: survivalRunLabel(run), figure: `event-free time difference ${formatStatistic('raw', run.evidence.restrictedMeanDifference).text}` }
-    case 'multi-state-survival-run': return { method: `${survivalRunLabel(run)} · ${survivalFamilyLabel(run.evidence.family)}`, figure: `${formatCount(run.evidence.transitions.length).text} transitions` }
+    case 'multi-state-survival-run': return { method: `${survivalRunLabel(run)}, ${survivalFamilyLabel(run.evidence.family)}`, figure: `${formatCount(run.evidence.transitions.length).text} transitions` }
     default: return assertNever(run)
   }
 }
@@ -397,19 +398,19 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
   const summary = survivalRunSummary(run)
   const heading = (() => {
     switch (run.kind) {
-      case 'aalen-run': return { title: 'Aalen additive regression', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
-      case 'survival-forest-run': return { title: 'Random survival forest', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.trees).text} trees` }
+      case 'aalen-run': return { title: 'Aalen additive regression', meta: <Metadata><span>{formatCount(run.evidence.observations).text} observations</span><span>{formatCount(run.evidence.events).text} events</span></Metadata> }
+      case 'survival-forest-run': return { title: 'Random survival forest', meta: <Metadata><span>{formatCount(run.evidence.observations).text} observations</span><span>{formatCount(run.evidence.trees).text} trees</span></Metadata> }
       case 'right-censored-survival-run':
-        return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
+        return { title: survivalFamilyLabel(run.evidence.family), meta: <Metadata><span>{formatCount(run.evidence.observations).text} observations</span><span>{formatCount(run.evidence.events).text} events</span></Metadata> }
       case 'start-stop-survival-run':
-        return { title: survivalFamilyLabel(run.evidence.family), meta: `${formatCount(run.evidence.observations).text} intervals · ${formatCount(run.evidence.events).text} events` }
+        return { title: survivalFamilyLabel(run.evidence.family), meta: <Metadata><span>{formatCount(run.evidence.observations).text} intervals</span><span>{formatCount(run.evidence.events).text} events</span></Metadata> }
       case 'penalized-aft-run':
-        return { title: `${penalizedAftFamilyLabel(run.evidence.family)} with an L2 penalty`, meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events · penalizer ${statistic(run.evidence.penalizer)}` }
+        return { title: `${penalizedAftFamilyLabel(run.evidence.family)} with an L2 penalty`, meta: <Metadata><span>{formatCount(run.evidence.observations).text} observations</span><span>{formatCount(run.evidence.events).text} events</span><span>penalizer {statistic(run.evidence.penalizer)}</span></Metadata> }
       case 'cox-regression-run':
-        return { title: 'Cox proportional-hazards model', meta: `${formatCount(run.evidence.observations).text} ${run.evidence.observation.kind === 'startStop' ? 'intervals' : 'observations'} · ${formatCount(run.evidence.events).text} events` }
-      case 'nonparametric-survival-run': return { title: 'Kaplan–Meier and Nelson–Aalen', meta: `${formatCount(run.evidence.observations).text} observations · ${formatCount(run.evidence.events).text} events` }
-      case 'two-group-survival-run': return { title: 'Group 1 compared with group 0', meta: `${formatCount(run.evidence.observations).text} rows · compared through time ${statistic(run.evidence.truncationTime)}` }
-      case 'multi-state-survival-run': return { title: `${survivalFamilyLabel(run.evidence.family)} transition model`, meta: `${formatCount(run.evidence.observations).text} transition rows · ${formatCount(run.evidence.states.length).text} states` }
+        return { title: 'Cox proportional-hazards model', meta: <Metadata><span>{formatCount(run.evidence.observations).text} {run.evidence.observation.kind === 'startStop' ? 'intervals' : 'observations'}</span><span>{formatCount(run.evidence.events).text} events</span></Metadata> }
+      case 'nonparametric-survival-run': return { title: 'Kaplan–Meier and Nelson–Aalen', meta: <Metadata><span>{formatCount(run.evidence.observations).text} observations</span><span>{formatCount(run.evidence.events).text} events</span></Metadata> }
+      case 'two-group-survival-run': return { title: 'Group 1 compared with group 0', meta: <Metadata><span>{formatCount(run.evidence.observations).text} rows</span><span>compared through time {statistic(run.evidence.truncationTime)}</span></Metadata> }
+      case 'multi-state-survival-run': return { title: `${survivalFamilyLabel(run.evidence.family)} transition model`, meta: <Metadata><span>{formatCount(run.evidence.observations).text} transition rows</span><span>{formatCount(run.evidence.states.length).text} states</span></Metadata> }
       default: return assertNever(run)
     }
   })()
@@ -584,8 +585,8 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <p className={label('m-0 mb-2 text-muted')}>Shared gamma frailty by {frailtyGroup}</p>
             <Tiles>
               <MetricTile frame="cell" size="compact" label="Variance of the frailty" value={formatStatistic('raw', frailty.theta)} context={`${formatCount(frailty.groups).text} groups`} />
-              <MetricTile frame="cell" size="compact" label="Frailty term" value={formatStatistic('raw', frailty.termTest.statistic)} context={`chi-squared on ${statistic(frailty.termTest.df)} df · ${formatP(frailty.termTest.pValue).text}`} />
-              <MetricTile frame="cell" size="compact" label="Effective degrees of freedom" value={formatStatistic('raw', frailty.degreesOfFreedom)} context={`${formatCount(frailty.outerIterations).text} outer and ${formatCount(frailty.innerIterations).text} Newton iterations · ${frailty.ties === 'breslow' ? 'Breslow' : 'Efron'} ties`} />
+              <MetricTile frame="cell" size="compact" label="Frailty term" value={formatStatistic('raw', frailty.termTest.statistic)} context={<Metadata><span>chi-squared on {statistic(frailty.termTest.df)} df</span><span>{formatP(frailty.termTest.pValue).text}</span></Metadata>} />
+              <MetricTile frame="cell" size="compact" label="Effective degrees of freedom" value={formatStatistic('raw', frailty.degreesOfFreedom)} context={<Metadata><span>{formatCount(frailty.outerIterations).text} outer and {formatCount(frailty.innerIterations).text} Newton iterations</span><span>{frailty.ties === 'breslow' ? 'Breslow' : 'Efron'} ties</span></Metadata>} />
             </Tiles>
             <p className={caption('mb-0 mt-2')}>The variance is the theta of the gamma frailty, chosen by the "em" search of survival's frailty.gamma on the corrected likelihood. The frailty term's statistic is the sum of squared frailty coefficients over their variances, tested on the term's effective degrees of freedom (Therneau, Grambsch and Pankratz 2003). The coefficient standard errors are from the penalised information matrix; the likelihood-ratio test uses the effective degrees of freedom of the whole model.</p>
           </div>}
@@ -654,7 +655,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
         return <>
           <Tiles>
             <MetricTile frame="cell" size="compact" label={`${first.parameter} time ratio`} value={formatStatistic('raw', first.timeRatio)} context={`${formatPercent(change, { precision: 1 }).text} ${direction} time to the event`} />
-            <MetricTile frame="cell" size="compact" label="AIC" value={formatStatistic('raw', evidence.aic)} context={`BIC ${statistic(evidence.bic)} · log likelihood ${statistic(evidence.logLikelihood)}`} />
+            <MetricTile frame="cell" size="compact" label="AIC" value={formatStatistic('raw', evidence.aic)} context={<Metadata><span>BIC {statistic(evidence.bic)}</span><span>log likelihood {statistic(evidence.logLikelihood)}</span></Metadata>} />
             <MetricTile frame="cell" size="compact" label="Concordance" value={formatStatistic('raw', evidence.concordance.kind === 'recorded' ? evidence.concordance.result : Number.NaN)} context={evidence.concordance.kind === 'recorded' ? 'on the predicted medians' : 'unavailable'} />
           </Tiles>
           <Interpretation run={run}
@@ -831,7 +832,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           {current ? <div className="min-w-0 flex-1">
             <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
             <h3 id={`survival-run-${run.id}`} className="mb-1 mt-1 text-heading font-medium text-ink text-balance">{heading.title}</h3>
-            <p className="m-0 text-body text-faint">{heading.meta} · {summary.figure} · <span className={num()}>{formatTime(run.createdAt)}</span></p>
+            <p className="m-0 text-body text-faint"><Metadata><span>{heading.meta}</span><span>{summary.figure}</span><span><span className={num()}>{formatTime(run.createdAt)}</span></span></Metadata></p>
           </div> : <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-1">
             <h3 id={`survival-run-${run.id}`} className={caption('m-0 text-ink')}>{survivalRunLabel(run)}</h3>
             <span className={num('text-label text-ink')}>{summary.figure}</span>

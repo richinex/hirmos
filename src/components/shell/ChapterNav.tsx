@@ -38,8 +38,6 @@ const statusGlyph = (status: ChapterStatus): { readonly icon: string; readonly t
   }
 }
 
-const number = (index: number): string => String(index + 1).padStart(2, '0')
-
 /** The same bar the phone tab carries, under the icon: anything alongside crowds the glyph. */
 function BusyBar({ fraction, className }: { readonly fraction: number; readonly className?: string }) {
   return (
@@ -195,7 +193,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
     return () => document.removeEventListener('pointerdown', away)
   }, [onClose, open, phone])
 
-  const entries = new Map(chapters.map((chapter, index) => [chapter.id, { chapter, index }]))
+  const entries = new Map(chapters.map((chapter) => [chapter.id, chapter]))
   return (
     <>
     {phone && !open && <div aria-hidden className="absolute inset-y-0 left-0 z-(--z-overlay) w-5 touch-none" {...slide.handlers('edge')} />}
@@ -242,14 +240,13 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
             <div aria-hidden className={cn('h-[18px] overflow-hidden whitespace-nowrap pl-[18px] text-micro leading-[18px] text-rail-faint transition-opacity duration-(--motion-base)', lobeOpen ? 'opacity-100' : 'opacity-0')}>{section.title}</div>
             <ol className="m-0 list-none p-0" aria-label={section.title}>
               {section.chapters.map((id) => {
-                const entry = entries.get(id)
-                if (entry === undefined) return null
-                const { chapter, index } = entry
+                const chapter = entries.get(id)
+                if (chapter === undefined) return null
                 const isActive = chapter.id === active
                 const locked = chapter.status === 'locked'
                 const glyph = statusGlyph(chapter.status)
                 const busy = chapter.busy ?? null
-                const name = `${number(index)} · ${chapter.name}`
+                const name = chapter.name
                 return (
                   <li key={chapter.id}>
                     <button
@@ -275,7 +272,6 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
                           lobeOpen ? 'ml-[18px] w-[150px] opacity-100' : 'ml-0 w-0 opacity-0',
                         )}
                       >
-                        <span className={cn('text-micro tabular-nums', locked ? 'text-rail-dim' : 'text-rail-faint')}>{number(index)}</span>
                         <span className="truncate">{chapter.name}</span>
                       </span>
                       {glyph && (

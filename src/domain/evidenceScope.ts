@@ -95,5 +95,5 @@ export function describeEvidenceSelection(selection: EvidenceSelection): string 
   if (selection.source !== null) parts.push(`source ${selection.source}`)
   if (selection.target !== null) parts.push(`target ${selection.target}`)
   if (selection.lag !== null) parts.push(`lag ${selection.lag}`)
-  return parts.length === 0 ? null : parts.join(' · ')
+  return parts.length === 0 ? null : parts.join('; ')
 }

@@ -140,7 +140,7 @@ export function GcmEffectsPanel(props: Props) {
   return <WorkbenchLayout id="root-cause" inspector={{ title: 'Data and method requirements', body: requirements }}
     bottom={{ title: `Run history (${props.runs.length})`, defaultCollapsed: true, body: <History runs={props.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section className="@container/panel flex flex-col gap-5">
-      <div><ChapterHeading className="mb-2">Root-cause analysis</ChapterHeading><p className={chapterIntro}>Estimate intervention effects using the prepared data and the recorded causal graph.</p></div>
+      <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Estimate intervention effects using the prepared data and the recorded causal graph.</p></div>
       <section className={panel('p-(--panel-space)')} aria-label="Intervention effects setup">
         <div className="mb-6"><GraphDetails name={props.name} graph={props.graph} disabled={busy} onOpen={props.onGraph} /></div>
         <fieldset disabled={busy} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">Intervention effect settings</legend>

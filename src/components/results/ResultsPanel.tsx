@@ -6,6 +6,7 @@ import type { TimeSeriesRun } from '@/domain/timeSeries'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { EstimateHeadline } from '@/components/results/EstimateHeadline'
+import { Metadata } from '@/components/ui/Metadata'
 import { SurvivalRunResult, survivalRunLabel } from '@/components/survival/SurvivalRunResult'
 import { RootCauseRunResult } from '@/components/root-cause/RootCauseRunResult'
 import { GcmEffectResult } from '@/components/root-cause/GcmEffectsPanel'
@@ -92,12 +93,12 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
             <span className={label('text-signal')}>Estimate and uncertainty</span>
-            <p className="mb-0 mt-1 text-body text-muted">{describeEstimator(run.configuration.kind)} · {run.eligibility.kind === 'eligible' ? 'all pre-run checks completed' : `${run.eligibility.unresolved.length} pre-run requirements to review`}</p>
+            <p className="mb-0 mt-1 text-body text-muted"><Metadata><span>{describeEstimator(run.configuration.kind)}</span><span>{run.eligibility.kind === 'eligible' ? 'All pre-run checks completed' : `${run.eligibility.unresolved.length} pre-run requirements to review`}</span></Metadata></p>
           </div>
           <button type="button" className={button('outline')} onClick={download}>Export the manifest</button>
         </div>
         <div className="mt-3">
-          <EstimateHeadline estimate={estimate} sentence={study === null ? run.method : resultHeadline(run, study)} scaleLine={study === null ? (estimate.effect.kind === 'expectedCountRatio' ? `expected-count ratio · ${outcomeName} per unit of ${treatmentName}` : `additive · ${outcomeName} per unit of ${treatmentName}`) : resultScaleLine(run, study, stepLabel)} sampleLine={resultSampleLine(run)} stepLabel={stepLabel} accent testId="result-figure" />
+          <EstimateHeadline estimate={estimate} sentence={study === null ? run.method : resultHeadline(run, study)} scaleLine={study === null ? (estimate.effect.kind === 'expectedCountRatio' ? `Ratio of expected ${outcomeName} counts per unit increase in ${treatmentName}.` : `Difference in ${outcomeName} per unit increase in ${treatmentName}.`) : resultScaleLine(run, study, stepLabel)} sampleLine={resultSampleLine(run)} stepLabel={stepLabel} accent testId="result-figure" />
         </div>
         {study !== null && <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />}
       </article>
@@ -114,10 +115,10 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       <div className={panel('space-y-3 p-4')} aria-label="Analysis record">
       <Section title="Estimator">
         <Row term="Method">{describeEstimator(run.configuration.kind)}</Row>
-        <Row term="Configuration"><span className={literal('text-muted')}>{Object.entries(run.configuration).filter(([key]) => key !== 'kind').map(([key, value]) => `${key} ${JSON.stringify(value)}`).join(' · ') || 'defaults'}</span></Row>
+        <Row term="Configuration"><dl className="m-0 grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-3 gap-y-1">{Object.entries(run.configuration).filter(([key]) => key !== 'kind').map(([key, value]) => <div key={key} className="contents"><dt className="text-muted [overflow-wrap:anywhere]">{key}</dt><dd className={literal('m-0 text-ink [overflow-wrap:anywhere]')}>{JSON.stringify(value)}</dd></div>)}</dl></Row>
         <Row term="Pre-run eligibility">{run.eligibility.kind === 'eligible' ? 'all checks completed' : `${run.eligibility.unresolved.length} requirements to review`}</Row>
         <Row term="Rows">{formatCount(estimate.sample.observations).text}</Row>
-        <Row term="Run">{shortId(run.id)} · {formatTimestamp(run.createdAt)}</Row>
+        <Row term="Run"><Metadata>{shortId(run.id)}<time>{formatTimestamp(run.createdAt)}</time></Metadata></Row>
       </Section>
 
       {study !== null && (
@@ -125,13 +126,14 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
           <Row term="Target quantity">{describeEstimand(study)}</Row>
           <Row term="Treatment">{study.treatment.name}</Row>
           <Row term="Outcome">{study.outcome.name}</Row>
-          <Row term="Design category">{describeAssignmentKind(study.assignment.kind)} · {describeStudyDesignCategory(studyDesignCategory(study))}</Row>
+          <Row term="Assignment">{describeAssignmentKind(study.assignment.kind)}</Row>
+          <Row term="Design category">{describeStudyDesignCategory(studyDesignCategory(study))}</Row>
           <Row term="Adjustment used by estimator">{appliedAdjustment(estimate.adjustment)}</Row>
           <Row term="Identification">{manifest.identification === null ? 'not recorded' : identificationMethod(manifest.identification)}</Row>
           {manifest.identification?.result.kind === 'identified' && (
             <>
               <Row term="Canonical adjustment set">{names(manifest.identification.result.canonicalAdjustmentSet)}</Row>
-              <Row term="Minimal valid sets">{manifest.identification.result.minimalAdjustmentSets.sets.map((set, index) => <span key={index}>{index > 0 && <span className="text-faint"> or </span>}{names(set)}</span>)}{manifest.identification.result.minimalAdjustmentSets.kind === 'truncated' ? <span className="text-faint"> · result limit reached</span> : null}</Row>
+              <Row term="Minimal valid sets">{manifest.identification.result.minimalAdjustmentSets.sets.map((set, index) => <span key={index}>{index > 0 && <span className="text-faint"> or </span>}{names(set)}</span>)}{manifest.identification.result.minimalAdjustmentSets.kind === 'truncated' ? <span className="text-faint"><Metadata className="ml-3"><span>result limit reached</span></Metadata></span> : null}</Row>
               <Row term="Identified expression"><Formula tex={identifiedExpressionTex(study, manifest.identification.result.adjustment.variables)} plain={identifiedExpression(study, manifest.identification.result.adjustment.variables)} /></Row>
             </>
           )}
@@ -141,15 +143,15 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       {manifest.dag !== null && (
         <Section title="Graph">
           <Row term="Name">{manifest.dag.name}</Row>
-          <Row term="Revision">{shortId(String(manifest.dag.revision))} · {describeDagValidation(manifest.dag.validation)}</Row>
+          <Row term="Revision"><Metadata>{shortId(String(manifest.dag.revision))}<span>{describeDagValidation(manifest.dag.validation)}</span></Metadata></Row>
           <Row term="Origin">{manifest.dag.origin.kind === 'user-authored' ? describeDagBasis(manifest.dag.origin.basis) : 'substantive review of discovery results'}</Row>
           <Row term="Arrows">{formatCount(manifest.dag.graph.edges.length).text} among {formatCount(manifest.dag.graph.nodes.length).text} nodes</Row>
         </Section>
       )}
 
       <Section title="Data">
-        <Row term="Source">{manifest.source.name} · {formatCount(manifest.source.bytes).text} bytes · rows not included</Row>
-        <Row term="Prepared dataset">{shortId(String(manifest.prepared.id))} ·{manifest.prepared.kind === 'prepared-time-series' ? `${manifest.prepared.sampling.frequency} series` : manifest.prepared.kind === 'prepared-panel' ? `panel · ${manifest.prepared.panel.units} units × ${manifest.prepared.panel.periods} periods` : 'independent rows'} · {formatCount(manifest.prepared.observations).text} rows</Row>
+        <Row term="Source"><Metadata><span>{manifest.source.name}</span><span>{formatCount(manifest.source.bytes).text} bytes</span><span>Rows not included</span></Metadata></Row>
+        <Row term="Prepared dataset"><Metadata>{shortId(String(manifest.prepared.id))}<span>{manifest.prepared.kind === 'prepared-time-series' ? `${manifest.prepared.sampling.frequency} series` : manifest.prepared.kind === 'prepared-panel' ? `Panel of ${manifest.prepared.panel.units} units × ${manifest.prepared.panel.periods} periods` : 'Independent rows'}</span><span>{formatCount(manifest.prepared.observations).text} rows</span></Metadata></Row>
         <Row term="Missing data">{manifest.prepared.resolution.kind === 'none'
           ? 'none'
           : manifest.prepared.resolution.kind === 'window'
@@ -158,14 +160,13 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
               ? `${manifest.prepared.resolution.cells} cells excluded during lagged sample construction`
               : `${manifest.prepared.resolution.method}, ${manifest.prepared.resolution.cells} cells`}</Row>
         <Row term="Seasonal adjustment">{manifest.prepared.seasonalAdjustment.kind === 'none' ? 'none' : `seasonal-trend decomposition using loess (STL), period ${manifest.prepared.seasonalAdjustment.period}`}</Row>
-        <Row term="Series transformations">{manifest.prepared.kind !== 'prepared-time-series' ? 'not applicable' : manifest.prepared.seriesTransforms.map((record, index) => <span key={String(record.column)}>{index > 0 && <span className="text-faint"> · </span>}{manifest.schema.find((column) => column.id === String(record.column))?.name ?? record.column}: {describeSeriesTransform(record.transform)}</span>)}</Row>
+        <Row term="Series transformations">{manifest.prepared.kind !== 'prepared-time-series' ? 'not applicable' : manifest.prepared.seriesTransforms.map((record) => <span className="block" key={String(record.column)}>{manifest.schema.find((column) => column.id === String(record.column))?.name ?? record.column}: {describeSeriesTransform(record.transform)}</span>)}</Row>
         {manifest.stationarity !== null && (
           <Row term="Stationarity">
-            {manifest.stationarity.variables.map((variable, index) => {
+            {manifest.stationarity.variables.map((variable) => {
               const assessment = describeStationarityAssessment(variable.assessment)
               return (
-                <span key={String(variable.column)}>
-                  {index > 0 && <span className="text-faint"> · </span>}
+                <span className="block" key={String(variable.column)}>
                   {manifest.schema.find((column) => column.id === String(variable.column))?.name ?? variable.column}
                   <span className={statusText[assessment.tone]}> {assessment.verdict}</span>
                 </span>
@@ -176,8 +177,8 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
       </Section>
 
       <Section title="Sensitivity and counterfactuals">
-        <Row term="Sensitivity">{manifest.sensitivity.length === 0 ? 'none recorded' : manifest.sensitivity.map((probe) => probe.kind === 'linear-refutation-run' ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})` : probe.kind === 'dml-refutation-run' ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})` : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`).join(' · ')}</Row>
-        <Row term="Counterfactuals">{manifest.counterfactuals.length === 0 ? 'none recorded' : manifest.counterfactuals.map((counterfactual) => `model-implied ${counterfactual.evidence.interventions[0]} → ${counterfactual.evidence.interventions[1]} contrast: ${formatStatistic('raw', counterfactual.evidence.averageEffect).text}`).join(' · ')}</Row>
+        <Row term="Sensitivity">{manifest.sensitivity.length === 0 ? 'none recorded' : manifest.sensitivity.map((probe) => probe.kind === 'linear-refutation-run' ? `movement-only perturbations, no refuter p-values (placebo ${formatStatistic('raw', probe.evidence.placeboEffect).text}; subset ${formatStatistic('raw', probe.evidence.subsetEffect).text})` : probe.kind === 'dml-refutation-run' ? `DML mean-shift tests (placebo p ${formatP(probe.evidence.placebo.pValue, { withLabel: false }).text}; random covariate p ${formatP(probe.evidence.randomCommonCause.pValue, { withLabel: false }).text})` : `simulated-confounder movement grid ${probe.evidence.kappaT.length}×${probe.evidence.kappaY.length}, no p-value`).join('; ')}</Row>
+        <Row term="Counterfactuals">{manifest.counterfactuals.length === 0 ? 'none recorded' : manifest.counterfactuals.map((counterfactual) => `model-implied ${counterfactual.evidence.interventions[0]} → ${counterfactual.evidence.interventions[1]} contrast: ${formatStatistic('raw', counterfactual.evidence.averageEffect).text}`).join('; ')}</Row>
       </Section>
       </div>
     </div>
@@ -298,10 +299,10 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         const differences = manifest !== null && otherManifest !== null ? compareResults(manifest, otherManifest) : []
         return <>
           <div className="grid grid-cols-1 gap-3 @lg/panel:grid-cols-2">
-            <label className="block"><span className="block text-body font-medium text-ink">Estimate</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => setView({ ...activeView, selected: event.target.value === '' ? null : event.target.value as EstimationRunId })}><option value="" disabled>Choose a run</option>{[...estimationRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} · {describeEstimator(candidate.configuration.kind)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
-            <label className="block"><span className="block text-body font-medium text-ink">Compare with</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.compareWith ?? ''} onChange={(event) => setView({ ...activeView, compareWith: event.target.value === '' ? null : event.target.value as EstimationRunId })}><option value="">None</option>{[...estimationRuns].reverse().filter((candidate) => candidate.id !== activeView.selected).map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} · {describeEstimator(candidate.configuration.kind)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
+            <label className="block"><span className="block text-body font-medium text-ink">Estimate</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => setView({ ...activeView, selected: event.target.value === '' ? null : event.target.value as EstimationRunId })}><option value="" disabled>Choose a run</option>{[...estimationRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} — {describeEstimator(candidate.configuration.kind)} — {formatTime(candidate.createdAt)}</option>)}</Select></label>
+            <label className="block"><span className="block text-body font-medium text-ink">Compare with</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.compareWith ?? ''} onChange={(event) => setView({ ...activeView, compareWith: event.target.value === '' ? null : event.target.value as EstimationRunId })}><option value="">None</option>{[...estimationRuns].reverse().filter((candidate) => candidate.id !== activeView.selected).map((candidate) => <option key={candidate.id} value={candidate.id}>{(studyOf(candidate) === undefined ? candidate.method : estimandSentence(studyOf(candidate) as StudySpecification))} — {describeEstimator(candidate.configuration.kind)} — {formatTime(candidate.createdAt)}</option>)}</Select></label>
           </div>
-          {otherManifest !== null && manifest !== null && <section className={panel('p-(--panel-space)')} aria-label="Differences"><h3 className="mb-2 mt-0 text-faint text-label font-medium">Differences · {differences.length}</h3>{differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : <div className="figure-strip overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead><tbody>{differences.map((difference) => <tr key={difference.field} className={tr()}><td className={td('text-ink')}>{difference.field}</td><td className={td('whitespace-normal text-muted')}>{difference.left}</td><td className={td('whitespace-normal text-muted')}>{difference.right}</td></tr>)}</tbody></table></div>}</section>}
+          {otherManifest !== null && manifest !== null && <section className={panel('p-(--panel-space)')} aria-label="Differences"><h3 className="mb-2 mt-0 text-faint text-label font-medium"><Metadata><span>Differences</span><span>{differences.length}</span></Metadata></h3>{differences.length === 0 ? <p className="m-0 text-body text-muted">The two runs share every recorded field.</p> : <div className="figure-strip overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Field</th><th className={th()}>Selected</th><th className={th()}>Compared</th></tr></thead><tbody>{differences.map((difference) => <tr key={difference.field} className={tr()}><td className={td('text-ink')}>{difference.field}</td><td className={td('whitespace-normal text-muted')}>{difference.left}</td><td className={td('whitespace-normal text-muted')}>{difference.right}</td></tr>)}</tbody></table></div>}</section>}
           {manifest !== null && <Manifest manifest={manifest} stepLabel={stepLabel} />}
         </>
       }
@@ -311,7 +312,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
           <label className="block max-w-xl"><span className="block text-body font-medium text-ink">Survival run</span><Select className="mt-1 w-full rounded-md border border-control bg-well px-2 py-1.5 text-body text-ink" value={activeView.selected ?? ''} onChange={(event) => {
             const selected = survivalRuns.find((candidate) => candidate.id === event.target.value)?.id ?? null
             setView({ ...activeView, selected })
-          }}><option value="" disabled>Choose a run</option>{[...survivalRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{survivalRunLabel(candidate)} · {formatTime(candidate.createdAt)}</option>)}</Select></label>
+          }}><option value="" disabled>Choose a run</option>{[...survivalRuns].reverse().map((candidate) => <option key={candidate.id} value={candidate.id}>{survivalRunLabel(candidate)} — {formatTime(candidate.createdAt)}</option>)}</Select></label>
           {run === null ? <div className={well('px-4 py-6 text-center text-body text-faint')}>Choose a survival run to review.</div> : <SurvivalRunResult run={run} />}
         </>
       }
@@ -338,7 +339,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   })()
 
   const families: { value: ResultView['kind']; label: string }[] = [
-    ...(hasRootCause ? [{ value: 'root-cause' as const, label: 'Root-cause analysis' }] : []),
+    ...(hasRootCause ? [{ value: 'root-cause' as const, label: 'Causal model analysis' }] : []),
     ...(estimationRuns.length > 0 ? [{ value: 'estimation' as const, label: 'Causal estimates' }] : []),
     ...(hasTimeSeries ? [{ value: 'time-series' as const, label: 'Time series' }] : []),
     ...(survivalRuns.length > 0 ? [{ value: 'survival' as const, label: 'Survival' }] : []),

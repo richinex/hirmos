@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { Select } from '@/components/ui/Select'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
@@ -69,7 +70,7 @@ export function TimeGraphPlot({ run }: { readonly run: TimeGraphRun }) {
     names={run.variables.map((variable) => variable.name)}
     tauMax={run.result.tauMax}
     title={`${run.kind === 'lpcmci-run' ? 'LPCMCI' : 'PCMCI+'} partial correlations`}
-    caption={`Reported links · ${run.kind === 'lpcmci-run' ? 'PAG marks' : 'lag-graph marks'}`}
+    caption={`Reported links, ${run.kind === 'lpcmci-run' ? 'PAG marks' : 'lag-graph marks'}`}
   />
 }
 
@@ -80,7 +81,7 @@ export function RpcmciTimeGraphPlot({ run, regime }: { readonly run: RpcmciRun; 
     names={run.variables.map((variable) => variable.name)}
     tauMax={run.result.tauMax}
     title={`RPCMCI regime ${regime + 1} partial correlations`}
-    caption={`Regime ${regime + 1} · reported lag-graph marks`}
+    caption={`Regime ${regime + 1}, reported lag-graph marks`}
   />
 }
 
@@ -122,7 +123,7 @@ export function WeightPlot({ run }: { readonly run: WeightRun }) {
   return (
     <div className={well('mt-3 p-(--panel-space)')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className={caption('m-0')}>{run.kind === 'direct-lingam-run' ? 'Nonzero weights · source → target' : 'Nonzero weights · source(t−lag) → target(t)'}</p>
+        <p className={caption('m-0')}>{run.kind === 'direct-lingam-run' ? <Metadata><span>Nonzero weights</span><span>source → target</span></Metadata> : <Metadata><span>Nonzero weights</span><span>source(t−lag) → target(t)</span></Metadata>}</p>
         {run.kind !== 'direct-lingam-run' && <LagSelect lags={run.result.laggedWeights.length} value={lag} onChange={setLag} contemporaneous />}
       </div>
       <EChart
@@ -215,7 +216,7 @@ export function StructurePlot({ run, label: name, regime = 0 }: { readonly run: 
   if (projection.graph.links.length === 0) return <p className="mt-3 text-body text-faint">No link to draw: the run reported no relation.</p>
   return (
     <div className="mt-3">
-      <p className={caption('mb-1')}>Structure · {projection.graph.semantics.replaceAll('-', ' ')}</p>
+      <p className={caption('mb-1')}><Metadata><span>Structure</span><span>{projection.graph.semantics.replaceAll('-', ' ')}</span></Metadata></p>
       <LagGraphViews graph={projection.graph} warnings={projection.warnings} label={name} />
     </div>
   )

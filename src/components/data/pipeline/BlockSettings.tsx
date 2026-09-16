@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { lazy, Suspense, useEffect, useRef } from 'react'
 import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
@@ -224,7 +225,7 @@ function PythonRuntimeLine({ step }: { readonly step: PipelineBlockId }) {
     return (
       <div className="flex items-center gap-3" data-testid="python-runtime" aria-busy>
         <Orb state="working" aria-label="Script running" />
-        <span className={num('text-label text-muted')}>Running · {formatDuration(running.elapsedMs).text}</span>
+        <span className={num('text-label text-muted')}><Metadata><span>Running</span><span>{formatDuration(running.elapsedMs).text}</span></Metadata></span>
         <button type="button" className={button('quiet', undefined, 'sm')} onClick={cancelPythonRun}>Cancel run</button>
       </div>
     )
@@ -232,7 +233,7 @@ function PythonRuntimeLine({ step }: { readonly step: PipelineBlockId }) {
   switch (state.kind) {
     case 'idle': return null
     case 'loading': return <p className="m-0 flex items-center gap-2 text-label text-muted" data-testid="python-runtime" aria-busy><Orb state="connecting" aria-label="Python runtime loading" />{state.detail}</p>
-    case 'ready': return <p className="m-0 text-micro text-faint" data-testid="python-runtime">Python {state.python} · pandas · numpy</p>
+    case 'ready': return <p className="m-0 text-micro text-faint" data-testid="python-runtime"><Metadata><span>Python {state.python}</span><span>pandas</span><span>numpy</span></Metadata></p>
     case 'failed': return <Alert tone="danger" testId="python-runtime"><p className="m-0">Python could not load: {state.detail}</p></Alert>
     default: return assertNever(state)
   }

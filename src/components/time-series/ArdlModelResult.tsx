@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useState } from 'react'
 import type { TimeSeriesRun } from '@/domain/timeSeries'
 import { assertNever } from '@/domain/dop'
@@ -100,7 +101,7 @@ export function ArdlModelResult({run}:{readonly run:Run}) {
   const longRun=e.longRun
   const bounds=longRun.kind==='recorded'?longRun.boundsCritical[1]:undefined
   const finding=longRun.kind==='unavailable'?reasons[longRun.reason]:longRun.kind==='uncalibrated'?'The level relationship is estimated, but no bounds-test conclusion is reported without critical bounds.':bounds===undefined?'Bounds critical values are unavailable.':longRun.boundsStatistic>bounds[1]?'The bounds test supports a long-run level relationship at the 5% level.':longRun.boundsStatistic<bounds[0]?'The bounds test does not support a long-run level relationship at the 5% level.':'The bounds test is inconclusive at the 5% level.'
-  return <section className={resultSurface()} aria-label="Time-series result"><h3 className={`${resultTitle} m-0`}>ARDL · {run.outcome.name}</h3>
+  return <section className={resultSurface()} aria-label="Time-series result"><h3 className={`${resultTitle} m-0`}><Metadata><span>ARDL</span><span>{run.outcome.name}</span></Metadata></h3>
     <ResultInterpretation interpretation={{kind:'result-interpretation',statements:[{kind:'magnitude',text:`The model uses ${e.outcomeLag} earlier outcome values and ${e.predictorLags.filter(q=>q!==null).length} retained predictors. ${finding}`}]}} />
     <p className="m-0 text-body text-muted">{e.fittedRows} fitted observations from {e.observations} prepared observations. {run.specification.orders.kind==='fixed'||run.specification.orders.kind==='rFixed'?'Lag orders were specified before fitting.':'Lag orders were selected by the recorded search.'}</p>
     <div className="overflow-x-auto"><table className={table} aria-label="ARDL coefficients"><thead><tr><th className={th()}>Term</th><th className={th()}>Coefficient</th><th className={th()}>Standard error</th></tr></thead><tbody>{e.coefficients.map((term,i)=><tr key={i}><td className={td()}>{coefficientName(term,run)}</td><td className={td()}>{number(e.params[i]!)}</td><td className={td()}>{number(Math.sqrt(e.covariance[i]![i]!))}</td></tr>)}</tbody></table></div>

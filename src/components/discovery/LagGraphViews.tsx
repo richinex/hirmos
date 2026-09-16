@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EChartsCoreOption, EChartsType } from 'echarts/core'
 import { assertNever } from '@/domain/dop'
@@ -165,7 +166,7 @@ function LagGraphFigure({ graph, warnings, label, highlighted, view, onView, com
           ? <SegmentedControl variant="line" size="sm" ariaLabel="Structure view" value={view} onChange={onView} options={[{ value: 'summary', label: 'Summary' }, { value: 'lag-grid', label: 'Lag grid' }]} />
           : <span className="text-micro text-faint">Directed structure</span>}
         <span className="flex items-center gap-2 text-micro text-faint">
-          {graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? ` · τ max ${graph.tauMax}` : ' · same-period'}
+          {graph.links.length} {graph.semantics === 'temporal-dag' ? 'arrow' : 'link'}{graph.links.length === 1 ? '' : 's'}{graph.tauMax > 0 ? <Metadata><span></span><span>τ max {graph.tauMax}</span></Metadata> : <Metadata><span></span><span>same-period</span></Metadata>}
           {openButton}
         </span>
       </div>
@@ -186,9 +187,7 @@ function LagGraphFigure({ graph, warnings, label, highlighted, view, onView, com
         </dl>
       )}
       {warnings.length > 0 && (
-        <p className="mb-0 mt-2 px-1 text-label text-warn" role="status">
-          Unsupported mark{warnings.length === 1 ? '' : 's'} · {warnings.map((warning) => warning.mark || '(empty)').join(', ')} · drawn unresolved
-        </p>
+        <p className="mb-0 mt-2 px-1 text-label text-warn" role="status"><Metadata><span>Unsupported mark{warnings.length === 1 ? '' : 's'}</span><span>{warnings.map((warning) => warning.mark || '(empty)').join(', ')}</span><span>drawn unresolved</span></Metadata></p>
       )}
     </div>
   )

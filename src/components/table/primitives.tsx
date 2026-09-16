@@ -84,7 +84,7 @@ export function TableShell({ title, titleId, titleHelp, toolbar, lead, count, fo
         ) : (
           <h3 id={titleId} className={titleHidden ? 'sr-only' : 'm-0 text-body font-medium text-ink'}>{title}</h3>
         )}{titleHelp}</div>
-        {toolbar && !folded && <div className="flex min-w-0 flex-wrap items-center gap-2">{toolbar}</div>}
+        {toolbar && !folded && <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">{toolbar}</div>}
       </div>
       {!folded && lead}
       <div id={`${titleId}-body`} hidden={folded} ref={scrollRef} className={cn('figure-strip panel-scroll min-h-0 overflow-auto', maxHeight)}>
@@ -331,7 +331,7 @@ export function HeaderMenu({ label: menuLabel, items, className }: { readonly la
 export function countLine(shown: number, total: number, noun: string, extra?: string): string {
   const all = shown === total
   const base = all ? `${formatCount(total).text} ${noun}${total === 1 ? '' : 's'}` : `${formatCount(shown).text} of ${formatCount(total).text} ${noun}s`
-  return extra ? `${base} · ${extra}` : base
+  return extra ? `${base}, ${extra}` : base
 }
 
 /** Mono type text for a header line. */

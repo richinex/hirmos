@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
@@ -142,7 +143,7 @@ const specificationName = (specification: StationarityTestRef['specification']):
 const ruleLabel = (ref: StationarityTestRef): string => {
   const test = ref.test === 'zivot-andrews' ? 'Zivot–Andrews' : ref.test.toUpperCase()
   const scale = ref.series === 'first-difference' ? 'first difference' : 'prepared values'
-  return `${test} · ${specificationName(ref.specification)} · ${scale}: p ${pValue(ref.pValue)}`
+  return `${test}, ${specificationName(ref.specification)}, ${scale}: p ${pValue(ref.pValue)}`
 }
 
 /** The interpreted route for one series with the tests that decided it. */
@@ -157,7 +158,7 @@ function StationarityVerdict({ assessment }: { readonly assessment: Stationarity
       <span className={`text-body font-medium ${TONE_CLASS[described.tone]}`}>{described.verdict}</span>
       {conflicts.map((conflict) => <span key={conflict} className="block text-label text-warn">{conflict}</span>)}
       <span className="block text-label text-faint">{described.route}</span>
-      <span className={num('block text-micro text-faint')}>{decisive.map(ruleLabel).join(' · ')}</span>
+      <span className={num('block text-micro text-faint')}>{decisive.map(ruleLabel).join('; ')}</span>
     </div>
   )
 }
@@ -267,7 +268,7 @@ function TestStatisticsTable({ rows, density }: { readonly rows: readonly TestSt
 
 const rawNumber = (value: number): string => formatStatistic('raw', value).text
 const criticalValues = (values: readonly { readonly level: string; readonly value: number }[]): string =>
-  values.map(({ level, value }) => `${level}: ${rawNumber(value)}`).join(' · ')
+  values.map(({ level, value }) => `${level}: ${rawNumber(value)}`).join('; ')
 
 const labelledCriticalValues = (
   test: 'adf' | 'kpss' | 'zivot-andrews',
@@ -904,15 +905,13 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       </div>
 
       {preparedCurrent !== null && (
-        <p role="status" className="mb-0 mt-4 flex flex-wrap items-center gap-1.5 text-body text-muted">
-          <Icon name="check_circle" size={14} className="text-ok" />
-          {preparedCurrent.kind === 'prepared-time-series' ? 'Prepared time series' : preparedCurrent.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'} · <span className={num()}>{preparedCurrent.observations.toLocaleString()} rows</span>
-          {describeResolutionRecord(preparedCurrent.resolution) !== null && <> · {describeResolutionRecord(preparedCurrent.resolution)}</>}
-          {preparedCurrent.kind === 'prepared-time-series' && describeResampling(preparedCurrent.resampling, columnName) !== null && <> · {describeResampling(preparedCurrent.resampling, columnName)}</>}
-          {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName) !== null && <> · {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName)}</>}
-          {preparedCurrent.kind === 'prepared-time-series' && preparedCurrent.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <> · {preparedCurrent.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</>}
-          {preparedCurrent.kind === 'prepared-panel' && <> · {preparedCurrent.panel.units.toLocaleString()} units × {preparedCurrent.panel.periods.toLocaleString()} periods</>}
-        </p>
+        <p role="status" className="mb-0 mt-4 flex flex-wrap items-center gap-1.5 text-body text-muted"><Metadata><span><Icon name="check_circle" size={14} className="text-ok" />
+          {preparedCurrent.kind === 'prepared-time-series' ? 'Prepared time series' : preparedCurrent.kind === 'prepared-panel' ? 'Prepared panel' : 'Prepared cross-section'}</span><span><span className={num()}>{preparedCurrent.observations.toLocaleString()} rows</span>
+          {describeResolutionRecord(preparedCurrent.resolution) !== null && <><Metadata className="ml-3"><span>{describeResolutionRecord(preparedCurrent.resolution)}</span></Metadata></>}
+          {preparedCurrent.kind === 'prepared-time-series' && describeResampling(preparedCurrent.resampling, columnName) !== null && <><Metadata className="ml-3"><span>{describeResampling(preparedCurrent.resampling, columnName)}</span></Metadata></>}
+          {describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName) !== null && <><Metadata className="ml-3"><span>{describeSeasonalAdjustment(preparedCurrent.seasonalAdjustment, columnName)}</span></Metadata></>}
+          {preparedCurrent.kind === 'prepared-time-series' && preparedCurrent.seriesTransforms.some((record) => record.transform.kind !== 'levels') && <><Metadata className="ml-3"><span>{preparedCurrent.seriesTransforms.filter((record) => record.transform.kind !== 'levels').map((record) => `${columnName(record.column)}: ${describeSeriesTransform(record.transform)}`).join(', ')}</span></Metadata></>}
+          {preparedCurrent.kind === 'prepared-panel' && <><Metadata className="ml-3"><span>{preparedCurrent.panel.units.toLocaleString()} units × {preparedCurrent.panel.periods.toLocaleString()} periods</span></Metadata></>}</span></Metadata></p>
       )}
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
@@ -987,16 +986,14 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
             >
               <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-(--motion-fast) ${stationarityOpen ? 'rotate-180' : ''}`} />
-              <span className="flex flex-wrap items-center gap-2">
-                <Icon name="check_circle" size={14} className="text-ok" />
-                Stationarity tests · {stationarityEvidence.variables.length} variables · {stationarityEvidence.observations.toLocaleString()} rows · {
+              <span className="flex flex-wrap items-center gap-2"><Metadata><span><Icon name="check_circle" size={14} className="text-ok" />
+                Stationarity tests</span><span>{stationarityEvidence.variables.length} variables</span><span>{stationarityEvidence.observations.toLocaleString()} rows</span><span>{
                   stationarityEvidence.diagnosticTransform.kind === 'levels'
                     ? 'prepared values'
                     : stationarityEvidence.diagnosticTransform.kind === 'difference'
                       ? 'first difference of prepared values'
                       : 'linear detrend of prepared values'
-                }
-              </span>
+                }</span></Metadata></span>
             </button>
             <div className="grid transition-[grid-template-rows] duration-(--motion-base)" style={{ gridTemplateRows: stationarityOpen ? '1fr' : '0fr' }}>
             <div className="overflow-hidden">
@@ -1006,10 +1003,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               <thead>
                 <tr>
                   <th className={th()}>Variable</th>
-                  <th className={th('text-right')}>ADF p · constant</th>
-                  <th className={th('text-right')}>KPSS p · constant</th>
-                  <th className={th('text-right')}>Zivot–Andrews p · constant and trend</th>
-                  <th className={th()} title="Integration order is a property of the series, so it is read from the values in levels and their first difference whichever scale the columns show.">Verdict · from levels and first difference</th>
+                  <th className={th('text-right')}><Metadata><span>ADF p</span><span>constant</span></Metadata></th>
+                  <th className={th('text-right')}><Metadata><span>KPSS p</span><span>constant</span></Metadata></th>
+                  <th className={th('text-right')}><Metadata><span>Zivot–Andrews p</span><span>constant and trend</span></Metadata></th>
+                  <th className={th()} title="Integration order is a property of the series, so it is read from the values in levels and their first difference whichever scale the columns show."><Metadata><span>Verdict</span><span>from levels and first difference</span></Metadata></th>
                 </tr>
               </thead>
               <tbody>
@@ -1034,60 +1031,58 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 const result = evidence.result
                 const rows = [
                   {
-                    name: 'ADF · constant',
+                    name: 'ADF (constant)',
                     statistic: result.adf.constant.statistic,
                     p: result.adf.constant.pValue,
-                    fit: `lag ${result.adf.constant.usedLag} · n ${result.adf.constant.observations}`,
+                    fit: `lag ${result.adf.constant.usedLag}, n ${result.adf.constant.observations}`,
                     critical: labelledCriticalValues('adf', result.adf.constant.criticalValues),
                   },
                   {
-                    name: 'ADF · constant + trend',
+                    name: 'ADF (constant + trend)',
                     statistic: result.adf.constantAndTrend.statistic,
                     p: result.adf.constantAndTrend.pValue,
-                    fit: `lag ${result.adf.constantAndTrend.usedLag} · n ${result.adf.constantAndTrend.observations}`,
+                    fit: `lag ${result.adf.constantAndTrend.usedLag}, n ${result.adf.constantAndTrend.observations}`,
                     critical: labelledCriticalValues('adf', result.adf.constantAndTrend.criticalValues),
                   },
                   {
-                    name: 'KPSS · constant',
+                    name: 'KPSS (constant)',
                     statistic: result.kpss.constant.statistic,
                     p: result.kpss.constant.pValue,
                     fit: `lag ${result.kpss.constant.usedLag}`,
                     critical: labelledCriticalValues('kpss', result.kpss.constant.criticalValues),
                   },
                   {
-                    name: 'KPSS · constant + trend',
+                    name: 'KPSS (constant + trend)',
                     statistic: result.kpss.constantAndTrend.statistic,
                     p: result.kpss.constantAndTrend.pValue,
                     fit: `lag ${result.kpss.constantAndTrend.usedLag}`,
                     critical: labelledCriticalValues('kpss', result.kpss.constantAndTrend.criticalValues),
                   },
                   {
-                    name: 'Zivot–Andrews · level',
+                    name: 'Zivot–Andrews (level)',
                     statistic: result.zivotAndrews.level.statistic,
                     p: result.zivotAndrews.level.pValue,
-                    fit: `base lag ${result.zivotAndrews.level.baseLags} · break row ${result.zivotAndrews.level.breakIndex + 1}`,
+                    fit: `base lag ${result.zivotAndrews.level.baseLags}, break row ${result.zivotAndrews.level.breakIndex + 1}`,
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.level.criticalValues),
                   },
                   {
-                    name: 'Zivot–Andrews · trend',
+                    name: 'Zivot–Andrews (trend)',
                     statistic: result.zivotAndrews.trend.statistic,
                     p: result.zivotAndrews.trend.pValue,
-                    fit: `base lag ${result.zivotAndrews.trend.baseLags} · break row ${result.zivotAndrews.trend.breakIndex + 1}`,
+                    fit: `base lag ${result.zivotAndrews.trend.baseLags}, break row ${result.zivotAndrews.trend.breakIndex + 1}`,
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.trend.criticalValues),
                   },
                   {
-                    name: 'Zivot–Andrews · level + trend',
+                    name: 'Zivot–Andrews (level + trend)',
                     statistic: result.zivotAndrews.levelAndTrend.statistic,
                     p: result.zivotAndrews.levelAndTrend.pValue,
-                    fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags} · break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
+                    fit: `base lag ${result.zivotAndrews.levelAndTrend.baseLags}, break row ${result.zivotAndrews.levelAndTrend.breakIndex + 1}`,
                     critical: labelledCriticalValues('zivot-andrews', result.zivotAndrews.levelAndTrend.criticalValues),
                   },
                 ] as const
                 return (
                   <details key={evidence.column} className={well('px-3 py-2')}>
-                    <summary className="cursor-pointer text-body font-medium text-ink">
-                      {column?.name ?? evidence.column} · test statistics
-                    </summary>
+                    <summary className="cursor-pointer text-body font-medium text-ink"><Metadata><span>{column?.name ?? evidence.column}</span><span>test statistics</span></Metadata></summary>
                     <TestStatisticsTable rows={rows} density={density} />
                   </details>
                 )

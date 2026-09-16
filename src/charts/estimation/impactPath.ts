@@ -46,7 +46,7 @@ export function impactPathOption(view: ImpactPathView, theme: ChartTheme): EChar
       max: Math.max(last, first + 1),
       minInterval: 1,
       // The window opens at the intervention, so the axis says so rather than a rule on its own left edge.
-      name: `${view.stepLabel} · intervention from ${view.stepLabel} ${first}`,
+      name: `${view.stepLabel}, intervention from ${view.stepLabel} ${first}`,
       nameLocation: 'middle',
       nameGap: 24,
       nameTextStyle: { color: theme.muted, fontFamily: theme.font, fontSize: theme.labelSize },

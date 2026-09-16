@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -414,7 +415,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
               <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => dispatch({ type: 'identification-chosen', identification: event.target.value === '' ? null : (event.target.value as IdentificationId) })}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
-                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} · ${bound.dagName}`}</option>
+                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} — ${bound.dagName}`}</option>
                 })}
               </Select>
             </label>
@@ -556,9 +557,9 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
         <h3 id="counterfactual-study-title" className="mb-2 mt-1 text-body font-medium text-ink">{study === null ? 'No study chosen' : estimandSentence(study)}</h3>
         {study !== null && (
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Study">
-            <dt className="text-faint">Graph</dt><dd className="m-0 text-ink">{study.dagName} · {state.configuration.kind === 'dynamic-linear-scm' && selectedRevision !== null
-              ? `${selectedRevision.graph.nodes.length} nodes, ${selectedRevision.graph.edges.length} arrows · ${selectedRevision.graph.edges.filter((edge) => edge.timing.kind === 'lagged').length} lagged`
-              : `${study.graph.nodes.length} nodes, ${study.graph.edges.length} arrows`}</dd>
+            <dt className="text-faint">Graph</dt><dd className="m-0 text-ink"><Metadata><span>{study.dagName}</span><span>{state.configuration.kind === 'dynamic-linear-scm' && selectedRevision !== null
+              ? <Metadata><span>{selectedRevision.graph.nodes.length} nodes, {selectedRevision.graph.edges.length} arrows</span><span>{selectedRevision.graph.edges.filter((edge) => edge.timing.kind === 'lagged').length} lagged</span></Metadata>
+              : `${study.graph.nodes.length} nodes, ${study.graph.edges.length} arrows`}</span></Metadata></dd>
             <dt className="text-faint">Treatment</dt><dd className="m-0 text-ink">{study.treatment.name}</dd>
             <dt className="text-faint">Outcome</dt><dd className="m-0 text-ink">{study.outcome.name}</dd>
             <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{formatCount(prepared.observations).text}</dd>

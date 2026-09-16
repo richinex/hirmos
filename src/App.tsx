@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '@/components/Icon'
@@ -117,9 +118,9 @@ const THEME_ICON: Record<ThemeChoice, string> = {
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
   const sourceDetail = (() => {
     switch (source.recipe.kind) {
-      case 'uploaded-file': return `${source.format} · ${formatBytes(source.bytes)}`
-      case 'sql-derived': return `prepared with SQL · ${source.recipe.outputView} · ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'} · ${formatBytes(source.bytes)}`
-      case 'pipeline-derived': return `built with a pipeline · ${source.recipe.graph.nodes.length} blocks · ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'} · ${formatBytes(source.bytes)}`
+      case 'uploaded-file': return `${source.format}, ${formatBytes(source.bytes)}`
+      case 'sql-derived': return `prepared with SQL, ${source.recipe.outputView}, ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'}, ${formatBytes(source.bytes)}`
+      case 'pipeline-derived': return `built with a pipeline, ${source.recipe.graph.nodes.length} blocks, ${source.recipe.inputs.length} ${source.recipe.inputs.length === 1 ? 'input' : 'inputs'}, ${formatBytes(source.bytes)}`
       default: return assertNever(source.recipe)
     }
   })()
@@ -570,7 +571,7 @@ function App() {
   // The URL always names the chapter on screen: a legacy `?chapter=` link and a gated chapter both
   // rewrite to the canonical path without adding history, and the tab title follows.
   useEffect(() => {
-    document.title = `${activeName} · Hirmos`
+    document.title = `${activeName}, Hirmos`
     if (!route.ok) return
     const canonical = chapterPath(activeChapter)
     if (route.value.kind === 'chapter' && route.value.chapter !== activeChapter) replace(canonical)
@@ -697,7 +698,7 @@ function App() {
                               <div className="min-w-0 flex-1">
                                 <span className="block truncate text-body text-ink">{entry.name}</span>
                                 <span className={num('block truncate text-label text-faint')}>
-                                  {`${entry.sourceName ?? 'no data yet'}${entry.cachedSource !== null ? ' · cached' : ''} · ${entry.estimationRuns} ${entry.estimationRuns === 1 ? 'estimate' : 'estimates'} · saved ${formatTimestamp(entry.savedAt)}`}
+                                  {<Metadata><span>{entry.sourceName ?? 'no data yet'}{entry.cachedSource !== null ? ', cached' : ''}</span><span>{entry.estimationRuns} {entry.estimationRuns === 1 ? 'estimate' : 'estimates'}</span><span>saved {formatTimestamp(entry.savedAt)}</span></Metadata>}
                                 </span>
                               </div>
                               <OpenControl name={entry.name} onOpen={() => void reopenProject(entry.id)} />
@@ -752,7 +753,7 @@ function App() {
                         </p>
                       ) : (
                         <p className={cn(fieldHint, 'mt-0')}>
-                          {`${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : ` · ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
+                          {`${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : `, ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
                         </p>
                       )}
                       {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
@@ -920,7 +921,7 @@ function App() {
                     )}
                     <details className="group rounded-md border border-line bg-panel">
                       <summary className="flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-label text-muted transition-colors marker:content-none hover:text-ink">
-                        <span>Source file · storage and export</span>
+                        <span>Source file storage and export</span>
                         <Icon name="expand_more" size={14} className="shrink-0 transition-transform group-open:rotate-180" />
                       </summary>
                       <div className="border-t border-hair px-2.5 py-3">
@@ -989,7 +990,7 @@ function App() {
                   )}
                   {activeChapter === 'root-cause' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                      <Suspense fallback={<ChapterSkeleton label="Loading root-cause analysis…" />}>
+                      <Suspense fallback={<ChapterSkeleton label="Loading causal model analysis…" />}>
                         <RootCausePanel key={`${workflow.prepared.id}:${workflow.rootCause.selection?.dagRevision ?? ''}`} source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}
                           documents={workflow.dagDocuments} workspace={workflow.rootCause} onGraph={() => navigateToChapter('dag')}
                           onRun={(run) => dispatch({ type: 'root-cause-run-created', run })} onDelete={(id) => dispatch({ type: 'root-cause-run-deleted', id })}

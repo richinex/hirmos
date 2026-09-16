@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
@@ -144,7 +145,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
       {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
       {job.kind === 'ready' && heatmap !== null && scatter !== null && (
         <div className="mt-4 space-y-4">
-          <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Icon name="check_circle" size={16} className="text-ok" /> {job.evidence.variables} variables · {job.evidence.observations.toLocaleString()} rows</p>
+          <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {job.evidence.variables} variables</span><span>{job.evidence.observations.toLocaleString()} rows</span></Metadata></p>
           <div className="grid gap-4 @3xl/panel:grid-cols-2">
             <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">Correlation groups</h5>

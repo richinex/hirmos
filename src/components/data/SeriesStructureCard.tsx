@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { lagCorrelationOption } from '@/charts/data/lagCorrelation'
@@ -63,7 +64,7 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
     <li className={well('p-(--panel-space)')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">{facts.name}</span>
-        <span className={num('text-micro text-faint')}>{describeChangePoints(facts.evidence.changePoints, facts.timeAxis)} · penalty {formatStatistic('raw', facts.evidence.peltPenalty).text}</span>
+        <span className={num('text-micro text-faint')}><Metadata><span>{describeChangePoints(facts.evidence.changePoints, facts.timeAxis)}</span><span>penalty {formatStatistic('raw', facts.evidence.peltPenalty).text}</span></Metadata></span>
       </div>
       <div className={figureGrid('mt-2 @2xl/panel:grid-cols-3')}>
         <MetricTile label="Trend strength" size="compact" frame="cell" value={strength(facts.evidence.trendStrength)} context="seasonal-trend decomposition using loess (STL), 0 to 1" />
@@ -139,7 +140,7 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
       {job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{job.detail}</p>}
       {job.kind === 'ready' && (
         <>
-          <p role="status" className="mb-2 mt-4 flex items-center gap-2 text-body text-muted"><Icon name="check_circle" size={16} className="text-ok" /> {job.series.length} series checked · min segment {minSize}</p>
+          <p role="status" className="mb-2 mt-4 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {job.series.length} series checked</span><span>min segment {minSize}</span></Metadata></p>
           <ul className="m-0 list-none space-y-2 p-0" aria-label="Series structure">
             {job.series.map((facts) => <SeriesRow key={facts.column} facts={facts} period={job.period} />)}
           </ul>

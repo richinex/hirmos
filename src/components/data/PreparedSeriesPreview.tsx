@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { decompositionOption } from '@/charts/data/decomposition'
@@ -67,7 +68,7 @@ function DecompositionPlot({ series }: { readonly series: PreparedSeries & { rea
     <div className="mt-3 border-t border-hair pt-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">STL decomposition</span>
-        <span className={caption()}>trend strength {series.decomposition.trendStrength.toFixed(3)} · seasonal strength {series.decomposition.seasonalStrengthBefore.toFixed(3)}</span>
+        <span className={caption()}><Metadata><span>trend strength {series.decomposition.trendStrength.toFixed(3)}</span><span>seasonal strength {series.decomposition.seasonalStrengthBefore.toFixed(3)}</span></Metadata></span>
       </div>
       <p className="mb-0 mt-1 text-label text-muted">Observed = trend + seasonal + remainder at every retained time point. The components describe temporal structure; the decomposition does not assign causal meaning.</p>
       <ExpandableChart option={option} label={`${series.name} STL decomposition`} className="mt-2 h-[520px]" testId="stl-decomposition" />
@@ -80,7 +81,7 @@ function PreparedSeriesCell({ series }: { readonly series: PreparedSeries }) {
     <li className={well('p-(--panel-space)')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-body font-medium text-ink">{series.name}</span>
-        <span className={caption()}>{series.transform}{series.decomposition !== null ? ' · STL-adjusted' : ''}</span>
+        <span className={caption()}>{series.transform}{series.decomposition !== null ? <Metadata><span></span><span>STL-adjusted</span></Metadata> : ''}</span>
       </div>
       <ul className="m-0 mt-2 grid list-none gap-2 p-0" aria-label={`${series.name} preparation stages`}>
         {series.stages.map((stage, index) => (
@@ -115,7 +116,7 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
       const series = mapNonEmpty(final.columns, (column, index): PreparedSeries => {
         const transform = seriesTransformFor(prepared.seriesTransforms, column.id)
         const seasonallyAdjusted = prepared.seasonalAdjustment.kind === 'stl' && prepared.seasonalAdjustment.columns.includes(column.id)
-        const finalStage = { label: transform.kind === 'levels' ? 'Final' : `Final · ${describeSeriesTransform(transform)}`, values: columnValues(final.values, final.rowCount, index) }
+        const finalStage = { label: transform.kind === 'levels' ? 'Final' : `Final, ${describeSeriesTransform(transform)}`, values: columnValues(final.values, final.rowCount, index) }
         const prior = adjusted ?? resampled ?? resolved
         const timeAxis = prior.timeAxis
         const stack: NonEmptyArray<PreparedStage> = seasonallyAdjusted || transform.kind !== 'levels' || resampled !== null
@@ -168,7 +169,7 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
             className={'flex w-full items-center gap-1.5 px-2.5 py-1.5 text-label text-muted transition-colors hover:text-ink'}
           >
             <Icon name="expand_more" size={14} className={`shrink-0 transition-transform duration-(--motion-fast) ${open ? 'rotate-180' : ''}`} />
-            <span>Prepared series · {formatCount(job.rows, { noun: 'aligned rows' }).text}{job.leadingRowsRemoved > 0 ? ' · first source row removed for alignment' : ''}</span>
+            <span><Metadata><span>Prepared series</span><span>{formatCount(job.rows, { noun: 'aligned rows' }).text}{job.leadingRowsRemoved > 0 ? <Metadata><span></span><span>first source row removed for alignment</span></Metadata> : ''}</span></Metadata></span>
           </button>
           <div className="grid transition-[grid-template-rows] duration-(--motion-base)" style={{ gridTemplateRows: open ? '1fr' : '0fr' }}>
             <div className="overflow-hidden">

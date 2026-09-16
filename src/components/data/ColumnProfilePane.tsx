@@ -4,6 +4,7 @@ import { histogramOption } from '@/charts/data/histogram'
 import { useChartTheme } from '@/charts/theme'
 import { Alert } from '@/components/ui/Alert'
 import { FigureParts } from '@/components/ui/figures'
+import { IdentityRow } from '@/components/ui/IdentityRow'
 import { figureGrid, label, literal, num } from '@/components/ui/recipes'
 import { ShareBar } from '@/components/table/primitives'
 import type { ColumnProfile, ColumnProfileProblem, DatasetProfile, PhysicalColumnProfile } from '@/domain/dataset'
@@ -120,9 +121,10 @@ export function ColumnProfilePane({ profile, column, description }: {
   return (
     <div className="@container/inspector">
       <div className="mb-3">
-        <p className={label('m-0 text-faint')}>Column</p>
-        <h3 className="mb-0 mt-1 truncate text-title font-medium text-ink" title={column.name}>{column.name}</h3>
-        <p className={literal('mb-0 mt-1 text-micro text-faint')}>{column.duckdbType}{column.nullable ? '' : ' · not null'}</p>
+        <IdentityRow name={<h3 className="m-0 text-title font-medium text-ink">{column.name}</h3>}>
+          <span className={literal()}>{column.duckdbType}</span>
+          <span>{column.nullable ? 'Nullable' : 'Not null'}</span>
+        </IdentityRow>
       </div>
       {description.kind === 'loading' && <Skeleton />}
       {description.kind === 'idle' && <Skeleton />}

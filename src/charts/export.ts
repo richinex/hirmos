@@ -83,7 +83,7 @@ const pointsTable = (root: Record<string, unknown>, series: readonly Series[], w
   const xAxis = firstOf(root.xAxis)
   const categories = labelsOf(xAxis)
   // An axis name may carry a note after a separator; a column header keeps the word alone.
-  const xName = xAxis !== null && typeof xAxis.name === 'string' && xAxis.name.length > 0 ? xAxis.name.split(' · ')[0] : 'x'
+  const xName = xAxis !== null && typeof xAxis.name === 'string' && xAxis.name.length > 0 ? xAxis.name.split(/ · |, (?=standardised$|intervention from )/)[0] : 'x'
   const byX = new Map<string | number, (number | null)[]>()
   const order: (string | number)[] = []
   series.forEach((entry, column) => {

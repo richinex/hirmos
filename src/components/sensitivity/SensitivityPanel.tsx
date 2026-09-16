@@ -193,7 +193,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
       <MetricGrid as="ul" className="m-0 mt-3" label="Refuters">
         {run.refuters.map((fact) => (
           <li key={fact.id}>
-            <MetricTile label={fact.id === 'placebo' ? 'Placebo treatment' : fact.id === 'data-subset' ? `Data subset · ${Math.round(evidence.subsetFraction * 100)}%` : 'Random common cause'} size="compact" frame="cell" className="h-full" value={formatStatistic('raw', fact.refuted)} context={refuterInterpretation(fact)} />
+            <MetricTile label={fact.id === 'placebo' ? 'Placebo treatment' : fact.id === 'data-subset' ? `Data subset, ${Math.round(evidence.subsetFraction * 100)}%` : 'Random common cause'} size="compact" frame="cell" className="h-full" value={formatStatistic('raw', fact.refuted)} context={refuterInterpretation(fact)} />
           </li>
         ))}
       </MetricGrid>
@@ -402,7 +402,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               <Select className={field('text', 'mt-1')} value={state.estimationRun ?? ''} onChange={(event) => dispatch({ type: 'run-chosen', run: event.target.value === '' ? null : (event.target.value as EstimationRunId) })}>
                 {[...estimationRuns].reverse().map((run) => {
                   const bound = studies.find((candidate) => candidate.id === run.study)
-                  return <option key={run.id} value={run.id}>{bound === undefined ? run.id : `${estimandSentence(bound)} · ${describeEstimator(run.configuration.kind)} · ${formatTime(run.createdAt)}`}</option>
+                  return <option key={run.id} value={run.id}>{bound === undefined ? run.id : `${estimandSentence(bound)} — ${describeEstimator(run.configuration.kind)} — ${formatTime(run.createdAt)}`}</option>
                 })}
               </Select>
             </label>

@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useMemo, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { pValueBarsOption } from '@/charts/discovery/pValueBars'
@@ -47,7 +48,7 @@ function GrangerPlot({ artifact }: { readonly artifact: GrangerEvidenceArtifact 
   }, theme), [artifact, theme])
   return (
     <div className={well('mt-3 p-(--panel-space)')}>
-      <p className={caption('m-0')}>p-value by lag order · alpha 0.05 reference, log scale</p>
+      <p className={caption('m-0')}><Metadata><span>p-value by lag order</span><span>alpha 0.05 reference, log scale</span></Metadata></p>
       <EChart option={option} label="Granger p-values by lag order" className="h-[clamp(160px,26cqb,240px)]" />
     </div>
   )
@@ -68,7 +69,7 @@ function GrangerRecord({ artifact, open }: { readonly artifact: GrangerEvidenceA
         <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg px-3 py-2 transition-colors hover:bg-raised [&::-webkit-details-marker]:hidden">
           <Icon name="expand_more" size={14} className="shrink-0 self-center text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
           <span className="text-body font-medium text-ink">{artifact.candidateCause.name} → {artifact.target.name}</span>
-          <span className={num('text-label text-faint')}>lags 1 to {artifact.maxLag} · {formatCount(artifact.result.observations).text} rows</span>
+          <span className={num('text-label text-faint')}><Metadata><span>lags 1 to {artifact.maxLag}</span><span>{formatCount(artifact.result.observations).text} rows</span></Metadata></span>
           <span className={num('ml-auto text-micro text-faint')}>{formatTime(artifact.createdAt)}</span>
         </summary>
         <div className="px-3 pb-3">

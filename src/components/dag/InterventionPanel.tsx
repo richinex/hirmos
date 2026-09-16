@@ -1,3 +1,4 @@
+import { Metadata } from '@/components/ui/Metadata'
 import { useMemo, useState, type ReactNode } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { EChart } from '@/charts/EChart'
@@ -53,7 +54,7 @@ function QueryFrame({ query, open, summary, children }: { readonly query: Interv
   )
 }
 
-function DistributionRecord({ query, result, context, methodNote, formula }: { readonly query: InterventionQueryArtifact; readonly result: Pick<DiscreteBnEvidence, 'observations' | 'bins' | 'statePreparations' | 'treatmentStates' | 'expectations' | 'effect' | 'distributionLow' | 'distributionHigh'>; readonly context: string; readonly methodNote: string; readonly formula?: { readonly plain: string; readonly tex: string } }) {
+function DistributionRecord({ query, result, context, methodNote, formula }: { readonly query: InterventionQueryArtifact; readonly result: Pick<DiscreteBnEvidence, 'observations' | 'bins' | 'statePreparations' | 'treatmentStates' | 'expectations' | 'effect' | 'distributionLow' | 'distributionHigh'>; readonly context: React.ReactNode; readonly methodNote: string; readonly formula?: { readonly plain: string; readonly tex: string } }) {
   const theme = useChartTheme()
   const option = useMemo(() => interventionBarsOption({
     set: query.set.name,
@@ -76,7 +77,7 @@ function DistributionRecord({ query, result, context, methodNote, formula }: { r
       <div className={well('mt-3 p-2')}>
         <EChart option={option} label={`${query.read.name} distribution under do(${query.set.name})`} className="h-[200px]" />
       </div>
-      <p className="mb-0 mt-2 text-label text-faint">Graph revision {query.dagRevision.slice(0, 8)} · {result.observations} rows</p>
+      <p className="mb-0 mt-2 text-label text-faint"><Metadata><span>Graph revision {query.dagRevision.slice(0, 8)}</span><span>{result.observations} rows</span></Metadata></p>
     </>
   )
 }
@@ -84,7 +85,7 @@ function DistributionRecord({ query, result, context, methodNote, formula }: { r
 function BayesianNetworkRecord({ query, result, open, equivalentSampleSize }: { readonly query: InterventionQueryArtifact; readonly result: DiscreteBnEvidence; readonly open: boolean; readonly equivalentSampleSize: number }) {
   return (
     <QueryFrame query={query} open={open} summary={<span className={num('text-body text-ink')}>{formatStatistic('raw', result.effect).text}</span>}>
-      <DistributionRecord query={query} result={result} context={`${result.bins} bins · equivalent sample size ${equivalentSampleSize}`} methodNote="The contrast comes from BDeu conditional probability tables fitted to the fully observed DAG. No uncertainty interval is reported." />
+      <DistributionRecord query={query} result={result} context={<Metadata><span>{result.bins} bins</span><span>equivalent sample size {equivalentSampleSize}</span></Metadata>} methodNote="The contrast comes from BDeu conditional probability tables fitted to the fully observed DAG. No uncertainty interval is reported." />
     </QueryFrame>
   )
 }
@@ -96,7 +97,7 @@ function IdentifiedExpressionRecord({ query, evidence, document, open }: { reado
     return (
       <QueryFrame query={query} open={open} summary={<span className="text-body text-danger">Not identified</span>}>
         <p className="m-0 text-body text-muted">{describeInterventionVerdict(query)}</p>
-        <p className="mb-0 mt-2 text-label text-faint">Hedge: {evidence.result.hedgeGraph.map(nodeName).join(', ') || 'none'} · treatment-removed subgraph: {evidence.result.hedgeSubgraph.map(nodeName).join(', ') || 'none'}.</p>
+        <p className="mb-0 mt-2 text-label text-faint"><Metadata><span>Hedge: {evidence.result.hedgeGraph.map(nodeName).join(', ') || 'none'}</span><span>treatment-removed subgraph: {evidence.result.hedgeSubgraph.map(nodeName).join(', ') || 'none'}.</span></Metadata></p>
       </QueryFrame>
     )
   }
@@ -105,7 +106,7 @@ function IdentifiedExpressionRecord({ query, evidence, document, open }: { reado
     ? recordedRevision.graph.nodes[evidence.query.variable]?.name ?? `node ${evidence.query.variable}`
     : null
   const context = evidence.query.kind === 'conditional'
-    ? `${result.algorithm} · ${conditionName} bin ${evidence.query.state}`
+    ? `${result.algorithm}, ${conditionName} bin ${evidence.query.state}`
     : result.algorithm
   const conditionNote = evidence.query.kind === 'conditional'
     ? ` The query conditions on ${conditionName} in bin ${evidence.query.state}, represented by ${formatStatistic('raw', evidence.query.representativeValue).text}.`
