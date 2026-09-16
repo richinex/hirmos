@@ -1,9 +1,10 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useId, useRef, useState } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { ActionRow, type Job } from './ActionRow'
+import { ActionRow } from './ActionRow'
 import { GcmEffectsPanel } from './GcmEffectsPanel'
 import { GcmInfluencePanel } from './GcmInfluencePanel'
 import type { GcmInfluenceRun } from '@/domain/gcmInfluence'
@@ -116,10 +117,9 @@ export function RootCausePanel(props: Props) {
   const [seed, setSeed] = useState(previous?.model.random.kind === 'seed' ? previous.model.random.seed : 0)
   const [randomSource, setRandomSource] = useState('seed')
   const [replay, setReplay] = useState<RootCauseRequest | null>(null)
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob(`root-cause:${props.workspace.selection?.dagRevision ?? ''}`)
+  const { job } = session
   const [selected, setSelected] = useState<string | null>(null)
-  const attempt = useRef(0)
-  useEffect(() => () => { attempt.current += 1 }, [])
   const latest = props.workspace.runs.find((run) => run.id === selected) ?? props.workspace.runs.at(-1)
   const effectiveFitting = replay?.query.kind === 'change' ? replay.query.fitting.kind : changeFitting
   const checkFitting = analysis === 'change' && effectiveFitting === 'automaticFull' ? 'automatic' : 'halfNormalLinear'
@@ -133,30 +133,30 @@ export function RootCausePanel(props: Props) {
 
   const check = async () => {
     if (!graph.ok) return
-    const current = ++attempt.current
-    setJob({ kind: 'running', action: 'checks', stage: 'Preparing model checks' })
+    const current = session.start('checks', 'Preparing model checks')
+    if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { checkRootCause }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(graph.value.nodes, (node) => node.column))
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
       const model = rootCauseCheckRequestSchema.parse({ names: graph.value.nodes.map((node) => node.name), edges: graph.value.edges, rows: data.value.rowCount, seed, scope: 'fitted', fitting: checkFitting })
-      if (current !== attempt.current) return
-      const result = await checkRootCause(data.value.values, model, (progress) => { if (current === attempt.current) setJob({ kind: 'running', action: 'checks', stage: progress.stage }) })
-      if (current !== attempt.current) return
+      if (!session.current(current)) return
+      const result = await checkRootCause(data.value.values, model, progress => session.progress(current, progress.stage))
+      if (!session.current(current)) return
       if (!result.ok) throw new Error(describeAnalysisWorkerProblem(result.error))
       const record = rootCauseCheckRecordSchema.parse({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), graph: { dagDocument: graph.value.dagDocument, dagRevision: graph.value.dagRevision, preparedDataset: graph.value.preparedDataset }, model, evidence: result.value })
       props.onChecks(record)
-      setJob({ kind: 'idle' })
+      session.finish(current)
     } catch (error: unknown) {
-      if (current === attempt.current) setJob({ kind: 'failed', action: 'checks', detail: error instanceof Error ? error.message : String(error) })
+      session.fail(current, error instanceof Error ? error.message : String(error))
     }
   }
 
   const run = async () => {
     if (analysis === 'effects' || analysis === 'intrinsic' || analysis === 'arrows') return
     if (!graph.ok || (!enteringValues && file === null) || !confirmed || target === '') return
-    const current = ++attempt.current
-    setJob({ kind: 'running', action: 'analysis', stage: 'Preparing causal model analysis' })
+    const current = session.start('analysis', 'Preparing causal model analysis')
+    if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { profileSource, materializeNumericColumns }, { runRootCause }] = await Promise.all([
         import('@/data/prepared'), import('@/data/duckdb'), import('@/analysis/client'),
@@ -201,9 +201,9 @@ export function RootCausePanel(props: Props) {
       const values = new Float64Array(fitting.values.length + observed.value.values.length)
       values.set(fitting.values)
       values.set(observed.value.values, fitting.values.length)
-      if (current !== attempt.current) return
-      const result = await runRootCause(values, model.data, (progress) => { if (current === attempt.current) setJob({ kind: 'running', action: 'analysis', stage: `${progress.stage}, ${progress.completed} of ${progress.total}` }) })
-      if (current !== attempt.current) return
+      if (!session.current(current)) return
+      const result = await runRootCause(values, model.data, progress => session.progress(current, `${progress.stage}, ${progress.completed} of ${progress.total}`))
+      if (!session.current(current)) return
       if (!result.ok) throw new Error(describeAnalysisWorkerProblem(result.error))
       const recorded = rootCauseRunSchema.safeParse({
         id: crypto.randomUUID(), createdAt: new Date().toISOString(),
@@ -215,22 +215,13 @@ export function RootCausePanel(props: Props) {
       if (!recorded.success) throw new Error(recorded.error.issues.map((issue) => issue.message).join(' '))
       props.onRun(recorded.data)
       setSelected(recorded.data.id)
-      setJob({ kind: 'idle' })
+      session.finish(current)
     } catch (error: unknown) {
-      if (current !== attempt.current) return
-      setJob({ kind: 'failed', action: 'analysis', detail: error instanceof Error ? error.message : String(error) })
+      session.fail(current, error instanceof Error ? error.message : String(error))
     }
   }
 
-  const cancel = async () => {
-    if (job.kind !== 'running') return
-    const action = job.action
-    const current = ++attempt.current
-    const { cancelAnalysisRuns } = await import('@/analysis/client')
-    if (current !== attempt.current) return
-    cancelAnalysisRuns()
-    setJob({ kind: 'failed', action, detail: action === 'checks' ? 'The model check was cancelled.' : 'The analysis run was cancelled.' })
-  }
+  const cancel = session.cancel
 
   const requirements = <div className="space-y-6">
     <section><h3 className="m-0 text-body font-medium text-ink">Understanding model checks</h3><p className={fieldHint}>KL divergence measures the difference between observed and model-generated distributions. Lower values indicate closer agreement. CRPS assesses predictive distributions; lower values indicate better predictions.</p><p className={fieldHint}>Noise-independence checks test whether a variable’s estimated noise is independent of its parent variables. A rejected check suggests that the fitted relationship needs review. Passing a graph check does not remove that concern.</p></section>
@@ -266,9 +257,9 @@ export function RootCausePanel(props: Props) {
         <div className="mb-6">
           <GraphDetails name={document?.name ?? 'Analysis graph'} graph={graph.value} disabled={job.kind === 'running'} onOpen={props.onGraph} />
         </div>
+        <div className="mb-4" hidden={replay !== null}><SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={(value) => { setAnalysis(value); setSamples(value === 'change' ? 2000 : 3000) }} /></div>
         <fieldset disabled={job.kind === 'running'} className="m-0 min-w-0 space-y-4 border-0 p-0">
           <legend className="sr-only">Root-cause specification</legend>
-          <div hidden={replay !== null}><SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={(value) => { setAnalysis(value); setSamples(value === 'change' ? 2000 : 3000) }} /></div>
           <div><h3 className={`${sectionTitle} m-0`}>{description.title}</h3><p className={`${fieldHint} max-w-[65ch]`}>{description.summary}</p></div>
           {analysis === 'change' && replay === null && <label><ParameterLabel className={fieldLabel} label="Conditional models" help="Automatic selection compares prediction errors across five held-out folds and retains the selected model classes. Linear models use half-normal root distributions and refit sampled subsets." /><Select aria-label="Conditional models" className={field('text', 'mt-1')} value={changeFitting} onChange={event => setChangeFitting(event.target.value as typeof changeFitting)}><option value="halfNormalLinear">Linear models</option><option value="automaticFull">Automatic selection</option></Select></label>}
           {analysis === 'anomaly' && <SegmentedControl ariaLabel="Observation input" value={observationMode} options={[{ value: 'values', label: 'Enter values' }, { value: 'file', label: 'Upload file' }]} onChange={value => { setObservationMode(value); setConfirmed(false) }} size="md" />}
@@ -287,13 +278,13 @@ export function RootCausePanel(props: Props) {
           <RootCauseSettings graph={graph.value} value={replay} onChange={(settings) => { setReplay(settings); if (settings !== null) { setAnalysis(settings.query.kind); setTarget(String(settings.target)); setConfirmed(false) } }} />
           <label className="flex max-w-[75ch] items-start gap-2 text-body"><input className="mt-0.5 shrink-0" type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />{enteringValues ? 'These values use the same units and transformations as the prepared data.' : 'The selected file uses the same variable definitions, units and transformations as the prepared data.'}</label>
         </fieldset>
-        <ActionRow job={job} action="analysis" disabled={(!enteringValues && file === null) || !confirmed || target === ''} onRun={() => void run()} onCancel={() => void cancel()} />
+        <ActionRow job={job} action="analysis" disabled={session.blocked || (!enteringValues && file === null) || !confirmed || target === ''} onRun={() => void run()} onCancel={cancel} />
         </section>
         {latest !== undefined && <div className="space-y-4"><h3 className={`${sectionTitle} m-0`}>Results</h3><RootCauseRunResult key={latest.id} run={latest} /></div>}
         <section className={panel('space-y-4 p-(--panel-space)')} aria-label="Model assessment">
           <div><h3 className={`${sectionTitle} m-0`}>Model assessment</h3><p className={`${fieldHint} max-w-[65ch]`}>Check prediction performance, fitted distributions and noise independence against the prepared data.</p></div>
           <RootCauseData graph={graph.value} source={props.source} profile={props.profile} prepared={props.prepared} />
-          <ActionRow job={job} action="checks" onRun={() => void check()} onCancel={() => void cancel()} />
+          <ActionRow job={job} action="checks" disabled={session.blocked} onRun={() => void check()} onCancel={cancel} />
           {checked !== undefined && <RootCauseChecks record={checked} />}
         </section>
       </>}

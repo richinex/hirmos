@@ -1,3 +1,5 @@
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -127,10 +129,10 @@ const adjustmentStrategyLabel = (adjustment: CausalEffectsAdjustment): string =>
   }
 }
 
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running'; readonly progress: AnalysisProgress | null }
-  | { readonly kind: 'failed'; readonly detail: string }
+type RunEvent =
+  | { readonly type: 'run-progressed'; readonly progress: AnalysisProgress }
+  | { readonly type: 'run-failed'; readonly detail: string }
+  | { readonly type: 'run-finished' }
 
 type ExplicitAdjustmentMemberDraft =
   | { readonly kind: 'closed' }
@@ -204,7 +206,6 @@ const estimationSelection = (identification: IdentificationArtifact | null, stud
 }
 
 interface State extends EstimationSelection {
-  readonly job: Job
   readonly panelPreflight: PanelPreflightJob
   readonly studyDataPreflight: StudyDataPreflightJob
 }
@@ -213,10 +214,6 @@ type Event =
   | { readonly type: 'identification-chosen'; readonly selection: EstimationSelection }
   | { readonly type: 'estimator-chosen'; readonly estimator: EstimatorId }
   | { readonly type: 'configured'; readonly configuration: EstimatorConfiguration }
-  | { readonly type: 'run-started' }
-  | { readonly type: 'run-progressed'; readonly progress: AnalysisProgress }
-  | { readonly type: 'run-failed'; readonly detail: string }
-  | { readonly type: 'run-finished' }
   | { readonly type: 'panel-preflight-not-required' }
   | { readonly type: 'panel-preflight-started'; readonly binding: PanelBinding }
   | { readonly type: 'panel-preflight-succeeded'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
@@ -228,13 +225,9 @@ type Event =
 
 const step = (state: State, event: Event): State => {
   switch (event.type) {
-    case 'identification-chosen': return { ...state, ...event.selection, job: { kind: 'idle' } }
-    case 'estimator-chosen': return { ...state, estimator: event.estimator, job: { kind: 'idle' } }
-    case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration }, job: { kind: 'idle' } }
-    case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
-    case 'run-progressed': return state.job.kind === 'running' ? { ...state, job: { kind: 'running', progress: event.progress } } : state
-    case 'run-failed': return { ...state, job: { kind: 'failed', detail: event.detail } }
-    case 'run-finished': return { ...state, job: { kind: 'idle' } }
+    case 'identification-chosen': return { ...state, ...event.selection }
+    case 'estimator-chosen': return { ...state, estimator: event.estimator }
+    case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration } }
     case 'panel-preflight-not-required': return { ...state, panelPreflight: { kind: 'not-required' } }
     case 'panel-preflight-started': return { ...state, panelPreflight: { kind: 'loading', binding: event.binding } }
     case 'panel-preflight-succeeded': return { ...state, panelPreflight: { kind: 'ready', binding: event.binding, matrix: event.matrix, layout: event.layout } }
@@ -792,7 +785,6 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     return {
       ...selection,
       ...(latest !== null && recorded !== null ? { estimator: latest.configuration.kind, configurations: { ...selection.configurations, [latest.configuration.kind]: latest.configuration } } : {}),
-      job: { kind: 'idle' },
       panelPreflight: { kind: 'not-required' },
       studyDataPreflight: { kind: 'not-required' },
     }
@@ -942,21 +934,35 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     }
   }, [adjustmentDraft.kind, configuration])
 
-  useRunActivity(onActivity, state.job.kind === 'running' ? { label: describeEstimator(state.estimator), progress: state.job.progress === null ? null : state.job.progress.completed / Math.max(1, state.job.progress.total) } : null)
+  const session = useJob('estimation')
+  const { job } = session
+  useRunActivity(onActivity, job.kind === 'running' ? { label: describeEstimator(state.estimator), progress: job.progress === null ? null : job.progress.completed / Math.max(1, job.progress.total) } : null)
   const execute = async () => {
-    if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running' || adjustmentDraftOpen || !method.ok) return
+    if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || adjustmentDraftOpen || !method.ok) return
     if (!estimableIdentification(identification.result)) return
-    dispatch({ type: 'run-started' })
+    const current = session.start('analysis', describeEstimator(state.estimator))
+    if (current === null) return
+    const dispatch = (event: RunEvent) => {
+      switch (event.type) {
+        case 'run-progressed': session.progress(current, describeEstimator(state.estimator), event.progress); return
+        case 'run-failed': session.fail(current, event.detail); return
+        case 'run-finished': session.finish(current); return
+        default: assertNever(event)
+      }
+    }
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const materialise = async (columns: NonEmptyArray<StudyVariable>) => {
         const matrix = await materialisePrepared(source, profile, prepared, columns.map((column) => column.column) as unknown as NonEmptyArray<ColumnId>)
+        if (!session.current(current)) throw new DOMException('The estimation run was cancelled.', 'AbortError')
         if (!matrix.ok) throw new Error(describePreparedMaterialisationProblem(matrix.error))
         return matrix.value
       }
       const columnAt = (values: Float64Array, rows: number, index: number): number[] => Array.from(values.subarray(index * rows, (index + 1) * rows))
       const identity = { id: newEstimationRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), eligibility } as const
       const finish = (run: EstimationRunArtifact | null, detail: string) => {
+        if (!session.current(current)) return
         if (run === null) { dispatch({ type: 'run-failed', detail }); return }
         onRun(run)
         dispatch({ type: 'run-finished' })
@@ -1700,12 +1706,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             </div>
             {selectedEstimatorIsVisible && eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {studyDataError !== null && <Alert tone="danger" className="mt-3"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
-            {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The estimate could not run: {state.job.detail}</p></Alert>}
+            <JobNotice job={job} />
             <div className="mt-4 flex items-center gap-3">
-              <button type="button" className={button('signal')} disabled={!selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
               </button>
-              {state.job.kind === 'running' && <Orb state="solving" aria-label="Estimator running" />}
+              {job.kind === 'running' && <><Orb state="solving" aria-label="Estimator running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
             </div>
           </>
         )}

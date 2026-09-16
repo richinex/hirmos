@@ -1,4 +1,6 @@
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { useCallback, useState, type ReactNode } from 'react'
 import { COUNT_SERIES_DIAGNOSTIC_METHODS, TIME_SERIES_METHODS } from '@/domain/methods'
 import { TimeSeriesRequirements } from './TimeSeriesRequirements'
@@ -23,7 +25,6 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
 type Model = 'ardl' | 'vecm'
-type Job = { readonly kind: 'idle' } | { readonly kind: 'running' } | { readonly kind: 'failed'; readonly detail: string }
 export type TimeSeriesPanelProps = {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -53,7 +54,8 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
   const [terms, setTerms] = useState<ArdlTerms>(() => previous?.kind === 'ardl' ? previous.specification.terms : 'constant')
   const [deterministic, setDeterministic] = useState<'n' | 'co' | 'ci' | 'coli'>(() => previous?.kind === 'vecm' ? previous.specification.deterministic : 'ci')
   const [significance, setSignificance] = useState<90 | 95 | 99>(() => previous?.kind === 'vecm' ? previous.specification.significance : 95)
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob(`time-series:${model}`)
+  const { job } = session
   const [forecastSteps,setForecastSteps]=useState('')
   useRunActivity(props.onActivity, job.kind === 'running' ? { label: model.toUpperCase(), progress: null } : null)
   const runs = props.runs.filter((run) => run.kind === model)
@@ -62,13 +64,16 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
 
   const run = async () => {
     if (!ready || selected[0] === undefined) return
-    setJob({ kind: 'running' })
+    const current = session.start('analysis', `Preparing ${model.toUpperCase()}`)
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const matrix = await materialisePrepared(props.source, props.profile, props.prepared, selected as NonEmptyArray<ColumnId>)
-      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(current)) return
+      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const { values, rowCount, columns: used, timeAxis } = matrix.value
-      if (timeAxis === null) { setJob({ kind: 'failed', detail: 'The prepared time series has no recorded time key.' }); return }
+      if (timeAxis === null) { fail('The prepared time series has no recorded time key.'); return }
       const plotTime = { kind: timeAxis.kind, values: Array.from(timeAxis.kind === 'calendar' ? timeAxis.timestamps : timeAxis.values) }
       const variables = used.map(({ id, name }) => ({ id, name }))
       const identity = { id: newTimeSeriesRunId(), preparedDataset: props.prepared.id, createdAt: new Date().toISOString(), plotTime }
@@ -88,10 +93,11 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
           default: return assertNever(model)
         }
       })()
-      if (!fitted.ok) { setJob({ kind: 'failed', detail: fitted.error }); return }
+      if (!session.current(current)) return
+      if (!fitted.ok) { fail(fitted.error); return }
       props.onRun(fitted.value)
-      setJob({ kind: 'idle' })
-    } catch (cause: unknown) { setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) }) }
+      session.finish(current)
+    } catch (cause: unknown) { fail(cause instanceof Error ? cause.message : String(cause)) }
   }
 
   const controls = <><fieldset disabled={job.kind === 'running'} className="m-0 grid min-w-0 grid-cols-1 items-start gap-4 border-0 p-0 @lg/panel:grid-cols-2">
@@ -109,7 +115,7 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
     {model==='vecm'&&<label className="block"><span className={fieldLabel}>Forecast periods</span><input type="number" min={1} max={200} className={field('text','mt-1')} placeholder="No forecast" value={forecastSteps} onChange={e=>setForecastSteps(e.target.value)} /><span className={fieldHint}>Leave blank to fit without forecasting.</span></label>}
     {selected.length >= 2 && props.prepared.observations < minimumRows && <p role="status" className="text-body text-muted">This specification needs at least {minimumRows} prepared observations.</p>}
   </fieldset>
-  <div className="mt-4 flex items-center gap-3"><button type="button" className={button('signal')} disabled={!ready} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button><span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label={`${model.toUpperCase()} running`} />}</span></div></>
+  <div className="mt-4 flex items-center gap-3"><button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button><span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label={`${model.toUpperCase()} running`} />}</span>{job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div></>
 
   return <WorkbenchLayout id={`time-series-${model}`}
     bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} /> }}
@@ -122,7 +128,7 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
         <p className={`${fieldHint} mb-4 mt-1 max-w-[65ch]`}>{model === 'ardl' ? 'Estimate how an outcome relates to its own earlier values and to current and earlier values of another series.' : 'Estimate long-run equilibrium relationships and how changes in the series respond to departures from them.'}</p>
         {controls}
         <span role="status" className="sr-only">{job.kind === 'running' ? `Fitting ${model.toUpperCase()}…` : ''}</span>
-        {job.kind === 'failed' && <p role="alert" className="mt-3 text-body text-danger">{job.detail}</p>}
+        <JobNotice job={job} />
       </section>
       {runs.length === 0 && <p className="text-body text-muted">Choose series and a model specification to begin.</p>}
       {runs.length > 0 && <h3 className={`${sectionTitle} m-0`}>Results</h3>}

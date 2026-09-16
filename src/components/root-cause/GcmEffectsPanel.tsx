@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
@@ -10,7 +11,7 @@ import { ExpandableChart } from '@/charts/ExpandableChart'
 import { runComparisonOption } from '@/charts/estimation/runComparison'
 import { useChartTheme } from '@/charts/theme'
 import { Icon } from '@/components/Icon'
-import { ActionRow, type Job } from './ActionRow'
+import { ActionRow } from './ActionRow'
 import { GraphDetails } from './GraphDetails'
 import { mapNonEmpty } from '@/domain/dop'
 import { gcmEffectsRequestSchema, gcmEffectsRunSchema, type GcmEffectsRequest, type GcmEffectsRun } from '@/domain/gcmEffects'
@@ -100,37 +101,31 @@ export function GcmEffectsPanel(props: Props) {
     mechanisms: props.graph.nodes.map((_, i) => !props.graph.edges.some(([, child]) => child === i) ? { kind: 'empirical' }
       : i === 0 ? { kind: 'classifier', classes: 2 } : { kind: 'regression' }),
   }))
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob(`effects:${props.graph.dagRevision}`)
+  const { job } = session
   const [selected, setSelected] = useState<string | null>(null)
-  const attempt = useRef(0)
-  useEffect(() => () => { attempt.current += 1 }, [])
   const latest = props.runs.find(run => run.id === selected) ?? previous
   const busy = job.kind === 'running'
   const run = async () => {
-    const current = ++attempt.current
-    setJob({ kind: 'running', action: 'analysis', stage: 'Preparing intervention effects' })
+    const current = session.start('analysis', 'Preparing intervention effects')
+    if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runGcmEffects }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(props.graph.nodes, node => node.column))
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
       const request = gcmEffectsRequestSchema.safeParse({ ...model, rows: data.value.rowCount })
       if (!request.success) throw new Error(request.error.issues.map(issue => issue.message).join(' '))
-      if (current !== attempt.current) return
-      const result = await runGcmEffects(data.value.values, request.data, progress => { if (current === attempt.current) setJob({ kind: 'running', action: 'analysis', stage: `${progress.stage}: ${progress.completed} of ${progress.total}` }) })
-      if (current !== attempt.current) return
+      if (!session.current(current)) return
+      const result = await runGcmEffects(data.value.values, request.data, progress => session.progress(current, `${progress.stage}: ${progress.completed} of ${progress.total}`))
+      if (!session.current(current)) return
       if (!result.ok) throw new Error(describeAnalysisWorkerProblem(result.error))
       const record = gcmEffectsRunSchema.parse({ id: crypto.randomUUID(), createdAt: new Date().toISOString(),
         graph: { dagDocument: props.graph.dagDocument, dagRevision: props.graph.dagRevision, preparedDataset: props.graph.preparedDataset },
         model: request.data, evidence: result.value })
-      props.onRun(record); setSelected(record.id); setJob({ kind: 'idle' })
-    } catch (error) { if (current === attempt.current) setJob({ kind: 'failed', action: 'analysis', detail: error instanceof Error ? error.message : String(error) }) }
+      props.onRun(record); setSelected(record.id); session.finish(current)
+    } catch (error) { session.fail(current, error instanceof Error ? error.message : String(error)) }
   }
-  const cancel = async () => {
-    const current = ++attempt.current
-    const { cancelAnalysisRuns } = await import('@/analysis/client')
-    if (current !== attempt.current) return
-    cancelAnalysisRuns(); setJob({ kind: 'failed', action: 'analysis', detail: 'The analysis was cancelled.' })
-  }
+  const cancel = session.cancel
   const requirements = <div className="space-y-6">
     <section><h3 className="m-0 text-body font-medium">Variable models</h3><p className={fieldHint}>Variables without parents retain their observed distribution. Other variables use a random-forest regression with empirical noise, or a categorical classifier. Categories must be coded consecutively from 0; categorical parents use one-hot encoding.</p></section>
     <section><h3 className="m-0 text-body font-medium">Intervention</h3><p className={fieldHint}>The treatment is assigned 0 or 1 with equal probability in each simulation. Affected variables are sampled again; unaffected observed covariates remain together. Grouping is limited to variables without parents.</p></section>
@@ -143,8 +138,8 @@ export function GcmEffectsPanel(props: Props) {
       <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Estimate intervention effects using the prepared data and the recorded causal graph.</p></div>
       <section className={panel('p-(--panel-space)')} aria-label="Intervention effects setup">
         <div className="mb-6"><GraphDetails name={props.name} graph={props.graph} disabled={busy} onOpen={props.onGraph} /></div>
+        <div className="mb-4">{props.navigation}</div>
         <fieldset disabled={busy} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">Intervention effect settings</legend>
-          {props.navigation}
           <div><h3 className={`${sectionTitle} m-0`}>Estimate the effect of an intervention</h3><p className={fieldHint}>Compare simulated outcomes when the treatment is set to 1 rather than 0.</p></div>
           <div className="grid min-w-0 gap-4 @lg/panel:grid-cols-2">
             {(['treatment', 'outcome'] as const).map(role => <label key={role}><span className={fieldLabel}>{role === 'treatment' ? 'Treatment' : 'Outcome'}</span><Select aria-label={role === 'treatment' ? 'GCM treatment' : 'GCM outcome'} className={field('text', 'mt-1')} value={String(model[role])} onChange={event => setModel({ ...model, [role]: Number(event.target.value) })}>{model.names.map((name, i) => <option key={name} value={i}>{name}</option>)}</Select></label>)}
@@ -162,7 +157,7 @@ export function GcmEffectsPanel(props: Props) {
             {([{ key: 'trees', label: 'Trees per model', min: 1 }, { key: 'minLeaf', label: 'Minimum leaf size', min: 1 }, { key: 'fitSeed', label: 'Fitting seed', min: 0 }, { key: 'simulationSeed', label: 'Simulation seed', min: 0 }, { key: 'repetitions', label: 'Simulations', min: 1 }] as const).map(item => <label key={item.key}><span className={fieldLabel}>{item.label}</span><input aria-label={item.label} type="number" min={item.min} value={model[item.key]} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, [item.key]: Number(event.target.value) })} /></label>)}
             <label><span className={fieldLabel}>Upper percentile</span><input aria-label="Upper percentile" type="number" min={51} max={99.9} step={0.1} value={model.upperQuantile * 100} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, upperQuantile: Number(event.target.value) / 100 })} /></label>
           </div></details>
-        </fieldset><ActionRow job={job} action="analysis" onRun={() => void run()} onCancel={() => void cancel()} />
+        </fieldset><ActionRow job={job} action="analysis" disabled={session.blocked} onRun={() => void run()} onCancel={cancel} />
       </section>
       {latest && <GcmEffectResult run={latest} />}
     </section>} />

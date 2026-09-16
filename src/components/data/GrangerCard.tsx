@@ -26,11 +26,8 @@ import { formatTime } from '@/lib/format/date'
 import { formatCount } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
-
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running' }
-  | { readonly kind: 'failed'; readonly detail: string }
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 
 const pValue = (value: number): string => (value < 0.0001 ? '<0.0001' : value.toFixed(4))
 const statistic = (value: number): string => (Math.abs(value) >= 10_000 ? value.toExponential(4) : value.toFixed(6))
@@ -102,7 +99,8 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
   const [candidateCause, setCandidateCause] = useState<ColumnId | null>(null)
   const [target, setTarget] = useState<ColumnId | null>(null)
   const [maxLag, setMaxLag] = useState<GrangerLag>(4)
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob('granger')
+  const { job } = session
   const method = methodDefinition(GRANGER_SSR_F_METHOD_ID)
   if (!method.ok) return <p role="alert" className="mt-4 text-body text-danger">The Granger test is not registered in the method catalogue.</p>
   const readiness = readyGrangerSpecification(target, candidateCause, maxLag, prepared)
@@ -119,16 +117,21 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
 
   const run = async () => {
     if (!readiness.ok || eligibility.kind === 'refused') return
-    setJob({ kind: 'running' })
+    const current = session.start('analysis', 'Granger test')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const matrix = await materialisePrepared(source, profile, prepared, [readiness.value.target, readiness.value.candidateCause])
-      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(current)) return
+      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const targetColumn = matrix.value.columns.find((column) => column.id === readiness.value.target)
       const causeColumn = matrix.value.columns.find((column) => column.id === readiness.value.candidateCause)
-      if (targetColumn === undefined || causeColumn === undefined) { setJob({ kind: 'failed', detail: 'The returned matrix omitted the selected pair.' }); return }
+      if (targetColumn === undefined || causeColumn === undefined) { fail('The returned matrix omitted the selected pair.'); return }
       const result = await analysis.runGrangerSsrF(matrix.value.values, matrix.value.rowCount, readiness.value.maxLag)
-      if (!result.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+      if (!session.current(current)) return
+      if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
       onEvidence({
         kind: 'granger-evidence',
         id: newGrangerEvidenceId(),
@@ -141,9 +144,9 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
         eligibility,
         result: result.value,
       })
-      setJob({ kind: 'idle' })
+      session.finish(current)
     } catch (cause: unknown) {
-      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      fail(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -154,13 +157,13 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
       <p className={prose('mb-0 mt-1 text-faint')}>Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-body text-ink"><span className={label('block text-faint')}>Candidate cause</span>
-          <Select aria-label="Candidate cause" className={field('text', 'mt-1 w-44')} value={columnOf(candidateCause) ?? ''} onChange={(event) => { setCandidateCause(event.target.value === '' ? null : (event.target.value as ColumnId)); setJob({ kind: 'idle' }) }}>
+          <Select aria-label="Candidate cause" className={field('text', 'mt-1 w-44')} value={columnOf(candidateCause) ?? ''} onChange={(event) => setCandidateCause(event.target.value === '' ? null : (event.target.value as ColumnId))}>
             <option value="">Choose variable</option>
             {columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
           </Select>
         </label>
         <label className="text-body text-ink"><span className={label('block text-faint')}>Target</span>
-          <Select aria-label="Target" className={field('text', 'mt-1 w-44')} value={columnOf(target) ?? ''} onChange={(event) => { setTarget(event.target.value === '' ? null : (event.target.value as ColumnId)); setJob({ kind: 'idle' }) }}>
+          <Select aria-label="Target" className={field('text', 'mt-1 w-44')} value={columnOf(target) ?? ''} onChange={(event) => setTarget(event.target.value === '' ? null : (event.target.value as ColumnId))}>
             <option value="">Choose variable</option>
             {columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
           </Select>
@@ -170,12 +173,13 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
             {GRANGER_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
           </Select>
         </label>
-        <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused'} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>
+        <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>
           Run Granger test
         </button>
+        {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel tests</button>}
       </div>
       {!readiness.ok && <Alert tone="danger" className="mt-2">{describeGrangerReadiness(readiness.error)}</Alert>}
-      {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
+      <JobNotice job={job} />
       {pair !== null && warning !== null && (
         <Alert tone="warn" live={false} className="mt-3">
           <p className="m-0">Stationarity not confirmed</p>

@@ -48,7 +48,7 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   await page.getByRole('checkbox', { name: 'x', exact: true }).check()
   await page.getByRole('button', { name: 'Fit ARDL', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toHaveCount(1, { timeout: 60_000 })
-  await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toContainText('ARDL · y')
+  await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toContainText('ARDL y')
   const ardlCharts = page.getByRole('region', { name: 'Time-series result' }).locator('div.space-y-3').filter({ has: page.getByRole('heading', { name: 'Observed outcome and estimated long-run level', exact: true }) })
   await expect(ardlCharts.locator('[_echarts_instance_]')).toHaveCount(2)
   await ardlCharts.scrollIntoViewIfNeeded()

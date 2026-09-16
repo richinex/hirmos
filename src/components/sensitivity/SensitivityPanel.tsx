@@ -6,6 +6,8 @@ import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
 import { useMemo, useReducer, useState } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { EChart } from '@/charts/EChart'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
 import { useChartTheme } from '@/charts/theme'
@@ -51,31 +53,22 @@ import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { interpretSensitivityResult } from '@/domain/resultInterpretation'
 import { cn } from '@/lib/utils'
 
-type Job = { readonly kind: 'idle' } | { readonly kind: 'running' } | { readonly kind: 'failed'; readonly detail: string }
-
 interface State {
   readonly estimationRun: EstimationRunId | null
   readonly probe: SensitivityProbe
   readonly configurations: Readonly<Record<SensitivityProbe, SensitivityConfiguration>>
-  readonly job: Job
 }
 
 type Event =
   | { readonly type: 'run-chosen'; readonly run: EstimationRunId | null }
   | { readonly type: 'probe-chosen'; readonly probe: SensitivityProbe }
   | { readonly type: 'configured'; readonly configuration: SensitivityConfiguration }
-  | { readonly type: 'job-started' }
-  | { readonly type: 'job-failed'; readonly detail: string }
-  | { readonly type: 'job-finished' }
 
 const step = (state: State, event: Event): State => {
   switch (event.type) {
-    case 'run-chosen': return { ...state, estimationRun: event.run, job: { kind: 'idle' } }
-    case 'probe-chosen': return { ...state, probe: event.probe, job: { kind: 'idle' } }
-    case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration }, job: { kind: 'idle' } }
-    case 'job-started': return { ...state, job: { kind: 'running' } }
-    case 'job-failed': return { ...state, job: { kind: 'failed', detail: event.detail } }
-    case 'job-finished': return { ...state, job: { kind: 'idle' } }
+    case 'run-chosen': return { ...state, estimationRun: event.run }
+    case 'probe-chosen': return { ...state, probe: event.probe }
+    case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration } }
     default: return assertNever(event)
   }
 }
@@ -289,7 +282,7 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
   )
 }
 
-export function SensitivityPanel({ source, profile, prepared, studies, estimationRuns, runs, onRun, onDeleteRun, onActivity }: {
+export function SensitivityPanel({ source, profile, prepared, studies, estimationRuns, runs, onRun: recordRun, onDeleteRun, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -309,7 +302,6 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       estimationRun: probed?.id ?? [...estimationRuns].reverse().find((run) => run.kind === 'backdoor-linear-run')?.id ?? estimationRuns.at(-1)?.id ?? null,
       probe: latest !== null && probed !== null ? latest.configuration.kind : 'linear-refutation',
       configurations: latest !== null && probed !== null ? { ...defaults, [latest.configuration.kind]: latest.configuration } : defaults,
-      job: { kind: 'idle' },
     }
   })
   const estimation = estimationRuns.find((run) => run.id === state.estimationRun) ?? null
@@ -318,23 +310,35 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
   const eligibility = probeEligibility(state.probe, estimation, null)
   const configure = (next: SensitivityConfiguration) => dispatch({ type: 'configured', configuration: next })
 
-  useRunActivity(onActivity, state.job.kind === 'running' ? { label: describeProbe(state.probe), progress: null } : null)
+  const session = useJob('sensitivity')
+  const { job } = session
+  useRunActivity(onActivity, job.kind === 'running' ? { label: describeProbe(state.probe), progress: null } : null)
   const execute = async () => {
-    if (estimation === null || study === null || eligibility.kind === 'refused' || state.job.kind === 'running') return
-    dispatch({ type: 'job-started' })
+    if (estimation === null || study === null || eligibility.kind === 'refused') return
+    const current = session.start('analysis', describeProbe(state.probe))
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
+    const onRun = (run: SensitivityRunArtifact) => {
+      if (!session.current(current)) return
+      recordRun(run)
+      session.finish(current)
+    }
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const adjustmentVariables = contemporaneousAdjustmentVariables(estimation.estimate.adjustment)
-      if (adjustmentVariables === null) { dispatch({ type: 'job-failed', detail: 'This probe requires contemporaneous adjustment columns; the selected run used time-indexed adjustment rows.' }); return }
+      if (adjustmentVariables === null) { fail('This probe requires contemporaneous adjustment columns; the selected run used time-indexed adjustment rows.'); return }
       const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...adjustmentVariables]
       const matrix = await materialisePrepared(source, profile, prepared, columns.map((column) => column.column) as unknown as NonEmptyArray<ColumnId>)
-      if (!matrix.ok) { dispatch({ type: 'job-failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(current)) return
+      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const adjustment = adjustmentVariables.map((_, index) => index + 2)
       const identity = { id: newSensitivityRunId(), estimationRun: estimation.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), columns } as const
       switch (configuration.kind) {
         case 'linear-refutation': {
           const result = await analysis.runLinearRefutation(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, simulations: configuration.simulations, subsetFraction: configuration.subsetFraction, seed: configuration.seed, ljungBoxLags: configuration.ljungBoxLags })
-          if (!result.ok) { dispatch({ type: 'job-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+          if (!session.current(current)) return
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
           const evidence = result.value
           const refuters: NonEmptyArray<RefuterFact> = [
             { id: 'placebo', method: PLACEBO_REFUTER_METHOD_ID, original: evidence.estimate, refuted: evidence.placeboEffect, interpretation: { kind: 'reference-distance', reference: 'zero', reading: 'A permuted treatment should produce an estimate near zero.' } },
@@ -349,36 +353,35 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
             { id: 'durbin-watson', method: LJUNG_BOX_METHOD_ID, reading: `Durbin–Watson ${formatStatistic('raw', evidence.durbinWatson).text}${evidence.durbinWatson < 1.5 ? '; positive serial correlation' : evidence.durbinWatson > 2.5 ? '; negative serial correlation' : '; near 2'}.` },
           ]
           onRun({ ...identity, kind: 'linear-refutation-run', configuration, evidence, refuters, diagnostics })
-          dispatch({ type: 'job-finished' })
           return
         }
         case 'dml-refutation': {
-          if (estimation.kind !== 'double-ml-run') { dispatch({ type: 'job-failed', detail: 'The DML batch needs a double machine learning run.' }); return }
+          if (estimation.kind !== 'double-ml-run') { fail('The DML batch needs a double machine learning run.'); return }
           const result = await analysis.runDmlRefutationBatch(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, model: estimation.evidence.model, att: estimation.evidence.att, seed: configuration.seed })
-          if (!result.ok) { dispatch({ type: 'job-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+          if (!session.current(current)) return
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
           const evidence = result.value
           const refuters: NonEmptyArray<RefuterFact> = [
             { id: 'placebo', method: DML_REFUTATION_METHOD_ID, original: evidence.placebo.originalEffect, refuted: evidence.placebo.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'Null: the mean estimate across permuted-treatment refits is zero.', pValue: evidence.placebo.pValue, alpha: 0.05 } },
             { id: 'random-common-cause', method: DML_REFUTATION_METHOD_ID, original: evidence.randomCommonCause.originalEffect, refuted: evidence.randomCommonCause.refutedEffect, interpretation: { kind: 'mean-shift-test', nullHypothesis: 'Null: the mean shift after adding an independent random covariate is zero.', pValue: evidence.randomCommonCause.pValue, alpha: 0.05 } },
           ]
           onRun({ ...identity, kind: 'dml-refutation-run', configuration, evidence, refuters })
-          dispatch({ type: 'job-finished' })
           return
         }
         case 'unobserved-confounding': {
           const treatment = Array.from(matrix.value.values.subarray(0, matrix.value.rowCount))
-          if (treatment.some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'job-failed', detail: `${study.treatment.name} is not binary; the simulation flips a 0 or 1 treatment.` }); return }
+          if (treatment.some((value) => value !== 0 && value !== 1)) { fail(`${study.treatment.name} is not binary; the simulation flips a 0 or 1 treatment.`); return }
           const result = await analysis.runUnobservedConfounding(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, seed: configuration.seed, kappaT: kappaValues(configuration.kappaT), kappaY: kappaValues(configuration.kappaY) })
-          if (!result.ok) { dispatch({ type: 'job-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+          if (!session.current(current)) return
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
           onRun({ ...identity, kind: 'unobserved-confounding-run', configuration, evidence: result.value })
-          dispatch({ type: 'job-finished' })
           return
         }
         default:
           return assertNever(configuration)
       }
     } catch (cause: unknown) {
-      dispatch({ type: 'job-failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      fail(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -453,12 +456,12 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               )}
             </div>
             {eligibility.kind === 'refused' && <Alert tone="warn" live={false} className="mt-4"><p className="m-0">{eligibility.reason}</p></Alert>}
-            {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The probe could not run: {state.job.detail}</p></Alert>}
+            <JobNotice job={job} />
             <div className="mt-4 flex items-center gap-3">
-              <button type="button" className={button('signal')} disabled={eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              <button type="button" className={button('signal')} disabled={eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 Run {lowerFirst(describeProbe(state.probe))}
               </button>
-              {state.job.kind === 'running' && <Orb state="working" aria-label="Probe running" />}
+              {job.kind === 'running' && <><Orb state="working" aria-label="Probe running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
             </div>
           </>
         )}

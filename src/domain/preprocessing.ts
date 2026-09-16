@@ -85,19 +85,6 @@ export interface ColumnSeriesTransform {
   readonly transform: SeriesTransform
 }
 
-export type PreparationJob =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running' }
-  | { readonly kind: 'failed'; readonly detail: string }
-  | { readonly kind: 'succeeded'; readonly artifact: PreparedDatasetArtifact }
-
-export type StationarityJob =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'cancelled' }
-  | { readonly kind: 'running'; readonly completed: number; readonly total: number }
-  | { readonly kind: 'failed'; readonly detail: string }
-  | { readonly kind: 'succeeded'; readonly evidence: StationarityEvidenceArtifact }
-
 /** Which selected columns lose their STL seasonal component when the version is created. */
 export type SeasonalAdjustmentDraft =
   | { readonly kind: 'none' }
@@ -114,8 +101,6 @@ export interface PreprocessingDraft {
   readonly seriesTransforms: readonly ColumnSeriesTransform[]
   /** A display-only scale for the stationarity table; it never changes the prepared matrix. */
   readonly diagnosticTransform: SeriesTransform
-  readonly preparation: PreparationJob
-  readonly stationarity: StationarityJob
 }
 
 export type DenseReadyMissingness = Exclude<MissingnessDraft, { readonly kind: 'unresolved' | 'lag-aware-exclusion' }>
@@ -199,7 +184,6 @@ export interface StationarityEvidenceArtifact {
 }
 
 export type PreprocessingEvent =
-  | { readonly type: 'diagnostics-cleared' }
   | { readonly type: 'regular-series-selected' }
   | { readonly type: 'cross-section-selected' }
   | { readonly type: 'regular-panel-selected' }
@@ -215,14 +199,6 @@ export type PreprocessingEvent =
   | { readonly type: 'series-transform-selected'; readonly column: ColumnId; readonly transform: SeriesTransform }
   | { readonly type: 'all-series-transforms-selected'; readonly transform: SeriesTransform }
   | { readonly type: 'diagnostic-transform-selected'; readonly transform: SeriesTransform }
-  | { readonly type: 'preparation-started' }
-  | { readonly type: 'preparation-failed'; readonly detail: string }
-  | { readonly type: 'preparation-succeeded'; readonly artifact: PreparedDatasetArtifact }
-  | { readonly type: 'diagnostics-started'; readonly total: number }
-  | { readonly type: 'diagnostics-cancelled' }
-  | { readonly type: 'diagnostic-completed' }
-  | { readonly type: 'diagnostics-failed'; readonly detail: string }
-  | { readonly type: 'diagnostics-succeeded'; readonly evidence: StationarityEvidenceArtifact }
 
 export type PreprocessingReadinessProblem =
   | { readonly kind: 'observational-structure-required' }
@@ -250,15 +226,8 @@ export const initialPreprocessingDraft = (profile: DatasetProfile): Preprocessin
     seasonal: { kind: 'none' },
     seriesTransforms: [],
     diagnosticTransform: { kind: 'levels' },
-    preparation: { kind: 'idle' },
-    stationarity: { kind: 'idle' },
   }
 }
-
-const resetStructuralWork = (): Pick<PreprocessingDraft, 'preparation' | 'stationarity'> => ({
-  preparation: { kind: 'idle' },
-  stationarity: { kind: 'idle' },
-})
 
 const toggleColumn = (variables: VariableDraft, column: ColumnId): VariableDraft => {
   const current: readonly ColumnId[] = variables.kind === 'selected' ? variables.columns : []
@@ -316,7 +285,6 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         sampling: state.sampling.kind === 'regular-series' || state.sampling.kind === 'regular-series-awaiting-time'
           ? state.sampling
           : { kind: 'regular-series-awaiting-time', frequency: 'monthly' },
-        ...resetStructuralWork(),
       }
     case 'cross-section-selected':
       return {
@@ -326,7 +294,6 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         resampling: { kind: 'none' },
         seriesTransforms: [],
         diagnosticTransform: { kind: 'levels' },
-        ...resetStructuralWork(),
       }
     case 'regular-panel-selected':
       return {
@@ -334,7 +301,7 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         sampling: state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys'
           ? state.sampling
           : { kind: 'regular-panel-awaiting-keys', unitColumn: null, timeColumn: null, frequency: 'yearly' },
-        seasonal: { kind: 'none' }, resampling: { kind: 'none' }, seriesTransforms: [], diagnosticTransform: { kind: 'levels' }, ...resetStructuralWork(),
+        seasonal: { kind: 'none' }, resampling: { kind: 'none' }, seriesTransforms: [], diagnosticTransform: { kind: 'levels' },
       }
     case 'unit-column-selected': {
       if (state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
@@ -343,7 +310,7 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         ? { kind: 'regular-panel-awaiting-keys', unitColumn: event.unitColumn, timeColumn, frequency: state.sampling.frequency }
         : { kind: 'regular-panel', unitColumn: event.unitColumn, timeColumn, frequency: state.sampling.frequency }
       const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.unitColumn) ? toggleColumn(state.variables, event.unitColumn) : state.variables
-      return { ...state, sampling, variables, ...resetStructuralWork() }
+      return { ...state, sampling, variables }
     }
     case 'time-column-selected': {
       if (state.sampling.kind === 'regular-panel' || state.sampling.kind === 'regular-panel-awaiting-keys') {
@@ -352,7 +319,7 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
           ? { kind: 'regular-panel-awaiting-keys', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
           : { kind: 'regular-panel', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
         const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn) ? toggleColumn(state.variables, event.timeColumn) : state.variables
-        return { ...state, sampling, variables, ...resetStructuralWork() }
+        return { ...state, sampling, variables }
       }
       if (state.sampling.kind !== 'regular-series' && state.sampling.kind !== 'regular-series-awaiting-time') return state
       const frequency = state.sampling.frequency
@@ -362,18 +329,17 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
         variables: state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn)
           ? toggleColumn(state.variables, event.timeColumn)
           : state.variables,
-        ...resetStructuralWork(),
       }
     }
     case 'frequency-selected':
       if (state.sampling.kind === 'regular-series') {
-        return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' }, ...resetStructuralWork() }
+        return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' } }
       }
       if (state.sampling.kind === 'regular-series-awaiting-time') {
-        return { ...state, sampling: { kind: 'regular-series-awaiting-time', frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' }, ...resetStructuralWork() }
+        return { ...state, sampling: { kind: 'regular-series-awaiting-time', frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' } }
       }
-      if (state.sampling.kind === 'regular-panel') return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
-      if (state.sampling.kind === 'regular-panel-awaiting-keys') return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, ...resetStructuralWork() }
+      if (state.sampling.kind === 'regular-panel') return { ...state, sampling: { ...state.sampling, frequency: event.frequency } }
+      if (state.sampling.kind === 'regular-panel-awaiting-keys') return { ...state, sampling: { ...state.sampling, frequency: event.frequency } }
       return state
     case 'variable-toggled': {
       const variables = toggleColumn(state.variables, event.column)
@@ -383,17 +349,17 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
       const resampling: ResamplingDraft = state.resampling.kind === 'daily-downsample'
         ? { ...state.resampling, aggregations: state.resampling.aggregations.filter((candidate) => kept.includes(candidate.column)) }
         : state.resampling
-      return { ...state, variables, seasonal, resampling, seriesTransforms, ...resetStructuralWork() }
+      return { ...state, variables, seasonal, resampling, seriesTransforms }
     }
     case 'column-selection-replaced':
-      return { ...state, ...retainColumnConfiguration(state, event.columns), ...resetStructuralWork() }
+      return { ...state, ...retainColumnConfiguration(state, event.columns) }
     case 'seasonal-adjustment-selected':
-      return { ...state, seasonal: event.seasonal, ...resetStructuralWork() }
+      return { ...state, seasonal: event.seasonal }
     case 'missingness-selected':
-      return { ...state, missingness: event.resolution, ...resetStructuralWork() }
+      return { ...state, missingness: event.resolution }
     case 'resampling-selected':
       if (state.sampling.kind !== 'regular-series' || state.sampling.frequency !== 'daily') return state
-      return { ...state, resampling: event.resampling, ...resetStructuralWork() }
+      return { ...state, resampling: event.resampling }
     case 'resampling-aggregation-selected':
       if (state.resampling.kind !== 'daily-downsample' || state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
       return {
@@ -405,37 +371,16 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
             { column: event.column, aggregation: event.aggregation },
           ],
         },
-        ...resetStructuralWork(),
       }
     case 'series-transform-selected':
       if (state.variables.kind !== 'selected' || !state.variables.columns.includes(event.column)) return state
-      return { ...state, seriesTransforms: setSeriesTransform(state.seriesTransforms, event.column, event.transform), ...resetStructuralWork() }
+      return { ...state, seriesTransforms: setSeriesTransform(state.seriesTransforms, event.column, event.transform) }
     case 'all-series-transforms-selected':
       return state.variables.kind === 'selected'
-        ? { ...state, seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({ column, transform: event.transform })), ...resetStructuralWork() }
+        ? { ...state, seriesTransforms: mapNonEmpty(state.variables.columns, (column) => ({ column, transform: event.transform })) }
         : state
     case 'diagnostic-transform-selected':
-      return { ...state, diagnosticTransform: event.transform, stationarity: { kind: 'idle' } }
-    case 'preparation-started':
-      return { ...state, preparation: { kind: 'running' }, stationarity: { kind: 'idle' } }
-    case 'preparation-failed':
-      return { ...state, preparation: { kind: 'failed', detail: event.detail }, stationarity: { kind: 'idle' } }
-    case 'preparation-succeeded':
-      return { ...state, preparation: { kind: 'succeeded', artifact: event.artifact }, stationarity: { kind: 'idle' } }
-    case 'diagnostics-started':
-      return { ...state, stationarity: { kind: 'running', completed: 0, total: event.total } }
-    case 'diagnostics-cleared':
-      return { ...state, stationarity: { kind: 'idle' } }
-    case 'diagnostics-cancelled':
-      return { ...state, stationarity: { kind: 'cancelled' } }
-    case 'diagnostic-completed':
-      return state.stationarity.kind === 'running'
-        ? { ...state, stationarity: { ...state.stationarity, completed: Math.min(state.stationarity.completed + 1, state.stationarity.total) } }
-        : state
-    case 'diagnostics-failed':
-      return { ...state, stationarity: { kind: 'failed', detail: event.detail } }
-    case 'diagnostics-succeeded':
-      return { ...state, stationarity: { kind: 'succeeded', evidence: event.evidence } }
+      return { ...state, diagnosticTransform: event.transform }
     default:
       return assertNever(event)
   }

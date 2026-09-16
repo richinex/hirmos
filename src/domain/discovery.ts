@@ -1074,15 +1074,8 @@ export interface DiscoveryProgress {
   readonly total: number
 }
 
-export type DiscoveryJob =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running'; readonly progress: DiscoveryProgress | null }
-  | { readonly kind: 'failed'; readonly problem: DiscoveryRunProblem }
-  | { readonly kind: 'succeeded'; readonly artifact: DiscoveryRunArtifact }
-
 export interface DiscoveryDraft {
   readonly configuration: DiscoveryConfiguration
-  readonly job: DiscoveryJob
 }
 
 export type DiscoverySession =
@@ -1110,11 +1103,11 @@ export type DiscoveryEvent =
   | { readonly type: 'ocse-method-selected'; readonly value: OcseInformationMethod }
   | { readonly type: 'neural-configured'; readonly configuration: Extract<DiscoveryConfiguration, { readonly kind: 'cmlp' | 'clstm' }> }
   | { readonly type: 'max-lag-selected'; readonly value: DiscoveryLag }
-  | { readonly type: 'run-started' }
+
+export type DiscoveryRunEvent =
   | { readonly type: 'run-cancelled' }
   | { readonly type: 'run-progressed'; readonly progress: DiscoveryProgress }
   | { readonly type: 'run-failed'; readonly problem: DiscoveryRunProblem }
-  | { readonly type: 'run-succeeded'; readonly artifact: DiscoveryRunArtifact }
 
 export type DiscoverySessionEvent =
   | { readonly type: 'prepared-dataset-changed'; readonly prepared: PreparedDatasetArtifact | null; readonly recorded?: DiscoveryRunArtifact | null }
@@ -1122,7 +1115,6 @@ export type DiscoverySessionEvent =
 
 export const INITIAL_DISCOVERY_DRAFT: DiscoveryDraft = {
   configuration: { kind: 'pcmci-plus', tauMax: 2, pcAlpha: 0.05 },
-  job: { kind: 'idle' },
 }
 
 /**
@@ -1174,7 +1166,6 @@ export const initialDiscoveryDraftFor = (prepared: PreparedDatasetArtifact, reco
       : prepared.kind === 'prepared-panel'
         ? initialConfigurationFor('jpcmci-plus')
         : INITIAL_DISCOVERY_DRAFT.configuration,
-  job: { kind: 'idle' },
 })
 
 export const initialDiscoverySessionFor = (prepared: PreparedDatasetArtifact | null, recorded: DiscoveryRunArtifact | null = null): DiscoverySession =>
@@ -1205,75 +1196,67 @@ export function stepDiscovery(state: DiscoveryDraft, event: DiscoveryEvent): Dis
     case 'method-selected':
       return {
         configuration: initialConfigurationFor(event.method),
-        job: { kind: 'idle' },
       }
     case 'tau-max-selected':
       return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'jpcmci-plus' || state.configuration.kind === 'lpcmci'
-        ? { configuration: { ...state.configuration, tauMax: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, tauMax: event.value } }
         : state
     case 'pc-alpha-selected':
       return state.configuration.kind === 'pcmci-plus' || state.configuration.kind === 'jpcmci-plus' || state.configuration.kind === 'lpcmci'
-        ? { configuration: { ...state.configuration, pcAlpha: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, pcAlpha: event.value } }
         : state
     case 'constraint-configured':
-      return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
-        ? { configuration: event.configuration, job: { kind: 'idle' } }
+      return state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration }
         : state
     case 'jpcmci-configured':
-      return state.job.kind !== 'running' && state.configuration.kind === 'jpcmci-plus'
-        ? { configuration: event.configuration, job: { kind: 'idle' } }
+      return state.configuration.kind === 'jpcmci-plus'
+        ? { configuration: event.configuration }
         : state
     case 'rpcmci-configured':
       return state.configuration.kind === 'rpcmci'
-        ? { configuration: event.configuration, job: { kind: 'idle' } }
+        ? { configuration: event.configuration }
         : state
     case 'cdnots-configured':
-      return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
-        ? { configuration: event.configuration, job: { kind: 'idle' } }
+      return state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration }
         : state
     case 'grace-configured':
-      return state.job.kind !== 'running' && state.configuration.kind === 'grace'
-        ? { configuration: event.configuration, job: { kind: 'idle' } }
+      return state.configuration.kind === 'grace'
+        ? { configuration: event.configuration }
         : state
     case 'dynotears-lambda-w-selected':
       return state.configuration.kind === 'dynotears'
-        ? { configuration: { ...state.configuration, lambdaW: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, lambdaW: event.value } }
         : state
     case 'dynotears-lambda-a-selected':
       return state.configuration.kind === 'dynotears'
-        ? { configuration: { ...state.configuration, lambdaA: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, lambdaA: event.value } }
         : state
     case 'var-lingam-prune-selected':
       return state.configuration.kind === 'var-lingam'
-        ? { configuration: { ...state.configuration, prune: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, prune: event.value } }
         : state
     case 'ocse-alpha-selected':
       return state.configuration.kind === 'ocse'
-        ? { configuration: { ...state.configuration, alpha: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, alpha: event.value } }
         : state
     case 'ocse-shuffles-selected':
       return state.configuration.kind === 'ocse'
-        ? { configuration: { ...state.configuration, nShuffles: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, nShuffles: event.value } }
         : state
     case 'ocse-method-selected':
       return state.configuration.kind === 'ocse'
-        ? { configuration: { ...state.configuration, method: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, method: event.value } }
         : state
     case 'neural-configured':
-      return state.job.kind !== 'running' && state.configuration.kind === event.configuration.kind
-        ? { configuration: event.configuration, job: { kind: 'idle' } }
+      return state.configuration.kind === event.configuration.kind
+        ? { configuration: event.configuration }
         : state
     case 'max-lag-selected':
       return state.configuration.kind === 'dynotears' || state.configuration.kind === 'var-lingam' || state.configuration.kind === 'ocse'
-        ? { configuration: { ...state.configuration, maxLag: event.value }, job: { kind: 'idle' } }
+        ? { configuration: { ...state.configuration, maxLag: event.value } }
         : state
-    case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
-    case 'run-cancelled': return { ...state, job: { kind: 'idle' } }
-    case 'run-progressed': return state.job.kind === 'running'
-      ? { ...state, job: { kind: 'running', progress: event.progress } }
-      : state
-    case 'run-failed': return { ...state, job: { kind: 'failed', problem: event.problem } }
-    case 'run-succeeded': return { ...state, job: { kind: 'succeeded', artifact: event.artifact } }
     default: return assertNever(event)
   }
 }

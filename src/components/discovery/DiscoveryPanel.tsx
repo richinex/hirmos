@@ -1,4 +1,9 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
+import { useRunActivity } from '@/lib/useRunActivity'
+import type { RunActivity } from '@/domain/activity'
+import type { DiscoveryRunEvent } from '@/domain/discovery'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
@@ -110,7 +115,7 @@ interface DiscoveryPanelProps {
   readonly documents: readonly DagDocument[]
   readonly draft: DiscoveryDraft
   readonly onEvent: (event: DiscoveryEvent) => void
-  readonly cancellation: { requested: boolean }
+  readonly onActivity?: (activity: RunActivity | null) => void
   readonly onRun: (artifact: DiscoveryRunArtifact) => void
   readonly onDeleteRun: (deletion: DeletableDiscoveryRun) => void
 }
@@ -1426,7 +1431,10 @@ function SettingsBadge({ configuration, onReset }: { readonly configuration: Dis
   )
 }
 
-export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, documents, draft, onEvent: dispatch, cancellation, onRun, onDeleteRun }: DiscoveryPanelProps) {
+export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, documents, draft, onEvent: dispatch, onActivity, onRun: recordRun, onDeleteRun }: DiscoveryPanelProps) {
+  const session = useJob('discovery')
+  const { job } = session
+  useRunActivity(onActivity, job.kind === 'running' ? { label: 'Discovery', progress: job.progress === null ? null : job.progress.completed / Math.max(1, job.progress.total) } : null)
   const [deletionDialog, setDeletionDialog] = useState<DiscoveryDeletionDialog>({ kind: 'closed' })
   const configuration = draft.configuration
   const methodId = methodIdOf(configuration)
@@ -1450,7 +1458,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       value,
       label: definition.value.name.replace(/ with ParCorr(?:Mult)?$/, ''),
       hint: eligibilityHint(candidateEligibility),
-      disabled: draft.job.kind === 'running' || candidateEligibility.kind === 'refused',
+      disabled: job.kind === 'running' || candidateEligibility.kind === 'refused',
       title: candidateEligibility.kind === 'refused'
         ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}`
         : undefined,
@@ -1477,13 +1485,27 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
     if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused') return
-    cancellation.requested = false
-    dispatch({ type: 'run-started' })
+    const current = session.start('analysis', 'Discovery')
+    if (current === null) return
+    const dispatch = (event: DiscoveryRunEvent) => {
+      switch (event.type) {
+        case 'run-progressed': session.progress(current, event.progress.stage, event.progress); return
+        case 'run-failed': session.fail(current, describeDiscoveryRunProblem(event.problem)); return
+        case 'run-cancelled': if (session.current(current)) session.cancel(); return
+        default: assertNever(event)
+      }
+    }
+    const onRun = (artifact: DiscoveryRunArtifact) => {
+      if (!session.current(current)) return
+      recordRun(artifact)
+      session.finish(current)
+    }
     try {
       const [{ materialisePrepared, materialiseRoleAwarePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([
         import('@/data/prepared'),
         import('@/analysis/client'),
       ])
+      if (!session.current(current)) return
       const roleAwarePrepared = prepared.kind === 'prepared-time-series' && prepared.missingness.kind === 'lag-aware-exclusion'
         ? { prepared, missingness: prepared.missingness }
         : null
@@ -1516,10 +1538,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           missingness: roleAwarePrepared.missingness,
         }
       }
-      if (cancellation.requested) {
-        dispatch({ type: 'run-cancelled' })
-        return
-      }
+      if (!session.current(current)) return
       const matrix = input.matrix
 
       switch (specification.value.kind) {
@@ -1531,7 +1550,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'direct-lingam') return
         const artifact: DiscoveryRunArtifact = { kind: 'direct-lingam-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DIRECT_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1554,7 +1572,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'pc-stable') return
         const artifact: DiscoveryRunArtifact = { kind: 'pc-stable-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: PC_STABLE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1578,7 +1595,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'fci') return
         const artifact: DiscoveryRunArtifact = { kind: 'fci-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: FCI_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1608,7 +1624,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           eligibility,
           result: result.value,
         }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1620,6 +1635,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           import('@/domain/panel'),
         ])
         const keys = await materializePanelKeysInWorker(source.file, profile, prepared.sampling.unitColumn, prepared.sampling.timeColumn)
+        if (!session.current(current)) return
         if (!keys.ok) {
           dispatch({ type: 'run-failed', problem: { kind: 'materialization-refused', detail: describePanelDataProblem(keys.error) } })
           return
@@ -1653,7 +1669,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           createdAt: new Date().toISOString(), method: JPCMCI_PLUS_PAR_CORR_METHOD_ID,
           variables: joint.value.columns, nodes, eligibility, result: result.value,
         }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1666,7 +1681,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'lpcmci') return
         const artifact: DiscoveryRunArtifact = { kind: 'lpcmci-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LPCMCI_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1694,7 +1708,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           eligibility,
           result: result.value,
         }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1713,7 +1726,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'cdnots') return
         const artifact: DiscoveryRunArtifact = { kind: 'cdnots-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1732,7 +1744,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'cdnots-plus') return
         const artifact: DiscoveryRunArtifact = { kind: 'cdnots-plus-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CDNOTS_PLUS_PAR_CORR_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1751,7 +1762,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'grace') return
         const artifact: DiscoveryRunArtifact = { kind: 'grace-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: GRACE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1763,7 +1773,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'dynotears') return
         const artifact: DiscoveryRunArtifact = { kind: 'dynotears-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNOTEARS_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1775,7 +1784,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'var-lingam') return
         const artifact: DiscoveryRunArtifact = { kind: 'var-lingam-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: VAR_LINGAM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1787,7 +1795,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'ocse') return
         const artifact: DiscoveryRunArtifact = { kind: 'ocse-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: OCSE_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1805,7 +1812,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'cmlp') return
         const artifact: DiscoveryRunArtifact = { kind: 'cmlp-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CMLP_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1823,7 +1829,6 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
         }
         if (configuration.kind !== 'clstm') return
         const artifact: DiscoveryRunArtifact = { kind: 'clstm-run', configuration, id: newDiscoveryRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: CLSTM_METHOD_ID, variables: matrix.columns, eligibility, result: result.value }
-        dispatch({ type: 'run-succeeded', artifact })
         onRun(artifact)
         return
       }
@@ -1840,10 +1845,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     }
   }
 
-  const cancelRun = () => {
-    cancellation.requested = true
-    void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns())
-  }
+  const cancelRun = session.cancel
 
   const inspector = (
     <div className="flex flex-col gap-4">
@@ -1882,7 +1884,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             ariaLabel="Discovery method family"
             value={visibleMethodGroup}
             onChange={setVisibleMethodGroup}
-            disabled={draft.job.kind === 'running'}
+            disabled={job.kind === 'running'}
             options={DISCOVERY_METHOD_GROUPS.map((group) => ({ value: group.id, label: DISCOVERY_GROUP_LABELS[group.id], title: group.name }))}
           />
           <div className="mb-2 mt-3">
@@ -2075,15 +2077,15 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           <EligibilityView eligibility={eligibility} />
           {/* A refusal disables the run, so it is an alert in the danger tone: louder than the review note above it, which leaves the run available. */}
           {!readiness.ok && <Alert tone="danger" className="mt-3">{describeDiscoveryReadiness(readiness.error)}</Alert>}
-          {draft.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{describeDiscoveryRunProblem(draft.job.problem)}</p></Alert>}
-          {draft.job.kind === 'running' && draft.job.progress !== null && (
+          <JobNotice job={job} />
+          {job.kind === 'running' && job.progress !== null && (
             <div className="mt-3" role="status" aria-live="polite">
               <div className="mb-1 flex items-center justify-between gap-3 text-micro text-faint">
-                <span>{draft.job.progress.stage}</span>
-                <span className={num()}>{draft.job.progress.completed} / {draft.job.progress.total}</span>
+                <span>{job.stage}</span>
+                <span className={num()}>{job.progress.completed} / {job.progress.total}</span>
               </div>
-              <div className="bar-live h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={draft.job.progress.total} aria-valuenow={draft.job.progress.completed}>
-                <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((draft.job.progress.completed / Math.max(1, draft.job.progress.total)) * 100)}%` }} />
+              <div className="bar-live h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={job.progress.total} aria-valuenow={job.progress.completed}>
+                <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((job.progress.completed / Math.max(1, job.progress.total)) * 100)}%` }} />
               </div>
             </div>
           )}
@@ -2091,13 +2093,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             <button
               type="button"
               className={button('signal')}
-              disabled={!readiness.ok || eligibility.kind === 'refused' || draft.job.kind === 'running'}
-              aria-busy={draft.job.kind === 'running'}
+              disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked}
+              aria-busy={job.kind === 'running'}
               onClick={() => void execute()}
             >
               Run {method.name}
             </button>
-            {draft.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={cancelRun}>Cancel run</button>}
+            {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={cancelRun}>Cancel run</button>}
           </div>
             </>
           )}

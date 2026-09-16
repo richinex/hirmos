@@ -1,6 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
-import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { RunFold } from '@/components/ui/RunFold'
@@ -35,33 +34,24 @@ import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretCounterfactualResult } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
 import { formatTime } from '@/lib/format/date'
-import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { cn } from '@/lib/utils'
-
-type Job = { readonly kind: 'idle' } | { readonly kind: 'running'; readonly progress: AnalysisProgress | null } | { readonly kind: 'failed'; readonly detail: string }
 
 interface State {
   readonly identification: IdentificationId | null
   readonly configuration: CounterfactualConfiguration
-  readonly job: Job
 }
 
 type Event =
   | { readonly type: 'identification-chosen'; readonly identification: IdentificationId | null }
   | { readonly type: 'configured'; readonly configuration: CounterfactualConfiguration }
-  | { readonly type: 'run-started' }
-  | { readonly type: 'run-progressed'; readonly progress: AnalysisProgress }
-  | { readonly type: 'run-failed'; readonly detail: string }
-  | { readonly type: 'run-finished' }
 
 const step = (state: State, event: Event): State => {
   switch (event.type) {
-    case 'identification-chosen': return { ...state, identification: event.identification, job: { kind: 'idle' } }
-    case 'configured': return { ...state, configuration: event.configuration, job: { kind: 'idle' } }
-    case 'run-started': return { ...state, job: { kind: 'running', progress: null } }
-    case 'run-progressed': return state.job.kind === 'running' ? { ...state, job: { kind: 'running', progress: event.progress } } : state
-    case 'run-failed': return { ...state, job: { kind: 'failed', detail: event.detail } }
-    case 'run-finished': return { ...state, job: { kind: 'idle' } }
+    case 'identification-chosen': return { ...state, identification: event.identification }
+    case 'configured': return { ...state, configuration: event.configuration }
     default: return assertNever(event)
   }
 }
@@ -240,7 +230,7 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
   )
 }
 
-export function CounterfactualPanel({ source, profile, prepared, documents, studies, identifications, runs, onRun, onDeleteRun, onActivity }: {
+export function CounterfactualPanel({ source, profile, prepared, documents, studies, identifications, runs, onRun: recordRun, onDeleteRun, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -260,7 +250,6 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
     return {
       identification: recorded?.id ?? identified.at(-1)?.id ?? null,
       configuration: latest !== null && recorded !== null ? latest.configuration : prepared.kind === 'prepared-time-series' ? DEFAULT_DYNAMIC_LINEAR_SCM : DEFAULT_LINEAR_SCM,
-      job: { kind: 'idle' },
     }
   })
   const identification = identified.find((candidate) => candidate.id === state.identification) ?? null
@@ -337,17 +326,26 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
   }
   void profile
 
-  useRunActivity(onActivity, state.job.kind === 'running' ? { label: 'Counterfactual', progress: state.job.progress === null ? null : state.job.progress.completed / Math.max(1, state.job.progress.total) } : null)
+  const session = useJob('counterfactual')
+  const { job } = session
+  useRunActivity(onActivity, job.kind === 'running' ? { label: 'Counterfactual', progress: job.progress === null ? null : job.progress.completed / Math.max(1, job.progress.total) } : null)
   const execute = async () => {
-    if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused' || state.job.kind === 'running') return
-    dispatch({ type: 'run-started' })
+    if (identification === null || study === null || eligibility === null || eligibility.kind === 'refused') return
+    const current = session.start('analysis', 'Counterfactual')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
+    const onRun = (run: CounterfactualRunArtifact) => {
+      if (session.current(current)) recordRun(run)
+    }
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const measured = study.graph.nodes.flatMap((node) => (node.column === null ? [] : [{ node: node.node, column: node.column, name: node.name }]))
-      if (measured.length !== study.graph.nodes.length) { dispatch({ type: 'run-failed', detail: 'Counterfactual estimation requires measured values for every node. Replace or remove unmeasured nodes in the DAG workspace.' }); return }
+      if (measured.length !== study.graph.nodes.length) { fail('Counterfactual estimation requires measured values for every node. Replace or remove unmeasured nodes in the DAG workspace.'); return }
       const nodes = measured as unknown as NonEmptyArray<StudyVariable>
       const matrix = await materialisePrepared(source, profile, prepared, nodes.map((variable) => variable.column) as unknown as NonEmptyArray<ColumnId>)
-      if (!matrix.ok) { dispatch({ type: 'run-failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(current)) return
+      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const position = (node: StudyVariable['node']) => measured.findIndex((candidate) => candidate.node === node)
       switch (state.configuration.kind) {
         case 'linear-scm': {
@@ -360,14 +358,15 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             interventions: state.configuration.interventions,
             observationNoise: state.configuration.observationNoise,
           })
-          if (!result.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+          if (!session.current(current)) return
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
           onRun({ kind: 'linear-scm-run', id: newCounterfactualRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: LINEAR_SCM_METHOD_ID, configuration: state.configuration, nodes, evidence: result.value, eligibility })
           break
         }
         case 'dynamic-linear-scm': {
           const document = documents.find((candidate) => candidate.id === study.dagDocument)
           const revision = document?.audit.find((candidate) => candidate.id === study.dagRevision)
-          if (revision === undefined) { dispatch({ type: 'run-failed', detail: 'The DAG revision recorded by this study is not available.' }); return }
+          if (revision === undefined) { fail('The DAG revision recorded by this study is not available.'); return }
           const stationary = stationaryMarksFromGraph(revision.graph)
           const timing = state.configuration.schedule.kind === 'point'
             ? { kind: 'point' as const, time: state.configuration.schedule.row - 1 }
@@ -382,17 +381,18 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             steps: state.configuration.steps,
             interventions: state.configuration.interventions,
             uncertainty: state.configuration.uncertainty,
-          }, (progress) => dispatch({ type: 'run-progressed', progress }))
-          if (!result.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(result.error) }); return }
+          }, (progress) => session.progress(current, 'Bootstrap refits', progress))
+          if (!session.current(current)) return
+          if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
           onRun({ kind: 'dynamic-linear-scm-run', id: newCounterfactualRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), method: DYNAMIC_LINEAR_SCM_METHOD_ID, configuration: state.configuration, nodes, evidence: result.value, eligibility })
           break
         }
         default:
           assertNever(state.configuration)
       }
-      dispatch({ type: 'run-finished' })
+      session.finish(current)
     } catch (cause: unknown) {
-      dispatch({ type: 'run-failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      fail(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -516,17 +516,18 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             )}
             {method.ok && <p className={prose('mb-0 mt-3 text-faint')}>{method.value.summary}</p>}
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
-            {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The counterfactual could not run: {state.job.detail}</p></Alert>}
+            <JobNotice job={job} />
             <div className="mt-4 flex items-center gap-3">
-              <button type="button" className={button('signal')} disabled={eligibility === null || eligibility.kind === 'refused'} aria-busy={state.job.kind === 'running'} onClick={state.job.kind === 'running' ? undefined : () => void execute()}>
+              <button type="button" className={button('signal')} disabled={eligibility === null || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 Run counterfactual
               </button>
+              {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
             </div>
-            {state.job.kind === 'running' && state.job.progress !== null && (
+            {job.kind === 'running' && job.progress !== null && (
               <div className="mt-2 max-w-sm text-label text-faint">
-                <div className="mb-1 flex justify-between gap-3"><span>Bootstrap refits</span><span className={num()}>{state.job.progress.completed} / {state.job.progress.total}</span></div>
-                <div className="bar-live h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={state.job.progress.total} aria-valuenow={state.job.progress.completed}>
-                <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((state.job.progress.completed / Math.max(1, state.job.progress.total)) * 100)}%` }} />
+                <div className="mb-1 flex justify-between gap-3"><span>Bootstrap refits</span><span className={num()}>{job.progress.completed} / {job.progress.total}</span></div>
+                <div className="bar-live h-1.5 w-full overflow-hidden rounded-full bg-line" role="progressbar" aria-valuemin={0} aria-valuemax={job.progress.total} aria-valuenow={job.progress.completed}>
+                <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((job.progress.completed / Math.max(1, job.progress.total)) * 100)}%` }} />
               </div>
               </div>
             )}

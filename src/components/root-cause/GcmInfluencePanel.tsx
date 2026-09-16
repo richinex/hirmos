@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
 import { WorkbenchLayout, useClosePane } from '@/components/shell/WorkbenchLayout'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Select } from '@/components/ui/Select'
@@ -10,7 +11,7 @@ import { absoluteShares, influenceBars, influenceGraph } from '@/charts/gcmInflu
 import { useChartTheme } from '@/charts/theme'
 import { downloadText } from '@/data/bundleFiles'
 import { Icon } from '@/components/Icon'
-import { ActionRow, type Job } from './ActionRow'
+import { ActionRow } from './ActionRow'
 import { GraphDetails } from './GraphDetails'
 import { mapNonEmpty } from '@/domain/dop'
 import { gcmInfluenceRequestSchema, gcmInfluenceRunSchema, type GcmInfluenceRequest, type GcmInfluenceRun } from '@/domain/gcmInfluence'
@@ -91,34 +92,28 @@ export function GcmInfluencePanel(props: Props) {
   const [target, setTarget] = useState(previous === undefined ? '' : String(previous.model.target))
   const [query, setQuery] = useState(previous?.model.query ?? defaults[props.analysis])
   const [seed, setSeed] = useState(previous?.model.random.kind === 'seed' ? previous.model.random.seed : 0)
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob(`influence:${props.graph.dagRevision}:${props.analysis}`)
+  const { job } = session
   const [selected, setSelected] = useState<string | null>(null)
-  const attempt = useRef(0)
-  useEffect(() => () => { attempt.current += 1 }, [])
   const latest = props.runs.find(run => run.id === selected) ?? previous
   const busy = job.kind === 'running'
   const run = async () => {
-    const current = ++attempt.current
-    setJob({ kind: 'running', action: 'analysis', stage: 'Preparing causal influence' })
+    const current = session.start('analysis', 'Preparing causal influence')
+    if (current === null) return
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runGcmInfluence }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const data = await materialisePrepared(props.source, props.profile, props.prepared, mapNonEmpty(props.graph.nodes, node => node.column))
       if (!data.ok) throw new Error(describePreparedMaterialisationProblem(data.error))
       const request = gcmInfluenceRequestSchema.parse({ names: props.graph.nodes.map(node => node.name), edges: props.graph.edges, rows: data.value.rowCount, target: Number(target), random: { kind: 'seed', seed }, query })
-      if (current !== attempt.current) return
-      const result = await runGcmInfluence(data.value.values, request, progress => { if (current === attempt.current) setJob({ kind: 'running', action: 'analysis', stage: progress.stage }) })
-      if (current !== attempt.current) return
+      if (!session.current(current)) return
+      const result = await runGcmInfluence(data.value.values, request, progress => session.progress(current, progress.stage))
+      if (!session.current(current)) return
       if (!result.ok) throw new Error(describeAnalysisWorkerProblem(result.error))
       const record = gcmInfluenceRunSchema.parse({ id: crypto.randomUUID(), createdAt: new Date().toISOString(), graph: { dagDocument: props.graph.dagDocument, dagRevision: props.graph.dagRevision, preparedDataset: props.graph.preparedDataset }, model: request, evidence: result.value })
-      props.onRun(record); setSelected(record.id); setJob({ kind: 'idle' })
-    } catch (error) { if (current === attempt.current) setJob({ kind: 'failed', action: 'analysis', detail: error instanceof Error ? error.message : String(error) }) }
+      props.onRun(record); setSelected(record.id); session.finish(current)
+    } catch (error) { session.fail(current, error instanceof Error ? error.message : String(error)) }
   }
-  const cancel = async () => {
-    const current = ++attempt.current
-    const { cancelAnalysisRuns } = await import('@/analysis/client')
-    if (current !== attempt.current) return
-    cancelAnalysisRuns(); setJob({ kind: 'failed', action: 'analysis', detail: 'The analysis was cancelled.' })
-  }
+  const cancel = session.cancel
   const settings = query.kind === 'intrinsic' ? [
     { label: 'Prediction training samples', value: query.training, change: (training: number) => setQuery({ ...query, training }) },
     { label: 'Randomization samples', value: query.randomization, change: (randomization: number) => setQuery({ ...query, randomization }) },
@@ -137,14 +132,15 @@ export function GcmInfluencePanel(props: Props) {
     <div><ChapterHeading className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Explain variation in an outcome using the recorded causal graph.</p></div>
     <section className={panel('p-(--panel-space)')} aria-label="Causal influence setup">
       <div className="mb-6"><GraphDetails name={props.name} graph={props.graph} disabled={busy} onOpen={props.onGraph} /></div>
-      <fieldset disabled={busy} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">Causal influence settings</legend>{props.navigation}
+      <div className="mb-4">{props.navigation}</div>
+      <fieldset disabled={busy} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">Causal influence settings</legend>
         <div><h3 className={`${sectionTitle} m-0`}>{titles[props.analysis]}</h3><p className={fieldHint}>{descriptions[props.analysis]}</p></div>
         <label className="block"><span className={fieldLabel}>Target variable</span><Select aria-label="Influence target" className={field('text', 'mt-1')} value={target} onChange={event => setTarget(event.target.value)}><option value="">Choose target</option>{props.graph.nodes.map((node, index) => <option key={node.id} value={index} disabled={props.analysis === 'arrows' && !props.graph.edges.some(([, child]) => child === index)}>{node.name}</option>)}</Select></label>
         <details><summary className="cursor-pointer text-body font-medium">Sampling settings</summary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
           {settings.map(setting => <label key={setting.label}><span className={fieldLabel}>{setting.label}</span><input aria-label={setting.label} type="number" min={0} step="any" value={setting.value} className={field('text', 'mt-1')} onChange={event => setting.change(Number(event.target.value))} /></label>)}
           <label><span className={fieldLabel}>Random seed</span><input aria-label="Random seed" type="number" min={0} value={seed} className={field('text', 'mt-1')} onChange={event => setSeed(Number(event.target.value))} /></label>
         </div></details>
-      </fieldset><ActionRow job={job} action="analysis" progress="accessible" disabled={target === ''} onRun={() => void run()} onCancel={() => void cancel()} />
+      </fieldset><ActionRow job={job} action="analysis" progress="accessible" disabled={target === '' || session.blocked} onRun={() => void run()} onCancel={cancel} />
     </section>{latest && <GcmInfluenceResult run={latest} />}
   </section>} />
 }

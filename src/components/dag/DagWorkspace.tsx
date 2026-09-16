@@ -9,7 +9,9 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { InterventionPanel } from './InterventionPanel'
 import type { InterventionOverlay, InterventionQueryArtifact } from '@/domain/intervention'
 import type { SelectedSource } from '@/domain/workflow'
-import { describeAnalysisWorkerProblem, type AnalysisProgress } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
 import { button, chapterIntro, field, iconControl, literal, panel, pill, sectionTitle, segment, well } from '@/components/ui/recipes'
@@ -85,11 +87,6 @@ interface DagWorkspaceProps {
   readonly studyDraft: StudyDesignDraft
   readonly onStudyDraftChanged: (draft: StudyDesignDraft) => void
 }
-
-type DagCheckJob =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running'; readonly progress: AnalysisProgress | null }
-  | { readonly kind: 'failed'; readonly detail: string }
 
 type EdgeTimingDraft =
   | { readonly kind: 'contemporaneous' }
@@ -489,27 +486,33 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
   readonly checks: readonly DagCheckArtifact[]
   readonly onCheck: (check: DagCheckArtifact) => void
 }) {
-  const [job, setJob] = useState<DagCheckJob>({ kind: 'idle' })
+  const session = useJob(`graph-check:${document.current.id}`)
+  const { job } = session
   const plan = useMemo(() => planDagImplications(document), [document])
   const current = [...checks].reverse().find((check) => check.dagDocument === document.id && check.dagRevision === document.current.id)
   const nodeName = (position: number): string => document.current.graph.nodes.filter((node) => node.kind === 'observed')[position]?.name ?? `Variable ${position + 1}`
 
   const run = async () => {
     if (plan.kind !== 'test') return
+    const execution = session.start('checks', 'Testing graph implications')
+    if (execution === null) return
+    const fail = (detail: string) => session.fail(execution, detail)
+    try {
     const observed = document.current.graph.nodes.filter((node) => node.kind === 'observed')
     if (observed.length < 2) {
-      setJob({ kind: 'failed', detail: 'At least two observed variables are required.' })
+      fail('At least two observed variables are required.')
       return
     }
-    setJob({ kind: 'running', progress: null })
     const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runDagCheck }] = await Promise.all([
       import('@/data/prepared'),
       import('@/analysis/client'),
     ])
+    if (!session.current(execution)) return
     const columns = observed.map((node) => node.column) as unknown as NonEmptyArray<ColumnId>
     const matrix = await materialisePrepared(source, profile, prepared, columns)
+    if (!session.current(execution)) return
     if (!matrix.ok) {
-      setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) })
+      fail(describePreparedMaterialisationProblem(matrix.error))
       return
     }
     const positions = new Map(observed.map((node, index) => [node.id, index] as const))
@@ -531,7 +534,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
         : [{ x, y, given }]
     })
     if (implications.length !== plan.implications.length) {
-      setJob({ kind: 'failed', detail: 'The graph implication plan refers to a variable outside the observed data projection.' })
+      fail('The graph implication plan refers to a variable outside the observed data projection.')
       return
     }
     const result = await runDagCheck(
@@ -547,23 +550,25 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
         significanceLevel: plan.significanceLevel,
         runFalsification: document.current.graph.nodes.every((node) => node.kind === 'observed'),
       },
-      (progress) => setJob({ kind: 'running', progress }),
+      (progress) => session.progress(execution, progress.stage === 'dag-permutations' ? 'Comparing relabeled graphs' : 'Testing graph implications', progress),
     )
+    if (!session.current(execution)) return
     if (!result.ok) {
-      setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) })
+      fail(describeAnalysisWorkerProblem(result.error))
       return
     }
     onCheck(recordDagCheck(document, result.value))
-    setJob({ kind: 'idle' })
+    session.finish(execution)
+    } catch (cause: unknown) {
+      fail(cause instanceof Error ? cause.message : String(cause))
+    }
   }
 
   const evidence = current?.evidence
   const contradictions = evidence?.implications.filter((implication) => implication.decision === 'contradicted').length ?? 0
   const systematicTension = evidence !== undefined && evidence.uniformity.pValue < evidence.significanceLevel
   const progressText = job.kind === 'running' && job.progress !== null
-    ? job.progress.stage === 'dag-permutations'
-      ? `Comparing relabeled graphs, ${job.progress.completed} of ${job.progress.total}`
-      : `Testing graph implications, ${job.progress.completed} of ${job.progress.total}`
+    ? `${job.stage}, ${job.progress.completed} of ${job.progress.total}`
     : 'Testing graph implications…'
 
   return (
@@ -574,7 +579,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
           <p className="mb-0 mt-1 text-label text-faint">Test the conditional independences implied by this revision against the prepared data.</p>
         </div>
         {plan.kind === 'test' && (
-          <button type="button" className={button('outline')} disabled={job.kind === 'running'} onClick={() => void run()}>
+          <button type="button" className={button('outline')} disabled={job.kind === 'running' || session.blocked} onClick={() => void run()}>
             {job.kind === 'running' ? 'Running…' : current === undefined ? 'Run checks' : 'Run again'}
           </button>
         )}
@@ -583,9 +588,10 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
         <div className="mt-2 flex items-center gap-2">
           <Orb state="weaving" aria-label="Graph checks running" />
           <p role="status" className="m-0 text-label text-muted">{progressText}</p>
+          <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>
         </div>
       )}
-      {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
+      <JobNotice job={job} />
       {plan.kind === 'not-testable' && <p className="mb-0 mt-2 text-body text-faint">No observed local-Markov implication is available to test for this revision.</p>}
       {plan.kind === 'requires-lag-aware-validation' && <p className="mb-0 mt-2 text-body text-faint">Use the lag-aware CausalEffects validation route for this time-series graph.</p>}
       {evidence !== undefined && (

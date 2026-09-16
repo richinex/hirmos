@@ -1,4 +1,7 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { useJob } from '@/analysis/JobsProvider'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { matrixHeatmapOption } from '@/charts/discovery/matrixHeatmap'
@@ -13,19 +16,12 @@ import type { PreparedMatrix } from '@/data/prepared'
 import type { DatasetProfile } from '@/domain/dataset'
 import {
   multicollinearitySelection,
-  type MulticollinearityEvidence,
   type MulticollinearitySelection,
 } from '@/domain/multicollinearity'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatStatistic } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
-
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running' }
-  | { readonly kind: 'ready'; readonly matrix: PreparedMatrix; readonly evidence: MulticollinearityEvidence }
-  | { readonly kind: 'failed'; readonly detail: string }
 
 type Availability =
   | { readonly kind: 'available' }
@@ -44,7 +40,11 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
   const [correlationThreshold, setCorrelationThreshold] = useState(0.9)
   const [vifThreshold, setVifThreshold] = useState(10)
   const [pair, setPair] = useState<readonly [number, number]>([0, 1])
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob('redundancy')
+  const { job } = session
+  const result = useWorkflow(state => state.redundancy?.prepared === prepared.id ? state.redundancy : null)
+  const record = useWorkflow(state => state.recordRedundancy)
+  const [selectionProblem, setSelectionProblem] = useState<string | null>(null)
   const availability: Availability = prepared.observations < 3
     ? { kind: 'unavailable', reason: 'At least three prepared rows are required.' }
     : prepared.columns.length < 2 || prepared.columns.length > 64
@@ -53,15 +53,19 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
 
   const run = async () => {
     if (availability.kind === 'unavailable') return
-    setJob({ kind: 'running' })
+    const id = session.start('analysis', 'Predictor redundancy')
+    if (id === null) return
+    setSelectionProblem(null)
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runMulticollinearity }] = await Promise.all([
         import('@/data/prepared'),
         import('@/analysis/client'),
       ])
+      if (!session.current(id)) return
       const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
+      if (!session.current(id)) return
       if (!matrix.ok) {
-        setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) })
+        session.fail(id, describePreparedMaterialisationProblem(matrix.error))
         return
       }
       const result = await runMulticollinearity(
@@ -70,56 +74,58 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
         matrix.value.columns.length,
         { correlation: correlationThreshold, vif: vifThreshold },
       )
+      if (!session.current(id)) return
       if (!result.ok) {
-        setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(result.error) })
+        session.fail(id, describeAnalysisWorkerProblem(result.error))
         return
       }
       const firstCluster = result.value.correlationClusters.find((cluster) => cluster.length > 1)
       setPair(firstCluster === undefined ? [0, 1] : [firstCluster[0] ?? 0, firstCluster[1] ?? 1])
-      setJob({ kind: 'ready', matrix: matrix.value, evidence: result.value })
+      record({ prepared: prepared.id, matrix: matrix.value, evidence: result.value })
+      session.finish(id)
       onResult?.()
     } catch (cause: unknown) {
-      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      session.fail(id, cause instanceof Error ? cause.message : String(cause))
     }
   }
 
   const apply = (method: 'correlation' | 'vif') => {
-    if (job.kind !== 'ready') return
-    const selection = multicollinearitySelection(job.evidence, job.matrix.columns, method)
+    if (result === null) return
+    const selection = multicollinearitySelection(result.evidence, result.matrix.columns, method)
     if (!selection.ok) {
-      setJob({ kind: 'failed', detail: 'The diagnostic result no longer matches the prepared columns. Run it again.' })
+      setSelectionProblem('The diagnostic result no longer matches the prepared columns. Run it again.')
       return
     }
     onSelection(selection.value)
   }
 
-  const heatmap = useMemo(() => job.kind === 'ready'
+  const heatmap = useMemo(() => result !== null
     ? matrixHeatmapOption({
       title: 'Pairwise Pearson correlations',
-      sources: job.matrix.columns.map((column) => column.name),
-      targets: job.matrix.columns.map((column) => column.name),
-      values: job.evidence.correlation,
+      sources: result.matrix.columns.map((column) => column.name),
+      targets: result.matrix.columns.map((column) => column.name),
+      values: result.evidence.correlation,
       scale: 'signed',
       quantity: 'Pearson r',
       relation: 'symmetric',
-      threshold: correlationThreshold,
+      threshold: result.evidence.correlationThreshold,
     }, theme)
-    : null, [job, theme, correlationThreshold])
+    : null, [result, theme])
 
   const scatter = useMemo(() => {
-    if (job.kind !== 'ready') return null
+    if (result === null) return null
     const [xIndex, yIndex] = pair
-    const rows = job.matrix.rowCount
-    const x = Array.from(job.matrix.values.subarray(xIndex * rows, (xIndex + 1) * rows))
-    const y = Array.from(job.matrix.values.subarray(yIndex * rows, (yIndex + 1) * rows))
+    const rows = result.matrix.rowCount
+    const x = Array.from(result.matrix.values.subarray(xIndex * rows, (xIndex + 1) * rows))
+    const y = Array.from(result.matrix.values.subarray(yIndex * rows, (yIndex + 1) * rows))
     return pairwiseScatterOption({
-      xName: nameAt(job.matrix, xIndex),
-      yName: nameAt(job.matrix, yIndex),
+      xName: nameAt(result.matrix, xIndex),
+      yName: nameAt(result.matrix, yIndex),
       x,
       y,
-      correlation: job.evidence.correlation[xIndex]?.[yIndex] ?? 0,
+      correlation: result.evidence.correlation[xIndex]?.[yIndex] ?? 0,
     }, theme)
-  }, [job, pair, theme])
+  }, [result, pair, theme])
 
   return (
     <section aria-labelledby="multicollinearity-title">
@@ -137,41 +143,43 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection, 
             <label className="block"><span className={fieldLabel}>|r| threshold</span><input type="number" min={0.01} max={1} step={0.01} className={field('text', 'mt-1 w-full @xl/panel:w-28')} value={correlationThreshold} onChange={(event) => setCorrelationThreshold(Math.max(0.01, Math.min(1, Number(event.target.value) || 0.9)))} /></label>
             <label className="block"><span className={fieldLabel}>VIF threshold</span><input type="number" min={1.01} step={0.5} className={field('text', 'mt-1 w-full @xl/panel:w-28')} value={vifThreshold} onChange={(event) => setVifThreshold(Math.max(1.01, Number(event.target.value) || 10))} /></label>
           </div>
-          <button type="button" className={button('quiet')} disabled={availability.kind === 'unavailable'} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Analyse redundancy</button>
+          <button type="button" className={button('quiet')} disabled={availability.kind === 'unavailable' || session.blocked || job.kind === 'running'} aria-busy={job.kind === 'running'} onClick={() => void run()}>Analyse redundancy</button>
+          {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel analysis</button>}
         </div>
       </div>
 
       {availability.kind === 'unavailable' && <p role="status" className="mb-0 mt-3 text-body text-faint">{availability.reason}</p>}
-      {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
-      {job.kind === 'ready' && heatmap !== null && scatter !== null && (
+      <JobNotice job={job} />
+      {selectionProblem !== null && <Alert tone="danger" className="mt-3"><p className="m-0">{selectionProblem}</p></Alert>}
+      {result !== null && heatmap !== null && scatter !== null && (
         <div className="mt-4 space-y-4">
-          <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {job.evidence.variables} variables</span><span>{job.evidence.observations.toLocaleString()} rows</span></Metadata></p>
+          <p role="status" className="m-0 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {result.evidence.variables} variables</span><span>{result.evidence.observations.toLocaleString()} rows</span></Metadata></p>
           <div className="grid gap-4 @3xl/panel:grid-cols-2">
             <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">Correlation groups</h5>
               <p className="mb-2 mt-1 text-label text-muted">Complete linkage over 1 − |r|. The deterministic recommendation retains the first selected variable in each group; review that representative before applying it.</p>
               <ul className="m-0 space-y-1 pl-5 text-body text-muted">
-                {job.evidence.correlationClusters.filter((cluster) => cluster.length > 1).map((cluster) => <li key={cluster.join('-')}>{cluster.map((index) => nameAt(job.matrix, index)).join(', ')}</li>)}
-                {job.evidence.correlationDrop.length === 0 && <li>No group crossed |r| ≥ {job.evidence.correlationThreshold}.</li>}
+                {result.evidence.correlationClusters.filter((cluster) => cluster.length > 1).map((cluster) => <li key={cluster.join('-')}>{cluster.map((index) => nameAt(result.matrix, index)).join(', ')}</li>)}
+                {result.evidence.correlationDrop.length === 0 && <li>No group crossed |r| ≥ {result.evidence.correlationThreshold}.</li>}
               </ul>
-              {job.evidence.correlationDrop.length > 0 && <button type="button" className={button('quiet', 'mt-3')} onClick={() => apply('correlation')}>Use correlation selection</button>}
+              {result.evidence.correlationDrop.length > 0 && <button type="button" className={button('quiet', 'mt-3')} onClick={() => apply('correlation')}>Use correlation selection</button>}
             </div>
             <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">VIF elimination path</h5>
               <p className="mb-2 mt-1 text-label text-muted">At each step the variable with the largest VIF is removed; ties are resolved by the later selected column.</p>
-              {job.evidence.vifHistory.length === 0
-                ? <p className="m-0 text-body text-muted">Every VIF is below {job.evidence.vifThreshold}.</p>
-                : <div className="overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Step</th><th className={th()}>Removed</th><th className={th('text-right')}>VIF</th></tr></thead><tbody>{job.evidence.vifHistory.map((entry, index) => <tr key={`${entry.column}-${index}`} className={tr()}><td className={td()}>{index + 1}</td><td className={td()}>{nameAt(job.matrix, entry.column)}</td><td className={td(num('text-right'))}>{entry.vif === null ? '∞' : formatStatistic('raw', entry.vif).text}</td></tr>)}</tbody></table></div>}
-              {job.evidence.vifDrop.length > 0 && <button type="button" className={button('quiet', 'mt-3')} onClick={() => apply('vif')}>Use VIF selection</button>}
+              {result.evidence.vifHistory.length === 0
+                ? <p className="m-0 text-body text-muted">Every VIF is below {result.evidence.vifThreshold}.</p>
+                : <div className="overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Step</th><th className={th()}>Removed</th><th className={th('text-right')}>VIF</th></tr></thead><tbody>{result.evidence.vifHistory.map((entry, index) => <tr key={`${entry.column}-${index}`} className={tr()}><td className={td()}>{index + 1}</td><td className={td()}>{nameAt(result.matrix, entry.column)}</td><td className={td(num('text-right'))}>{entry.vif === null ? '∞' : formatStatistic('raw', entry.vif).text}</td></tr>)}</tbody></table></div>}
+              {result.evidence.vifDrop.length > 0 && <button type="button" className={button('quiet', 'mt-3')} onClick={() => apply('vif')}>Use VIF selection</button>}
             </div>
           </div>
           <ExpandableChart option={heatmap} label="Pairwise correlation matrix" className="h-[360px]" testId="correlation-matrix" />
           <div>
             <div className="mb-2 flex flex-wrap items-end gap-2">
-              <label><span className={fieldLabel}>X axis</span><Select value={pair[0]} className={field('text', 'mt-1 w-48')} onChange={(event) => setPair([Number(event.target.value), pair[1]])}>{job.matrix.columns.map((column, index) => <option key={column.id} value={index}>{column.name}</option>)}</Select></label>
-              <label><span className={fieldLabel}>Y axis</span><Select value={pair[1]} className={field('text', 'mt-1 w-48')} onChange={(event) => setPair([pair[0], Number(event.target.value)])}>{job.matrix.columns.map((column, index) => <option key={column.id} value={index}>{column.name}</option>)}</Select></label>
+              <label><span className={fieldLabel}>X axis</span><Select value={pair[0]} className={field('text', 'mt-1 w-48')} onChange={(event) => setPair([Number(event.target.value), pair[1]])}>{result.matrix.columns.map((column, index) => <option key={column.id} value={index}>{column.name}</option>)}</Select></label>
+              <label><span className={fieldLabel}>Y axis</span><Select value={pair[1]} className={field('text', 'mt-1 w-48')} onChange={(event) => setPair([pair[0], Number(event.target.value)])}>{result.matrix.columns.map((column, index) => <option key={column.id} value={index}>{column.name}</option>)}</Select></label>
             </div>
-            <ExpandableChart option={scatter} label={`${nameAt(job.matrix, pair[1])} against ${nameAt(job.matrix, pair[0])}`} className="h-[320px]" testId="pairwise-scatter" />
+            <ExpandableChart option={scatter} label={`${nameAt(result.matrix, pair[1])} against ${nameAt(result.matrix, pair[0])}`} className="h-[320px]" testId="pairwise-scatter" />
           </div>
         </div>
       )}

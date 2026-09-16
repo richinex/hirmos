@@ -1,7 +1,9 @@
 import { Metadata } from '@/components/ui/Metadata'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState, type FormEvent } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { JobsProvider } from '@/analysis/JobsProvider'
+import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
 import { Icon } from '@/components/Icon'
 import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
@@ -35,19 +37,14 @@ import {
   describeDatasetProfileProblem,
   describeProjectNameProblem,
   describeSourceSelectionProblem,
-  INITIAL_WORKFLOW,
   newImportRequestId,
-  stepWorkflow,
   type DerivedRecipe,
   type SelectedSource,
 } from '@/domain/workflow'
 import { identificationAllowsEstimation } from '@/domain/study'
 import {
-  initialDiscoverySessionFor,
-  stepDiscoverySession,
   type DiscoveryEvent,
 } from '@/domain/discovery'
-import { useRunActivity } from '@/lib/useRunActivity'
 import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
 import type { SourceRecipe, SqlPreparationInput } from '@/domain/sqlPreparation'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -143,7 +140,8 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
 }
 
 function App() {
-  const [workflow, dispatch] = useReducer(stepWorkflow, INITIAL_WORKFLOW)
+  const workflow = useWorkflow(state => state.workflow)
+  const dispatch = useWorkflow(state => state.dispatch)
   const fileInput = useRef<HTMLInputElement>(null)
   const [dataEntryMode, setDataEntryMode] = useState<'file' | 'sql' | 'pipeline'>('file')
   const { location, route } = useRoute()
@@ -155,31 +153,12 @@ function App() {
   const theme = useTheme()
   const profiled = workflow.kind === 'profiled' ? workflow : null
   const currentPrepared = profiled?.prepared ?? null
-  const latestDiscoveryRun = profiled?.discoveryRuns.at(-1) ?? null
-  const [discoverySession, dispatchDiscoverySession] = useReducer(
-    stepDiscoverySession,
-    null,
-    () => initialDiscoverySessionFor(currentPrepared, latestDiscoveryRun),
-  )
-  const discoveryCancellation = useRef({ requested: false })
-
-  useEffect(() => {
-    const currentId = currentPrepared?.id ?? null
-    const sessionId = discoverySession.kind === 'with-prepared-dataset'
-      ? discoverySession.preparedDataset
-      : null
-    if (currentId === sessionId) return
-
-    if (discoverySession.kind === 'with-prepared-dataset' && discoverySession.draft.job.kind === 'running') {
-      discoveryCancellation.current.requested = true
-      void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns())
-    }
-    dispatchDiscoverySession({ type: 'prepared-dataset-changed', prepared: currentPrepared, recorded: latestDiscoveryRun })
-  }, [currentPrepared, discoverySession, latestDiscoveryRun])
+  const discoverySession = useWorkflow(state => state.discovery)
+  const dispatchDiscoverySession = useWorkflow(state => state.dispatchDiscovery)
 
   const reportDiscoveryEvent = useCallback((event: DiscoveryEvent) => {
     dispatchDiscoverySession({ type: 'discovery-event-received', event })
-  }, [])
+  }, [dispatchDiscoverySession])
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -312,17 +291,6 @@ function App() {
     && discoverySession.preparedDataset === currentPrepared.id
     ? discoverySession.draft
     : null
-  useRunActivity(
-    reportActivity.discovery,
-    discoveryDraft?.job.kind === 'running'
-      ? {
-          label: 'Discovery',
-          progress: discoveryDraft.job.progress === null
-            ? null
-            : discoveryDraft.job.progress.completed / Math.max(1, discoveryDraft.job.progress.total),
-        }
-      : null,
-  )
   const [saved, setSaved] = useState<readonly SavedProjectHeader[]>([])
   /** The user's own projects; the shipped examples are listed by the ledger from the catalog instead. */
   const yours = saved.filter((entry) => !isShippedExampleId(entry.id))
@@ -646,6 +614,7 @@ function App() {
   const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
   return (
     <ChartExportProvider.Provider value={exportContext}>
+      <JobsProvider key={project?.id ?? ''} prepared={currentPrepared?.id ?? null} profile={profiled?.profile.id ?? null}>
       {editConfirmDialog}
       <AppShell
         skipTarget="stage"
@@ -961,7 +930,7 @@ function App() {
                       documents={workflow.dagDocuments}
                       draft={discoveryDraft}
                       onEvent={reportDiscoveryEvent}
-                      cancellation={discoveryCancellation.current}
+                      onActivity={reportActivity.discovery}
                       onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
                       onDeleteRun={(deletion) => dispatch({ type: 'discovery-run-deletion-committed', deletion })}
                     />
@@ -1139,8 +1108,11 @@ function App() {
           </>
         )}
       />
+      </JobsProvider>
     </ChartExportProvider.Provider>
   )
 }
 
-export default App
+export default function Workbench() {
+  return <WorkflowProvider><App /></WorkflowProvider>
+}

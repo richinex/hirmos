@@ -1,4 +1,8 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { useJob } from '@/analysis/JobsProvider'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
+import type { SeriesFacts } from '@/domain/diagnostics'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { lagCorrelationOption } from '@/charts/data/lagCorrelation'
@@ -8,25 +12,16 @@ import { Icon } from '@/components/Icon'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { MetricTile } from '@/components/ui/figures'
 import { button, field, figureGrid, label, num, panel, sectionTitle, well } from '@/components/ui/recipes'
-import type { ColumnId, DatasetProfile, TimeAxis } from '@/domain/dataset'
+import type { DatasetProfile, TimeAxis } from '@/domain/dataset'
 import { SERIES_STRUCTURE_METHODS } from '@/domain/methods'
 import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import { seasonalPeriodOf } from '@/domain/seasonal'
-import { defaultPeltPenalty, type SeriesStructureEvidence } from '@/domain/sensitivity'
+import { defaultPeltPenalty } from '@/domain/sensitivity'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatDay } from '@/lib/format/date'
 import { formatAbsent, formatCount, formatStatistic } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { cn } from '@/lib/utils'
-
-interface SeriesFacts {
-  readonly column: ColumnId
-  readonly name: string
-  readonly values: readonly number[]
-  readonly evidence: SeriesStructureEvidence['series'][number]
-  /** Parsed temporal order, so a change point can be named by its date. */
-  readonly timeAxis: TimeAxis | null
-}
 
 /** List at most this many change points inline; the rest are counted. */
 const NAMED_CHANGE_POINTS = 6
@@ -48,12 +43,6 @@ function describeChangePoints(changePoints: readonly number[], timeAxis: TimeAxi
   const remaining = changePoints.length - NAMED_CHANGE_POINTS
   return remaining > 0 ? `change points at ${named} and ${formatCount(remaining).text} more` : `change points at ${named}`
 }
-
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running'; readonly completed: number; readonly total: number }
-  | { readonly kind: 'ready'; readonly period: number | null; readonly series: readonly SeriesFacts[] }
-  | { readonly kind: 'failed'; readonly detail: string }
 
 function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly period: number | null }) {
   const theme = useChartTheme()
@@ -91,33 +80,42 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
   readonly embedded?: boolean
   readonly onResult?: () => void
 }) {
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob('series-structure')
+  const { job } = session
+  const result = useWorkflow(state => state.temporalStructure?.prepared === prepared.id ? state.temporalStructure : null)
+  const record = useWorkflow(state => state.recordTemporalStructure)
   const [minSize, setMinSize] = useState(4)
   const [maxLag, setMaxLag] = useState(40)
   const period = seasonalPeriodOf(prepared.sampling.frequency)
 
   const run = async () => {
-    setJob({ kind: 'running', completed: 0, total: prepared.columns.length })
+    const id = session.start('analysis', 'Temporal structure')
+    if (id === null) return
+    session.progress(id, 'Temporal structure', { completed: 0, total: prepared.columns.length })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runSeriesStructure }] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(id)) return
       const matrix = await materialisePrepared(source, profile, prepared, prepared.columns)
-      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(id)) return
+      if (!matrix.ok) { session.fail(id, describePreparedMaterialisationProblem(matrix.error)); return }
       const series: SeriesFacts[] = []
       const correlationMaxLag = Math.min(maxLag, Math.floor((matrix.value.rowCount - 1) / 2))
-      if (correlationMaxLag < 1) { setJob({ kind: 'failed', detail: 'At least three prepared observations are required for ACF and PACF.' }); return }
+      if (correlationMaxLag < 1) { session.fail(id, 'At least three prepared observations are required for ACF and PACF.'); return }
       for (const [index, column] of matrix.value.columns.entries()) {
         const values = Array.from(matrix.value.values.subarray(index * matrix.value.rowCount, (index + 1) * matrix.value.rowCount))
         const result = await runSeriesStructure(Float64Array.from(values), matrix.value.rowCount, 1, { period, robust: false, correlationMaxLag, peltMinSize: minSize, peltJump: 1, peltPenalty: defaultPeltPenalty(values) })
-        if (!result.ok) { setJob({ kind: 'failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(result.error)}` }); return }
+        if (!session.current(id)) return
+        if (!result.ok) { session.fail(id, `${column.name}: ${describeAnalysisWorkerProblem(result.error)}`); return }
         const evidence = result.value.series[0]
-        if (evidence === undefined) { setJob({ kind: 'failed', detail: `${column.name}: no structure evidence returned.` }); return }
+        if (evidence === undefined) { session.fail(id, `${column.name}: no structure evidence returned.`); return }
         series.push({ column: column.id, name: column.name, values, evidence, timeAxis: matrix.value.timeAxis })
-        setJob({ kind: 'running', completed: index + 1, total: prepared.columns.length })
+        session.progress(id, 'Temporal structure', { completed: index + 1, total: prepared.columns.length })
       }
-      setJob({ kind: 'ready', period, series })
+      record({ prepared: prepared.id, period, minSize, maxLag: correlationMaxLag, series })
+      session.finish(id)
       onResult?.()
     } catch (cause: unknown) {
-      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      session.fail(id, cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -131,18 +129,19 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-body text-ink"><span className={label('block text-faint')}>Min segment</span><input type="number" min={1} max={200} className={field('text', 'mt-1 w-20')} value={minSize} onChange={(event) => setMinSize(Math.max(1, Math.min(200, Number(event.target.value) || 1)))} /></label>
           <label className="text-body text-ink"><span className={label('block text-faint')}>Max lag</span><input type="number" min={1} max={400} className={field('text', 'mt-1 w-20')} value={maxLag} onChange={(event) => setMaxLag(Math.max(1, Math.min(400, Number(event.target.value) || 1)))} /></label>
-          <button type="button" className={button('quiet')} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>
+          <button type="button" className={button('quiet')} disabled={session.blocked || job.kind === 'running'} aria-busy={job.kind === 'running'} onClick={() => void run()}>
             Analyse temporal structure
           </button>
+          {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel analysis</button>}
         </div>
       </div>
       <MethodCaveats methods={SERIES_STRUCTURE_METHODS} />
-      {job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{job.detail}</p>}
-      {job.kind === 'ready' && (
+      <JobNotice job={job} />
+      {result !== null && (
         <>
-          <p role="status" className="mb-2 mt-4 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {job.series.length} series checked</span><span>min segment {minSize}</span></Metadata></p>
+          <p role="status" className="mb-2 mt-4 flex items-center gap-2 text-body text-muted"><Metadata><span><Icon name="check_circle" size={16} className="text-ok" /> {result.series.length} series checked</span><span>min segment {result.minSize}</span></Metadata></p>
           <ul className="m-0 list-none space-y-2 p-0" aria-label="Series structure">
-            {job.series.map((facts) => <SeriesRow key={facts.column} facts={facts} period={job.period} />)}
+            {result.series.map((facts) => <SeriesRow key={facts.column} facts={facts} period={result.period} />)}
           </ul>
         </>
       )}

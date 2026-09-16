@@ -1,7 +1,8 @@
 import { Orb } from '@/components/ui/Orb'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { button } from '@/components/ui/recipes'
-type Action = 'analysis' | 'checks'
-export type Job = { readonly kind: 'idle' } | { readonly kind: 'running'; readonly action: Action; readonly stage: string } | { readonly kind: 'failed'; readonly action: Action; readonly detail: string }
+import type { Action, Job } from '@/analysis/jobs'
+export type { Job } from '@/analysis/jobs'
 
 export function ActionRow({ job, action, progress = 'visible', disabled = false, onRun, onCancel }: { readonly job: Job; readonly action: Action; readonly progress?: 'visible' | 'accessible'; readonly disabled?: boolean; readonly onRun: () => void; readonly onCancel: () => void }) {
   const active = job.kind !== 'idle' && job.action === action ? job : null
@@ -14,6 +15,6 @@ export function ActionRow({ job, action, progress = 'visible', disabled = false,
         <span role="status" className={progress === 'accessible' ? 'sr-only' : 'min-w-0 flex-1 truncate text-label text-muted'}>{active.stage}</span>
       </>}
     </div>
-    {active?.kind === 'failed' && <p role="alert" className="mt-2 text-body text-warn">{active.detail}</p>}
+    {active !== null && <JobNotice job={active} />}
   </div>
 }

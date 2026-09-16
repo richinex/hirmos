@@ -4,7 +4,10 @@ import { RunFold } from '@/components/ui/RunFold'
 import { RunMeta } from '@/components/ui/RunMeta'
 import { Select } from '@/components/ui/Select'
 import { CausalHierarchy } from './CausalHierarchy'
-import { useId, useMemo, useReducer } from 'react'
+import { useId, useMemo, useState } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import type { RunActivity } from '@/domain/activity'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { literatureOf, MethodCaveats, RequirementsFold } from '@/components/MethodCaveats'
@@ -60,28 +63,6 @@ import {
   type StudySpecification,
   type StudyVariable,
 } from '@/domain/study'
-
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running' }
-  | { readonly kind: 'choosing-adjustment-set'; readonly study: StudySpecification; readonly evidence: BackdoorIdentificationEvidence }
-  | { readonly kind: 'failed'; readonly detail: string }
-
-type Event =
-  | { readonly type: 'run-started' }
-  | { readonly type: 'adjustment-set-choice-required'; readonly study: StudySpecification; readonly evidence: BackdoorIdentificationEvidence }
-  | { readonly type: 'run-failed'; readonly detail: string }
-  | { readonly type: 'run-finished' }
-
-const step = (state: Job, event: Event): Job => {
-  switch (event.type) {
-    case 'run-started': return { kind: 'running' }
-    case 'adjustment-set-choice-required': return { kind: 'choosing-adjustment-set', study: event.study, evidence: event.evidence }
-    case 'run-failed': return { kind: 'failed', detail: event.detail }
-    case 'run-finished': return { kind: 'idle' }
-    default: return assertNever(event)
-  }
-}
 
 
 const ledgerLabel = (result: IdentificationArtifact['result']): string => {
@@ -341,7 +322,12 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
   readonly onContinue: () => void
   readonly onOpenDag: () => void
 }) {
-  const [job, dispatch] = useReducer(step, { kind: 'idle' } as Job)
+  const session = useJob('identification')
+  const { job } = session
+  const adjustmentChoice = useWorkflow(state => state.adjustmentDecision)
+  const offerAdjustment = useWorkflow(state => state.offerAdjustment)
+  const clearAdjustment = useWorkflow(state => state.clearAdjustment)
+  const [choiceProblem, setChoiceProblem] = useState<string | null>(null)
   useRunActivity(onActivity, job.kind === 'running' ? { label: 'Identifying the effect', progress: null } : null)
   const rationaleId = useId()
   const state = { draft, job }
@@ -368,12 +354,11 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
     const identification = identifications.find((candidate) => candidate.study === study.id)
     return identification === undefined ? [] : [{ study, identification }]
   })[0] ?? null
-  const adjustmentChoice = state.job.kind === 'choosing-adjustment-set' ? state.job : null
 
   const recordIdentification = (study: StudySpecification, evidence: BackdoorIdentificationEvidence, choice: AdjustmentSetChoice) => {
     const result = identificationFrom(study, evidence, choice)
     if (!result.ok) {
-      dispatch({ type: 'run-failed', detail: `Adjustment set ${result.error.ordinal + 1} is not available; ${result.error.available} minimal sets were returned.` })
+      setChoiceProblem(`Adjustment set ${result.error.ordinal + 1} is not available; ${result.error.available} minimal sets were returned.`)
       return
     }
     const identification: IdentificationArtifact = {
@@ -390,22 +375,28 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       result: result.value,
     }
     onIdentified(study, identification)
-    dispatch({ type: 'run-finished' })
+    clearAdjustment(study.id)
+    setChoiceProblem(null)
   }
 
   const execute = async () => {
     const ready = readyStudySpecification(state.draft, documents, prepared)
     if (!ready.ok || state.job.kind === 'running') return
-    dispatch({ type: 'run-started' })
+    const id = session.start('analysis', 'Identifying the effect')
+    if (id === null) return
+    setChoiceProblem(null)
     try {
       const analysis = await import('@/analysis/client')
+      if (!session.current(id)) return
       const outcome = await analysis.identifyBackdoor(backdoorIdentificationCommand(ready.value))
+      if (!session.current(id)) return
       if (!outcome.ok) {
-        dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(outcome.error) })
+        session.fail(id, describeAnalysisWorkerProblem(outcome.error))
         return
       }
       if (outcome.value.result.kind === 'identified' && outcome.value.result.minimalSets.length > 1) {
-        dispatch({ type: 'adjustment-set-choice-required', study: ready.value, evidence: outcome.value })
+        offerAdjustment({ study: ready.value, evidence: outcome.value })
+        session.finish(id)
         return
       }
       recordIdentification(
@@ -413,8 +404,9 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         outcome.value,
         outcome.value.result.kind === 'identified' ? { kind: 'minimal', ordinal: 0 } : { kind: 'canonical' },
       )
+      session.finish(id)
     } catch (cause: unknown) {
-      dispatch({ type: 'run-failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      session.fail(id, cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -575,17 +567,19 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
           <dd className="m-0 text-ink">{document === null ? '—' : <><Metadata><span><span className={literal()}>{document.current.id.slice(0, 8)}</span></span><span>{document.current.graph.edges.length} arrows{preview !== null && preview.graph.laggedArrows > 0 ? `, ${preview.graph.laggedArrows} lagged` : ''}</span></Metadata></>}</dd>
         </dl>
         {!readiness.ok && <Alert tone="danger" className="mt-3">{describeStudyDesignProblem(readiness.error)}</Alert>}
-        {state.job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">Identification could not run: {state.job.detail}</p>}
+        <JobNotice job={job} />
+        {choiceProblem !== null && <Alert tone="danger" className="mt-3">{choiceProblem}</Alert>}
         {adjustmentChoice !== null && <AdjustmentSetChoicePanel study={adjustmentChoice.study} evidence={adjustmentChoice.evidence} onChoose={(choice) => recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)} />}
         <button
           type="button"
           className={button('signal', 'mt-4')}
-          disabled={!readiness.ok || state.job.kind === 'choosing-adjustment-set'}
+          disabled={!readiness.ok || adjustmentChoice !== null || session.blocked || job.kind === 'running'}
           aria-busy={state.job.kind === 'running'}
           onClick={state.job.kind === 'running' ? undefined : () => void execute()}
         >
           Identify the effect
         </button>
+        {job.kind === 'running' && <button type="button" className={button('quiet', 'mt-4')} onClick={session.cancel}>Cancel identification</button>}
       </section>
 
       {newestRecorded !== null && (

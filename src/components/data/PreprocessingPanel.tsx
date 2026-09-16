@@ -5,8 +5,10 @@ import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
-import { cancelAnalysisRuns } from '@/analysis/client'
+import { useState, type ReactNode } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
+import { useWorkflow } from '@/components/WorkflowProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { Orb } from '@/components/ui/Orb'
 import { Icon } from '@/components/Icon'
 import { SelectionActions } from '@/components/ui/SelectionActions'
@@ -29,13 +31,12 @@ import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
   describeReadinessProblem,
   describeSeriesTransform,
-  initialPreprocessingDraft,
   newPreparedDatasetVersionId,
   newStationarityEvidenceId,
   newTransformRecipeId,
   readyPreprocessingRecipe,
   seriesTransformFor,
-  stepPreprocessing,
+  type PreprocessingEvent,
   transformSeries,
   transformWarmup,
   type Frequency,
@@ -321,39 +322,33 @@ function preparedArtifact(
 }
 
 export function PreprocessingPanel({ source, profile, onPrepared, onStationarityEvidence, onClearStationarityEvidence, stationarity, preparedVersion, grangerEvidence, onGrangerEvidence }: PreprocessingPanelProps) {
-  const diagnostics = useRef<AbortController | null>(null)
+  const preparation = useJob('preparation')
+  const preprocessing = useWorkflow(state => state.preprocessing)
+  const changePreprocessing = useWorkflow(state => state.changePreprocessing)
+  const saveRecipe = useWorkflow(state => state.saveRecipe)
+  const session = useJob('stationarity')
+  const { job } = session
   const [testSelection, setTestSelection] = useState<{ readonly prepared: string; readonly columns: readonly ColumnId[] } | null>(null)
-  useEffect(() => () => {
-    if (diagnostics.current === null) return
-    diagnostics.current.abort()
-    cancelAnalysisRuns()
-  }, [])
   const [diagnostic, setDiagnostic] = useState<Diagnostic>('multicollinearity')
   const [multicollinearityChecked, setMulticollinearityChecked] = useState(false)
   const [structureChecked, setStructureChecked] = useState(false)
-  const [draft, dispatch] = useReducer(
-    stepPreprocessing,
-    profile,
-    initialPreprocessingDraft,
-  )
+  if (preprocessing === null || preprocessing.profile !== profile.id) throw new Error('Preprocessing requires the current source profile.')
+  const { draft, savedRecipe } = preprocessing
+  const dispatch = (event: PreprocessingEvent) => changePreprocessing(profile.id, event)
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
-  const [savedRecipe, setSavedRecipe] = useState<string | null>(null)
   const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
   const readiness = readyPreprocessingRecipe(draft)
   const recipeDirty = readiness.ok && JSON.stringify(readiness.value) !== savedRecipe
   const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
-  // The version this panel just made, or the one the project reopened with.
-  const preparedCurrent = draft.preparation.kind === 'succeeded' ? draft.preparation.artifact : preparedVersion
+  const preparedCurrent = preparedVersion
   const preparedTimeSeries = preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series' ? preparedCurrent : null
   const testColumns = preparedTimeSeries !== null && testSelection?.prepared === preparedTimeSeries.id
     ? testSelection.columns.filter(column => preparedTimeSeries.columns.includes(column)) : []
   const selectTestColumns = (columns: readonly ColumnId[]) => {
     if (preparedTimeSeries !== null) setTestSelection({ prepared: preparedTimeSeries.id, columns })
   }
-  const stationarityEvidence: StationarityEvidenceArtifact | null = draft.stationarity.kind === 'succeeded'
-    ? draft.stationarity.evidence
-    : stationarity !== null && preparedCurrent !== null && stationarity.preparedDataset === preparedCurrent.id ? stationarity : null
+  const stationarityEvidence = stationarity !== null && preparedCurrent !== null && stationarity.preparedDataset === preparedCurrent.id ? stationarity : null
   const panelSelected = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys'
   const crossSectionSelected = draft.sampling.kind === 'cross-sectional'
   const currentFrequency = timeSeriesSelected || panelSelected ? draft.sampling.frequency : 'monthly'
@@ -374,12 +369,16 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const createPreparedVersion = async () => {
     const recipe = readyPreprocessingRecipe(draft)
     if (!recipe.ok) return
-    dispatch({ type: 'preparation-started' })
+    const id = preparation.start('analysis', 'Preparing dataset')
+    if (id === null) return
+    const dispatch = (event: { readonly type: 'preparation-failed'; readonly detail: string }) => preparation.fail(id, event.detail)
     try {
       let panelStructure: PanelStructureEvidence | null = null
       if (recipe.value.kind === 'regular-panel') {
         const { inspectPanelInWorker } = await import('@/data/client')
+        if (!preparation.current(id)) return
         const inspected = await inspectPanelInWorker(source.file, profile, recipe.value.sampling.unitColumn, recipe.value.sampling.timeColumn)
+        if (!preparation.current(id)) return
         if (!inspected.ok) { dispatch({ type: 'preparation-failed', detail: describePanelDataProblem(inspected.error) }); return }
         panelStructure = inspected.value
         if (panelStructure.missingUnitKeys > 0 || panelStructure.missingTimeKeys > 0) {
@@ -389,9 +388,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         if (!panelStructure.balanced) { dispatch({ type: 'preparation-failed', detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. Complete every unit–period cell.` }); return }
       }
       const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('@/data/client')
+      if (!preparation.current(id)) return
       const matrix = recipe.value.kind === 'regular-series'
         ? await materializeTimeSeriesColumnsInWorker(source.file, profile, recipe.value.sampling.timeColumn, recipe.value.columns)
         : await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
+      if (!preparation.current(id)) return
       if (!matrix.ok) {
         const detail = matrix.error.kind === 'time-value-unparseable'
           ? `${matrix.error.name} contains an unparseable time at sorted row ${matrix.error.row + 1}.`
@@ -407,6 +408,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       }
 
       const { describePreparedMaterialisationProblem, resolveNullableInput } = await import('@/data/prepared')
+      if (!preparation.current(id)) return
       let observations: number
       let resolution: MissingnessResolutionRecord
       let resolvedMatrix: PreparedMatrix | null = null
@@ -419,6 +421,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         resolution = { kind: 'lag-aware-exclusion', cells: matrix.value.missingCells }
       } else {
         const resolved = await resolveNullableInput(matrix.value, recipe.value.missingness)
+        if (!preparation.current(id)) return
         if (!resolved.ok) { dispatch({ type: 'preparation-failed', detail: describePreparedMaterialisationProblem(resolved.error) }); return }
         observations = resolved.value.matrix.rowCount
         resolution = resolved.value.resolution
@@ -438,7 +441,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           const aggregations = aggregationsForColumns(input.columns, recipe.value.resampling)
           if (!aggregations.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(aggregations.error) }); return }
           const { runPandasResampling } = await import('@/analysis/client')
+          if (!preparation.current(id)) return
           const evidence = await runPandasResampling(input.timestamps, input.values, input.rowCount, input.columns.length, recipe.value.resampling.targetFrequency, recipe.value.resampling.incompleteBins, aggregations.value, input.imputedCells)
+          if (!preparation.current(id)) return
           if (!evidence.ok) { dispatch({ type: 'preparation-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const grouped = resampledMatrixFromEvidence(input, recipe.value.resampling, evidence.value)
           if (!grouped.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(grouped.error) }); return }
@@ -455,9 +460,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
 
       const artifact = preparedArtifact(recipe.value, profile, observations, resolution, resampling, panelStructure)
       if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
-      dispatch({ type: 'preparation-succeeded', artifact: artifact.value })
+      preparation.finish(id)
+      saveRecipe(profile.id, JSON.stringify(recipe.value))
       onPrepared(artifact.value)
-      setSavedRecipe(JSON.stringify(recipe.value))
     } catch (cause: unknown) {
       dispatch({
         type: 'preparation-failed',
@@ -467,22 +472,22 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   }
 
   const runDiagnostics = async () => {
-    if (preparedTimeSeries === null || diagnostics.current !== null || !isNonEmpty(testColumns)) return
-    const controller = new AbortController()
-    diagnostics.current = controller
-    const { signal } = controller
+    if (preparedTimeSeries === null || !isNonEmpty(testColumns)) return
+    const current = session.start('analysis', 'Stationarity tests')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
     const prepared = preparedTimeSeries
-    dispatch({ type: 'diagnostics-started', total: testColumns.length })
+    session.progress(current, 'Preparing selected variables', { completed: 0, total: testColumns.length })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, { runStationarityBattery }] = await Promise.all([
         import('@/data/prepared'),
         import('@/analysis/client'),
       ])
-      if (signal.aborted) return
+      if (!session.current(current)) return
       const matrix = await materialisePrepared(source, profile, prepared, testColumns)
-      if (signal.aborted) return
+      if (!session.current(current)) return
       if (!matrix.ok) {
-        dispatch({ type: 'diagnostics-failed', detail: describePreparedMaterialisationProblem(matrix.error) })
+        fail(describePreparedMaterialisationProblem(matrix.error))
         return
       }
 
@@ -491,16 +496,16 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         const start = columnIndex * matrix.value.rowCount
         const savedValues = matrix.value.values.slice(start, start + matrix.value.rowCount)
         const saved = await runStationarityBattery(savedValues)
-        if (signal.aborted) return
+        if (!session.current(current)) return
         if (!saved.ok) {
-          dispatch({ type: 'diagnostics-failed', detail: `${column.name}: ${describeAnalysisWorkerProblem(saved.error)}` })
+          fail(`${column.name}: ${describeAnalysisWorkerProblem(saved.error)}`)
           return
         }
         evidence.push({ column: column.id, result: saved.value, levels: saved.value, differenced: null, assessment: assessStationarity(saved.value, null) })
-        dispatch({ type: 'diagnostic-completed' })
+        session.progress(current, 'Stationarity tests', { completed: evidence.length, total: testColumns.length })
       }
       if (!isNonEmpty(evidence)) {
-        dispatch({ type: 'diagnostics-failed', detail: 'The stationarity tests returned no results. Check the selected numeric columns and run the tests again.' })
+        fail('The stationarity tests returned no results. Check the selected numeric columns and run the tests again.')
         return
       }
       const [firstEvidence] = evidence
@@ -512,31 +517,16 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         diagnosticTransform: { kind: 'levels' },
         variables: [firstEvidence, ...evidence.slice(1), ...(stationarityEvidence?.variables.filter(previous => !evidence.some(next => next.column === previous.column)) ?? [])],
       }
-      dispatch({
-        type: 'diagnostics-succeeded',
-        evidence: completedEvidence,
-      })
       onStationarityEvidence(completedEvidence)
+      session.finish(current)
     } catch (cause: unknown) {
-      if (signal.aborted) return
-      dispatch({
-        type: 'diagnostics-failed',
-        detail: cause instanceof Error ? cause.message : String(cause),
-      })
-    } finally {
-      if (diagnostics.current === controller) diagnostics.current = null
+      fail(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
-  const cancelDiagnostics = () => {
-    diagnostics.current?.abort()
-    diagnostics.current = null
-    cancelAnalysisRuns()
-    dispatch({ type: 'diagnostics-cancelled' })
-  }
+  const cancelDiagnostics = session.cancel
 
   const clearDiagnostics = () => {
-    dispatch({ type: 'diagnostics-cleared' })
     onClearStationarityEvidence()
   }
 
@@ -545,7 +535,6 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     const variables = stationarityEvidence.variables.filter(value => value.column !== column)
     if (!isNonEmpty(variables)) { clearDiagnostics(); return }
     const evidence = { ...stationarityEvidence, id: newStationarityEvidenceId(), variables }
-    dispatch({ type: 'diagnostics-succeeded', evidence })
     onStationarityEvidence(evidence)
   }
 
@@ -974,7 +963,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             </div>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />
-          <fieldset disabled={draft.stationarity.kind === 'running'} className="mt-4 min-w-0 border-0 p-0" aria-label="Stationarity variables">
+          <fieldset disabled={job.kind === 'running'} className="mt-4 min-w-0 border-0 p-0" aria-label="Stationarity variables">
             <legend className={fieldLabel}>Variables to test</legend>
             <div className="mb-2 flex items-center justify-between gap-3">
               <p className="m-0 text-body text-faint">Only selected variables are tested. The prepared dataset is unchanged.</p>
@@ -993,25 +982,25 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               <button
                 type="button"
                 className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
-                disabled={preparedTimeSeries === null || testColumns.length === 0 || draft.stationarity.kind === 'running'}
-                aria-busy={draft.stationarity.kind === 'running'}
-                onClick={draft.stationarity.kind === 'running' ? undefined : () => void runDiagnostics()}
+                disabled={preparedTimeSeries === null || testColumns.length === 0 || job.kind === 'running' || session.blocked}
+                aria-busy={job.kind === 'running'}
+                onClick={() => void runDiagnostics()}
               >
                 Run stationarity tests
               </button>
-              {draft.stationarity.kind === 'running' && <>
+              {job.kind === 'running' && <>
                 <Orb state="solving" aria-label="Stationarity tests running" />
                 <button type="button" className={button('quiet')} onClick={cancelDiagnostics}>Cancel tests</button>
-                <span role="status" className="sr-only">{draft.stationarity.completed} of {draft.stationarity.total} variables completed</span>
+                <span role="status" className="sr-only">{job.progress?.completed ?? 0} of {job.progress?.total ?? 0} variables completed</span>
               </>}
             </div>
           </div>
-          {draft.stationarity.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{draft.stationarity.detail}</p></Alert>}
-          {draft.stationarity.kind === 'cancelled' && <Alert tone="info" className="mt-3"><p className="m-0">Stationarity tests cancelled. No new results were saved.</p></Alert>}
+          {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
+          {job.kind === 'cancelled' && <Alert tone="info" className="mt-3"><p className="m-0">Stationarity tests cancelled. No new results were saved.</p></Alert>}
           {stationarityEvidence !== null && <section className="mt-5 space-y-4" aria-label="Stationarity results">
             <div className="flex items-center justify-between gap-3">
               <h4 className="m-0 text-title font-medium">Results</h4>
-              <button type="button" className={button('quiet')} disabled={draft.stationarity.kind === 'running'} onClick={clearDiagnostics}>Clear results</button>
+              <button type="button" className={button('quiet')} disabled={job.kind === 'running'} onClick={clearDiagnostics}>Clear results</button>
             </div>
             {stationarityEvidence.variables.map(evidence => {
               const column = profile.columns.find(candidate => candidate.id === evidence.column)
@@ -1075,7 +1064,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     <p className="m-0 text-label text-faint">{result.observations.toLocaleString()} rows{preparedTimeSeries === null ? '' : `, ${describeSeriesTransform(seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column))}`}</p>
                   </div>
                   <StationarityVerdict assessment={evidence.assessment} transform={preparedTimeSeries === null ? { kind: 'levels' } : seriesTransformFor(preparedTimeSeries.seriesTransforms, evidence.column)} />
-                  <button type="button" className={button('quiet')} aria-label={`Delete stationarity result for ${name}`} disabled={draft.stationarity.kind === 'running'} onClick={() => deleteDiagnostic(evidence.column)}><Icon name="delete" size={15} />Delete</button>
+                  <button type="button" className={button('quiet')} aria-label={`Delete stationarity result for ${name}`} disabled={job.kind === 'running'} onClick={() => deleteDiagnostic(evidence.column)}><Icon name="delete" size={15} />Delete</button>
                 </header>
                 <MetricGrid className="stationarity-metrics" label={`Stationarity p-values for ${name}`}>
                   <MetricTile label="ADF p-value" value={formatP(result.adf.constant.pValue)} context="Constant" size="compact" />
@@ -1113,17 +1102,19 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </section>
       )}
 
-      {draft.preparation.kind === 'failed' && <Alert tone="danger" className="mt-4"><p className="m-0">{draft.preparation.detail}</p></Alert>}
+      <JobNotice job={preparation.job} />
       {recipeDirty && (
       <div className="pop sticky bottom-3 z-(--z-sticky) ml-auto mt-4 w-fit max-w-full">
         <button
           type="button"
           className={button('signal', 'float')}
-          aria-busy={draft.preparation.kind === 'running'}
-          onClick={draft.preparation.kind === 'running' ? undefined : () => void createPreparedVersion()}
+          disabled={preparation.blocked || preparation.job.kind === 'running'}
+          aria-busy={preparation.job.kind === 'running'}
+          onClick={() => void createPreparedVersion()}
         >
           Create prepared dataset version
         </button>
+        {preparation.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={preparation.cancel}>Cancel preparation</button>}
       </div>
       )}
     </section>

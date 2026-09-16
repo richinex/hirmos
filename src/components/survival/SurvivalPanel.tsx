@@ -1,7 +1,9 @@
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { SelectionActions } from '@/components/ui/SelectionActions'
-import { useMemo, useReducer, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { SurvivalRunResult, survivalFamilyLabel, survivalRunSummary } from '@/components/survival/SurvivalRunResult'
 import { Alert } from '@/components/ui/Alert'
@@ -159,28 +161,6 @@ const FOREST_PARAMETERS = [
   { key: 'minNodeSize', title: 'Minimum node size', help: 'Do not split a node with fewer than this many observations.' },
   { key: 'minBucket', title: 'Minimum terminal size', help: 'Require at least this many observations in each child node.' },
 ] as const
-
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running' }
-  | { readonly kind: 'failed'; readonly detail: string }
-
-interface State { readonly draft: Draft; readonly job: Job }
-type Event =
-  | { readonly type: 'draft-changed'; readonly draft: Draft }
-  | { readonly type: 'run-started' }
-  | { readonly type: 'run-failed'; readonly detail: string }
-  | { readonly type: 'run-finished' }
-
-const step = (state: State, event: Event): State => {
-  switch (event.type) {
-    case 'draft-changed': return { ...state, draft: event.draft, job: { kind: 'idle' } }
-    case 'run-started': return { ...state, job: { kind: 'running' } }
-    case 'run-failed': return { ...state, job: { kind: 'failed', detail: event.detail } }
-    case 'run-finished': return { ...state, job: { kind: 'idle' } }
-    default: return assertNever(event)
-  }
-}
 
 /** A column whose name says what it is; otherwise the field waits for a choice rather than guessing by position. */
 const columnLike = (columns: readonly ColumnSelection[], pattern: RegExp): ColumnId | null =>
@@ -997,7 +977,7 @@ const transitionPairs = (transitions: NonEmptyArray<TransitionDraft>): NonEmptyA
   return [[first.from, first.to], ...rest.map(({ from, to }) => [from, to] as const)]
 }
 
-export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDeleteRun, onActivity }: {
+export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRun, onDeleteRun, onActivity }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly prepared: PreparedDatasetArtifact
@@ -1008,29 +988,35 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
 }) {
   const columns = useMemo(() => profile.columns.filter((column) => prepared.columns.includes(column.id) && isNumericDuckDbType(column.duckdbType)).map((column) => ({ id: column.id, name: column.name })), [prepared.columns, profile.columns])
   const sourceColumns = useMemo(() => profile.columns.map((column) => ({ id: column.id, name: column.name })), [profile.columns])
-  const [state, dispatch] = useReducer(step, columns, (available): State => {
+  const [draft, configure] = useState<Draft>(() => {
     const recorded = runs.at(-1)
-    return { draft: recorded === undefined ? draftFor('right-censored', available) : draftFromRun(recorded, available, sourceColumns), job: { kind: 'idle' } }
+    return recorded === undefined ? draftFor('right-censored', columns) : draftFromRun(recorded, columns, sourceColumns)
   })
+  const session = useJob('survival')
+  const { job } = session
   const [pendingDelete, setPendingDelete] = useState<SurvivalRunArtifact | null>(null)
   const latest = runs.at(-1) ?? null
-  useRunActivity(onActivity, state.job.kind === 'running' ? { label: 'Survival analysis', progress: null } : null)
-  const configure = (draft: Draft) => dispatch({ type: 'draft-changed', draft })
+  useRunActivity(onActivity, job.kind === 'running' ? { label: 'Survival analysis', progress: null } : null)
 
   const execute = async () => {
-    if (state.job.kind === 'running') return
-    const validated = validateDraft(state.draft, columns, sourceColumns)
+    const current = session.start('analysis', 'Survival analysis')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
+    const onRun = (run: SurvivalRunArtifact) => {
+      if (session.current(current)) recordRun(run)
+    }
+    const validated = validateDraft(draft, columns, sourceColumns)
     if (!validated.ok) {
-      dispatch({ type: 'run-failed', detail: validated.error.detail })
+      fail(validated.error.detail)
       return
     }
-    dispatch({ type: 'run-started' })
-    const fail = (detail: string) => dispatch({ type: 'run-failed', detail })
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const identity = (matrixColumns: NonEmptyArray<ColumnSelection>) => ({ id: newSurvivalRunId(), preparedDataset: prepared.id, createdAt: new Date().toISOString(), columns: matrixColumns })
       const materialise = async (ids: NonEmptyArray<ColumnId>) => {
         const matrix = await materialisePrepared(source, profile, prepared, ids)
+        if (!session.current(current)) return null
         if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return null }
         return matrix.value
       }
@@ -1210,7 +1196,9 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
             case 'longitudinal-states': {
               const matrix = await materialise(input.columns); if (matrix === null) return
               const { materializePanelKeysInWorker } = await import('@/data/client')
+              if (!session.current(current)) return
               const keys = await materializePanelKeysInWorker(source.file, profile, input.subject.id, input.time.id)
+              if (!session.current(current)) return
               if (!keys.ok) { fail(`The subject and time keys could not be prepared: ${keys.error.kind}.`); return }
               if (keys.value.rowCount !== matrix.rowCount) { fail('The subject keys and prepared time/state columns contain different rows. Use a preparation that retains every source row.'); return }
               const subjectCodes = new Map<string, number>()
@@ -1252,14 +1240,13 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
         }
         default: assertNever(validated.value)
       }
-      dispatch({ type: 'run-finished' })
+      session.finish(current)
     } catch (cause: unknown) {
       console.error('Unexpected survival analysis failure', cause)
       fail('Survival analysis stopped unexpectedly. Try the run again; if it continues, report the problem.')
     }
   }
 
-  const draft = state.draft
   const selectDraft = (kind: Draft['kind']) => configure(retainCovariates(draft, draftFor(kind, columns)))
   const changeFamily = (value: string) => {
     switch (draft.kind) {
@@ -1637,10 +1624,10 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun, onDelete
           <div className="grid gap-4 sm:grid-cols-2">{draftControls}</div>
           {covariateControls}
         </div>
-        {state.job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">The analysis could not run: {state.job.detail}</p></Alert>}
+        <JobNotice job={job} />
         <div className="mt-4 flex items-center gap-3">
-          <button type="button" className={button('signal')} disabled={state.job.kind === 'running'} onClick={() => void execute()}>{state.job.kind === 'running' ? 'Running…' : 'Run survival analysis'}</button>
-          {state.job.kind === 'running' && <><Orb state="solving" aria-label="Survival analysis running" /><button type="button" className={button('quiet')} onClick={() => void import('@/analysis/client').then(({ cancelAnalysisRuns }) => cancelAnalysisRuns()).then(() => dispatch({ type: 'run-failed', detail: 'The survival run was cancelled.' }))}>Cancel run</button></>}
+          <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked} onClick={() => void execute()}>{job.kind === 'running' ? 'Running…' : 'Run survival analysis'}</button>
+          {job.kind === 'running' && <><Orb state="solving" aria-label="Survival analysis running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
         </div>
       </section>
 

@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from 'react'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { z } from 'zod'
 import { ardlModelRequestSchema } from '@/domain/ardlModel'
 import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun, type ArdlTerms } from '@/domain/timeSeries'
@@ -20,7 +22,6 @@ import { TimeSeriesRunResult } from './TimeSeriesRunResult'
 
 type Role = {readonly kind: 'unused'} | {readonly kind: 'predictor'; readonly lag: string} | {readonly kind: 'fixed'}
 type Future = {readonly kind: 'none'} | {readonly kind: 'scenario'; readonly columns: Readonly<Record<string, string>>}
-type Job = {readonly kind: 'idle'} | {readonly kind: 'running'} | {readonly kind: 'failed'; readonly detail: string}
 const numeric = (text: string) => text.trim() === '' ? NaN : Number(text)
 const futureValues = (text: string) => text.trim() === '' ? [] : text.trim().split(/[\s,;]+/).map(numeric)
 type Mode = 'fixed' | 'search' | 'rFixed' | 'rHorizontal' | 'rGrid'
@@ -49,7 +50,8 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
   const [terms, setTerms] = useState<ArdlTerms>('constant')
   const [horizon, setHorizon] = useState('12')
   const [future, setFuture] = useState<Future>({kind: 'none'})
-  const [job, setJob] = useState<Job>({kind: 'idle'})
+  const session = useJob('time-series:ardl-model')
+  const { job } = session
   useRunActivity(props.onActivity, job.kind === 'running' ? {label: 'ARDL', progress: null} : null)
   const predictors = columns.filter(c => c.id !== outcome && roles[c.id]?.kind === 'predictor')
   const fixed = columns.filter(c => c.id !== outcome && roles[c.id]?.kind === 'fixed')
@@ -58,29 +60,33 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
   const fit = async () => {
     const y = columns.find(c => c.id === outcome)
     if (y === undefined) return
+    const current = session.start('analysis', 'Preparing ARDL')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
     const orders = predictors.map(c => {const role = roles[c.id]; return role?.kind === 'predictor' ? numeric(role.lag) : NaN})
     const parsed = ardlModelRequestSchema.safeParse({outcome: 0, predictors: predictors.map((_,i) => i+1), fixed: fixed.map((_,i) => i+1+predictors.length), terms,
       orders: ordersFor(mode, numeric(outcomeLag), orders, [y,...predictors].map(c=>numeric(starting[c.id]??'1')), [y,...predictors].map(c=>(fixedOrders[c.id]??'').trim()===''?null:numeric(fixedOrders[c.id]!)), numeric(minimum)),
       holdBack: holdBack.trim() === '' ? null : numeric(holdBack), multiplierHorizon: numeric(horizon),
       future: future.kind === 'none' ? future : {kind: 'scenario', confidence: 0.95, predictors: predictors.map(c => futureValues(future.columns[c.id] ?? '')), fixed: fixed.map(c => futureValues(future.columns[c.id] ?? ''))}})
-    if (!parsed.success) {setJob({kind: 'failed', detail: z.prettifyError(parsed.error)}); return}
+    if (!parsed.success) {fail(z.prettifyError(parsed.error)); return}
     const selected = [y, ...predictors, ...fixed].map(c => c.id)
-    if (!isNonEmpty(selected)) return
-    setJob({kind: 'running'})
+    if (!isNonEmpty(selected)) { fail('Choose an outcome series.'); return }
     try {
       const [{materialisePrepared, describePreparedMaterialisationProblem}, {runArdlModel}] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const matrix = await materialisePrepared(props.source, props.profile, props.prepared, selected)
-      if (!matrix.ok) {setJob({kind:'failed',detail:describePreparedMaterialisationProblem(matrix.error)}); return}
+      if (!session.current(current)) return
+      if (!matrix.ok) {fail(describePreparedMaterialisationProblem(matrix.error)); return}
       const {values,rowCount,timeAxis} = matrix.value
-      if (timeAxis === null) {setJob({kind:'failed',detail:'The prepared series has no time key.'}); return}
+      if (timeAxis === null) {fail('The prepared series has no time key.'); return}
       const evidence = await runArdlModel(values,rowCount,selected.length,parsed.data)
-      if (!evidence.ok) {setJob({kind:'failed',detail:describeAnalysisWorkerProblem(evidence.error)}); return}
+      if (!session.current(current)) return
+      if (!evidence.ok) {fail(describeAnalysisWorkerProblem(evidence.error)); return}
       const saved = parseTimeSeriesRun({kind:'ardl-model', id:newTimeSeriesRunId(),preparedDataset:props.prepared.id,createdAt:new Date().toISOString(),
         outcome:{id:y.id,name:y.name},predictors:predictors.map(({id,name})=>({id,name})),fixed:fixed.map(({id,name})=>({id,name})),specification:parsed.data,evidence:evidence.value,
         plotTime:{kind:timeAxis.kind,values:Array.from(timeAxis.kind==='calendar'?timeAxis.timestamps:timeAxis.values)}})
-      if (!saved.ok) {setJob({kind:'failed',detail:saved.error}); return}
-      props.onRun(saved.value); setJob({kind:'idle'})
-    } catch (error: unknown) {setJob({kind:'failed',detail:error instanceof Error?error.message:String(error)})}
+      if (!saved.ok) {fail(saved.error); return}
+      props.onRun(saved.value); session.finish(current)
+    } catch (error: unknown) {fail(error instanceof Error?error.message:String(error))}
   }
   return <WorkbenchLayout id="time-series-ardl" bottom={{trigger: { label: 'History', icon: 'history' }, title:`Time-series runs (${runs.length})`,defaultSize:150,body:<TimeSeriesHistory entries={runs} onDelete={run=>props.onDeleteRun(run.id)} />}}
     inspector={{trigger: { label: 'Requirements', icon: 'fact_check' }, title:'Data and method requirements',body:<TimeSeriesRequirements method={TIME_SERIES_METHODS.ardl} prepared={props.prepared} source={props.source.name} />}}
@@ -105,6 +111,6 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
         <div className="grid gap-4 @lg/panel:grid-cols-2"><label><span className={fieldLabel}>Initial observations to exclude</span><input className={field('text','mt-1')} type="number" min={0} placeholder="Use the largest lag" value={holdBack} onChange={e=>setHoldBack(e.target.value)} /></label><label><span className={fieldLabel}>Multiplier horizon</span><input className={field('text','mt-1')} type="number" min={0} max={200} value={horizon} onChange={e=>setHorizon(e.target.value)} /></label></div>
         <label className="flex gap-2 text-body text-ink"><input type="checkbox" checked={future.kind==='scenario'} onChange={e=>setFuture(e.target.checked?{kind:'scenario',columns:{}}:{kind:'none'})} />Forecast with supplied future values</label>
         {future.kind==='scenario'&&<div className="space-y-3"><p className={fieldHint}>Enter one value per future period, separated by spaces or commas. Supply the same number of periods for every included column. No future values are filled in automatically.</p>{futureColumns.map(c=><label key={c.id} className="block"><span className={fieldLabel}>Future {c.name}</span><textarea className={field('text','mt-1')} rows={2} value={future.columns[c.id]??''} onChange={e=>setFuture({kind:'scenario',columns:{...future.columns,[c.id]:e.target.value}})} /></label>)}</div>}
-      </fieldset><div className="mt-4 flex items-center gap-3"><button className={button('signal')} disabled={outcome===null||predictors.length===0} aria-busy={job.kind==='running'} onClick={job.kind==='running'?undefined:()=>void fit()}>Fit ARDL</button><span className="inline-flex h-5 w-5">{job.kind==='running'&&<Orb state="solving" aria-label="ARDL running" />}</span></div>
-      {job.kind==='failed'&&<p role="alert" className="mt-3 text-body text-danger">{job.detail}</p>}</section>{runs.slice(-1).map(run=><TimeSeriesRunResult key={run.id} run={run} />)}</section>} />
+      </fieldset><div className="mt-4 flex items-center gap-3"><button className={button('signal')} disabled={session.blocked||outcome===null||predictors.length===0} aria-busy={job.kind==='running'} onClick={job.kind==='running'?undefined:()=>void fit()}>Fit ARDL</button><span className="inline-flex h-5 w-5">{job.kind==='running'&&<Orb state="solving" aria-label="ARDL running" />}</span>{job.kind==='running'&&<button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div>
+      <JobNotice job={job} /></section>{runs.slice(-1).map(run=><TimeSeriesRunResult key={run.id} run={run} />)}</section>} />
 }

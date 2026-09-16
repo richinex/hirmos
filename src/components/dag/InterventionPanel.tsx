@@ -26,11 +26,8 @@ import type { PreparedDatasetArtifact } from '@/domain/preprocessing'
 import type { SelectedSource } from '@/domain/workflow'
 import { formatStatistic } from '@/lib/format/number'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
-
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running' }
-  | { readonly kind: 'failed'; readonly detail: string }
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 
 type ConditionDraft =
   | { readonly kind: 'none' }
@@ -146,7 +143,8 @@ export function InterventionPanel({ document, source, profile, prepared, queries
   const [condition, setCondition] = useState<ConditionDraft>({ kind: 'none' })
   const [bins, setBins] = useState<number>(3)
   const [equivalentSampleSize, setEquivalentSampleSize] = useState(5)
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob(`intervention:${document.current.id}`)
+  const { job } = session
   const graphNodes = document.current.graph.nodes
   const observed = graphNodes.filter((node) => node.kind === 'observed')
   const hasLatent = graphNodes.some((node) => node.kind === 'latent')
@@ -159,18 +157,21 @@ export function InterventionPanel({ document, source, profile, prepared, queries
     const nextRead = which === 'read' ? next : read
     if (which === 'set') setSet(next); else setRead(next)
     setCondition((current) => current.kind === 'selected' && (current.node === nextSet || current.node === nextRead) ? { kind: 'none' } : current)
-    setJob({ kind: 'idle' })
     onOverlay(nextSet === null ? null : { set: nextSet, read: nextRead })
   }
 
   const run = async () => {
     if (!readiness.ok) return
-    setJob({ kind: 'running' })
+    const current = session.start('analysis', 'Intervention query')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
+      if (!session.current(current)) return
       const columns = observed.map((node) => node.column) as unknown as NonEmptyArray<ColumnId>
       const matrix = await materialisePrepared(source, profile, prepared, columns)
-      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(current)) return
+      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const fullPosition = new Map(graphNodes.map((node, index) => [node.id, index] as const))
       const position = (id: DagNodeId): number => fullPosition.get(id) ?? -1
       const fullEdges = document.current.graph.edges.flatMap((edge) => edge.cause === edge.effect ? [] : [[position(edge.cause), position(edge.effect)] as const])
@@ -189,7 +190,8 @@ export function InterventionPanel({ document, source, profile, prepared, queries
           nodes: observed.map((_, index) => index), names: observed.map((node) => node.name), edges: fullEdges,
           treatment: position(readiness.value.set.id), outcome: position(readiness.value.read.id), bins, equivalentSampleSize,
         })
-        if (!evidence.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+        if (!session.current(current)) return
+        if (!evidence.ok) { fail(describeAnalysisWorkerProblem(evidence.error)); return }
         onQuery({ ...base, route: { kind: 'bayesian-network', bins, equivalentSampleSize, result: evidence.value } })
       } else {
         const evidence = await analysis.runIdentifiedDiscreteQuery(matrix.value.values, matrix.value.rowCount, observed.length, {
@@ -198,12 +200,13 @@ export function InterventionPanel({ document, source, profile, prepared, queries
           unobserved: graphNodes.flatMap((node, index) => node.kind === 'latent' ? [index] : []), bins,
           condition: condition.kind === 'none' ? null : { variable: position(condition.node), state: condition.state },
         })
-        if (!evidence.ok) { setJob({ kind: 'failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+        if (!session.current(current)) return
+        if (!evidence.ok) { fail(describeAnalysisWorkerProblem(evidence.error)); return }
         onQuery({ ...base, route: { kind: 'identified-expression', result: evidence.value } })
       }
-      setJob({ kind: 'idle' })
+      session.finish(current)
     } catch (cause: unknown) {
-      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      fail(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -244,8 +247,11 @@ export function InterventionPanel({ document, source, profile, prepared, queries
       </div>
       <p className="mb-0 mt-2 text-label text-faint">Method: {identifiedRoute ? (condition.kind === 'selected' ? 'IDC expression' : 'ID expression') : 'fully observed Bayesian network'}</p>
       {!readiness.ok && <Alert tone="danger" className="mt-2">{describeInterventionReadiness(readiness.error)}</Alert>}
-      {job.kind === 'failed' && <p role="alert" className="mb-0 mt-2 text-body text-danger">{job.detail}</p>}
-      <button type="button" className={button('signal', 'mt-3')} disabled={!readiness.ok} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Evaluate intervention</button>
+      <JobNotice job={job} />
+      <div className="mt-3 flex items-center gap-3">
+        <button type="button" className={button('signal')} disabled={!readiness.ok || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>Evaluate intervention</button>
+        {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
+      </div>
       {recorded.length > 0 && <ul className="m-0 mt-4 list-none space-y-2 p-0" aria-label="Intervention queries">{recorded.map((query, index) => <QueryRecord key={query.id} query={query} document={document} open={index === 0} />)}</ul>}
     </section>
   )

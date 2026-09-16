@@ -1,4 +1,6 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { useJob } from '@/analysis/JobsProvider'
+import { JobNotice } from '@/components/ui/JobNotice'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
@@ -28,10 +30,6 @@ import { formatCount, formatStatistic, formatWords } from '@/lib/format/number'
 import { formatTime } from '@/lib/format/date'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 
-type Job =
-  | { readonly kind: 'idle' }
-  | { readonly kind: 'running'; readonly phase: string }
-  | { readonly kind: 'failed'; readonly detail: string }
 
 function ResultCharts({ artifact }: { readonly artifact: CountSeriesModelArtifact }) {
   const theme = useChartTheme()
@@ -97,19 +95,23 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
   const [candidateStart, setCandidateStart] = useState(Math.max(1, Math.floor(prepared.observations * 0.2)))
   const [candidateEnd, setCandidateEnd] = useState(Math.max(1, Math.floor(prepared.observations * 0.8)))
   const [delta, setDelta] = useState(1)
-  const [job, setJob] = useState<Job>({ kind: 'idle' })
+  const session = useJob('time-series:counts')
+  const { job } = session
   useRunActivity(onActivity, job.kind === 'running' ? { label: 'Count-series scan', progress: null } : null)
 
   const run = async () => {
-    if (outcome === null) { setJob({ kind: 'failed', detail: 'Choose the count series to model.' }); return }
-    setJob({ kind: 'running', phase: 'Preparing count series' })
+    const current = session.start('analysis', 'Preparing count series')
+    if (current === null) return
+    const fail = (detail: string) => session.fail(current, detail)
+    if (outcome === null) { fail('Choose the count series to model.'); return }
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       const matrix = await materialisePrepared(source, profile, prepared, [outcome])
-      if (!matrix.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(matrix.error) }); return }
+      if (!session.current(current)) return
+      if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const values = Array.from(matrix.value.values)
       const specification = readyCountSeriesSpecification({ outcome, link, pastObservationLags, pastMeanLags, candidateStart, candidateEnd, delta }, matrix.value.rowCount, values)
-      if (!specification.ok) { setJob({ kind: 'failed', detail: describeCountSeriesReadiness(specification.error) }); return }
+      if (!specification.ok) { fail(describeCountSeriesReadiness(specification.error)); return }
       const candidateReferencePoints = Array.from({ length: specification.value.candidateEnd - specification.value.candidateStart + 1 }, (_, index) => specification.value.candidateStart + index)
       const result = await analysis.runCountSeriesInterventionScan(matrix.value.values, matrix.value.rowCount, matrix.value.columns.length, {
         outcome: 0,
@@ -118,14 +120,15 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
         pastMeanLags,
         candidateReferencePoints,
         delta,
-      }, (progress) => setJob({ kind: 'running', phase: progress.stage }))
+      }, progress => session.progress(current, progress.stage))
+      if (!session.current(current)) return
       if (!result.ok) {
         const detail = describeAnalysisWorkerProblem(result.error)
-        setJob({ kind: 'failed', detail: detail.includes('DispersionNotEstimable') ? 'The negative-binomial dispersion could not be estimated for this specification. Review the count variation and selected lags.' : detail })
+        fail(detail.includes('DispersionNotEstimable') ? 'The negative-binomial dispersion could not be estimated for this specification. Review the count variation and selected lags.' : detail)
         return
       }
       const selected = matrix.value.columns[0]
-      if (selected === undefined) { setJob({ kind: 'failed', detail: 'The prepared matrix omitted the selected count series.' }); return }
+      if (selected === undefined) { fail('The prepared matrix omitted the selected count series.'); return }
       onArtifact({
         kind: 'count-series-model',
         id: newCountSeriesModelId(),
@@ -135,9 +138,9 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
         specification: { link, pastObservationLags, pastMeanLags, candidateStart: specification.value.candidateStart, candidateEnd: specification.value.candidateEnd, delta },
         result: result.value,
       })
-      setJob({ kind: 'idle' })
+      session.finish(current)
     } catch (cause: unknown) {
-      setJob({ kind: 'failed', detail: cause instanceof Error ? cause.message : String(cause) })
+      fail(cause instanceof Error ? cause.message : String(cause))
     }
   }
 
@@ -158,11 +161,12 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
         {delta > 0 && delta < 1 && <label className="block"><span className={fieldLabel}>Decay δ</span><input type="number" min={0.01} max={0.99} step={0.01} className={field('text', 'mt-1')} value={delta} onChange={(event) => setDelta(Math.max(0.01, Math.min(0.99, Number(event.target.value) || 0.8)))} /></label>}
       </fieldset>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" className={button('signal')} aria-busy={job.kind === 'running'} disabled={outcome === null} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit and scan</button>
+        <button type="button" className={button('signal')} aria-busy={job.kind === 'running'} disabled={outcome === null || session.blocked} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit and scan</button>
         <span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label="Count model running" />}</span>
-        <span role="status" className="sr-only">{job.kind === 'running' ? job.phase : ''}</span>
-        {job.kind === 'failed' && <span role="alert" className="text-body text-danger">{job.detail}</span>}
+        <span role="status" className="sr-only">{job.kind === 'running' ? job.stage : ''}</span>
+        {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
       </div>
+      <JobNotice job={job} />
       </section>
       {artifacts.length > 0 && <h3 className={`${sectionTitle} m-0`}>Results</h3>}
       {artifacts.slice(-1).map((artifact) => <ul key={artifact.id} className="m-0 list-none p-0"><CountSeriesRecord artifact={artifact} open /></ul>)}

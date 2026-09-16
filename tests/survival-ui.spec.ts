@@ -90,8 +90,8 @@ test('runs ComparisonSurv on the exact crossing-curves package data and records 
 
   await page.getByRole('radio', { name: 'Compare groups' }).click()
   await chooseColumn(page, 'Duration', 'time')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
-  await chooseColumn(page, 'Group · 0 or 1', 'group')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'status')
+  await chooseColumn(page, 'Group 0 or 1', 'group')
   await page.getByRole('spinbutton', { name: 'Compare through time' }).fill('2')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
@@ -122,8 +122,8 @@ test('reproduces the three survival comparisons from the A/B article', async ({ 
 
   await page.getByRole('radio', { name: 'Compare groups' }).click()
   await chooseColumn(page, 'Duration', 'tstatus')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
-  await chooseColumn(page, 'Group · 0 or 1', 'group')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'status')
+  await chooseColumn(page, 'Group 0 or 1', 'group')
   await page.getByRole('spinbutton', { name: 'Compare through time' }).fill('7')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
