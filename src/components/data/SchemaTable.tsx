@@ -89,8 +89,9 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
   })), [profile, summary])
 
   const query = search.trim()
+  const hasTypeChoice = new Set(rows.map((row) => row.kind)).size > 1
   const visible = useMemo(() => rows.filter((row) =>
-    (kinds.size === 0 || kinds.has(row.kind)) && (query.length === 0 || row.name.toLowerCase().includes(query.toLowerCase()))), [kinds, query, rows])
+    (!hasTypeChoice || kinds.size === 0 || kinds.has(row.kind)) && (query.length === 0 || row.name.toLowerCase().includes(query.toLowerCase()))), [hasTypeChoice, kinds, query, rows])
 
   const facets: readonly Facet[] = KINDS.map((kind) => ({
     id: kind,
@@ -198,8 +199,8 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
       titleId={titleId}
       toolbar={(
         <>
-          <FilterField value={search} onChange={setSearch} placeholder="Find a column" label="Search columns" className="w-40" />
-          <FacetPills facets={facets} label="Column types" onToggle={(id) => setKinds((current) => { const next = new Set(current); if (next.has(id as ColumnKind)) next.delete(id as ColumnKind); else next.add(id as ColumnKind); return next })} />
+          <FilterField value={search} onChange={setSearch} placeholder="Find a column" label="Search columns" className="w-40 min-w-24 flex-[1_1_8rem]" />
+          {hasTypeChoice && <FacetPills facets={facets} label="Column types" onToggle={(id) => setKinds((current) => { const next = new Set(current); if (next.has(id as ColumnKind)) next.delete(id as ColumnKind); else next.add(id as ColumnKind); return next })} />}
           <DensityToggle density={density} onChange={setDensity} />
         </>
       )}
