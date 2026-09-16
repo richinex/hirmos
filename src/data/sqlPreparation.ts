@@ -1,4 +1,5 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
+import { RecordBatchFileWriter } from 'apache-arrow'
 import { fingerprintFile } from './fingerprint'
 import { isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
 import { rememberInputFiles } from './inputFiles'
@@ -136,6 +137,17 @@ const shellDatabase = (
   connection: { current: number | null },
 ): duckdb.AsyncDuckDB => new Proxy(database, {
   get(target, property) {
+    if (property === 'runQuery') {
+      return async (id: number, sql: string) => {
+        const live = new duckdb.AsyncDuckDBConnection(target, id)
+        // DuckDB executes batches and returns their final statement's result.
+        const reader = await live.send(sql)
+        // The official shell expects Arrow file IPC. Arrow preserves the schema
+        // and batches while DuckDB's pending API leaves the query cancellable.
+        const writer = await RecordBatchFileWriter.writeAll(reader)
+        return writer.toUint8Array()
+      }
+    }
     if (property === 'connectInternal') {
       return async () => {
         const id = await target.connectInternal()

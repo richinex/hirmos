@@ -37,7 +37,7 @@ export async function mount() {
     }
     function Editor() {
       const owner = usePreparationSession()
-      const entry = useStore(owner.store, state => state.pipeline)
+      const entry = useStore(owner.store, state => state.entry.kind === 'pipeline' ? state.entry : null)
       if (entry !== null) controller = entry.controller
       const [visible, show] = React.useState(true)
       return h(React.Fragment, null,
