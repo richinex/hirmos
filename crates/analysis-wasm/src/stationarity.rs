@@ -2,9 +2,9 @@
 
 use super::*;
 
-fn checked_break(values: &[f64], model: ZaModel) -> Result<ZaResult, String> {
-    use hirmos_causal_core::zivot_andrews::{try_zivot_andrews, ZaError};
-    try_zivot_andrews(values, None, model).map_err(|error| match error {
+fn checked_breaks(values: &[f64]) -> Result<[ZaResult; 3], String> {
+    use hirmos_causal_core::zivot_andrews::{try_zivot_andrews_all, ZaError};
+    try_zivot_andrews_all(values, None).map_err(|error| match error {
         ZaError::RankDeficient => "Zivot–Andrews auxiliary regression is not full rank.".to_owned(),
         ZaError::DecompositionFailed => "Zivot–Andrews auxiliary regression could not be solved.".to_owned(),
     })
@@ -12,6 +12,7 @@ fn checked_break(values: &[f64], model: ZaModel) -> Result<ZaResult, String> {
 
 pub(crate) fn stationarity_battery(values: &[f64]) -> Result<AnalysisResult, String> {
     validate_stationarity_values(values)?;
+    let [level, trend, level_and_trend] = checked_breaks(values)?;
     Ok(AnalysisResult::StationarityBattery {
         observations: values.len(),
         adf: DeterministicEvidence {
@@ -23,9 +24,9 @@ pub(crate) fn stationarity_battery(values: &[f64]) -> Result<AnalysisResult, Str
             constant_and_trend: kpss(values, Regression::Ct).into(),
         },
         zivot_andrews: BreakEvidence {
-            level: checked_break(values, ZaModel::C)?.into(),
-            trend: checked_break(values, ZaModel::T)?.into(),
-            level_and_trend: checked_break(values, ZaModel::Ct)?.into(),
+            level: level.into(),
+            trend: trend.into(),
+            level_and_trend: level_and_trend.into(),
         },
     })
 }

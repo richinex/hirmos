@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @import "./themes.css";
 
+/* Shallow face/depth treatment inspired by UI Buttons' 3D button 2.
+   Only mobile workbench openers use this class; shared control dimensions stay unchanged. */
+.sheet-opener {
+  background: var(--color-raised);
+  color: var(--color-ink);
+  border-color: var(--color-edge);
+  box-shadow: 0 2px 0 var(--color-edge), 0 4px 6px rgb(0 0 0 / 0.14),
+    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
+}
+.sheet-opener:active,
+.sheet-opener[aria-expanded='true'] {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--color-edge), 0 1px 2px rgb(0 0 0 / 0.12);
+}
+
 /* Hirmos — lime on black, set like a paper.
    ------------------------------------------------------------------------
    What this palette IS, and the reasoning behind it. Earlier experiments were tried and reverted; their

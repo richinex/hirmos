@@ -73,7 +73,7 @@ function PaneOpener({ pane, icon, open, onOpen }: { readonly pane: WorkbenchPane
   return (
     <button
       type="button"
-      className={button('outline', cn('min-w-0 w-full whitespace-normal text-center', open ? 'bg-well text-ink' : 'bg-panel text-muted'))}
+      className={button('outline', 'sheet-opener min-w-0 w-full whitespace-normal text-center')}
       aria-label={pane.title}
       aria-haspopup="dialog"
       aria-expanded={open}

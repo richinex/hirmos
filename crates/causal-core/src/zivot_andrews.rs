@@ -197,11 +197,29 @@ pub enum ZaError {
 }
 
 /// Checked entry point for callers that must report a refused auxiliary fit.
-pub fn try_zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> Result<ZaResult, ZaError> {
-    let trim = 0.15;
-    let nobs = x.len();
+pub fn try_zivot_andrews(
+    x: &[f64],
+    maxlag: Option<usize>,
+    model: ZaModel,
+) -> Result<ZaResult, ZaError> {
     let adf_reg = Regression::Ct;
     let baselags = adfuller_maxlag(x, adf_reg, maxlag).usedlag;
+    with_lags(x, baselags, model)
+}
+
+/// Run all break models with the same source-prescribed ADF lag selection.
+pub fn try_zivot_andrews_all(x: &[f64], maxlag: Option<usize>) -> Result<[ZaResult; 3], ZaError> {
+    let lags = adfuller_maxlag(x, Regression::Ct, maxlag).usedlag;
+    Ok([
+        with_lags(x, lags, ZaModel::C)?,
+        with_lags(x, lags, ZaModel::T)?,
+        with_lags(x, lags, ZaModel::Ct)?,
+    ])
+}
+
+fn with_lags(x: &[f64], baselags: usize, model: ZaModel) -> Result<ZaResult, ZaError> {
+    let trim = 0.15;
+    let nobs = x.len();
 
     let trimcnt = (nobs as f64 * trim) as usize;
     let start_period = trimcnt;
@@ -236,6 +254,7 @@ pub fn try_zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> Re
 
     let mut best_stat = f64::INFINITY;
     let mut best_bp = 0usize;
+    let mut products = None;
     for bp in start_period + 1..=end_period {
         let cutoff = bp - (baselags + 1);
         match model {
@@ -266,9 +285,13 @@ pub fn try_zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> Re
             if fit.rank < cols {
                 return Err(ZaError::RankDeficient);
             }
+            products = Some(BreakProducts::new(&exog, &y, model));
             fit.tvalues()[basecols - 1]
         } else {
-            quick_ols(&exog, &y)?[basecols - 1]
+            products
+                .as_mut()
+                .expect("first candidate initializes products")
+                .tvalues(&exog, &y)?[basecols - 1]
         };
         if stat < best_stat {
             best_stat = stat;
@@ -300,13 +323,94 @@ pub fn try_zivot_andrews(x: &[f64], maxlag: Option<usize>, model: ZaModel) -> Re
 }
 
 /// Statsmodels ZivotAndrewsUnitRoot._quick_ols; the first candidate checks rank.
-fn quick_ols(x: &DMatrix<f64>, y: &DVector<f64>) -> Result<DVector<f64>, ZaError> {
-    let inverse = crate::linalg::inverse(&(x.transpose() * x))
-        .map_err(|_| ZaError::DecompositionFailed)?;
-    let coefficients = &inverse * (x.transpose() * y);
-    let residuals = y - x * &coefficients;
-    let variance = residuals.dot(&residuals) / (x.nrows() - x.ncols()) as f64;
-    Ok(DVector::from_iterator(x.ncols(), (0..x.ncols()).map(|i| {
-        coefficients[i] / (variance * inverse[(i, i)]).sqrt()
-    })))
+struct BreakProducts {
+    gram: DMatrix<f64>,
+    rhs: DVector<f64>,
+    changing: Vec<usize>,
+}
+
+impl BreakProducts {
+    fn new(x: &DMatrix<f64>, y: &DVector<f64>, model: ZaModel) -> Self {
+        Self {
+            gram: x.transpose() * x,
+            rhs: x.transpose() * y,
+            changing: match model {
+                ZaModel::C => vec![1],
+                ZaModel::T => vec![2],
+                ZaModel::Ct => vec![1, 3],
+            },
+        }
+    }
+
+    fn tvalues(&mut self, x: &DMatrix<f64>, y: &DVector<f64>) -> Result<DVector<f64>, ZaError> {
+        // Only break indicators change. Keep the products of fixed columns.
+        for &column in &self.changing {
+            self.rhs[column] = x.column(column).dot(y);
+            for other in 0..x.ncols() {
+                let value = x.column(column).dot(&x.column(other));
+                self.gram[(column, other)] = value;
+                self.gram[(other, column)] = value;
+            }
+        }
+        let inverse =
+            crate::linalg::inverse(&self.gram).map_err(|_| ZaError::DecompositionFailed)?;
+        let coefficients = &inverse * &self.rhs;
+        let residuals = y - x * &coefficients;
+        let variance = residuals.dot(&residuals) / (x.nrows() - x.ncols()) as f64;
+        let result = DVector::from_iterator(
+            x.ncols(),
+            (0..x.ncols()).map(|i| coefficients[i] / (variance * inverse[(i, i)]).sqrt()),
+        );
+        #[cfg(test)]
+        {
+            let reference_inverse = crate::linalg::inverse(&(x.transpose() * x)).unwrap();
+            let reference_b = &reference_inverse * (x.transpose() * y);
+            let reference_e = y - x * &reference_b;
+            let reference_variance = reference_e.dot(&reference_e) / (x.nrows() - x.ncols()) as f64;
+            for i in 0..x.ncols() {
+                let expected =
+                    reference_b[i] / (reference_variance * reference_inverse[(i, i)]).sqrt();
+                assert!(
+                    (result[i] - expected).abs() <= 1e-8 * expected.abs().max(1.0),
+                    "cached t statistic {} vs {}",
+                    result[i],
+                    expected
+                );
+            }
+        }
+        Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod product_tests {
+    use super::*;
+    #[test]
+    fn cached_products_match_full_products_at_every_break() {
+        let mut seed = 42_u64;
+        let values: Vec<f64> = (0..512)
+            .map(|i| {
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                (seed >> 11) as f64 / (1_u64 << 53) as f64 + if i > 250 { 1.0 } else { 0.0 }
+            })
+            .collect();
+        for lags in [0, 4, 38] {
+            for model in [ZaModel::C, ZaModel::T, ZaModel::Ct] {
+                with_lags(&values, lags, model).unwrap();
+            }
+        }
+    }
+    #[test]
+    fn shared_lags_match_separate_models() {
+        let values: Vec<f64> = (0..128)
+            .map(|i| (i as f64 * 1.7).sin() + (i as f64 * 0.37).cos())
+            .collect();
+        let combined = try_zivot_andrews_all(&values, Some(0)).unwrap();
+        for (actual, model) in combined.iter().zip([ZaModel::C, ZaModel::T, ZaModel::Ct]) {
+            let expected = try_zivot_andrews(&values, Some(0), model).unwrap();
+            assert_eq!(actual.stat, expected.stat);
+            assert_eq!(actual.bpidx, expected.bpidx);
+            assert_eq!(actual.baselags, expected.baselags);
+        }
+    }
 }
