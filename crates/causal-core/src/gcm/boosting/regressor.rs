@@ -6,6 +6,7 @@ use super::{
 };
 use crate::{nprandom::Mt19937, numpy_reduce::numpy_mean};
 use nalgebra::{DMatrix, DVector};
+use std::collections::HashMap;
 use std::num::NonZeroUsize;
 
 #[derive(Clone, Copy)]
@@ -187,22 +188,98 @@ impl Regressor {
             return Err(BoostError::NonFinite);
         }
         let mut values = DVector::from_element(x.nrows(), self.intercept);
-        for r in 0..x.nrows() {
-            let row: Vec<_> = self
-                .bins
-                .iter()
-                .enumerate()
-                .map(|(c, b)| b.map(x[(r, c)]))
-                .collect();
+        // Identical bins follow identical paths. Bound the cache independently of row count.
+        let mut cache: HashMap<Vec<u8>, f64> = HashMap::new();
+        let columns = self.bins.len();
+        let mut rows = vec![0; x.nrows().min(256) * columns];
+        let mut pending = Vec::with_capacity(x.nrows().min(256));
+        for start in (0..x.nrows()).step_by(256) {
+            pending.clear();
+            let count = (x.nrows() - start).min(256);
+            for r in 0..count {
+                let row = &mut rows[r * columns..(r + 1) * columns];
+                for (c, b) in self.bins.iter().enumerate() {
+                    row[c] = b.map(x[(start + r, c)]);
+                }
+                match cache.get(&*row) {
+                    Some(&value) => values[start + r] = value,
+                    None => pending.push(r),
+                }
+            }
+            // Cache misses still add trees in their original order for each row.
             for tree in &self.trees {
-                values[r] += tree
-                    .predict(&row, self.missing)
-                    .map_err(|_| BoostError::Tree)?;
+                for &r in &pending {
+                    values[start + r] += tree
+                        .predict(&rows[r * columns..(r + 1) * columns], self.missing)
+                        .map_err(|_| BoostError::Tree)?;
+                }
+            }
+            for &r in &pending {
+                if cache.len() == 4096 {
+                    break;
+                }
+                cache.insert(
+                    rows[r * columns..(r + 1) * columns].to_vec(),
+                    values[start + r],
+                );
             }
         }
         Ok(values)
     }
     pub fn iterations(&self) -> usize {
         self.trees.len()
+    }
+}
+
+#[cfg(test)]
+mod prediction_tests {
+    use super::*;
+
+    #[test]
+    fn cached_bins_match_independent_rows() {
+        let x = DMatrix::from_fn(128, 3, |r, c| ((r * (c + 3)) % 37) as f64);
+        let y = DVector::from_fn(128, |r, _| x[(r, 0)] * x[(r, 1)] - x[(r, 2)]);
+        let model = Regressor::fit(&x, &y, &Options::default(), &mut Mt19937::seeded(0)).unwrap();
+        let mut rng = Mt19937::seeded(123);
+        let mut input = DMatrix::from_fn(9001, 3, |_, _| rng.next_f64() * 36.0);
+        input[(0, 0)] = f64::NAN;
+        input[(127, 2)] = f64::NAN;
+        input.row_mut(8999).fill(0.1);
+        input.row_mut(9000).fill(0.2);
+        let actual = model.predict(&input).unwrap();
+        assert_eq!(actual[8999].to_bits(), actual[9000].to_bits());
+        let small = model.predict(&input.rows(0, 777).into_owned()).unwrap();
+        assert_eq!(actual.rows(0, 777), small);
+        let keys: std::collections::HashSet<Vec<u8>> = (0..input.nrows())
+            .map(|r| {
+                model
+                    .bins
+                    .iter()
+                    .enumerate()
+                    .map(|(c, b)| b.map(input[(r, c)]))
+                    .collect()
+            })
+            .collect();
+        assert!(keys.len() > 4096, "Exercise full-cache misses");
+        for r in 0..input.nrows() {
+            let row: Vec<_> = model
+                .bins
+                .iter()
+                .enumerate()
+                .map(|(c, b)| b.map(input[(r, c)]))
+                .collect();
+            let mut expected = model.intercept;
+            for tree in &model.trees {
+                expected += tree.predict(&row, model.missing).unwrap();
+            }
+            assert_eq!(actual[r].to_bits(), expected.to_bits());
+        }
+        assert!(model.predict(&DMatrix::zeros(0, 3)).unwrap().is_empty());
+        assert!(matches!(
+            model.predict(&DMatrix::zeros(2, 4)),
+            Err(BoostError::Shape)
+        ));
+        input[(0, 0)] = f64::INFINITY;
+        assert!(matches!(model.predict(&input), Err(BoostError::NonFinite)));
     }
 }
