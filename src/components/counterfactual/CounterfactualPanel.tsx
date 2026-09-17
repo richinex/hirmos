@@ -66,7 +66,7 @@ function EquationsTable({ run }: { readonly run: CounterfactualRunArtifact }) {
   })()
   return (
     <div className="figure-strip mt-3 overflow-x-auto">
-      <table className="w-full border-collapse text-left text-body" aria-label="Structural equations">
+      <table className="w-full border-collapse text-left text-table" aria-label="Structural equations">
         <thead className="text-faint">
           <tr>
             <th className="border-b border-hair px-2 py-1.5 font-normal">Node</th>

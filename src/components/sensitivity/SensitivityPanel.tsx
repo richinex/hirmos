@@ -117,7 +117,7 @@ function DmlRefutationRecord({ run, study }: { readonly run: Extract<Sensitivity
         ))}
       </ul>
       <div className="figure-strip mt-3 overflow-x-auto">
-        <table className="w-full border-collapse text-left text-body" aria-label="Confounding scenarios">
+        <table className="w-full border-collapse text-left text-table" aria-label="Confounding scenarios">
           <thead className="text-faint">
             <tr><th className="border-b border-hair px-2 py-1.5 font-normal">Confounding share</th><th className="border-b border-hair px-2 py-1.5 text-right font-normal">Effect bounds</th><th className="border-b border-hair px-2 py-1.5 text-right font-normal">Interval bounds</th></tr>
           </thead>
@@ -180,7 +180,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
       <details className="mt-3 text-body">
         <DisclosureSummary className="cursor-pointer text-ink">Ljung–Box by lag</DisclosureSummary>
         <div className="figure-strip mt-2 overflow-x-auto">
-        <table className="w-full border-collapse text-body" aria-label="Ljung-Box by lag">
+        <table className="w-full border-collapse text-table" aria-label="Ljung-Box by lag">
           <thead><tr className="text-left"><th scope="col" className="px-2 py-1 text-label font-medium text-muted">Lag</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">Q</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">p</th></tr></thead>
           <tbody>
             {evidence.ljungBoxLags.map((lag, index) => (

@@ -185,7 +185,7 @@ function SyntheticControlEvidenceDetails({ run }: { readonly run: Extract<Estima
       <div className="mt-3 grid gap-4">
         {evidence.crossFit.kind === 'available' ? (
           <div className="figure-strip overflow-x-auto">
-            <table className="w-full border-collapse text-body" aria-label="Cross-fitted synthetic-control folds">
+            <table className="w-full border-collapse text-table" aria-label="Cross-fitted synthetic-control folds">
               <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Fold</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Held-out rows</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Bias</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Effect</th></tr></thead>
               <tbody>{evidence.crossFit.folds.map((fold, index) => <tr key={index}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{index + 1}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{fold.heldOut[0] + 1}–{(fold.heldOut.at(-1) ?? fold.heldOut[0]) + 1}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', fold.bias).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', fold.att).text}</td></tr>)}</tbody>
             </table>
@@ -193,7 +193,7 @@ function SyntheticControlEvidenceDetails({ run }: { readonly run: Extract<Estima
         ) : <p className="m-0 text-body text-muted">Cross-fitted inference unavailable: {evidence.crossFit.reason}</p>}
         {evidence.donorPlacebo.kind === 'available' ? (
           <div className="figure-strip overflow-x-auto">
-            <table className="w-full border-collapse text-body" aria-label="Donor-placebo MSPE ratios">
+            <table className="w-full border-collapse text-table" aria-label="Donor-placebo MSPE ratios">
               <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Series</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Pre MSPE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Post MSPE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Post/pre ratio</th></tr></thead>
               <tbody>
                 <tr><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-medium">Treated</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.donorPlacebo.treatedPreMspe).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.donorPlacebo.treatedPostMspe).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{evidence.donorPlacebo.treatedMspeRatio === null ? '∞' : formatStatistic('raw', evidence.donorPlacebo.treatedMspeRatio).text}</td></tr>
@@ -242,7 +242,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
       <div className="mt-3 grid gap-4">
         {periods.kind === 'dense-codes' && <Alert tone="info" live={false}><p className="m-0">This saved run does not contain source period labels. The period tables therefore show zero-based dense codes.</p></Alert>}
         <div className="figure-strip overflow-x-auto">
-          <table className="w-full border-collapse text-body" aria-label="Panel estimator comparison">
+          <table className="w-full border-collapse text-table" aria-label="Panel estimator comparison">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Estimator</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Estimate</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Placebo SE</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">In-time placebo</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">Noise level</th></tr></thead>
             <tbody>{estimates.map(([name, estimate, placebo, inTime]) => <tr key={name}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{name}{name.startsWith('Synthetic difference') ? <Metadata><span></span><span>primary</span></Metadata> : ''}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.estimate).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{placebo === null ? '—' : placebo.kind === 'available' ? formatStatistic('raw', placebo.standardError).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{inTime === null ? '—' : inTime.kind === 'available' ? formatStatistic('raw', inTime.estimate).text : 'Unavailable'}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', estimate.noiseLevel).text}</td></tr>)}</tbody>
           </table>
@@ -256,19 +256,19 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
           </ul>
         ) : null}
         <div className="figure-strip overflow-x-auto">
-          <table className="w-full border-collapse text-body" aria-label="Panel unit weights">
+          <table className="w-full border-collapse text-table" aria-label="Panel unit weights">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Control unit</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
             <tbody>{controls.map((unit, index) => <tr key={unit}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{unit}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.did.omega, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticControl.omega, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticDid.omega, index)}</td></tr>)}</tbody>
           </table>
         </div>
         <div className="figure-strip overflow-x-auto">
-          <table className="w-full border-collapse text-body" aria-label="Panel time weights">
+          <table className="w-full border-collapse text-table" aria-label="Panel time weights">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Pre-period</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
             <tbody>{preLabels.map((period, index) => <tr key={`${period}-${index}`}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{period}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.did.lambda, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticControl.lambda, index)}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{panelWeight(evidence.syntheticDid.lambda, index)}</td></tr>)}</tbody>
           </table>
         </div>
         <div className="figure-strip overflow-x-auto">
-          <table className="w-full border-collapse text-body" aria-label="Panel post-period effects">
+          <table className="w-full border-collapse text-table" aria-label="Panel post-period effects">
             <thead><tr className="text-left"><th className="border-b border-hair px-2 py-1.5 font-medium">Post-period</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">DID</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SC</th><th className="border-b border-hair px-2 py-1.5 text-right font-medium">SDID</th></tr></thead>
             <tbody>{postLabels.map((period, index) => <tr key={`${period}-${index}`}><th scope="row" className="border-b border-hair px-2 py-1.5 text-left font-normal">{period}</th><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.did.effectCurve[index] ?? Number.NaN).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.syntheticControl.effectCurve[index] ?? Number.NaN).text}</td><td className={num('border-b border-hair px-2 py-1.5 text-right')}>{formatStatistic('raw', evidence.syntheticDid.effectCurve[index] ?? Number.NaN).text}</td></tr>)}</tbody>
           </table>

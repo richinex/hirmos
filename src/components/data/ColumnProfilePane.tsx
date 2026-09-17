@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { histogramOption } from '@/charts/data/histogram'
 import { useChartTheme } from '@/charts/theme'
@@ -115,27 +115,29 @@ export function ColumnProfilePane({ profile, column, description }: {
   readonly column: PhysicalColumnProfile | null
   readonly description: ColumnDescription
 }) {
+  const [displayed, setDisplayed] = useState<{ readonly column: PhysicalColumnProfile; readonly profile: ColumnProfile } | null>(null)
+  const current = description.kind !== 'idle' && description.column === column?.id
+  if (current && description.kind === 'ready' && column !== null && displayed?.profile !== description.profile) {
+    setDisplayed({ column, profile: description.profile })
+  }
   if (column === null) {
     return <p className="m-0 text-body text-faint">Select a column to inspect its values, missing values and distribution.</p>
   }
+  const failed = current && description.kind === 'failed'
+  const shown = failed ? column : displayed?.column ?? column
   return (
-    <div className="@container/inspector">
+    <div className="@container/inspector" aria-busy={!current || description.kind === 'loading'}>
       <div className="mb-3">
-        <IdentityRow name={<h3 className="m-0 text-title font-medium text-ink">{column.name}</h3>}>
-          <span className={literal()}>{column.duckdbType}</span>
-          <span>{column.nullable ? 'Nullable' : 'Not null'}</span>
+        <IdentityRow name={<h3 className="m-0 text-title font-medium text-ink">{shown.name}</h3>}>
+          <span className={literal()}>{shown.duckdbType}</span>
+          <span>{shown.nullable ? 'Nullable' : 'Not null'}</span>
         </IdentityRow>
       </div>
-      {description.kind === 'loading' && <Skeleton />}
-      {description.kind === 'idle' && <Skeleton />}
-      {description.kind === 'failed' && description.column === column.id && (
-        <Alert tone="danger" title="Column profile refused">{describeProblem(description.problem)}</Alert>
-      )}
-      {description.kind === 'ready' && description.column === column.id && (
-        description.profile.kind === 'numeric-column-profile'
-          ? <NumericSummary column={column} profile={description.profile} rowCount={profile.rowCount} />
-          : <CategoricalSummary profile={description.profile} rowCount={profile.rowCount} />
-      )}
+      {failed ? <Alert tone="danger" title="Column profile refused">{describeProblem(description.problem)}</Alert>
+        : displayed === null ? <Skeleton />
+        : displayed.profile.kind === 'numeric-column-profile'
+          ? <NumericSummary column={displayed.column} profile={displayed.profile} rowCount={profile.rowCount} />
+          : <CategoricalSummary profile={displayed.profile} rowCount={profile.rowCount} />}
     </div>
   )
 }

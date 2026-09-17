@@ -113,7 +113,7 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
               type="button"
               aria-pressed={selected}
               onClick={(event) => { event.stopPropagation(); onSelectColumn(row.id) }}
-              className="block min-w-0 flex-1 truncate text-left text-body text-ink"
+              className="block min-w-0 flex-1 truncate text-left text-table text-ink"
               title={`Profile ${row.name}`}
             >
               <Highlighted text={row.name} query={query} />

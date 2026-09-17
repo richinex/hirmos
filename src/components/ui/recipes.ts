@@ -224,7 +224,7 @@ export const panelTitle = 'text-title font-medium text-ink text-balance'
 export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px] pb-[6px]' } as const
 
 /** A data table: the caps tier for headers, hairline rows, comfortable 32px body rows unless a density is applied; figure cells add `text-right`. */
-export const table = 'w-full border-collapse text-left text-body'
+export const table = 'w-full border-collapse text-left text-table'
 
 /** A header cell. Sticky and opaque on its table's surface, carried by weight rather than capitals,
  *  because a header may be a phrase ("Zivot-Andrews p, constant and trend"). `p-0` when a sort button fills it. */

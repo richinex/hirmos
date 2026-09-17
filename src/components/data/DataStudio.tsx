@@ -31,8 +31,8 @@ export function DataStudio({ source, profile, prepared, onEditSource, children }
           {children}
         </DataProfileView>
       )}
-      inspector={{ trigger: { label: 'Profile', icon: 'query_stats' }, title: 'Column profile', body: <>{prepared !== null && <PreparedDataSummary prepared={prepared} profile={profile} />}<ColumnProfilePane profile={profile} column={selected} description={description} /></> }}
-      bottom={{ trigger: { label: 'Series', icon: 'show_chart' }, title: 'Series', body: <ColumnSeriesPane column={selected} description={description} stepLabel={stepLabel} /> }}
+      inspector={{ trigger: { label: 'Profile', icon: 'query_stats' }, title: 'Column profile', body: <>{prepared !== null && <PreparedDataSummary prepared={prepared} profile={profile} />}<ColumnProfilePane key={profile.id} profile={profile} column={selected} description={description} /></> }}
+      bottom={{ trigger: { label: 'Series', icon: 'show_chart' }, title: 'Series', body: <ColumnSeriesPane key={profile.id} column={selected} description={description} stepLabel={stepLabel} /> }}
     />
   )
 }

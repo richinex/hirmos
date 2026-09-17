@@ -24,7 +24,7 @@ function RowEffectTable({ effect }: { readonly effect: Extract<CausalEstimate['e
     ['Largest row effect', summary.maximum],
   ]
   return (
-    <table className="mt-2 w-full border-collapse text-body">
+    <table className="mt-2 w-full border-collapse text-table">
       <thead>
         <tr>
           <th className={th()}>Across {formatCount(summary.rows).text} rows</th>
@@ -59,7 +59,7 @@ function GroupEffectTable({ effect, interval, observations }: {
 }) {
   const bounds = (lower: number, upper: number) => `[${formatStatistic('raw', lower).text}, ${formatStatistic('raw', upper).text}]`
   return (
-    <table className="mt-2 w-full border-collapse text-body">
+    <table className="mt-2 w-full border-collapse text-table">
       <thead>
         <tr>
           <th className={th()}>{effect.modifier}</th>
