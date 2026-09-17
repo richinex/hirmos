@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -147,14 +148,14 @@ export function GcmEffectsPanel(props: Props) {
             <label><span className={fieldLabel}>Group effects by</span><Select aria-label="Group effects by" className={field('text', 'mt-1')} value={model.grouping.kind === 'none' ? '' : String(model.grouping.column)} onChange={event => setModel({ ...model, grouping: event.target.value === '' ? { kind: 'none' } : { kind: 'quantiles', column: Number(event.target.value), groups: 5, scope: { kind: 'all' } } })}><option value="">All rows</option>{model.names.map((name, i) => !model.edges.some(([, child]) => child === i) && i !== model.treatment && i !== model.outcome ? <option key={name} value={i}>{name}</option> : null)}</Select></label>
             {model.grouping.kind === 'quantiles' && <QuantileGroups value={model.grouping} onChange={grouping => setModel({ ...model, grouping })} />}
           </div>
-          <details><summary className="cursor-pointer text-body font-medium">Variable models</summary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">{model.mechanisms.map((mechanism, i) => <div key={model.names[i]}>
+          <details><DisclosureSummary className="cursor-pointer text-body font-medium">Variable models</DisclosureSummary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">{model.mechanisms.map((mechanism, i) => <div key={model.names[i]}>
             <span className={fieldLabel}>{model.names[i]}</span>
             {mechanism.kind === 'empirical' ? <p className={fieldHint}>Observed distribution</p> : <>
               <SegmentedControl className="mt-1" fill ariaLabel={`Model for ${model.names[i]}`} value={mechanism.kind} options={[{ value: 'regression', label: 'Continuous' }, { value: 'classifier', label: 'Categorical' }]} onChange={kind => setModel({ ...model, mechanisms: model.mechanisms.map((entry, j) => j !== i ? entry : kind === 'regression' ? { kind } : { kind, classes: 2 }) })} />
               {mechanism.kind === 'classifier' && <label className="mt-2 block"><span className={fieldLabel}>Categories, coded from 0</span><input aria-label={`Categories for ${model.names[i]}`} type="number" min={2} max={7} value={mechanism.classes} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, mechanisms: model.mechanisms.map((entry, j) => j !== i ? entry : { kind: 'classifier', classes: Number(event.target.value) }) })} /></label>}
             </>}
           </div>)}</div></details>
-          <details><summary className="cursor-pointer text-body font-medium">Sampling settings</summary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
+          <details><DisclosureSummary className="cursor-pointer text-body font-medium">Sampling settings</DisclosureSummary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
             {([{ key: 'trees', label: 'Trees per model', min: 1 }, { key: 'minLeaf', label: 'Minimum leaf size', min: 1 }, { key: 'fitSeed', label: 'Fitting seed', min: 0 }, { key: 'simulationSeed', label: 'Simulation seed', min: 0 }, { key: 'repetitions', label: 'Simulations', min: 1 }] as const).map(item => <label key={item.key}><span className={fieldLabel}>{item.label}</span><input aria-label={item.label} type="number" min={item.min} value={model[item.key]} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, [item.key]: Number(event.target.value) })} /></label>)}
             <label><span className={fieldLabel}>Upper percentile</span><input aria-label="Upper percentile" type="number" min={51} max={99.9} step={0.1} value={model.upperQuantile * 100} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, upperQuantile: Number(event.target.value) / 100 })} /></label>
           </div></details>

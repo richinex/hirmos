@@ -301,6 +301,7 @@ function App() {
   const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(() => lastStorageFailure())
   const [reopenProblem, setReopenProblem] = useState<string | null>(null)
   const [exampleNotice, setExampleNotice] = useState<string | null>(null)
+  const [resetExample, setResetExample] = useState<ShippedExample | null>(null)
   const refreshSaved = useCallback(() => { void listProjects().then(setSaved) }, [])
   useEffect(() => { refreshSaved() }, [refreshSaved])
   useEffect(() => subscribeStorageHealth(setStorageFailure), [])
@@ -390,7 +391,7 @@ function App() {
    * A shipped example. Edits to this release are retained, while a copy made from an older shipped
    * release is replaced so newly completed chapters are not hidden behind stale browser state.
    */
-  const openExample = async (example: ShippedExample, reset = false) => {
+  const loadExampleBundle = async (example: ShippedExample) => {
     setImportProblem(null)
     setExampleNotice(null)
     let bundle: ProjectBundle
@@ -407,8 +408,20 @@ function App() {
       setImportProblem(`The example could not be loaded: ${cause instanceof Error ? cause.message : String(cause)}`)
       return
     }
-    const existing = reset ? null : await loadProject(example.id)
-    if (existing !== null && existing.ok) {
+    return bundle
+  }
+  const restoreExample = async (example: ShippedExample) => {
+    const bundle = await loadExampleBundle(example)
+    if (bundle === undefined) return
+    const result = await saveProject(bundle.project)
+    if (!result.ok) return
+    refreshSaved()
+  }
+  const openExample = async (example: ShippedExample) => {
+    const bundle = await loadExampleBundle(example)
+    if (bundle === undefined) return
+    const existing = await loadProject(example.id)
+    if (existing.ok) {
       const assessment = assessExampleCopy(existing.value, bundle.exportedAt, example.id)
       switch (assessment.kind) {
         case 'current-release': await openWithBundleData(assessment.snapshot, bundle.data); return
@@ -619,6 +632,15 @@ function App() {
     <ChartExportProvider.Provider value={exportContext}>
       <JobsProvider key={project?.id ?? ''} prepared={currentPrepared?.id ?? null} profile={profiled?.profile.id ?? null}>
       {editConfirmDialog}
+      {resetExample !== null && <ConfirmDialog
+        open
+        title={`Reset ${resetExample.name}?`}
+        message="This restores the original example and removes changes and saved analyses from your copy."
+        confirmLabel="Reset example"
+        danger
+        onConfirm={() => void restoreExample(resetExample)}
+        onClose={() => setResetExample(null)}
+      />}
       <AppShell
         skipTarget="stage"
         mode={fullBleed ? 'full' : 'reading'}
@@ -648,13 +670,10 @@ function App() {
                       />
                     </label>
                     {workflow.problem && <p role="alert" className="text-body text-danger">{describeProjectNameProblem(workflow.problem)}</p>}
-                    {/* The two ways to get a project, side by side: make one, or open one exported earlier.
-                        On a narrow stage the two share the row and the same height, so no dead space sits to the
-                        right and a label that wraps does not leave its neighbour shorter. */}
-                    <div className="flex flex-wrap items-center gap-2 @max-md/panel:items-stretch @max-md/panel:*:flex-1">
-                      <button type="submit" className={button('signal')}>Create project</button>
+                    <div className="grid grid-cols-2 items-stretch gap-2">
+                      <button type="submit" className={button('signal', 'w-full min-w-0')}>Create project</button>
                       <input ref={bundleInput} type="file" accept=".json,application/json" className="sr-only" aria-label="Exported project file" onChange={(event) => { void importBundle(event.target.files?.[0]); event.target.value = '' }} />
-                      <button type="button" className={button('outline')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open an exported file</button>
+                      <button type="button" className={button('outline', 'w-full min-w-0')} title="A .hirmos.json file from Export project. If it was exported without its data file, you choose the file after opening." onClick={() => bundleInput.current?.click()}>Open exported file</button>
                     </div>
                   </form>
                   <section className="mt-8" aria-labelledby="projects-title" hidden={yours.length === 0 && reopenProblem === null && importProblem === null}>
@@ -689,7 +708,7 @@ function App() {
                       saved={saved}
                       formatSaved={formatDay}
                       onOpen={(example) => void openExample(example)}
-                      onReset={(example) => void openExample(example, true)}
+                      onReset={setResetExample}
                       onExport={(id) => void exportSaved(id)}
                       onDelete={(entry) => void removeProject(entry)}
                     />

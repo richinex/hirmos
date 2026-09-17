@@ -1,3 +1,4 @@
+import { RunDetails } from '@/components/ui/RunDetails'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -186,20 +187,13 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
         </dl>
       </div>
       <EquationsTable run={run} />
-      <details className={well('mt-3 px-3 py-2 text-body')}>
-        <summary className="cursor-pointer text-muted">Run details</summary>
-        <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
-          <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
-          <dt>Study</dt><dd className={literal('m-0 break-all')}>{run.study}</dd>
-          <dt>Identification</dt><dd className={literal('m-0 break-all')}>{run.identification}</dd>
-          <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
-        </dl>
-      </details>
+
     </>
   )
   if (!current) {
     return (
       <RunFold title={`${study.treatment.name} ${view.interventions[0]} → ${view.interventions[1]}`} figure={`average ${formatStatistic('raw', view.averageEffect).text}`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
+        <RunDetails label="Counterfactual run details"><RunRecord run={run} /></RunDetails>
         {record}
       </RunFold>
     )
@@ -588,4 +582,14 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
     />
     </>
   )
+}
+
+function RunRecord({ run }: { readonly run: CounterfactualRunArtifact }) {
+  return (<dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
+          <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
+          <dt>Created</dt><dd className="m-0">{formatTime(run.createdAt)}</dd>
+          <dt>Study</dt><dd className={literal('m-0 break-all')}>{run.study}</dd>
+          <dt>Identification</dt><dd className={literal('m-0 break-all')}>{run.identification}</dd>
+          <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
+        </dl>)
 }

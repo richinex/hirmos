@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { Alert } from '@/components/ui/Alert'
 import { button, literal } from '@/components/ui/recipes'
@@ -31,7 +32,7 @@ export class ChapterBoundary extends Component<{ readonly chapter: string; reado
           <button type="button" className={button('quiet')} onClick={() => this.setState({ error: null })}>Try again</button>
         </div>
         <details className="mt-3">
-          <summary className="cursor-pointer text-label text-muted">Technical detail</summary>
+          <DisclosureSummary className="cursor-pointer text-label text-muted">Technical detail</DisclosureSummary>
           <p className={literal('mb-0 mt-2 break-words text-body text-faint')}>{this.state.error.message}</p>
         </details>
       </Alert>

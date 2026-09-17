@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { RunFold } from '@/components/ui/RunFold'
@@ -118,7 +119,7 @@ const assignmentHint = (kind: AssignmentMechanism['kind']): string => {
 function StudyRecord({ study, identification }: { readonly study: StudySpecification; readonly identification: IdentificationArtifact | null }) {
   return (
     <details className={well('mt-3 px-3 py-2 text-body')}>
-      <summary className="cursor-pointer text-ink">Study details</summary>
+      <DisclosureSummary className="cursor-pointer text-ink">Study details</DisclosureSummary>
       <RecordList className="mt-2 text-label">
         <RecordRow term="Study"><span className={literal('text-muted')} title={study.id}>{study.id.slice(0, 8)}</span></RecordRow>
         <RecordRow term="Identification">{identification === null ? '—' : <span className={literal('text-muted')} title={identification.id}>{identification.id.slice(0, 8)}</span>}</RecordRow>
@@ -149,7 +150,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
     case 'identified': {
       const selectedLabel = result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
       return (
-        <Alert tone="ok" live={false} className="mt-3">
+        <Alert tone="ok" icon="function" live={false} className="mt-3">
           <p className="m-0">Identified by back-door adjustment</p>
           <p className="mb-0 mt-1 text-muted">
             {result.adjustment.variables.length === 0
@@ -158,7 +159,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
           </p>
           {result.adjustment.kind === 'minimal' && <p className="mb-0 mt-1 text-faint">Canonical set: {result.canonicalAdjustmentSet.map((variable) => variable.name).join(', ') || 'none'}.</p>}
           <details className="mt-2 text-muted">
-            <summary className="cursor-pointer text-body text-ink"><Metadata><span>Minimal valid sets</span><span>{result.minimalAdjustmentSets.sets.length}</span></Metadata></summary>
+            <DisclosureSummary className="cursor-pointer text-body text-ink"><Metadata><span>Minimal valid sets</span><span>{result.minimalAdjustmentSets.sets.length}</span></Metadata></DisclosureSummary>
             <ol className="mb-0 mt-1 pl-5">
               {result.minimalAdjustmentSets.sets.map((set, index) => (
                 <li key={set.map((variable) => variable.node).join('|') || 'empty'}>
@@ -181,7 +182,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
     }
     case 'graphically-identified':
       return (
-        <Alert tone="ok" live={false} className="mt-3">
+        <Alert tone="ok" icon="function" live={false} className="mt-3">
           <p className="m-0">Identified by the general ID algorithm</p>
           <p className="mb-0 mt-1 text-muted">The graph has no measured back-door adjustment set, but the interventional distribution can be written using observed probabilities.</p>
           <figure className="mb-0 mt-2">
@@ -197,7 +198,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
       )
     case 'counterfactually-identified':
       return (
-        <Alert tone="ok" live={false} className="mt-3">
+        <Alert tone="ok" icon="function" live={false} className="mt-3">
           <p className="m-0">Identified by IDC*</p>
           <p className="mb-0 mt-1 text-muted">The effect on the treated is identified through two conditional counterfactual distributions.</p>
           <div className="mt-2 grid gap-2">
@@ -215,14 +216,14 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
       )
     case 'instrument-identified':
       return (
-        <Alert tone="ok" live={false} className="mt-3">
+        <Alert tone="ok" icon="function" live={false} className="mt-3">
           <p className="m-0">Instrumental variable estimand</p>
           <p className="mb-0 mt-1 text-muted">
             No measured back-door adjustment set and no observational expression were found, but the graph names {result.instruments.length === 1 ? 'an instrument' : 'instruments'}: {variableChips(result.instruments)}.
           </p>
           <p className="mb-0 mt-2 text-muted">The instrumental variable estimand does not rely on adjusting for all common causes. The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed, and the estimator makes a linearity assumption.</p>
           <details className="mt-2 text-muted">
-            <summary className="cursor-pointer text-body text-ink"><Metadata><span>Why no observational expression</span><span>{result.reasons.length}</span></Metadata></summary>
+            <DisclosureSummary className="cursor-pointer text-body text-ink"><Metadata><span>Why no observational expression</span><span>{result.reasons.length}</span></Metadata></DisclosureSummary>
             {failureList(result.reasons)}
           </details>
         </Alert>

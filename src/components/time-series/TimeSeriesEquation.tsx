@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Formula } from '@/components/ui/Formula'
 import { timeSeriesEquations } from '@/domain/timeSeriesEquations'
 import type { TimeSeriesRun } from '@/domain/timeSeries'
@@ -6,7 +7,7 @@ import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 export function TimeSeriesEquation({ run }: { readonly run: TimeSeriesRun | CountSeriesModelArtifact }) {
   const equations = timeSeriesEquations(run)
   return <details className="@container mt-4 min-w-0 border-t border-hair pt-3 [&_.formula]:pr-2" data-testid="time-series-equation">
-    <summary className="cursor-pointer text-label font-medium text-ink">Model equation</summary>
+    <DisclosureSummary className="cursor-pointer text-label font-medium text-ink">Model equation</DisclosureSummary>
     <div className="equation-columns mt-5" data-paired="true">
       <div className="equation-group">
         <h5 className="m-0 text-label font-medium text-ink">General model</h5>

@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { scatterMatrixOption, type MatrixColumn } from '@/charts/data/scatterMatrix'
@@ -28,7 +29,7 @@ export function RootCauseData({ graph, source, profile, prepared }: { readonly g
       setData({ kind: 'ready', rows: rowCount, columns: graph.nodes.map((node, column) => ({ name: node.name, values: Array.from(values.subarray(column * rowCount, (column + 1) * rowCount)) })) })
     } catch (error: unknown) { setData({ kind: 'failed', detail: error instanceof Error ? error.message : String(error) }) }
   }
-  return <details className="text-body"><summary className="cursor-pointer text-muted">Baseline data relationships</summary><div className="mt-3 space-y-3">
+  return <details className="text-body"><DisclosureSummary className="cursor-pointer text-muted">Baseline data relationships</DisclosureSummary><div className="mt-3 space-y-3">
     {data.kind !== 'ready' && <button type="button" className={button('outline')} disabled={data.kind === 'loading'} onClick={() => void load()}>{data.kind === 'loading' ? 'Loading baseline data…' : 'Explore baseline data'}</button>}
     {data.kind === 'failed' && <p role="alert" className="text-warn">{data.detail}</p>}
     {data.kind === 'ready' && <>

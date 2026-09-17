@@ -1,3 +1,5 @@
+import { RunDetails } from '@/components/ui/RunDetails'
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { initialEstimationDraft, estimationSelection, samePanelBinding, sameStudyDataBinding, type EstimationEvent, type PanelBinding, type StudyDataBinding } from '@/domain/estimationDraft'
 import { useJob } from '@/analysis/JobsProvider'
@@ -179,7 +181,7 @@ function SyntheticControlEvidenceDetails({ run }: { readonly run: Extract<Estima
   const donorNames = run.columns.slice(2).map((column) => column.name)
   return (
     <details className={well('mt-3 px-3 py-2 text-body')}>
-      <summary className="cursor-pointer text-ink">Synthetic-control inference</summary>
+      <DisclosureSummary className="cursor-pointer text-ink">Synthetic-control inference</DisclosureSummary>
       <div className="mt-3 grid gap-4">
         {evidence.crossFit.kind === 'available' ? (
           <div className="figure-strip overflow-x-auto">
@@ -236,7 +238,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
   ] as const
   return (
     <details className={well('mt-3 px-3 py-2 text-body')}>
-      <summary className="cursor-pointer text-ink">Panel weights and period effects</summary>
+      <DisclosureSummary className="cursor-pointer text-ink">Panel weights and period effects</DisclosureSummary>
       <div className="mt-3 grid gap-4">
         {periods.kind === 'dense-codes' && <Alert tone="info" live={false}><p className="m-0">This saved run does not contain source period labels. The period tables therefore show zero-based dense codes.</p></Alert>}
         <div className="figure-strip overflow-x-auto">
@@ -278,8 +280,7 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
 
 function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
   return (
-    <details className={well('mt-3 px-3 py-2 text-body')}>
-      <summary className="cursor-pointer text-ink">Run details</summary>
+    <>
       <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
         <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
         <dt>Study</dt><dd className={literal('m-0 break-all')}>{run.study}</dd>
@@ -290,7 +291,7 @@ function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
         <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         <dt>Method</dt><dd className={literal('m-0')}>{run.method}</dd>
       </dl>
-    </details>
+    </>
   )
 }
 
@@ -637,13 +638,13 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       <Diagnostics run={run} />
       {run.kind === 'synthetic-control-run' ? <SyntheticControlEvidenceDetails run={run} /> : null}
       {run.kind === 'panel-intervention-run' ? <PanelEvidenceDetails run={run} /> : null}
-      <RunRecord run={run} />
     </>
   )
   if (!current) {
     // History rows fold to one line in the runs drawer; only the current estimate keeps the stage.
     return (
       <RunFold title={sentence} figure={headlineFigure(estimate).text} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
+        <RunDetails label="Estimation run details"><RunRecord run={run} /></RunDetails>
         {body}
       </RunFold>
     )

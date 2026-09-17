@@ -1,3 +1,5 @@
+import { RunDetails } from '@/components/ui/RunDetails'
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { Orb } from '@/components/ui/Orb'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -82,6 +84,7 @@ function DmlRefutationCard({ run, estimation, study, current, onDelete }: { read
   if (!current) {
     return (
       <RunFold title="Double machine learning probe batch" figure={<RunMeta>{[`Placebo ${formatStatistic('raw', evidence.placebo.refutedEffect).text}`, `Robustness ${formatStatistic('score', evidence.sensitivity.robustnessValue).text}`]}</RunMeta>} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+        <RunDetails label="Probe run details"><RunRecord run={run} /></RunDetails>
         <DmlRefutationRecord run={run} study={study} />
       </RunFold>
     )
@@ -140,6 +143,7 @@ function RefutationCard({ run, estimation, study, current, onDelete }: { readonl
   if (!current) {
     return (
       <RunFold title="Perturbation and residual probes" figure={<RunMeta>{[`Placebo ${formatStatistic('raw', evidence.placeboEffect).text}`, `Subset ${formatStatistic('raw', evidence.subsetEffect).text}`]}</RunMeta>} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+        <RunDetails label="Probe run details"><RunRecord run={run} /></RunDetails>
         <RefutationRecord run={run} study={study} />
       </RunFold>
     )
@@ -174,7 +178,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
         {run.diagnostics.map((fact) => <li key={fact.id} className="py-2 text-body text-muted">{fact.reading}</li>)}
       </ul>
       <details className="mt-3 text-body">
-        <summary className="cursor-pointer text-ink">Ljung–Box by lag</summary>
+        <DisclosureSummary className="cursor-pointer text-ink">Ljung–Box by lag</DisclosureSummary>
         <div className="figure-strip mt-2 overflow-x-auto">
         <table className="w-full border-collapse text-body" aria-label="Ljung-Box by lag">
           <thead><tr className="text-left"><th scope="col" className="px-2 py-1 text-label font-medium text-muted">Lag</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">Q</th><th scope="col" className="px-2 py-1 text-right text-label font-medium text-muted">p</th></tr></thead>
@@ -190,15 +194,7 @@ function RefutationRecord({ run, study }: { readonly run: Extract<SensitivityRun
         </table>
         </div>
       </details>
-      <details className={well('mt-3 px-3 py-2 text-body')}>
-        <summary className="cursor-pointer text-ink">Run details</summary>
-        <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
-          <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
-          <dt>Estimation run</dt><dd className={literal('m-0 break-all')}>{run.estimationRun}</dd>
-          <dt>Configuration</dt><dd className={literal('m-0 break-all')}>{JSON.stringify(run.configuration)}</dd>
-          <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
-        </dl>
-      </details>
+
     </>
   )
 }
@@ -231,21 +227,13 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
         <MetricTile label="Sign changes" size="compact" frame="cell" value={formatCount(flips)} context={`of ${formatCount(flat.length).text} cells`} />
       </MetricGrid>
       <EChart option={option} label="Refitted effect over simulated confounder strengths" className="mt-3 h-[300px]" testId="unobserved-grid" />
-      <details className={well('mt-3 px-3 py-2 text-body')}>
-        <summary className="cursor-pointer text-ink">Run details</summary>
-        <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
-          <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
-          <dt>Estimation run</dt><dd className={literal('m-0 break-all')}>{run.estimationRun}</dd>
-          <dt>Treatment flip strength</dt><dd className={literal('m-0 break-all')}>{evidence.kappaT.map((value) => formatStatistic('score', value).text).join(', ')}</dd>
-          <dt>Outcome shift strength</dt><dd className={literal('m-0 break-all')}>{evidence.kappaY.map((value) => formatStatistic('raw', value).text).join(', ')}</dd>
-          <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
-        </dl>
-      </details>
+
     </>
   )
   if (!current) {
     return (
       <RunFold title="Unmeasured confounder" figure={`${evidence.kappaT.length}×${evidence.kappaY.length} grid`} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this probe">
+        <RunDetails label="Probe run details"><RunRecord run={run} /></RunDetails>
         {record}
       </RunFold>
     )
@@ -517,4 +505,21 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     />
     </>
   )
+}
+
+function RunRecord({ run }: { readonly run: SensitivityRunArtifact }) {
+  if (run.kind === 'unobserved-confounding-run') { const { evidence } = run; return (<dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
+          <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
+          <dt>Estimation run</dt><dd className={literal('m-0 break-all')}>{run.estimationRun}</dd>
+          <dt>Treatment flip strength</dt><dd className={literal('m-0 break-all')}>{evidence.kappaT.map((value) => formatStatistic('score', value).text).join(', ')}</dd>
+          <dt>Outcome shift strength</dt><dd className={literal('m-0 break-all')}>{evidence.kappaY.map((value) => formatStatistic('raw', value).text).join(', ')}</dd>
+          <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
+        </dl>) }
+  if (run.kind !== 'linear-refutation-run') return <dl><dt>Probe</dt><dd className="break-all">{run.id}</dd><dt>Estimation run</dt><dd className="break-all">{run.estimationRun}</dd></dl>
+  return (<dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
+          <dt>Probe</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
+          <dt>Estimation run</dt><dd className={literal('m-0 break-all')}>{run.estimationRun}</dd>
+          <dt>Configuration</dt><dd className={literal('m-0 break-all')}>{JSON.stringify(run.configuration)}</dd>
+          <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
+        </dl>)
 }

@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { useStore } from 'zustand'
@@ -101,7 +102,7 @@ function SqlEditor({ inputs, onPrepared, onCleared, controller }: SqlShellProps 
         </div>
 
         <details className="mb-4">
-          <summary className="cursor-pointer text-body font-medium text-ink">Starting query</summary>
+          <DisclosureSummary className="cursor-pointer text-body font-medium text-ink">Starting query</DisclosureSummary>
           <pre className={literal('mb-2 mt-2 overflow-x-auto whitespace-pre-wrap rounded-md border border-line bg-panel p-2 text-label text-muted')}>{starterSql(inputs)}</pre>
           <button type="button" className={button('quiet', 'gap-1', 'sm')} onClick={() => void copyStarter()}>
             <Icon name="content_copy" size={13} />

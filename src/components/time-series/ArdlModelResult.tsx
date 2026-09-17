@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { useState } from 'react'
 import type { TimeSeriesRun } from '@/domain/timeSeries'
@@ -42,13 +43,13 @@ function RAnalysis({run}:{readonly run:Run}) {
     <h4 className="m-0 text-body text-ink">Error-correction model</h4>
     <p className="m-0 text-label text-muted">This equation models the change in {run.outcome.name}. A zero-lag predictor enters at its current level without an additional change term.</p>
     <div className="overflow-x-auto"><table className={table} aria-label="Error-correction coefficients"><thead><tr><th className={th()}>Term</th><th className={th()}>Coefficient</th><th className={th()}>Standard error</th></tr></thead><tbody>{r.coefficients.map((term,i)=><tr key={i}><td className={td()}>{coefficientName(term,run)}</td><td className={td()}>{number(r.params[i]!)}</td><td className={td()}>{number(Math.sqrt(r.covariance[i]![i]!))}</td></tr>)}</tbody></table></div>
-    <details><summary className="cursor-pointer text-body text-ink">Model diagnostics</summary><div className="mt-3 space-y-3">
+    <details><DisclosureSummary className="cursor-pointer text-body text-ink">Model diagnostics</DisclosureSummary><div className="mt-3 space-y-3">
       <p className="m-0 text-label text-muted">PSS AIC {number(r.aicPss)}; PSS SBC {number(r.sbcPss)}. Higher values are preferred when comparing models fitted to the same observations.</p>
       <p className="m-0 text-label text-muted">Bounds F statistic {number(r.boundsF)}.{r.boundsT.kind==='recorded'?` Bounds t statistic ${number(r.boundsT.value)}.`:' The t-bounds statistic does not apply to the selected restricted deterministic case.'} These are test statistics, not p-values. Critical bounds for these statistics are not reported.</p>
       <div className="overflow-x-auto"><table className={table} aria-label="Serial-correlation tests"><thead><tr><th className={th()}>Residual lags</th><th className={th()}>BG statistic</th><th className={th()}>p-value</th></tr></thead><tbody>{r.serialCorrelation.map(test=><tr key={test.order}><td className={td()}>{test.order}</td><td className={td()}>{number(test.statistic)}</td><td className={td()}>{number(test.pValue)}</td></tr>)}</tbody></table></div>
       <p className="m-0 text-label text-muted">Breusch–Godfrey tests assess remaining serial correlation in the residuals. Small p-values indicate that the fitted model may not account for all of the time dependence.</p>
     </div></details>
-    {r.ranking.kind!=='notRequested'&&<details open><summary className="cursor-pointer text-body text-ink">Lag-search results</summary>
+    {r.ranking.kind!=='notRequested'&&<details open><DisclosureSummary className="cursor-pointer text-body text-ink">Lag-search results</DisclosureSummary>
       <p className="text-label text-muted">{r.ranking.kind==='grid'?`${r.ranking.evaluated} combinations evaluated. `:'Horizontal search from the recorded starting orders. '}Up to 20 retained candidates are shown in decreasing PSS AIC order.</p>
       <div className="overflow-x-auto"><table className={table} aria-label="Lag-search ranking"><thead><tr>{[run.outcome,...run.predictors].map(c=><th key={c.id} className={th()}>{c.name}</th>)}<th className={th()}>PSS AIC</th></tr></thead><tbody>{r.ranking.rows.map((row,i)=><tr key={i}>{row.order.map((q,j)=><td key={j} className={td()}>{q}</td>)}<td className={td()}>{number(row.aicPss)}</td></tr>)}</tbody></table></div>
     </details>}

@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -146,7 +147,7 @@ export function GcmInfluencePanel(props: Props) {
       <fieldset disabled={busy} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">Causal influence settings</legend>
         <div><h3 className={`${sectionTitle} m-0`}>{titles[props.analysis]}</h3><p className={fieldHint}>{descriptions[props.analysis]}</p></div>
         <label className="block"><span className={fieldLabel}>Target variable</span><Select aria-label="Influence target" className={field('text', 'mt-1')} value={target} onChange={event => setTarget(event.target.value)}><option value="">Choose target</option>{props.graph.nodes.map((node, index) => <option key={node.id} value={index} disabled={props.analysis === 'arrows' && !props.graph.edges.some(([, child]) => child === index)}>{node.name}</option>)}</Select></label>
-        <details><summary className="cursor-pointer text-body font-medium">Sampling settings</summary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
+        <details><DisclosureSummary className="cursor-pointer text-body font-medium">Sampling settings</DisclosureSummary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
           {settings.map(setting => <label key={setting.label}><span className={fieldLabel}>{setting.label}</span><input aria-label={setting.label} type="number" min={0} step="any" value={setting.value} className={field('text', 'mt-1')} onChange={event => setting.change(Number(event.target.value))} /></label>)}
           <label><span className={fieldLabel}>Random seed</span><input aria-label="Random seed" type="number" min={0} value={seed} className={field('text', 'mt-1')} onChange={event => setSeed(Number(event.target.value))} /></label>
         </div></details>

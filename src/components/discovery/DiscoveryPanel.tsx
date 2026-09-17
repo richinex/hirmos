@@ -1,3 +1,5 @@
+import { RunDetails } from '@/components/ui/RunDetails'
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
@@ -519,7 +521,7 @@ function RpcmciControls({ configuration, onChange }: {
         </Select>
       </div>
       <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
-        <summary className="cursor-pointer text-body text-ink">Annealing and conditional-independence settings</summary>
+        <DisclosureSummary className="cursor-pointer text-body text-ink">Annealing and conditional-independence settings</DisclosureSummary>
         <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
           <div className="text-body text-ink">
             <ParameterLabel label="Minimum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.minimumLag} htmlFor="rpcmci-minimum-lag" />
@@ -657,7 +659,7 @@ function GraceControls({ configuration, onChange }: {
         <input id="grace-gate-threshold" className={field('text', 'mt-1')} type="number" min={0} max={1} step={0.05} value={configuration.gateThreshold} onChange={(event) => changeNumber('gateThreshold', event.currentTarget.valueAsNumber)} />
       </div>
       <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
-        <summary className="cursor-pointer text-body text-ink">Training settings</summary>
+        <DisclosureSummary className="cursor-pointer text-body text-ink">Training settings</DisclosureSummary>
         <div className="mt-3 grid gap-3 @md/panel:grid-cols-3">
           <div className="text-body text-ink">
             <ParameterLabel label="Epochs" help={DISCOVERY_PARAMETER_HELP.grace.epochs} htmlFor="grace-epochs" />
@@ -752,7 +754,7 @@ function NeuralControls({ configuration, onChange }: {
         </>
       )}
       <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
-        <summary className="cursor-pointer text-body text-ink">Training settings</summary>
+        <DisclosureSummary className="cursor-pointer text-body text-ink">Training settings</DisclosureSummary>
         <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
           <div className="text-body text-ink">
             <ParameterLabel label="Ridge λ" help={DISCOVERY_PARAMETER_HELP.neural.ridge} htmlFor={`${prefix}-ridge`} />
@@ -796,15 +798,14 @@ function ResultEligibility({ eligibility }: { readonly eligibility: MethodEligib
 
 function RunRecord({ run }: { readonly run: DiscoveryRunArtifact }) {
   return (
-    <details className={well('mt-3 px-3 py-2 text-body')}>
-      <summary className="cursor-pointer text-ink">Run details</summary>
+    <>
       <dl className="mb-0 mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-micro text-faint">
         <dt>Run</dt><dd className={literal('m-0 break-all')}>{run.id}</dd>
         <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
         <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         <dt>Method</dt><dd className={literal('m-0')}>{run.method}</dd>
       </dl>
-    </details>
+    </>
   )
 }
 
@@ -835,6 +836,7 @@ function ResultCard({ run, method, title, meta, current, children }: {
   if (!current) {
     return (
       <RunFold title={title} figure={method} stamp={formatTime(run.createdAt)} onDelete={requestDeletion === null ? undefined : () => requestDeletion(run)} deleteLabel={`Delete ${discoveryRunName(run)} run`}>
+        <RunDetails label="Discovery run details"><RunRecord run={run} /></RunDetails>
         {body}
       </RunFold>
     )
@@ -922,7 +924,6 @@ function TimeGraphResult({ run, current }: { readonly current: boolean; readonly
   return (
     <ResultCard run={run} current={current} method={methodLabel} title={resultTitle} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.tauMax}</span><span>alpha {run.result.pcAlpha}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label={`${methodLabel} structure`} />
       <TimeGraphPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">Empty marks appear as “—”. {isLpcmci ? 'The legend under the structure view defines each mark.' : 'Unoriented same-period links keep the o-o mark.'}</p>
@@ -976,7 +977,6 @@ function JpcmciResult({ run, current }: { readonly current: boolean; readonly ru
   return (
     <ResultCard run={run} current={current} method="J-PCMCI+ with ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<><Metadata><span>{run.result.datasets} units × {run.result.periods} periods</span><span>{run.result.observedVariables} observed variables</span><span>maximum lag {run.result.tauMax}</span><span>alpha {run.result.pcAlpha}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label="J-PCMCI+ joint structure" />
       <p className="mb-3 mt-3 text-body text-muted">Generated period and unit contexts remain visible as auxiliary nodes. Only relations between observed columns can be taken into the editable DAG workspace.</p>
       <EvidenceTable<typeof rows[number]>
@@ -1035,7 +1035,6 @@ function RpcmciResult({ run, current }: { readonly current: boolean; readonly ru
       meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>{run.result.numRegimes} regimes</span><span>lags {run.result.tauMin}–{run.result.tauMax}</span><span>graph alpha {run.result.alphaLevel}</span></Metadata></>}
     >
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <RpcmciMembershipPlot run={run} />
       <div className="mt-3 flex items-center gap-2">
         <label className="text-body text-ink">
@@ -1088,7 +1087,6 @@ function CdnotsResult({ run, current }: { readonly current: boolean; readonly ru
   return (
     <ResultCard run={run} current={current} method={`${method} with ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.observedVariables} observed variables</span><span>maximum lag {run.result.maxLag}</span><span>{context}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} structure`} />
       <p className="mb-3 mt-3 text-body text-muted">Generated context nodes appear in this evidence graph but are not dataset columns and cannot be copied into the editable DAG.</p>
       <EvidenceTable<typeof rows[number]>
@@ -1125,7 +1123,6 @@ function GraceResult({ run, current }: { readonly current: boolean; readonly run
   return (
     <ResultCard run={run} current={current} method="GRACE" title={<>Gated lag-graph refinement</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.maxLag}</span><span>{run.result.epochs} epochs</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label="GRACE retained relations" />
       <dl className={figureGrid('mt-3 grid-cols-2 @2xl/panel:grid-cols-4')}>
         <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Gate threshold</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{statistic(run.result.gateThreshold)}</dd></div>
@@ -1161,7 +1158,6 @@ function DynotearsResult({ run, current }: { readonly current: boolean; readonly
   return (
     <ResultCard run={run} current={current} method="DYNOTEARS" title={<>Sparse dynamic structural equation model weights</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.maxLag}</span><span>λW {run.result.lambdaW}</span><span>λA {run.result.lambdaA}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label="DYNOTEARS structure" />
       <WeightPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">All fitted weights are retained without a display threshold. Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
@@ -1187,7 +1183,6 @@ function VarLingamResult({ run, current }: { readonly current: boolean; readonly
   return (
     <ResultCard run={run} current={current} method="VAR-LiNGAM" title={<>Non-Gaussian structural vector autoregression weights</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>Bayesian information criterion lag {run.result.selectedLag} of at most {run.result.lags}</span><span>{run.result.prune ? 'adaptive-lasso pruned' : 'unpruned'}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <p className="mb-1 mt-3 text-body text-muted">Contemporaneous causal order from residual non-Gaussianity:</p>
       <p className={num('mb-3 mt-0 text-body text-ink')} aria-label="VAR-LiNGAM causal order">{order.join(' → ')}</p>
       <StructurePlot run={run} label="VAR-LiNGAM structure" />
@@ -1217,7 +1212,6 @@ function DirectLingamResult({ run, current }: { readonly current: boolean; reado
   return (
     <ResultCard run={run} current={current} method="DirectLiNGAM" title={<>Linear non-Gaussian directed structure</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} independent observations</span><span>{run.result.variables} variables</span><span>adaptive-lasso adjacency</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <p className="mb-1 mt-3 text-body text-muted">Causal order inferred from non-Gaussianity:</p>
       <p className={num('mb-3 mt-0 text-body text-ink')} aria-label="DirectLiNGAM causal order">{order.join(' → ')}</p>
       <StructurePlot run={run} label="DirectLiNGAM structure" />
@@ -1245,7 +1239,6 @@ function OcseResult({ run, current }: { readonly current: boolean; readonly run:
   return (
     <ResultCard run={run} current={current} method="Optimal causation entropy" title={<>Conditional-information network evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>maximum lag {run.result.maxLag}</span><span>{run.result.method} conditional mutual information</span><span>{run.result.nShuffles} shuffles</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label="oCSE structure" />
       <OcsePlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">Selected lagged relations can be reviewed in the DAG workspace. They are not estimates of intervention effects.</p>
@@ -1292,7 +1285,6 @@ function ConstraintDiscoveryResult({ run, current }: {
   return (
     <ResultCard run={run} current={current} method={method} title={<>{graphName}</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>{run.result.ciTest === 'fisherZ' ? 'Fisher Z' : 'KCI'}</span><span>α {run.result.alpha}</span><span>{run.result.ciTests.length} CI tests</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <StructurePlot run={run} label={`${method} ${graphName.toLowerCase()}`} />
       <EvidenceTable<typeof links[number]>
         frame="none"
@@ -1342,7 +1334,6 @@ function CmlpResult({ run, current }: { readonly current: boolean; readonly run:
   return (
     <ResultCard run={run} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.lag}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
       <StructurePlot run={run} label="cMLP lag-resolved relations" />
       <NeuralSummaryPlot run={run} />
@@ -1376,7 +1367,6 @@ function ClstmResult({ run, current }: { readonly current: boolean; readonly run
   return (
     <ResultCard run={run} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>context {run.result.context}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <RunRecord run={run} />
       <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
       <NeuralSummaryPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">cLSTM selects whether a source history helps predict a target. It does not select an individual lag, so Hirmos does not render this result as a lag graph.</p>

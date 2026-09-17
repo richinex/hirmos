@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Formula } from '@/components/ui/Formula'
 import { survivalEquations, survivalEquationVariables } from '@/domain/survivalEquations'
 import type { SurvivalRunArtifact } from '@/domain/survival'
@@ -9,7 +10,7 @@ export function SurvivalEquation({ run }: { readonly run: SurvivalRunArtifact })
   const details = equations.definitions.filter((definition) => typeof definition !== 'string')
   // Reserve space for italic glyph overhang at a formula's right edge.
   return <details className="@container mt-4 min-w-0 border-t border-hair pt-3 [&_.formula]:pr-2" data-testid="survival-equation">
-    <summary className="cursor-pointer text-label font-medium text-ink">Model equation</summary>
+    <DisclosureSummary className="cursor-pointer text-label font-medium text-ink">Model equation</DisclosureSummary>
     <div className="equation-columns mt-5" data-paired={equations.fitted.length > 0} data-testid="survival-equation-layout">
       <div className="equation-group" data-testid="survival-equation-formulas">
         <h5 className="m-0 text-label font-medium text-ink">General model</h5>
@@ -37,7 +38,7 @@ export function SurvivalEquation({ run }: { readonly run: SurvivalRunArtifact })
       </div>}
     </div>
     {details.map((detail, index) => <details key={index} className="mt-5 min-w-0 border-t border-hair pt-3" data-testid="survival-equation-detail">
-      <summary className="cursor-pointer text-label font-medium text-muted">{detail.title}</summary>
+      <DisclosureSummary className="cursor-pointer text-label font-medium text-muted">{detail.title}</DisclosureSummary>
       <div className="mt-4 grid min-w-0 items-start gap-4 @min-[44rem]:grid-cols-[2fr_3fr] @min-[44rem]:gap-6">
         <Formula tex={`\\displaystyle ${detail.formula.tex}`} plain={detail.formula.plain} />
         <p className="m-0 max-w-prose text-body text-muted">{detail.description}</p>

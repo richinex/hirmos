@@ -16,8 +16,9 @@ const TONE: Record<AlertTone, string> = {
 const TONE_ICON: Record<AlertTone, string> = { danger: 'error', warn: 'warning', ok: 'check_circle', info: 'info' }
 
 /** The one status banner: every surface renders alerts through this instead of hand-templated border/bg/text triples. */
-export function Alert({ tone, title, live = true, testId, className, children }: {
+export function Alert({ tone, title, icon, live = true, testId, className, children }: {
   readonly tone: AlertTone
+  readonly icon?: string
   /** Optional micro-cap heading above the body, in the same tone. */
   readonly title?: string
   /** role="alert" for announcements; pass false for static caveats that should not interrupt. */
@@ -28,7 +29,7 @@ export function Alert({ tone, title, live = true, testId, className, children }:
 }) {
   return (
     <div role={live ? 'alert' : undefined} data-testid={testId} className={cn('flex items-start gap-2 rounded-lg border px-3 py-2.5 text-body', TONE[tone], className)}>
-      <Icon name={TONE_ICON[tone]} size={15} className="mt-[0.1875rem] shrink-0" />
+      <Icon name={icon ?? TONE_ICON[tone]} size={15} className="mt-[0.1875rem] shrink-0" />
       <div className="min-w-0 flex-1">
         {title && <p className={labelCn('mb-1')}>{title}</p>}
         {children}

@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { CountDraft } from '@/domain/timeSeriesDraft'
@@ -57,11 +58,11 @@ export function CountSeriesRecord({ artifact, open }: { readonly artifact: Count
   return (
     <li>
       <details className={well()} open={open}>
-        <summary className="cursor-pointer px-3 py-2 text-body text-ink">
+        <DisclosureSummary className="cursor-pointer px-3 py-2 text-body text-ink">
           <span className="font-medium">{artifact.outcome.name}</span>
           <span className={num('ml-3 text-label text-faint')}><Metadata><span>{artifact.result.link === 'identity' ? 'additive' : 'multiplicative'}</span><span>count lags {artifact.result.pastObservationLags.join(', ')}</span><span>mean lags {artifact.result.pastMeanLags.join(', ')}</span></Metadata></span>
           <span className={num('float-right text-micro text-faint')}>{formatTime(artifact.createdAt)}</span>
-        </summary>
+        </DisclosureSummary>
         <div className="border-t border-hair px-3 py-3">
           <MetricGrid label="Count-model summary">
             <MetricTile label="Strongest candidate" value={formatWords(`row ${artifact.result.strongestReferencePoint + 1}`)} />

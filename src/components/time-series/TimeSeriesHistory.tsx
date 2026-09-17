@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -20,7 +21,7 @@ export function TimeSeriesHistory<T extends Entry>({ entries, onDelete }: {
       {entries.length === 0 && <li className="px-3 py-2 text-faint">No runs yet.</li>}
       {[...entries].reverse().map((entry) => <li key={entry.id} className="flex items-start gap-2 px-3 py-2">
         <details className="min-w-0 flex-1">
-          <summary className="cursor-pointer text-ink"><span className={caption('[overflow-wrap:anywhere] text-ink')}>{entry.kind === 'count-series-model' ? `Count model for ${entry.outcome.name}` : timeSeriesRunLabel(entry)}</span><span className="ml-3 whitespace-nowrap font-sans text-label tabular-nums text-faint">{formatTime(entry.createdAt)}</span></summary>
+          <DisclosureSummary className="cursor-pointer text-ink"><span className={caption('[overflow-wrap:anywhere] text-ink')}>{entry.kind === 'count-series-model' ? `Count model for ${entry.outcome.name}` : timeSeriesRunLabel(entry)}</span><span className="ml-3 whitespace-nowrap font-sans text-label tabular-nums text-faint">{formatTime(entry.createdAt)}</span></DisclosureSummary>
           <div className="mt-3">{entry.kind === 'count-series-model' ? <ul className="m-0 list-none p-0"><CountSeriesRecord artifact={entry} open /></ul> : <TimeSeriesRunResult run={entry} />}</div>
         </details>
         <button type="button" className={iconControl('quiet', 'shrink-0')} aria-label={`Delete ${entry.kind === 'count-series-model' ? 'count-model run' : timeSeriesRunLabel(entry)}`} onClick={() => setPending(entry)}><Icon name="delete" size={16} /></button>

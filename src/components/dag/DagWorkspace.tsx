@@ -1,3 +1,4 @@
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { ParameterHelp } from '@/components/ui/ParameterLabel'
@@ -455,7 +456,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
       <div className="mt-6 text-body text-muted">
         {plan.kind === 'test' && (
           <details>
-            <summary className="text-ink">{plan.implications.length} testable graph implication{plan.implications.length === 1 ? '' : 's'}</summary>
+            <DisclosureSummary className="text-ink">{plan.implications.length} testable graph implication{plan.implications.length === 1 ? '' : 's'}</DisclosureSummary>
             <ul className="mb-0 mt-2 space-y-1 pl-4 text-label text-faint">
               {plan.implications.map((implication) => (
                 <li key={`${implication.x}:${implication.y}:${implication.given.join(',')}`}>
@@ -609,7 +610,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
           </p>
           <p className="mb-0 mt-1 text-label text-faint">Non-rejection is not proof that the graph is correct. These tests assess implications that are observable in this dataset; they cannot rule out every omitted variable or alternative graph.</p>
           <details className="mt-3">
-            <summary className="cursor-pointer text-body text-ink">Conditional-independence results</summary>
+            <DisclosureSummary className="cursor-pointer text-body text-ink">Conditional-independence results</DisclosureSummary>
             <div className="figure-strip mt-2 overflow-x-auto">
               <table className="w-full border-collapse text-left text-label">
                 <thead><tr className="border-b border-line text-faint"><th className="py-1 pr-2 font-medium">Implication</th><th className="px-2 py-1 font-medium">Raw p</th><th className="px-2 py-1 font-medium">Holm p</th><th className="py-1 pl-2 font-medium">Decision</th></tr></thead>
