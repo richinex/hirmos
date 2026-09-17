@@ -105,9 +105,8 @@ test('reopens the console on the source it made, with its views and output view 
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByLabel('Dataset size').getByText('rows', { exact: true }).locator('..')).toContainText('1')
 
-  await page.getByRole('button', { name: 'Edit SQL' }).click()
-  await expect(page.getByRole('alertdialog')).toContainText('Editing replaces the prepared dataset and removes the current analysis.')
-  await page.getByRole('button', { name: 'Edit and remove' }).click()
+  await page.getByRole('button', { name: 'Edit data', exact: true }).click()
+  await page.getByRole('button', { name: 'Edit SQL', exact: true }).click()
   await expect(page.getByRole('combobox', { name: 'Output view' })).toContainText('joined_a', { timeout: 30_000 })
 })
 

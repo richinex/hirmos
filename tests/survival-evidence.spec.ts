@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
+import { parseAnalysisWorkerCommand } from '../src/workers/analysisProtocol'
 import {
   describeSurvivalRefusal,
   parseComparisonSurvivalEvidence,
@@ -104,10 +105,40 @@ test('Cox evidence admits a consistent fitted model', () => {
   expect(parseCoxRegressionEvidence(coxRegression()).ok).toBe(true)
 })
 
+test('clustered Breslow retains its sandwich covariance and convergence status', () => {
+  const value = {
+    ...coxRegression(), standardErrors: 'clustered',
+    fitting: { kind: 'clusteredBreslow', clusters: 10, convergence: 'iterationLimit', robustCovariance: [0.01], scoreTest: 4, robustScoreTest: 3, waldTest: 4 },
+    proportionalHazardsTests: { kind: 'unavailable', reason: 'Not available for this fit.' },
+  }
+  const parsed = parseCoxRegressionEvidence(value)
+  expect(parsed.ok).toBe(true)
+  if (parsed.ok) expect(parsed.value.fitting).toMatchObject({ kind: 'clusteredBreslow', convergence: 'iterationLimit' })
+  expect(parseCoxRegressionEvidence({ ...value, fitting: { ...value.fitting, robustCovariance: [0.04] } }).ok).toBe(false)
+  expect(parseCoxRegressionEvidence({ ...value, observation: { kind: 'startStop', subjects: 20 } }).ok).toBe(false)
+  expect(parseCoxRegressionEvidence({ ...value, fitting: { ...value.fitting, clusters: 41 } }).ok).toBe(false)
+})
+
 test('Cox evidence refuses a hazard ratio that contradicts its coefficient', () => {
   const evidence = coxRegression()
   evidence.coefficients[0]!.hazardRatio = 0.5
   expect(parseCoxRegressionEvidence(evidence).ok).toBe(false)
+})
+
+test('clustered Breslow rejects unsupported combinations at the worker boundary', () => {
+  const design = {
+    observation: { kind: 'rightCensored', duration: 0, event: 1, entry: { kind: 'notUsed' }, standardErrors: { kind: 'clusteredBreslow', column: 2 }, frailty: { kind: 'none' } },
+    weights: { kind: 'equal' }, strata: { kind: 'unstratified' }, penalty: { kind: 'unpenalized' }, covariates: [3], confidenceLevel: 0.95,
+  }
+  const command = { kind: 'cox-regression', request: 'caea2001-5302-4037-997e-fcfcdb27ed56', rows: 2, columns: 5, values: new Float64Array(10), design }
+  expect(parseAnalysisWorkerCommand(command).ok).toBe(true)
+  for (const changed of [
+    { ...design, weights: { kind: 'column', column: 4 } },
+    { ...design, strata: { kind: 'column', column: 4 } },
+    { ...design, penalty: { kind: 'elasticNet', penalizer: 0.1, l1Ratio: 0 } },
+    { ...design, observation: { ...design.observation, entry: { kind: 'column', column: 4 } } },
+    { ...design, observation: { ...design.observation, frailty: { kind: 'gamma', column: 4, ties: 'breslow' } } },
+  ]) expect(parseAnalysisWorkerCommand({ ...command, design: changed }).ok).toBe(false)
 })
 
 test('Cox evidence refuses right-censored diagnostics on a start-stop fit', () => {

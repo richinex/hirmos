@@ -144,6 +144,7 @@ export interface SqlResume { readonly statement: string; readonly outputView: Sq
 export interface PipelineResume { readonly graph: PipelineGraph; readonly inputs: readonly SqlPreparationInput[] }
 
 export type WorkflowEvent =
+  | { readonly type: 'source-replaced'; readonly previous: SelectedSource; readonly source: SelectedSource }
   | { readonly type: 'gcm-effects-created'; readonly run: GcmEffectsRun }
   | { readonly type: 'gcm-effects-deleted'; readonly id: string }
   | { readonly type: 'gcm-influence-created'; readonly run: GcmInfluenceRun }
@@ -395,6 +396,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
       if (event.type === 'source-cleared') return { kind: 'awaiting-data', project: state.project, origin: state.origin, problem: null, restore: null }
       return state
     case 'profiled':
+      if (event.type === 'source-replaced') return event.previous === state.source
+        ? { kind: 'source-selected', project: state.project, origin: state.origin, source: event.source }
+        : state
       if (event.type === 'editor-reopened') return reopenEditor(state.project, state.origin, event)
       if (event.type === 'source-persistence-changed') {
         return { ...state, profile: { ...state.profile, source: { ...state.profile.source, persistence: event.persistence } } }

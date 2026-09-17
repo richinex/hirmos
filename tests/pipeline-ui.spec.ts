@@ -356,14 +356,14 @@ test.describe('pipeline canvas', () => {
     await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('region')
 
-    // Back from the profile: a confirm, since what was built from this source goes with it.
+    // Opening preserves the accepted source; confirmation belongs to accepting the replacement.
+    await page.getByRole('button', { name: 'Edit data', exact: true }).click()
     await page.getByRole('button', { name: 'Edit pipeline' }).click()
-    await expect(page.getByRole('alertdialog')).toContainText('Editing replaces the prepared dataset and removes the current analysis.')
-    await page.getByRole('button', { name: 'Edit and remove' }).click()
     await expect(page.getByTestId('pipeline-canvas')).toBeVisible({ timeout: 30_000 })
     await expect(page.locator('.react-flow__node')).toHaveCount(5)
     await expect(block(page, filter)).toContainText('3 rows, 4 columns', { timeout: 30_000 })
     await useAsSource(page).click()
+    await page.getByRole('alertdialog', { name: 'Replace dataset?' }).getByRole('button', { name: 'Replace dataset', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
 
     // Files forgotten, as after a reload: the editor asks for them first, refuses the wrong one, then opens where it left off.

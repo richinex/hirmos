@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla'
 import type { Redundancy, TemporalStructure } from './diagnostics'
-import { initialPreprocessingDraft, stepPreprocessing, type PreprocessingDraft, type PreprocessingEvent } from './preprocessing'
+import { initialPreprocessingDraft, selectedMissingness, stepPreprocessing, type PreprocessingDraft, type PreprocessingEvent } from './preprocessing'
 import type { DatasetProfileId } from './dataset'
 import { estimableIdentification, type BackdoorIdentificationEvidence, type StudySpecification } from './study'
 import type { PreparedDatasetVersionId } from './preprocessing'
@@ -26,6 +26,10 @@ function decisionApplies(decision: AdjustmentDecision, workflow: Workflow): bool
 }
 
 interface State {
+  readonly sourceEditor: { readonly kind: 'closed' } | { readonly kind: 'choosing' | 'editing'; readonly profile: DatasetProfileId }
+  readonly openSourceEditor: () => void
+  readonly showSourceEditor: (kind: 'choosing' | 'editing') => void
+  readonly closeSourceEditor: () => void
   readonly timeSeriesDraft: TimeSeriesDraft | null
   readonly changeTimeSeries: (prepared: PreparedDatasetVersionId, event: TimeSeriesEvent) => void
   readonly estimationDraft: EstimationSession | null
@@ -58,6 +62,10 @@ interface State {
 
 export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
   return createStore<State>(set => ({
+    sourceEditor: { kind: 'closed' },
+    openSourceEditor: () => set(state => state.workflow.kind === 'profiled' ? { sourceEditor: { kind: 'choosing', profile: state.workflow.profile.id } } : state),
+    showSourceEditor: kind => set(state => state.sourceEditor.kind === 'closed' ? state : { sourceEditor: { ...state.sourceEditor, kind } }),
+    closeSourceEditor: () => set({ sourceEditor: { kind: 'closed' } }),
     timeSeriesDraft: retainTimeSeriesDraft(null, initial),
     changeTimeSeries: (prepared, event) => set(state => state.timeSeriesDraft?.prepared === prepared ? { timeSeriesDraft: stepTimeSeriesDraft(state.timeSeriesDraft, event) } : state),
     estimationDraft: retainEstimationDraft(null, initial),
@@ -103,8 +111,11 @@ export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
     preprocessing: initial.kind === 'profiled' ? { profile: initial.profile.id, draft: initialPreprocessingDraft(initial.profile), savedRecipe: null } : null,
     changePreprocessing: (profile, event) => set(state => {
       const current = state.preprocessing
-      if (current === null || current.profile !== profile) return state
-      const draft = stepPreprocessing(current.draft, event)
+      if (current === null || current.profile !== profile || state.workflow.kind !== 'profiled') return state
+      const next = stepPreprocessing(current.draft, event)
+      const draft = next.variables === current.draft.variables
+        ? next
+        : { ...next, missingness: selectedMissingness(next, state.workflow.profile) }
       return draft === current.draft ? state : { preprocessing: { ...current, draft } }
     }),
     saveRecipe: (profile, savedRecipe) => set(state => {
@@ -156,7 +167,9 @@ export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
         const estimationDraft = retainEstimationDraft(sameProject ? state.estimationDraft : null, workflow)
         const timeSeriesDraft = retainTimeSeriesDraft(sameProject ? state.timeSeriesDraft : null, workflow)
         const causalModelDrafts = retainCausalModelDrafts(sameProject ? state.causalModelDrafts : [], workflow)
-        return { workflow, discovery, temporalStructure, redundancy, preprocessing, adjustmentDecision, diagnosticDraft, causalModelDrafts, sensitivityDraft, counterfactualDraft, survivalDraft, estimationDraft, timeSeriesDraft }
+        const sourceEditor = workflow.kind === 'profiled' && state.sourceEditor.kind !== 'closed' && state.sourceEditor.profile === workflow.profile.id
+          ? state.sourceEditor : { kind: 'closed' as const }
+        return { workflow, sourceEditor, discovery, temporalStructure, redundancy, preprocessing, adjustmentDecision, diagnosticDraft, causalModelDrafts, sensitivityDraft, counterfactualDraft, survivalDraft, estimationDraft, timeSeriesDraft }
       })
     },
   }))

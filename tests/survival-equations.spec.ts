@@ -21,7 +21,7 @@ const names = [{ id: 'a', name: 'AI_% {use} \\href{bad}' }, { id: 'b', name: 'ex
 const cox = (varying = false, frailty = false): SurvivalRunArtifact => run({
   kind: 'cox-regression-run',
   configuration: { observation: { kind: varying ? 'start-stop' : 'right-censored' }, strata: { kind: 'column', column: { name: 'department' } }, covariates: names },
-  evidence: { coefficients: [coefficient(-0.223), coefficient(1e-10)], covariateMeans: [0.5, 4], frailty: frailty ? { kind: 'gamma', theta: 0.3 } : { kind: 'none' } },
+  evidence: { coefficients: [coefficient(-0.223), coefficient(1e-10)], covariateMeans: [0.5, 4], fitting: { kind: frailty ? 'gammaFrailty' : 'efron' }, frailty: frailty ? { kind: 'gamma', theta: 0.3 } : { kind: 'none' } },
 })
 
 const models: readonly [ParametricSurvivalFamily, readonly number[], number, string][] = [

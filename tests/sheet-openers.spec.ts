@@ -16,7 +16,7 @@ test('mobile sheet openers have depth without changing size or dialog behaviour'
     createRoot(host).render(h(WorkbenchLayout, {
       id: 'sheet-test', stage: h('h1', null, 'Stationarity tests'),
       inspector: { title: 'Prepared dataset and method requirements', trigger: { label: 'Requirements', icon: 'fact_check' }, body: h('p', null, 'Method requirements') },
-      bottom: { title: 'Saved runs', trigger: { label: 'History', icon: 'history' }, body: h('p', null, 'Saved analyses') },
+      bottom: { title: 'Saved runs', trigger: { label: 'History', icon: 'history' }, body: h('p', { className: 'text-body' }, 'Saved analyses') },
     }))
   })
   const actions = page.getByRole('group', { name: 'Panes' })
@@ -43,6 +43,12 @@ test('mobile sheet openers have depth without changing size or dialog behaviour'
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
   await expect(opener).toBeFocused()
+  await actions.getByRole('button', { name: 'Saved runs' }).click()
+  const history = page.getByRole('dialog', { name: 'Saved runs' })
+  await expect(history.getByText('Saved analyses')).toHaveCSS('font-size', '13px')
+  await expect(history.getByRole('heading', { name: 'Saved runs' })).toHaveCSS('font-size', '18px')
+  await history.screenshot({ path: info.outputPath('bottom-panel-content.png') })
+  await page.keyboard.press('Escape')
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await expect.poll(() => opener.evaluate(el => getComputedStyle(el).transitionProperty)).not.toContain('transform')
 })

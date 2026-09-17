@@ -21,6 +21,8 @@ interface SqlShellProps {
   readonly resume: SqlResume | null
   readonly onPrepared: (source: SelectedSource) => void
   readonly onCleared: () => void
+  readonly clearLabel?: string
+  readonly onCancelEditing?: () => void
 }
 
 const starterSql = (inputs: NonEmptyArray<SqlPreparationInput>): string => {
@@ -39,7 +41,7 @@ export function SqlShell(props: SqlShellProps) {
   return <SqlEditor {...props} controller={controller} />
 }
 
-function SqlEditor({ inputs, onPrepared, onCleared, controller }: SqlShellProps & { readonly controller: SqlController }) {
+function SqlEditor({ inputs, onPrepared, onCleared, clearLabel = 'Choose other files', onCancelEditing, controller }: SqlShellProps & { readonly controller: SqlController }) {
   const container = useRef<HTMLDivElement>(null)
   const state = useStore(controller.store, state => state.shell)
   const cancellation = useStore(controller.store, state => state.cancellation)
@@ -125,14 +127,15 @@ function SqlEditor({ inputs, onPrepared, onCleared, controller }: SqlShellProps 
 
       <div className="min-w-0 self-start lg:col-start-1">
         <div className="grid grid-cols-2 gap-2">
-          <button type="button" className={button('signal', 'col-span-2')} aria-busy={state.kind === 'materializing'} disabled={busy || state.kind === 'failed-to-open' || outputView.kind !== 'available'} onClick={() => void usePreparedView()}>
+          {onCancelEditing !== undefined && <button type="button" className={button('quiet', 'text-danger hover:border-danger/50 hover:text-danger')} onClick={onCancelEditing}>Cancel editing</button>}
+          <button type="button" className={button('signal', onCancelEditing === undefined ? 'col-span-2' : '')} aria-busy={state.kind === 'materializing'} disabled={busy || state.kind === 'failed-to-open' || outputView.kind !== 'available'} onClick={() => void usePreparedView()}>
             {state.kind === 'materializing' ? 'Checking selected view' : 'Use selected view'}
           </button>
           <button type="button" className={button('quiet')} disabled={session === null || cancellation.kind === 'requesting'} onClick={() => void controller.cancel()}>
             Cancel query
           </button>
           <button type="button" className={button('quiet')} disabled={state.kind === 'materializing'} onClick={onCleared}>
-            Choose other files
+            {clearLabel}
           </button>
         </div>
 

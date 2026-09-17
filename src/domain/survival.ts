@@ -81,6 +81,7 @@ export type CoxStandardErrors =
   | { readonly kind: 'model-based' }
   | { readonly kind: 'robust' }
   | { readonly kind: 'clustered'; readonly cluster: NumericColumnSelection }
+  | { readonly kind: 'clustered-breslow'; readonly cluster: NumericColumnSelection }
 
 export type CoxPenalty =
   | { readonly kind: 'none' }
@@ -361,6 +362,19 @@ export const coxRegressionEvidenceSchema = z.object({
   proportionalHazardsTests: coxProportionalHazardsTestsSchema,
   baseline: coxBaselineSchema,
   frailty: coxFrailtyEvidenceSchema.default({ kind: 'none' }),
+  fitting: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('efron') }).strict(),
+    z.object({ kind: z.literal('gammaFrailty') }).strict(),
+    z.object({
+      kind: z.literal('clusteredBreslow'),
+      clusters: z.number().int().positive(),
+      convergence: z.enum(['converged', 'convergedDuringHalving', 'iterationLimit']),
+      robustCovariance: z.array(finiteNumber).min(1),
+      scoreTest: finiteNumber.nonnegative(),
+      robustScoreTest: finiteNumber.nonnegative(),
+      waldTest: finiteNumber.nonnegative(),
+    }).strict(),
+  ]).default({ kind: 'efron' }),
 }).strict()
 
 export type CoxRegressionEvidence = z.infer<typeof coxRegressionEvidenceSchema>
@@ -864,6 +878,19 @@ export function parseCoxRegressionEvidence(
     return !approximatelyEqual(value, evidence.covariance[column * coefficientCount + row]!)
   })
   if (asymmetricCovariance) return invalidEvidence('The Cox covariance matrix is not symmetric.')
+  if (evidence.fitting.kind === 'clusteredBreslow') {
+    const covariance = evidence.fitting.robustCovariance
+    if (evidence.standardErrors !== 'clustered' || evidence.frailty.kind !== 'none'
+      || evidence.observation.kind !== 'rightCensored' || evidence.observation.delayedEntry
+      || evidence.baseline.kind !== 'shared' || evidence.fitting.clusters > evidence.observations) {
+      return invalidEvidence('The clustered Breslow result has incompatible observation or uncertainty settings.')
+    }
+    if (covariance.length !== coefficientCount ** 2
+      || covariance.some((value, index) => !approximatelyEqual(value, covariance[(index % coefficientCount) * coefficientCount + Math.floor(index / coefficientCount)]!))
+      || evidence.coefficients.some((estimate, index) => !approximatelyEqual(estimate.standardError ** 2, covariance[index * coefficientCount + index]!))) {
+      return invalidEvidence('The clustered standard errors do not match the sandwich covariance matrix.')
+    }
+  }
   if (evidence.standardErrors === 'modelBased') {
     const inconsistentStandardError = evidence.coefficients.some((estimate, column) => (
       !approximatelyEqual(
@@ -1151,8 +1178,12 @@ export function coxRegressionRun(
   }
   const configuredStandardErrors = configuration.observation.standardErrors.kind === 'model-based'
     ? 'modelBased'
+    : configuration.observation.standardErrors.kind === 'clustered-breslow' ? 'clustered'
     : configuration.observation.standardErrors.kind
   if (configuredStandardErrors !== evidence.standardErrors) {
+    return err({ kind: 'standard-errors-mismatch' })
+  }
+  if ((configuration.observation.standardErrors.kind === 'clustered-breslow') !== (evidence.fitting.kind === 'clusteredBreslow')) {
     return err({ kind: 'standard-errors-mismatch' })
   }
   const baselineMatches = (

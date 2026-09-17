@@ -189,6 +189,7 @@ export type CoxRegressionWorkerDesign = {
           | { readonly kind: 'modelBased' }
           | { readonly kind: 'robust' }
           | { readonly kind: 'clustered'; readonly column: number }
+          | { readonly kind: 'clusteredBreslow'; readonly column: number }
         readonly frailty:
           | { readonly kind: 'none' }
           | { readonly kind: 'gamma'; readonly column: number; readonly ties: 'efron' | 'breslow' }
@@ -1228,6 +1229,7 @@ const commandSchema = z.discriminatedUnion('kind', [
             z.object({ kind: z.literal('modelBased') }).strict(),
             z.object({ kind: z.literal('robust') }).strict(),
             z.object({ kind: z.literal('clustered'), column: z.number().int().nonnegative() }).strict(),
+            z.object({ kind: z.literal('clusteredBreslow'), column: z.number().int().nonnegative() }).strict(),
           ]),
           frailty: z.discriminatedUnion('kind', [
             z.object({ kind: z.literal('none') }).strict(),
@@ -1259,12 +1261,17 @@ const commandSchema = z.discriminatedUnion('kind', [
     }).strict(),
   }).strict().superRefine((value, context) => {
     const observation = value.design.observation
+    if (observation.kind === 'rightCensored' && observation.standardErrors.kind === 'clusteredBreslow'
+      && (observation.entry.kind !== 'notUsed' || observation.frailty.kind !== 'none'
+        || value.design.weights.kind !== 'equal' || value.design.strata.kind !== 'unstratified' || value.design.penalty.kind !== 'unpenalized')) {
+      context.addIssue({ code: 'custom', message: 'Clustered Breslow requires equal weights, no delayed entry, no strata, no frailty and no penalty.' })
+    }
     const roles = observation.kind === 'rightCensored'
       ? [
           observation.duration,
           observation.event,
           ...(observation.entry.kind === 'column' ? [observation.entry.column] : []),
-          ...(observation.standardErrors.kind === 'clustered' ? [observation.standardErrors.column] : []),
+          ...('column' in observation.standardErrors ? [observation.standardErrors.column] : []),
           ...(observation.frailty.kind === 'gamma' ? [observation.frailty.column] : []),
         ]
       : [observation.subject, observation.start, observation.stop, observation.event]

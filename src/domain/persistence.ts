@@ -397,7 +397,10 @@ const upgradeSurvivalRunRecord = (value: Record<string, unknown>): Record<string
       && Reflect.get(observation, 'kind') === 'right-censored'
       && Reflect.get(observation, 'frailty') === undefined
     const needsEvidence = typeof evidence === 'object' && evidence !== null && Reflect.get(evidence, 'frailty') === undefined
-    if (!needsConfiguration && !needsEvidence) return value
+    const needsFitting = typeof evidence === 'object' && evidence !== null && Reflect.get(evidence, 'fitting') === undefined
+    const frailty = typeof evidence === 'object' && evidence !== null ? Reflect.get(evidence, 'frailty') : null
+    const fitting = { kind: typeof frailty === 'object' && frailty !== null && Reflect.get(frailty, 'kind') === 'gamma' ? 'gammaFrailty' : 'efron' }
+    if (!needsConfiguration && !needsEvidence && !needsFitting) return value
     return {
       ...value,
       ...(needsConfiguration
@@ -408,7 +411,11 @@ const upgradeSurvivalRunRecord = (value: Record<string, unknown>): Record<string
             },
           }
         : {}),
-      ...(needsEvidence ? { evidence: { ...(evidence as Record<string, unknown>), frailty: { kind: 'none' } } } : {}),
+      ...(needsEvidence || needsFitting ? { evidence: {
+        ...(evidence as Record<string, unknown>),
+        ...(needsEvidence ? { frailty: { kind: 'none' } } : {}),
+        ...(needsFitting ? { fitting } : {}),
+      } } : {}),
     }
   }
   if (kind !== 'multi-state-survival-run') return value

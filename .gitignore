@@ -4,6 +4,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+test-results-*/
 .claude/
 crates/analysis-wasm/target/
 crates/causal-core/target/

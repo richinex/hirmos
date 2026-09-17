@@ -1,6 +1,7 @@
 //! Cox proportional-hazards regression for right-censored and start-stop data.
 
 mod baseline;
+mod clustered;
 pub(crate) mod concordance;
 mod data;
 mod fit;
@@ -11,6 +12,7 @@ mod residuals;
 mod time_varying;
 
 pub use baseline::{BaselineCurves, BaselineEstimate, StratumBaseline};
+pub use clustered::{fit_clustered_breslow, ClusteredBreslowError, ClusteredBreslowFit, ClusteredBreslowOptions, ClusteredConvergence};
 pub use concordance::ConcordanceIndex;
 pub(crate) use concordance::prediction_concordance_index;
 pub use data::{CoxCovariates, CoxDataError, Event, RightCensoredData, TimeVaryingData};

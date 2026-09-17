@@ -25,6 +25,7 @@ export type CoxStandardErrorsDraft =
   | { readonly kind: 'model-based' }
   | { readonly kind: 'robust' }
   | { readonly kind: 'clustered'; readonly column: ColumnId | null }
+  | { readonly kind: 'clustered-breslow'; readonly column: ColumnId | null }
 
 export type CoxPenaltyDraft =
   | { readonly kind: 'unpenalized' }
@@ -150,8 +151,8 @@ export const draftFromRun = (run: SurvivalRunArtifact, columns: readonly Numeric
             entry: configuration.observation.entry.kind === 'not-used'
               ? configuration.observation.entry
               : { kind: 'column', column: present(configuration.observation.entry.column) },
-            standardErrors: configuration.observation.standardErrors.kind === 'clustered'
-              ? { kind: 'clustered', column: present(configuration.observation.standardErrors.cluster) }
+            standardErrors: configuration.observation.standardErrors.kind === 'clustered' || configuration.observation.standardErrors.kind === 'clustered-breslow'
+              ? { kind: configuration.observation.standardErrors.kind, column: present(configuration.observation.standardErrors.cluster) }
               : configuration.observation.standardErrors,
             frailty: configuration.observation.frailty.kind === 'gamma'
               ? { kind: 'gamma', column: present(configuration.observation.frailty.group), ties: configuration.observation.frailty.ties }

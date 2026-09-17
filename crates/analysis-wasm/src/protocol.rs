@@ -210,6 +210,7 @@ pub(crate) enum CoxStandardErrorsCommand {
     ModelBased,
     Robust,
     Clustered { column: usize },
+    ClusteredBreslow { column: usize },
 }
 
 #[derive(Clone, Copy, serde::Deserialize)]
@@ -325,6 +326,29 @@ pub(crate) enum CoxStandardErrorsEvidence {
     ModelBased,
     Robust,
     Clustered,
+}
+
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum CoxFittingEvidence {
+    Efron,
+    GammaFrailty,
+    ClusteredBreslow {
+        clusters: usize,
+        convergence: CoxConvergenceEvidence,
+        robust_covariance: Vec<f64>,
+        score_test: f64,
+        robust_score_test: f64,
+        wald_test: f64,
+    },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CoxConvergenceEvidence {
+    Converged,
+    ConvergedDuringHalving,
+    IterationLimit,
 }
 
 #[derive(Serialize)]
@@ -2104,6 +2128,7 @@ pub(crate) enum AnalysisResult {
         concordance: SurvivalSummary<f64>,
         proportional_hazards_tests: CoxProportionalHazardsEvidence,
         frailty: CoxFrailtyEvidence,
+        fitting: CoxFittingEvidence,
     },
     PenalizedAft {
         observations: usize,

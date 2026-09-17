@@ -1,4 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { LagGridCanvas } from './LagGridCanvas'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { EChartsCoreOption, EChartsType } from 'echarts/core'
 import { assertNever } from '@/domain/dop'
@@ -6,7 +7,7 @@ import { useElementSize } from '@/lib/useElementWidth'
 import { EChart } from '@/charts/EChart'
 import { FloatingFigure } from '@/charts/FloatingFigure'
 import { useChartExport } from '@/charts/useChartExport'
-import { DEFAULT_LAG_GRID_METRICS, lagGridMetrics, lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discovery/lagGraphs'
+import { lagGridMetrics, lagGridOption, lagGridSize, summaryGraphOption } from '@/charts/discovery/lagGraphs'
 import { useChartTheme } from '@/charts/theme'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { summarizeLagGraph, type LagGraph, type LagGraphSemantics, type LagGraphWarning } from '@/domain/lagGraph'
@@ -138,17 +139,7 @@ function LagGraphFigure({ graph, warnings, label, highlighted, view, onView, com
       ? { width: Math.max(200, Math.min(hostWidth, 340)), height: 260, nodeSize: 40 }
       : { width: Math.max(240, Math.min(hostWidth, 560)), height: Math.min(380, 200 + 36 * graph.variables.length), nodeSize: 46 }
   }, [compact, fill, graph.variables.length, hostHeight, hostWidth])
-  // The grid is always drawn at its own size: its axes are pixel-true, so a chart squeezed into a
-  // shorter box would slide the column labels into the nodes. In the window the spacing grows with
-  // the room there, up to about twice the resting size, and never below it; the nodes grow less, so
-  // the lines between them stay the point of the drawing. A window too small for the grid scrolls.
-  const gridMetrics = useMemo(() => {
-    if (!fill) return lagGridMetrics(graph)
-    const resting = lagGridSize(graph)
-    const factor = Math.min(2.2, Math.max(1, Math.min(hostWidth / resting.width, hostHeight / resting.height)))
-    const base = DEFAULT_LAG_GRID_METRICS
-    return lagGridMetrics(graph, { ...base, nodeSize: Math.round(base.nodeSize * Math.min(1.5, factor)), dx: Math.round(base.dx * factor), dy: Math.round(base.dy * factor) })
-  }, [fill, graph, hostHeight, hostWidth])
+  const gridMetrics = useMemo(() => lagGridMetrics(graph), [graph])
   const option = useMemo(
     () => (view === 'summary'
       ? summaryGraphOption(summary, theme, summaryMetrics, highlighted)
@@ -170,10 +161,10 @@ function LagGraphFigure({ graph, warnings, label, highlighted, view, onView, com
           {openButton}
         </span>
       </div>
-      <div ref={host} className={cn(view === 'lag-grid' ? 'figure-strip flex overflow-auto' : 'flex justify-center', view === 'lag-grid' && !fill && 'max-h-[520px]', fill && 'min-h-0 flex-1')}>
+      <div ref={host} data-testid="lag-graph-viewport" className={cn(view === 'lag-grid' ? 'relative overflow-hidden' : 'flex justify-center', view === 'lag-grid' && !fill && 'h-[520px]', fill && 'min-h-0 flex-1')}>
         {view === 'summary'
           ? (hostWidth > 0 && <EChart key="summary" option={option} label={label} className="block" style={{ width: summaryMetrics.width, height }} testId={testIds ? 'summary-graph' : undefined} onReady={setChart} />)
-          : <EChart key="lag-grid" option={option} label={label} className="m-auto block shrink-0" style={{ width: gridSize.width, height }} testId={testIds ? 'lag-grid' : undefined} onReady={setChart} />}
+          : <LagGridCanvas option={option} label={label} width={gridSize.width} height={height} testId={testIds ? 'lag-grid' : undefined} onReady={setChart} />}
       </div>
       {meanings.length > 0 && (
         <dl className="mb-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1 px-1 text-label text-faint" aria-label="Link mark legend">

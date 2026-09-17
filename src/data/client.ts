@@ -1,4 +1,5 @@
 import { assertNever, err, type Result } from '@/domain/dop'
+import type { TimeInterpretation, TimePreview } from '@/domain/timeInterpretation'
 import type { NonEmptyArray } from '@/domain/dop'
 import {
   type ColumnId,
@@ -36,6 +37,7 @@ type PanelStructureOutcome = Result<PanelStructureEvidence, PanelDataProblem>
 type PanelMaterializationOutcome = Result<PanelLongMatrix, PanelDataProblem>
 type PanelKeyMaterializationOutcome = Result<PanelKeyMatrix, PanelDataProblem>
 type PendingRequest =
+  | { readonly kind: 'time-preview'; readonly resolve: (result: Result<TimePreview, TimeSeriesMaterializationProblem>) => void }
   | { readonly kind: 'profile'; readonly resolve: (outcome: ProfileOutcome) => void }
   | { readonly kind: 'summary'; readonly profile: DatasetProfile; readonly resolve: (outcome: SummaryOutcome) => void }
   | { readonly kind: 'preview-window'; readonly profile: DatasetProfile; readonly resolve: (outcome: PreviewWindowOutcome) => void }
@@ -64,6 +66,7 @@ type SharedWorkerProblem =
 const stopAll = (problem: SharedWorkerProblem) => {
   for (const request of pending.values()) {
     switch (request.kind) {
+      case 'time-preview': request.resolve(err(problem)); break
       case 'profile': request.resolve(err(problem)); break
       case 'summary': request.resolve(err(problem)); break
       case 'preview-window': request.resolve(err(problem)); break
@@ -101,6 +104,17 @@ const dataWorker = (): Worker => {
     }
     const waiting = pending.get(parsed.value.request)
     if (!waiting) return
+    if (waiting.kind === 'time-preview') {
+      if (parsed.value.kind !== 'time-preview-succeeded' && parsed.value.kind !== 'materialization-failed') {
+        failAll('The data worker returned another response for a time preview.')
+        return
+      }
+      pending.delete(parsed.value.request)
+      waiting.resolve(parsed.value.kind === 'time-preview-succeeded'
+        ? { ok: true, value: parsed.value.preview }
+        : { ok: false, error: parsed.value.problem })
+      return
+    }
     if (waiting.kind === 'profile') {
       if (parsed.value.kind !== 'profile-succeeded' && parsed.value.kind !== 'profile-failed') {
         failAll('The data worker returned a materialization response for a profile request.')
@@ -269,16 +283,29 @@ export function materializeNumericColumnsInWorker(
   })
 }
 
+export function previewTimeColumnInWorker(file: File, profile: DatasetProfile, timeColumn: ColumnId, interpretation: TimeInterpretation): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
+  const request = newImportRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, { kind: 'time-preview', resolve })
+    const command: DataWorkerCommand = { kind: 'preview-time', request, file, profile, timeColumn, interpretation }
+    try { dataWorker().postMessage(command) } catch (cause) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
 export function materializeTimeSeriesColumnsInWorker(
   file: File,
   profile: DatasetProfile,
   timeColumn: ColumnId,
   columnIds: NonEmptyArray<ColumnId>,
+  interpretation: TimeInterpretation = { kind: 'source-type' },
 ): Promise<TimeSeriesMaterializationOutcome> {
   const request = newImportRequestId()
   return new Promise((resolve) => {
     pending.set(request, { kind: 'time-series-materialization', profile, resolve })
-    const command: DataWorkerCommand = { kind: 'materialize-time-series', request, file, profile, timeColumn, columnIds }
+    const command: DataWorkerCommand = { kind: 'materialize-time-series', request, file, profile, timeColumn, columnIds, interpretation }
     try {
       dataWorker().postMessage(command)
     } catch (cause: unknown) {

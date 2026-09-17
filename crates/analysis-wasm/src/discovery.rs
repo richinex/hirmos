@@ -1808,7 +1808,10 @@ mod tests {
                 assert_eq!(pc_alpha, 0.05);
                 assert!(matches!(samples, TemporalSamples::Dense));
             }
-            AnalysisCommand::StationarityBattery
+            AnalysisCommand::RootCause { .. }
+            | AnalysisCommand::RootCauseChecks { .. }
+            | AnalysisCommand::ArdlModel { .. }
+            | AnalysisCommand::StationarityBattery
             | AnalysisCommand::Multicollinearity { .. }
             | AnalysisCommand::PandasResampleDaily { .. }
             | AnalysisCommand::FlexSurv { .. }

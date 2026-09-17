@@ -37,8 +37,8 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
         <div className="flex min-w-0 max-w-full items-center gap-2">
           <Icon name="description" size={22} className="text-muted" />
           <h2 id="data-profile-title" className="m-0 min-w-0 text-heading text-ink [overflow-wrap:anywhere]">{profile.source.fileName}</h2>
-            {source.recipe.kind !== 'uploaded-file' && onEditSource !== null && (
-              <button type="button" className={iconControl('quiet', 'h-7 w-7')} aria-label={source.recipe.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'} title={source.recipe.kind === 'sql-derived' ? 'Edit the SQL that made this source' : 'Edit the pipeline that made this source'} onClick={onEditSource}>
+            {onEditSource !== null && (
+              <button type="button" className={iconControl('quiet', 'h-7 w-7')} aria-label="Edit data" title="Edit data" onClick={onEditSource}>
                 <Icon name="edit" size={15} />
               </button>
             )}

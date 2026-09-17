@@ -96,6 +96,7 @@ import { formatCount } from '@/lib/format/number'
 import { DISCOVERY_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { describeAnalysisWorkerProblem, type AnalysisWorkerProblem, type TemporalSamples } from '@/workers/analysisProtocol'
 import type { PreparedMatrix, RoleAwarePreparedMatrix } from '@/data/prepared'
+import { reviewDiscoverySamples, explainSampleFailure } from '@/domain/discoverySamples'
 import { cn } from '@/lib/utils'
 
 const DISCOVERY_GROUP_LABELS: Readonly<Record<DiscoveryMethodGroupId, string>> = {
@@ -1440,6 +1441,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
   const method: MethodDefinition = selectedMethod.value
   const eligibility = evaluateDiscoveryEligibility(method, prepared, stationarity)
   const readiness = readyDiscoverySpecification(configuration, prepared)
+  const sampleReview = reviewDiscoverySamples(configuration, prepared, profile)
   const methodOptions = visibleGroup.methods.flatMap((value) => {
     const definition = methodDefinition(methodIdForChoice(value))
     if (!definition.ok) return []
@@ -1474,13 +1476,13 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
 
   const execute = async () => {
     const specification = readyDiscoverySpecification(configuration, prepared)
-    if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused') return
+    if (!selectedMethodIsVisible || !specification.ok || eligibility.kind === 'refused' || sampleReview.kind === 'blocked') return
     const current = session.start('analysis', 'Discovery')
     if (current === null) return
     const dispatch = (event: DiscoveryRunEvent) => {
       switch (event.type) {
         case 'run-progressed': session.progress(current, event.progress.stage, event.progress); return
-        case 'run-failed': session.fail(current, describeDiscoveryRunProblem(event.problem)); return
+        case 'run-failed': session.fail(current, explainSampleFailure(describeDiscoveryRunProblem(event.problem))); return
         case 'run-cancelled': if (session.current(current)) session.cancel(); return
         default: assertNever(event)
       }
@@ -2064,7 +2066,8 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           )}
 
 
-          <EligibilityView eligibility={eligibility} />
+          {sampleReview.kind !== 'blocked' && job.kind !== 'failed' ? <EligibilityView eligibility={eligibility} /> : null}
+          {sampleReview.kind !== 'ready' ? <Alert tone={sampleReview.kind === 'blocked' ? 'danger' : 'warn'} className="mt-3">{sampleReview.detail}</Alert> : null}
           {/* A refusal disables the run, so it is an alert in the danger tone: louder than the review note above it, which leaves the run available. */}
           {!readiness.ok && <Alert tone="danger" className="mt-3">{describeDiscoveryReadiness(readiness.error)}</Alert>}
           <JobNotice job={job} />
@@ -2083,7 +2086,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             <button
               type="button"
               className={button('signal')}
-              disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked}
+              disabled={!readiness.ok || eligibility.kind === 'refused' || sampleReview.kind === 'blocked' || job.kind === 'running' || session.blocked}
               aria-busy={job.kind === 'running'}
               onClick={() => void execute()}
             >

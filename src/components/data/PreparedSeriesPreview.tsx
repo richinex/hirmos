@@ -1,4 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { Alert } from '@/components/ui/Alert'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { decompositionOption } from '@/charts/data/decomposition'
@@ -16,7 +17,7 @@ import { cn } from '@/lib/utils'
 
 interface PreparedStage {
   readonly label: string
-  readonly values: readonly number[]
+  readonly values: readonly (number | null)[]
 }
 
 interface PreparedSeries {
@@ -109,7 +110,26 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
   const load = useCallback(async () => {
     setBusy(true)
     try {
-      const { materialisePreparedStages, describePreparedMaterialisationProblem } = await import('@/data/prepared')
+      const { materialisePreparedStages, materialiseRoleAwarePrepared, describePreparedMaterialisationProblem } = await import('@/data/prepared')
+      if (prepared.missingness.kind === 'lag-aware-exclusion') {
+        const result = await materialiseRoleAwarePrepared(source, profile, prepared, prepared.columns)
+        if (!result.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(result.error) }); return }
+        const matrix = result.value
+        const series = mapNonEmpty(matrix.columns, (column, index): PreparedSeries => ({
+          column: column.id,
+          name: column.name,
+          transform: 'Lag-aware sample exclusion',
+          decomposition: null,
+          time: Array.from(matrix.timeAxis.kind === 'calendar' ? matrix.timeAxis.timestamps : matrix.timeAxis.values),
+          calendar: matrix.timeAxis.kind === 'calendar',
+          stages: [{ label: 'Saved values', values: Array.from({ length: matrix.rowCount }, (_, row) => {
+            const cell = index * matrix.rowCount + row
+            return matrix.validity[cell] === 0 ? null : matrix.values[cell]
+          }) }],
+        }))
+        setJob({ kind: 'ready', rows: matrix.rowCount, leadingRowsRemoved: 0, series })
+        return
+      }
       const stages = await materialisePreparedStages(source, profile, prepared, prepared.columns)
       if (!stages.ok) { setJob({ kind: 'failed', detail: describePreparedMaterialisationProblem(stages.error) }); return }
       const { resolved, resampled, adjusted, stl, final } = stages.value
@@ -153,13 +173,15 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 id="prepared-preview-title" className={cn(sectionTitle, 'm-0')}>Prepared values</h3>
-          <p className="mb-0 mt-1 text-body text-faint">Inspect the exact values passed to diagnostics, discovery methods, and estimators. An adjusted column shows each station of its recipe.</p>
+          <p className="mb-0 mt-1 text-body text-faint">{prepared.missingness.kind === 'lag-aware-exclusion'
+            ? 'Missing values remain as gaps. Supported analyses exclude samples according to their lag and variable roles.'
+            : 'Inspect the exact values passed to diagnostics, discovery methods, and estimators. An adjusted column shows each station of its recipe.'}</p>
         </div>
         <button type="button" className={button('quiet')} aria-busy={busy} onClick={busy ? undefined : () => void load()}>
-          {job.kind === 'ready' ? 'Refresh preview' : 'Loading preview'}
+          {busy ? 'Loading preview' : job.kind === 'failed' ? 'Retry preview' : 'Refresh preview'}
         </button>
       </div>
-      {job.kind === 'failed' && <p role="alert" className="mb-0 mt-3 text-body text-danger">{job.detail}</p>}
+      {job.kind === 'failed' ? <Alert tone="danger" className="mt-3">{job.detail}</Alert> : null}
       {job.kind === 'ready' && (
         <div className="mt-4 rounded-md border border-line">
           <button

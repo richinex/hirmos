@@ -23,6 +23,20 @@ export interface SqlPreparationInput extends SqlInputDescriptor {
   readonly file: File
 }
 
+/** Recovered files keep the aliases recorded in the recipe, not their current filenames. */
+export function matchInputFiles(descriptors: NonEmptyArray<SqlInputDescriptor>, offered: readonly SqlPreparationInput[]): Result<NonEmptyArray<SqlPreparationInput>, string> {
+  const inputs: SqlPreparationInput[] = []
+  const missing: string[] = []
+  for (const descriptor of descriptors) {
+    const input = offered.find(candidate => candidate.fingerprint === descriptor.fingerprint)
+    if (input === undefined) missing.push(descriptor.fileName)
+    else inputs.push({ ...input, alias: descriptor.alias })
+  }
+  return missing.length === 0 && isNonEmpty(inputs)
+    ? ok(inputs)
+    : err(`The files chosen do not include ${missing.join(', ')}, unchanged.`)
+}
+
 export type SqlAliasProblem =
   | { readonly kind: 'empty-alias' }
   | { readonly kind: 'reserved-alias'; readonly alias: string }

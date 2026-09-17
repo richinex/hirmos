@@ -1,4 +1,5 @@
 import type { MissingnessResolutionRecord } from './missingness'
+import type { TimeInterpretation } from './timeInterpretation'
 import { assertNever, brand, err, isNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { ColumnId, DatasetProfile } from './dataset'
 import { seasonalPeriodOf, type SeasonalAdjustmentRecord } from './seasonal'
@@ -36,7 +37,7 @@ export type SamplingDraft =
   | { readonly kind: 'unconfigured' }
   | { readonly kind: 'cross-sectional' }
   | { readonly kind: 'regular-series-awaiting-time'; readonly frequency: Frequency }
-  | { readonly kind: 'regular-series'; readonly timeColumn: ColumnId; readonly frequency: Frequency }
+  | { readonly kind: 'regular-series'; readonly timeColumn: ColumnId; readonly frequency: Frequency; readonly interpretation?: TimeInterpretation }
   | { readonly kind: 'regular-panel-awaiting-keys'; readonly unitColumn: ColumnId | null; readonly timeColumn: ColumnId | null; readonly frequency: Frequency }
   | { readonly kind: 'regular-panel'; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly frequency: Frequency }
 
@@ -184,6 +185,7 @@ export interface StationarityEvidenceArtifact {
 }
 
 export type PreprocessingEvent =
+  | { readonly type: 'time-interpretation-selected'; readonly interpretation: TimeInterpretation }
   | { readonly type: 'regular-series-selected' }
   | { readonly type: 'cross-section-selected' }
   | { readonly type: 'regular-panel-selected' }
@@ -215,18 +217,22 @@ export type PreprocessingReadinessProblem =
   | { readonly kind: 'resampling-aggregations-required'; readonly columns: NonEmptyArray<ColumnId> }
 
 export const initialPreprocessingDraft = (profile: DatasetProfile): PreprocessingDraft => {
-  const missingCells = profile.columns.reduce((sum, column) => sum + column.nullCount, 0)
   return {
     sampling: { kind: 'unconfigured' },
     variables: { kind: 'empty' },
-    missingness: missingCells === 0
-      ? { kind: 'not-present' }
-      : { kind: 'unresolved', cells: missingCells },
+    missingness: { kind: 'not-present' },
     resampling: { kind: 'none' },
     seasonal: { kind: 'none' },
     seriesTransforms: [],
     diagnosticTransform: { kind: 'levels' },
   }
+}
+
+/** A policy applies to the chosen analysis values; key validity is checked separately. */
+export function selectedMissingness(draft: PreprocessingDraft, profile: DatasetProfile): MissingnessDraft {
+  const selected = new Set(draft.variables.kind === 'selected' ? draft.variables.columns : [])
+  const cells = profile.columns.reduce((sum, column) => sum + (selected.has(column.id) ? column.nullCount : 0), 0)
+  return cells === 0 ? { kind: 'not-present' } : { kind: 'unresolved', cells }
 }
 
 const toggleColumn = (variables: VariableDraft, column: ColumnId): VariableDraft => {
@@ -279,6 +285,10 @@ const setSeriesTransform = (
 
 export function stepPreprocessing(state: PreprocessingDraft, event: PreprocessingEvent): PreprocessingDraft {
   switch (event.type) {
+    case 'time-interpretation-selected':
+      return state.sampling.kind === 'regular-series'
+        ? { ...state, sampling: { ...state.sampling, interpretation: event.interpretation } }
+        : state
     case 'regular-series-selected':
       return {
         ...state,
@@ -500,6 +510,25 @@ export function transformSeries(values: Float64Array, transform: SeriesTransform
     }
     default:
       return assertNever(transform)
+  }
+}
+
+export type PreparationAction =
+  | { readonly kind: 'ready' }
+  | { readonly kind: 'running' }
+  | { readonly kind: 'blocked'; readonly reason: string }
+
+export function preparationAction(readiness: Result<ReadyPreprocessingRecipe, PreprocessingReadinessProblem>, savedRecipe: string | null, activity: 'idle' | 'running' | 'busy'): PreparationAction {
+  switch (activity) {
+    case 'running': return { kind: 'running' }
+    case 'busy': return { kind: 'blocked', reason: 'Wait for the current calculation to finish, or cancel it before preparing data.' }
+    case 'idle': {
+      if (!readiness.ok) return { kind: 'blocked', reason: describeReadinessProblem(readiness.error) }
+      return JSON.stringify(readiness.value) === savedRecipe
+        ? { kind: 'blocked', reason: 'These preparation settings are already saved.' }
+        : { kind: 'ready' }
+    }
+    default: return assertNever(activity)
   }
 }
 

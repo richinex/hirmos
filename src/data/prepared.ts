@@ -33,6 +33,7 @@ export interface RoleAwarePreparedMatrix {
   readonly values: Float64Array
   readonly validity: Uint8Array
   readonly analysisMask: Uint8Array
+  readonly timeAxis: TimeAxis
   readonly rowCount: number
   readonly columns: NonEmptyArray<NumericColumnSelection>
 }
@@ -86,6 +87,7 @@ export async function materialiseRoleAwarePrepared(
     profile,
     prepared.sampling.timeColumn,
     prepared.columns,
+    prepared.sampling.interpretation,
   )
   if (!sourceMatrix.ok) return err({ kind: 'materialization-refused', detail: sourceMatrix.error.kind })
   if (sourceMatrix.value.missingCells !== prepared.missingness.cells) {
@@ -110,6 +112,7 @@ export async function materialiseRoleAwarePrepared(
     values,
     validity,
     analysisMask: new Uint8Array(rows * columns.length),
+    timeAxis: sourceMatrix.value.timeAxis,
     rowCount: rows,
     columns,
   })
@@ -228,7 +231,7 @@ async function materialiseResolved(
   }
   const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('./client')
   const matrix = prepared.kind === 'prepared-time-series'
-    ? await materializeTimeSeriesColumnsInWorker(source.file, profile, prepared.sampling.timeColumn, prepared.columns)
+    ? await materializeTimeSeriesColumnsInWorker(source.file, profile, prepared.sampling.timeColumn, prepared.columns, prepared.sampling.interpretation)
     : await materializeNumericColumnsInWorker(source.file, profile, prepared.columns)
   if (!matrix.ok) return err({ kind: 'materialization-refused', detail: matrix.error.kind })
   const resolved = await resolveNullableInput(matrix.value, missingness)

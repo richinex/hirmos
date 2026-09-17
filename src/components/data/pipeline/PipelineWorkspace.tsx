@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
-import { button, caption, chromeAction, label, literal, num, prose } from '@/components/ui/recipes'
+import { button, caption, chromeAction, label, literal, num } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import { blockLabel, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineNode, type RowTest } from '@/domain/pipeline'
@@ -93,6 +93,7 @@ type Props = {
   /** A graph and its files to start from, when the canvas reopens on a source it made. */
   readonly resume: PipelineResume | null
   readonly onPrepared: (source: SelectedSource) => void
+  readonly onCancelEditing?: () => void
 }
 
 export function PipelineWorkspace(props: Props) {
@@ -102,7 +103,7 @@ export function PipelineWorkspace(props: Props) {
   return <PythonProvider runtime={controller.python}><PipelineEditor {...props} controller={controller} /></PythonProvider>
 }
 
-function PipelineEditor({ onPrepared, controller }: Props & { readonly controller: PipelineController }) {
+function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { readonly controller: PipelineController }) {
   const graph = useStore(controller.store, state => state.graph)
   const files = useStore(controller.store, state => state.files)
   const session = useStore(controller.store, state => state.session)
@@ -224,17 +225,18 @@ function PipelineEditor({ onPrepared, controller }: Props & { readonly controlle
     </div>
   )
 
+  const outputNotice = completeProblem === null ? null : <div id="pipeline-output-problem"><Alert tone="warn" live={false} testId="pipeline-incomplete">{completeProblem}</Alert></div>
   const inspector = selectedNode === null
     ? (
       <div className="space-y-3">
-        <p className={prose('m-0 text-muted')}>Each block is one operation on a table. Select an Input file card and choose its file, wire it into blocks, and wire the last block into "Use as source". Select a block to set it up and to see its rows below.</p>
+        <Alert tone="info" live={false}>Connect input files through transformation blocks to “Use as source”. Select a block to edit its settings and preview its rows.</Alert>
+        {outputNotice}
         <p className={caption('m-0')}><Metadata><span>{formatCount(graph.nodes.length).text} blocks</span><span>{formatCount(graph.edges.length).text} arrows</span></Metadata></p>
-        {completeProblem !== null && <p className={caption('m-0 text-warn')} data-testid="pipeline-incomplete">{completeProblem}</p>}
         {files.length > 0 && (
-          <div className="border-t border-hair pt-3">
+          <div>
             <span className={label('block text-muted')}>Files</span>
             <ul className="m-0 mt-1 list-none space-y-0.5 p-0">
-              {files.map((input) => <li key={input.alias} className="flex items-baseline gap-2 text-body text-ink"><span className={literal('truncate')}>{input.alias}</span><span className="ml-auto shrink-0 text-micro text-faint"><Metadata><span>{input.fileName}</span><span>{formatBytes(input.bytes)}</span></Metadata></span></li>)}
+              {files.map((input) => <li key={input.alias} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-1 text-body"><span className={literal('min-w-0 text-ink [overflow-wrap:anywhere]')}>{input.alias}</span><span className="text-micro text-faint">{formatBytes(input.bytes)}</span><span className="col-span-2 min-w-0 text-micro text-muted [overflow-wrap:anywhere]">{input.fileName}</span></li>)}
             </ul>
           </div>
         )}
@@ -291,11 +293,15 @@ function PipelineEditor({ onPrepared, controller }: Props & { readonly controlle
         stageScroll={false}
         inspector={{
           title: selectedNode === null ? 'Pipeline' : blockLabel(selectedNode.block.kind),
-          body: inspector,
-          controls: (
-            <div className="flex items-center gap-2">
-              {materializing.kind === 'refused' && <span className="max-w-[16rem] truncate text-label text-danger" title={materializing.detail}>{materializing.detail}</span>}
-              <button type="button" className={button('signal', 'h-7 px-3 text-label', 'sm')} disabled={!outputReady || materializing.kind === 'busy'} aria-busy={materializing.kind === 'busy'} title={completeProblem ?? undefined} onClick={() => void adoptAsSource()}>Use as source</button>
+          body: (
+            <div className="flex min-w-0 flex-col gap-4">
+              <div role="group" aria-label="Pipeline actions" className={cn('grid gap-2', onCancelEditing === undefined ? 'grid-cols-1' : 'grid-cols-2')}>
+                {onCancelEditing !== undefined && <button type="button" className={button('quiet', 'text-danger hover:border-danger/50 hover:text-danger')} onClick={onCancelEditing}>Cancel editing</button>}
+                <button type="button" className={button('signal')} disabled={!outputReady || materializing.kind === 'busy'} aria-busy={materializing.kind === 'busy'} aria-describedby={completeProblem === null ? undefined : 'pipeline-output-problem'} onClick={() => void adoptAsSource()}>Use as source</button>
+              </div>
+              {materializing.kind === 'refused' && <Alert tone="danger">{materializing.detail}</Alert>}
+              {selectedNode !== null && outputNotice}
+              {inspector}
             </div>
           ),
         }}
@@ -329,7 +335,7 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
   return (
     <div className="space-y-4">
       {node.block.kind === 'input' && <InputFileField held={held} choosing={choosing} />}
-      {!(node.block.kind === 'input' && node.block.file.kind === 'empty') && <BlockStatus outcome={outcome} running={running !== null} />}
+      {!(node.block.kind === 'input' && node.block.file.kind === 'empty') && !(node.block.kind === 'output' && outcome?.kind === 'waiting') && <BlockStatus outcome={outcome} running={running !== null} />}
       {outcome?.kind === 'ran' && (
         <details className="group/schema">
           <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Metadata><span><Icon name="chevron_right" size={14} className="transition-transform group-open/schema:rotate-90" /> Columns</span><span>{outcome.columns.length}</span></Metadata></summary>

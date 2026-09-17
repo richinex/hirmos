@@ -117,7 +117,7 @@ function PhoneWorkbench({ stage, inspector, bottom, stagePadding }: {
       {bottom && (
         <Sheet open={open === 'bottom'} onClose={() => setOpen(null)} title={bottom.title}>
           {bottom.controls && <div className="mb-2 flex justify-end">{bottom.controls}</div>}
-          {bottom.body}
+          <div className="workbench-bottom-content">{bottom.body}</div>
         </Sheet>
       )}
     </div>
@@ -211,7 +211,7 @@ function DesktopWorkbench({ id, stage, inspector, bottom, stagePadding = true, s
                 className="flex flex-col border-t border-line bg-column [container-type:size] [container-name:layout_bottom]"
               >
                 <PaneHeader title={bottom.title} controls={bottom.controls} collapse={{ collapsed: bottomCollapsed, onToggle: () => toggle(bottomRef, bottomCollapsed), icon: { open: 'keyboard_arrow_down', closed: 'keyboard_arrow_up' } }} />
-                {!bottomCollapsed && <div className="panel-scroll min-h-0 flex-1 overflow-y-auto">{bottom.body}</div>}
+                {!bottomCollapsed && <div className="workbench-bottom-content panel-scroll min-h-0 flex-1 overflow-y-auto">{bottom.body}</div>}
               </Panel>
             </>
           )}

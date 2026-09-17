@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
+import { readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { bodyText, prepare } from './examples/support'
 
 test.describe.configure({ timeout: 180_000 })
@@ -40,7 +42,7 @@ const chooseColumnWithin = async (
 const createPreparedProjectFrom = async (
   page: Page,
   name: string,
-  source: string,
+  source: string | { name: string; mimeType: string; buffer: Buffer },
   columns: readonly string[],
 ): Promise<void> => {
   await page.goto('/app')
@@ -50,7 +52,7 @@ const createPreparedProjectFrom = async (
   await page.getByRole('button', { name: /Inspect data/ }).click()
   await expect(page.getByText('Choose the observation structure')).toBeVisible({ timeout: 90_000 })
   await prepare(page, { structure: 'cross-section', columns })
-  await openSurvivalChapter(page, false)
+  await openSurvivalChapter(page, (page.viewportSize()?.width ?? 1280) < 640)
 }
 
 const createPreparedProject = async (
@@ -206,18 +208,110 @@ test('runs start-stop Cox regression through the worker and records its diagnost
   await chooseColumn(page, 'Subject', 'id')
   await chooseColumn(page, 'Start time', 'start')
   await chooseColumn(page, 'Stop time', 'stop')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'event')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'event')
   for (const covariate of ['feature_active', 'experience', 'complexity']) {
     await page.getByRole('checkbox', { name: covariate, exact: true }).check()
   }
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
   await expect(page.getByRole('heading', { name: 'Cox proportional-hazards model' }).first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('455 intervals · 132 events').first()).toBeVisible()
+  await expect(page.getByText(/455 intervals\s+132 events/).first()).toBeVisible()
   await expect(page.getByRole('region', { name: 'Covariate estimates' }).first()).toContainText('feature_active')
   await expect(page.getByTestId('cox-forest').first()).toBeVisible()
   await expect(page.getByTestId('cox-baseline-survival').first()).toBeVisible()
   await expect(page.getByText('Survival runs (1)')).toBeVisible()
+})
+
+test('fits clustered Breslow through the UI and preserves the Efron default', async ({ page }, testInfo) => {
+  await createPreparedProjectFrom(page, 'Clustered Breslow', testData('kidney.csv'), ['time', 'status', 'age', 'sex', 'id'])
+  await page.getByRole('radio', { name: 'Cox regression', exact: true }).click()
+  await chooseColumn(page, 'Duration', 'time')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'status')
+  await page.getByRole('radiogroup', { name: 'Cox standard errors' }).getByRole('radio', { name: 'Clustered', exact: true }).click()
+  const ties = page.getByRole('radiogroup', { name: 'Cox clustered tied event times' })
+  await expect(ties.getByRole('radio', { name: 'Efron' })).toBeChecked()
+  await ties.getByRole('radio', { name: 'Breslow' }).click()
+  for (const [group, option] of [['Cox delayed entry', 'Entry column'], ['Cox observation weights', 'Weight column'], ['Cox strata', 'Stratum column'], ['Cox penalty', 'Elastic net']]) {
+    await expect(page.getByRole('radiogroup', { name: group, exact: true }).getByRole('radio', { name: option })).toBeDisabled()
+  }
+  await chooseColumn(page, 'Cluster', 'id')
+  for (const name of ['age', 'sex']) await page.getByRole('checkbox', { name, exact: true }).check()
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+  await expect(page.getByText('Breslow ties', { exact: true }).first()).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('38 clusters', { exact: true }).first()).toBeVisible()
+  const estimates = page.getByRole('region', { name: 'Covariate estimates' }).first()
+  await expect(estimates).toContainText('0.440')
+  await expect(estimates).toContainText('0.482')
+  await expect(page.getByTestId('cox-baseline-survival').first()).toBeVisible()
+  await estimates.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: testInfo.outputPath('clustered-breslow.png') })
+  const readRun = () => page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('hirmos', 1)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const records = await new Promise<{ body: string }[]>((resolve, reject) => {
+      const request = db.transaction('projects').objectStore('projects').getAll()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+    return records.map(({ body }) => JSON.parse(body)).find((record) => record.project.name === 'Clustered Breslow')?.survivalRuns[0]
+  })
+  await expect.poll(async () => (await readRun())?.evidence.fitting.kind).toBe('clusteredBreslow')
+  const saved = await readRun()
+  expect(saved.evidence.coefficients[0].coefficient).toBeCloseTo(0.0021815164528771131, 9)
+  expect(saved.evidence.coefficients[1].coefficient).toBeCloseTo(-0.82099531459508091, 9)
+  expect(saved.evidence.fitting.robustCovariance[3]).toBeCloseTo(0.23260797648908862, 9)
+  expect(saved.configuration.observation.standardErrors.kind).toBe('clustered-breslow')
+  await page.reload()
+  await page.getByRole('button', { name: 'Open Clustered Breslow', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
+  await page.locator('input[type=file]').setInputFiles(testData('kidney.csv'))
+  await openSurvivalChapter(page, testInfo.project.name === 'mobile-chromium')
+  await expect(page.getByText('Breslow ties', { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+})
+
+test('reproduces the full CLSA commit-clustered fit through the UI', async ({ page }, testInfo) => {
+  const directory = process.env.CLSA_COX_ORACLE
+  test.skip(directory === undefined || testInfo.project.name !== 'chromium', 'Set CLSA_COX_ORACLE to the retained R clsa fixture directory for the full-data check.')
+  test.setTimeout(300_000)
+  const names = readFileSync(join(directory!, 'names.txt'), 'utf8').trim().split('\n')
+  const source = { name: 'clsa-commit-clustered.csv', mimeType: 'text/csv', buffer: Buffer.from(['duration,event,commit,' + names.join(','), readFileSync(join(directory!, 'input.csv'), 'utf8')].join('\n')) }
+  await createPreparedProjectFrom(page, 'CLSA commit-clustered', source, ['duration', 'event', 'commit', ...names])
+  await page.getByRole('radio', { name: 'Cox regression', exact: true }).click()
+  await chooseColumn(page, 'Duration', 'duration')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'event')
+  await page.getByRole('radiogroup', { name: 'Cox standard errors' }).getByRole('radio', { name: 'Clustered', exact: true }).click()
+  await chooseColumn(page, 'Cluster', 'commit')
+  await page.getByRole('radiogroup', { name: 'Cox clustered tied event times' }).getByRole('radio', { name: 'Breslow' }).click()
+  for (const name of names) await page.getByRole('checkbox', { name, exact: true }).check()
+  await page.getByRole('button', { name: 'Run survival analysis' }).click()
+  await expect(page.getByText('107,802 clusters', { exact: true }).first()).toBeVisible({ timeout: 180_000 })
+  const readEvidence = () => page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('hirmos', 1)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    const records = await new Promise<{ body: string }[]>((resolve, reject) => {
+      const request = db.transaction('projects').objectStore('projects').getAll()
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    db.close()
+    return records.map(({ body }) => JSON.parse(body)).find((record) => record.project.name === 'CLSA commit-clustered')?.survivalRuns[0]?.evidence
+  })
+  await expect.poll(async () => (await readEvidence())?.observations, { timeout: 30_000 }).toBe(346808)
+  const evidence = await readEvidence()
+  const numbers = (name: string) => readFileSync(join(directory!, name + '.csv'), 'utf8').trim().split(/[,\s]+/).map(Number)
+  numbers('coefficients').forEach((value, index) => expect(evidence.coefficients[index].coefficient).toBeCloseTo(value, 7))
+  numbers('covariance').forEach((value, index) => expect(evidence.fitting.robustCovariance[index]).toBeCloseTo(value, 7))
+  numbers('naive').forEach((value, index) => expect(evidence.covariance[index]).toBeCloseTo(value, 7))
+  expect(evidence.fitting.convergence).toBe('converged')
+  writeFileSync(testInfo.outputPath('clsa-browser-evidence.json'), JSON.stringify(evidence, null, 2))
+  await testInfo.attach('clsa-browser-evidence', { body: JSON.stringify(evidence, null, 2), contentType: 'application/json' })
 })
 
 test('fits a shared gamma frailty as survival does on the kidney data', async ({ page }, testInfo) => {
@@ -226,7 +320,7 @@ test('fits a shared gamma frailty as survival does on the kidney data', async ({
 
   await page.getByRole('radio', { name: 'Cox regression' }).click()
   await chooseColumn(page, 'Duration', 'time')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'status')
   await page.getByRole('radiogroup', { name: 'Cox shared frailty' }).getByRole('radio', { name: 'Gamma by group' }).click()
   await chooseColumn(page, 'Frailty group', 'id')
   await page.getByRole('radiogroup', { name: 'Cox tied event times' }).getByRole('radio', { name: 'Breslow' }).click()
@@ -236,7 +330,7 @@ test('fits a shared gamma frailty as survival does on the kidney data', async ({
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
   await expect(page.getByRole('heading', { name: 'Cox proportional-hazards model' }).first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('76 observations · 58 events').first()).toBeVisible()
+  await expect(page.getByText(/76 observations\s+58 events/).first()).toBeVisible()
   // survival 3.6-4 prints the frailty variance of the final fit as 0.398; sex has coefficient −1.5568
   // (hazard ratio 0.211) and the concordance is 0.813.
   await expect(page.getByText('Shared gamma frailty by id').first()).toBeVisible()

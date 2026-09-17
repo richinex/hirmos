@@ -1,0 +1,2 @@
+timefix TRUE
+maxiter 50

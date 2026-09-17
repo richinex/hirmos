@@ -7,6 +7,7 @@
 details[open] > .disclosure-summary > .disclosure-show { display: none; }
 details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 :root[data-surface="workbench"] { font-size: 100%; }
+.workbench-bottom-content { --text-body: .8125rem; }
 :root[data-theme] {
   --font-weight-medium: 500;
   --text-heading: 1.5rem;

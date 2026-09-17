@@ -16,6 +16,7 @@ use hirmos_causal_core::survival::comparison_surv::{
 };
 use hirmos_causal_core::survival::aft::{AftFamily, AftPreparation};
 use hirmos_causal_core::survival::coxph::{
+    fit_clustered_breslow, ClusteredBreslowOptions, ClusteredConvergence,
     fit_gamma_frailty, fit_right_censored, fit_time_varying, BaselineCurves, CoxCovariates, CoxFit,
     CoxFitOptions, CoxPenalty, Event as CoxEvent, GammaFrailtyFit, GammaFrailtyOptions,
     ProportionalHazardsDiagnostics, RightCensoredData, StandardErrorMethod, TieMethod, TimeTransform,
@@ -650,6 +651,7 @@ fn cox_frailty_result(
             delayed_entry: false,
         },
         standard_errors: CoxStandardErrorsEvidence::ModelBased,
+        fitting: CoxFittingEvidence::GammaFrailty,
         coefficients,
         covariance: fit.var.clone(),
         log_likelihood: fit.loglik[1],
@@ -703,6 +705,7 @@ fn cox_result(
 ) -> AnalysisResult {
     AnalysisResult::CoxRegression {
         frailty: CoxFrailtyEvidence::None,
+        fitting: CoxFittingEvidence::Efron,
         observations,
         events,
         total_weight,
@@ -722,6 +725,74 @@ fn cox_result(
         concordance,
         proportional_hazards_tests,
     }
+}
+
+fn clustered_breslow_result(
+    durations: Vec<f64>,
+    events: Vec<CoxEvent>,
+    clusters: Option<Vec<usize>>,
+    covariates: CoxCovariates,
+    confidence_level: f64,
+) -> Result<AnalysisResult, String> {
+    if !confidence_level.is_finite() || confidence_level <= 0.0 || confidence_level >= 1.0 {
+        return Err("Cox confidence level must be between 0 and 1.".to_owned());
+    }
+    let rows = durations.len();
+    let event_count = events.iter().filter(|&&event| event == CoxEvent::Observed).count();
+    let weights = vec![1.0; rows];
+    let data = RightCensoredData::with_grouping(
+        durations, events.clone(), weights.clone(), None, None, clusters, covariates,
+    ).map_err(|problem| format!("Cox right-censored data refused: {problem:?}"))?;
+    let fit = fit_clustered_breslow(&data, ClusteredBreslowOptions::default())
+        .map_err(|problem| format!("Clustered Breslow regression failed: {problem:?}"))?;
+    let p = fit.coefficients.len();
+    let quantile = ndtri((1.0 + confidence_level) / 2.0);
+    let coefficients = fit.coefficients.iter().enumerate().map(|(j, &coefficient)| {
+        let standard_error = fit.covariance[j * p + j].sqrt();
+        let z = coefficient / standard_error;
+        let lower = coefficient - quantile * standard_error;
+        let upper = coefficient + quantile * standard_error;
+        CoxCoefficientEvidence {
+            coefficient, hazard_ratio: coefficient.exp(), standard_error,
+            coefficient_interval: [lower, upper], hazard_ratio_interval: [lower.exp(), upper.exp()],
+            z, p_value: chdtrc(1.0, z * z),
+        }
+    }).collect();
+    let baseline = frailty_baseline(&fit.times, &events, &weights, None, &fit.linear_predictors, TieMethod::Breslow);
+    let likelihood_ratio = 2.0 * (fit.log_likelihood[1] - fit.log_likelihood[0]);
+    Ok(AnalysisResult::CoxRegression {
+        observations: rows, events: event_count, total_weight: rows as f64,
+        observation: CoxObservationEvidence::RightCensored { delayed_entry: false },
+        standard_errors: CoxStandardErrorsEvidence::Clustered,
+        coefficients,
+        // The shared result contract retains inverse-information covariance; the fitting record
+        // explicitly stores the sandwich covariance used for clustered intervals.
+        covariance: fit.naive_covariance,
+        log_likelihood: fit.log_likelihood[1], null_log_likelihood: fit.log_likelihood[0],
+        likelihood_ratio, likelihood_ratio_p_value: chdtrc(p as f64, likelihood_ratio),
+        partial_aic: 2.0 * p as f64 - 2.0 * fit.log_likelihood[1],
+        iterations: fit.iterations, covariate_means: fit.means,
+        covariate_standard_deviations: covariate_standard_deviations(&data),
+        baseline,
+        concordance: match fit.concordance {
+            Some(result) => SurvivalSummary::Recorded { result },
+            None => SurvivalSummary::Unavailable { reason: "Concordance needs at least one comparable pair of observations.".to_owned() },
+        },
+        proportional_hazards_tests: CoxProportionalHazardsEvidence::Unavailable {
+            reason: "Proportional-hazards tests are not available for the clustered Breslow fit.".to_owned(),
+        },
+        frailty: CoxFrailtyEvidence::None,
+        fitting: CoxFittingEvidence::ClusteredBreslow {
+            clusters: fit.clusters,
+            convergence: match fit.convergence {
+                ClusteredConvergence::Converged => CoxConvergenceEvidence::Converged,
+                ClusteredConvergence::ConvergedDuringHalving => CoxConvergenceEvidence::ConvergedDuringHalving,
+                ClusteredConvergence::IterationLimit => CoxConvergenceEvidence::IterationLimit,
+            },
+            robust_covariance: fit.covariance,
+            score_test: fit.score_test, robust_score_test: fit.robust_score_test, wald_test: fit.wald_test,
+        },
+    })
 }
 
 fn cox_optional_column(command: CoxEntryCommand) -> Option<usize> {
@@ -802,6 +873,9 @@ pub(crate) fn cox_regression_evidence(
                 CoxStandardErrorsCommand::Clustered { column } => {
                     (StandardErrorMethod::Clustered, Some(column))
                 }
+                CoxStandardErrorsCommand::ClusteredBreslow { column } => {
+                    (StandardErrorMethod::Clustered, Some(column))
+                }
             };
             let mut observation_roles = vec![duration, event];
             observation_roles.extend(entry_column);
@@ -828,6 +902,17 @@ pub(crate) fn cox_regression_evidence(
                 CoxFrailtyCommand::Gamma { .. } => Some((durations.clone(), events.clone(), weights.clone())),
                 CoxFrailtyCommand::None => None,
             };
+            if matches!(standard_errors, CoxStandardErrorsCommand::ClusteredBreslow { .. }) {
+                if !matches!(entry, CoxEntryCommand::NotUsed)
+                    || !matches!(frailty, CoxFrailtyCommand::None)
+                    || !matches!(weights_command, CoxWeightsCommand::Equal)
+                    || !matches!(strata_command, CoxStrataCommand::Unstratified)
+                    || !matches!(penalty, CoxPenaltyCommand::Unpenalized)
+                {
+                    return Err("Clustered Breslow requires equal weights, no delayed entry, no strata, no frailty and no penalty.".to_owned());
+                }
+                return clustered_breslow_result(durations, events, clusters, covariates, confidence_level);
+            }
             let data = RightCensoredData::with_grouping(
                 durations, events, weights, entries, strata, clusters, covariates,
             )
@@ -1917,6 +2002,48 @@ fn event_status(value: f64, row: usize) -> Result<EventStatus, String> {
 #[cfg(test)]
 mod upstream_data_tests {
     use super::*;
+
+    #[test]
+    fn clustered_breslow_matches_r_through_the_browser_contract() {
+        use std::{fs, path::Path};
+        let numbers = |path: &Path| -> Vec<f64> {
+            fs::read_to_string(path).unwrap().split(|c: char| c == ',' || c.is_whitespace())
+                .filter(|s| !s.is_empty()).map(|s| s.parse().unwrap()).collect()
+        };
+        for name in ["kidney", "tied", "near_tied"] {
+            let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../causal-core/oracle/fixtures/clustered_breslow").join(name);
+            let csv = fs::read_to_string(path.join("input.csv")).unwrap();
+            let rows = csv.lines().map(|line| line.split(',').map(|v| v.parse::<f64>().unwrap()).collect::<Vec<_>>()).collect::<Vec<_>>();
+            let columns = rows[0].len();
+            let values = (0..columns).flat_map(|j| rows.iter().map(move |row| row[j])).collect::<Vec<_>>();
+            let result = cox_regression_evidence(
+                &values, rows.len(), columns,
+                CoxObservationCommand::RightCensored {
+                    duration: 0, event: 1, entry: CoxEntryCommand::NotUsed,
+                    standard_errors: CoxStandardErrorsCommand::ClusteredBreslow { column: 2 },
+                    frailty: CoxFrailtyCommand::None,
+                },
+                CoxWeightsCommand::Equal, CoxStrataCommand::Unstratified,
+                &(3..columns).collect::<Vec<_>>(), CoxPenaltyCommand::Unpenalized, 0.95,
+            ).unwrap();
+            let json = serde_json::to_value(result).unwrap();
+            let beta = numbers(&path.join("coefficients.csv"));
+            let covariance = numbers(&path.join("covariance.csv"));
+            let naive = numbers(&path.join("naive.csv"));
+            for (j, &expected) in beta.iter().enumerate() {
+                let row = &json["coefficients"][j];
+                assert!((row["coefficient"].as_f64().unwrap() - expected).abs() < 2e-8, "{name} beta {j}");
+                assert!((row["standardError"].as_f64().unwrap().powi(2) - covariance[j * beta.len() + j]).abs() < 2e-8);
+            }
+            for j in 0..covariance.len() {
+                assert!((json["fitting"]["robustCovariance"][j].as_f64().unwrap() - covariance[j]).abs() < 2e-8);
+                assert!((json["covariance"][j].as_f64().unwrap() - naive[j]).abs() < 2e-8);
+            }
+            assert_eq!(json["fitting"]["kind"], "clusteredBreslow");
+            assert_eq!(json["fitting"]["convergence"], "converged");
+            assert_eq!(json["concordance"]["kind"], "recorded");
+        }
+    }
 
     fn cox_case(section: &str, name: &str) -> serde_json::Value {
         let fixture: serde_json::Value = serde_json::from_str(include_str!(

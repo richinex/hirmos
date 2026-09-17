@@ -1,4 +1,8 @@
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
+import { TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
+import { TimePreview } from './TimePreview'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
+import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { resultSurface } from '@/components/ui/recipes'
 import { Metadata } from '@/components/ui/Metadata'
 import { Select } from '@/components/ui/Select'
@@ -30,6 +34,7 @@ import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { STATIONARITY_METHODS } from '@/domain/methods'
 import {
   describeReadinessProblem,
+  preparationAction,
   describeSeriesTransform,
   newPreparedDatasetVersionId,
   newStationarityEvidenceId,
@@ -343,7 +348,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
   const readiness = readyPreprocessingRecipe(draft)
-  const recipeDirty = readiness.ok && JSON.stringify(readiness.value) !== savedRecipe
+  const action = preparationAction(readiness, savedRecipe, preparation.job.kind === 'running' ? 'running' : preparation.blocked ? 'busy' : 'idle')
   const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
   const preparedCurrent = preparedVersion
   const preparedTimeSeries = preparedCurrent !== null && preparedCurrent.kind === 'prepared-time-series' ? preparedCurrent : null
@@ -388,12 +393,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           dispatch({ type: 'preparation-failed', detail: `Panel keys have ${panelStructure.missingUnitKeys} missing unit values and ${panelStructure.missingTimeKeys} missing time values. Fill or drop those rows.` }); return
         }
         if (panelStructure.duplicateKeys > 0) { dispatch({ type: 'preparation-failed', detail: `${panelStructure.duplicateKeys} unit–time keys repeat. Remove the duplicate rows.` }); return }
-        if (!panelStructure.balanced) { dispatch({ type: 'preparation-failed', detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. Complete every unit–period cell.` }); return }
+        if (!panelStructure.balanced) { dispatch({ type: 'preparation-failed', detail: `The panel is unbalanced: ${panelStructure.observations} rows for ${panelStructure.units} units × ${panelStructure.periods} periods. This preparation route requires a balanced panel. Review each unit's observation window before changing the data.` }); return }
       }
       const { materializeNumericColumnsInWorker, materializeTimeSeriesColumnsInWorker } = await import('@/data/client')
       if (!preparation.current(id)) return
       const matrix = recipe.value.kind === 'regular-series'
-        ? await materializeTimeSeriesColumnsInWorker(source.file, profile, recipe.value.sampling.timeColumn, recipe.value.columns)
+        ? await materializeTimeSeriesColumnsInWorker(source.file, profile, recipe.value.sampling.timeColumn, recipe.value.columns, recipe.value.sampling.interpretation)
         : await materializeNumericColumnsInWorker(source.file, profile, recipe.value.columns)
       if (!preparation.current(id)) return
       if (!matrix.ok) {
@@ -601,6 +606,19 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   {profile.columns.filter((column) => column.id !== currentUnit).map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
                 </Select>
               </label>
+              {draft.sampling.kind === 'regular-series' ? <div className="block text-body text-ink">
+                {draft.sampling.interpretation?.kind === 'iso-week'
+                  ? <ParameterLabel htmlFor="time-interpretation" label="Time interpretation" help="Weeks start on Monday. The ISO week-year can differ from the calendar year." />
+                  : <label htmlFor="time-interpretation">Time interpretation</label>}
+                <Select id="time-interpretation" className={field('text', 'mt-1')}
+                  value={draft.sampling.interpretation?.kind === 'date-format' ? draft.sampling.interpretation.format : draft.sampling.interpretation?.kind ?? 'source-type'}
+                  onChange={(event) => {
+                    const choice = TIME_INTERPRETATIONS.find((candidate) => candidate.value === event.target.value)
+                    if (choice) dispatch({ type: 'time-interpretation-selected', interpretation: choice.interpretation })
+                  }}>
+                  {TIME_INTERPRETATIONS.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
+                </Select>
+              </div> : null}
               <label className="block text-body text-ink">
                 Source frequency
                 <Select
@@ -616,6 +634,10 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               </label>
             </div>
           )}
+          {draft.sampling.kind === 'regular-series' ? <details className="mt-3">
+            <DisclosureSummary>Time preview</DisclosureSummary>
+            <TimePreview file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} />
+          </details> : null}
           {crossSectionSelected && (
             <p className="m-0 text-body text-muted">Rows are independent units. Their order does not represent time.</p>
           )}
@@ -665,7 +687,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           ) : panelSelected ? (
             <Alert tone="danger" live={false}>
               <p className="m-0">Fill the missing values separately within each unit before preparing this panel.</p>
-              <p className="mb-0 mt-1 text-muted">Interpolation and complete-interval operations on this screen do not cross unit boundaries.</p>
+              <p className="mb-0 mt-1 text-muted">This form does not yet support missing-value handling within panel units. Prepare those values in the pipeline or SQL editor.</p>
             </Alert>
           ) : (
             <div className="space-y-2">
@@ -706,7 +728,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       <option value="2xtau-max-future">Future-aligned 2 × maximum lag</option>
                     </Select>
                   </label>
-                  <label className="flex items-start gap-2 pt-5 text-body text-ink">
+                  <label className="flex items-center gap-2 self-end py-2 text-body text-ink">
                     <input
                       type="checkbox"
                       checked={lagExclusion.propagateThroughMaxLag}
@@ -1106,20 +1128,20 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       )}
 
       <JobNotice job={preparation.job} />
-      {recipeDirty && (
-      <div className="pop sticky bottom-3 z-(--z-sticky) ml-auto mt-4 w-fit max-w-full">
+      {action.kind === 'blocked' ? <div id="preparation-requirement" className="mt-3"><Alert tone="info" live={false}>{action.reason}</Alert></div> : null}
+      <div className="sticky bottom-3 z-(--z-sticky) ml-auto mt-4 flex w-fit max-w-full flex-wrap items-center justify-end gap-2">
+        {preparation.job.kind === 'running' && <button type="button" className={button('quiet', 'bg-panel')} onClick={preparation.cancel}>Cancel preparation</button>}
         <button
           type="button"
-          className={button('signal', 'float')}
-          disabled={preparation.blocked || preparation.job.kind === 'running'}
+          className={button('signal', 'float disabled:bg-raised disabled:border-control disabled:shadow-[0_2px_0_var(--color-edge),0_4px_8px_rgb(0_0_0/0.18),inset_0_1px_0_var(--color-highlight)]')}
+          disabled={action.kind !== 'ready'}
+          aria-describedby={action.kind === 'blocked' ? 'preparation-requirement' : undefined}
           aria-busy={preparation.job.kind === 'running'}
           onClick={() => void createPreparedVersion()}
         >
           Create prepared dataset version
         </button>
-        {preparation.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={preparation.cancel}>Cancel preparation</button>}
       </div>
-      )}
     </section>
   )
 }

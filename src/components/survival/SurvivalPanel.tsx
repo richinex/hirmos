@@ -262,11 +262,11 @@ const validateDraft = (
             const { duration, event, entry, standardErrors, frailty } = draft.observation
             if (duration === null || event === null) return null
             if (entry.kind === 'column' && entry.column === null) return null
-            if (standardErrors.kind === 'clustered' && standardErrors.column === null) return null
+            if ('column' in standardErrors && standardErrors.column === null) return null
             if (frailty.kind === 'gamma' && frailty.column === null) return null
             const ids: ColumnId[] = [duration, event]
             if (entry.kind === 'column' && entry.column !== null) ids.push(entry.column)
-            if (standardErrors.kind === 'clustered' && standardErrors.column !== null) ids.push(standardErrors.column)
+            if ('column' in standardErrors && standardErrors.column !== null) ids.push(standardErrors.column)
             if (frailty.kind === 'gamma' && frailty.column !== null) ids.push(frailty.column)
             return ids
           }
@@ -280,6 +280,11 @@ const validateDraft = (
         }
       })()
       if (observationIds === null) return invalid('Choose every column required by the selected Cox observation, standard-error and frailty settings.')
+      if (draft.observation.kind === 'right-censored' && draft.observation.standardErrors.kind === 'clustered-breslow'
+        && (draft.observation.entry.kind !== 'not-used' || draft.observation.frailty.kind !== 'none'
+          || draft.weights.kind !== 'equal' || draft.strata.kind !== 'unstratified' || draft.penalty.kind !== 'unpenalized')) {
+        return invalid('Clustered Breslow requires equal weights, no delayed entry, no strata, no frailty and no penalty.')
+      }
       if (draft.observation.kind === 'right-censored' && draft.observation.frailty.kind === 'gamma') {
         if (draft.observation.entry.kind !== 'not-used') return invalid('A shared frailty model does not take a delayed-entry column.')
         if (draft.observation.standardErrors.kind !== 'model-based') return invalid('A shared frailty model reports model-based standard errors only.')
@@ -320,10 +325,11 @@ const validateDraft = (
               switch (draft.observation.standardErrors.kind) {
                 case 'model-based': return draft.observation.standardErrors
                 case 'robust': return draft.observation.standardErrors
-                case 'clustered': {
+                case 'clustered':
+                case 'clustered-breslow': {
                   if (draft.observation.standardErrors.column === null) return null
                   const cluster = chosen(draft.observation.standardErrors.column)
-                  return cluster === null ? null : { kind: 'clustered', cluster }
+                  return cluster === null ? null : { kind: draft.observation.standardErrors.kind, cluster }
                 }
                 default: return assertNever(draft.observation.standardErrors)
               }
@@ -515,7 +521,7 @@ const observationColumns = (draft: Draft): readonly (ColumnId | null)[] => {
             observation.duration,
             observation.event,
             ...(observation.entry.kind === 'column' ? [observation.entry.column] : []),
-            ...(observation.standardErrors.kind === 'clustered' ? [observation.standardErrors.column] : []),
+            ...('column' in observation.standardErrors ? [observation.standardErrors.column] : []),
             ...(observation.frailty.kind === 'gamma' ? [observation.frailty.column] : []),
           ]
           case 'start-stop': return [observation.subject, observation.start, observation.stop, observation.event]
@@ -920,6 +926,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                     case 'model-based': return { kind: 'modelBased' as const }
                     case 'robust': return { kind: 'robust' as const }
                     case 'clustered': return { kind: 'clustered' as const, column: columnPosition(matrix.columns, draft.observation.standardErrors.cluster) }
+                    case 'clustered-breslow': return { kind: 'clusteredBreslow' as const, column: columnPosition(matrix.columns, draft.observation.standardErrors.cluster) }
                     default: return assertNever(draft.observation.standardErrors)
                   }
                 })()
@@ -1154,6 +1161,8 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
       </>
       case 'cox-regression': {
         const penalty = draft.penalty
+        const clusteredBreslow = draft.observation.kind === 'right-censored' && draft.observation.standardErrors.kind === 'clustered-breslow'
+        const breslowConstraint = 'Clustered Breslow requires equal weights, no delayed entry, no strata and no penalty.'
         const setObservation = (observation: CoxObservationDraft) => {
           const changed: Draft = { ...draft, observation }
           const reserved = observationColumns(changed)
@@ -1180,6 +1189,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
           switch (draft.observation.kind) {
             case 'right-censored': {
               const observation = draft.observation
+              const canUseBreslow = observation.entry.kind === 'not-used' && draft.weights.kind === 'equal' && draft.strata.kind === 'unstratified' && penalty.kind === 'unpenalized'
               const chooseEntry = (kind: CoxEntryDraft['kind']) => {
                 switch (kind) {
                   case 'not-used': setObservation({ ...observation, entry: { kind } }); return
@@ -1202,7 +1212,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                   default: return assertNever(kind)
                 }
               }
-              const chooseStandardErrors = (kind: CoxStandardErrorsDraft['kind']) => {
+              const chooseStandardErrors = (kind: Exclude<CoxStandardErrorsDraft['kind'], 'clustered-breslow'>) => {
                 switch (kind) {
                   case 'model-based': setObservation({ ...observation, standardErrors: { kind } }); return
                   case 'robust': setObservation({ ...observation, standardErrors: { kind } }); return
@@ -1225,14 +1235,20 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                 {observation.frailty.kind === 'none' && <>
                   <div>
                     <ParameterLabel label="Delayed entry" help="Select an entry-time column when an observation joined the risk set after time zero." />
-                    <SegmentedControl size="sm" ariaLabel="Cox delayed entry" value={observation.entry.kind} onChange={chooseEntry} options={[{ value: 'not-used', label: 'Not used' }, { value: 'column', label: 'Entry column' }]} />
+                    <SegmentedControl size="sm" ariaLabel="Cox delayed entry" value={observation.entry.kind} onChange={chooseEntry} options={[{ value: 'not-used', label: 'Not used' }, { value: 'column', label: 'Entry column', disabled: clusteredBreslow, title: breslowConstraint }]} />
                   </div>
                   {observation.entry.kind === 'column' && <ColumnSelect title="Entry time" value={observation.entry.column} columns={columns} onChange={(column) => setObservation({ ...observation, entry: { kind: 'column', column } })} />}
                   <div className="sm:col-span-2">
                     <ParameterLabel label="Standard errors" help="Use robust errors for weighted or misspecified models. Use clustered errors when rows within the same cluster may be related." />
-                    <SegmentedControl size="sm" ariaLabel="Cox standard errors" value={observation.standardErrors.kind} onChange={chooseStandardErrors} options={[{ value: 'model-based', label: 'Model-based' }, { value: 'robust', label: 'Robust' }, { value: 'clustered', label: 'Clustered' }]} />
+                    <SegmentedControl size="sm" ariaLabel="Cox standard errors" value={observation.standardErrors.kind === 'clustered-breslow' ? 'clustered' : observation.standardErrors.kind} onChange={chooseStandardErrors} options={[{ value: 'model-based', label: 'Model-based' }, { value: 'robust', label: 'Robust' }, { value: 'clustered', label: 'Clustered' }]} />
                   </div>
-                  {observation.standardErrors.kind === 'clustered' && <ColumnSelect title="Cluster" value={observation.standardErrors.column} columns={columns} onChange={(column) => setObservation({ ...observation, standardErrors: { kind: 'clustered', column } })} />}
+                  {'column' in observation.standardErrors && <>
+                    <ColumnSelect title="Cluster" value={observation.standardErrors.column} columns={columns} onChange={(column) => setObservation({ ...observation, standardErrors: { kind: observation.standardErrors.kind === 'clustered-breslow' ? 'clustered-breslow' : 'clustered', column } })} />
+                    <div>
+                      <ParameterLabel label="Tied event times" help="Efron adjusts the risk set within tied event groups. Breslow uses the same risk set for every event at that time. Clustered Breslow supports equal weights, no delayed entry, no strata and no penalty." />
+                      <SegmentedControl size="sm" ariaLabel="Cox clustered tied event times" value={observation.standardErrors.kind === 'clustered-breslow' ? 'breslow' : 'efron'} onChange={(ties: 'efron' | 'breslow') => setObservation({ ...observation, standardErrors: { kind: ties === 'breslow' ? 'clustered-breslow' : 'clustered', column: 'column' in observation.standardErrors ? observation.standardErrors.column : null } })} options={[{ value: 'efron', label: 'Efron' }, { value: 'breslow', label: 'Breslow', disabled: !canUseBreslow, title: breslowConstraint }]} />
+                    </div>
+                  </>}
                 </>}
                 {observation.frailty.kind === 'gamma' && <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>A shared frailty model uses model-based standard errors, no delayed entry and no penalty.</p>}
               </>
@@ -1258,17 +1274,17 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
           {observationControls}
           <div>
             <ParameterLabel label="Observation weights" help="Select a positive weight column when rows contribute different weights to the partial likelihood." />
-            <SegmentedControl size="sm" ariaLabel="Cox observation weights" value={draft.weights.kind} onChange={(kind) => setWeights(kind === 'equal' ? { kind } : { kind, column: columnLike(columns, /^(weight|weights)$/i) })} options={[{ value: 'equal', label: 'Equal' }, { value: 'column', label: 'Weight column' }]} />
+            <SegmentedControl size="sm" ariaLabel="Cox observation weights" value={draft.weights.kind} onChange={(kind) => setWeights(kind === 'equal' ? { kind } : { kind, column: columnLike(columns, /^(weight|weights)$/i) })} options={[{ value: 'equal', label: 'Equal' }, { value: 'column', label: 'Weight column', disabled: clusteredBreslow, title: breslowConstraint }]} />
           </div>
           {draft.weights.kind === 'column' && <ColumnSelect title="Weight" value={draft.weights.column} columns={columns} onChange={(column) => setWeights({ kind: 'column', column })} />}
           <div>
             <ParameterLabel label="Strata" help="Select a stratum column when groups may have different baseline hazards but share the same covariate coefficients." />
-            <SegmentedControl size="sm" ariaLabel="Cox strata" value={draft.strata.kind} onChange={(kind) => setStrata(kind === 'unstratified' ? { kind } : { kind, column: columnLike(columns, /^(strata|stratum|group)$/i) })} options={[{ value: 'unstratified', label: 'Unstratified' }, { value: 'column', label: 'Stratum column' }]} />
+            <SegmentedControl size="sm" ariaLabel="Cox strata" value={draft.strata.kind} onChange={(kind) => setStrata(kind === 'unstratified' ? { kind } : { kind, column: columnLike(columns, /^(strata|stratum|group)$/i) })} options={[{ value: 'unstratified', label: 'Unstratified' }, { value: 'column', label: 'Stratum column', disabled: clusteredBreslow, title: breslowConstraint }]} />
           </div>
           {draft.strata.kind === 'column' && <ColumnSelect title="Stratum" value={draft.strata.column} columns={columns} onChange={(column) => setStrata({ kind: 'column', column })} />}
           {!(draft.observation.kind === 'right-censored' && draft.observation.frailty.kind === 'gamma') && <div className="sm:col-span-2">
             <ParameterLabel label="Penalty" help="An elastic-net penalty can stabilize a model with many or strongly related covariates. Leave the model unpenalized unless the study specifies a penalty." />
-            <SegmentedControl size="sm" ariaLabel="Cox penalty" value={penalty.kind} onChange={(kind) => configure({ ...draft, penalty: kind === 'unpenalized' ? { kind } : { kind, strength: 0.1, l1Ratio: 0 } })} options={[{ value: 'unpenalized', label: 'Unpenalized' }, { value: 'elastic-net', label: 'Elastic net' }]} />
+            <SegmentedControl size="sm" ariaLabel="Cox penalty" value={penalty.kind} onChange={(kind) => configure({ ...draft, penalty: kind === 'unpenalized' ? { kind } : { kind, strength: 0.1, l1Ratio: 0 } })} options={[{ value: 'unpenalized', label: 'Unpenalized' }, { value: 'elastic-net', label: 'Elastic net', disabled: clusteredBreslow, title: breslowConstraint }]} />
           </div>}
           {penalty.kind === 'elastic-net' && <>
             <label className="block"><span className={fieldLabel}>Penalty strength</span><input className={field('text', 'mt-1 w-full')} type="number" min={Number.EPSILON} step="any" value={penalty.strength} onChange={(event) => configure({ ...draft, penalty: { ...penalty, strength: Number(event.target.value) } })} /></label>

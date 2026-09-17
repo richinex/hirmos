@@ -92,6 +92,9 @@ export function survivalEquations(run: SurvivalRunArtifact): SurvivalEquations {
       const frailty = evidence.frailty.kind === 'gamma'
       const general = [formula(`h(t\\mid x${time})=${frailty ? 'z_g' : ''}${baseline}\\exp[\\eta${time}]`, `h(t | x${time}) = ${frailty ? 'z_g × ' : ''}${configuration.strata.kind === 'column' ? 'h_0,s(t)' : 'h_0(t)'} × exp(eta${time})`), formula(`\\eta${time}=\\sum_{j=1}^p\\beta_j(x_j${time}-\\bar x_j)`, `eta${time} = sum of beta_j × (x_j${time} − mean_j)`)]
       const fitted = [predictor(evidence.coefficients.map((c) => c.coefficient), evidence.covariateMeans, varying)]
+      if (evidence.fitting.kind === 'clusteredBreslow') {
+        general[1] = formula('\\eta=\\sum_{j=1}^p\\beta_j(x_j-c_j)', 'eta = sum of beta_j × (x_j − centring value_j)')
+      }
       const definitions = ['h is the event rate among observations still event-free at time t. The baseline rate is defined at the recorded centring values shown in the fitted expression. For a 1-unit covariate increase, exp(beta) is the hazard ratio, holding the other covariates fixed.']
       if (configuration.strata.kind === 'column') definitions.push(`s identifies a stratum of ${configuration.strata.column.name}; each stratum has its own baseline rate.`)
       if (varying) definitions.push('x(t) uses the covariate values recorded for the interval containing time t.')

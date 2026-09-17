@@ -1,6 +1,7 @@
 import { Metadata } from '@/components/ui/Metadata'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
+import { matchInputFiles } from '@/domain/sourceInputs'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { JobsProvider } from '@/analysis/JobsProvider'
 import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
@@ -47,7 +48,7 @@ import {
   type DiscoveryEvent,
 } from '@/domain/discovery'
 import { assertNever, err, isNonEmpty, type Result } from '@/domain/dop'
-import type { SourceRecipe, SqlPreparationInput } from '@/domain/sqlPreparation'
+import type { SourceRecipe } from '@/domain/sqlPreparation'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { cn } from '@/lib/utils'
 
@@ -100,6 +101,7 @@ const ResultsPanel = lazy(async () => ({ default: (await loadResultsPanel()).Res
 
 const SqlShell = lazy(async () => ({ default: (await loadSqlPreparationWorkspace()).SqlShell }))
 const PipelineWorkspace = lazy(async () => ({ default: (await loadPipelineWorkspace()).PipelineWorkspace }))
+const SourceEditor = lazy(async () => ({ default: (await import('@/components/data/SourceEditor')).SourceEditor }))
 
 type SqlIntake =
   | { readonly kind: 'idle' }
@@ -143,6 +145,10 @@ function SourceSummary({ source }: { readonly source: SelectedSource }) {
 function App() {
   const workflow = useWorkflow(state => state.workflow)
   const dispatch = useWorkflow(state => state.dispatch)
+  const sourceEditor = useWorkflow(state => state.sourceEditor)
+  const openSourceEditor = useWorkflow(state => state.openSourceEditor)
+  const showSourceEditor = useWorkflow(state => state.showSourceEditor)
+  const closeSourceEditor = useWorkflow(state => state.closeSourceEditor)
   const fileInput = useRef<HTMLInputElement>(null)
   const [dataEntryMode, setDataEntryMode] = useState<'file' | 'sql' | 'pipeline'>('file')
   const { location, route } = useRoute()
@@ -221,17 +227,10 @@ function App() {
     const offered = await data.prepareSqlInputs(files)
     setSqlIntake({ kind: 'idle' })
     if (!offered.ok) { dispatch({ type: 'editor-files-refused', detail: data.describeSqlPreparationProblem(offered.error) }); return }
-    const matched: SqlPreparationInput[] = []
-    const missing: string[] = []
-    for (const descriptor of recipe.inputs) {
-      const input = offered.value.find((candidate) => candidate.fingerprint === descriptor.fingerprint)
-      if (input === undefined) missing.push(descriptor.fileName)
-      else matched.push({ ...input, alias: descriptor.alias })
-    }
-    if (missing.length > 0 || !isNonEmpty(matched)) { dispatch({ type: 'editor-files-refused', detail: `The files chosen do not include ${missing.join(', ')}, unchanged.` }); return }
-    dispatch({ type: 'editor-reopened', recipe, inputs: matched })
+    const matched = matchInputFiles(recipe.inputs, offered.value)
+    if (!matched.ok) { dispatch({ type: 'editor-files-refused', detail: matched.error }); return }
+    dispatch({ type: 'editor-reopened', recipe, inputs: matched.value })
   }
-  const [editConfirm, setEditConfirm] = useState<DerivedRecipe | null>(null)
 
   // A source the SQL or pipeline step built is rebuilt from its input files; the result then passes the same fingerprint check.
   const restoreFromInputs = async (files: readonly File[]) => {
@@ -613,17 +612,6 @@ function App() {
     </>
   )
 
-  const editConfirmDialog = editConfirm !== null && (
-    <ConfirmDialog
-      open
-      title={editConfirm.kind === 'sql-derived' ? 'Edit SQL' : 'Edit pipeline'}
-      message="Editing replaces the prepared dataset and removes the current analysis."
-      confirmLabel="Edit and remove"
-      danger
-      onConfirm={() => { const recipe = editConfirm; setEditConfirm(null); void reopenEditor(recipe) }}
-      onClose={() => setEditConfirm(null)}
-    />
-  )
   const fullBleed = workflow.kind === 'pipeline-opened' || profiled !== null && ['data', 'time-series', 'survival', 'root-cause', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
   // Every chart export names the project it came from.
@@ -631,7 +619,6 @@ function App() {
   return (
     <ChartExportProvider.Provider value={exportContext}>
       <JobsProvider key={project?.id ?? ''} prepared={currentPrepared?.id ?? null} profile={profiled?.profile.id ?? null}>
-      {editConfirmDialog}
       {resetExample !== null && <ConfirmDialog
         open
         title={`Reset ${resetExample.name}?`}
@@ -718,7 +705,7 @@ function App() {
   
               {workflow.kind === 'awaiting-data' && (
                 <section className="rise my-auto w-full max-w-6xl" aria-labelledby="load-data-title">
-                  <div className="grid gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:gap-8">
+                  <div className="grid gap-6 lg:grid-cols-[minmax(26rem,1.2fr)_minmax(0,1fr)] lg:gap-8">
                     <div className="min-w-0">
                       <ChapterHeading id="load-data-title" className="mb-3">{workflow.restore === null ? 'Choose data' : 'Choose the data file again'}</ChapterHeading>
                       {workflow.restore === null ? (
@@ -726,6 +713,7 @@ function App() {
                           <SegmentedControl
                             variant="line"
                             ariaLabel="Data input method"
+                            className="lg:flex-nowrap"
                             value={dataEntryMode}
                             onChange={setDataEntryMode}
                             options={[{ value: 'file', label: 'Upload a file' }, { value: 'sql', label: 'Prepare with SQL' }, { value: 'pipeline', label: 'Build a pipeline' }]}
@@ -884,10 +872,15 @@ function App() {
                 </section>
               )}
   
-              {workflow.kind === 'profiled' && (
+              {workflow.kind === 'profiled' && sourceEditor.kind !== 'closed' && (
+                <Suspense fallback={null}>
+                  <SourceEditor source={workflow.source} onView={showSourceEditor} onCancel={closeSourceEditor} onAccept={source => dispatch({ type: 'source-replaced', previous: workflow.source, source })} />
+                </Suspense>
+              )}
+              {workflow.kind === 'profiled' && sourceEditor.kind !== 'editing' && (
                 <>
                   {activeChapter === 'data' && (
-                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared} onEditSource={workflow.source.recipe.kind === 'uploaded-file' ? null : () => { const recipe = workflow.source.recipe; if (recipe.kind !== 'uploaded-file') setEditConfirm(recipe) }}>
+                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared} onEditSource={openSourceEditor}>
                       <PreprocessingPanel
                         key={workflow.profile.id}
                         source={workflow.source}

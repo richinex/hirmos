@@ -1,4 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { Alert } from '@/components/ui/Alert'
 import { useState, type ReactNode } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { comparisonMeasureOption, hazardCurveOption, observedSurvivalOption, restrictedMeanOption, stateOccupancyOption, survivalCurvesOption, transitionMapOption, transitionMatrixOption } from '@/charts/survival/curves'
@@ -571,6 +572,11 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           ? run.configuration.observation.frailty.group.name
           : 'group'
         return <>
+          {evidence.fitting.kind === 'clusteredBreslow' && <>
+            <Metadata><span>Breslow ties</span><span>{formatCount(evidence.fitting.clusters).text} clusters</span><span>Clustered standard errors</span></Metadata>
+            {evidence.fitting.convergence === 'iterationLimit' && <Alert tone="warn" title="Iteration limit reached">The fit did not converge. Do not rely on these estimates or intervals.</Alert>}
+            {evidence.fitting.convergence === 'convergedDuringHalving' && <Alert tone="warn">The fit stopped during step halving. Check the stability of the estimates.</Alert>}
+          </>}
           <Tiles>
             <MetricTile frame="cell" size="compact" label={`${first.covariate} hazard ratio`} value={formatStatistic('raw', first.hazardRatio)} context={`${formatPercent(rateChange, { precision: 1 }).text} ${direction} event rate`} />
             <MetricTile frame="cell" size="compact" label={`${confidence}% interval`} value={formatStatistic('raw', first.hazardRatioInterval[0])} context={`to ${statistic(first.hazardRatioInterval[1])}`} />
@@ -615,7 +621,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
           <div className="mt-3">
             <p className={label('m-0 mb-2 text-muted')}>{evidence.baseline.kind === 'shared' ? 'Baseline event-free probability' : 'Baseline event-free probability by stratum'}</p>
             <ExpandableChart className="h-[260px]" label="Cox baseline event-free probability" testId="cox-baseline-survival" option={survivalCurvesOption(coxBaselineSeries(evidence.baseline), 'follow-up time', theme)} />
-            <p className={caption('mb-0 mt-2')}>The baseline curves use the fitted covariate means. They are not unadjusted Kaplan–Meier curves.</p>
+            <p className={caption('mb-0 mt-2')}>{evidence.fitting.kind === 'clusteredBreslow' ? 'The baseline curve uses the recorded centring values: zero for columns containing only −1, 0 or 1, and the mean for other columns.' : 'The baseline curves use the fitted covariate means.'} They are not unadjusted Kaplan–Meier curves.</p>
           </div>
           {assumptionRows.length > 0 && <div className="mt-4">
             <EvidenceTable<CoxAssumptionRow>

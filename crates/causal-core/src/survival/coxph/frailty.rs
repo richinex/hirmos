@@ -175,7 +175,7 @@ fn coxsafe(x: f64) -> f64 {
 
 /// `aeqSurv`: times within `sqrt(.Machine$double.eps)` of each other, absolutely or relative to
 /// the mean time, become the first time of their run.
-fn aeq_surv(times: &[f64]) -> Vec<f64> {
+pub(super) fn aeq_surv(times: &[f64]) -> Vec<f64> {
     let tolerance = f64::EPSILON.sqrt();
     let mut y = times.iter().cloned().filter(|t| t.is_finite()).collect::<Vec<_>>();
     y.sort_by(f64::total_cmp);
@@ -927,7 +927,7 @@ fn control_step(
 }
 
 /// `cholesky2` on a row-major square matrix, as `coxph.wtest` uses it.
-fn cholesky2(matrix: &mut [f64], n: usize, toler: f64) {
+pub(super) fn cholesky2(matrix: &mut [f64], n: usize, toler: f64) {
     let mut eps = 0.0_f64;
     for i in 0..n {
         if matrix[i * n + i] > eps {
@@ -959,7 +959,7 @@ fn cholesky2(matrix: &mut [f64], n: usize, toler: f64) {
     }
 }
 
-fn chsolve2(matrix: &[f64], n: usize, y: &mut [f64]) {
+pub(super) fn chsolve2(matrix: &[f64], n: usize, y: &mut [f64]) {
     for i in 0..n {
         let mut temp = y[i];
         for j in 0..i {

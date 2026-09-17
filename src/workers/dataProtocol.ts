@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { timeInterpretationSchema, timePreviewSchema, type TimeInterpretation, type TimePreview } from '@/domain/timeInterpretation'
 import {
   parseColumnProfileShape,
   parseDatasetProfile,
@@ -20,11 +21,12 @@ import {
   type PreviewSort,
   type PreviewWindowProblem,
 } from '@/domain/dataset'
-import { err, isNonEmpty, ok, type Result } from '@/domain/dop'
+import { assertNever, err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { importRequestId, type ImportRequestId } from '@/domain/workflow'
 import { panelDataProblemSchema, parsePanelDataProblem, type PanelDataProblem } from '@/domain/panel'
 
 export type DataWorkerCommand =
+  | { readonly kind: 'preview-time'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly timeColumn: ColumnId; readonly interpretation: TimeInterpretation }
   | {
       readonly kind: 'profile-source'
       readonly request: ImportRequestId
@@ -39,6 +41,7 @@ export type DataWorkerCommand =
     }
   | {
       readonly kind: 'materialize-time-series'
+      readonly interpretation?: TimeInterpretation
       readonly request: ImportRequestId
       readonly file: File
       readonly profile: DatasetProfile
@@ -70,6 +73,7 @@ export type DataWorkerCommand =
   | { readonly kind: 'materialize-panel'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly outcomeColumn: ColumnId; readonly treatmentColumn: ColumnId }
 
 export type DataWorkerEvent =
+  | { readonly kind: 'time-preview-succeeded'; readonly request: ImportRequestId; readonly preview: TimePreview }
   | { readonly kind: 'profile-succeeded'; readonly request: ImportRequestId; readonly profile: DatasetProfile }
   | { readonly kind: 'profile-failed'; readonly request: ImportRequestId; readonly problem: DatasetProfileProblem }
   | { readonly kind: 'materialization-succeeded'; readonly request: ImportRequestId; readonly matrix: NullableNumericMatrix }
@@ -94,6 +98,7 @@ export type DataProtocolProblem =
 const requestSchema = z.string().uuid()
 
 const commandSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('preview-time'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), timeColumn: z.string(), interpretation: timeInterpretationSchema }).strict(),
   z.object({
     kind: z.literal('profile-source'),
     request: requestSchema,
@@ -108,6 +113,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('materialize-time-series'),
+    interpretation: timeInterpretationSchema.default({ kind: 'source-type' }),
     request: requestSchema,
     file: z.instanceof(File),
     profile: z.unknown(),
@@ -188,6 +194,7 @@ const previewWindowProblemSchema = z.discriminatedUnion('kind', [
 ])
 
 const eventSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('time-preview-succeeded'), request: requestSchema, preview: timePreviewSchema }).strict(),
   z.object({
     kind: z.literal('profile-succeeded'),
     request: requestSchema,
@@ -222,6 +229,16 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('panel-data-failed'), request: requestSchema, problem: panelDataProblemSchema }).strict(),
 ])
 
+function bindColumns(known: ReadonlyMap<string, ColumnId>, requested: readonly string[]): Result<NonEmptyArray<ColumnId>, DataProtocolProblem> {
+  const columns: ColumnId[] = []
+  for (const raw of requested) {
+    const column = known.get(raw)
+    if (column === undefined) return err({ kind: 'invalid-command', detail: `Column identity ${raw} is not in the supplied profile.` })
+    columns.push(column)
+  }
+  return isNonEmpty(columns) ? ok(columns) : err({ kind: 'invalid-command', detail: 'At least one numeric column is required.' })
+}
+
 export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand, DataProtocolProblem> {
   const parsed = commandSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-command', detail: z.prettifyError(parsed.error) })
@@ -234,35 +251,44 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
 
   const profile = parseDatasetProfile(data.profile)
   if (!profile.ok) return err({ kind: 'invalid-command', detail: profile.error.detail })
-  if (data.kind === 'materialize-time-series') {
-    const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
+  const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
+  switch (data.kind) {
+  case 'preview-time': {
+    const timeColumn = known.get(data.timeColumn)
+    return timeColumn === undefined
+      ? err({ kind: 'invalid-command', detail: 'The time column is outside the supplied profile.' })
+      : ok({ ...data, request: request.value, profile: profile.value, timeColumn })
+  }
+  case 'materialize-time-series': {
     const timeColumn = known.get(data.timeColumn)
     if (timeColumn === undefined) return err({ kind: 'invalid-command', detail: 'The time column is outside the supplied profile.' })
-    const columnIds: ColumnId[] = []
-    for (const rawId of data.columnIds) {
-      const id = known.get(rawId)
-      if (id === undefined) return err({ kind: 'invalid-command', detail: `Column identity ${rawId} is not in the supplied profile.` })
-      columnIds.push(id)
-    }
-    if (!isNonEmpty(columnIds)) return err({ kind: 'invalid-command', detail: 'At least one numeric column is required.' })
-    return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, timeColumn, columnIds })
+    const columns = bindColumns(known, data.columnIds)
+    if (!columns.ok) return columns
+    return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, timeColumn, columnIds: columns.value, interpretation: data.interpretation })
   }
-  if (data.kind === 'inspect-panel' || data.kind === 'materialize-panel-keys' || data.kind === 'materialize-panel') {
-    const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
+  case 'inspect-panel':
+  case 'materialize-panel-keys':
+  case 'materialize-panel': {
     const unitColumn = known.get(data.unitColumn)
     const timeColumn = known.get(data.timeColumn)
     if (unitColumn === undefined || timeColumn === undefined) return err({ kind: 'invalid-command', detail: 'Panel keys are outside the supplied profile.' })
-    if (data.kind === 'inspect-panel' || data.kind === 'materialize-panel-keys') return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn })
-    const outcomeColumn = known.get(data.outcomeColumn)
-    const treatmentColumn = known.get(data.treatmentColumn)
-    if (outcomeColumn === undefined || treatmentColumn === undefined) return err({ kind: 'invalid-command', detail: 'Panel values are outside the supplied profile.' })
-    return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn, outcomeColumn, treatmentColumn })
+    switch (data.kind) {
+      case 'inspect-panel':
+      case 'materialize-panel-keys':
+        return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn })
+      case 'materialize-panel': {
+        const outcomeColumn = known.get(data.outcomeColumn)
+        const treatmentColumn = known.get(data.treatmentColumn)
+        if (outcomeColumn === undefined || treatmentColumn === undefined) return err({ kind: 'invalid-command', detail: 'Panel values are outside the supplied profile.' })
+        return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn, outcomeColumn, treatmentColumn })
+      }
+      default: return assertNever(data)
+    }
   }
-  if (data.kind === 'summarize-columns') {
+  case 'summarize-columns': {
     return ok({ kind: 'summarize-columns', request: request.value, file: data.file, profile: profile.value })
   }
-  if (data.kind === 'preview-window') {
-    const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
+  case 'preview-window': {
     const bind = (column: string): ColumnId | null => known.get(column) ?? null
     const filters: PreviewFilter[] = []
     for (const filter of data.query.filters) {
@@ -279,26 +305,24 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
     const query: PreviewQuery = { offset: data.query.offset, limit: data.query.limit, sort, filters, search: data.query.search }
     return ok({ kind: 'preview-window', request: request.value, file: data.file, profile: profile.value, query })
   }
-  if (data.kind === 'profile-column') {
+  case 'profile-column': {
     const column = profile.value.columns.find((candidate) => candidate.id === data.columnId)
     if (!column) return err({ kind: 'invalid-command', detail: `Column identity ${data.columnId} is not in the supplied profile.` })
     return ok({ kind: 'profile-column', request: request.value, file: data.file, profile: profile.value, columnId: column.id })
   }
-  const byId = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
-  const columnIds: ColumnId[] = []
-  for (const rawId of data.columnIds) {
-    const id = byId.get(rawId)
-    if (!id) return err({ kind: 'invalid-command', detail: `Column identity ${rawId} is not in the supplied profile.` })
-    columnIds.push(id)
+  case 'materialize-numeric': {
+    const columns = bindColumns(known, data.columnIds)
+    if (!columns.ok) return columns
+    return ok({
+      kind: 'materialize-numeric',
+      request: request.value,
+      file: data.file,
+      profile: profile.value,
+      columnIds: columns.value,
+    })
   }
-  if (!isNonEmpty(columnIds)) return err({ kind: 'invalid-command', detail: 'At least one numeric column is required.' })
-  return ok({
-    kind: 'materialize-numeric',
-    request: request.value,
-    file: data.file,
-    profile: profile.value,
-    columnIds,
-  })
+  default: return assertNever(data)
+  }
 }
 
 export function parseDataWorkerEvent(value: unknown): Result<DataWorkerEvent, DataProtocolProblem> {
@@ -308,48 +332,52 @@ export function parseDataWorkerEvent(value: unknown): Result<DataWorkerEvent, Da
 
   const request = importRequestId(parsed.data.request)
   if (!request.ok) return err({ kind: 'invalid-event', detail: 'The import request identity is invalid.' })
-  if (parsed.data.kind === 'panel-data-failed') {
+  switch (parsed.data.kind) {
+  case 'time-preview-succeeded':
+  case 'panel-inspection-succeeded':
+  case 'panel-materialization-succeeded':
+  case 'panel-keys-succeeded':
+  case 'profile-failed':
+  case 'materialization-failed':
+  case 'column-profile-failed':
+  case 'summary-succeeded':
+  case 'preview-window-succeeded':
+    return ok({ ...parsed.data, request: request.value })
+  case 'summary-failed':
+    return ok({ ...parsed.data, request: request.value, problem: parsed.data.problem as DatasetSummaryProblem })
+  case 'preview-window-failed':
+    return ok({ ...parsed.data, request: request.value, problem: parsed.data.problem as PreviewWindowProblem })
+  case 'panel-data-failed': {
     const problem = parsePanelDataProblem(parsed.data.problem)
     return problem.ok
       ? ok({ kind: parsed.data.kind, request: request.value, problem: problem.value })
       : err({ kind: 'invalid-event', detail: problem.error.detail })
   }
-  if (parsed.data.kind === 'panel-inspection-succeeded') return ok({ kind: parsed.data.kind, request: request.value, structure: parsed.data.structure })
-  if (parsed.data.kind === 'panel-materialization-succeeded') return ok({ kind: parsed.data.kind, request: request.value, matrix: parsed.data.matrix })
-  if (parsed.data.kind === 'panel-keys-succeeded') return ok({ kind: parsed.data.kind, request: request.value, matrix: parsed.data.matrix })
-  if (parsed.data.kind === 'profile-failed' || parsed.data.kind === 'materialization-failed' || parsed.data.kind === 'column-profile-failed') {
-    return ok({ ...parsed.data, request: request.value })
-  }
-  if (parsed.data.kind === 'summary-failed') {
-    return ok({ kind: 'summary-failed', request: request.value, problem: parsed.data.problem as DatasetSummaryProblem })
-  }
-  if (parsed.data.kind === 'preview-window-failed') {
-    return ok({ kind: 'preview-window-failed', request: request.value, problem: parsed.data.problem as PreviewWindowProblem })
-  }
-  if (parsed.data.kind === 'summary-succeeded' || parsed.data.kind === 'preview-window-succeeded') {
-    return ok({ ...parsed.data, request: request.value })
-  }
-  if (parsed.data.kind === 'column-profile-succeeded') {
+  case 'column-profile-succeeded': {
     const profile = parseColumnProfileShape(parsed.data.profile)
     return profile.ok
       ? ok({ kind: 'column-profile-succeeded', request: request.value, profile: profile.value })
       : err({ kind: 'invalid-event', detail: profile.error.detail })
   }
-  if (parsed.data.kind === 'materialization-succeeded') {
+  case 'materialization-succeeded': {
     const matrix = parseNullableNumericMatrix(parsed.data.matrix)
     return matrix.ok
       ? ok({ kind: 'materialization-succeeded', request: request.value, matrix: matrix.value })
       : err({ kind: 'invalid-event', detail: matrix.error.detail })
   }
-  if (parsed.data.kind === 'time-series-materialization-succeeded') {
+  case 'time-series-materialization-succeeded': {
     const matrix = parseTimeOrderedNumericMatrix(parsed.data.matrix)
     return matrix.ok
       ? ok({ kind: parsed.data.kind, request: request.value, matrix: matrix.value })
       : err({ kind: 'invalid-event', detail: matrix.error.detail })
   }
 
-  const profile = parseDatasetProfile(parsed.data.profile)
-  return profile.ok
-    ? ok({ kind: 'profile-succeeded', request: request.value, profile: profile.value })
-    : err({ kind: 'invalid-event', detail: profile.error.detail })
+  case 'profile-succeeded': {
+    const profile = parseDatasetProfile(parsed.data.profile)
+    return profile.ok
+      ? ok({ kind: 'profile-succeeded', request: request.value, profile: profile.value })
+      : err({ kind: 'invalid-event', detail: profile.error.detail })
+  }
+  default: return assertNever(parsed.data)
+  }
 }

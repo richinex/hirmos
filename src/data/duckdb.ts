@@ -1,4 +1,5 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
+import type { TimeInterpretation, TimePreview } from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
 import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
@@ -409,12 +410,52 @@ export async function materializeNumericColumns(
   )
 }
 
+/** DuckDB owns calendar arithmetic; the round trip rejects overflowing ISO week numbers. */
+function timeExpression(column: string, numeric: boolean, interpretation: TimeInterpretation): { readonly kind: 'ordinal' | 'calendar'; readonly sql: string } {
+  switch (interpretation.kind) {
+    case 'source-type': return timeExpression(column, numeric, { kind: numeric ? 'ordinal' : 'timestamp' })
+    case 'ordinal': return { kind: 'ordinal', sql: `TRY_CAST(${column} AS DOUBLE)` }
+    case 'timestamp': return { kind: 'calendar', sql: `epoch_ms(TRY_CAST(${column} AS TIMESTAMPTZ))` }
+    case 'date-format': return { kind: 'calendar', sql: `epoch_ms(try_strptime(CAST(${column} AS VARCHAR), ${sqlString(interpretation.format)}))` }
+    case 'iso-week': {
+      const text = `CAST(${column} AS VARCHAR)`
+      const parsed = `try_strptime(${text} || '-1', '%G-W%V-%u')`
+      return { kind: 'calendar', sql: `CASE WHEN strftime(${parsed}, '%G-W%V') = ${text} THEN epoch_ms(${parsed}) ELSE NULL END` }
+    }
+    default: return assertNever(interpretation)
+  }
+}
+
+export async function previewTimeColumn(source: SelectedSource, profile: DatasetProfile, columnId: ColumnId, interpretation: TimeInterpretation): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
+  const column = profile.columns.find((candidate) => candidate.id === columnId)
+  if (column === undefined) return err({ kind: 'column-not-found', id: columnId })
+  const time = sqlIdentifier(column.name)
+  const parsed = timeExpression(time, isNumericDuckDbType(column.duckdbType), interpretation)
+  return withSource(
+    source, profile,
+    (detail): TimeSeriesMaterializationProblem => ({ kind: 'materialization-failed', detail }),
+    (expected, actual): TimeSeriesMaterializationProblem => ({ kind: 'source-changed', expected, actual }),
+    async (connection, relation) => {
+      const result = await connection.query(`SELECT CAST(${time} AS VARCHAR) AS original, ${parsed.sql} AS parsed FROM ${relation} LIMIT 12`)
+      const rows = Array.from({ length: result.numRows }, (_, index) => {
+        const original = result.getChild('original')?.get(index)
+        const value = result.getChild('parsed')?.get(index)
+        const number = value == null ? NaN : Number(value)
+        return { original: original == null ? null : String(original), parsed: Number.isFinite(number) ? number : null }
+      })
+      return ok({ kind: parsed.kind, rows })
+    },
+    interpretation.kind === 'source-type' ? undefined : column.name,
+  )
+}
+
 /** Read the analysis columns together with one parsed temporal key and sort them chronologically. */
 export async function materializeTimeSeriesColumns(
   source: SelectedSource,
   profile: DatasetProfile,
   timeColumnId: ColumnId,
   requestedColumnIds: NonEmptyArray<string>,
+  interpretation: TimeInterpretation = { kind: 'source-type' },
 ): Promise<Result<TimeOrderedNumericMatrix, TimeSeriesMaterializationProblem>> {
   const timeColumn = profile.columns.find((candidate) => candidate.id === timeColumnId)
   if (timeColumn === undefined) return err({ kind: 'column-not-found', id: timeColumnId })
@@ -424,10 +465,9 @@ export async function materializeTimeSeriesColumns(
     `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS ${sqlIdentifier(`hirmos_numeric_${index}`)}`,
   )
   const time = sqlIdentifier(timeColumn.name)
-  const ordinal = isNumericDuckDbType(timeColumn.duckdbType)
-  const timeProjection = ordinal
-    ? `CAST(${time} AS DOUBLE)`
-    : `epoch_ms(TRY_CAST(${time} AS TIMESTAMPTZ))`
+  const parsedTime = timeExpression(time, isNumericDuckDbType(timeColumn.duckdbType), interpretation)
+  const ordinal = parsedTime.kind === 'ordinal'
+  const timeProjection = parsedTime.sql
   return withSource(
     source,
     profile,
@@ -459,6 +499,7 @@ export async function materializeTimeSeriesColumns(
         timeAxis: ordinal ? { kind: 'ordinal', values: times } : { kind: 'calendar', timestamps: times },
       })
     },
+    interpretation.kind === 'source-type' ? undefined : timeColumn.name,
   )
 }
 
@@ -488,9 +529,9 @@ async function verifiedPanelSource(
   try { return ok(await engine()) } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
 }
 
-const sourceRelation = (source: SelectedSource, path: string): string => source.format === 'parquet'
+const sourceRelation = (source: SelectedSource, path: string, textColumn?: string): string => source.format === 'parquet'
   ? `read_parquet(${sqlString(path)})`
-  : `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480)`
+  : `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480${textColumn === undefined ? '' : `, types = {${sqlString(textColumn)}: 'VARCHAR'}`})`
 
 /** Validate the observational panel keys without reading the scientific values. */
 export async function inspectPanelStructure(
@@ -891,6 +932,7 @@ async function withSource<Value, Problem>(
   failure: (detail: string) => Problem,
   changed: (expected: SourceFingerprint, actual: SourceFingerprint) => Problem,
   work: (connection: duckdb.AsyncDuckDBConnection, relation: string) => Promise<Result<Value, Problem>>,
+  textColumn?: string,
 ): Promise<Result<Value, Problem>> {
   const fingerprint = await fingerprintFile(source.file)
   if (!fingerprint.ok) return err(failure(fingerprint.error.detail))
@@ -907,9 +949,7 @@ async function withSource<Value, Problem>(
   } catch (cause) {
     return err(failure(detailOf(cause)))
   }
-  const relation = source.format === 'parquet'
-    ? `read_parquet(${sqlString(registeredPath)})`
-    : `read_csv_auto(${sqlString(registeredPath)}, header = true, sample_size = 20480)`
+  const relation = sourceRelation(source, registeredPath, textColumn)
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<Value, Problem>
   try {

@@ -5,7 +5,7 @@ import { variableColour, type ChartTheme } from '../theme'
 
 export interface ChangePointsChartView {
   readonly name: string
-  readonly values: readonly number[]
+  readonly values: readonly (number | null)[]
   /** One-based row numbers where a new segment starts. */
   readonly changePoints: readonly number[]
   readonly stepLabel: string
@@ -56,6 +56,7 @@ export function changePointsOption(view: ChangePointsChartView, theme: ChartThem
       // away or dropped by a heuristic — which matters when the outliers are what the plot is for.
       sampling: 'minmax',
       symbol: 'none',
+      connectNulls: false,
       lineStyle: { color: variableColour(theme, view.name), width: 1.2 },
       itemStyle: { color: variableColour(theme, view.name) },
       markLine: {
