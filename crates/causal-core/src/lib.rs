@@ -137,6 +137,7 @@ pub mod pelt;
 pub mod pss_tables;
 pub mod refute_dml;
 pub mod resampling;
+pub mod calendar;
 pub mod rpcmci;
 pub mod simplex;
 pub mod sklearn_linear;

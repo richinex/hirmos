@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { timeInterpretationSchema, timePreviewSchema, type TimeInterpretation, type TimePreview } from '@/domain/timeInterpretation'
+import { calendarRequestSchema, type CalendarRequest } from '@/domain/calendar'
 import {
   parseColumnProfileShape,
   parseDatasetProfile,
@@ -26,7 +27,7 @@ import { importRequestId, type ImportRequestId } from '@/domain/workflow'
 import { panelDataProblemSchema, parsePanelDataProblem, type PanelDataProblem } from '@/domain/panel'
 
 export type DataWorkerCommand =
-  | { readonly kind: 'preview-time'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly timeColumn: ColumnId; readonly interpretation: TimeInterpretation }
+  | { readonly kind: 'preview-time'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly timeColumn: ColumnId; readonly interpretation: TimeInterpretation; readonly calendar?: CalendarRequest }
   | {
       readonly kind: 'profile-source'
       readonly request: ImportRequestId
@@ -98,7 +99,7 @@ export type DataProtocolProblem =
 const requestSchema = z.string().uuid()
 
 const commandSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('preview-time'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), timeColumn: z.string(), interpretation: timeInterpretationSchema }).strict(),
+  z.object({ kind: z.literal('preview-time'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), timeColumn: z.string(), interpretation: timeInterpretationSchema, calendar: calendarRequestSchema.optional() }).strict(),
   z.object({
     kind: z.literal('profile-source'),
     request: requestSchema,
@@ -254,6 +255,7 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
   const known = new Map<string, ColumnId>(profile.value.columns.map((column) => [column.id, column.id]))
   switch (data.kind) {
   case 'preview-time': {
+    if (data.calendar?.unitColumn !== undefined && !known.has(data.calendar.unitColumn)) return err({ kind: 'invalid-command', detail: 'The unit column is outside the supplied profile.' })
     const timeColumn = known.get(data.timeColumn)
     return timeColumn === undefined
       ? err({ kind: 'invalid-command', detail: 'The time column is outside the supplied profile.' })

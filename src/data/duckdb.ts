@@ -1,4 +1,5 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
+import { inspectCalendar } from './calendar'
 import type { TimeInterpretation, TimePreview } from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
@@ -426,7 +427,7 @@ function timeExpression(column: string, numeric: boolean, interpretation: TimeIn
   }
 }
 
-export async function previewTimeColumn(source: SelectedSource, profile: DatasetProfile, columnId: ColumnId, interpretation: TimeInterpretation): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
+export async function previewTimeColumn(source: SelectedSource, profile: DatasetProfile, columnId: ColumnId, interpretation: TimeInterpretation, calendar?: import('@/domain/calendar').CalendarRequest): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
   const column = profile.columns.find((candidate) => candidate.id === columnId)
   if (column === undefined) return err({ kind: 'column-not-found', id: columnId })
   const time = sqlIdentifier(column.name)
@@ -443,7 +444,23 @@ export async function previewTimeColumn(source: SelectedSource, profile: Dataset
         const number = value == null ? NaN : Number(value)
         return { original: original == null ? null : String(original), parsed: Number.isFinite(number) ? number : null }
       })
-      return ok({ kind: parsed.kind, rows })
+      if (calendar === undefined || parsed.kind === 'ordinal') return ok({ kind: parsed.kind, rows })
+      const unit = calendar.unitColumn === undefined ? undefined : profile.columns.find((candidate) => candidate.id === calendar.unitColumn)
+      if (calendar.unitColumn !== undefined && unit === undefined) return err({ kind: 'materialization-failed', detail: 'The unit column is outside the supplied profile.' })
+      const unitSql = unit === undefined ? "'Series'" : `CAST(${sqlIdentifier(unit.name)} AS VARCHAR)`
+      const axis = await connection.query(`SELECT ${unitSql} AS unit, ${parsed.sql} AS time FROM ${relation} ORDER BY unit, time`)
+      const groups = new Map<string, number[]>()
+      for (let index = 0; index < axis.numRows; index++) {
+        const name = axis.getChild('unit')?.get(index)
+        const value = axis.getChild('time')?.get(index)
+        if (name == null || value == null || !Number.isSafeInteger(Number(value))) return err({ kind: 'materialization-failed', detail: 'Calendar coverage needs valid dates and non-missing unit identifiers on every row.' })
+        const key = String(name)
+        const times = groups.get(key)
+        if (times === undefined) groups.set(key, [Number(value)])
+        else times.push(Number(value))
+      }
+      const report = await inspectCalendar(calendar.schedule, Array.from(groups, ([name, times]) => ({ name, times })))
+      return ok({ kind: parsed.kind, rows, calendar: report })
     },
     interpretation.kind === 'source-type' ? undefined : column.name,
   )
@@ -954,6 +971,9 @@ async function withSource<Value, Problem>(
   let outcome: Result<Value, Problem>
   try {
     connection = await running.db.connect()
+    // TimeZone is connection-local: the startup connection's setting does not carry over.
+    // Interpret unzoned calendar input in UTC while preserving explicitly supplied zones.
+    await connection.query("SET TimeZone = 'UTC'")
     outcome = await work(connection, relation)
   } catch (cause) {
     outcome = err(failure(detailOf(cause)))

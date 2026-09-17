@@ -87,7 +87,7 @@ export function TableShell({ title, titleId, titleHelp, toolbar, lead, count, fo
         {toolbar && !folded && <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">{toolbar}</div>}
       </div>
       {!folded && lead}
-      <div id={`${titleId}-body`} hidden={folded} ref={scrollRef} className={cn('figure-strip panel-scroll min-h-0 overflow-auto', maxHeight)}>
+      <div id={`${titleId}-body`} hidden={folded} ref={scrollRef} className={cn('figure-strip panel-scroll relative min-h-0 overflow-auto', maxHeight)}>
         {children}
       </div>
       {!folded && foot}

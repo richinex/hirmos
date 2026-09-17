@@ -11,6 +11,7 @@ crate-type = ["rlib"]
 [dependencies]
 burn = { version = "0.21", default-features = false, features = ["std", "ndarray", "autodiff"] }
 chrono = { version = "0.4", default-features = false }
+jiff = { version = "=0.2.35", default-features = false, features = ["std"] }
 getrandom = { version = "0.4", default-features = false, features = ["wasm_js"] }
 libm = "0.2"
 nalgebra = { version = "0.34", features = ["libm", "std"] }

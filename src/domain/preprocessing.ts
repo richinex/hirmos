@@ -515,6 +515,7 @@ export function transformSeries(values: Float64Array, transform: SeriesTransform
 
 export type PreparationAction =
   | { readonly kind: 'ready' }
+  | { readonly kind: 'saved' }
   | { readonly kind: 'running' }
   | { readonly kind: 'blocked'; readonly reason: string }
 
@@ -525,7 +526,7 @@ export function preparationAction(readiness: Result<ReadyPreprocessingRecipe, Pr
     case 'idle': {
       if (!readiness.ok) return { kind: 'blocked', reason: describeReadinessProblem(readiness.error) }
       return JSON.stringify(readiness.value) === savedRecipe
-        ? { kind: 'blocked', reason: 'These preparation settings are already saved.' }
+        ? { kind: 'saved' }
         : { kind: 'ready' }
     }
     default: return assertNever(activity)

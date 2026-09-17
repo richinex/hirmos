@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { calendarReportSchema } from './calendar'
 
 /** Omitted in older recipes: numeric source types are indices; other types are ISO timestamps. */
 export const timeInterpretationSchema = z.discriminatedUnion('kind', [
@@ -12,6 +13,7 @@ export const timeInterpretationSchema = z.discriminatedUnion('kind', [
 export type TimeInterpretation = z.infer<typeof timeInterpretationSchema>
 
 export const timePreviewSchema = z.object({
+  calendar: calendarReportSchema.optional(),
   kind: z.enum(['ordinal', 'calendar']),
   rows: z.array(z.object({ original: z.string().nullable(), parsed: z.number().finite().nullable() }).strict()).max(12),
 }).strict()

@@ -46,7 +46,7 @@ function StagePlot({ name, stage, final, labelled }: { readonly name: string; re
     zoom: false,
   }, theme), [name, stage, theme])
   return (
-    <li>
+    <li className="min-w-0">
       {/* The stage name separates one step of the preparation from the next, so a lone stage is left unlabelled. */}
       {labelled && <span className={label('text-faint')}>{stage.label}</span>}
       <ExpandableChart option={option} label={`${name}, ${stage.label}`} className={`${labelled ? 'mt-1' : ''} h-[110px]`} testId={final ? 'prepared-series' : undefined} />
@@ -79,12 +79,12 @@ function DecompositionPlot({ series }: { readonly series: PreparedSeries & { rea
 
 function PreparedSeriesCell({ series }: { readonly series: PreparedSeries }) {
   return (
-    <li className={well('p-(--panel-space)')}>
+    <li className={well('min-w-0 p-(--panel-space)')}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-body font-medium text-ink">{series.name}</span>
+        <span className="min-w-0 text-body font-medium text-ink [overflow-wrap:anywhere]">{series.name}</span>
         <span className={caption()}>{series.transform}{series.decomposition !== null ? <Metadata><span></span><span>STL-adjusted</span></Metadata> : ''}</span>
       </div>
-      <ul className="m-0 mt-2 grid list-none gap-2 p-0" aria-label={`${series.name} preparation stages`}>
+      <ul className="m-0 mt-2 grid min-w-0 grid-cols-1 list-none gap-2 p-0" aria-label={`${series.name} preparation stages`}>
         {series.stages.map((stage, index) => (
           <StagePlot key={stage.label} name={series.name} stage={stage} final={index === series.stages.length - 1} labelled={series.stages.length > 1} />
         ))}

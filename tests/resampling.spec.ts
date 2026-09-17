@@ -207,12 +207,13 @@ test('creates a weekly prepared version through the Data studio controls', async
   await choose(page.getByLabel('Source frequency'), 'Daily')
   await page.getByRole('checkbox', { name: 'x', exact: true }).check()
   await page.getByRole('radio', { name: 'Weekly', exact: true }).click()
-  await expect(page.getByRole('button', { name: /Create prepared/ })).toHaveCount(0)
-  await expect(page.getByText(/Choose how to aggregate the selected column/)).toBeVisible()
+  await expect(page.getByRole('button', { name: /Create prepared/ })).toBeDisabled()
+  await expect(page.locator('#preparation-requirement')).toContainText('Choose how to aggregate the selected column')
   await choose(page.getByLabel('Aggregation for x'), 'Sum')
   await page.getByRole('button', { name: /Create prepared/ }).click()
 
-  await expect(page.getByText(/Prepared time series · 3 rows/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('region', { name: 'Prepared data', exact: true })).toContainText('3 rows', { timeout: 30_000 })
+  await page.getByText(/Daily to weekly, x: sum/).locator('xpath=ancestor::details[1]').locator('summary').click()
   await expect(page.getByText(/Daily to weekly, x: sum/)).toBeVisible()
 })
 

@@ -283,11 +283,11 @@ export function materializeNumericColumnsInWorker(
   })
 }
 
-export function previewTimeColumnInWorker(file: File, profile: DatasetProfile, timeColumn: ColumnId, interpretation: TimeInterpretation): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
+export function previewTimeColumnInWorker(file: File, profile: DatasetProfile, timeColumn: ColumnId, interpretation: TimeInterpretation, calendar?: import('@/domain/calendar').CalendarRequest): Promise<Result<TimePreview, TimeSeriesMaterializationProblem>> {
   const request = newImportRequestId()
   return new Promise((resolve) => {
     pending.set(request, { kind: 'time-preview', resolve })
-    const command: DataWorkerCommand = { kind: 'preview-time', request, file, profile, timeColumn, interpretation }
+    const command: DataWorkerCommand = { kind: 'preview-time', request, file, profile, timeColumn, interpretation, calendar }
     try { dataWorker().postMessage(command) } catch (cause) {
       pending.delete(request)
       resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))

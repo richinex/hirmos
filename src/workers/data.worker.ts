@@ -38,7 +38,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
 
     switch (command.kind) {
       case 'preview-time': {
-        const result = await previewTimeColumn(source.value, command.profile, command.timeColumn, command.interpretation)
+        const result = await previewTimeColumn(source.value, command.profile, command.timeColumn, command.interpretation, command.calendar)
         emit(result.ok
           ? { kind: 'time-preview-succeeded', request: command.request, preview: result.value }
           : { kind: 'materialization-failed', request: command.request, problem: result.error })

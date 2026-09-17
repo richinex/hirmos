@@ -88,6 +88,7 @@ use std::collections::{BTreeMap, HashMap};
 use wasm_bindgen::prelude::*;
 
 mod missingness;
+mod calendar;
 
 use missingness::{resolve_missingness, MissingnessExecution, MissingnessResolution};
 

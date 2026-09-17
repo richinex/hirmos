@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 /**
  * The geometry half of a floating tool window: clamp, persist, restore.
@@ -59,6 +59,17 @@ function save(key: string, r: Rect): void {
  */
 export function useFloatingRect(storageKey: string | null, initial: () => Rect, insets?: RectInsets) {
   const [rect, setRect] = useState<Rect>(() => clampRect(storageKey ? load(storageKey) ?? initial() : initial(), insets))
+  const top = insets?.top ?? 8
+  const side = insets?.side ?? 8
+  const bottom = insets?.bottom ?? 32
+  useEffect(() => {
+    const resize = () => setRect((current) => {
+      const next = clampRect(current, { top, side, bottom })
+      return next.x === current.x && next.y === current.y && next.width === current.width && next.height === current.height ? current : next
+    })
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [top, side, bottom])
   const update = (r: Rect) => {
     setRect(r)
     if (storageKey) save(storageKey, r)

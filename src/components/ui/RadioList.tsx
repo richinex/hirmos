@@ -1,6 +1,7 @@
 import { useCallback, useId, useRef, type KeyboardEvent, type ReactNode } from 'react'
 import { fieldLabel, well } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
+import { ParameterHelp } from '@/components/ui/ParameterLabel'
 
 /**
  * A single choice where each option needs a line of explanation, or where labels would wrap a
@@ -12,6 +13,7 @@ export interface RadioOption<V extends string> {
   readonly value: V
   readonly label: string
   readonly hint?: string
+  readonly help?: string
   readonly disabled?: boolean
   /** Shown on hover; use it for the reason an option is disabled. */
   readonly title?: string
@@ -58,13 +60,14 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
         {options.map((option) => {
           const chosen = option.value === value
           return (
+            <div key={option.value} className="relative min-w-0">
             <label
-              key={option.value}
               title={option.title}
               className={cn(
                 'relative grid grid-cols-[auto_1fr] items-start gap-x-2.5 rounded-md border px-2.5 py-1.5 transition-colors duration-(--motion-fast) pointer-coarse:min-h-11',
                 option.disabled ? 'cursor-not-allowed text-faint' : 'cursor-pointer',
                 chosen ? 'border-edge bg-raised' : 'border-transparent hover:border-hair',
+                option.help !== undefined && 'pr-9 pointer-coarse:pr-12',
               )}
             >
               <input
@@ -81,6 +84,8 @@ export function RadioList<V extends string>({ legend, legendHidden = false, valu
                 {option.hint !== undefined && <span className="block text-label text-faint">{option.hint}</span>}
               </span>
             </label>
+            {option.help !== undefined && <span className="absolute right-1 top-1 pointer-coarse:top-0"><ParameterHelp label={option.label} help={option.help} /></span>}
+            </div>
           )
         })}
       </div>

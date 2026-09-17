@@ -1,6 +1,7 @@
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
 import { TimePreview } from './TimePreview'
+import { CalendarReport } from './CalendarReport'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { resultSurface } from '@/components/ui/recipes'
@@ -136,6 +137,12 @@ const MISSINGNESS_LABELS: Record<MissingnessChoiceKind, string> = {
   'lag-aware-exclusion': 'Lag-aware sample exclusion',
   'complete-interval': 'Complete contiguous interval',
   imputation: 'Explicit imputation',
+}
+const MISSINGNESS_HELP: Record<MissingnessChoiceKind, string> = {
+  unresolved: 'Leave missing cells unchanged; choose a resolution before creating the prepared dataset.',
+  'lag-aware-exclusion': 'Keep the time grid and missing cells; compatible methods exclude constructed lagged samples affected by missing values.',
+  'complete-interval': 'Keep the longest consecutive run where every selected column is observed, dropping rows before and after it.',
+  imputation: 'Replace missing cells using the chosen method; this does not create rows for absent time points.',
 }
 
 const ANALYSIS_MASK_ROLES: readonly { readonly value: AnalysisMaskRole; readonly label: string }[] = [
@@ -645,6 +652,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             <DisclosureSummary>Time preview</DisclosureSummary>
             <TimePreview file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} />
           </details> : null}
+          {draft.sampling.kind === 'regular-series' && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} frequency={draft.sampling.frequency} />}
+          {draft.sampling.kind === 'regular-panel' && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} unitColumn={draft.sampling.unitColumn} frequency={draft.sampling.frequency} />}
           {crossSectionSelected && (
             <p className="m-0 text-body text-muted">Rows are independent units. Their order does not represent time.</p>
           )}
@@ -703,15 +712,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 legend="Missing-value policy"
                 legendHidden
                 value={draft.missingness.kind}
-                options={missingnessChoices.map((value) => ({ value, label: MISSINGNESS_LABELS[value] }))}
+                options={missingnessChoices.map((value) => ({ value, label: MISSINGNESS_LABELS[value], help: MISSINGNESS_HELP[value] }))}
                 onChange={(kind) => dispatch({
                   type: 'missingness-selected',
                   resolution: missingnessChoice(kind, draft.missingness.kind === 'not-present' ? 0 : draft.missingness.cells),
                 })}
               />
-              {draft.missingness.kind === 'complete-interval' && (
-                <p className="mb-0 mt-1 pl-6 text-body text-faint">Keeps the longest run of rows where every selected column is observed; rows before and after are dropped and recorded.</p>
-              )}
               {lagExclusion !== null && (
                 <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-2">
                   <label className="block text-body text-ink">
@@ -770,7 +776,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               {draft.missingness.kind === 'imputation' && (
                 <div className="mt-2 grid gap-3 pl-6 @md/card:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
                   <div>
-                    <span className={fieldLabel}>Method</span>
+                    <span className={`${fieldLabel} min-h-5 pointer-coarse:min-h-11 flex items-center`}>Method</span>
                     <RadioList frame="none"
                       className="mt-1"
                       legend="Imputation method"
@@ -778,14 +784,14 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       value={draft.missingness.kind === 'imputation' ? draft.missingness.method : null}
                       onChange={(method) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), method } })}
                       options={[
-                        { value: 'linearInterior', label: 'Linear inside the series', hint: 'Fill each gap on a straight line between its neighbouring values.' },
-                        { value: 'forwardFill', label: 'Carry forward', hint: 'Repeat the last recorded value through the gap.' },
-                        { value: 'structuralZero', label: 'Structural zero', hint: 'Treat each missing cell as a true zero; asks for confirmation.' },
+                        { value: 'linearInterior', label: 'Linear inside the series', help: 'Interpolate between the observed values on both sides of a gap; edge gaps and gaps exceeding the limit remain missing.' },
+                        { value: 'forwardFill', label: 'Carry forward', help: 'Repeat the preceding observed value through a gap; leading gaps and gaps exceeding the limit remain missing.' },
+                        { value: 'structuralZero', label: 'Structural zero', help: 'Replace every missing cell with zero only when you confirm it represents a true zero, not an unknown value.' },
                       ]}
                     />
                   </div>
                   {draft.missingness.method !== 'structuralZero' ? (
-                    <label className="block text-body text-ink"><span className={fieldLabel}>Longest gap to fill</span><input type="number" min={1} max={1000} aria-label="Longest gap to fill" className={field('text', 'mt-1 w-24')} value={draft.missingness.maxGap} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), maxGap: Math.max(1, Math.min(1000, Number(event.target.value) || 1)) } })} /></label>
+                    <div className="text-body text-ink"><ParameterLabel className={fieldLabel} label="Longest gap to fill" help="Maximum consecutive missing cells per column; a longer gap is left entirely unfilled, not partially filled." /><input type="number" min={1} max={1000} aria-label="Longest gap to fill" className={field('text', 'mt-1 w-24')} value={draft.missingness.maxGap} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), maxGap: Math.max(1, Math.min(1000, Number(event.target.value) || 1)) } })} /></div>
                   ) : (
                     <label className="flex items-start gap-2 text-body text-ink"><input type="checkbox" checked={draft.missingness.confirmedStructuralZero} onChange={(event) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), confirmedStructuralZero: event.target.checked } })} /><span>Confirm that each missing value represents a true zero.</span></label>
                   )}

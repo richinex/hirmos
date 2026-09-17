@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla'
 import type { Redundancy, TemporalStructure } from './diagnostics'
-import { initialPreprocessingDraft, selectedMissingness, stepPreprocessing, type PreprocessingDraft, type PreprocessingEvent } from './preprocessing'
+import { selectedMissingness, stepPreprocessing, type PreprocessingEvent } from './preprocessing'
+import { retainPreprocessing, type PreprocessingSession } from './preprocessingSession'
 import type { DatasetProfileId } from './dataset'
 import { estimableIdentification, type BackdoorIdentificationEvidence, type StudySpecification } from './study'
 import type { PreparedDatasetVersionId } from './preprocessing'
@@ -47,7 +48,7 @@ interface State {
   readonly adjustmentDecision: AdjustmentDecision | null
   readonly offerAdjustment: (decision: AdjustmentDecision) => void
   readonly clearAdjustment: (study: StudySpecification['id']) => void
-  readonly preprocessing: { readonly profile: DatasetProfileId; readonly draft: PreprocessingDraft; readonly savedRecipe: string | null } | null
+  readonly preprocessing: PreprocessingSession | null
   readonly changePreprocessing: (profile: DatasetProfileId, event: PreprocessingEvent) => void
   readonly saveRecipe: (profile: DatasetProfileId, recipe: string) => void
   readonly redundancy: Redundancy | null
@@ -108,7 +109,7 @@ export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
     adjustmentDecision: null,
     offerAdjustment: decision => set(state => decisionApplies(decision, state.workflow) ? { adjustmentDecision: decision } : state),
     clearAdjustment: study => set(state => state.adjustmentDecision?.study.id === study ? { adjustmentDecision: null } : state),
-    preprocessing: initial.kind === 'profiled' ? { profile: initial.profile.id, draft: initialPreprocessingDraft(initial.profile), savedRecipe: null } : null,
+    preprocessing: retainPreprocessing(null, initial),
     changePreprocessing: (profile, event) => set(state => {
       const current = state.preprocessing
       if (current === null || current.profile !== profile || state.workflow.kind !== 'profiled') return state
@@ -153,9 +154,10 @@ export function createWorkflowStore(initial: Workflow = INITIAL_WORKFLOW) {
         const prepared = workflow.kind === 'profiled' ? workflow.prepared?.id : undefined
         const temporalStructure = state.temporalStructure?.prepared === prepared ? state.temporalStructure : null
         const redundancy = state.redundancy?.prepared === prepared ? state.redundancy : null
-        const preprocessing = workflow.kind !== 'profiled' ? null
-          : state.workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id && state.preprocessing?.profile === workflow.profile.id ? state.preprocessing
-          : { profile: workflow.profile.id, draft: initialPreprocessingDraft(workflow.profile), savedRecipe: null }
+        const preprocessing = retainPreprocessing(
+          state.workflow.kind === 'profiled' && workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id ? state.preprocessing : null,
+          workflow,
+        )
         const adjustmentDecision = event.type !== 'study-draft-changed' && state.adjustmentDecision !== null && decisionApplies(state.adjustmentDecision, workflow) ? state.adjustmentDecision : null
         const diagnosticDraft = workflow.kind !== 'profiled' || workflow.prepared === null ? null
           : state.workflow.kind === 'profiled' && state.workflow.project.id === workflow.project.id && state.diagnosticDraft?.prepared === workflow.prepared.id ? state.diagnosticDraft

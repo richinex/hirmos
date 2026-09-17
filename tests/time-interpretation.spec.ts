@@ -2,6 +2,46 @@ import { expect, test } from '@playwright/test'
 import { choose } from './examples/support'
 import { parseDataWorkerEvent } from '../src/workers/dataProtocol'
 
+for (const timezoneId of ['UTC', 'Europe/Amsterdam', 'America/New_York']) {
+  test(`calendar parsing is independent of browser timezone: ${timezoneId}`, async ({ browser }) => {
+    const context = await browser.newContext({ timezoneId })
+    try {
+      const page = await context.newPage()
+      await page.goto('/app')
+      const dates = await page.evaluate(async () => {
+        const data = await import(new URL('/src/data/client.ts', location.href).href)
+        const workflow = await import(new URL('/src/domain/workflow.ts', location.href).href)
+        async function read(value: string) {
+          const file = new File([`date,x\n${value},1\n`], 'date.csv', { type: 'text/csv' })
+          const profile = await data.profileSourceInWorker(workflow.newImportRequestId(), file)
+          if (!profile.ok) throw new Error(JSON.stringify(profile.error))
+          const date = profile.value.columns.find((c: { name: string }) => c.name === 'date')
+          const x = profile.value.columns.find((c: { name: string }) => c.name === 'x')
+          const matrix = await data.materializeTimeSeriesColumnsInWorker(file, profile.value, date.id, [x.id])
+          if (!matrix.ok) throw new Error(JSON.stringify(matrix.error))
+          return new Date(matrix.value.timeAxis.timestamps[0]).toISOString()
+        }
+        return Promise.all([
+          read('2026-01-05'),
+          read('2026-01-05T00:00:00'),
+          read('2026-01-05T00:00:00+02:00'),
+          read('2024-03-31 00:30:00 Europe/Amsterdam'),
+          read('2024-03-31 03:30:00 Europe/Amsterdam'),
+        ])
+      })
+      expect(dates).toEqual([
+        '2026-01-05T00:00:00.000Z',
+        '2026-01-05T00:00:00.000Z',
+        '2026-01-04T22:00:00.000Z',
+        '2024-03-30T23:30:00.000Z',
+        '2024-03-31T01:30:00.000Z',
+      ])
+    } finally {
+      await context.close()
+    }
+  })
+}
+
 test('time preview protocol rejects unknown variants and malformed results', () => {
   const request = '8c2b1a19-9b68-45b3-8f47-e31450850436'
   expect(parseDataWorkerEvent({ kind: 'unknown', request }).ok).toBe(false)
