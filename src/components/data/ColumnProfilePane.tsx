@@ -5,7 +5,7 @@ import { useChartTheme } from '@/charts/theme'
 import { Alert } from '@/components/ui/Alert'
 import { FigureParts } from '@/components/ui/figures'
 import { IdentityRow } from '@/components/ui/IdentityRow'
-import { figureGrid, label, literal, num } from '@/components/ui/recipes'
+import { figureGrid, label, literal, num, sectionTitle } from '@/components/ui/recipes'
 import { ShareBar } from '@/components/table/primitives'
 import type { ColumnProfile, ColumnProfileProblem, DatasetProfile, PhysicalColumnProfile } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
@@ -25,9 +25,9 @@ const describeProblem = (problem: ColumnProfileProblem): string => {
 
 function Stat({ name, value, tone = 'ink' }: { readonly name: string; readonly value: Formatted; readonly tone?: 'ink' | 'muted' | 'warn' }) {
   return (
-    <div className="bg-panel px-3 py-2.5">
+    <div className="bg-panel px-3 py-2">
       <dt className={label('text-faint')}>{name}</dt>
-      <dd className={num(`m-0 mt-1 text-title leading-none tracking-tight ${tone === 'warn' ? 'text-warn' : tone === 'muted' ? 'text-muted' : 'text-ink'}`)} title={value.exact || value.srText}><FigureParts value={value} /></dd>
+      <dd className={num(`m-0 mt-0.5 text-body ${tone === 'warn' ? 'text-warn' : tone === 'muted' ? 'text-muted' : 'text-ink'}`)} title={value.exact || value.srText}><FigureParts value={value} /></dd>
     </div>
   )
 }
@@ -64,7 +64,7 @@ function NumericSummary({ column, profile, rowCount }: { readonly column: Physic
         <Stat name="Bins" value={formatCount(profile.histogram.counts.length)} tone="muted" />
       </StatList>
       <div className="mt-3">
-        <p className={label('mb-1 text-faint')}>Distribution</p>
+        <h4 className={`${sectionTitle} mb-1 mt-0`}>Distribution</h4>
         <EChart option={option} label={`Histogram of ${column.name}`} className="h-[clamp(160px,28cqb,220px)]" testId="column-histogram" />
       </div>
     </>
@@ -83,7 +83,7 @@ function CategoricalSummary({ profile, rowCount }: { readonly profile: Extract<C
         <Stat name="Shown" value={formatWords(`top ${profile.top.length}`)} tone="muted" />
       </StatList>
       <div className="mt-3">
-        <p className={label('mb-2 text-faint')}>Most frequent values</p>
+        <h4 className={`${sectionTitle} mb-2 mt-0`}>Most frequent values</h4>
         <ol className="m-0 list-none space-y-1.5 p-0" aria-label="Most frequent values">
           {profile.top.map((entry) => (
             <li key={entry.value} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 text-body">

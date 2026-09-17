@@ -115,14 +115,14 @@ export const pill = (active: boolean, extra?: string): string =>
  *  the affordance at 3:1, and the placeholder is italic so it never reads as an entered value. */
 export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string =>
   cn(
-    'dashboard-field w-full rounded-md border border-control bg-well px-3 py-1.5 text-body text-ink placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint pointer-coarse:min-h-11',
+    'dashboard-field w-full rounded-md border border-control bg-well px-3 py-1.5 text-body font-normal text-ink placeholder:text-faint focus:border-signal/60 disabled:cursor-not-allowed disabled:text-faint pointer-coarse:min-h-11',
     variant === 'mono' && 'font-mono',
     extra,
   )
 
 /** The label above a field. Ink, not muted: the label is the anchor of the group, and muted sat one
  *  step from the faint hint below it, which made label, hint and placeholder read as one grey. */
-export const fieldLabel = 'block text-body font-medium text-ink'
+export const fieldLabel = 'block text-label font-medium text-ink'
 
 /** The help line below a field. Body size and the token's 1.5 line height, because the old
  *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. Serif, because a
@@ -210,7 +210,7 @@ export const figureGrid = (extra?: string): string => cn('numeric-surface numeri
 export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 
 /** Section headings use type hierarchy, without decorative markers. */
-export const sectionTitle = 'text-title font-medium text-muted text-balance'
+export const sectionTitle = 'text-base font-semibold text-ink text-balance'
 export const resultTitle = 'text-heading font-medium text-ink text-balance'
 export const resultSurface = (extra?: string): string => panel(cn('result-surface p-(--panel-space)', extra))
 

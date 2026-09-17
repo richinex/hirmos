@@ -131,6 +131,13 @@ const MISSINGNESS_CHOICES: readonly MissingnessChoiceKind[] = [
   'imputation',
 ]
 
+const MISSINGNESS_LABELS: Record<MissingnessChoiceKind, string> = {
+  unresolved: 'Leave unresolved',
+  'lag-aware-exclusion': 'Lag-aware sample exclusion',
+  'complete-interval': 'Complete contiguous interval',
+  imputation: 'Explicit imputation',
+}
+
 const ANALYSIS_MASK_ROLES: readonly { readonly value: AnalysisMaskRole; readonly label: string }[] = [
   { value: 'candidate-cause', label: 'Candidate cause (X)' },
   { value: 'tested-outcome', label: 'Tested outcome (Y)' },
@@ -585,7 +592,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             <div className="grid gap-3 @md/card:grid-cols-2">
               {panelSelected && (
                 <label className="block text-body text-ink">
-                  Unit column
+                  <span className={fieldLabel}>Unit column</span>
                   <Select className={field('text', 'mt-1')} value={currentUnit} onChange={(event) => { const column = profile.columns.find((candidate) => candidate.id === event.target.value); if (column) dispatch({ type: 'unit-column-selected', unitColumn: column.id }) }}>
                     <option value="">Choose column</option>
                     {profile.columns.filter((column) => column.id !== currentTime).map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}
@@ -593,7 +600,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 </label>
               )}
               <label className="block text-body text-ink">
-                Time column
+                <span className={fieldLabel}>Time column</span>
                 <Select
                   className={field('text', 'mt-1')}
                   value={currentTime}
@@ -608,8 +615,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               </label>
               {draft.sampling.kind === 'regular-series' ? <div className="block text-body text-ink">
                 {draft.sampling.interpretation?.kind === 'iso-week'
-                  ? <ParameterLabel htmlFor="time-interpretation" label="Time interpretation" help="Weeks start on Monday. The ISO week-year can differ from the calendar year." />
-                  : <label htmlFor="time-interpretation">Time interpretation</label>}
+                  ? <ParameterLabel className={fieldLabel} htmlFor="time-interpretation" label="Time interpretation" help="Weeks start on Monday. The ISO week-year can differ from the calendar year." />
+                  : <label className={fieldLabel} htmlFor="time-interpretation">Time interpretation</label>}
                 <Select id="time-interpretation" className={field('text', 'mt-1')}
                   value={draft.sampling.interpretation?.kind === 'date-format' ? draft.sampling.interpretation.format : draft.sampling.interpretation?.kind ?? 'source-type'}
                   onChange={(event) => {
@@ -620,7 +627,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 </Select>
               </div> : null}
               <label className="block text-body text-ink">
-                Source frequency
+                <span className={fieldLabel}>Source frequency</span>
                 <Select
                   className={field('text', 'mt-1')}
                   value={currentFrequency}
@@ -646,8 +653,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           )}
         </section>
 
-        <section className={panel('@container/card p-(--panel-space)')} aria-labelledby="variables-title">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <section className={panel('@container/card flex min-h-0 flex-col p-(--panel-space)')} aria-labelledby="variables-title">
+          <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3">
             <div>
               <span className={label('text-faint')}>Variables</span>
               <h3 id="variables-title" className={cn(sectionTitle, 'mb-0 mt-1')}>Select analysis columns</h3>
@@ -659,18 +666,19 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               onClear={() => selectedIds.forEach((column) => dispatch({ type: 'variable-toggled', column }))}
             />
           </div>
-          <div className="grid max-h-40 gap-1 overflow-y-auto @md/card:grid-cols-2">
+          <div className="panel-scroll grid max-h-64 content-start gap-1 overflow-y-auto @md/card:grid-cols-2 @3xl/panel:min-h-40 @3xl/panel:max-h-none @3xl/panel:flex-1 @3xl/panel:[contain:size]" data-testid="analysis-columns-list">
             {numericColumns.map((column) => {
               const isKey = column.id === currentTime || column.id === currentUnit
               return (
-                <label key={column.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 text-body text-muted hover:bg-well">
+                <label key={column.id} className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-body text-muted hover:bg-well">
                   <input
                     type="checkbox"
+                    className="shrink-0"
                     checked={selectedIds.includes(column.id)}
                     disabled={isKey}
                     onChange={() => dispatch({ type: 'variable-toggled', column: column.id })}
                   />
-                  <span className={isKey ? 'text-faint' : 'text-ink'}>{column.name}</span>
+                  <span className={cn('min-w-0 [overflow-wrap:anywhere]', isKey ? 'text-faint' : 'text-ink')}>{column.name}</span>
                 </label>
               )
             })}
@@ -691,20 +699,16 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             </Alert>
           ) : (
             <div className="space-y-2">
-              {missingnessChoices.map((kind) => (
-                <label key={kind} className="flex items-start gap-2 text-body text-ink">
-                  <input
-                    type="radio"
-                    name="missingness"
-                    checked={draft.missingness.kind === kind}
-                    onChange={() => dispatch({
-                      type: 'missingness-selected',
-                      resolution: missingnessChoice(kind, draft.missingness.kind === 'not-present' ? 0 : draft.missingness.cells),
-                    })}
-                  />
-                  <span>{kind === 'unresolved' ? 'Leave unresolved' : kind === 'lag-aware-exclusion' ? 'Lag-aware sample exclusion' : kind === 'complete-interval' ? 'Complete contiguous interval' : 'Explicit imputation'}</span>
-                </label>
-              ))}
+              <RadioList frame="none"
+                legend="Missing-value policy"
+                legendHidden
+                value={draft.missingness.kind}
+                options={missingnessChoices.map((value) => ({ value, label: MISSINGNESS_LABELS[value] }))}
+                onChange={(kind) => dispatch({
+                  type: 'missingness-selected',
+                  resolution: missingnessChoice(kind, draft.missingness.kind === 'not-present' ? 0 : draft.missingness.cells),
+                })}
+              />
               {draft.missingness.kind === 'complete-interval' && (
                 <p className="mb-0 mt-1 pl-6 text-body text-faint">Keeps the longest run of rows where every selected column is observed; rows before and after are dropped and recorded.</p>
               )}
