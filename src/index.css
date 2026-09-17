@@ -347,9 +347,13 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
 }
 
-/* Scrollbars hidden (anatomy-style clean surfaces): content still scrolls, there is just no visible track. */
-* { scrollbar-width: none; }
-::-webkit-scrollbar { width: 0; height: 0; }
+/* Native scrolling everywhere; transparent thumbs at rest keep the geometry stable. */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*[data-scrolling] { scrollbar-color: var(--scroll-thumb, var(--color-hair)) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+*[data-scrolling]::-webkit-scrollbar-thumb { background: var(--scroll-thumb, var(--color-hair)); }
 
 /* The SQL console: the terminal paints its own viewport black under and beside the canvas, which would read
    as a second box inside the window. Both take the window body's colour, so the console is one surface. */
@@ -495,11 +499,6 @@ button[aria-busy="true"]::after {
   }
 }
 
-/* The answer-figures thumbnail strip: a THIN VISIBLE scrollbar is the affordance that more figures exist
-   past the fold (an invisible scrollbar made the tail unreachable-looking for mouse users). */
-.figure-strip { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
-/* The vertical sibling: panel bodies whose overflow is unpredictable get the same thin native bar, so
-   "this scrolls" is visible before the first wheel. Same reasoning as .figure-strip, other axis. */
 /* Pane separators: the seam is a one-pixel hairline; an 8px hit area either side does the ergonomics.
    react-resizable-panels sets data-separator="active" while dragging. */
 /* A one-line label that fades where it would overflow, decided by layout rather than script: the real
@@ -599,10 +598,6 @@ button[aria-busy="true"]::after {
    finger on a card is a scroll candidate and the browser can cancel the drag. */
 .react-flow__node, .react-flow__handle { touch-action: none; }
 
-.panel-scroll { scrollbar-width: thin; scrollbar-color: var(--color-hair) transparent; }
-.panel-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
-.panel-scroll::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }
-.panel-scroll::-webkit-scrollbar-track { background: transparent; }
 /* The live log: edge fades say "more above / more below" without a bar. Driven by the two data
    attributes its scroll handler sets, so a log pinned to the tail never fades its newest line. */
 .log-fade { --fade-top: 0px; --fade-bottom: 0px; mask-image: linear-gradient(to bottom, transparent 0, black var(--fade-top), black calc(100% - var(--fade-bottom)), transparent 100%); }
@@ -610,9 +605,6 @@ button[aria-busy="true"]::after {
 .log-fade[data-clipped-bottom='1'] { --fade-bottom: 18px; }
 /* cmdk publishes its list height; animate it on the house curve. */
 .cmdk-list { height: var(--cmdk-list-height); transition: height var(--motion-fast) cubic-bezier(0.2, 0.7, 0.2, 1); }
-.figure-strip::-webkit-scrollbar { height: 6px; }
-.figure-strip::-webkit-scrollbar-thumb { background: var(--color-hair); border-radius: 3px; }
-.figure-strip::-webkit-scrollbar-track { background: transparent; }
 
 /* Radial stage vignette behind the transparent graph canvas — theme-aware, restores the "lit field"
    depth from v1 so the plot floats rather than sitting flat against a solid panel. */

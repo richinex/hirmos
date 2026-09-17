@@ -24,7 +24,7 @@ const houseHighlight = HighlightStyle.define([
 const houseTheme = EditorView.theme({
   '&': { minHeight: 'var(--editor-min-height)', backgroundColor: 'var(--color-well)', color: 'var(--color-ink)', fontSize: '12px', borderRadius: '6px', border: '1px solid var(--color-control)' },
   '&.cm-focused': { outline: 'none', borderColor: 'color-mix(in srgb, var(--color-signal) 60%, transparent)' },
-  '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6', scrollbarWidth: 'thin', scrollbarGutter: 'stable' },
+  '.cm-scroller': { fontFamily: 'var(--font-mono)', lineHeight: '1.6', scrollbarGutter: 'stable' },
   '.cm-content.cm-lineWrapping .cm-line': { paddingRight: '28px' },
   '.cm-content': { padding: '8px 0', caretColor: 'var(--color-ink)' },
   '.cm-line': { padding: '0 10px' },

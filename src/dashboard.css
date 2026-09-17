@@ -39,7 +39,7 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 .dashboard-brand .text-title { font-size: 22px; }
 .dashboard-brand-mark { --color-signal: var(--color-brand); }
 .dashboard-chapters { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 12px; }
-.dashboard-chapters { scrollbar-width: thin; }
+.dashboard-chapters { --scroll-thumb: var(--color-rail-faint); }
 .dashboard-nav-group + .dashboard-nav-group { margin-top: 20px; }
 .dashboard-nav-heading { font-size: .75rem; font-weight: 600; letter-spacing: .025em; text-transform: uppercase; color: var(--color-faint); margin: 0 12px 8px; }
 .dashboard-chapters ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }

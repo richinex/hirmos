@@ -18,8 +18,8 @@ import { cn } from '@/lib/utils'
 /** Row pitch per density, hairline included; the recipes' `rowPadding` is derived to hit it exactly. */
 export const ROW_HEIGHT: Record<TableDensity, number> = { compact: 24, comfortable: 32 }
 
-// Touch controls reserve 44px for the target and 6px for the density track's border and padding.
-const toolbarHeight = 'min-h-6 pointer-coarse:min-h-[3.125rem]'
+// Match the 32px chrome controls; touch adds the density track's border and padding to its 44px targets.
+const toolbarHeight = 'min-h-8 pointer-coarse:min-h-[3.125rem]'
 
 /** Cell padding that lands the row on the density's height with 12px body text and its 1px hairline. */
 export const cellPadding = (density: TableDensity): string => rowPadding[density]
@@ -31,9 +31,9 @@ export function useTableDensity(): readonly [TableDensity, (density: TableDensit
 
 export function DensityToggle({ density, onChange }: { readonly density: TableDensity; readonly onChange: (density: TableDensity) => void }) {
   return (
-    <div className={cn('flex shrink-0 gap-0.5 rounded-md border border-hair bg-panel p-0.5', toolbarHeight)} role="group" aria-label="Row density">
-      <button type="button" className={segment(density === 'comfortable', 'h-[18px] px-1.5 py-0')} aria-pressed={density === 'comfortable'} title="Comfortable rows" aria-label="Comfortable rows" onClick={() => onChange('comfortable')}><Icon name="density_medium" size={13} /></button>
-      <button type="button" className={segment(density === 'compact', 'h-[18px] px-1.5 py-0')} aria-pressed={density === 'compact'} title="Compact rows" aria-label="Compact rows" onClick={() => onChange('compact')}><Icon name="density_small" size={13} /></button>
+    <div className={cn('flex shrink-0 items-center gap-0.5 rounded-md border border-hair bg-panel p-0.5', toolbarHeight)} role="group" aria-label="Row density">
+      <button type="button" className={segment(density === 'comfortable', 'grid h-[26px] place-items-center px-1.5 py-0')} aria-pressed={density === 'comfortable'} title="Comfortable rows" aria-label="Comfortable rows" onClick={() => onChange('comfortable')}><Icon name="density_medium" size={13} /></button>
+      <button type="button" className={segment(density === 'compact', 'grid h-[26px] place-items-center px-1.5 py-0')} aria-pressed={density === 'compact'} title="Compact rows" aria-label="Compact rows" onClick={() => onChange('compact')}><Icon name="density_small" size={13} /></button>
     </div>
   )
 }
