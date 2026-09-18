@@ -82,7 +82,7 @@ test.describe('pipeline canvas', () => {
   test('runs each block as it is wired, previews it, and reports what stops the output', async ({ page }) => {
     await startPipeline(page)
     await page.locator('.react-flow__pane').click({ position: { x: 20, y: 20 } })
-    await expect(page.getByTestId('pipeline-incomplete')).toHaveText('Use as source needs 1 input wired in; it has 0.')
+    await expect(page.getByTestId('pipeline-incomplete')).toContainText('Use as source needs 1 input wired in; it has 0.')
     await expect(useAsSource(page)).toBeDisabled()
 
     const filter = await addBlock(page, 'Filter rows', 'filter-rows')

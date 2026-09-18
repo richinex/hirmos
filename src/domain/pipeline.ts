@@ -93,7 +93,7 @@ export function blockArity(kind: PipelineBlockKind): BlockArity {
     case 'input': return { kind: 'exactly', count: 0 }
     case 'join': return { kind: 'exactly', count: 2 }
     case 'union': return { kind: 'at-least', count: 2 }
-    case 'script': return { kind: 'at-least', count: 1 }
+    case 'script': return { kind: 'at-least', count: 0 }
     case 'filter-rows':
     case 'select-columns':
     case 'derive-columns':
@@ -140,7 +140,7 @@ export function emptyBlock(kind: AddableBlockKind): PipelineBlock {
 export const SCRIPT_TEMPLATE = `import pandas as pd
 import numpy as np
 
-df = inputs[0]
+df = inputs[0] if inputs else pd.DataFrame()
 
 prepared = df
 `
@@ -314,8 +314,8 @@ export type DraftStep = PipelineStep & { readonly inputIds: readonly PipelineBlo
 /**
  * What the canvas runs while the pipeline is being built: every block whose inputs are all wired and
  * themselves ready, in dependency order. The rest wait, each with the reason, so a half-built graph
- * still shows rows on the blocks that can produce them. The complete pipeline is this draft with
- * nothing waiting; `compilePipeline` is that check.
+ * still shows rows on the blocks that can produce them. Source readiness is a separate check of
+ * the output branch in `compilePipeline`.
  */
 export interface DraftPipeline {
   readonly steps: readonly DraftStep[]
@@ -372,25 +372,21 @@ export function compileDraft(graph: PipelineGraph, aliases: ReadonlySet<string>)
 }
 
 /**
- * The pipeline as a whole, for "Use as source" and for replay: the draft with every block ready,
- * one output block, and no block left out of the path to it. An input file that nothing reads is
- * only a table nobody selected from; any other loose block is unfinished work.
+ * Only the output and its ancestors determine source readiness. Unconnected draft work remains
+ * editable without becoming a dependency of the saved source.
  */
 export function compilePipeline(graph: PipelineGraph, aliases: ReadonlySet<string>): Result<CompiledPipeline, PipelineProblem> {
   const outputs = graph.nodes.filter((node) => node.block.kind === 'output')
   if (outputs.length === 0) return err({ kind: 'no-output-block' })
   if (outputs.length > 1) return err({ kind: 'several-output-blocks' })
   const output = outputs[0]!
+  const { byId, inputIdsOf } = wiringOf(graph)
   for (const edge of graph.edges) {
-    const { byId } = wiringOf(graph)
     if (!byId.has(edge.from)) return err({ kind: 'unknown-node', id: edge.from })
     if (!byId.has(edge.to)) return err({ kind: 'unknown-node', id: edge.to })
   }
   const draft = compileDraft(graph, aliases)
-  const problem = draftProblem(graph, draft)
-  if (problem !== null) return err(problem)
 
-  const { inputIdsOf } = wiringOf(graph)
   const reached = new Set<PipelineBlockId>()
   const pending = [output.id]
   while (pending.length > 0) {
@@ -399,12 +395,14 @@ export function compilePipeline(graph: PipelineGraph, aliases: ReadonlySet<strin
     reached.add(id)
     pending.push(...inputIdsOf(id))
   }
-  const loose = graph.nodes.find((node) => !reached.has(node.id) && node.block.kind !== 'input')
-  if (loose !== undefined) return err({ kind: 'unreachable-block', id: loose.id })
+  const sourceGraph = { nodes: graph.nodes.filter((node) => reached.has(node.id)), edges: graph.edges.filter((edge) => reached.has(edge.to)) }
+  const problem = draftProblem(sourceGraph, draft)
+  if (problem !== null) return err(problem)
+  const steps = draft.steps.filter((step) => reached.has(step.id))
   const fed = inputIdsOf(output.id)[0]
   const outputView = fed === undefined ? undefined : draft.views.get(fed)
-  if (outputView === undefined || !isNonEmpty(draft.steps)) return err({ kind: 'incomplete-block', id: output.id, detail: 'the output block has nothing wired into it' })
-  return ok({ steps: draft.steps, outputView, views: draft.views })
+  if (outputView === undefined || !isNonEmpty(steps)) return err({ kind: 'incomplete-block', id: output.id, detail: 'the output block has nothing wired into it' })
+  return ok({ steps, outputView, views: new Map([...draft.views].filter(([id]) => reached.has(id))) })
 }
 
 /** The first waiting block's reason as a problem, in the shape the strict compile reports. */
@@ -477,13 +475,13 @@ export const pipelineGraphSchema = z.object({
 export const pipelineRecipeSchema = z.object({
   kind: z.literal('pipeline-derived'),
   graph: pipelineGraphSchema,
-  inputs: z.array(inputDescriptorSchema).min(1),
+  inputs: z.array(inputDescriptorSchema),
 }).strict()
 
 export interface PipelineRecipe {
   readonly kind: 'pipeline-derived'
   readonly graph: PipelineGraph
-  readonly inputs: NonEmptyArray<SqlInputDescriptor>
+  readonly inputs: readonly SqlInputDescriptor[]
 }
 
 export function parsePipelineRecipe(value: unknown): Result<PipelineRecipe, { readonly kind: 'invalid-pipeline-recipe'; readonly detail: string }> {

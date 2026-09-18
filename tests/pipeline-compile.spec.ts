@@ -93,8 +93,8 @@ test('refuses wiring the runtime could not follow, and says which block', () => 
   if (!loop.ok) expect(loop.error.kind === 'cycle' || loop.error.kind === 'wrong-input-count').toBe(true)
 
   const stray = compilePipeline({ nodes: [...frailty.nodes, { id: id('stray'), block: { kind: 'sort-limit', sort: [], limit: null }, position: at(9, 9) }], edges: [...frailty.edges, { from: id('in'), to: id('stray'), port: 0 }] }, aliases)
-  expect(stray.ok).toBe(false)
-  if (!stray.ok) expect(describePipelineProblem(stray.error, name)).toBe('stray is not wired into the output. Remove it or connect it.')
+  expect(stray.ok).toBe(true)
+  if (stray.ok) expect(stray.value.views.has(id('stray'))).toBe(false)
 })
 
 test('an input file nothing reads is allowed; a draft runs what is wired and says what the rest waits on', () => {

@@ -76,7 +76,7 @@ export type Workflow =
       readonly project: Project
       readonly origin: ProjectOrigin
       /** The files the SQL console exposes as tables; a view becomes the source only once it materialises. */
-      readonly inputs: NonEmptyArray<SqlPreparationInput>
+      readonly inputs: readonly SqlPreparationInput[]
       /** The recorded statement and output view to start from, when the console is reopened on a source it made. */
       readonly resume: SqlResume | null
     }
@@ -156,10 +156,10 @@ export type WorkflowEvent =
   | { readonly type: 'project-name-changed'; readonly value: string }
   | { readonly type: 'project-submitted' }
   | { readonly type: 'file-selected'; readonly file: File }
-  | { readonly type: 'sql-inputs-chosen'; readonly inputs: NonEmptyArray<SqlPreparationInput> }
+  | { readonly type: 'sql-inputs-chosen'; readonly inputs: readonly SqlPreparationInput[] }
   | { readonly type: 'pipeline-opened' }
   /** Reopen the editor that made the source; with the files when they are still in memory, otherwise the files are asked for first. Everything made from the source is dropped. */
-  | { readonly type: 'editor-reopened'; readonly recipe: DerivedRecipe; readonly inputs: NonEmptyArray<SqlPreparationInput> | null }
+  | { readonly type: 'editor-reopened'; readonly recipe: DerivedRecipe; readonly inputs: readonly SqlPreparationInput[] | null }
   | { readonly type: 'editor-files-refused'; readonly detail: string }
   /** A derived source is ready: the SQL view or the pipeline's output block has been written to a file. */
   | { readonly type: 'sql-source-created'; readonly source: SelectedSource }

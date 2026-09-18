@@ -3,6 +3,7 @@ import { RecordBatchFileWriter } from 'apache-arrow'
 import { fingerprintFile } from './fingerprint'
 import { isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
 import { rememberInputFiles } from './inputFiles'
+import { exportDirectory, type SqlInputDescriptor } from '@/domain/sourceInputs'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { selectSource, type SelectedSource } from '@/domain/workflow'
 import {
@@ -33,7 +34,7 @@ export type SqlPreparationProblem =
 export interface SqlPreparationSession {
   readonly shellDatabase: duckdb.AsyncDuckDB
   readonly database: duckdb.AsyncDuckDB
-  readonly inputs: NonEmptyArray<SqlPreparationInput>
+  readonly inputs: readonly SqlPreparationInput[]
   readonly shellConnection: { current: number | null }
   readonly lifecycle: { current: 'open' | 'closed' }
 }
@@ -61,24 +62,68 @@ const relationFor = (input: SqlPreparationInput, path: string): string => input.
 
 export async function registerInputs(
   engine: DuckDbEngine,
-  inputs: NonEmptyArray<SqlPreparationInput>,
+  inputs: readonly SqlPreparationInput[],
   namespace: string,
 ): Promise<Result<null, SqlPreparationProblem>> {
   const connection = await engine.db.connect()
   try {
     for (const input of inputs) {
-      const path = `${namespace}-${input.fingerprint}.${input.format}`
+      const path = input.format === 'duckdb-export-file' ? input.path : `${namespace}-${input.fingerprint}.${input.format}`
       try {
         await engine.db.registerFileHandle(path, input.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
-        await connection.query(`CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${relationFor(input, path)}`)
+        if (input.format !== 'duckdb-export-file') await connection.query(`CREATE OR REPLACE VIEW ${sqlIdentifier(input.alias)} AS SELECT * FROM ${relationFor(input, path)}`)
       } catch (cause) {
         return err({ kind: 'input-registration-failed', fileName: input.fileName, detail: detailOf(cause) })
       }
+    }
+    const exported = inputs.filter(input => input.format === 'duckdb-export-file')
+    if (exported.length > 0) {
+      const directory = exportDirectory(exported.map(input => input.path))
+      if (!directory.ok) return err({ kind: 'prepared-view-invalid', detail: directory.error.detail })
+      try { await connection.query(`IMPORT DATABASE ${sqlString(directory.value)}`) }
+      catch (cause) { return err({ kind: 'input-registration-failed', fileName: directory.value, detail: detailOf(cause) }) }
     }
     return ok(null)
   } finally {
     await connection.close()
   }
+}
+
+export async function prepareDatabaseExport(files: readonly File[]): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
+  const paths = files.map(file => file.webkitRelativePath)
+  const directory = exportDirectory(paths)
+  if (!directory.ok) return err({ kind: 'prepared-view-invalid', detail: directory.error.detail })
+  const inputs: SqlPreparationInput[] = []
+  const occupied = new Set<string>()
+  for (const file of files) {
+    const fingerprint = await fingerprintFile(file)
+    if (!fingerprint.ok) return err({ kind: 'fingerprint-failed', fileName: file.name, detail: fingerprint.error.detail })
+    const alias = uniqueSqlInputAlias(`export_${file.webkitRelativePath}`, occupied)
+    occupied.add(alias)
+    inputs.push({ alias, file, fileName: file.name, bytes: file.size, fingerprint: fingerprint.value, format: 'duckdb-export-file', path: file.webkitRelativePath })
+  }
+  rememberInputFiles(inputs)
+  return ok(inputs)
+}
+
+/** Match original bytes first, then restore their recorded role and path. */
+export async function recoverSqlInputs(descriptors: readonly SqlInputDescriptor[], files: readonly File[]): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
+  const offered = new Map<string, File>()
+  for (const file of files) {
+    const fingerprint = await fingerprintFile(file)
+    if (!fingerprint.ok) return err({ kind: 'fingerprint-failed', fileName: file.name, detail: fingerprint.error.detail })
+    offered.set(fingerprint.value, file)
+  }
+  const matched: SqlPreparationInput[] = []
+  const missing: string[] = []
+  for (const descriptor of descriptors) {
+    const file = offered.get(descriptor.fingerprint)
+    if (file === undefined) missing.push(descriptor.fileName)
+    else matched.push({ ...descriptor, file })
+  }
+  if (missing.length > 0) return err({ kind: 'replay-inputs-missing', fileNames: missing })
+  rememberInputFiles(matched)
+  return ok(matched)
 }
 
 /** Each file gets an alias no other file in the batch, nor any in `taken`, already uses. */
@@ -161,14 +206,14 @@ const shellDatabase = (
 })
 
 export async function openSqlPreparation(
-  inputs: NonEmptyArray<SqlPreparationInput>,
+  inputs: readonly SqlPreparationInput[],
 ): Promise<Result<SqlPreparationSession, SqlPreparationProblem>> {
   let engine: DuckDbEngine
   try { engine = await isolatedDuckDbEngine() } catch (cause) {
     return err({ kind: 'engine-unavailable', detail: detailOf(cause) })
   }
   const registered = await registerInputs(engine, inputs, `sql-shell-${crypto.randomUUID()}`)
-  if (!registered.ok) return registered
+  if (!registered.ok) { await engine.db.terminate(); return registered }
   const shellConnection = { current: null as number | null }
   return ok({
     shellDatabase: shellDatabase(engine.db, shellConnection),
@@ -227,7 +272,8 @@ async function viewDefinitions(session: SqlPreparationSession): Promise<Result<r
       if (!name.ok || typeof statement !== 'string' || statement.trim().length === 0) {
         return err({ kind: 'prepared-view-invalid', detail: 'DuckDB returned an invalid view definition.' })
       }
-      definitions.push({ name: name.value, statement })
+      // Catalog SQL is generated by DuckDB. Replacement also replays views included in an export.
+      definitions.push({ name: name.value, statement: statement.replace(/^CREATE VIEW\b/i, 'CREATE OR REPLACE VIEW') })
     }
     return ok(definitions)
   } catch (cause) {
@@ -250,7 +296,7 @@ export async function listSqlPreparationViews(
  * run its steps on the connection already.
  */
 export async function materializeView(
-  engine: DuckDbEngine,
+  engine: Pick<DuckDbEngine, 'db'>,
   connection: duckdb.AsyncDuckDBConnection,
   outputView: string,
   fileName: string,
@@ -283,7 +329,7 @@ export async function materializeView(
 async function verifyAndMaterialize(
   definitions: readonly SqlViewDefinition[],
   outputView: SqlViewName,
-  inputs: NonEmptyArray<SqlPreparationInput>,
+  inputs: readonly SqlPreparationInput[],
 ): Promise<Result<Omit<SqlPreparedOutput, 'recipe'>, SqlPreparationProblem>> {
   let engine: DuckDbEngine
   try { engine = await isolatedDuckDbEngine() } catch (cause) {
@@ -329,6 +375,15 @@ export async function materializePreparedView(
   const recipe = sqlDerivedRecipe(statement, outputView, session.inputs)
   if (!recipe.ok) return err({ kind: 'prepared-view-invalid', detail: 'The prepared view has an incomplete source recipe.' })
   const materialized = await verifyAndMaterialize(definitions.value, outputView, session.inputs)
+  if (materialized.ok && session.inputs.some(input => input.format === 'duckdb-export-file')) {
+    const connection = await session.database.connect()
+    try {
+      const live = await materializeView({ db: session.database }, connection, outputView, `${outputView}.parquet`)
+      if (!live.ok) return live
+      const [expected, actual] = await Promise.all([fingerprintFile(materialized.value.file), fingerprintFile(live.value.file)])
+      if (!expected.ok || !actual.ok || expected.value !== actual.value) return err({ kind: 'prepared-view-invalid', detail: 'The selected view differs from the saved import and view definitions. Changes to imported table data are not saved by this recipe. Express the transformation as a view, or export the changed data.' })
+    } finally { await connection.close() }
+  }
   return materialized.ok
     ? ok({ ...materialized.value, recipe: recipe.value })
     : materialized
@@ -344,23 +399,15 @@ export async function replaySqlRecipe(
   recipe: Extract<SelectedSource['recipe'], { readonly kind: 'sql-derived' }>,
   files: readonly File[],
 ): Promise<Result<File, SqlPreparationProblem>> {
-  const offered = await prepareSqlInputs(files)
-  if (!offered.ok) return offered
-  const matched: SqlPreparationInput[] = []
-  const missing: string[] = []
-  for (const descriptor of recipe.inputs) {
-    const input = offered.value.find((candidate) => candidate.fingerprint === descriptor.fingerprint)
-    if (input === undefined) missing.push(descriptor.fileName)
-    else matched.push({ ...input, alias: descriptor.alias })
-  }
-  if (missing.length > 0 || !isNonEmpty(matched)) return err({ kind: 'replay-inputs-missing', fileNames: missing })
+  const recovered = await recoverSqlInputs(recipe.inputs, files)
+  if (!recovered.ok) return recovered
   // The recorded statement is the view definitions DuckDB reported, one per line, in creation order.
   const definitions: SqlViewDefinition[] = recipe.statement
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((statement) => ({ name: recipe.outputView, statement }))
-  const materialized = await verifyAndMaterialize(definitions, recipe.outputView, matched)
+  const materialized = await verifyAndMaterialize(definitions, recipe.outputView, recovered.value)
   return materialized.ok ? ok(materialized.value.file) : materialized
 }
 

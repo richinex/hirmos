@@ -223,7 +223,11 @@ export interface PipelineOutput {
 }
 
 export async function materializePipeline(session: PipelineSession, graph: PipelineGraph): Promise<Result<PipelineOutput, PipelineRunProblem>> {
-  const ran = await runPipeline(session, graph)
+  const compiled = compilePipeline(graph, new Set(session.inputs.map((input) => input.alias as string)))
+  if (!compiled.ok) return err({ kind: 'wiring', problem: compiled.error })
+  const required = compiled.value.views
+  const sourceGraph = { nodes: graph.nodes.filter((node) => required.has(node.id)), edges: graph.edges.filter((edge) => required.has(edge.to)) }
+  const ran = await runPipeline(session, sourceGraph)
   if (!ran.ok) return ran
   if (!ran.value.complete.ok) return err({ kind: 'wiring', problem: ran.value.complete.error })
   for (const [id, outcome] of ran.value.outcomes) {
@@ -234,9 +238,8 @@ export async function materializePipeline(session: PipelineSession, graph: Pipel
     const materialized = await materializeView(session.engine, connection, outputView, 'pipeline_prepared.parquet')
     if (!materialized.ok) return err({ kind: 'materialization', problem: materialized.error })
     // The recipe records the files the graph reads, not every file that was ever chosen.
-    const used = new Set(graph.nodes.flatMap((node) => node.block.kind === 'input' && node.block.file.kind === 'chosen' ? [node.block.file.alias as string] : []))
+    const used = new Set(sourceGraph.nodes.flatMap((node) => node.block.kind === 'input' && node.block.file.kind === 'chosen' ? [node.block.file.alias as string] : []))
     const descriptors = session.inputs.filter((input) => used.has(input.alias)).map(inputDescriptor)
-    if (!isNonEmpty(descriptors)) return err({ kind: 'wiring', problem: { kind: 'no-output-block' } })
     return ok({ ...materialized.value, recipe: { kind: 'pipeline-derived', graph, inputs: descriptors } })
   })
 }
@@ -251,7 +254,7 @@ export async function replayPipelineRecipe(
   files: readonly File[],
   scripts: ScriptRuntime,
 ): Promise<Result<File, PipelineRunProblem>> {
-  const offered = await prepareSqlInputs(files)
+  const offered = files.length === 0 ? ok([]) : await prepareSqlInputs(files)
   if (!offered.ok) return err({ kind: 'input', problem: offered.error })
   const matched: SqlPreparationInput[] = []
   const missing: string[] = []
@@ -260,7 +263,7 @@ export async function replayPipelineRecipe(
     if (input === undefined) missing.push(descriptor.fileName)
     else matched.push({ ...input, alias: descriptor.alias })
   }
-  if (missing.length > 0 || !isNonEmpty(matched)) return err({ kind: 'input', problem: { kind: 'replay-inputs-missing', fileNames: missing } })
+  if (missing.length > 0) return err({ kind: 'input', problem: { kind: 'replay-inputs-missing', fileNames: missing } })
   const session = await openPipeline(matched, scripts)
   if (!session.ok) return session
   try {

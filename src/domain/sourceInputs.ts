@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { sourceFingerprint, type SourceFingerprint } from './dataset'
-import { brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import { brand, err, ok, type Brand, type Result } from './dop'
 
 /**
  * The files a derived source is built from, as every derivation records them: an alias the recipe
@@ -11,28 +11,30 @@ import { brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result
 
 export type SqlInputAlias = Brand<string, 'SqlInputAlias'>
 
-export interface SqlInputDescriptor {
+interface InputFileDescriptor {
   readonly alias: SqlInputAlias
   readonly fileName: string
   readonly bytes: number
-  readonly format: 'csv' | 'tsv' | 'parquet'
   readonly fingerprint: SourceFingerprint
 }
 
-export interface SqlPreparationInput extends SqlInputDescriptor {
-  readonly file: File
-}
+export type SqlInputDescriptor = InputFileDescriptor & (
+  | { readonly format: 'csv' | 'tsv' | 'parquet' }
+  | { readonly format: 'duckdb-export-file'; readonly path: string }
+)
+
+export type SqlPreparationInput = SqlInputDescriptor & { readonly file: File }
 
 /** Recovered files keep the aliases recorded in the recipe, not their current filenames. */
-export function matchInputFiles(descriptors: NonEmptyArray<SqlInputDescriptor>, offered: readonly SqlPreparationInput[]): Result<NonEmptyArray<SqlPreparationInput>, string> {
+export function matchInputFiles(descriptors: readonly SqlInputDescriptor[], offered: readonly SqlPreparationInput[]): Result<readonly SqlPreparationInput[], string> {
   const inputs: SqlPreparationInput[] = []
   const missing: string[] = []
   for (const descriptor of descriptors) {
     const input = offered.find(candidate => candidate.fingerprint === descriptor.fingerprint)
     if (input === undefined) missing.push(descriptor.fileName)
-    else inputs.push({ ...input, alias: descriptor.alias })
+    else inputs.push({ ...descriptor, file: input.file })
   }
-  return missing.length === 0 && isNonEmpty(inputs)
+  return missing.length === 0
     ? ok(inputs)
     : err(`The files chosen do not include ${missing.join(', ')}, unchanged.`)
 }
@@ -75,17 +77,37 @@ export function uniqueSqlInputAlias(fileName: string, occupied: ReadonlySet<stri
 
 export const inputDescriptor = ({ file: _file, ...descriptor }: SqlPreparationInput): SqlInputDescriptor => descriptor
 
-export const inputDescriptorSchema = z.object({
+const fileFields = {
   alias: z.string().min(1),
   fileName: z.string().min(1),
   bytes: z.number().int().positive(),
-  format: z.enum(['csv', 'tsv', 'parquet']),
   fingerprint: z.string(),
-}).strict()
+}
+export const inputDescriptorSchema = z.union([
+  z.object({ ...fileFields, format: z.enum(['csv', 'tsv', 'parquet']) }).strict(),
+  z.object({ ...fileFields, bytes: z.number().int().nonnegative(), format: z.literal('duckdb-export-file'), path: z.string().min(1) }).strict(),
+])
+
+/** Export paths are local relative names, never URLs or parent-directory traversals. */
+export function exportDirectory(paths: readonly string[]): Result<string, { readonly detail: string }> {
+  const roots = new Set<string>()
+  const seen = new Set<string>()
+  for (const path of paths) {
+    const parts = path.split('/')
+    if (parts.length < 2 || /[\\\\:\u0000-\u001f]/.test(path) || parts.some(part => part === '' || part === '.' || part === '..')) return err({ detail: `Invalid export path: ${path}` })
+    if (seen.has(path)) return err({ detail: `Duplicate export path: ${path}` })
+    seen.add(path)
+    roots.add(parts[0]!)
+  }
+  const root = [...roots][0]
+  if (roots.size !== 1 || root === undefined) return err({ detail: 'Choose one DuckDB export folder.' })
+  if (!seen.has(`${root}/schema.sql`) || !seen.has(`${root}/load.sql`)) return err({ detail: 'The export folder must contain schema.sql and load.sql.' })
+  return ok(root)
+}
 
 export function parseInputDescriptors(
   values: readonly z.infer<typeof inputDescriptorSchema>[],
-): Result<NonEmptyArray<SqlInputDescriptor>, { readonly detail: string }> {
+): Result<readonly SqlInputDescriptor[], { readonly detail: string }> {
   const descriptors: SqlInputDescriptor[] = []
   const occupied = new Set<string>()
   for (const input of values) {
@@ -96,5 +118,10 @@ export function parseInputDescriptors(
     occupied.add(alias.value)
     descriptors.push({ ...input, alias: alias.value, fingerprint: fingerprint.value })
   }
-  return isNonEmpty(descriptors) ? ok(descriptors) : err({ detail: 'The recipe has no inputs.' })
+  const exports = descriptors.filter(input => input.format === 'duckdb-export-file')
+  if (exports.length > 0) {
+    const directory = exportDirectory(exports.map(input => input.path))
+    if (!directory.ok) return directory
+  }
+  return ok(descriptors)
 }

@@ -1,5 +1,6 @@
 import { createStore } from 'zustand/vanilla'
 import type { Terminal } from 'xterm'
+import { tableFromIPC } from 'apache-arrow'
 import { isNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { PREPARED_VIEW, type SqlPreparationInput, type SqlViewName } from '@/domain/sqlPreparation'
 import { selectSqlDerivedSource, type SelectedSource, type SqlResume } from '@/domain/workflow'
@@ -10,6 +11,7 @@ type Shell =
   | { readonly kind: 'opening' }
   | { readonly kind: 'ready'; readonly session: SqlPreparationSession }
   | { readonly kind: 'materializing'; readonly session: SqlPreparationSession }
+  | { readonly kind: 'running-script'; readonly session: SqlPreparationSession }
   | { readonly kind: 'failed-to-open'; readonly problem: SqlPreparationProblem }
   | { readonly kind: 'materialization-refused'; readonly session: SqlPreparationSession; readonly problem: SqlPreparationProblem }
 type Cancellation = { readonly kind: 'idle' } | { readonly kind: 'requesting' } | { readonly kind: 'reported'; readonly message: string }
@@ -18,7 +20,18 @@ type Output =
   | { readonly kind: 'none' }
   | { readonly kind: 'available'; readonly views: NonEmptyArray<SqlViewName>; readonly selected: SqlViewName }
   | { readonly kind: 'failed'; readonly problem: SqlPreparationProblem }
+type Script =
+  | { readonly kind: 'closed' }
+  | { readonly kind: 'reading'; readonly name: string }
+  | { readonly kind: 'editing'; readonly name: string; readonly text: string }
+  | { readonly kind: 'failed'; readonly name: string; readonly detail: string }
+type ScriptResult =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'failed'; readonly detail: string }
+  | { readonly kind: 'complete'; readonly count: number; readonly columns: readonly string[]; readonly rows: readonly (readonly string[])[] }
 interface State {
+  readonly script: Script
+  readonly scriptResult: ScriptResult
   readonly shell: Shell
   readonly cancellation: Cancellation
   readonly output: Output
@@ -26,8 +39,9 @@ interface State {
 }
 
 /** Owns the database and terminal together; editor removal only detaches the host. */
-export function createSqlSession(inputs: NonEmptyArray<SqlPreparationInput>, resume: SqlResume | null) {
-  const store = createStore<State>(() => ({ shell: { kind: 'opening' }, cancellation: { kind: 'idle' }, output: { kind: 'checking' }, size: null }))
+export function createSqlSession(inputs: readonly SqlPreparationInput[], resume: SqlResume | null) {
+  const store = createStore<State>(() => ({ scriptResult: { kind: 'none' }, script: { kind: 'closed' }, shell: { kind: 'opening' }, cancellation: { kind: 'idle' }, output: { kind: 'checking' }, size: null }))
+  let reading = 0
   let closed = true
   let epoch = 0
   let listing = 0
@@ -107,6 +121,7 @@ export function createSqlSession(inputs: NonEmptyArray<SqlPreparationInput>, res
     if (closed) return
     closed = true
     epoch++
+    reading++
     listing++
     observer?.disconnect()
     unwatch?.()
@@ -160,6 +175,44 @@ export function createSqlSession(inputs: NonEmptyArray<SqlPreparationInput>, res
     store.setState({ shell: { kind: 'ready', session: live } })
     return selected.value
   }
-  return { store, open, dispose, attach, refresh, select, cancel, adopt, active: () => !closed }
+  const closeScript = () => { reading++; store.setState({ script: { kind: 'closed' } }) }
+  const loadScript = async (file: File) => {
+    if (closed) return
+    const request = ++reading
+    const generation = epoch
+    store.setState({ script: { kind: 'reading', name: file.name }, scriptResult: { kind: 'none' } })
+    try {
+      const text = await file.text()
+      if (!valid(generation) || reading !== request) return
+      store.setState({ script: { kind: 'editing', name: file.name, text } })
+    } catch (cause) {
+      if (valid(generation) && reading === request) store.setState({ script: { kind: 'failed', name: file.name, detail: String(cause) } })
+    }
+  }
+  const editScript = (text: string) => store.setState(state => state.script.kind === 'editing' ? { script: { ...state.script, text } } : state)
+  const runScript = async () => {
+    const { script, shell } = store.getState()
+    if (closed || session === null || session.shellConnection.current === null || script.kind !== 'editing' || !script.text.trim() || (shell.kind !== 'ready' && shell.kind !== 'materialization-refused')) return
+    const generation = epoch
+    const live = session
+    const connection = session.shellConnection.current
+    store.setState({ shell: { kind: 'running-script', session: live }, scriptResult: { kind: 'none' } })
+    try {
+      // The shell's existing cancellable batch path lets DuckDB parse the complete file.
+      const result = tableFromIPC(await live.shellDatabase.runQuery(connection, script.text))
+      if (!valid(generation)) return
+      const columns = result.schema.fields.map(field => field.name)
+      const rows = Array.from({ length: Math.min(200, result.numRows) }, (_, row) => columns.map((_, column) => {
+        const value = result.getChildAt(column)?.get(row)
+        return value === null || value === undefined ? 'NULL' : String(value)
+      }))
+      store.setState({ scriptResult: { kind: 'complete', count: result.numRows, columns, rows } })
+    } catch (cause) {
+      if (valid(generation)) store.setState({ scriptResult: { kind: 'failed', detail: String(cause) } })
+    } finally {
+      if (valid(generation)) { store.setState({ shell: { kind: 'ready', session: live } }); await refresh() }
+    }
+  }
+  return { store, open, dispose, attach, refresh, select, cancel, adopt, loadScript, editScript, closeScript, runScript, active: () => !closed }
 }
 export type SqlController = ReturnType<typeof createSqlSession>

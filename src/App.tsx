@@ -1,7 +1,7 @@
 import { Metadata } from '@/components/ui/Metadata'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
-import { matchInputFiles } from '@/domain/sourceInputs'
+import { DatabaseFolder } from '@/components/data/DatabaseFolder'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { JobsProvider } from '@/analysis/JobsProvider'
 import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
@@ -216,7 +216,7 @@ function App() {
   const reopenEditor = async (recipe: DerivedRecipe) => {
     const [{ inputsFromMemory }] = await Promise.all([import('@/data/inputFiles'), recipe.kind === 'sql-derived' ? loadSqlPreparationWorkspace() : loadPipelineWorkspace()])
     const inputs = inputsFromMemory(recipe.inputs)
-    dispatch({ type: 'editor-reopened', recipe, inputs: inputs !== null && isNonEmpty(inputs) ? inputs : null })
+    dispatch({ type: 'editor-reopened', recipe, inputs })
   }
   // The files chosen again for an editor: each must match a recorded fingerprint, and takes the alias the recipe used.
   const editorFilesChosen = async (files: readonly File[]) => {
@@ -224,12 +224,10 @@ function App() {
     const recipe = workflow.recipe
     setSqlIntake({ kind: 'reading' })
     const data = await import('@/data/sqlPreparation')
-    const offered = await data.prepareSqlInputs(files)
+    const offered = await data.recoverSqlInputs(recipe.inputs, files)
     setSqlIntake({ kind: 'idle' })
     if (!offered.ok) { dispatch({ type: 'editor-files-refused', detail: data.describeSqlPreparationProblem(offered.error) }); return }
-    const matched = matchInputFiles(recipe.inputs, offered.value)
-    if (!matched.ok) { dispatch({ type: 'editor-files-refused', detail: matched.error }); return }
-    dispatch({ type: 'editor-reopened', recipe, inputs: matched.value })
+    dispatch({ type: 'editor-reopened', recipe, inputs: offered.value })
   }
 
   // A source the SQL or pipeline step built is rebuilt from its input files; the result then passes the same fingerprint check.
@@ -268,8 +266,20 @@ function App() {
   }
 
   const project = workflow.kind === 'awaiting-project' ? null : workflow.project
+  const restoreRecipe = workflow.kind === 'awaiting-data' ? workflow.restore?.source?.recipe : undefined
+  const generatedRestore = restoreRecipe !== undefined && restoreRecipe.kind !== 'uploaded-file' && restoreRecipe.inputs.length === 0
   useEffect(() => { setDataEntryMode('file') }, [project?.id])
   const [sqlIntake, setSqlIntake] = useState<SqlIntake>({ kind: 'idle' })
+  const chooseDatabaseExport = async (files: readonly File[]) => {
+    setSqlIntake({ kind: 'reading' })
+    try {
+      const data = await import('@/data/sqlPreparation')
+      const prepared = await data.prepareDatabaseExport(files)
+      if (!prepared.ok) { setSqlIntake({ kind: 'failed', detail: data.describeSqlPreparationProblem(prepared.error) }); return }
+      setSqlIntake({ kind: 'idle' })
+      dispatch({ type: 'sql-inputs-chosen', inputs: prepared.value })
+    } catch (cause) { setSqlIntake({ kind: 'failed', detail: String(cause) }) }
+  }
   // The engine and the console load while the files are read, so the SQL step renders with both already loaded.
   const chooseSqlInputs = async (files: readonly File[]) => {
     setSqlIntake({ kind: 'reading' })
@@ -707,7 +717,7 @@ function App() {
                 <section className="rise my-auto w-full max-w-6xl" aria-labelledby="load-data-title">
                   <div className="grid gap-6 lg:grid-cols-[minmax(26rem,1.2fr)_minmax(0,1fr)] lg:gap-8">
                     <div className="min-w-0">
-                      <ChapterHeading id="load-data-title" className="mb-3">{workflow.restore === null ? 'Choose data' : 'Choose the data file again'}</ChapterHeading>
+                      <ChapterHeading id="load-data-title" className="mb-3">{workflow.restore === null ? 'Choose data' : generatedRestore ? 'Rebuild the generated data' : 'Choose the data file again'}</ChapterHeading>
                       {workflow.restore === null ? (
                         <>
                           <SegmentedControl
@@ -722,13 +732,13 @@ function App() {
                             {dataEntryMode === 'file'
                               ? 'Choose one CSV, TSV or Parquet file. It becomes the source as it is.'
                               : dataEntryMode === 'sql'
-                                ? 'Choose one or more CSV, TSV or Parquet files. Each file becomes a table in a SQL console, and created views can be selected for further analysis.'
-                                : 'Open a canvas of blocks. Give each Input file card a file, wire blocks together to filter, join, derive and aggregate, and use the result as the source.'}
+                                ? 'Start with files or open an empty SQL console. Create a view and use it as the analysis source.'
+                                : 'Start with a file or create a DataFrame in a Python script. Wire blocks together and use the result as the source.'}
                           </p>
                         </>
                       ) : workflow.restore.source !== null && workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
                         <p className={cn(fieldHint, 'mt-0')}>
-                          {`${workflow.project.name} was built from ${workflow.restore.source.name}, which the ${workflow.restore.source.recipe.kind === 'sql-derived' ? 'SQL step' : 'pipeline'} created from ${workflow.restore.source.recipe.inputs.map((input) => `${input.fileName} (${formatBytes(input.bytes)})`).join(' and ')}. Choose those files again, unchanged. The recorded ${workflow.restore.source.recipe.kind === 'sql-derived' ? 'statement runs' : 'blocks run'} on them and the result is checked against the recorded fingerprint before the work returns.`}
+                          {generatedRestore ? 'Run the saved recipe to recreate the data. No input files are needed. The result must match the saved fingerprint before your work returns.' : `${workflow.project.name} was built from ${workflow.restore.source.name}, which the ${workflow.restore.source.recipe.kind === 'sql-derived' ? 'SQL step' : 'pipeline'} created from ${workflow.restore.source.recipe.inputs.map((input) => `${input.fileName} (${formatBytes(input.bytes)})`).join(' and ')}. Choose those files again, unchanged. The recorded ${workflow.restore.source.recipe.kind === 'sql-derived' ? 'statement runs' : 'blocks run'} on them and the result is checked against the recorded fingerprint before the work returns.`}
                         </p>
                       ) : (
                         <p className={cn(fieldHint, 'mt-0')}>
@@ -739,6 +749,10 @@ function App() {
                       {sqlIntake.kind === 'failed' && <p role="alert" className="mt-3 text-body text-danger">{sqlIntake.detail}</p>}
                     </div>
                     {workflow.restore?.source !== null && workflow.restore?.source !== undefined && workflow.restore.source.recipe.kind !== 'uploaded-file' ? (
+                      workflow.restore.source.recipe.inputs.length === 0 ?
+                      <button type="button" className={button('signal')} disabled={sqlIntake.kind === 'reading'} onClick={() => void restoreFromInputs([])}>Rebuild from saved recipe</button> :
+                      workflow.restore.source.recipe.inputs.some(input => input.format === 'duckdb-export-file') ?
+                      <DatabaseFolder busy={sqlIntake.kind === 'reading'} onFiles={files => void restoreFromInputs(files)} /> :
                       <DataDropZone
                         multiple
                         invitation="Drop the input files here."
@@ -754,6 +768,7 @@ function App() {
                         onFiles={([file]) => chooseFile(file)}
                       />
                     ) : dataEntryMode === 'sql' ? (
+                      <div className="flex flex-col gap-3">
                       <DataDropZone
                         multiple
                         invitation="Drop one or more CSV, TSV or Parquet files here."
@@ -763,6 +778,11 @@ function App() {
                         onFiles={(files) => void chooseSqlInputs(files)}
                         onIntent={() => { void loadSqlPreparationWorkspace() }}
                       />
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <button type="button" className={button('outline')} onClick={() => dispatch({ type: 'sql-inputs-chosen', inputs: [] })}>Open empty SQL editor</button>
+                        <DatabaseFolder busy={sqlIntake.kind === 'reading'} onFiles={files => void chooseDatabaseExport(files)} />
+                      </div>
+                      </div>
                     ) : (
                       <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-well px-6 py-8 text-center">
                         <Icon name="account_tree" size={28} className="text-faint" aria-hidden />
@@ -825,14 +845,14 @@ function App() {
                       {workflow.problem !== null && <p role="alert" className="mt-3 text-body text-danger">{workflow.problem}</p>}
                       <button type="button" className={button('quiet', 'mt-4')} onClick={() => dispatch({ type: 'source-cleared' })}>Choose other data instead</button>
                     </div>
-                    <DataDropZone
+                    {workflow.recipe.inputs.some(input => input.format === 'duckdb-export-file') ? <DatabaseFolder busy={sqlIntake.kind === 'reading'} onFiles={files => void editorFilesChosen(files)} /> : <DataDropZone
                       multiple
                       invitation="Drop the input files here."
                       consequence="The editor opens with its blocks and arrows as they were."
                       action="Choose input files"
                       busy={sqlIntake.kind === 'reading'}
                       onFiles={(files) => void editorFilesChosen(files)}
-                    />
+                    />}
                   </div>
                 </section>
               )}

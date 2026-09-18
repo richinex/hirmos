@@ -36,7 +36,7 @@ import { usePythonRun } from './usePythonRun'
 import { iconControl } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import { BLOCK_DRAG_TYPE, blockIcon, type PaletteKind } from './blockIcons'
-import { CARD_WIDTH, connectionRefusal, indexGraph, inputPorts, type ConnectionRefusal } from './pipelineWorkspaceModel'
+import { CARD_HEIGHT, CARD_WIDTH, connectionRefusal, indexGraph, inputPorts, type ConnectionRefusal } from './pipelineWorkspaceModel'
 
 interface CardData extends Record<string, unknown> {
   readonly node: PipelineNode
@@ -55,7 +55,7 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
   const failed = outcome?.kind === 'failed'
   const skipped = outcome?.kind === 'skipped'
   const foot = running !== null
-    ? <span className="flex items-center gap-1.5"><Metadata><span><Orb state="working" aria-label="Script running" className="scale-75" />running</span><span>{formatDuration(running.elapsedMs).text}</span></Metadata></span>
+    ? <span className="flex items-center gap-1.5"><span className="grid size-4 shrink-0 place-items-center"><Orb state="working" aria-label="Script running" className="scale-75" /></span><span>running</span><span>{formatDuration(running.elapsedMs).text}</span></span>
     : outcome === undefined
       ? 'not run'
       : outcome.kind === 'ran'
@@ -63,8 +63,8 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
         : outcome.kind === 'failed' ? 'failed' : outcome.kind === 'waiting' ? 'waiting' : 'not run'
   return (
     <div
-      className={cn('rounded-lg border bg-panel text-left', selected ? 'border-signal' : failed ? 'border-danger' : 'border-hair', skipped && 'opacity-50')}
-      style={{ width: CARD_WIDTH, boxShadow: selected ? '0 0 0 2px var(--color-panel), 0 0 0 3px var(--color-signal)' : undefined }}
+      className={cn('flex flex-col rounded-lg border bg-panel text-left', selected ? 'border-signal' : failed ? 'border-danger' : 'border-hair', skipped && 'opacity-50')}
+      style={{ width: CARD_WIDTH, height: CARD_HEIGHT, boxShadow: selected ? '0 0 0 2px var(--color-panel), 0 0 0 3px var(--color-signal)' : undefined }}
       data-testid={`block-${node.id}`}
     >
       {Array.from({ length: ports }, (_, port) => (
@@ -77,12 +77,12 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
           title={ports > 1 ? `Input ${port + 1}` : 'Input'}
         />
       ))}
-      <div className="flex items-center gap-2 px-2.5 pt-2 pb-1">
+      <div className="flex h-8 shrink-0 items-center gap-2 px-2.5">
         <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded', node.block.kind === 'input' || node.block.kind === 'output' ? 'bg-ink text-panel' : 'bg-raised text-muted')}><Icon name={blockIcon(node.block.kind)} size={14} /></span>
         <span className="truncate text-body font-medium text-ink">{blockLabel(node.block.kind)}</span>
       </div>
-      <p className="m-0 truncate px-2.5 pb-2 font-mono text-[11px] text-faint" title={data.summary}>{data.summary}</p>
-      <div className={cn('flex justify-between border-t border-line px-2.5 py-1 text-[10px]', failed ? 'text-danger' : 'text-faint')}>
+      <p className="m-0 min-h-0 flex-1 truncate px-2.5 font-mono text-[11px] leading-4 text-faint" title={data.summary}>{data.summary}</p>
+      <div className={cn('flex h-7 shrink-0 items-center justify-between border-t border-line px-2.5 text-[10px]', failed ? 'text-danger' : 'text-faint')}>
         <span className="tabular-nums">{foot}</span>
       </div>
       {node.block.kind !== 'output' && (

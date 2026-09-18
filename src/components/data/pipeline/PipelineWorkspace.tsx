@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
+import { TapNote, Tooltip } from '@/components/ui/Tooltip'
 import { button, caption, chromeAction, label, literal, num } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
@@ -51,8 +52,8 @@ const previewNotice = (outcome: BlockOutcome | undefined, nothingSelected: boole
   if (nothingSelected) return 'Select a block to see its rows.'
   if (outcome === undefined) return 'Not run yet.'
   switch (outcome.kind) {
-    case 'failed': return `This block failed: ${outcome.detail}`
-    case 'waiting': return `Not run yet: ${outcome.detail}.`
+    case 'failed': return 'No preview available.'
+    case 'waiting': return 'No preview available.'
     case 'skipped': return 'Not run: a block before it failed.'
     case 'ran': return 'No rows to show yet.'
     default: return assertNever(outcome)
@@ -112,7 +113,8 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   const materializing = useStore(controller.store, state => state.materializing)
   const setGraph = controller.setGraph
   const [selected, setSelected] = useState<PipelineBlockId | null>(null)
-  const [preview, setPreview] = useState<BlockPreview | null>(null)
+  const [shown, setShown] = useState<{ readonly data: BlockPreview; readonly title: string; readonly outcome: BlockOutcome } | null>(null)
+  const preview = shown?.data ?? null
   const [refusal, setRefusal] = useState<string | null>(null)
   const index = useMemo(() => indexGraph(graph), [graph])
   const isMobile = useIsMobile()
@@ -129,14 +131,15 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   // The rows of the selected block, read once per run of it; the run already knows its columns and count.
   const selectedOutcome = selected === null ? undefined : outcomes.get(selected)
   const selectedView = selected === null ? null : viewOf(selected)
+  const selectedTitle = selected === null ? 'Block' : nameOf(selected)
   useEffect(() => {
-    if (session.kind !== 'ready' || selected === null || selectedView === null || selectedOutcome?.kind !== 'ran') { setPreview(null); return }
+    if (session.kind !== 'ready' || selected === null || selectedView === null || selectedOutcome?.kind !== 'ran') return
     let cancelled = false
     void previewBlock(session.live, selectedView, selected, selectedOutcome).then((result) => {
-      if (!cancelled) setPreview(result.ok ? result.value : null)
+      if (!cancelled) setShown(result.ok ? { data: result.value, title: selectedTitle, outcome: selectedOutcome } : null)
     })
     return () => { cancelled = true }
-  }, [selected, selectedOutcome, selectedView, session])
+  }, [selected, selectedOutcome, selectedView, session, selectedTitle])
 
   const selectedNode = selected === null ? null : index.nodes.get(selected) ?? null
   const summaries = useMemo(() => new Map(graph.nodes.map((node) => [node.id, summarise(node.block)])), [graph.nodes])
@@ -172,7 +175,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   }
 
   const completeProblem = run.kind === 'ran' && !run.result.complete.ok ? describePipelineProblem(run.result.complete.error, nameOf) : null
-  const outputReady = run.kind === 'ran' && run.result.complete.ok && [...run.result.outcomes.values()].every((outcome) => outcome.kind === 'ran')
+  const outputReady = run.kind === 'ran' && run.result.complete.ok && [...run.result.complete.value.views.keys()].every((id) => run.result.outcomes.get(id)?.kind === 'ran')
 
   const stage = (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -231,7 +234,20 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
       <div className="space-y-3">
         <Alert tone="info" live={false}>Connect input files through transformation blocks to “Use as source”. Select a block to edit its settings and preview its rows.</Alert>
         {outputNotice}
-        <p className={caption('m-0')}><Metadata><span>{formatCount(graph.nodes.length).text} blocks</span><span>{formatCount(graph.edges.length).text} arrows</span></Metadata></p>
+        <div className={caption('m-0 flex items-center gap-3')} aria-label="Pipeline size">
+          {[
+            { icon: 'deployed_code', count: graph.nodes.length, singular: 'block', plural: 'blocks' },
+            { icon: 'arrow_right_alt', count: graph.edges.length, singular: 'connection', plural: 'connections' },
+          ].map(({ icon, count, singular, plural }) => {
+            const description = `${formatCount(count).text} ${count === 1 ? singular : plural}`
+            const Note = isMobile ? TapNote : Tooltip
+            return <Note key={icon} text={description}>
+              <button type="button" aria-label={description} className="inline-flex items-center gap-1.5 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current">
+                <Icon name={icon} size={16} /><span aria-hidden className="tabular-nums">{formatCount(count).text}</span>
+              </button>
+            </Note>
+          })}
+        </div>
         {files.length > 0 && (
           <div>
             <span className={label('block text-muted')}>Files</span>
@@ -258,22 +274,23 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
     })),
   ], [decimals, preview])
   const previewRows = useMemo<PreviewRow[]>(() => preview === null ? [] : preview.rows.map((cells, index) => ({ index, cells })), [preview])
+  const previewVisible = shown !== null && selectedNode !== null && selectedOutcome?.kind === 'ran'
+  const previewPending = previewVisible && (shown.data.id !== selected || shown.outcome !== selectedOutcome)
   const bottom = (
-    <div className="flex h-full min-h-0 flex-col">
-      {preview === null
-        ? <p className={caption('m-3')}>{previewNotice(selectedNode === null ? undefined : outcomes.get(selectedNode.id), selectedNode === null)}</p>
-        : (
-          <div className="min-h-0 flex-1 overflow-auto p-3">
+    <div className="flex h-full min-h-0 flex-col" data-testid="pipeline-preview" aria-busy={previewPending}>
+      {!previewVisible && <p className={caption('m-3')}>{previewNotice(selectedNode === null ? undefined : outcomes.get(selectedNode.id), selectedNode === null)}</p>}
+      {preview !== null && shown !== null && (
+          <div hidden={!previewVisible} className={cn('min-h-0 flex-1 overflow-auto p-3', !previewVisible && 'hidden')}>
             <EvidenceTable
               appearance="data"
-              title={selectedNode === null ? 'Block' : blockLabel(selectedNode.block.kind)}
+              title={shown.title}
               rows={previewRows}
               columns={previewColumns}
               rowKey={(row) => String(row.index)}
               noun="row"
               empty="The block produced no rows."
               total={preview.rowCount}
-              exportName={selectedNode === null ? undefined : `${selectedNode.id}-preview`}
+              exportName={`${preview.id}-preview`}
               maxHeight="max-h-none"
               frame="none"
             />

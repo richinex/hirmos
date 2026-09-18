@@ -10,7 +10,7 @@ const createSqlProject = async (page: import('@playwright/test').Page) => {
 }
 
 const selectTwoInputs = async (page: import('@playwright/test').Page) => {
-  await page.locator('input[type="file"][multiple]').setInputFiles([
+  await page.locator('input[type="file"][multiple]:not([webkitdirectory])').setInputFiles([
     { name: 'measurements.csv', mimeType: 'text/csv', buffer: Buffer.from('id,value\n1,10\n2,20\n') },
     { name: 'groups.csv', mimeType: 'text/csv', buffer: Buffer.from('id,group_name\n1,A\n2,B\n') },
   ])
@@ -77,7 +77,7 @@ test('reopens a project built by the SQL step from its input files', async ({ pa
   await page.getByRole('list', { name: 'Projects' }).getByRole('button', { name: 'Open' }).first().click()
   await expect(page.getByRole('heading', { name: 'Choose the data file again' })).toBeVisible()
   await expect(page.getByText(/the SQL step created from measurements.csv/)).toBeVisible()
-  await page.locator('input[type="file"][multiple]').setInputFiles([
+  await page.locator('input[type="file"][multiple]:not([webkitdirectory])').setInputFiles([
     { name: 'measurements.csv', mimeType: 'text/csv', buffer: Buffer.from('id,value\n1,10\n2,20\n') },
     { name: 'groups.csv', mimeType: 'text/csv', buffer: Buffer.from('id,group_name\n1,A\n2,B\n') },
   ])
@@ -244,7 +244,7 @@ test('refuses a prepared view that depends on an unrecorded shell table', async 
 test('runs grouped survival analysis from two SQL inputs through the ordinary preparation path', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'The complete SQL-to-WASM path runs once')
   await createSqlProject(page)
-  await page.locator('input[type="file"][multiple]').setInputFiles([
+  await page.locator('input[type="file"][multiple]:not([webkitdirectory])').setInputFiles([
     { name: 'cohorts.csv', mimeType: 'text/csv', buffer: Buffer.from('cohort,stratum,entry_time,observation_end,entrants\njan,A,0,5,10\nfeb,A,1,5,5\n') },
     { name: 'events.csv', mimeType: 'text/csv', buffer: Buffer.from('cohort,event_time,event_count\njan,2,2\njan,4,1\nfeb,3,2\n') },
   ])

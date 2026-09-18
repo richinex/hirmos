@@ -2,9 +2,9 @@ import { lazy, Suspense, useState } from 'react'
 import { createStore } from 'zustand/vanilla'
 import { useStore } from 'zustand'
 import type { SelectedSource, SqlResume, PipelineResume } from '@/domain/workflow'
-import type { NonEmptyArray } from '@/domain/dop'
-import { assertNever, isNonEmpty, ok } from '@/domain/dop'
-import { matchInputFiles, type SqlPreparationInput } from '@/domain/sourceInputs'
+import { assertNever } from '@/domain/dop'
+import { type SqlPreparationInput } from '@/domain/sourceInputs'
+import { DatabaseFolder } from './DatabaseFolder'
 import { inputsFromMemory } from '@/data/inputFiles'
 import { initialGraph } from './pipeline/pipelineWorkspaceModel'
 import { Alert } from '@/components/ui/Alert'
@@ -17,7 +17,7 @@ const SqlShell = lazy(async () => ({ default: (await import('./SqlPreparationWor
 const PipelineWorkspace = lazy(async () => ({ default: (await import('./pipeline/PipelineWorkspace')).PipelineWorkspace }))
 
 type Editor =
-  | { readonly kind: 'sql'; readonly inputs: NonEmptyArray<SqlPreparationInput>; readonly resume: SqlResume | null }
+  | { readonly kind: 'sql'; readonly inputs: readonly SqlPreparationInput[]; readonly resume: SqlResume | null }
   | { readonly kind: 'pipeline'; readonly resume: PipelineResume }
 type Stage =
   | { readonly kind: 'choose' }
@@ -26,7 +26,7 @@ type Stage =
   | { readonly kind: 'failed'; readonly detail: string }
   | { readonly kind: 'editing'; readonly editor: Editor; readonly proposed: SelectedSource | null }
 
-function editorFor(source: SelectedSource, inputs: NonEmptyArray<SqlPreparationInput>, route: 'sql' | 'pipeline'): Editor {
+function editorFor(source: SelectedSource, inputs: readonly SqlPreparationInput[], route: 'sql' | 'pipeline'): Editor {
   const recipe = source.recipe
   switch (recipe.kind) {
     case 'uploaded-file': return route === 'sql' ? { kind: 'sql', inputs, resume: null }
@@ -61,16 +61,14 @@ export function SourceEditor({ source, onView, onCancel, onAccept }: {
         return
       }
       const data = await import('@/data/sqlPreparation')
-      const offered = remembered !== null && files === undefined && isNonEmpty(remembered)
+      const offered = remembered !== null && files === undefined
         ? { ok: true as const, value: remembered }
-        : await data.prepareSqlInputs(files ?? [source.file])
-      if (!offered.ok) { setStage({ kind: 'failed', detail: data.describeSqlPreparationProblem(offered.error) }); return }
-      const inputs = recipe.kind === 'uploaded-file' ? ok(offered.value) : matchInputFiles(recipe.inputs, offered.value)
-      if (!inputs.ok) {
-        setStage({ kind: 'files', detail: inputs.error })
+        : recipe.kind === 'uploaded-file' ? await data.prepareSqlInputs(files ?? [source.file]) : await data.recoverSqlInputs(recipe.inputs, files ?? [])
+      if (!offered.ok) {
+        setStage({ kind: offered.error.kind === 'replay-inputs-missing' ? 'files' : 'failed', detail: data.describeSqlPreparationProblem(offered.error) })
         return
       }
-      setStage({ kind: 'editing', editor: editorFor(source, inputs.value, route), proposed: null })
+      setStage({ kind: 'editing', editor: editorFor(source, offered.value, route), proposed: null })
     } catch (error) {
       setStage({ kind: 'failed', detail: error instanceof Error ? error.message : String(error) })
     }
@@ -86,7 +84,9 @@ export function SourceEditor({ source, onView, onCancel, onAccept }: {
     {stage.kind === 'reading' && <p role="status" className="m-0 text-body text-muted">Opening editor…</p>}
     {stage.kind === 'files' && <>
       {stage.detail !== null && <Alert tone="danger">{stage.detail}</Alert>}
-      <DataDropZone multiple invitation="Choose the original input files." action="Choose input files" onFiles={files => void open(source.recipe.kind === 'sql-derived' ? 'sql' : 'pipeline', files)} />
+      {source.recipe.kind === 'sql-derived' && source.recipe.inputs.some(input => input.format === 'duckdb-export-file')
+        ? <DatabaseFolder onFiles={files => void open('sql', files)} />
+        : <DataDropZone multiple invitation="Choose the original input files." action="Choose input files" onFiles={files => void open(source.recipe.kind === 'sql-derived' ? 'sql' : 'pipeline', files)} />}
     </>}
     {stage.kind === 'failed' && <><Alert tone="danger">{stage.detail}</Alert><button type="button" className={button('outline')} onClick={() => setStage({ kind: 'choose' })}>Try again</button></>}
     </div>

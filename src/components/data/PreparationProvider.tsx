@@ -2,7 +2,6 @@ import { createContext, useContext, useLayoutEffect, useState, type ReactNode } 
 import { createStore, useStore } from 'zustand'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import type { PipelineResume, SqlResume } from '@/domain/workflow'
-import type { NonEmptyArray } from '@/domain/dop'
 import type { SqlPreparationInput } from '@/domain/sqlPreparation'
 import type { PipelineController } from './pipeline/pipelineSession'
 import type { SqlController } from './sqlSession'
@@ -10,7 +9,7 @@ import type { SqlController } from './sqlSession'
 type Entry =
   | { readonly kind: 'none' }
   | { readonly kind: 'pipeline'; readonly resume: PipelineResume | null; readonly controller: PipelineController }
-  | { readonly kind: 'sql'; readonly inputs: NonEmptyArray<SqlPreparationInput>; readonly resume: SqlResume | null; readonly controller: SqlController }
+  | { readonly kind: 'sql'; readonly inputs: readonly SqlPreparationInput[]; readonly resume: SqlResume | null; readonly controller: SqlController }
 
 export function createPreparationSession() {
   const store = createStore<{ readonly entry: Entry }>(() => ({ entry: { kind: 'none' } }))
@@ -26,7 +25,7 @@ export function createPreparationSession() {
       controller.open()
       store.setState({ entry: { kind: 'pipeline', resume, controller } })
     },
-    selectSql: (inputs: NonEmptyArray<SqlPreparationInput>, resume: SqlResume | null, create: () => SqlController) => {
+    selectSql: (inputs: readonly SqlPreparationInput[], resume: SqlResume | null, create: () => SqlController) => {
       const current = store.getState().entry
       if (current.kind === 'sql' && current.inputs === inputs && current.resume === resume) { current.controller.open(); return }
       clear()
@@ -66,7 +65,7 @@ export function usePipelineSession(resume: PipelineResume | null, create: () => 
   return entry.kind === 'pipeline' && entry.resume === resume ? entry.controller : null
 }
 
-export function useSqlSession(inputs: NonEmptyArray<SqlPreparationInput>, resume: SqlResume | null, create: () => SqlController) {
+export function useSqlSession(inputs: readonly SqlPreparationInput[], resume: SqlResume | null, create: () => SqlController) {
   const session = usePreparationSession()
   const entry = useStore(session.store, state => state.entry)
   useLayoutEffect(() => { session.selectSql(inputs, resume, create) }, [session, inputs, resume, create])

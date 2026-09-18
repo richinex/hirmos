@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import { brand, err, ok, type Brand, type Result } from './dop'
 import { parsePipelineRecipe, pipelineRecipeSchema, type PipelineRecipe } from './pipeline'
 import { inputDescriptor, inputDescriptorSchema, parseInputDescriptors, type SqlInputDescriptor, type SqlPreparationInput } from './sourceInputs'
 
@@ -14,7 +14,7 @@ export type SourceRecipe =
       readonly kind: 'sql-derived'
       readonly outputView: SqlViewName
       readonly statement: string
-      readonly inputs: NonEmptyArray<SqlInputDescriptor>
+      readonly inputs: readonly SqlInputDescriptor[]
     }
   | PipelineRecipe
 
@@ -30,13 +30,12 @@ export function sqlDerivedRecipe(
   inputs: readonly SqlPreparationInput[],
 ): Result<Extract<SourceRecipe, { readonly kind: 'sql-derived' }>, { readonly kind: 'invalid-sql-derivation' }> {
   const canonical = statement.trim()
-  if (canonical.length === 0 || !isNonEmpty(inputs)) return err({ kind: 'invalid-sql-derivation' })
-  const [first, ...rest] = inputs
+  if (canonical.length === 0) return err({ kind: 'invalid-sql-derivation' })
   return ok({
     kind: 'sql-derived',
     outputView,
     statement: canonical,
-    inputs: [inputDescriptor(first), ...rest.map(inputDescriptor)],
+    inputs: inputs.map(inputDescriptor),
   })
 }
 
@@ -46,7 +45,7 @@ const sourceRecipeSchema = z.discriminatedUnion('kind', [
     kind: z.literal('sql-derived'),
     outputView: z.string().min(1),
     statement: z.string().trim().min(1),
-    inputs: z.array(inputDescriptorSchema).min(1),
+    inputs: z.array(inputDescriptorSchema),
   }).strict(),
   pipelineRecipeSchema,
 ])

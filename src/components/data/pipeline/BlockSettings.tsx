@@ -208,7 +208,7 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
         <Suspense fallback={<div className="min-h-[14rem] rounded-md border border-control bg-well" aria-busy />}>
           <PythonEditor label="Python script" value={block.code} onChange={(code) => onChange({ ...block, code })} />
         </Suspense>
-        <p className={caption('m-0')}>Each input is a pandas DataFrame in <code>inputs</code>, in port order. Assign the table to pass on to <code>prepared</code>.</p>
+        <p className={caption('m-0')}>Create a DataFrame without an input, or read connected DataFrames from <code>inputs</code> in port order. Assign the result to <code>prepared</code>.</p>
         <PythonRuntimeLine step={node.id} />
       </div>
     )

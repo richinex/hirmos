@@ -55,6 +55,14 @@ The preview table inherited the dashboard's 14px body size; the earlier 13px red
 
 The follow-up source audit found 11 tables bypassing the shared recipe in `EstimationPanel`, `SensitivityPanel`, `CounterfactualPanel` and `EstimateHeadline`. Their explicit body-text classes now use the table token too. Shared evidence, time-series, preprocessing and history tables inherit the recipe. The compact DAG ledger intentionally remains label-sized. Empty-state explanations remain body text; inspector headings retain their separate hierarchy. This source audit does not claim that every estimator screen has been visually replayed.
 
+## Pipeline previews and Script cards (18 September 2026)
+
+The pipeline preview now retains the last successful table together with its block identity, title and run outcome. Pending requests cannot relabel an old table as a different block. Late responses are ignored. Waiting or failed blocks hide the retained table instead of destroying it; recovery updates the same table instance. Detailed errors appear once in the inspector, while the preview says no preview is available.
+
+Pasting code exposed a separate geometry problem: replacing status text with the running orb increased the node height by about 14.5px. Pipeline cards now use the existing 86px card-height constant, with fixed header and status rows and a fixed-size orb slot. This fixes the changing geometry without delaying execution or suppressing updates.
+
+`tests/pipeline-preview-stability.spec.ts` exercises a real Script block through execution, failure and recovery. It checks retained table and node DOM identity, one detailed error, stable preview-pane height, and less than 0.5px node-height variation during a rerun.
+
 ## References
 
 - [React: preserving and resetting state](https://react.dev/learn/preserving-and-resetting-state)
