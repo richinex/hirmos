@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { showSqlSource, hideSqlSource } from './sql-pane'
 
 test('editing preserves workflow identity and rejects a replacement from another source', async ({ page }) => {
   await page.goto('/app')
@@ -78,7 +79,10 @@ test('direct upload can enter either editor without losing preparation on cancel
   for (const route of ['Build a pipeline', 'Prepare with SQL']) {
     await page.getByRole('button', { name: 'Edit data', exact: true }).click()
     await page.getByRole('button', { name: route, exact: true }).click()
-    if (route === 'Prepare with SQL') await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible({ timeout: 30_000 })
+    if (route === 'Prepare with SQL') {
+      await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible({ timeout: 30_000 })
+      await showSqlSource(page)
+    }
     else {
       await expect(page.getByTestId('block-input-measurements')).toContainText('3 rows, 1 column', { timeout: 30_000 })
       if (info.project.name === 'mobile-chromium') await page.getByRole('group', { name: 'Panes' }).getByRole('button', { name: 'Pipeline', exact: true }).click()
@@ -101,11 +105,14 @@ test('direct upload can enter either editor without losing preparation on cancel
 
   await page.getByRole('button', { name: 'Edit data', exact: true }).click()
   await page.getByRole('button', { name: 'Prepare with SQL', exact: true }).click()
+  await showSqlSource(page)
   await expect(page.getByRole('button', { name: 'Refresh views' })).toBeEnabled({ timeout: 30_000 })
+  await hideSqlSource(page)
   const terminal = page.getByLabel('SQL console').locator('.xterm-helper-textarea')
   await terminal.focus()
   await terminal.pressSequentially('CREATE OR REPLACE VIEW edited AS SELECT value * 2 AS doubled FROM measurements;')
   await terminal.press('Enter')
+  await showSqlSource(page)
   await page.getByRole('button', { name: 'Refresh views' }).click()
   await expect(page.getByRole('button', { name: 'Use selected view' })).toBeEnabled({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Use selected view' }).click()
@@ -113,6 +120,7 @@ test('direct upload can enter either editor without losing preparation on cancel
   await expect(confirm).toBeVisible({ timeout: 30_000 })
   await confirm.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible()
+  await showSqlSource(page)
   await page.getByRole('button', { name: 'Use selected view' }).click()
   await confirm.getByRole('button', { name: 'Replace dataset', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible()
@@ -125,10 +133,12 @@ test('direct upload can enter either editor without losing preparation on cancel
   await expect(page.getByRole('alert')).toContainText('do not include measurements.csv')
   await page.locator('input[type=file][multiple]').setInputFiles({ name: 'measurements.csv', mimeType: 'text/csv', buffer: Buffer.from('value\n1\n2\n3\n') })
   await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible({ timeout: 30_000 })
+  await showSqlSource(page)
   await page.getByRole('button', { name: 'Cancel editing', exact: true }).click()
   await page.getByRole('button', { name: 'Edit data', exact: true }).click()
   await page.getByRole('button', { name: 'Edit SQL', exact: true }).click()
   await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible({ timeout: 30_000 })
+  await showSqlSource(page)
   await page.getByRole('button', { name: 'Cancel editing', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('doubled')
 })

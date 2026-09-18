@@ -29,7 +29,7 @@ for (const mixed of [false, true]) {
         await page.setViewportSize({ width, height: 844 })
         await search.scrollIntoViewIfNeeded()
         const field = (await search.locator('..').boundingBox())!
-        const density = (await schema.getByRole('group', { name: 'Row density' }).boundingBox())!
+        const density = (await schema.getByRole('radiogroup', { name: 'Row density' }).boundingBox())!
         expect(Math.abs(field.y - density.y)).toBeLessThanOrEqual(1)
         expect(Math.abs(field.height - density.height)).toBeLessThanOrEqual(1)
         await schema.screenshot({ path: info.outputPath(`schema-${width}.png`) })
@@ -43,7 +43,7 @@ for (const mixed of [false, true]) {
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
         const preview = page.getByRole('region', { name: 'Preview', exact: true })
         for (const [region, field, control] of [
-          [schema, search.locator('..'), schema.getByRole('group', { name: 'Row density' })],
+          [schema, search.locator('..'), schema.getByRole('radiogroup', { name: 'Row density' })],
           [preview, preview.getByRole('searchbox', { name: 'Search rows' }).locator('..'), preview.locator('summary')],
         ] as const) {
           const row = field.locator('..')

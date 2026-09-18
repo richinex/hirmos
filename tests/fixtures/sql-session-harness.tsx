@@ -83,7 +83,7 @@ export async function mount() {
     return <>
       <button onClick={() => show(!visible)}>{visible ? 'Hide test editor' : 'Show test editor'}</button>
       {entry.kind === 'sql' && <Status current={entry.controller} />}
-      {visible && <SqlShell inputs={files} resume={null} onPrepared={() => {}} onCleared={owner.clear} />}
+      {visible && <div style={{ display: 'flex', flexDirection: 'column', height: '80vh' }}><SqlShell inputs={files} resume={null} onPrepared={() => {}} onCleared={owner.clear} /></div>}
     </>
   }
   function Harness() {
@@ -98,7 +98,8 @@ export async function mount() {
   }
   const host = document.createElement('div')
   host.id = 'sql-session-test'
-  host.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--color-stage);overflow:auto;padding:16px'
+  host.style.cssText = 'position:fixed;inset:0;z-index:1;background:var(--color-stage);overflow:auto;padding:16px'
+  document.getElementById('root')?.remove()
   document.body.append(host)
   createRoot(host).render(<Harness />)
 }

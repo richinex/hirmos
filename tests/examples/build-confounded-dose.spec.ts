@@ -21,7 +21,7 @@ test('build the confounded dose example bundle', async ({ page }) => {
   await addArrow(page, 'dose', 'recovery', 'The dose is given in order to raise recovery.')
 
   // The same query at two state budgets, to show the contrast is not a per-unit effect.
-  await page.getByRole('button', { name: /Intervene/ }).click()
+  await page.getByRole('radio', { name: /Intervene/ }).check()
   await choose(page, 'Variable to set', 'dose')
   await choose(page, 'Variable to read', 'recovery')
   await choose(page, 'State budget', '2')

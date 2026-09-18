@@ -64,7 +64,7 @@ test('build the Seatbelts example bundle', async ({ page }) => {
     ['kms', 'DriversKilled', 'More distance driven means more exposure to fatal crashes.'],
     ['law', 'DriversKilled', 'The seat-belt law changes survival in crashes.'],
   ] as const
-  await page.getByRole('button', { name: 'Selection', exact: true }).click()
+  await page.getByRole('radio', { name: 'Selection', exact: true }).check()
   const ledger = page.getByRole('table', { name: 'Arrows' })
   for (const [cause, effect, basis] of arrows) {
     await choose(page.getByLabel('Proposed cause'), cause)
@@ -76,12 +76,12 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await choose(page.getByLabel('Treatment'), 'kms')
   await choose(page.getByLabel('Outcome'), 'DriversKilled')
   await page.getByRole('button', { name: /Tidy graph/ }).click()
-  await page.getByRole('button', { name: 'Intervene' }).click()
+  await page.getByRole('radio', { name: 'Intervene' }).check()
   await choose(page.getByLabel('Variable to set'), 'kms')
   await choose(page.getByLabel('Variable to read'), 'DriversKilled')
   await page.getByRole('button', { name: /Evaluate intervention/ }).click()
   await expect(page.getByText(/Graph revision/)).toBeVisible({ timeout: 60_000 })
-  await page.getByRole('button', { name: 'Selection' }).click()
+  await page.getByRole('radio', { name: 'Selection' }).check()
   await page.getByRole('button', { name: /Use for study/ }).click()
 
   // the study

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { showSqlSource, hideSqlSource } from './sql-pane'
 
 test('opening SQL is inert; reviewed multiline SQL runs in the official console', async ({ page }, info) => {
   test.setTimeout(90_000)
@@ -7,21 +8,26 @@ test('opening SQL is inert; reviewed multiline SQL runs in the official console'
   await page.getByRole('button', { name: 'Create project', exact: true }).click()
   await page.getByRole('radio', { name: 'Prepare with SQL' }).click({ force: true })
   await page.getByRole('button', { name: 'Open empty SQL editor' }).click()
+  await showSqlSource(page)
   await expect(page.getByRole('button', { name: 'Open SQL file' })).toBeEnabled({ timeout: 30_000 })
+  await hideSqlSource(page)
   const text = '-- A multiline script\nCREATE VIEW opened_file AS\nSELECT * FROM (VALUES (1), (2), (3)) rows(value);\nCREATE VIEW second_statement AS SELECT * FROM opened_file WHERE value > 1;\nSELECT count(*) AS checked_rows FROM second_statement;\n'
   const file = { name: 'example.sql', mimeType: 'application/sql', buffer: Buffer.from(text) }
   await page.getByLabel('SQL script file').setInputFiles(file)
   await expect(page.getByRole('textbox', { name: 'SQL file contents' })).toHaveValue(text)
   await page.screenshot({ path: info.outputPath('sql-review.png'), fullPage: true })
   await page.getByRole('button', { name: 'Close sql file' }).click()
+  await showSqlSource(page)
   await page.getByRole('button', { name: 'Refresh views' }).click()
   await expect(page.getByRole('combobox', { name: 'Output view' })).toHaveCount(0)
+  await hideSqlSource(page)
   await page.getByLabel('SQL script file').setInputFiles(file)
   await page.getByRole('button', { name: 'Run SQL', exact: true }).click()
   await expect(page.getByText('Final statement result', { exact: true })).toBeVisible()
   await expect(page.getByRole('dialog', { name: 'SQL file', exact: true }).getByRole('cell', { name: '2', exact: true })).toBeVisible()
   await page.screenshot({ path: info.outputPath('sql-result.png'), fullPage: true })
   await page.getByRole('button', { name: 'Close sql file' }).click()
+  await showSqlSource(page)
   await expect(async () => {
     await page.getByRole('button', { name: 'Refresh views' }).click()
     await expect(page.getByRole('combobox', { name: 'Output view' })).toContainText('opened_file')
@@ -39,7 +45,9 @@ test('SQL files expose errors and allow cancelling a batch without running later
   await page.getByRole('button', { name: 'Create project', exact: true }).click()
   await page.getByRole('radio', { name: 'Prepare with SQL' }).click({ force: true })
   await page.getByRole('button', { name: 'Open empty SQL editor' }).click()
+  await showSqlSource(page)
   await expect(page.getByRole('button', { name: 'Open SQL file' })).toBeEnabled({ timeout: 30_000 })
+  await hideSqlSource(page)
   const open = async (text: string) => page.getByLabel('SQL script file').setInputFiles({ name: 'check.sql', mimeType: 'application/sql', buffer: Buffer.from(text) })
   await open('')
   await expect(page.getByRole('button', { name: 'Run SQL', exact: true })).toBeDisabled()
@@ -52,6 +60,7 @@ test('SQL files expose errors and allow cancelling a batch without running later
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel query', exact: true }).click()
   await expect(page.getByRole('dialog').getByRole('alert')).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Close sql file' }).click()
+  await showSqlSource(page)
   await page.getByRole('button', { name: 'Refresh views' }).click()
   await expect(page.getByRole('combobox', { name: 'Output view' })).toHaveCount(0)
 })

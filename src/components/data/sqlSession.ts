@@ -30,6 +30,7 @@ type ScriptResult =
   | { readonly kind: 'failed'; readonly detail: string }
   | { readonly kind: 'complete'; readonly count: number; readonly columns: readonly string[]; readonly rows: readonly (readonly string[])[] }
 interface State {
+  readonly query: 'idle' | 'running'
   readonly script: Script
   readonly scriptResult: ScriptResult
   readonly shell: Shell
@@ -40,7 +41,7 @@ interface State {
 
 /** Owns the database and terminal together; editor removal only detaches the host. */
 export function createSqlSession(inputs: readonly SqlPreparationInput[], resume: SqlResume | null) {
-  const store = createStore<State>(() => ({ scriptResult: { kind: 'none' }, script: { kind: 'closed' }, shell: { kind: 'opening' }, cancellation: { kind: 'idle' }, output: { kind: 'checking' }, size: null }))
+  const store = createStore<State>(() => ({ query: 'idle', scriptResult: { kind: 'none' }, script: { kind: 'closed' }, shell: { kind: 'opening' }, cancellation: { kind: 'idle' }, output: { kind: 'checking' }, size: null }))
   let reading = 0
   let closed = true
   let epoch = 0
@@ -84,7 +85,9 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     host = element
     mount?.append(element)
     void (async () => {
-      const opened = await openSqlPreparation(inputs)
+      const opened = await openSqlPreparation(inputs, running => {
+        if (valid(generation)) store.setState({ query: running ? 'running' : 'idle', ...(running ? { cancellation: { kind: 'idle' as const } } : {}) })
+      })
       if (!valid(generation)) { if (opened.ok) await closeSqlPreparation(opened.value); return }
       if (!opened.ok) { store.setState({ shell: { kind: 'failed-to-open', problem: opened.error } }); return }
       session = opened.value
@@ -135,7 +138,7 @@ export function createSqlSession(inputs: readonly SqlPreparationInput[], resume:
     observer = null
     unwatch = null
     unbridge = null
-    store.setState({ shell: { kind: 'opening' }, output: { kind: 'checking' }, cancellation: { kind: 'idle' }, size: null })
+    store.setState({ query: 'idle', shell: { kind: 'opening' }, output: { kind: 'checking' }, cancellation: { kind: 'idle' }, size: null })
   }
   const attach = (element: HTMLDivElement) => {
     mount = element

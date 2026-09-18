@@ -105,7 +105,7 @@ export function SourceEditor({ source, onView, onCancel, onAccept }: {
   return <>
       <Suspense fallback={<p role="status">Loading editor…</p>}>
         {stage.editor.kind === 'sql'
-          ? <section className="rise w-full max-w-6xl" aria-label="Prepare with SQL"><SqlShell inputs={stage.editor.inputs} resume={stage.editor.resume} onPrepared={propose} onCancelEditing={onCancel} clearLabel="Back to editor choice" onCleared={() => setStage({ kind: 'choose' })} /></section>
+          ? <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col" aria-label="Prepare with SQL"><SqlShell inputs={stage.editor.inputs} resume={stage.editor.resume} onPrepared={propose} onCancelEditing={onCancel} clearLabel="Back to editor choice" onCleared={() => setStage({ kind: 'choose' })} /></section>
           : <PipelineWorkspace resume={stage.editor.resume} onPrepared={propose} onCancelEditing={onCancel} />}
       </Suspense>
       {stage.proposed !== null && <ConfirmDialog open title="Replace dataset?" message="Accepting this result replaces the current source and clears its prepared dataset and analysis runs. The original input files are unchanged." confirmLabel="Replace dataset" danger onClose={() => propose(null)} onConfirm={() => { if (stage.proposed !== null) onAccept(stage.proposed) }} />}

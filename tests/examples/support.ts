@@ -88,7 +88,7 @@ export const createDag = async (page: Page, name: string): Promise<void> => {
   await page.getByRole('button', { name: 'Create DAG draft' }).click()
   // With discovery evidence present the inspector opens on Evidence; the arrow controls are under Selection.
   const cause = page.getByRole('combobox', { name: 'Proposed cause' })
-  await expect(cause).toBeVisible({ timeout: 5_000 }).catch(() => page.getByRole('button', { name: 'Selection', exact: true }).first().click())
+  await expect(cause).toBeVisible({ timeout: 5_000 }).catch(() => page.getByRole('radio', { name: 'Selection', exact: true }).first().check())
   await expect(cause).toBeVisible()
 }
 

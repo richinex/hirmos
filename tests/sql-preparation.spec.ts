@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { showSqlSource, hideSqlSource } from './sql-pane'
 import { parseSourceRecipe } from '../src/domain/sqlPreparation'
 import { choose, prepare } from './examples/support'
 
@@ -15,8 +16,10 @@ const selectTwoInputs = async (page: import('@playwright/test').Page) => {
     { name: 'groups.csv', mimeType: 'text/csv', buffer: Buffer.from('id,group_name\n1,A\n2,B\n') },
   ])
   await expect(page.getByLabel('SQL console').locator('.xterm')).toBeVisible({ timeout: 30_000 })
+  await showSqlSource(page)
   await expect(page.getByRole('button', { name: 'Refresh views' })).toBeEnabled({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: 'Use selected view' })).toBeDisabled()
+  await hideSqlSource(page)
 }
 
 const runSql = async (page: import('@playwright/test').Page, sql: string) => {
@@ -45,8 +48,7 @@ test('materializes a declared multi-file SQL view through the ordinary profile p
   await createSqlProject(page)
   await selectTwoInputs(page)
 
-  await page.getByRole('button', { name: 'Cancel query' }).click()
-  await expect(page.getByRole('status')).toHaveText('No query was running.')
+  await expect(page.getByRole('button', { name: 'Cancel query' })).toHaveCount(0)
 
   await runSql(page, 'CREATE OR REPLACE VIEW joined_measurements AS SELECT m.id, m.value, g.group_name FROM measurements m JOIN groups g USING (id);')
   await runSql(page, 'CREATE OR REPLACE VIEW analysis_rows AS SELECT * FROM joined_measurements;')

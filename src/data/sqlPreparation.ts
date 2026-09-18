@@ -180,17 +180,21 @@ export async function replayDefinitionsInShell(session: SqlPreparationSession, s
 const shellDatabase = (
   database: duckdb.AsyncDuckDB,
   connection: { current: number | null },
+  onQuery: (running: boolean) => void,
 ): duckdb.AsyncDuckDB => new Proxy(database, {
   get(target, property) {
     if (property === 'runQuery') {
       return async (id: number, sql: string) => {
-        const live = new duckdb.AsyncDuckDBConnection(target, id)
-        // DuckDB executes batches and returns their final statement's result.
-        const reader = await live.send(sql)
-        // The official shell expects Arrow file IPC. Arrow preserves the schema
-        // and batches while DuckDB's pending API leaves the query cancellable.
-        const writer = await RecordBatchFileWriter.writeAll(reader)
-        return writer.toUint8Array()
+        onQuery(true)
+        try {
+          const live = new duckdb.AsyncDuckDBConnection(target, id)
+          // DuckDB executes batches and returns their final statement's result.
+          const reader = await live.send(sql)
+          // The official shell expects Arrow file IPC. Arrow preserves the schema
+          // and batches while DuckDB's pending API leaves the query cancellable.
+          const writer = await RecordBatchFileWriter.writeAll(reader)
+          return await writer.toUint8Array()
+        } finally { onQuery(false) }
       }
     }
     if (property === 'connectInternal') {
@@ -207,6 +211,7 @@ const shellDatabase = (
 
 export async function openSqlPreparation(
   inputs: readonly SqlPreparationInput[],
+  onQuery: (running: boolean) => void = () => {},
 ): Promise<Result<SqlPreparationSession, SqlPreparationProblem>> {
   let engine: DuckDbEngine
   try { engine = await isolatedDuckDbEngine() } catch (cause) {
@@ -216,7 +221,7 @@ export async function openSqlPreparation(
   if (!registered.ok) { await engine.db.terminate(); return registered }
   const shellConnection = { current: null as number | null }
   return ok({
-    shellDatabase: shellDatabase(engine.db, shellConnection),
+    shellDatabase: shellDatabase(engine.db, shellConnection, onQuery),
     database: engine.db,
     inputs,
     shellConnection,

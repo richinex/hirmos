@@ -15,7 +15,8 @@ import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
-import { button, chapterIntro, field, iconControl, literal, panel, pill, sectionTitle, segment, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, iconControl, literal, panel, pill, sectionTitle, well } from '@/components/ui/recipes'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import {
   createDagDocument,
   describeDagCreateProblem,
@@ -877,9 +878,9 @@ export function DagWorkspace({
     <section aria-labelledby="dag-workspace-title" className="@container/panel flex h-full min-h-0 flex-col">
       {header}
       {documents.length > 1 && (
-        <div className={well('mb-3 flex flex-wrap gap-1 self-start p-1')} aria-label="DAG documents">
-          {documents.map((candidate) => <button key={candidate.id} type="button" className={segment(candidate.id === document.id)} aria-pressed={candidate.id === document.id} onClick={() => dispatch({ type: 'document-selected', document: candidate.id, latestRun: latestRunId(discoveryRuns) })}>{candidate.name}</button>)}
-        </div>
+        <SegmentedControl wrap className="mb-3 self-start" ariaLabel="DAG documents" value={document.id}
+          onChange={(id) => dispatch({ type: 'document-selected', document: id, latestRun: latestRunId(discoveryRuns) })}
+          options={documents.map((candidate) => ({ value: candidate.id, label: candidate.name }))} />
       )}
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
@@ -972,21 +973,14 @@ export function DagWorkspace({
     </section>
   )
 
-  const tab = (id: 'selection' | 'evidence' | 'intervene', icon: string, text: string) => (
-    <button
-      type="button"
-      onClick={() => setInspectorTab(id)}
-      aria-pressed={inspectorTab === id}
-      className={cn('flex items-center gap-1.5 rounded-md px-2 py-1 text-label transition-colors', inspectorTab === id ? 'bg-raised text-ink' : 'text-muted hover:text-ink')}
-    >
-      <Icon name={icon} size={14} />
-      {text}
-    </button>
-  )
-
   const rootCause = prepareRootCauseGraph(document, prepared)
   const inspector = (
     <div className="flex flex-col gap-4">
+      <SegmentedControl size="sm" fill ariaLabel="DAG inspector" value={inspectorTab} onChange={setInspectorTab} options={[
+        { value: 'selection', label: <span className="flex items-center gap-1.5"><Icon name="ads_click" size={14} />Selection</span> },
+        { value: 'evidence', label: <span className="flex items-center gap-1.5"><Icon name="schema" size={14} />Evidence</span> },
+        { value: 'intervene', label: <span className="flex items-center gap-1.5"><Icon name="bolt" size={14} />Intervene</span> },
+      ]} />
       <ValidationPanel document={document} flow={flow} onUseForStudy={() => { if (!boundHere) onStudyDraftChanged({ ...EMPTY_STUDY_DRAFT, dagDocument: document.id }); onUseForStudy() }} onUseForRootCause={rootCause.ok ? () => onUseForRootCause({ dagDocument: rootCause.value.dagDocument, dagRevision: rootCause.value.dagRevision, preparedDataset: rootCause.value.preparedDataset }) : null} onSelectEdge={(edge) => { setInspectorTab('selection'); selectEdge(document, edge) }} />
       <GraphCheckPanel source={source} profile={profile} prepared={prepared} document={document} checks={checks} onCheck={onCheck} />
       {inspectorTab === 'selection' && (
@@ -1052,7 +1046,6 @@ export function DagWorkspace({
       stageScroll={false}
       inspector={{
         title: 'Inspector',
-        controls: <div className="flex gap-1">{tab('selection', 'ads_click', 'Selection')}{tab('evidence', 'schema', 'Evidence')}{tab('intervene', 'bolt', 'Intervene')}</div>,
         body: inspector,
       }}
       bottom={{ title: `Arrows (${document.current.graph.edges.length})`, body: ledger, defaultSize: 150 }}

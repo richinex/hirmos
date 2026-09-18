@@ -1,4 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { BlockToolbar } from './BlockToolbar'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '@/components/Icon'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
@@ -178,17 +179,15 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   const outputReady = run.kind === 'ran' && run.result.complete.ok && [...run.result.complete.value.views.keys()].every((id) => run.result.outcomes.get(id)?.kind === 'ran')
 
   const stage = (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* One row, never a stack: on a phone the chips show their glyph alone so all nine fit; wider than that they carry their labels and scroll sideways if the stage is narrower than the row. The row has no heading of its own: the chip names say what it adds. */}
-      <div className="flex min-w-0 max-w-full flex-nowrap items-center gap-1 overflow-x-auto border-b border-line px-2 py-1.5" role="toolbar" aria-label="Add a block">
-        {PALETTE_GROUPS.map((group, index) => (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <BlockToolbar>
+        {PALETTE_GROUPS.map((group) => (
           <div key={group.label} className="flex shrink-0 items-center gap-0.5" role="group" aria-label={group.label}>
-            {index > 0 && <span aria-hidden className="mx-0.5 h-4 w-px bg-hair" />}
             {group.kinds.map((kind) => (
               <button
                 key={kind}
                 type="button"
-                className={chromeAction('quiet', 'shrink-0 cursor-grab whitespace-nowrap active:cursor-grabbing')}
+                className={chromeAction('quiet', 'min-w-10 shrink-0 cursor-grab justify-center whitespace-nowrap text-muted hover:bg-panel active:cursor-grabbing active:bg-well')}
                 aria-label={blockLabel(kind)}
                 title={`Click to add ${blockLabel(kind).toLowerCase()} after the selected block, or drag it onto the canvas`}
                 draggable
@@ -197,7 +196,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
                 onFocus={kind === 'script' ? preloadPythonEditor : undefined}
                 onClick={() => add(kind)}
               >
-                <Icon name={blockIcon(kind)} size={16} />{isMobile ? null : <span>{blockLabel(kind)}</span>}
+                <Icon name={blockIcon(kind)} size={16} /><span className="pipeline-block-label">{blockLabel(kind)}</span>
               </button>
             ))}
           </div>
@@ -206,7 +205,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
           {session.kind === 'opening' && <span className={caption('m-0')}>Opening DuckDB</span>}
           {session.kind === 'failed' && <span className="text-label text-danger">{session.detail}</span>}
         </span>
-      </div>
+      </BlockToolbar>
       {refusal !== null && <Alert tone="warn" className="mx-3 mt-2"><p className="m-0">{refusal}</p></Alert>}
       {run.kind === 'refused' && <Alert tone="danger" className="mx-3 mt-2"><p className="m-0">{run.detail}</p></Alert>}
       <div className="relative min-h-[16rem] flex-1">
@@ -375,14 +374,14 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
         </details>
       )}
       {removable && (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-hair pt-3">
+        <div className={cn('grid gap-2 pt-3', node.block.kind === 'input' ? 'grid-cols-2' : 'grid-cols-1')}>
           {node.block.kind === 'input'
             ? (
               <button type="button" className={button(held === null ? 'signal' : 'quiet', 'whitespace-nowrap', 'sm')} disabled={choosing.kind === 'busy'} aria-busy={choosing.kind === 'busy'} onClick={() => picker.current?.click()}>
                 <Icon name="upload_file" size={14} /> {held === null ? 'Choose file' : 'Replace file'}
               </button>
             )
-            : <span />}
+            : null}
           {/* The same control family as the file button beside it: control radius, the small step, danger only in the ink. */}
           <button type="button" className={button('quiet', 'whitespace-nowrap text-danger hover:border-danger/50 hover:text-danger', 'sm')} onClick={onRemove}><Icon name="delete" size={14} /> Remove block</button>
         </div>

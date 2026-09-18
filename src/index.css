@@ -563,6 +563,12 @@ button[aria-busy="true"]::after {
 .evidence-minimal table th, .evidence-minimal table tbody tr { border-color: transparent; }
 .evidence-minimal table th { background: var(--table-surface, var(--color-panel)); }
 
+/* Match the block rail's 8px top inset and 40px height without moving the canvas. */
+.workbench-pane-header:has(> #pipeline-inspector-title) { height: 48px; }
+@media (pointer: coarse) {
+  .workbench-pane-header:has(> #pipeline-inspector-title) { height: 60px; }
+}
+
 .equation-columns { display: grid; min-width: 0; gap: 2rem 3rem; }
 .equation-group { display: grid; min-width: 0; align-content: start; gap: .75rem; }
 @container (min-width: 44rem) {

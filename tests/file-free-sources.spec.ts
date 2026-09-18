@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { showSqlSource, hideSqlSource } from './sql-pane'
 import { compilePipeline, parsePipelineRecipe, pipelineBlockId, type PipelineGraph } from '../src/domain/pipeline'
 import { parseSourceRecipe } from '../src/domain/sqlPreparation'
 
@@ -58,10 +59,13 @@ test('empty SQL editor creates a source without uploaded files', async ({ page }
   await page.getByRole('radio', { name: 'Prepare with SQL' }).click({ force: true })
   await page.getByRole('button', { name: 'Open empty SQL editor' }).click()
   const terminal = page.getByLabel('SQL console').locator('.xterm-helper-textarea')
+  await showSqlSource(page)
   await expect(page.getByRole('button', { name: 'Refresh views' })).toBeEnabled({ timeout: 30_000 })
+  await hideSqlSource(page)
   await terminal.focus()
   await terminal.pressSequentially('CREATE VIEW generated AS SELECT * FROM (VALUES (1), (2), (3)) t(value);')
   await terminal.press('Enter')
+  await showSqlSource(page)
   await expect(async () => {
     await page.getByRole('button', { name: 'Refresh views' }).click()
     await expect(page.getByRole('combobox', { name: 'Output view' })).toBeVisible()

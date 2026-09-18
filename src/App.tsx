@@ -622,7 +622,7 @@ function App() {
     </>
   )
 
-  const fullBleed = workflow.kind === 'pipeline-opened' || profiled !== null && ['data', 'time-series', 'survival', 'root-cause', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
+  const fullBleed = workflow.kind === 'pipeline-opened' || workflow.kind === 'sql-inputs-chosen' || profiled !== null && ['data', 'time-series', 'survival', 'root-cause', 'discovery', 'dag', 'study', 'estimation', 'sensitivity', 'counterfactual', 'results'].includes(activeChapter)
 
   // Every chart export names the project it came from.
   const exportContext = useMemo(() => ({ project: project?.name ?? null }), [project])
@@ -802,7 +802,7 @@ function App() {
               )}
 
               {workflow.kind === 'sql-inputs-chosen' && (
-                <section className="rise w-full max-w-6xl" aria-label="Prepare with SQL">
+                <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col" aria-label="Prepare with SQL">
                   <Suspense fallback={<ChapterSkeleton label="Loading SQL preparation…" />}>
                     <SqlShell
                       inputs={workflow.inputs}

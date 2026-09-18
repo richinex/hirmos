@@ -26,7 +26,7 @@ test('table controls align on touch and desktop, including after search and wrap
   })
   const search = page.getByRole('searchbox', { name: 'Search columns' })
   const facet = page.getByRole('button', { name: 'Numeric 11' })
-  const density = page.getByRole('group', { name: 'Row density' })
+  const density = page.getByRole('radiogroup', { name: 'Row density' })
   await expect(search).toBeVisible()
   const touch = await page.evaluate(() => matchMedia('(pointer: coarse)').matches)
   for (const width of [390, 320, 768, 1440]) {
@@ -45,6 +45,6 @@ test('table controls align on touch and desktop, including after search and wrap
   await expect(search).toBeFocused()
   await facet.click()
   await expect(facet).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('button', { name: 'Compact rows' }).click()
-  await expect(page.getByRole('button', { name: 'Compact rows' })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('radio', { name: 'Compact rows' }).check()
+  await expect(page.getByRole('radio', { name: 'Compact rows' })).toBeChecked()
 })

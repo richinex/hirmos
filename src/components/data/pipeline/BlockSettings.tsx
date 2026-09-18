@@ -310,7 +310,7 @@ function RemoveRow({ label, index, onRemove }: { readonly label: string; readonl
       data-remove-row
       onClick={(event) => { onRemove(); focusAfterRemoval(event.currentTarget, index) }}
     >
-      <Icon name="close" size={13} />
+      <Icon name="delete" size={14} />
     </button>
   )
 }

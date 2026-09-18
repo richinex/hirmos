@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { Icon } from '@/components/Icon'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { useShellLayout } from '@/components/shell/useShellLayout'
-import { facet, literal, num, panel, rowPadding, segment, tableFoot, th } from '@/components/ui/recipes'
+import { facet, literal, num, panel, rowPadding, tableFoot, th } from '@/components/ui/recipes'
+import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import type { HistogramBins } from '@/domain/dataset'
 import type { TableDensity } from '@/domain/shellLayout'
 import { formatCount } from '@/lib/format/number'
@@ -31,10 +32,10 @@ export function useTableDensity(): readonly [TableDensity, (density: TableDensit
 
 export function DensityToggle({ density, onChange }: { readonly density: TableDensity; readonly onChange: (density: TableDensity) => void }) {
   return (
-    <div className={cn('flex shrink-0 items-center gap-0.5 rounded-md border border-hair bg-panel p-0.5', toolbarHeight)} role="group" aria-label="Row density">
-      <button type="button" className={segment(density === 'comfortable', 'grid h-[26px] place-items-center px-1.5 py-0')} aria-pressed={density === 'comfortable'} title="Comfortable rows" aria-label="Comfortable rows" onClick={() => onChange('comfortable')}><Icon name="density_medium" size={13} /></button>
-      <button type="button" className={segment(density === 'compact', 'grid h-[26px] place-items-center px-1.5 py-0')} aria-pressed={density === 'compact'} title="Compact rows" aria-label="Compact rows" onClick={() => onChange('compact')}><Icon name="density_small" size={13} /></button>
-    </div>
+    <SegmentedControl size="sm" className="shrink-0 pointer-coarse:py-0.75" ariaLabel="Row density" value={density} onChange={onChange} options={[
+      { value: 'comfortable', label: <Icon name="density_medium" size={13} />, ariaLabel: 'Comfortable rows', title: 'Comfortable rows' },
+      { value: 'compact', label: <Icon name="density_small" size={13} />, ariaLabel: 'Compact rows', title: 'Compact rows' },
+    ]} />
   )
 }
 

@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { showSqlSource } from './sql-pane'
 import { exportDirectory } from '../src/domain/sourceInputs'
 import { existsSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -13,6 +14,7 @@ test('book export can be selected, prepared and reopened through the UI', async 
   await page.getByRole('radio', { name: 'Prepare with SQL' }).click({ force: true })
   await page.getByLabel('DuckDB export folder').setInputFiles(folder)
   await page.getByRole('button', { name: 'Import database', exact: true }).click()
+  await showSqlSource(page)
   await expect(page.getByRole('button', { name: 'Refresh views' })).toBeEnabled({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Refresh views' }).click()
   await page.getByRole('combobox', { name: 'Output view' }).click()
@@ -21,6 +23,7 @@ test('book export can be selected, prepared and reopened through the UI', async 
   await page.getByRole('button', { name: 'Use selected view' }).click()
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('button', { name: 'Edit SQL', exact: true }).click()
+  await showSqlSource(page)
   await expect(page.getByRole('combobox', { name: 'Output view' })).toContainText('v_power_per_day', { timeout: 30_000 })
   await page.getByRole('button', { name: 'Use selected view', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Source selected' })).toBeVisible()
