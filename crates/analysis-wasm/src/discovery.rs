@@ -245,8 +245,8 @@ pub(crate) fn cdnots_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=32).contains(&columns) || !(1..=20).contains(&max_lag) {
-        return Err("CD-NOTS requires 2–32 variables and a maximum lag from 1 to 20".to_owned());
+    if columns < 2 || !(1..=20).contains(&max_lag) {
+        return Err("CD-NOTS requires at least 2 variables and a maximum lag from 1 to 20".to_owned());
     }
     let input = causal_ts_rows(values, validity, rows, columns)?;
     let context_preset = causal_ts_context(context);
@@ -471,8 +471,8 @@ pub(crate) fn pcmci_plus(
     pc_alpha: f64,
     samples: TemporalSamples,
 ) -> Result<AnalysisResult, String> {
-    if !(2..=32).contains(&columns) {
-        return Err("PCMCI+ requires between 2 and 32 selected variables".to_owned());
+    if columns < 2 {
+        return Err("PCMCI+ requires at least 2 selected variables".to_owned());
     }
     if !(1..=20).contains(&tau_max) {
         return Err("PCMCI+ tauMax must be between 1 and 20".to_owned());
@@ -537,9 +537,9 @@ pub(crate) fn jpcmciplus_evidence(
             "J-PCMCI+ requires one balanced period grid shared by every panel unit".to_owned(),
         );
     }
-    if !(2..=32).contains(&observed_columns) || classes.len() != observed_columns {
+    if observed_columns < 2 || classes.len() != observed_columns {
         return Err(
-            "J-PCMCI+ requires 2 to 32 observed variables and one class for each".to_owned(),
+            "J-PCMCI+ requires at least 2 observed variables and one class for each".to_owned(),
         );
     }
     if classes
@@ -729,8 +729,8 @@ pub(crate) fn lpcmci_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=32).contains(&columns) {
-        return Err("LPCMCI requires between 2 and 32 selected variables".to_owned());
+    if columns < 2 {
+        return Err("LPCMCI requires at least 2 selected variables".to_owned());
     }
     if !(1..=20).contains(&tau_max) {
         return Err("LPCMCI tauMax must be between 1 and 20".to_owned());
@@ -799,9 +799,9 @@ pub(crate) fn rpcmci_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
+    if columns < 2 {
         return Err(
-            "RPCMCI requires between 2 and 12 selected variables in the browser".to_owned(),
+            "RPCMCI requires at least 2 selected variables".to_owned(),
         );
     }
     if !(2..=6).contains(&num_regimes) {
@@ -894,9 +894,9 @@ pub(crate) fn dynotears_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
+    if columns < 2 {
         return Err(
-            "DYNOTEARS requires between 2 and 12 selected variables in the browser".to_owned(),
+            "DYNOTEARS requires at least 2 selected variables".to_owned(),
         );
     }
     if !(1..=6).contains(&max_lag) {
@@ -961,9 +961,9 @@ pub(crate) fn direct_lingam_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
+    if columns < 2 {
         return Err(
-            "DirectLiNGAM requires between 2 and 12 selected variables in the browser".to_owned(),
+            "DirectLiNGAM requires at least 2 selected variables".to_owned(),
         );
     }
     validate_dense_matrix("DirectLiNGAM", values, rows, columns)?;
@@ -1119,14 +1119,11 @@ pub(crate) fn cross_sectional_constraint_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=32).contains(&columns) {
-        return Err("PC-stable and FCI require between 2 and 32 selected variables".to_owned());
+    if columns < 2 {
+        return Err("PC-stable and FCI require at least 2 selected variables".to_owned());
     }
     if names.len() != columns {
         return Err("PC-stable and FCI require one variable name per matrix column".to_owned());
-    }
-    if matches!(ci_test, ConstraintCiTest::Kci) && columns > 12 {
-        return Err("KCI is limited to 12 selected variables in the browser".to_owned());
     }
     validate_dense_matrix(if fci { "FCI" } else { "PC-stable" }, values, rows, columns)?;
     let matrix = DMatrix::from_fn(rows, columns, |row, column| values[column * rows + row]);
@@ -1214,9 +1211,9 @@ pub(crate) fn var_lingam_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
+    if columns < 2 {
         return Err(
-            "VAR-LiNGAM requires between 2 and 12 selected variables in the browser".to_owned(),
+            "VAR-LiNGAM requires at least 2 selected variables".to_owned(),
         );
     }
     if !(1..=6).contains(&lags) {
@@ -1283,8 +1280,8 @@ pub(crate) fn ocse_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
-        return Err("oCSE requires between 2 and 12 selected variables in the browser".to_owned());
+    if columns < 2 {
+        return Err("oCSE requires at least 2 selected variables".to_owned());
     }
     if !(1..=8).contains(&max_lag) {
         return Err("oCSE maxLag must be between 1 and 8".to_owned());
@@ -1455,8 +1452,8 @@ pub(crate) fn cmlp_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
-        return Err("cMLP requires between 2 and 12 selected variables in the browser".to_owned());
+    if columns < 2 {
+        return Err("cMLP requires at least 2 selected variables".to_owned());
     }
     if !(1..=20).contains(&lag) {
         return Err("cMLP lag must be between 1 and 20 in the browser".to_owned());
@@ -1560,8 +1557,8 @@ pub(crate) fn clstm_evidence<F>(
 where
     F: FnMut(&'static str, usize, usize),
 {
-    if !(2..=12).contains(&columns) {
-        return Err("cLSTM requires between 2 and 12 selected variables in the browser".to_owned());
+    if columns < 2 {
+        return Err("cLSTM requires at least 2 selected variables".to_owned());
     }
     if !(1..=100).contains(&context) {
         return Err("cLSTM context must be between 1 and 100 in the browser".to_owned());

@@ -272,9 +272,13 @@ test('runs the stationarity battery in the Rust analysis worker', async ({ page 
     ) {
       throw new Error('Analysis client did not expose runStationarityBattery.')
     }
-    const values = Float64Array.from({ length: 120 }, (_, index) =>
-      0.015 * index + Math.sin(index / 5) + 0.2 * Math.cos(index / 2.7),
-    )
+    // Pure sinusoids make the lagged auxiliary regression rank deficient.
+    let seed = 555
+    const values = Float64Array.from({ length: 120 }, (_, index) => {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0
+      return 0.015 * index + Math.sin(index / 5) + 0.2 * Math.cos(index / 2.7)
+        + 0.1 * (seed / 4294967296 - 0.5)
+    })
     const result: unknown = await analysisModule.runStationarityBattery(values)
     return { result, detachedBytes: values.byteLength }
   })

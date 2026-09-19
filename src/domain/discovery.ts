@@ -31,7 +31,7 @@ import { levelModelVerdict } from './stationarityAssessment'
 export const pcmciPlusEvidenceSchema = z.object({
   kind: z.literal('pcmciPlus'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(32),
+  variables: z.number().int().min(2),
   tauMax: z.number().int().min(1).max(20),
   pcAlpha: z.number().finite().positive().max(1),
   graph: z.array(z.array(z.array(z.string().max(3)))),
@@ -51,8 +51,8 @@ export const jpcmciPlusEvidenceSchema = z.object({
   observations: z.number().int().positive(),
   datasets: z.number().int().min(2),
   periods: z.number().int().min(2),
-  observedVariables: z.number().int().min(2).max(32),
-  variables: z.number().int().min(2).max(34),
+  observedVariables: z.number().int().min(2),
+  variables: z.number().int().min(2),
   classes: z.array(z.enum(['system', 'timeContext', 'spaceContext', 'timeDummy', 'spaceDummy'])),
   timeDummy: z.boolean(),
   spaceDummy: z.boolean(),
@@ -89,7 +89,7 @@ export type LpcmciEvidence = z.infer<typeof lpcmciEvidenceSchema>
 export const rpcmciEvidenceSchema = z.object({
   kind: z.literal('rpcmci'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   numRegimes: z.number().int().min(2).max(6),
   maxTransitions: z.number().int().nonnegative(),
   switchThres: z.number().finite().min(0).max(1),
@@ -114,7 +114,7 @@ export type RpcmciEvidence = z.infer<typeof rpcmciEvidenceSchema>
 export const dynotearsEvidenceSchema = z.object({
   kind: z.literal('dynotears'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   maxLag: z.number().int().min(1).max(6),
   lambdaW: z.number().finite().nonnegative(),
   lambdaA: z.number().finite().nonnegative(),
@@ -127,7 +127,7 @@ export type DynotearsEvidence = z.infer<typeof dynotearsEvidenceSchema>
 export const directLingamEvidenceSchema = z.object({
   kind: z.literal('directLingam'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   causalOrder: z.array(z.number().int().nonnegative()),
   weights: z.array(z.array(z.number().finite())),
 }).strict()
@@ -152,7 +152,7 @@ const constraintCiEvidenceSchema = z.object({
 
 const constraintEvidenceBaseSchema = z.object({
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(32),
+  variables: z.number().int().min(2),
   alpha: z.number().finite().positive().max(1),
   maxDepth: z.number().int().nonnegative().nullable(),
   ciTest: constraintCiTestSchema,
@@ -185,7 +185,7 @@ export type FciEvidence = z.infer<typeof fciEvidenceSchema>
 export const varLingamEvidenceSchema = z.object({
   kind: z.literal('varLingam'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   lags: z.number().int().min(1).max(6),
   selectedLag: z.number().int().min(1).max(6),
   prune: z.boolean(),
@@ -199,7 +199,7 @@ export type VarLingamEvidence = z.infer<typeof varLingamEvidenceSchema>
 export const ocseEvidenceSchema = z.object({
   kind: z.literal('ocse'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   maxLag: z.number().int().min(1).max(8),
   alpha: z.number().finite().positive().max(1),
   nShuffles: z.number().int().min(20).max(2_000),
@@ -227,7 +227,7 @@ const neuralStandardizationSchema = z.object({
 export const cmlpEvidenceSchema = z.object({
   kind: z.literal('cmlp'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   lag: z.number().int().min(1).max(20),
   hidden: z.array(z.number().int().min(1).max(256)).min(1).max(4),
   activation: z.enum(['sigmoid', 'tanh', 'relu', 'leakyRelu', 'identity']),
@@ -254,7 +254,7 @@ export type CmlpEvidence = z.infer<typeof cmlpEvidenceSchema>
 export const clstmEvidenceSchema = z.object({
   kind: z.literal('clstm'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(12),
+  variables: z.number().int().min(2),
   context: z.number().int().min(1).max(100),
   hidden: z.number().int().min(1).max(256),
   lambda: z.number().finite().nonnegative(),
@@ -281,7 +281,7 @@ export type CdnotsContext = z.infer<typeof cdnotsContextSchema>
 
 const cdnotsEvidenceBaseSchema = z.object({
   observations: z.number().int().positive(),
-  observedVariables: z.number().int().min(2).max(32),
+  observedVariables: z.number().int().min(2),
   contextVariables: z.array(z.string().trim().min(1)).max(2),
   maxLag: z.number().int().min(1).max(20),
   alpha: z.number().finite().positive().max(1),
@@ -300,7 +300,7 @@ export type CdnotsPlusEvidence = z.infer<typeof cdnotsPlusEvidenceSchema>
 export const graceEvidenceSchema = z.object({
   kind: z.literal('grace'),
   observations: z.number().int().positive(),
-  variables: z.number().int().min(2).max(32),
+  variables: z.number().int().min(2),
   maxLag: z.number().int().min(1).max(20),
   alpha: z.number().finite().positive().max(1),
   context: cdnotsContextSchema,
@@ -1344,7 +1344,6 @@ export type DiscoveryReadinessProblem =
   | { readonly kind: 'at-least-two-variables-required' }
   | { readonly kind: 'too-few-observations'; readonly required: number; readonly available: number }
   | { readonly kind: 'dense-browser-boundary-required' }
-  | { readonly kind: 'browser-variable-limit'; readonly method: 'DirectLiNGAM' | 'PC-stable' | 'FCI' | 'PCMCI+' | 'J-PCMCI+' | 'LPCMCI' | 'RPCMCI' | 'CD-NOTS' | 'CD-NOTS+' | 'GRACE' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP' | 'cLSTM'; readonly maximum: number; readonly available: number }
   | { readonly kind: 'browser-lag-limit'; readonly method: 'RPCMCI' | 'DYNOTEARS' | 'VAR-LiNGAM' | 'oCSE' | 'cMLP'; readonly maximum: number }
   | { readonly kind: 'transition-budget-too-large'; readonly available: number }
   | { readonly kind: 'balanced-panel-required' }
@@ -1363,7 +1362,6 @@ export function readyDiscoverySpecification(
     if (!prepared.panel.balanced) return err({ kind: 'balanced-panel-required' })
     if (prepared.resolution.kind === 'window') return err({ kind: 'complete-interval-unsupported' })
     if (prepared.panel.units < 2) return err({ kind: 'at-least-two-panel-units-required', available: prepared.panel.units })
-    if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'J-PCMCI+', maximum: 32, available: prepared.columns.length })
     const roles = new Map<string, JpcmciObservedRole>()
     for (const assignment of configuration.assignments) {
       if (!prepared.columns.some((column) => column === assignment.column)) return err({ kind: 'unknown-context-assignment', column: assignment.column })
@@ -1389,9 +1387,6 @@ export function readyDiscoverySpecification(
   if (configuration.kind === 'direct-lingam' || configuration.kind === 'pc-stable' || configuration.kind === 'fci') {
     if (prepared.kind !== 'prepared-cross-section') return err({ kind: 'cross-section-required' })
     if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-    const maximum = configuration.kind === 'direct-lingam' || configuration.ciTest === 'kci' ? 12 : 32
-    const method = configuration.kind === 'direct-lingam' ? 'DirectLiNGAM' : configuration.kind === 'pc-stable' ? 'PC-stable' : 'FCI'
-    if (prepared.columns.length > maximum) return err({ kind: 'browser-variable-limit', method, maximum, available: prepared.columns.length })
     const required = prepared.columns.length + 16
     return prepared.observations < required
       ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1401,7 +1396,6 @@ export function readyDiscoverySpecification(
   switch (configuration.kind) {
     case 'pcmci-plus': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'PCMCI+', maximum: 32, available: prepared.columns.length })
       const required = Math.max(2 * configuration.tauMax + 16, 24)
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1409,7 +1403,6 @@ export function readyDiscoverySpecification(
     }
     case 'lpcmci': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'LPCMCI', maximum: 32, available: prepared.columns.length })
       const required = Math.max(2 * configuration.tauMax + 16, 24)
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1417,7 +1410,6 @@ export function readyDiscoverySpecification(
     }
     case 'rpcmci': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'RPCMCI', maximum: 12, available: prepared.columns.length })
       if (configuration.tauMax > 6) return err({ kind: 'browser-lag-limit', method: 'RPCMCI', maximum: 6 })
       if (configuration.maxTransitions >= prepared.observations) return err({ kind: 'transition-budget-too-large', available: prepared.observations })
       const required = Math.max(2 * configuration.tauMax + 24, 40)
@@ -1428,8 +1420,6 @@ export function readyDiscoverySpecification(
     case 'cdnots':
     case 'cdnots-plus': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      const name = configuration.kind === 'cdnots' ? 'CD-NOTS' : 'CD-NOTS+'
-      if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: name, maximum: 32, available: prepared.columns.length })
       const required = Math.max(2 * configuration.maxLag + 30, 40)
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1437,7 +1427,6 @@ export function readyDiscoverySpecification(
     }
     case 'grace': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 32) return err({ kind: 'browser-variable-limit', method: 'GRACE', maximum: 32, available: prepared.columns.length })
       const required = Math.max(2 * configuration.maxLag + 30, configuration.maxLag + 32)
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1445,7 +1434,6 @@ export function readyDiscoverySpecification(
     }
     case 'dynotears': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'DYNOTEARS', maximum: 12, available: prepared.columns.length })
       if (configuration.maxLag > 6) return err({ kind: 'browser-lag-limit', method: 'DYNOTEARS', maximum: 6 })
       const required = configuration.maxLag + 16
       return prepared.observations < required
@@ -1454,7 +1442,6 @@ export function readyDiscoverySpecification(
     }
     case 'var-lingam': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'VAR-LiNGAM', maximum: 12, available: prepared.columns.length })
       if (configuration.maxLag > 6) return err({ kind: 'browser-lag-limit', method: 'VAR-LiNGAM', maximum: 6 })
       const required = prepared.columns.length * (configuration.maxLag + 1) + 16
       return prepared.observations < required
@@ -1463,7 +1450,6 @@ export function readyDiscoverySpecification(
     }
     case 'ocse': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'oCSE', maximum: 12, available: prepared.columns.length })
       if (configuration.maxLag > 8) return err({ kind: 'browser-lag-limit', method: 'oCSE', maximum: 8 })
       const required = configuration.maxLag + 24
       return prepared.observations < required
@@ -1472,7 +1458,6 @@ export function readyDiscoverySpecification(
     }
     case 'cmlp': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'cMLP', maximum: 12, available: prepared.columns.length })
       if (configuration.lag > 20) return err({ kind: 'browser-lag-limit', method: 'cMLP', maximum: 20 })
       const required = configuration.lag + 16
       return prepared.observations < required
@@ -1481,7 +1466,6 @@ export function readyDiscoverySpecification(
     }
     case 'clstm': {
       if (prepared.columns.length < 2) return err({ kind: 'at-least-two-variables-required' })
-      if (prepared.columns.length > 12) return err({ kind: 'browser-variable-limit', method: 'cLSTM', maximum: 12, available: prepared.columns.length })
       const required = configuration.context + 16
       return prepared.observations < required
         ? err({ kind: 'too-few-observations', required, available: prepared.observations })
@@ -1646,7 +1630,6 @@ export function describeDiscoveryReadiness(problem: DiscoveryReadinessProblem): 
     case 'at-least-two-variables-required': return 'Select at least 2 variables.'
     case 'too-few-observations': return `This configuration needs at least ${problem.required} rows; ${problem.available} are available. Use more rows or choose a smaller configuration.`
     case 'dense-browser-boundary-required': return 'Choose a complete interval or imputation. This method needs complete numeric columns in the browser.'
-    case 'browser-variable-limit': return `${problem.method} accepts up to ${problem.maximum} variables in the browser; ${problem.available} are selected. Deselect ${problem.available - problem.maximum}.`
     case 'browser-lag-limit': return `${problem.method} accepts a maximum lag of ${problem.maximum} in the browser. Lower the maximum lag.`
     case 'transition-budget-too-large': return `The maximum transition count must be smaller than the ${problem.available} available observations.`
     case 'balanced-panel-required': return 'J-PCMCI+ needs exactly one row for every unit-period cell. Repair duplicate or missing panel cells in Data studio.'

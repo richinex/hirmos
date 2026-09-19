@@ -728,7 +728,7 @@ const VAR_LINGAM: MethodDefinition = {
     {
       id: caveatId('var-lingam-browser-boundary'),
       category: 'missingness',
-      requirement: 'Between 2 and 12 complete, varying columns and lags 1 to 6.',
+      requirement: 'At least 2 complete, varying columns and lags 1 to 6.',
       consequenceIfUnmet: 'A constant column or a gap refuses the run.',
       sources: [hirmos('crates/analysis-wasm/src/lib.rs#var_lingam_evidence')],
     },
@@ -895,7 +895,7 @@ const DIRECT_LINGAM: MethodDefinition = {
     {
       id: caveatId('direct-lingam-browser-boundary'),
       category: 'missingness',
-      requirement: 'Between 2 and 12 complete, varying numeric columns are selected.',
+      requirement: 'At least 2 complete, varying numeric columns are selected.',
       consequenceIfUnmet: 'The browser refuses the run before the numerical kernel is called.',
       sources: [hirmos('crates/analysis-wasm/src/discovery.rs#direct_lingam_evidence')],
     },
@@ -953,7 +953,7 @@ const DYNOTEARS: MethodDefinition = {
     {
       id: caveatId('dynotears-browser-boundary'),
       category: 'missingness',
-      requirement: 'Between 2 and 12 complete columns and lags 1 to 6.',
+      requirement: 'At least 2 complete columns and lags 1 to 6.',
       consequenceIfUnmet: 'A gap refuses the run.',
       sources: [hirmos('crates/analysis-wasm/src/lib.rs#dynotears_evidence')],
     },

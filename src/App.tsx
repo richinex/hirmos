@@ -723,7 +723,7 @@ function App() {
                           <SegmentedControl
                             variant="line"
                             ariaLabel="Data input method"
-                            className="lg:flex-nowrap"
+                            className="flex-nowrap max-sm:flex max-sm:w-full max-sm:gap-0 max-sm:[&_[data-segment-option]]:flex-auto max-sm:[&_[data-segment-option]]:px-1 max-sm:[&_[data-segment-option]]:text-label"
                             value={dataEntryMode}
                             onChange={setDataEntryMode}
                             options={[{ value: 'file', label: 'Upload a file' }, { value: 'sql', label: 'Prepare with SQL' }, { value: 'pipeline', label: 'Build a pipeline' }]}
