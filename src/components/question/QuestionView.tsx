@@ -62,7 +62,7 @@ export function QuestionView({ profile, state, dispatch }: {
           <ChapterHeading id="framed-question-title" className="mb-6">Causal question</ChapterHeading>
           <div className={panel('lift flex items-center gap-3 px-4 py-5 text-title text-ink')}>
             <span>{nameOfColumn(profile, state.question.treatment)}</span>
-            <span aria-label="affects" className="text-signal">→</span>
+            <span aria-label="affects" className="text-signal-text">→</span>
             <span>{nameOfColumn(profile, state.question.outcome)}</span>
           </div>
           <button type="button" className={button('quiet', 'mt-4')} onClick={() => dispatch({ type: 'edit-requested' })}>

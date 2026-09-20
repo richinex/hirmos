@@ -11,7 +11,7 @@ interface AppShellProps {
   readonly footer?: ReactNode
 }
 
-/** Header, chapter rail, and the stage as flex siblings. The header sits on the stage with no seam so the rail below it reads as one shape rising from the page edge; the row is the shell container the rail queries. */
+/** Header, chapter rail, and the stage as flex siblings. The header and the rail are the band: one blue shape along the top and the left, textured the same way; the row is the shell container the rail queries. */
 export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppShellProps) {
   return (
     // Vaul scales this element back while a bottom sheet is open, which is how the sheet reads as a
@@ -21,7 +21,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppSh
       <div className="@container/shell relative flex min-h-0 flex-1">
         {nav}
         <div className="dashboard-workspace flex min-w-0 flex-1 flex-col">
-      <header className="dashboard-header flex shrink-0 items-center justify-between gap-4 px-5">
+      <header className="dashboard-header band-texture flex shrink-0 items-center justify-between gap-4 px-5">
         {header}
       </header>
 

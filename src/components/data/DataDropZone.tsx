@@ -48,7 +48,7 @@ export function DataDropZone({ invitation, consequence, action, multiple = false
     >
       <Icon name="upload_file" size={28} className="text-faint" aria-hidden />
       <p className="m-0 text-body text-ink">{invitation}</p>
-      {consequence !== undefined && <p className="m-0 max-w-[40ch] font-serif text-body text-faint text-pretty">{consequence}</p>}
+      {consequence !== undefined && <p className="m-0 max-w-[40ch] text-body text-faint text-pretty">{consequence}</p>}
       <input
         ref={input}
         type="file"

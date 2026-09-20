@@ -160,6 +160,18 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
   const panelHandlers = phone ? slide.handlers('panel') : {}
 
   useEffect(() => phone && visible ? pushLayer(NAV_LAYER) : undefined, [phone, visible])
+  // On desktop the open rail lies over the stage, so a press anywhere off it puts it away; the toggle in
+  // the header handles its own press.
+  useEffect(() => {
+    if (phone || !open) return
+    const away = (event: PointerEvent) => {
+      const target = event.target
+      if (column.current?.contains(target as Node) || (target instanceof Element && target.closest('[data-rail-toggle]') !== null)) return
+      onClose()
+    }
+    document.addEventListener('pointerdown', away)
+    return () => document.removeEventListener('pointerdown', away)
+  }, [phone, open, onClose])
   useEffect(() => {
     if (!open) return
     const escape = (event: KeyboardEvent) => {
@@ -174,7 +186,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
   return <>
     {phone && !visible && <div aria-hidden className="absolute inset-y-0 left-0 z-(--z-overlay) w-3 touch-none" {...slide.handlers('edge')} />}
     {phone && visible && <div aria-hidden className="dashboard-scrim" onClick={onClose} {...panelHandlers} />}
-    <aside ref={column} className="dashboard-sidebar" data-open={visible} inert={phone && !visible ? true : undefined}
+    <aside ref={column} className="dashboard-sidebar band-texture" data-open={visible} inert={phone && !visible ? true : undefined}
       style={drag === null ? undefined : { transform: 'translateX(' + drag.offset + 'px)', transition: 'none' }}
       onClickCapture={event => { slide.clickGuard(event) }} {...panelHandlers}>
       <div className="dashboard-brand">

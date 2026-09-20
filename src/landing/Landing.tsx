@@ -29,7 +29,7 @@ function Scene() {
     return () => { mounted = false }
   }, [])
   return (
-    <div className="landing-scene landing-scene--fallback" aria-hidden="true">
+    <div className="landing-scene" aria-hidden="true">
       {Graph !== null && <Graph className="landing-scene__canvas" />}
     </div>
   )
@@ -95,36 +95,39 @@ export function Landing() {
   }, [])
   return (
     <main ref={root} className="landing-root">
-      <Scene />
-      <div className="landing-scrim" aria-hidden="true" />
-
-      <header className="landing-header">
-        <div className="landing-width landing-header__row">
-          <InternalLink className="landing-wordmark" href="/" aria-label="Hirmos home">
-            <HirmosMark className="landing-mark" />
-            <span>hirmos</span>
-          </InternalLink>
-        </div>
-      </header>
-
-      <div className="landing-width landing-hero-shell">
-        <section className="landing-hero-copy" aria-labelledby="landing-title">
-          <p className="landing-eyebrow">My causal inference workbench</p>
-          <h1 id="landing-title" className="landing-headline">
-            {HEADLINE.map((word, index) => (
-              <Fragment key={word}>
-                <span className="landing-slot" style={{ '--slot': index } as CSSProperties}><span className="landing-slot-word">{word}</span></span>
-                {index + 1 < HEADLINE.length ? ' ' : null}
-              </Fragment>
-            ))}
-          </h1>
-          <div className="landing-actions">
-            <InternalLink className="landing-primary" href="/app">Start an analysis</InternalLink>
+      {/* The band: header and hero on the blue. The scene fills the band behind the copy and takes the
+          band's tokens, so the observations and the graph draw in the band's ink on the band's ground. */}
+      <div className="landing-band band-texture">
+        <Scene />
+        <div className="landing-scrim" aria-hidden="true" />
+        <header className="landing-header">
+          <div className="landing-width landing-header__row">
+            <InternalLink className="landing-wordmark" href="/" aria-label="Hirmos home">
+              <HirmosMark className="landing-mark" size={28} />
+              <span>hirmos</span>
+            </InternalLink>
           </div>
-        </section>
+        </header>
+
+        <div className="landing-width landing-hero-shell">
+          <section className="landing-hero-copy" aria-labelledby="landing-title">
+            <p className="landing-eyebrow">My causal inference workbench</p>
+            <h1 id="landing-title" className="landing-headline">
+              {HEADLINE.map((word, index) => (
+                <Fragment key={word}>
+                  <span className="landing-slot" style={{ '--slot': index } as CSSProperties}><span className="landing-slot-word">{word}</span></span>
+                  {index + 1 < HEADLINE.length ? ' ' : null}
+                </Fragment>
+              ))}
+            </h1>
+            <div className="landing-actions">
+              <InternalLink className="landing-primary" href="/app">Start an analysis</InternalLink>
+            </div>
+          </section>
+        </div>
       </div>
 
-      <div className="landing-content-veil">
+      <div className="landing-content">
         <section id="workflow" className="landing-width workflow-section" aria-labelledby="workflow-title">
           <div className="section-intro">
             <p className="landing-eyebrow">The workbench</p>

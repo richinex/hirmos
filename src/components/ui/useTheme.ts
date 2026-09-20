@@ -1,20 +1,20 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 
-export type ThemeName = 'dark' | 'original-light'
+export type ThemeName = 'light' | 'dark'
 
 /** What the user picked: a concrete theme, or 'system' (follow the OS, live). */
 export type ThemeChoice = ThemeName | 'system'
 
 const KEY = 'hirmos-theme'
-export const THEMES: readonly ThemeName[] = ['dark', 'original-light']
+export const THEMES: readonly ThemeName[] = ['light', 'dark']
 const CYCLE: readonly ThemeChoice[] = [...THEMES, 'system']
-export const THEME_LABELS: Record<ThemeChoice, string> = { dark: 'Dark', 'original-light': 'Original Light', system: 'System' }
+export const THEME_LABELS: Record<ThemeChoice, string> = { light: 'Light', dark: 'Dark', system: 'System' }
 
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 
 /** The OS preference resolves to one of the two faces; the boot script in index.html applies the same rule. */
 const systemTheme = (): ThemeName =>
-  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'original-light'
+  window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 
 const subscribeOsTheme = (notify: () => void): (() => void) => {
   const query = window.matchMedia?.('(prefers-color-scheme: dark)')
@@ -24,8 +24,9 @@ const subscribeOsTheme = (notify: () => void): (() => void) => {
 }
 
 /**
- * The theme lives on `<html data-theme>`, which index.css keys off. The stored choice may be 'system', in
- * which case a media-query listener re-resolves on change; `data-theme` always carries a concrete theme.
+ * The theme lives on `<html data-theme>`, which themes.css keys off. Light is the default; the stored
+ * choice may be 'system', in which case a media-query listener re-resolves on change. `data-theme`
+ * always carries a concrete theme.
  */
 export function useTheme(): {
   readonly theme: ThemeName
@@ -37,13 +38,11 @@ export function useTheme(): {
   const [choice, setChoice] = useState<ThemeChoice>(() => {
     try {
       const stored = localStorage.getItem(KEY)
-      if (stored === 'soft-dark') return 'dark'
-      if (stored === 'light') return 'original-light'
       if (stored === 'system' || isTheme(stored)) return stored
     } catch { /* private mode */ }
-    return 'system'
+    return 'light'
   })
-  const osTheme = useSyncExternalStore(subscribeOsTheme, systemTheme, () => 'dark' as ThemeName)
+  const osTheme = useSyncExternalStore(subscribeOsTheme, systemTheme, () => 'light' as ThemeName)
   const theme: ThemeName = choice === 'system' ? osTheme : choice
 
   useEffect(() => {

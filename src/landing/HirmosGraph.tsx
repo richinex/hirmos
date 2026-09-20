@@ -11,8 +11,8 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 /**
  * The hero scene tells the headline: raw data becomes a causal estimate. A cloud of observations
  * drifts, condenses into the four variables, the arrows of the stated DAG draw on, and the effect
- * pulses along the causal path. Colour comes from the theme tokens; under reduced motion the scene
- * renders its final frame once.
+ * pulses along the causal path. Colour comes from the tokens of the surface it sits on, so on the band it
+ * takes the band's ground and ink; under reduced motion the scene renders its final frame once.
  */
 
 type Point = readonly [x: number, y: number, z: number]
@@ -144,7 +144,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
     const element = host.current
     if (element === null) return
 
-    const style = getComputedStyle(document.documentElement)
+    const style = getComputedStyle(element)
     const stage = colourToken(style, '--color-stage', '#0A0A0B')
     const ink = colourToken(style, '--color-ink', '#E6E3DC')
     const bone = colourToken(style, '--color-bone', '#B8B5AE')
@@ -433,7 +433,7 @@ export function HirmosGraph({ className }: { readonly className?: string }) {
       cancelAnimationFrame(frame)
     }
     const sync = () => { if (heroVisible && pageVisible) start(); else stop() }
-    const hero = document.querySelector('.landing-hero-shell')
+    const hero = document.querySelector('.landing-band')
     const intersectionObserver = new IntersectionObserver((entries) => {
       const entry = entries.at(0)
       if (entry !== undefined) heroVisible = entry.isIntersecting

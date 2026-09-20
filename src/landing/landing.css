@@ -1,5 +1,5 @@
 /* The workbench is a viewport-locked instrument; the landing page is a scrolling document, set like the
-   workbench: headings and controls in the sans at the paper's bold, paragraphs in the serif from index.css. */
+   workbench: the slab for headings, Lato for everything else, sizes on the rhythm unit. */
 
 :root[data-surface="landing"],
 :root[data-surface="landing"] body,
@@ -8,6 +8,10 @@
    stroke draw-on, one stagger step. The choreography script reads these rather than restating them. */
 :root[data-surface="landing"] { --motion-reveal: 640ms; --motion-draw: 900ms; --motion-stagger: 70ms; }
 :root[data-surface="landing"] body { overflow-x: hidden; overflow-y: auto; overscroll-behavior-y: auto; }
+/* The document scrollbar's track would paint a pale strip down the band's edge; the landing hides it.
+   Wheel, touch and keyboard scrolling are unaffected. */
+:root[data-surface="landing"], :root[data-surface="landing"] body { scrollbar-width: none; }
+:root[data-surface="landing"]::-webkit-scrollbar, :root[data-surface="landing"] body::-webkit-scrollbar { display: none; }
 :root[data-surface="landing"] #root { height: auto; }
 
 .landing-root {
@@ -19,44 +23,35 @@
   container-type: inline-size;
 }
 
-.landing-width { position: relative; z-index: 2; width: min(100% - 4rem, 80rem); margin-inline: auto; }
-.landing-scene { position: fixed; z-index: 0; inset: 0; width: 100%; height: 100lvh; pointer-events: none; }
+.landing-width { position: relative; width: min(100% - 4rem, 80rem); margin-inline: auto; }
+
+/* The band: the header and the hero on the blue, lit from above and grained (`.band-texture` in index.css).
+   The scene reads the surface tokens of its host, so the band restates ground, ink and the two greys in
+   its own colours; the signal stays the signal. */
+.landing-band {
+  position: relative;
+  overflow: clip;
+  background-color: var(--color-rail);
+  color: var(--color-rail-ink);
+  --color-stage: var(--color-rail);
+  --color-ink: var(--color-rail-ink);
+  --color-bone: var(--color-rail-faint);
+  --color-muted: var(--color-rail-faint);
+}
+.landing-scene { position: absolute; z-index: 0; inset: 0; pointer-events: none; }
 .landing-scene__canvas, .landing-scene canvas { display: block; width: 100%; height: 100%; }
-/* The scene recedes as the reader scrolls into the document. The blur is added only on wide screens,
-   so phones still do not pay for it. */
-@keyframes scene-recede { to { opacity: .16; } }
-@keyframes scene-recede-wide { to { opacity: .22; filter: blur(12px); } }
-@supports (animation-timeline: scroll()) {
-  .landing-scene { animation: scene-recede linear both; animation-timeline: scroll(); animation-range: 0 90lvh; }
-  /* The blur reads as depth as the scene withdraws; narrow hosts keep the opacity fade alone. */
-  @media (min-width: 901px) {
-    .landing-scene { animation-name: scene-recede-wide; }
-  }
-}
-.landing-scene--fallback {
-  background: radial-gradient(circle at 76% 38%, color-mix(in srgb, var(--color-bone) 5%, transparent), transparent 32rem);
-}
+/* The copy reads over the cloud: the band's own colour, fading out toward the graph. */
+.landing-scrim { position: absolute; z-index: 1; inset: 0; pointer-events: none; background: linear-gradient(90deg, var(--color-rail) 8%, color-mix(in srgb, var(--color-rail) 92%, transparent) 36%, color-mix(in srgb, var(--color-rail) 30%, transparent) 56%, transparent 72%); }
+.landing-header { position: relative; z-index: 3; }
+.landing-header__row { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 4.5rem; }
+.landing-wordmark { display: inline-flex; align-items: center; gap: .75rem; color: var(--color-rail-ink); font-family: var(--font-heading); font-size: var(--text-title); font-weight: 500; }
+.landing-wordmark:hover { color: var(--color-rail-ink); opacity: .85; }
 
-.landing-scrim {
-  position: fixed;
-  z-index: 1;
-  inset: 0;
-  height: 100lvh;
-  pointer-events: none;
-  background: linear-gradient(90deg, var(--color-stage) 4%, color-mix(in srgb, var(--color-stage) 96%, transparent) 37%, color-mix(in srgb, var(--color-stage) 28%, transparent) 58%, transparent 75%);
-}
-
-.landing-hero-shell { min-height: calc(100svh - 3rem); display: flex; flex-direction: column; }
-.landing-header { position: relative; z-index: 5; background: var(--color-panel); border-bottom: 1px solid var(--color-line); }
-.landing-header__row { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 3rem; }
-.landing-wordmark { display: inline-flex; align-items: center; gap: .55rem; color: var(--color-ink); font-size: var(--text-body); font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.landing-wordmark:hover { color: var(--color-ink); opacity: .72; }
-.landing-mark { color: var(--color-signal); }
-
-.landing-hero-copy { position: relative; z-index: 3; width: min(38rem, 46%); margin-block: auto; padding-block: 3rem 13rem; }
-/* A metadata line, not prose: sans, like the journal's running head. */
-.landing-eyebrow { margin: 0 0 1rem; color: var(--color-faint); font-family: var(--font-sans); font-size: var(--text-label); font-weight: 700; letter-spacing: .02em; }
-.landing-headline { max-width: 26ch; margin: 1.25rem 0 0; color: var(--color-ink); font-size: clamp(2.2rem, calc(3.565vw + 1.398rem), 4.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.05; text-wrap: balance; }
+.landing-hero-shell { position: relative; z-index: 2; min-height: calc(100svh - 4.5rem); display: flex; flex-direction: column; }
+.landing-hero-copy { width: min(38rem, 46%); margin-block: auto; padding-block: 3rem 6rem; }
+/* A metadata line, not prose: the interface face at bold. */
+.landing-eyebrow { margin: 0 0 1.5rem; color: var(--color-rail-faint); font-size: var(--text-body); font-weight: 700; }
+.landing-headline { max-width: 16ch; margin: 0; color: var(--color-rail-ink); font-size: var(--text-display); font-weight: 500; letter-spacing: -.02em; line-height: 1.15; text-wrap: balance; }
 /* The headline arrives one word at a time through a letterbox: each slot is one line tall and clips its
    word, which rises into place on the house curve. Pure CSS, so the hero paints before any script runs;
    the reduced-motion rule below collapses it to the final frame. The slot's bottom padding keeps
@@ -64,37 +59,39 @@
 .landing-slot { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: .12em; margin-bottom: -.12em; }
 .landing-slot-word { display: inline-block; transform: translateY(120%); animation: landing-slot-in var(--motion-reveal) cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(var(--slot) * var(--motion-stagger)); }
 @keyframes landing-slot-in { to { transform: translateY(0); } }
-.landing-lede { max-width: 55ch; margin: 1.25rem 0 0; color: var(--color-muted); font-size: clamp(1rem, 1.25cqi, 1.1rem); line-height: 1.65; text-wrap: pretty; }
 .landing-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-top: 2.25rem; }
-.landing-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; border-radius: 999px; padding: .7rem 1.5rem; background: var(--color-signal); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 700; transition: filter var(--motion-fast), transform var(--motion-fast); }
-.landing-primary:hover { color: var(--color-signal-ink); filter: brightness(1.08); }
+/* The one action: the complement as a fill under dark ink, lit from above. Height from line-height. */
+.landing-primary { display: inline-flex; align-items: center; justify-content: center; line-height: 3rem; border-radius: 999px; padding: 0 1.5rem; background-color: var(--color-signal); background-image: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0)); box-shadow: inset 0 1px 0 rgb(255 255 255 / .35), 0 1px 1px rgb(0 0 0 / .12); color: var(--color-signal-ink); font-size: var(--text-title); font-weight: 700; transition: background-color var(--motion-fast), transform var(--motion-fast); }
+.landing-primary:hover { color: var(--color-signal-ink); background-color: var(--color-signal-hover); }
 /* These anchors are drawn as controls, not prose links, so they opt out of the base underline. */
 .landing-wordmark, .landing-primary { text-decoration: none; }
 
-.landing-content-veil { position: relative; z-index: 2; padding-top: 6rem; background: linear-gradient(180deg, transparent 0, color-mix(in srgb, var(--color-stage) 96%, transparent) 4rem, var(--color-stage) 15rem); }
-.workflow-section, .feature-section, .structures-section { padding-block: 8rem; border-top: 1px solid var(--color-line); scroll-margin-top: 2rem; }
+.landing-content { position: relative; }
+.landing-content .landing-eyebrow { color: var(--color-faint); }
+.workflow-section, .feature-section, .structures-section { padding-block: 6rem; border-top: 1px solid var(--color-line); scroll-margin-top: 2rem; }
+.workflow-section { border-top: 0; }
 .section-intro { max-width: 48rem; }
-.section-intro h2, .feature-copy h2 { margin: 0; color: var(--color-ink); font-size: clamp(2rem, 3.8cqi, 3.35rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.06; text-wrap: balance; }
-.section-intro > p:last-child, .feature-copy > p { max-width: 65ch; margin: 1.5rem 0 0; color: var(--color-muted); font-size: var(--text-title); line-height: 1.65; text-wrap: pretty; }
+.section-intro h2, .feature-copy h2 { margin: 0; color: var(--color-ink); font-size: var(--text-display-sub); font-weight: 500; letter-spacing: -.01em; line-height: 1.2; text-wrap: balance; }
+.section-intro > p:last-child, .feature-copy > p { max-width: 65ch; margin: 1.5rem 0 0; color: var(--color-muted); font-size: var(--text-subtitle); line-height: 1.5rem; text-wrap: pretty; }
 
 .workflow-section { display: grid; grid-template-columns: minmax(18rem, .8fr) minmax(0, 1.2fr); align-items: start; gap: clamp(4rem, 8cqi, 8rem); }
 .workflow-section .section-intro { position: sticky; top: 4rem; }
 .workflow-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--color-edge); }
 .workflow-list li { display: grid; grid-template-columns: 3rem minmax(0, 1fr); gap: 1.25rem; padding-block: 1.65rem; border-bottom: 1px solid var(--color-line); }
-.workflow-list li > span { padding-top: .2rem; color: var(--color-faint); font-family: var(--font-mono); font-size: var(--text-micro); }
+.workflow-list li > span { padding-top: .2rem; color: var(--color-link); font-family: var(--font-mono); font-size: var(--text-label); }
 .workflow-list li > div { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 1.25rem; align-items: start; }
-.workflow-list h3, .structure-grid h3 { margin: 0; font-size: var(--text-title); font-weight: 700; color: var(--color-ink); text-wrap: balance; }
-.workflow-list p { margin: 0; color: var(--color-muted); font-size: var(--text-body); line-height: 1.6; text-wrap: pretty; }
-.structure-grid p { margin: .75rem 0 0; color: var(--color-faint); font-size: var(--text-title); line-height: 1.6; }
+.workflow-list h3, .structure-grid h3 { margin: 0; font-size: var(--text-title); line-height: var(--text-title--line-height); font-weight: 500; color: var(--color-ink); text-wrap: balance; }
+.workflow-list p { margin: 0; color: var(--color-muted); font-size: var(--text-subtitle); line-height: 1.5rem; text-wrap: pretty; }
+.structure-grid p { margin: .75rem 0 0; color: var(--color-muted); font-size: var(--text-subtitle); line-height: 1.5rem; }
 
 .feature-section { display: grid; grid-template-columns: minmax(0, .82fr) minmax(32rem, 1.18fr); align-items: center; gap: clamp(3rem, 7cqi, 7rem); }
 .feature-section--identify { grid-template-columns: minmax(30rem, 1.05fr) minmax(0, .95fr); }
 .feature-copy { max-width: 34rem; }
 .feature-points { display: grid; gap: .75rem; margin: 2.25rem 0 0; padding: 0; list-style: none; }
-.feature-points li { position: relative; padding-left: 1.4rem; color: var(--color-bone); font-family: var(--font-serif); font-size: var(--text-title); line-height: 1.55; }
+.feature-points li { position: relative; padding-left: 1.4rem; color: var(--color-bone); font-size: var(--text-subtitle); line-height: 1.5rem; }
 .feature-points li::before { content: ''; position: absolute; top: .55rem; left: 0; width: .38rem; height: .38rem; border-radius: 50%; background: var(--color-signal); }
 
-.evidence-figure { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; min-height: 24rem; border: 1px solid var(--color-hair); border-radius: .8rem; background: color-mix(in srgb, var(--color-panel) 86%, transparent); overflow: hidden; }
+.evidence-figure { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; min-height: 24rem; border-radius: .75rem; background: var(--color-panel); box-shadow: var(--shadow-lift); overflow: hidden; }
 .evidence-figure section { min-width: 0; padding: 1.25rem; }
 .evidence-figure header { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--color-line); color: var(--color-ink); font-size: var(--text-body); }
 .evidence-figure header small { color: var(--color-faint); font-size: var(--text-micro); }
@@ -110,10 +107,10 @@
 .dag-link--signal { stroke: var(--color-signal); stroke-width: 2.6; }
 #evidence-arrow path { fill: var(--color-bone); }
 .evidence-divider { display: grid; align-content: center; justify-items: center; gap: .7rem; width: 4.5rem; border-inline: 1px solid var(--color-line); background: var(--color-well); color: var(--color-faint); }
-.evidence-divider span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: var(--text-micro); letter-spacing: .08em; text-transform: uppercase; }
+.evidence-divider span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: var(--text-label); font-weight: 700; }
 .evidence-divider b { color: var(--color-signal); font-size: 1.1rem; font-weight: 400; }
 
-.backdoor-figure { width: 100%; min-height: 21rem; padding: 1.5rem; border: 1px solid var(--color-hair); border-radius: .8rem; background: color-mix(in srgb, var(--color-panel) 86%, transparent); }
+.backdoor-figure { width: 100%; min-height: 21rem; padding: 1.5rem; border-radius: .75rem; background: var(--color-panel); box-shadow: var(--shadow-lift); }
 .backdoor-node circle { fill: var(--color-panel); stroke: var(--color-edge); stroke-width: 2; }
 .backdoor-node text { fill: var(--color-ink); font-family: var(--font-mono); font-size: 16px; text-anchor: middle; }
 .backdoor-edge { fill: none; stroke-width: 2.2; }
@@ -121,13 +118,13 @@
 .backdoor-edge--signal { stroke: var(--color-signal); stroke-width: 3; }
 .backdoor-arrow { fill: var(--color-bone); }
 .backdoor-label { fill: var(--color-faint); font-family: var(--font-sans); font-size: 11px; text-anchor: middle; }
-.adjustment-record { display: grid; grid-template-columns: auto 1fr; gap: .75rem 1.5rem; margin-top: 2.25rem; padding: 1.25rem; border: 1px solid var(--color-hair); border-radius: .75rem; background: var(--color-well); font-size: var(--text-title); }
+.adjustment-record { display: grid; grid-template-columns: auto 1fr; gap: .75rem 1.5rem; margin-top: 2.25rem; padding: 1.25rem; border: 1px solid var(--color-hair); border-radius: .75rem; background: var(--color-well); font-size: var(--text-subtitle); }
 .adjustment-record span { color: var(--color-faint); }
-.adjustment-record b { color: var(--color-ink); font-family: var(--font-mono); font-weight: 550; text-align: right; }
+.adjustment-record b { color: var(--color-ink); font-family: var(--font-mono); font-weight: 500; text-align: right; }
 .adjustment-record .record-ok { color: var(--color-ok); font-family: var(--font-sans); }
 
-.structure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 4rem; border: 1px solid var(--color-line); background: var(--color-line); }
-.structure-grid article { min-height: 21rem; padding: 2rem; background: var(--color-stage); }
+.structure-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 3rem; }
+.structure-grid article { min-height: 21rem; padding: 2rem; border-radius: .75rem; background: var(--color-panel); box-shadow: var(--shadow-lift); }
 .structure-art { position: relative; display: block; width: 100%; height: 10rem; margin-bottom: 2.5rem; overflow: hidden; border-bottom: 1px solid var(--color-hair); }
 .structure-art::before, .structure-art::after { content: ''; position: absolute; inset: 1rem .25rem; }
 .structure-art--series::before { background: linear-gradient(145deg, transparent 0 12%, var(--color-faint) 12.5% 13.2%, transparent 13.8% 27%, var(--color-signal) 27.5% 28.6%, transparent 29.2% 48%, var(--color-faint) 48.5% 49.2%, transparent 49.8% 67%, var(--color-signal) 67.5% 68.4%, transparent 69%); clip-path: polygon(0 72%, 12% 45%, 23% 63%, 36% 22%, 49% 50%, 61% 38%, 73% 65%, 86% 30%, 100% 48%, 100% 54%, 86% 36%, 73% 71%, 61% 44%, 49% 56%, 36% 28%, 23% 69%, 12% 51%, 0 78%); background: var(--color-signal); }
@@ -136,21 +133,19 @@
 .structure-art--cross::before { background: radial-gradient(circle, var(--color-bone) 0 3px, transparent 4px); background-size: 2.45rem 2.1rem; }
 .structure-art--cross::after { inset: 18% 8% 26% 12%; border-bottom: 2px solid var(--color-signal); transform: rotate(-13deg); transform-origin: bottom left; }
 
-.final-cta { display: grid; justify-items: center; padding-block: 8rem; border-top: 1px solid var(--color-line); text-align: center; }
-.final-cta h2 { max-width: 48rem; margin: 1.5rem 0 0; color: var(--color-ink); font-size: clamp(2rem, 3.8cqi, 3.35rem); font-weight: 700; letter-spacing: -.025em; line-height: 1.12; }
-.final-cta .landing-primary { margin-top: 2.25rem; }
+.final-cta { display: grid; justify-items: center; padding-block: 6rem; border-top: 1px solid var(--color-line); text-align: center; }
+.final-cta h2 { max-width: 48rem; margin: 1.5rem 0 0; color: var(--color-ink); font-size: var(--text-display-sub); font-weight: 500; letter-spacing: -.01em; line-height: 1.2; }
+.final-cta .landing-primary { margin-top: 1.5rem; }
 .landing-footer { display: flex; align-items: center; justify-content: space-between; gap: 2rem; min-height: 6rem; border-top: 1px solid var(--color-line); color: var(--color-faint); font-size: var(--text-label); }
+.landing-footer .landing-wordmark { color: var(--color-ink); }
 .landing-footer p { flex: 1; margin: 0; text-align: center; }
-.landing-footer > a:last-child { color: var(--color-muted); }
 
 @media (max-width: 900px) {
   .landing-width { width: min(100% - 2rem, 44rem); }
-  .landing-scrim { background: linear-gradient(180deg, color-mix(in srgb, var(--color-stage) 8%, transparent) 0, color-mix(in srgb, var(--color-stage) 25%, transparent) 28%, var(--color-stage) 50%, var(--color-stage) 100%); }
+  .landing-scrim { background: linear-gradient(180deg, color-mix(in srgb, var(--color-rail) 8%, transparent) 0, color-mix(in srgb, var(--color-rail) 25%, transparent) 28%, var(--color-rail) 50%, var(--color-rail) 100%); }
   .landing-hero-copy { width: 100%; margin-top: auto; padding: min(28rem, 50svh) 0 4rem; }
-  .landing-headline { max-width: none; font-size: clamp(1.75rem, 8cqi, 2.6rem); }
-  .landing-lede { max-width: 36rem; }
-  .landing-content-veil { padding-top: 3rem; }
-  .workflow-section, .feature-section, .structures-section { padding-block: 5.5rem; }
+  .landing-headline { max-width: none; }
+  .workflow-section, .feature-section, .structures-section { padding-block: 4.5rem; }
   .workflow-section { grid-template-columns: 1fr; gap: 3rem; }
   .workflow-section .section-intro { position: static; }
   .feature-section, .feature-section--identify { grid-template-columns: 1fr; gap: 3rem; }
@@ -174,7 +169,7 @@
   .backdoor-figure { min-height: 0; padding: .5rem; }
   .adjustment-record { grid-template-columns: 1fr; gap: .3rem; }
   .adjustment-record b { margin-bottom: .6rem; text-align: left; }
-  .final-cta { padding-block: 7rem; }
+  .final-cta { padding-block: 4.5rem; }
   .landing-footer { flex-wrap: wrap; justify-content: space-between; gap: 1rem; padding-block: 1.5rem; }
 }
 

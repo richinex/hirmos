@@ -2,7 +2,7 @@ import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
 import { TimePreview } from './TimePreview'
 import { CalendarReport } from './CalendarReport'
-import { ParameterLabel } from '@/components/ui/ParameterLabel'
+import { ParameterLabel, ParameterHelp } from '@/components/ui/ParameterLabel'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { resultSurface } from '@/components/ui/recipes'
 import { Metadata } from '@/components/ui/Metadata'
@@ -105,10 +105,10 @@ const FREQUENCIES: readonly { readonly value: Frequency; readonly label: string 
   { value: 'yearly', label: 'Yearly' },
 ]
 
-const TRANSFORMS: readonly { readonly value: SeriesTransform; readonly label: string; readonly detail: string }[] = [
-  { value: { kind: 'levels' }, label: 'Keep levels', detail: 'Use the recorded values in their original units.' },
-  { value: { kind: 'difference', order: 1 }, label: 'First difference', detail: 'Use the change from the previous interval; one leading observation is removed.' },
-  { value: { kind: 'linear-detrend' }, label: 'Linear detrend', detail: 'Subtract a fitted intercept and linear time trend; use deviations from that trend.' },
+const TRANSFORMS: readonly { readonly value: SeriesTransform; readonly label: string }[] = [
+  { value: { kind: 'levels' }, label: 'Keep levels' },
+  { value: { kind: 'difference', order: 1 }, label: 'First difference' },
+  { value: { kind: 'linear-detrend' }, label: 'Linear detrend' },
 ]
 
 const RESAMPLING_AGGREGATIONS: readonly { readonly value: ResamplingAggregation; readonly label: string }[] = [
@@ -926,17 +926,14 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       ))}
                     </div>
                   </div>
-                  <div className="divide-y divide-hair">
+                  <div>
                     {selectedIds.map((column) => {
                       const name = columnName(column)
                       const selected = seriesTransformFor(draft.seriesTransforms, column)
-                      const definition = TRANSFORMS.find((candidate) => transformIsSelected(selected, candidate.value))
+                      // The row fills under the pointer, as a table row does (`tr('action')`), so a name and its control read as one row across the width without a rule between rows.
                       return (
-                        <div key={column} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3 py-2">
-                          <div className="min-w-0">
-                            <span className="block text-body text-ink">{name}</span>
-                            {selected.kind !== 'levels' && <span className="block text-label text-faint">{definition?.detail}</span>}
-                          </div>
+                        <div key={column} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-md px-3 py-1 transition-colors hover:bg-well has-[button:focus-visible]:bg-well">
+                          <span className="min-w-0 text-body text-ink">{name}</span>
                           <SegmentedControl
                             size="sm"
                             wrap
@@ -972,9 +969,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       {(preparedCurrent !== null || timeSeriesSelected) && (
         <section className={panel('mt-4 p-(--panel-space)')} aria-labelledby="diagnostics-title">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
+            <div className="flex items-center gap-1.5">
               <h3 id="diagnostics-title" className={cn(sectionTitle, 'm-0')}>Diagnostics</h3>
-              <p className="mb-0 mt-1 text-body text-faint">These tests do not change the prepared dataset.</p>
+              <ParameterHelp label="diagnostics" help="These tests do not change the prepared dataset." />
             </div>
             {/* A cross-section has one diagnostic, and one option is not a choice, so the switch appears only when there are several. */}
             {diagnosticOptions.length > 1 && (
@@ -984,12 +981,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           {preparedCurrent === null && (
             <p role="status" className="mb-0 mt-3 text-body text-faint">Create a prepared dataset version to run these diagnostics.</p>
           )}
-          <div hidden={diagnostic !== 'multicollinearity'} className="mt-4 border-t border-hair pt-4">
+          <div hidden={diagnostic !== 'multicollinearity'} className="mt-4">
             {preparedCurrent !== null
               ? <MulticollinearityCard source={source} profile={profile} prepared={preparedCurrent} onSelection={applyMulticollinearitySelection} />
               : null}
           </div>
-          <div hidden={diagnostic !== 'stationarity'} className="mt-4 border-t border-hair pt-4">
+          <div hidden={diagnostic !== 'stationarity'} className="mt-4">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
             <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
@@ -1114,12 +1111,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             })}
           </section>}
           </div>
-          <div hidden={diagnostic !== 'structure'} className="mt-4 border-t border-hair pt-4">
+          <div hidden={diagnostic !== 'structure'} className="mt-4">
             {preparedTimeSeries !== null
               ? <SeriesStructureCard embedded source={source} profile={profile} prepared={preparedTimeSeries} />
               : null}
           </div>
-          <div hidden={diagnostic !== 'granger'} className="mt-4 border-t border-hair pt-4">
+          <div hidden={diagnostic !== 'granger'} className="mt-4">
             {preparedTimeSeries !== null
               ? (
                 <GrangerCard
@@ -1143,7 +1140,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         {preparation.job.kind === 'running' && <button type="button" className={button('quiet', 'bg-panel')} onClick={preparation.cancel}>Cancel preparation</button>}
         <button
           type="button"
-          className={button('signal', 'float disabled:bg-raised disabled:border-control disabled:shadow-[0_2px_0_var(--color-edge),0_4px_8px_rgb(0_0_0/0.18),inset_0_1px_0_var(--color-highlight)]')}
+          className={button('signal')}
           disabled={action.kind !== 'ready'}
           aria-describedby={action.kind === 'blocked' ? 'preparation-requirement' : undefined}
           aria-busy={preparation.job.kind === 'running'}

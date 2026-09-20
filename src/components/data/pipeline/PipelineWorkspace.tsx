@@ -364,13 +364,13 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
       {(outcome?.kind === 'ran' || outcome?.kind === 'failed') && outcome.stdout !== undefined && outcome.stdout.length > 0 && (
         <div>
           <span className={label('block text-muted')}>Printed</span>
-          <pre className={cn(literal(), 'mt-1 max-h-48 overflow-auto rounded-md border border-hair bg-well px-2.5 py-2 text-[11px] leading-relaxed text-bone')} data-testid="block-stdout">{outcome.stdout}</pre>
+          <pre className={cn(literal(), 'mt-1 max-h-48 overflow-auto rounded-md border border-hair bg-well px-2.5 py-2 text-label leading-relaxed text-bone')} data-testid="block-stdout">{outcome.stdout}</pre>
         </div>
       )}
       {sql !== null && (
         <details className="group/sql">
           <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Icon name="chevron_right" size={14} className="transition-transform group-open/sql:rotate-90" /> As SQL</summary>
-          <pre className={cn(literal(), 'mt-2 overflow-x-auto rounded-md border border-hair bg-well px-2.5 py-2 text-[11px] leading-relaxed text-bone')} data-testid="block-sql">{sql}</pre>
+          <pre className={cn(literal(), 'mt-2 overflow-x-auto rounded-md border border-hair bg-well px-2.5 py-2 text-label leading-relaxed text-bone')} data-testid="block-sql">{sql}</pre>
         </details>
       )}
       {removable && (

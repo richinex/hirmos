@@ -199,9 +199,9 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
     )
   }
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} counterfactual`}>
+    <article className="rounded-xl bg-panel lift p-4" aria-label={`${estimandSentence(study)} counterfactual`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Current counterfactual</span>
+        <span className={label('text-signal-text')}>Current counterfactual</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       {record}

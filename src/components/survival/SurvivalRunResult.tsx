@@ -832,11 +832,11 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
 
   return (
     <article aria-labelledby={`survival-run-${run.id}`}>
-      <details className={`group ${current ? 'rounded-xl border border-edge bg-panel' : ''}`} open={open}>
+      <details className={`group ${current ? 'rounded-xl bg-panel lift' : ''}`} open={open}>
         <summary className={`flex cursor-pointer list-none items-start gap-3 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden ${current ? 'rounded-xl p-4' : 'py-1.5'}`}>
           <Icon name="expand_more" size={16} className="mt-1 shrink-0 text-faint transition-transform duration-(--motion-fast) group-open:rotate-180" />
           {current ? <div className="min-w-0 flex-1">
-            <span className={label(current ? 'text-signal' : 'text-faint')}>{method}</span>
+            <span className={label(current ? 'text-signal-text' : 'text-faint')}>{method}</span>
             <h3 id={`survival-run-${run.id}`} className="mb-1 mt-1 text-heading font-medium text-ink text-balance">{heading.title}</h3>
             <p className="m-0 text-body text-faint"><Metadata><span>{heading.meta}</span><span>{summary.figure}</span><span><span className={num()}>{formatTime(run.createdAt)}</span></span></Metadata></p>
           </div> : <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-4 gap-y-1">

@@ -1,23 +1,18 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <link rel="icon" type="image/svg+xml" href="/hirmos.svg?v=directed-h" />
-    <link rel="preload" href="/fonts/source-serif-4-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#16305A" />
     <title>Hirmos · browser causal inference workbench</title>
     <meta name="description" content="Prepare data, examine discovery evidence, specify and validate a DAG, identify an effect, and compare causal estimates in one local-first browser workbench." />
     <script>
       document.documentElement.dataset.surface = location.pathname === '/' ? 'landing' : 'workbench'
       try {
         var t = localStorage.getItem('hirmos-theme')
-        if (t === 'soft-dark') t = 'dark'
-        if (t === 'light') t = 'original-light'
-        var known = ['dark', 'original-light']
-        if (known.indexOf(t) === -1) {
-          t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'original-light'
-        }
+        if (t === 'system') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        if (t !== 'dark') t = 'light'
         document.documentElement.dataset.theme = t
       } catch (e) {}
     </script>
@@ -26,28 +21,29 @@
     <!-- Real first-viewport HTML: the product claim and workbench route survive slow or failed JS. -->
     <div id="root">
       <main class="landing-root">
-        <div class="landing-scene landing-scene--fallback" aria-hidden="true"></div>
-        <div class="landing-scrim" aria-hidden="true"></div>
-        <header class="landing-header">
-          <div class="landing-width landing-header__row">
-            <a class="landing-wordmark" href="/" aria-label="Hirmos home">
-              <svg width="20" height="20" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-                <rect width="32" height="32" rx="7" fill="var(--color-panel, #252e28)"/>
-                <g fill="var(--color-signal, #e5f0ae)"><path d="M7 7h5v7h6v-4l8 6-8 6v-4h-6v7H7z"/><path d="M21 7h4v5l-4-3zm0 16 4-3v5h-4z"/></g>
-              </svg>
-              <span>hirmos</span>
-            </a>
-          </div>
-        </header>
-        <div class="landing-width landing-hero-shell">
-          <section class="landing-hero-copy" aria-labelledby="landing-title">
-            <p class="landing-eyebrow">My causal inference workbench</p>
-            <h1 id="landing-title" class="landing-headline">Hirmos offers a framework for causal inference.</h1>
-            <div class="landing-actions">
-              <a class="landing-primary" href="/app">Start an analysis</a>
-              <a class="landing-secondary" href="#workflow">See the workflow</a>
+        <div class="landing-band band-texture">
+          <div class="landing-scene" aria-hidden="true"></div>
+          <div class="landing-scrim" aria-hidden="true"></div>
+          <header class="landing-header">
+            <div class="landing-width landing-header__row">
+              <a class="landing-wordmark" href="/" aria-label="Hirmos home">
+                <svg width="28" height="28" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                  <rect width="32" height="32" rx="7" fill="var(--color-rail-active, #234478)"/>
+                  <g fill="var(--color-rail-ink, #ffffff)"><path d="M7 7h5v7h6v-4l8 6-8 6v-4h-6v7H7z"/><path d="M21 7h4v5l-4-3zm0 16 4-3v5h-4z"/></g>
+                </svg>
+                <span>hirmos</span>
+              </a>
             </div>
-          </section>
+          </header>
+          <div class="landing-width landing-hero-shell">
+            <section class="landing-hero-copy" aria-labelledby="landing-title">
+              <p class="landing-eyebrow">My causal inference workbench</p>
+              <h1 id="landing-title" class="landing-headline">Hirmos offers a framework for causal inference.</h1>
+              <div class="landing-actions">
+                <a class="landing-primary" href="/app">Start an analysis</a>
+              </div>
+            </section>
+          </div>
         </div>
       </main>
     </div>

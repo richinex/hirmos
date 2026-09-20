@@ -10,13 +10,13 @@ const token = (name: string, fallback: string): string => getComputedStyle(docum
  * and every token clears it in both themes. The sixteen terminal colours the shell prints through map
  * onto the page's own tones, so a keyword or an error reads as it would anywhere else on the page.
  */
-const consoleGround = (): string => token('--color-stage', '#000000')
+const consoleGround = (): string => token('--color-stage', '#ECF1F6')
 
 export const consoleTheme = (): ITheme => {
   const stage = consoleGround()
-  const ink = token('--color-ink', '#F2F2F0')
-  const muted = token('--color-muted', '#A1A1A1')
-  const signal = token('--color-signal', '#BEF264')
+  const ink = token('--color-ink', '#16202E')
+  const muted = token('--color-muted', '#4C5A70')
+  const signal = token('--color-signal-text', '#8F5308')
   const ok = token('--color-ok', signal)
   const info = token('--color-info', muted)
   const warn = token('--color-warn', signal)
@@ -26,7 +26,7 @@ export const consoleTheme = (): ITheme => {
     foreground: ink,
     cursor: ink,
     cursorAccent: stage,
-    selectionBackground: token('--color-raised', '#1A1A1A'),
+    selectionBackground: token('--color-raised', '#DFE7EF'),
     selectionForeground: ink,
     black: stage, brightBlack: muted,
     red: danger, brightRed: danger,

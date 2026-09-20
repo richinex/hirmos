@@ -273,10 +273,10 @@ function IdentificationCard({ study, identification, current, onContinue, onOpen
     )
   }
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${title} identification`}>
+    <article className="rounded-xl bg-panel lift p-4" aria-label={`${title} identification`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
-          <span className={label('text-signal')}>Current study</span>
+          <span className={label('text-signal-text')}>Current study</span>
           <h3 className="mb-0 mt-1 text-title font-medium text-ink">{title}</h3>
         </div>
         <span className={num('text-micro text-faint')}><Metadata><span>{formatCount(study.population.observations).text} rows</span><span>{study.dagName}</span></Metadata></span>

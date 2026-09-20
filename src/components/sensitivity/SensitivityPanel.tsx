@@ -90,9 +90,9 @@ function DmlRefutationCard({ run, estimation, study, current, onDelete }: { read
     )
   }
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} DML refutation`}>
+    <article className="rounded-xl bg-panel lift p-4" aria-label={`${estimandSentence(study)} DML refutation`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Current probe</span>
+        <span className={label('text-signal-text')}>Current probe</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       <DmlRefutationRecord run={run} study={study} />
@@ -149,9 +149,9 @@ function RefutationCard({ run, estimation, study, current, onDelete }: { readonl
     )
   }
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} refutation`}>
+    <article className="rounded-xl bg-panel lift p-4" aria-label={`${estimandSentence(study)} refutation`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Current probe</span>
+        <span className={label('text-signal-text')}>Current probe</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       <RefutationRecord run={run} study={study} />
@@ -239,9 +239,9 @@ function UnobservedCard({ run, estimation, study, current, onDelete }: { readonl
     )
   }
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${estimandSentence(study)} unmeasured confounder`}>
+    <article className="rounded-xl bg-panel lift p-4" aria-label={`${estimandSentence(study)} unmeasured confounder`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Current probe</span>
+        <span className={label('text-signal-text')}>Current probe</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       {record}

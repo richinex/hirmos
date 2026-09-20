@@ -38,21 +38,30 @@ for (const example of [
   })
 }
 
-test('example headers match the table surface in both themes',async({page},info)=>{
+test('example cards are lit blocks and table headers sit on their surface in both themes',async({page},info)=>{
   await page.goto('/app/projects')
+  const resolve=(colour:string)=>page.evaluate(colour=>{const probe=document.createElement('div');probe.style.backgroundColor=colour;document.body.append(probe);const result=getComputedStyle(probe).backgroundColor;probe.remove();return result},colour)
   for(const theme of ['light','dark']) {
     await page.evaluate(theme=>{document.documentElement.dataset.theme=theme},theme)
-    const ledger=page.getByRole('table',{name:'Examples'}).first()
-    if(info.project.name==='chromium') {
-      await expect(ledger).toBeVisible()
-      const header=ledger.getByRole('columnheader').first()
-      const colours=await header.evaluate(el=>({background:getComputedStyle(el).backgroundColor,stage:getComputedStyle(document.documentElement).getPropertyValue('--color-stage').trim(),position:getComputedStyle(el).position}))
-      const stage=await page.evaluate(colour=>{const probe=document.createElement('div');probe.style.backgroundColor=colour;document.body.append(probe);const result=getComputedStyle(probe).backgroundColor;probe.remove();return result},colours.stage)
-      expect(colours.background).toBe(stage)
-      expect(colours.position).toBe('sticky')
-      await ledger.screenshot({path:info.outputPath(`examples-${theme}.png`)})
-    }
+    const cards=page.getByRole('list',{name:'Examples'})
+    await expect(cards).toBeVisible()
+    const card=await cards.locator('.example-card').first().evaluate(el=>{const css=getComputedStyle(el);return {background:css.backgroundColor,border:css.borderWidth,shadow:css.boxShadow,panel:getComputedStyle(document.documentElement).getPropertyValue('--color-panel').trim()}})
+    expect(card.background).toBe(await resolve(card.panel))
+    expect(card.border).toBe('0px')
+    expect(card.shadow).not.toBe('none')
     expect(await page.locator('body').evaluate(el=>el.scrollWidth<=innerWidth+1)).toBe(true)
+    if(info.project.name==='chromium') await cards.screenshot({path:info.outputPath(`examples-${theme}.png`)})
+  }
+  if(info.project.name!=='chromium') return
+  await page.getByRole('button',{name:'Open Seat-belt law and road deaths',exact:true}).click()
+  const schema=page.getByRole('table').first()
+  await expect(schema).toBeVisible({timeout:30_000})
+  for(const theme of ['light','dark']) {
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme},theme)
+    const header=schema.getByRole('columnheader').first()
+    const colours=await header.evaluate(el=>({background:getComputedStyle(el).backgroundColor,position:getComputedStyle(el).position,surface:getComputedStyle(el).getPropertyValue('--table-surface').trim()||getComputedStyle(document.documentElement).getPropertyValue('--color-stage').trim()}))
+    expect(colours.position).toBe('sticky')
+    expect(colours.background).toBe(await resolve(colours.surface))
   }
 })
 

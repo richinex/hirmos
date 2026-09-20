@@ -1474,7 +1474,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
           {type.requirements.map((requirement) => (
             <li key={requirement.holds} className="text-body">
               <p className="m-0 text-ink">{requirement.holds}</p>
-              <p className="m-0 font-serif text-faint">If this is not met: {requirement.otherwise}</p>
+              <p className="m-0 text-faint">If this is not met: {requirement.otherwise}</p>
             </li>
           ))}
         </ul>

@@ -81,8 +81,8 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
         <span className={cn('grid h-5 w-5 shrink-0 place-items-center rounded', node.block.kind === 'input' || node.block.kind === 'output' ? 'bg-ink text-panel' : 'bg-raised text-muted')}><Icon name={blockIcon(node.block.kind)} size={14} /></span>
         <span className="truncate text-body font-medium text-ink">{blockLabel(node.block.kind)}</span>
       </div>
-      <p className="m-0 min-h-0 flex-1 truncate px-2.5 font-mono text-[11px] leading-4 text-faint" title={data.summary}>{data.summary}</p>
-      <div className={cn('flex h-7 shrink-0 items-center justify-between border-t border-line px-2.5 text-[10px]', failed ? 'text-danger' : 'text-faint')}>
+      <p className="m-0 min-h-0 flex-1 truncate px-2.5 font-mono text-label text-faint" title={data.summary}>{data.summary}</p>
+      <div className={cn('flex h-7 shrink-0 items-center justify-between border-t border-line px-2.5 text-micro', failed ? 'text-danger' : 'text-faint')}>
         <span className="tabular-nums">{foot}</span>
       </div>
       {node.block.kind !== 'output' && (

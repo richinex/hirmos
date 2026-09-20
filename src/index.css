@@ -2,26 +2,16 @@
 @import "./themes.css";
 @import "./dashboard.css";
 
-/* Shallow face/depth treatment inspired by UI Buttons' 3D button 2.
-   Only mobile workbench openers use this class; shared control dimensions stay unchanged. */
-.sheet-opener {
-  background: var(--color-raised);
-  color: var(--color-ink);
-  border-color: var(--color-edge);
-  box-shadow: 0 2px 0 var(--color-edge), 0 4px 6px rgb(0 0 0 / 0.14),
-    inset 0 1px 0 color-mix(in srgb, var(--color-ink) 8%, transparent);
-}
+/* The phone's pane openers: a lifted block at rest, inset while its sheet is open, the way the texture
+   chapter presses a menu item in. Only mobile workbench openers use this class. */
+.sheet-opener { background: var(--color-panel); color: var(--color-ink); border-color: var(--color-hair); box-shadow: var(--shadow-lift); }
 .sheet-opener:active,
-.sheet-opener[aria-expanded='true'] {
-  transform: translateY(2px);
-  box-shadow: 0 0 0 var(--color-edge), 0 1px 2px rgb(0 0 0 / 0.12);
-}
+.sheet-opener[aria-expanded='true'] { background: var(--color-raised); box-shadow: inset 0 2px 3px rgb(0 0 0 / .12); }
 
-/* Hirmos — lime on black, set like a paper.
+/* Hirmos: blue with one orange, set on a rhythm.
    ------------------------------------------------------------------------
    What this palette IS, and the reasoning behind it. Earlier experiments were tried and reverted; their
-   reasons are recorded here because they are the useful part — without them the next person re-tries
-   them and rediscovers the same result the hard way.
+   reasons are recorded here because they are the useful part.
 
    1. COLOUR CARRIES CATEGORY. A node's group sets its colour: Okabe-Ito (colourblind-safe) for the
       first eight groups, OKLCH-generated overflow beyond, assigned first-seen. See theme.ts.
@@ -31,18 +21,14 @@
       discs (2D); tracePath and geometryFor still take a `shape` argument so call sites did not have to
       change, and both ignore it.
 
-   2. ONE SIGNAL COLOUR, FEW MEANINGS. --color-signal (the active theme's single accent) means "this is live": the answer to
-      your question, an in-progress compile (JobFlow's source card), and links. It is NOT a category
-      colour and never encodes a node's type — that is what the group ramp is for. The original rule
-      here was "the answer and nothing else"; the compile flow legitimately needed one attention colour
-      and reached for it, so the rule is written as it is actually followed.
-      The reason the rule exists at all still holds: when a categorical rainbow and the highlight share
-      a colour space, you cannot tell "this is in the answer" from "this is an Entity". The group ramp
-      is deliberately muted so the signal stays the loudest thing on the stage.
-      The signal is lime on the dark theme and the same hue darkened to an olive on the light one: a
-      tint that reads on black cannot also read on white, so the hue is kept and moved along it.
-      Because the signal is a green, `ok` is a teal on both themes, so a passed check is never mistaken
-      for the answer.
+   2. ONE SCHEME, TWO HUES. The palette is a complementary scheme on the artists' wheel: blue is the base,
+      orange its complement. Blue is cool and recedes, so it holds the large areas: the band that carries
+      the rail and the header, the tint in every grey. Orange is warm and pops, so it is the one signal:
+      --color-signal means "this is live", the answer to your question, an in-progress compile, the
+      primary action. It is NOT a category colour and never encodes a node's type; that is what the group
+      ramp is for. A complement must never sit as text on its opposite, so orange is always a fill under
+      dark ink, and a link keeps the base hue: --color-link is blue, on both faces.
+      The group ramp is deliberately muted so the signal stays the loudest thing on the stage.
 
    3. STATUS IS ITS OWN RAMP. ok / info / warn / danger, for machine state only — never category, never
       the answer. Tokenised so each carries a per-theme variant and exactly one meaning.
@@ -54,142 +40,114 @@
       every class and utility reads them, so a duration is a token the way a colour is.
       An ease-out is shaped for something that starts fast and settles, so a loop built on it lurches
       at the seam where it restarts; linear has no seam.
-      This is stated as a rule because six places had drifted onto Tailwind's `animate-pulse` — a 2s
-      loop on its own curve — which is exactly how a vocabulary stops being one. If you need a new
-      motion, first check whether one of these already means what you are trying to say.
 
-   5. TYPE IS SET LIKE A JOURNAL PAGE. The model is Buriak, "Which Font Looks Best in a Figure?",
-      Chem. Mater. 2016, 28, 689: running prose in a serif; headings, chrome and every figure in a
-      sans; the paper's own rule for figures is "Arial or Helvetica, always". Measured from that page,
-      body 9 pt, section heads 10 pt bold sans in grey with a square marker, the title 18 pt bold sans,
-      captions 8 pt, metadata 7 pt. Here that is: `p` and `figcaption` (and `prose()`) in Source Serif 4
-      at the 13px prose tier; headings, labels, buttons, tables and numbers in Helvetica, Arial, or
-      Arimo where neither is installed; `sectionTitle` bold and muted with the marker; JetBrains Mono
-      only for what is read character by character (`literal()`, code). Helvetica and Arial carry two
-      weights, regular and bold, so `font-medium` is tokenised to 600 and resolves to bold on both; the
-      paper itself uses no third weight.
+   5. TYPE IS THREE FACES ON A RHYTHM. Roboto Slab, a slab serif, for headings: it reads at a distance
+      and has an industrial but friendly voice. Lato, a humanist sans, in its two weights for everything
+      else: prose, labels, buttons, tables, figures. Fira Code only for what is read character by
+      character (`literal()`, code). The root is 16px and is the only pixel size; every other size, line
+      height and vertical margin is rem. One rhythm unit is 1.5rem (24px). Sizes come from a modular
+      scale, 1.2 on a phone and 1.333 from 720px up, so a headline grows with the format while the
+      reading size stays put. Lato has no 500 or 600, so `font-medium` and `font-semibold` are bold.
 
-   The original dark and light palettes live here; additional palettes live in themes.css.
-   All use :root[data-theme=...] with a pre-paint boot script in index.html.
+   6. TEXTURE IS CLEAN AND GRAINY. A subtle noise and a radial gradient on the band so a large flat blue
+      reads as a surface lit from above; a one-pixel top highlight and a faint gradient on a filled
+      button, so it is lit the same way; a double shadow (`.float`) under a surface that leaves the
+      plane. Nothing else: no bevels, no diagonals, no worn edges.
 
-   Elevation is NOT drop shadows: `.lift` is an inset top-edge highlight, `.float` a theme-aware shadow
-   for surfaces that leave the plane. Components carry no `shadow-*` utilities. */
+   The two faces of the palette live in themes.css under :root[data-theme=...], with a pre-paint boot
+   script in index.html. Light is the default. */
 @theme {
-  /* The figure face, per the paper: Helvetica or Arial from the system, Arimo (Arial's metric twin,
-     self-hosted) only where neither exists. The prose face is self-hosted with its optical-size axis, so
-     13px text gets the small-size cut. Mono is for code alone. */
-  --font-sans: Helvetica, Arial, Arimo, sans-serif;
-  --font-serif: "Source Serif 4 Variable", "Source Serif 4", Georgia, "Times New Roman", serif;
-  --font-mono: "JetBrains Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
-  /* Two weights, as on the page: regular and bold. `font-medium` lands on bold in Helvetica and Arial
-     (they have no 500), and on the serif's semibold. */
-  --font-weight-medium: 600;
+  --font-sans: Lato, 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-heading: 'Roboto Slab Variable', 'Roboto Slab', Rockwell, Georgia, serif;
+  --font-mono: 'Fira Code Variable', 'Fira Code', 'Courier New', Courier, monospace;
+  /* Lato carries regular and bold. Both medium and semibold resolve to bold. */
+  --font-weight-medium: 700;
+  --font-weight-semibold: 700;
 
   /* The house curve is the default for every transition utility, so a button's 150ms colour change
      rides the same ease-out as .pop and .rise instead of Tailwind's own curve. */
   --default-transition-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
 
-  /* THE TYPE RAMP — seven named tiers, and no other font size exists in the workspace UI.
-     The app once had nineteen: 61% of all type sat in a 9.5/10/10.5/11px cluster whose half-pixel
-     steps nobody can see, so hierarchy was being faked with colour and tracking. Six tiers with
-     real steps put it back on size. Rem, not px: an absolute px base overrides the reader's own
-     browser font-size preference, which is the one typography setting that is theirs, not ours.
-     Values are rem against the 16px default root, so `body` at --text-subtitle is today's 13px.
-     Line heights ride the tokens (1.5 floors the prose tiers per WCAG 2.1; display sizes tighten
-     because 1.5 gaps a two-line heading apart). Two sanctioned editorial exceptions live at call sites:
-     the hero's max-md 26px step, and the composer's 16px mobile input (the iOS auto-zoom floor). */
-  --text-metric: clamp(1.75rem, calc(1rem + 2.5cqi), 3rem); /* 28px at a 480px stage, 48px at 1280 */
+  /* The colour tokens, at their light values, so Tailwind generates the utilities (bg-panel, border-hair,
+     text-ink). Both faces of the palette are restated in themes.css under :root[data-theme]; a utility
+     compiles to var(--color-*) and takes the face that is live. */
+  --color-stage: #ECF1F6;        /* the canvas: a watered-down blue */
+  --color-panel: #FFFFFF;        /* a lit block on the canvas */
+  --color-column: #F5F8FB;       /* the bottom pane's ground */
+  --color-well: #F5F8FB;         /* an inset field */
+  --color-raised: #DFE7EF;       /* a selected row or chip */
+  --color-line: #D6DEE8;         /* a divider */
+  --color-hair: #C2CDDA;         /* a control border */
+  --color-edge: #9DACBE;         /* an emphasised border */
+  --color-control: #7A8AA3;      /* an input boundary: 3:1 on the well */
+  --color-ink: #16202E;
+  --color-bone: #33415A;
+  --color-muted: #4C5A70;
+  --color-faint: #59687F;        /* the smallest text allowed */
+  --color-dim: #C2CDDA;          /* non-text only */
+  --color-signal: #E8891D;       /* the action, the live answer: orange, always under dark ink */
+  --color-signal-ink: #16202E;
+  --color-signal-hover: #F29A33;
+  --color-signal-line: #F2C48A;  /* signal at border strength */
+  --color-signal-text: #8F5308;
+  --color-link: #2457A8;         /* a link keeps the base hue: the complement never sits as text */
+  --color-ok: #1A7353;
+  --color-info: #2457A8;
+  --color-warn: #8A5700;
+  --color-danger: #B23A3A;
+  --color-highlight: rgba(255, 255, 255, 0.35);
+  --color-rail: #16305A;
+  --color-rail-active: #234478;
+  --color-rail-ink: #FFFFFF;
+  --color-rail-faint: #B8C7DE;
+  --color-rail-dim: #4E6A96;
+  --color-rail-signal: #F2A24A;
+  --color-rail-ok: #6FD3AE;
+  --color-rail-info: #8CB8E8;
+  --color-rail-danger: #F28B82;
+
+  /* THE TYPE RAMP: the modular scale, named by tier. The reading size is 1rem (16px) on the 1.5rem unit.
+     Upward steps are powers of the wide-screen ratio 1.333 (the phone ratio 1.2 applies below 720px,
+     in the media query after this block); downward steps follow the shallower 1.2 ratio, as a type-scale
+     tool does, so the smallest sizes stay legible. Line heights of the reading tiers are whole units;
+     display sizes take whole units of their own. No other font size exists in the workspace UI. */
+  --text-metric: clamp(1.75rem, calc(1rem + 2.5cqi), 3rem);  /* a headline figure */
   --text-metric--line-height: 1;
-  --text-metric--letter-spacing: -0.04em;
-  --text-metric--font-weight: 600;
-  --text-heading: 1.1875rem;            /* 19px — the hero/empty-state display tier */
-  --text-heading--line-height: 1.5rem;  /* 24px box: a whole number of 4px steps */
-  /* The display tier: tutorial and landing-scale headlines. cqi, so a headline sizes to its
-     column, not the window; without an ancestor container it falls back to viewport units. */
-  --text-display: clamp(2rem, 5cqi, 4.75rem);
-  --text-display--line-height: 0.98;
-  --text-display--letter-spacing: -0.055em;
-  --text-display--font-weight: 600;
-  --text-display-sub: calc(var(--text-display) * 0.6); /* holds a fixed ratio to the display tier */
-  --text-display-sub--line-height: 1.1;
-  --text-display-sub--letter-spacing: -0.04em;
-  --text-display-sub--font-weight: 600;
-  --text-heading--letter-spacing: -0.03em;
-  --text-heading--font-weight: 600;
-  --text-title: 0.9375rem;              /* 15px — a surface's subject */
-  --text-title--line-height: 1.4;
-  --text-subtitle: 0.8125rem;           /* 13px — reading prose; the body element's own size */
-  --text-subtitle--line-height: 1.25rem; /* 20px box */
-  --text-body: 0.75rem;                 /* 12px — working text: fields, dialogs, hints */
+  --text-metric--letter-spacing: -0.02em;
+  --text-metric--font-weight: 700;
+  --text-display: clamp(2.0736rem, 4.5cqi, 3.1573rem);        /* 1.2^4 to 1.333^4: the landing headline */
+  --text-display--line-height: 1.1;
+  --text-display--letter-spacing: -0.02em;
+  --text-display--font-weight: 500;
+  --text-display-sub: calc(var(--text-display) * 0.6);
+  --text-display-sub--line-height: 1.2;
+  --text-display-sub--letter-spacing: -0.01em;
+  --text-display-sub--font-weight: 500;
+  --text-heading: 1.7778rem;            /* 1.333^2, 28.4px: a chapter title */
+  --text-heading--line-height: 3rem;    /* two units */
+  --text-heading--letter-spacing: -0.01em;
+  --text-heading--font-weight: 500;
+  --text-title: 1.3333rem;              /* 1.333^1, 21.3px: a surface's subject */
+  --text-title--line-height: 1.5rem;    /* one unit */
+  --text-title--font-weight: 500;
+  --text-subtitle: 1rem;                /* 16px: reading prose; the body element's own size */
+  --text-subtitle--line-height: 1.5rem; /* one unit */
+  --text-body: 0.8333rem;               /* 1 / 1.2, 13.3px: working text: fields, dialogs, hints */
   --text-body--line-height: 1.5;
-  --text-table: 0.8125rem;              /* 13px — data cells, independent of prose */
+  --text-table: 0.8333rem;              /* data cells, independent of prose */
   --text-table--line-height: 1.5;
-  --text-label: 0.6875rem;              /* 11px — chrome: buttons, panel titles, captions */
-  --text-label--line-height: 1rem;      /* 16px box: never less leading than body */
-  --text-micro: 0.625rem;               /* 10px — the floor: timings, keycaps, terse execution metadata */
-  --text-micro--line-height: 1rem;      /* 16px box */
-
-  --color-stage: #000000;        /* graph ground, app background: black */
-  --color-panel: #0A0A0A;        /* chrome: header, rail, composer bed */
-  --color-column: #050505;       /* conversation column */
-  --color-well: #111111;         /* inset control / input */
-  --color-raised: #1A1A1A;       /* active nav, selected tab */
-
-  --color-line: #1C1C1C;         /* structural divider */
-  --color-hair: #262626;         /* control border */
-  --color-edge: #3A3A3A;         /* emphasised border (focus, panels) */
-  --color-control: #6B6B6B;      /* input boundary: 3:1 on the well (WCAG 1.4.11) */
-
-  --color-ink: #F2F2F0;          /* primary text, selected node */
-  --color-bone: #C9C6BF;         /* graph node stroke, secondary text */
-  --color-muted: #A1A1A1;        /* labels, section titles, inactive controls */
-  --color-faint: #8F8F8F;        /* SMALLEST TEXT ALLOWED — ≥4.5:1 on every ground incl. raised */
-  --color-dim: #333333;          /* NON-TEXT ONLY: hairlines, dimmed plot, disabled fill */
-
-  --color-signal: #BEF264;       /* lime: "this is live": the answer, a running compile, links. Never a category. 16:1 on black. */
-  --color-signal-ink: #000000;   /* text on signal */
-  --color-signal-line: #4A5A2A;  /* signal at border strength */
-
-  /* Status ramp — the ONLY other hues, and only for machine state, never category or the answer. Tokenised
-     so they carry a light-mode variant and one meaning each, instead of scattered raw Tailwind classes. */
-  --color-ok: #2DD4BF;           /* success / extracted / valid: a teal, kept off the lime signal */
-  --color-info: #60A5FA;         /* in-progress / running (sky, not the signal) */
-  --color-warn: #FBBF24;         /* caution / abstained */
-  --color-danger: #F87171;       /* destructive / failed */
-
-  /* Elevation: a faint top-edge highlight lifts a surface off the stage (lit from above). */
-  --color-highlight: rgba(255, 255, 255, 0.06);
-
-  /* The chapter rail is a solid dark shape in both themes, so its text and glyphs take the dark palette
-     whatever the page is; only the fill and the disabled tone change on paper. */
-  --color-rail: #1A1A1A;
-  --color-rail-ink: #F2F2F0;
-  --color-rail-faint: #8F8F8F;
-  --color-rail-dim: #444444;
-  --color-rail-signal: #BEF264;
-  --color-rail-ok: #2DD4BF;
-  --color-rail-info: #60A5FA;
-  --color-rail-danger: #F87171;
+  --text-label: 0.6944rem;              /* 1 / 1.2^2, 11.1px: chrome: buttons, panel titles, captions */
+  --text-label--line-height: 1rem;
+  --text-micro: 0.6944rem;              /* the floor: timings, keycaps; the same step as label */
+  --text-micro--line-height: 1rem;
 }
-
-/* The prose face, self-hosted from @fontsource-variable/source-serif-4 5.3.0 (files copied into
-   public/fonts so index.html can preload the roman before the stylesheet asks for it). Both axes are in
-   the file: weight, and optical size, which the browser applies from the text's own size. */
-@font-face {
-  font-family: "Source Serif 4 Variable";
-  font-style: normal;
-  font-display: swap;
-  font-weight: 200 900;
-  src: url("/fonts/source-serif-4-latin-opsz-normal.woff2") format("woff2-variations");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Source Serif 4 Variable";
-  font-style: italic;
-  font-display: swap;
-  font-weight: 200 900;
-  src: url("/fonts/source-serif-4-latin-opsz-italic.woff2") format("woff2-variations");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+/* The phone scale: 1.2 between tiers, so a heading takes less of a small screen. */
+@media (max-width: 719px) {
+  :root {
+    --text-heading: 1.44rem;
+    --text-heading--line-height: 1.5rem;
+    --text-title: 1.2rem;
+  }
 }
 
 /* 100dvh, not 100%/100vh: on iOS Safari the static units include the retracted toolbar, which parked
@@ -197,14 +155,14 @@
    the real visible height. Fallback chain for pre-dvh engines. */
 /* Native form controls (the OS select picker, scrollbars, inputs) follow the ACTIVE theme instead
    of the system default: without this, Android renders a dark picker sheet over the paper themes. */
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 
-/* Radius: rounded-full for every action and every single-line field (`button()`, `iconControl()`,
-   `chromeAction()`, `field()`), so an action reads as a capsule and a filled capsule is the primary
-   one; rounded-md for every choice among a few options (segments, facets, view switches), which keeps
-   a choice apart from an action; rounded-lg for rows, small cards and multi-line fields, rounded-xl
-   for section cards, rounded-2xl for the palette, rounded-3xl for floating windows and sheets.
-   Progress tracks, drag handles and dots are shapes, not controls. Anything else is drift. */
+/* Radius: rounded-md for every action and every single-line field (`button()`, `iconControl()`,
+   `chromeAction()`, `field()`, the table search) and for every choice among a few options (segments,
+   facets, view switches), so controls read as one family; rounded-lg for rows, small cards and multi-line
+   fields, rounded-xl for section cards and blocks, rounded-3xl for floating windows and sheets. The one
+   capsule is the landing's call to action. Progress tracks, drag handles and dots are shapes, not
+   controls. Anything else is drift. */
 
 /* The layering order, in one readable list. Increments of 10 leave room; nothing floats
    without a name here. */
@@ -221,20 +179,18 @@
   --z-toast: 100;
   --z-drag: 110;
 }
-:root[data-theme="light"] { color-scheme: light; }
 
 html, body { height: 100%; margin: 0; }
-/* The root grows with the viewport above 1280px (16px there, 18px at 1920px) so every rem tier scales
-   together on large displays; below 1280px the ramp stays at its designed size. */
-html { font-size: clamp(1rem, calc(0.5svw + 0.6rem), 1.125rem); }
+/* The one pixel size on the page: the root. Every other size, line height and margin is rem against it. */
+html { font-size: 16px; }
 #root { height: 100%; height: 100dvh; }
 body {
   background: var(--color-stage);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* Rem so the reader's browser base-size preference actually reaches the app; 13px at default root. */
-  font-size: 0.8125rem;
-  line-height: 1.5;
+  /* The reading size on the rhythm unit. */
+  font-size: var(--text-subtitle);
+  line-height: var(--text-subtitle--line-height);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -257,9 +213,9 @@ button, a, [role="button"] { -webkit-tap-highlight-color: transparent; }
   /* A link rests on an underline in the signal-line tone, so it is findable without colour (WCAG 1.4.1);
      hover brings the underline up to the text colour instead of lightening the text. */
   a {
-    color: var(--color-signal);
+    color: var(--color-link);
     text-decoration: underline;
-    text-decoration-color: var(--color-signal-line);
+    text-decoration-color: color-mix(in srgb, var(--color-link) 40%, transparent);
     text-underline-offset: 3px;
     transition: text-decoration-color var(--motion-fast) var(--default-transition-timing-function);
   }
@@ -294,18 +250,16 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   }
 }
 
-/* The paper's split, on the elements that already mean it: a paragraph or a caption is read as prose
-   and takes the serif; a heading, a label, a cell, a button or a summary is chrome or a figure and keeps
-   the sans it inherits. In `base`, so a `font-sans` utility can take a paragraph back when it is a line
-   of chrome. `prose()` in recipes.ts carries the same face for text that is not a paragraph element. */
+/* The heading face on the elements that mean a heading. A level below h3 is a label or a subject inside
+   a surface and keeps the sans at bold. In `base`, so a `font-sans` utility can take a heading back when
+   it is a line of chrome. */
 @layer base {
-  p, figcaption { font-family: var(--font-serif); }
+  h1, h2, h3 { font-family: var(--font-heading); font-weight: 500; }
 }
 
 /* Figures in tables and definition lists align down a column without every cell opting in through
    `num()`. Kerning stays on here: a text cell's height is predicted from a kerned measurement
-   (lib/textMetrics.ts), and only `num()` switches kerning off, for the pair "11" that Helvetica, Arial
-   and Arimo pull together. */
+   (lib/textMetrics.ts), and only `num()` switches kerning off, for the pair "11". */
 @layer base {
   table, dl { font-variant-numeric: tabular-nums lining-nums; }
   /* A heading balances its lines so one word is never left alone on the last line. */
@@ -370,10 +324,6 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
 .mac-terminal-body { background: var(--color-stage); }
 :root[data-theme="dark"] .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
 :root[data-theme="dark"] .mac-terminal-title { color: #B4B4B4; }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]):not([data-theme="original-light"]) .mac-terminal-bar { background: linear-gradient(#3B3B3D, #2D2D2F); border-bottom-color: #000000; }
-  :root:not([data-theme="light"]):not([data-theme="original-light"]) .mac-terminal-title { color: #B4B4B4; }
-}
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 /* The house durations. Read by the classes below, by `duration-(--motion-*)` utilities, and by the
@@ -448,7 +398,7 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   width: 14px;
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent));
 }
-:root:is([data-theme="light"], [data-theme="original-light"]) .bar-live::after {
+:root[data-theme="light"] .bar-live::after {
   background: linear-gradient(90deg, transparent, color-mix(in srgb, white 75%, transparent), transparent);
 }
 @media (prefers-reduced-motion: reduce) { .bar-live::after { animation: none; opacity: 0; } }
@@ -467,22 +417,22 @@ button[aria-busy="true"]::after {
 }
 @media (prefers-reduced-motion: reduce) { button[aria-busy="true"]::after { animation: none; left: 0; width: 100%; opacity: 0.5; } }
 
-/* Elevation utilities. `.lift` is just the top-edge highlight for inline surfaces (cards, legend). `.float`
-   adds a theme-aware drop shadow for surfaces that leave the plane (Rnd windows, modals), replacing the flat
-   shadow-2xl so panels visibly lift off the stage. */
+/* Elevation, the texture chapter's way: light from above. `.lift` is a contact shadow for a block on the
+   canvas (cards, panels), with no ring and no top line, so a card is a surface and not a frame; `.float`
+   is the double shadow, a tight one for contact and a wide soft one for distance, for surfaces that leave
+   the plane (Rnd windows, modals). The values are per-theme tokens in themes.css. */
 .lift { box-shadow: var(--shadow-lift); }
-:root { --shadow-lift: inset 0 1px 0 var(--color-highlight); }
-/* On the light theme the highlight is white on a white panel and paints nothing, so a lifted surface
-   sat flat on the stage. A hairline ring at five percent ink and a one-pixel shade give it an edge; it is
-   still not a drop shadow. */
-:root[data-theme="light"] { --shadow-lift: 0 0 0 1px rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.06); }
+.float { box-shadow: var(--shadow-float), inset 0 1px 0 var(--color-highlight); }
 /* Non-interactive texture: a faint 45° hatch says "not usable here" as a pattern, not a colour. */
 .hatch { background-image: repeating-linear-gradient(45deg, color-mix(in oklab, var(--color-muted) 14%, transparent) 0 2px, transparent 2px 9px); }
-:root { --shadow-float: 0 24px 50px -12px rgba(0, 0, 0, 0.55); }
-:root[data-theme="light"] { --shadow-float: 0 18px 48px rgba(0, 0, 0, 0.10); }
-.float { box-shadow: var(--shadow-float), inset 0 1px 0 var(--color-highlight); }
-
-/* Light and Soft UI Dark palettes are defined in themes.css. */
+/* The band's grain: a pattern of tiny translucent dots, generated as an SVG tile, over a radial gradient
+   that lights the band from the top centre. Applied to the rail and the header; `.band-texture` carries
+   only the images, the ground colour comes from the element. */
+.band-texture {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(120% 90% at 50% 0%, var(--color-rail-active), var(--color-rail));
+}
 
 /* Reduced motion removes MOVEMENT, not feedback.
    WCAG 2.3.3 is about motion animation: things that travel, scale, spin or slide. A colour change on

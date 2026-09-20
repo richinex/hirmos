@@ -149,7 +149,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
   return (
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title text-ink">{sentence}</figcaption>
-      <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${accent ? 'text-signal' : 'text-ink'}`)} title={figure.exact}><FigureParts value={figure} /></p>
+      <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${accent ? 'text-signal-text' : 'text-ink'}`)} title={figure.exact}><FigureParts value={figure} /></p>
       <p className={num('mb-0 mt-1 text-body text-bone')}><Metadata>{span.length > 0 && <span>{span}</span>}<span>No interval</span><span>{sampleLine}</span></Metadata></p>
       {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}
       <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>

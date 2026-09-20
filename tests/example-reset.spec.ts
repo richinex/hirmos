@@ -7,7 +7,7 @@ test('sidebar project name and folder follow the rail foreground in both themes'
   await page.getByRole('button', { name: 'Expand chapter list' }).click()
   const link = page.locator('.dashboard-project-link')
   await expect(link).toBeVisible()
-  for (const theme of ['original-light', 'dark']) {
+  for (const theme of ['light', 'dark']) {
     await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
     const colors = await link.evaluate(el => {
       const probe = document.createElement('span')

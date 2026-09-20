@@ -113,7 +113,7 @@ type Chapter = Omit<ChapterEntry, 'status'>
 const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
 
 const THEME_ICON: Record<ThemeChoice, string> = {
-  dark: 'dark_mode', 'original-light': 'light_mode', system: 'brightness_auto',
+  light: 'light_mode', dark: 'dark_mode', system: 'brightness_auto',
 }
 
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
@@ -787,7 +787,7 @@ function App() {
                       <div className="flex min-h-[18rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-line bg-well px-6 py-8 text-center">
                         <Icon name="account_tree" size={28} className="text-faint" aria-hidden />
                         <p className="m-0 text-body text-ink">Build the source from blocks on a canvas.</p>
-                        <p className="m-0 max-w-[40ch] font-serif text-body text-faint text-pretty">Each Input file card takes one CSV, TSV or Parquet file. Wire the cards into filters, joins, derived columns, aggregates or a Python script, and use the last block as the source.</p>
+                        <p className="m-0 max-w-[40ch] text-body text-faint text-pretty">Each Input file card takes one CSV, TSV or Parquet file. Wire the cards into filters, joins, derived columns, aggregates or a Python script, and use the last block as the source.</p>
                         <button type="button" className={button('signal', 'mt-1 inline-flex items-center gap-2')} onMouseEnter={() => { void loadPipelineWorkspace() }} onFocus={() => { void loadPipelineWorkspace() }} onClick={() => void openPipelineEditor()}>Open the editor</button>
                       </div>
                     )}
@@ -914,7 +914,7 @@ function App() {
                         onGrangerEvidence={(evidence) => dispatch({ type: 'granger-evidence-created', evidence })}
                       />
                     {workflow.prepared !== null && (
-                      <section className="rounded-xl border border-edge bg-panel p-4" aria-labelledby="prepared-next-title">
+                      <section className="rounded-xl bg-panel lift p-4" aria-labelledby="prepared-next-title">
                         <span className={label('text-faint')}>Continue</span>
                         <h3 id="prepared-next-title" className={cn(sectionTitle, 'mb-1 mt-1')}>Build a DAG or run discovery</h3>
                         <p className="mb-3 mt-0 text-body text-faint">Proceed directly to a DAG specified from substantive knowledge and the study design, or run discovery methods to obtain candidate empirical relations.</p>

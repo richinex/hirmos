@@ -21,7 +21,7 @@ test('mobile sheet openers have depth without changing size or dialog behaviour'
   })
   const actions = page.getByRole('group', { name: 'Panes' })
   await expect(actions.getByRole('button')).toHaveCount(2)
-  for (const theme of ['dark', 'light', 'original-light', 'soft-dark']) {
+  for (const theme of ['light', 'dark']) {
     await page.evaluate(theme => document.documentElement.dataset.theme = theme, theme)
     for (const width of [320, 390]) {
       await page.setViewportSize({ width, height: 844 })
@@ -46,7 +46,7 @@ test('mobile sheet openers have depth without changing size or dialog behaviour'
   await actions.getByRole('button', { name: 'Saved runs' }).click()
   const history = page.getByRole('dialog', { name: 'Saved runs' })
   await expect(history.getByText('Saved analyses')).toHaveCSS('font-size', '13px')
-  await expect(history.getByRole('heading', { name: 'Saved runs' })).toHaveCSS('font-size', '18px')
+  await expect(history.getByRole('heading', { name: 'Saved runs' })).toHaveCSS('font-size', '16px')
   await history.screenshot({ path: info.outputPath('bottom-panel-content.png') })
   await page.keyboard.press('Escape')
   await page.emulateMedia({ reducedMotion: 'reduce' })

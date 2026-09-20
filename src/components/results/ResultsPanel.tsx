@@ -91,10 +91,10 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
   const treatmentName = study?.treatment.name ?? 'treatment'
   return (
     <div className="grid gap-4">
-      <article className="rounded-xl border border-edge bg-panel p-4" aria-label="Result">
+      <article className="rounded-xl bg-panel lift p-4" aria-label="Result">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div>
-            <span className={label('text-signal')}>Estimate and uncertainty</span>
+            <span className={label('text-signal-text')}>Estimate and uncertainty</span>
             <p className="mb-0 mt-1 text-body text-muted"><Metadata><span>{describeEstimator(run.configuration.kind)}</span><span>{run.eligibility.kind === 'eligible' ? 'All pre-run checks completed' : `${run.eligibility.unresolved.length} pre-run requirements to review`}</span></Metadata></p>
           </div>
           <button type="button" className={button('outline')} onClick={download}>Export the manifest</button>

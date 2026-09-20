@@ -843,9 +843,9 @@ function ResultCard({ run, method, title, meta, current, children }: {
     )
   }
   return (
-    <article aria-labelledby={`run-${run.id}`} className="rounded-xl border border-edge bg-panel p-4">
+    <article aria-labelledby={`run-${run.id}`} className="rounded-xl bg-panel lift p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}><Metadata><span>Current result</span><span>{method}</span></Metadata></span>
+        <span className={label('text-signal-text')}><Metadata><span>Current result</span><span>{method}</span></Metadata></span>
         <span className={num('text-micro text-faint')}>{formatTime(run.createdAt)}</span>
       </div>
       <h3 id={`run-${run.id}`} className="mb-2 mt-1 text-heading font-medium text-ink text-balance">{title}</h3>

@@ -650,9 +650,9 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
     )
   }
   return (
-    <article className="rounded-xl border border-edge bg-panel p-4" aria-label={`${sentence} estimate`}>
+    <article className="rounded-xl bg-panel lift p-4" aria-label={`${sentence} estimate`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className={label('text-signal')}>Current estimate</span>
+        <span className={label('text-signal-text')}>Current estimate</span>
         <span className={num('text-micro text-faint')}>{stamp}</span>
       </div>
       {body}

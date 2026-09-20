@@ -19,11 +19,12 @@ import { cn } from '@/lib/utils'
 export type ButtonTone = 'signal' | 'soft' | 'danger' | 'outline' | 'quiet' | 'mono'
 
 /** The signal wash: a tint and a translucent border, so a live control reads as live without a second fill on the surface. */
-const SIGNAL_WASH = 'border-signal/40 bg-signal/10 text-signal hover:bg-signal/15'
+const SIGNAL_WASH = 'border-signal/40 bg-signal/10 text-signal-text hover:bg-signal/15'
 
-/** A filled tone carries the inset top highlight the house uses for elevation, and drops it on press: the
- * button reads as pushed in, with no drop shadow. The press itself is the 1px settle in index.css. */
-const FILLED = 'font-medium text-signal-ink shadow-[inset_0_1px_0_var(--color-highlight)] hover:brightness-110 active:shadow-none'
+/** A filled tone is lit from above, the texture chapter's way: a faint top-to-bottom gradient over the fill
+ * and a one-pixel highlight along the top edge, both dropped on press so the button reads as pushed in.
+ * The press itself is the 1px settle in index.css. */
+const FILLED = 'font-medium text-signal-ink [background-image:linear-gradient(to_bottom,rgb(255_255_255/.15),rgb(255_255_255/0))] shadow-[inset_0_1px_0_var(--color-highlight)] hover:brightness-105 active:[background-image:none] active:shadow-none disabled:[background-image:none]'
 
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
@@ -34,7 +35,7 @@ const BUTTON_TONE: Record<ButtonTone, string> = {
   signal: cn('dashboard-primary bg-signal px-4', FILLED),
   soft: SIGNAL_WASH,
   danger: cn('bg-danger', FILLED),
-  outline: 'border border-hair bg-panel text-ink shadow-sm hover:border-edge',
+  outline: 'border border-hair bg-panel text-ink hover:border-edge',
   quiet: 'border border-hair text-muted hover:text-ink',
   // Named for its register, not its typeface: the label voice, at button size.
   mono: 'border border-hair text-label font-medium text-muted hover:border-edge hover:text-ink',
@@ -125,42 +126,36 @@ export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string
 export const fieldLabel = 'block text-label font-medium text-ink'
 
 /** The help line below a field. Body size and the token's 1.5 line height, because the old
- *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. Serif, because a
- *  hint is a sentence, and named here because a hint is as often a span as a paragraph. */
-export const fieldHint = 'mt-1 font-serif text-body text-faint text-pretty'
+ *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. Named here
+ *  because a hint is as often a span as a paragraph. */
+export const fieldHint = 'mt-1 text-body text-faint text-pretty'
 
 /**
- * Which typeface, and why. The model is a journal page (index.css rule 5).
+ * Which typeface, and why (index.css rule 5).
  *
- * Serif for what is read as prose: a paragraph, a caption, a narrative. Sans for what is scanned or
- * compared: headings, labels, buttons, table cells and every number, in the face the paper prescribes for
- * figures, Helvetica or Arial. Mono is a reading aid, not a house style: it buys a fixed pitch and
- * unambiguous shapes, so 1/l and 0/O stay apart in an id you may have to retype, and it costs legibility
- * in running text. So mono only for what is read character by character: code, ids, locators, hashes.
+ * The slab for headings, and only the elements that mean a heading: h1 to h3 take it from index.css.
+ * Lato for everything read or operated: prose, labels, buttons, table cells and every number. Mono is a
+ * reading aid, not a house style: it buys a fixed pitch and unambiguous shapes, so 1/l and 0/O stay
+ * apart in an id you may have to retype, and it costs legibility in running text. So mono only for what
+ * is read character by character: code, ids, locators, hashes.
  */
 
 /** Running text: the paragraph under a chapter title, the explanation beside a method, the reading of a
- *  result. The serif at the 13px prose tier on a 65-character measure, which is the paper's column
- *  brought to the screen. Colour is the call site's: muted for a narrative, faint for an aside. A `p`
- *  element already takes the serif from index.css; the face is named here so a span reads the same. */
-export const prose = (extra?: string): string => cn('max-w-[65ch] font-serif text-subtitle text-pretty', extra)
+ *  result. The reading tier (16px on the 24px unit) on a 65-character measure. Colour is the call
+ *  site's: muted for a narrative, faint for an aside. */
+export const prose = (extra?: string): string => cn('max-w-[65ch] text-subtitle text-pretty', extra)
 
-/** The paragraph under a chapter title, set the way the page it is modelled on sets its body: two columns
- *  that fill the stage. A column is at least 45 characters wide; the browser fits two when the width
- *  holds two and shares the remaining width between them, one otherwise, and never three, which turns
- *  a short paragraph into a row of fragments (Clarke, "Revisiting CSS Multi-Column Layout", 2025). On
- *  a stage wider than two full measures the type grows with the container instead, so the columns keep
- *  filling the width without the measure passing 75 characters; the line height is a ratio so it grows
- *  with it. Below the tablet step the paragraph keeps the single-column measure. The columns balance,
- *  words are never hyphenated, and a column keeps at least two lines of a sentence on each side of the
- *  break. Only the chapter narrative takes this: a help line beside a field is one thought and stays one
- *  column. */
-export const chapterIntro = prose('m-0 text-muted @3xl/panel:max-w-[calc(150ch+2rem)] @3xl/panel:text-[length:clamp(0.8125rem,0.4rem+0.6cqi,1.0625rem)] leading-[1.55] [columns:45ch_2] gap-x-8 hyphens-none [orphans:2] [widows:2]')
+/** The paragraph under a chapter title: two columns that fill the stage. A column is at least 45
+ *  characters wide; the browser fits two when the width holds two and shares the remaining width between
+ *  them, one otherwise, and never three, which turns a short paragraph into a row of fragments (Clarke,
+ *  "Revisiting CSS Multi-Column Layout", 2025). Below the tablet step the paragraph keeps the
+ *  single-column measure. The columns balance, words are never hyphenated, and a column keeps at least
+ *  two lines of a sentence on each side of the break. Only the chapter narrative takes this: a help line
+ *  beside a field is one thought and stays one column. */
+export const chapterIntro = prose('m-0 text-muted @3xl/panel:max-w-[calc(150ch+2rem)] [columns:45ch_2] gap-x-8 hyphens-none [orphans:2] [widows:2]')
 
 /** Figures the reader compares down a column. `tabular-nums` fixes digit advance width, so a counter
- *  ticking 9 to 10 does not nudge what follows; kerning is off because Helvetica and Arial pull the pair
- *  "11" together and that would undo it. The sans is named, not inherited, because a figure line is
- *  often a paragraph element and a paragraph otherwise takes the serif: a figure is sans without exception. */
+ *  ticking 9 to 10 does not nudge what follows; kerning is off so the pair "11" keeps its advance. */
 export const num = (extra?: string): string => cn('font-sans tabular-nums [font-kerning:none]', extra)
 
 /** A literal the reader may have to type or match character by character: a node id, an API key, a hash.
@@ -176,7 +171,7 @@ export const label = (extra?: string): string => cn('font-sans text-label font-m
  *
  * A caption is a phrase, not a slot name, so it is sentence case: `label()` stays for the short fixed
  * nouns that name a field. Same tier and colour, so the two still read as one register. */
-export const caption = (extra?: string): string => cn('font-serif text-label text-faint text-pretty', extra)
+export const caption = (extra?: string): string => cn('text-label text-faint text-pretty', extra)
 
 /** A variable name as a member of a set the reader counts: enclosure marks membership, so it is for sets only, never a name inside a sentence. */
 export const chip = (extra?: string): string => cn('inline-block rounded-md border border-hair bg-panel px-1.5 py-0.5 text-ink', extra)
@@ -188,12 +183,12 @@ export const chip = (extra?: string): string => cn('inline-block rounded-md bord
  * a panel, 12px on a well, and one step less each when the chapter column is narrower than a tablet.
  * Density is then a property of the surface, retuned in one place, not a padding chosen per call site.
  *
- * One recipe so the app has one panel, and so a surface can be dropped in one place rather than in
- * fifteen. A panel holds content, never another panel: two of these nested draw the same border
- * twice around the same thing, and the inner one stops meaning anything. Where a component would
+ * A panel is a block on the canvas: lifted by its value step and a contact shadow, with no border, so
+ * a card never reads as a frame. One recipe so the app has one panel. A panel holds content, never
+ * another panel: two of these nested lift the same thing twice, and the inner one stops meaning anything. Where a component would
  * land its own surface inside this one, reach for its `frame` escape hatch instead.
  */
-export const panel = (extra?: string): string => cn('rounded-xl border border-line bg-panel shadow-sm [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
+export const panel = (extra?: string): string => cn('rounded-xl bg-panel lift [--table-surface:var(--color-panel)] [--panel-space:--spacing(4)] @max-md/panel:[--panel-space:--spacing(3)]', extra)
 
 /**
  * A recessed area inside a panel: a control group, a figure, a quoted reading.
@@ -210,15 +205,15 @@ export const figureGrid = (extra?: string): string => cn('numeric-surface numeri
 export const statusText: Record<'ok' | 'warn' | 'danger' | 'muted', string> = { ok: 'text-ok', warn: 'text-warn', danger: 'text-danger', muted: 'text-muted' }
 
 /** Section headings use type hierarchy, without decorative markers. */
-export const sectionTitle = 'text-base font-semibold text-ink text-balance'
+export const sectionTitle = 'text-subtitle font-semibold text-ink text-balance'
 export const resultTitle = 'text-heading font-medium text-ink text-balance'
 export const resultSurface = (extra?: string): string => panel(cn('result-surface p-(--panel-space)', extra))
 
 /** The title of a floating surface: panel, drawer or sheet.
  *
- * A heading, so it is set in sentence case on the title tier, the ramp step named for a surface's
- * subject. Capitals are for a label naming a slot, not for a heading naming a surface. */
-export const panelTitle = 'text-title font-medium text-ink text-balance'
+ * A heading, so it is set in sentence case, at the reading size in bold: a pane is inside the chapter, one
+ * step below a surface's subject. Capitals are for a label naming a slot, not for a heading naming a surface. */
+export const panelTitle = 'text-subtitle font-medium text-ink text-balance'
 
 /** Row padding per density: 24px compact and 32px comfortable rows with 12px body text, including the 1px hairline under the row. */
 export const rowPadding = { compact: 'pt-[3px] pb-[2px]', comfortable: 'pt-[7px] pb-[6px]' } as const

@@ -285,7 +285,7 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
           aria-hidden
           className={cn(
             'pointer-events-none absolute left-0 top-0 duration-(--motion-base) ease-[cubic-bezier(0.2,0.7,0.2,1)] motion-reduce:transition-none',
-            form === 'track' ? 'rounded-md bg-panel shadow-[0_1px_3px_rgb(0_0_0/0.10)]' : 'bg-ink',
+            form === 'track' ? 'rounded-md bg-panel lift' : 'bg-ink',
             !motionReady ? 'transition-none' : dragging ? 'transition-[width,height]' : 'transition-[transform,width,height]',
           )}
           style={form === 'track'

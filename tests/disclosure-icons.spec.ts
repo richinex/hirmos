@@ -21,7 +21,7 @@ test('study details show and hide with eye icons and native keyboard controls', 
   await expect(details).not.toHaveAttribute('open')
   await page.keyboard.press('Space')
   await expect(details).toHaveAttribute('open', '')
-  for (const theme of ['original-light', 'dark']) {
+  for (const theme of ['light', 'dark']) {
     await page.evaluate(value => { document.documentElement.dataset.theme = value }, theme)
     await summary.screenshot({ path: info.outputPath(`disclosure-${theme}.png`) })
   }

@@ -90,7 +90,7 @@ export function Select({ value, onChange, children, className, disabled, id, 'ar
                 className="relative flex cursor-pointer select-none items-center gap-2 rounded-md py-1.5 pl-2 pr-7 outline-none data-[disabled]:cursor-not-allowed data-[disabled]:text-dim data-[highlighted]:bg-well data-[state=checked]:text-ink"
               >
                 <RadixSelect.ItemText>{option.label}</RadixSelect.ItemText>
-                <RadixSelect.ItemIndicator aria-hidden className="absolute right-2 text-signal"><Icon name="check" size={13} /></RadixSelect.ItemIndicator>
+                <RadixSelect.ItemIndicator aria-hidden className="absolute right-2 text-signal-text"><Icon name="check" size={13} /></RadixSelect.ItemIndicator>
               </RadixSelect.Item>
             ))}
           </RadixSelect.Viewport>

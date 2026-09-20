@@ -6,14 +6,15 @@ import { useLocation } from '@/lib/router'
 import { useDocTheme } from '@/components/ui/useDocTheme'
 import { updateFavicon } from '@/lib/brand'
 import { useScrollActivity } from '@/lib/useScrollActivity'
-// Arimo is fetched only where neither Helvetica nor Arial is installed: the stack names it third.
-import '@fontsource/arimo/400.css'
-import '@fontsource/arimo/700.css'
-import '@fontsource/arimo/400-italic.css'
-import '@fontsource-variable/jetbrains-mono'
-import '@fontsource-variable/inter'
-import '@fontsource-variable/geist'
-import '@fontsource-variable/jetbrains-mono/wght-italic.css'
+// The three faces: Roboto Slab for headings, Lato in its two weights for everything read or operated,
+// Fira Code for what is read character by character. Self-hosted; each stack in index.css names a
+// web-safe face after it.
+import '@fontsource-variable/roboto-slab'
+import '@fontsource/lato/400.css'
+import '@fontsource/lato/700.css'
+import '@fontsource/lato/400-italic.css'
+import '@fontsource/lato/700-italic.css'
+import '@fontsource-variable/fira-code'
 import 'xterm/css/xterm.css'
 import 'material-symbols/sharp.css'
 import '@/index.css'
