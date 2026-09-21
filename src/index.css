@@ -431,7 +431,7 @@ button[aria-busy="true"]::after {
 .band-texture {
   background-image:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
-    radial-gradient(120% 90% at 50% 0%, var(--color-rail-active), var(--color-rail));
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--color-rail-active) 45%, var(--color-rail)), var(--color-rail));
 }
 
 /* Reduced motion removes MOVEMENT, not feedback.

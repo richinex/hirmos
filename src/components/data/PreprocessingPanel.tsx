@@ -361,6 +361,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType))
   const [density] = useTableDensity()
   const selectedIds: readonly ColumnId[] = draft.variables.kind === 'selected' ? draft.variables.columns : []
+  // The transform every selected column shares, or null when they differ: what the "all columns" control shows.
+  const sharedTransformKind = ((): SeriesTransform['kind'] | null => {
+    const kinds = new Set(selectedIds.map((column) => seriesTransformFor(draft.seriesTransforms, column).kind))
+    return kinds.size === 1 ? [...kinds][0] ?? null : null
+  })()
   const readiness = readyPreprocessingRecipe(draft)
   const action = preparationAction(readiness, savedRecipe, preparation.job.kind === 'running' ? 'running' : preparation.blocked ? 'busy' : 'idle')
   const timeSeriesSelected = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-series-awaiting-time'
@@ -916,15 +921,23 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               </div>
               <div className="mt-4 pt-3">
                 <div role="group" aria-label="Transformations by column">
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5">
+                  {/* One layout for the whole list, decided by the panel's width rather than per row: a name beside
+                      its control when the panel is at least md wide, every name above its control below that. */}
+                  <div className="grid gap-x-3 gap-y-1 px-3 py-1.5 @md/panel:grid-cols-[minmax(0,1fr)_auto] @md/panel:items-center">
                     <span className="text-body text-muted">All columns</span>
-                    <div className="flex flex-wrap items-center gap-1 pr-[5px]" role="group" aria-label="Set transformation for all selected columns">
-                      {TRANSFORMS.map((transform) => (
-                        <button key={transform.value.kind} type="button" className={button('quiet', 'px-2 py-1 text-label')} onClick={() => dispatch({ type: 'all-series-transforms-selected', transform: transform.value })}>
-                          {transform.label}
-                        </button>
-                      ))}
-                    </div>
+                    {/* The same control as each row: it shows the transform the columns share, nothing when they differ, and sets every column when chosen. */}
+                    <SegmentedControl
+                      size="sm"
+                      wrap
+                      frame="none"
+                      ariaLabel="Transformation for all selected columns"
+                      value={sharedTransformKind}
+                      onChange={(next) => {
+                        const chosen = TRANSFORMS.find((candidate) => candidate.value.kind === next)
+                        if (chosen) dispatch({ type: 'all-series-transforms-selected', transform: chosen.value })
+                      }}
+                      options={TRANSFORMS.map((transform) => ({ value: transform.value.kind, label: transform.label }))}
+                    />
                   </div>
                   <div>
                     {selectedIds.map((column) => {
@@ -932,7 +945,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       const selected = seriesTransformFor(draft.seriesTransforms, column)
                       // The row fills under the pointer, as a table row does (`tr('action')`), so a name and its control read as one row across the width without a rule between rows.
                       return (
-                        <div key={column} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-md px-3 py-1 transition-colors hover:bg-well has-[button:focus-visible]:bg-well">
+                        <div key={column} className="grid gap-x-3 gap-y-1 rounded-md px-3 py-1 transition-colors hover:bg-well has-[button:focus-visible]:bg-well @md/panel:grid-cols-[minmax(0,1fr)_auto] @md/panel:items-center">
                           <span className="min-w-0 text-body text-ink">{name}</span>
                           <SegmentedControl
                             size="sm"
@@ -1140,7 +1153,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         {preparation.job.kind === 'running' && <button type="button" className={button('quiet', 'bg-panel')} onClick={preparation.cancel}>Cancel preparation</button>}
         <button
           type="button"
-          className={button('signal')}
+          // It floats over the panel as the reader scrolls, so it carries the double shadow whatever its state.
+          className={button('signal', 'float disabled:shadow-(--shadow-float)')}
           disabled={action.kind !== 'ready'}
           aria-describedby={action.kind === 'blocked' ? 'preparation-requirement' : undefined}
           aria-busy={preparation.job.kind === 'running'}

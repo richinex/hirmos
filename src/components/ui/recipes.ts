@@ -28,8 +28,10 @@ const FILLED = 'font-medium text-signal-ink [background-image:linear-gradient(to
 
 /** Busy is `aria-busy="true"`, set from the run's own state and never from the pointer: the label stays
  * (so the width does) and a bar-live sweep runs along the inside bottom edge (index.css). `disabled`
- * remains "not ready"; a busy button keeps focus so nothing jumps when the run ends. */
-const BUTTON_BASE = 'dashboard-button inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-transparent disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+ * remains "not ready": the fill drops to the well and the text to faint, but the button keeps a solid
+ * ground, because a button that floats over scrolling content must stay a surface. A busy button keeps
+ * focus so nothing jumps when the run ends. */
+const BUTTON_BASE = 'dashboard-button inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent transition-[color,background-color,border-color,box-shadow,transform] duration-(--motion-fast) aria-busy:pointer-events-none disabled:cursor-not-allowed disabled:border-hair disabled:bg-well disabled:text-faint disabled:shadow-none disabled:hover:brightness-100 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
 
 const BUTTON_TONE: Record<ButtonTone, string> = {
   signal: cn('dashboard-primary bg-signal px-4', FILLED),

@@ -13,7 +13,6 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 .dashboard-header { height: 3.75rem; background-color: var(--color-rail); color: var(--color-rail-ink); padding-inline: 1.25rem; }
 .dashboard-header { --color-ink: var(--color-rail-ink); --color-muted: var(--color-rail-faint); --color-faint: var(--color-rail-faint); --color-well: var(--color-rail-active); --color-line: var(--color-rail-active); }
 .dashboard-breadcrumb { display: flex; align-items: center; }
-.dashboard .dashboard-menu { background: var(--color-well); }
 /* The rail is a 5rem column of icons that the workspace leaves room for. Opened, it grows out over the stage
    with the names, as a sheet: nothing behind it reflows, and a press anywhere off it puts it away. */
 .dashboard-sidebar { position: absolute; inset-block: 0; left: 0; width: 5rem; display: flex; flex-direction: column; background-color: var(--color-rail); min-height: 0; z-index: var(--z-overlay); transition: width var(--motion-base) cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow var(--motion-base); }
@@ -64,12 +63,19 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 :root[data-surface="workbench"] .dashboard-button { min-height: 2.25rem; border-radius: 6px; font-weight: 700; }
 :root[data-surface="workbench"] .dashboard-button-sm { min-height: 1.875rem; }
 .dashboard .example-cards { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; list-style: none; padding: 0; margin: 1.5rem 0 0; }
-.dashboard .example-card { display: flex; flex-direction: column; gap: 1rem; min-width: 0; padding: 1.5rem; background: var(--color-panel); border-radius: 12px; box-shadow: var(--shadow-lift); transition: box-shadow 150ms; }
+/* Each card is a subgrid on four rows of the catalogue grid (label, title, meta, footer), so a two-line title
+   stretches the title row for the whole row of cards and every meta line and footer sits on one line across
+   the row. Aligned that way, the footer needs no rule to mark it. Engines without subgrid lay the card out
+   on its own rows and lose only the cross-card alignment. */
+.dashboard .example-card { display: grid; grid-template-rows: auto 1fr auto auto; row-gap: 1rem; min-width: 0; padding: 1.5rem; background: var(--color-panel); border-radius: 12px; box-shadow: var(--shadow-lift); transition: box-shadow 150ms; }
+@supports (grid-template-rows: subgrid) {
+  .dashboard .example-card { grid-template-rows: subgrid; grid-row: span 4; }
+}
 .dashboard .example-card:hover { box-shadow: var(--shadow-lift), 0 4px 16px rgb(22 32 46 / .08); }
 .dashboard .example-card h3 { margin: 0; font-size: var(--text-title); line-height: var(--text-title--line-height); }
 .dashboard .example-card p { margin: 0; font-size: var(--text-body); line-height: 1.5; color: var(--color-muted); }
-.dashboard .example-card-meta { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--text-label); color: var(--color-faint); }
-.dashboard .example-card-footer { display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+.dashboard .example-card-meta { align-self: end; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: var(--text-label); color: var(--color-faint); }
+.dashboard .example-card-footer { align-self: end; display: flex; align-items: center; gap: 8px; min-height: 2rem; }
 .dashboard .example-card-source { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-label); line-height: 1.5; color: var(--color-faint); }
 /* Repohistory's one/two/three-column catalogue, based on available workspace
    width so an expanded sidebar cannot compress the cards past their measure. */
