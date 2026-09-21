@@ -286,11 +286,10 @@ test('the shipped example uses the current applied-adjustment record', async ({ 
 test('opens the shipped example Estimation chapter without the compatibility boundary', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Example rendering runs once')
   await page.goto('/app')
-  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
-  await example.getByRole('button', { name: 'Open' }).click()
+  await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByText('The Estimation chapter could not be displayed.')).toHaveCount(0)
-  await expect(page.getByText('Runs · 2')).toBeVisible()
+  await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 })
 
 test('replaces an unstamped saved example even when it has the shipped project creation time', async ({ page }, testInfo) => {
@@ -304,8 +303,10 @@ test('replaces an unstamped saved example even when it has the shipped project c
     const response = await fetch('/examples/seatbelts.hirmos.json')
     const parsed = bundleModule.parseBundle(await response.text())
     if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
+    // An unstamped copy: the bundle carries its release stamp, so the seed removes it.
     const stale = {
       ...parsed.value.project,
+      origin: { kind: 'user' },
       savedAt: '2026-01-01T00:00:00.000Z',
       studies: [],
       identifications: [],
@@ -318,11 +319,10 @@ test('replaces an unstamped saved example even when it has the shipped project c
   })
   await page.reload()
 
-  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
-  await example.getByRole('button', { name: 'Open' }).click()
+  await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await expect(page.getByText('The example changed in this build, so your earlier copy was replaced.')).toBeVisible()
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
-  await expect(page.getByText('Runs · 2')).toBeVisible()
+  await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 
   const releases = await page.evaluate(async () => {
     const [exampleModule, bundleModule, store] = await Promise.all([
@@ -369,11 +369,10 @@ test('opening an unchanged project preserves its saved time', async ({ page }, t
   }, originalSavedAt)
   await page.reload()
 
-  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
-  await example.getByRole('button', { name: 'Open' }).click()
+  await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await page.waitForTimeout(700)
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
-  await expect(page.getByText('Runs · 2')).toBeVisible()
+  await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 
   const savedAt = await page.evaluate(async () => {
     const [exampleModule, store] = await Promise.all([
@@ -426,7 +425,7 @@ test('serves workbench deep links without changing their paths', async ({ page }
     const response = await page.goto(path)
     expect(response?.status()).toBe(200)
     expect(new URL(page.url()).pathname).toBe(path)
-    await expect(page.getByRole('heading', { name: 'Create an analysis' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
   }
 })
 

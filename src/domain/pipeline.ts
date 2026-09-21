@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { brand, err, isNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import { inputDescriptorSchema, parseInputDescriptors, type SqlInputAlias, type SqlInputDescriptor } from './sourceInputs'
+import { timestampSql, type CalendarTimeInterpretation } from './timeInterpretation'
 
 /**
  * A preparation pipeline: blocks on a canvas, each one operation on a table, wired into a directed
@@ -49,6 +50,43 @@ export type AggregateMeasure =
 export const measureWithFunction = (measure: AggregateMeasure, fn: AggregateFunction, fallbackColumn: string): AggregateMeasure =>
   fn === 'count' ? { function: fn, as: measure.as } : { function: fn, column: 'column' in measure ? measure.column : fallbackColumn, as: measure.as }
 
+/** A day of the year, as the calendar prints it; the window repeats every year. */
+export interface CalendarDay {
+  readonly day: number
+  readonly month: number
+}
+
+/**
+ * The days a calendar-events block marks. The year-end preset is the shutdown between Christmas Eve
+ * and the second of January, the window the Census Bureau's genhol convention calls a holiday
+ * regressor: each row carries the share of its days inside the window, so a week that straddles an
+ * edge carries a fraction rather than a 0 or 1.
+ */
+export type CalendarWindow =
+  | { readonly kind: 'year-end' }
+  | { readonly kind: 'custom'; readonly from: CalendarDay; readonly to: CalendarDay }
+
+export const YEAR_END_WINDOW: { readonly from: CalendarDay; readonly to: CalendarDay } = { from: { day: 24, month: 12 }, to: { day: 2, month: 1 } }
+
+/** How many days a row covers, counted from the date in its column. */
+export type CalendarRowSpan = 'day' | 'week' | 'month'
+
+export const calendarWindowDays = (window: CalendarWindow): { readonly from: CalendarDay; readonly to: CalendarDay } =>
+  window.kind === 'year-end' ? YEAR_END_WINDOW : window
+
+/** The column name a calendar-events block proposes for its window; a person may rename it. */
+export const calendarShareName = (window: CalendarWindow): string => window.kind === 'year-end' ? 'holiday_share' : 'calendar_share'
+
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+export const describeCalendarDay = (day: CalendarDay): string => `${day.day} ${MONTH_NAMES[day.month - 1] ?? '?'}`
+
+export function describeCalendarWindow(window: CalendarWindow): string {
+  const days = calendarWindowDays(window)
+  const span = `${describeCalendarDay(days.from)} to ${describeCalendarDay(days.to)}`
+  return window.kind === 'year-end' ? `year-end shutdown, ${span}` : span
+}
+
 /** An input block either holds a chosen file, known by its alias, or is still waiting for one. */
 export type InputFile =
   | { readonly kind: 'chosen'; readonly alias: SqlInputAlias }
@@ -59,6 +97,7 @@ export type PipelineBlock =
   | { readonly kind: 'filter-rows'; readonly match: 'all' | 'any'; readonly conditions: readonly RowCondition[] }
   | { readonly kind: 'select-columns'; readonly mode: 'keep' | 'drop'; readonly columns: readonly string[]; readonly renames: readonly { readonly from: string; readonly to: string }[] }
   | { readonly kind: 'derive-columns'; readonly columns: readonly DerivedColumn[] }
+  | { readonly kind: 'calendar-events'; readonly column: string; readonly interpretation: CalendarTimeInterpretation; readonly span: CalendarRowSpan; readonly window: CalendarWindow; readonly name: string }
   | { readonly kind: 'join'; readonly how: JoinKind; readonly keys: readonly { readonly left: string; readonly right: string }[] }
   | { readonly kind: 'union'; readonly by: 'name' | 'position'; readonly distinct: boolean }
   | { readonly kind: 'aggregate'; readonly groupBy: readonly string[]; readonly measures: readonly AggregateMeasure[] }
@@ -97,6 +136,7 @@ export function blockArity(kind: PipelineBlockKind): BlockArity {
     case 'filter-rows':
     case 'select-columns':
     case 'derive-columns':
+    case 'calendar-events':
     case 'aggregate':
     case 'sort-limit':
     case 'output': return { kind: 'exactly', count: 1 }
@@ -110,6 +150,7 @@ export function blockLabel(kind: PipelineBlockKind): string {
     case 'filter-rows': return 'Filter rows'
     case 'select-columns': return 'Select columns'
     case 'derive-columns': return 'Derive columns'
+    case 'calendar-events': return 'Calendar events'
     case 'join': return 'Join'
     case 'union': return 'Union'
     case 'aggregate': return 'Group and aggregate'
@@ -128,6 +169,7 @@ export function emptyBlock(kind: AddableBlockKind): PipelineBlock {
     case 'filter-rows': return { kind, match: 'all', conditions: [] }
     case 'select-columns': return { kind, mode: 'keep', columns: [], renames: [] }
     case 'derive-columns': return { kind, columns: [] }
+    case 'calendar-events': return { kind, column: '', interpretation: { kind: 'timestamp' }, span: 'week', window: { kind: 'year-end' }, name: calendarShareName({ kind: 'year-end' }) }
     case 'join': return { kind, how: 'inner', keys: [] }
     case 'union': return { kind, by: 'name', distinct: false }
     case 'aggregate': return { kind, groupBy: [], measures: [] }
@@ -205,6 +247,27 @@ function measureSql(measure: AggregateMeasure): string {
   return `${call} AS ${identifier(measure.as)}`
 }
 
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+export const validCalendarDay = (day: CalendarDay): boolean =>
+  Number.isInteger(day.month) && day.month >= 1 && day.month <= 12 && Number.isInteger(day.day) && day.day >= 1 && day.day <= (DAYS_IN_MONTH[day.month - 1] ?? 0)
+
+/**
+ * The share of a row's days inside the window: the days are counted from the row's date, each
+ * placed in the year by month and day so the window applies to every year, and a window whose end
+ * precedes its start wraps over the new year. A row without a date has no share.
+ */
+function calendarShareSql(column: string, interpretation: CalendarTimeInterpretation, span: CalendarRowSpan, days: { readonly from: CalendarDay; readonly to: CalendarDay }): string {
+  const start = `CAST(${timestampSql(identifier(column), interpretation, sqlString)} AS DATE)`
+  const count = span === 'day' ? '1' : span === 'week' ? '7' : `date_diff('day', ${start}, ${start} + INTERVAL 1 MONTH)`
+  const date = `${start} + to_days(CAST(d.i AS INTEGER))`
+  const key = `(month(${date}) * 100 + dayofmonth(${date}))`
+  const fromKey = days.from.month * 100 + days.from.day
+  const toKey = days.to.month * 100 + days.to.day
+  const inside = fromKey <= toKey ? `${key} BETWEEN ${fromKey} AND ${toKey}` : `(${key} >= ${fromKey} OR ${key} <= ${toKey})`
+  return `CASE WHEN ${start} IS NULL THEN NULL ELSE (SELECT count(*) FROM range(${count}) AS d(i) WHERE ${inside}) / CAST(${count} AS DOUBLE) END`
+}
+
 /** Input views are in port order. */
 export function blockSql(node: PipelineNode, inputs: readonly string[]): Result<string, PipelineProblem> {
   const block = node.block
@@ -242,6 +305,14 @@ export function blockSql(node: PipelineNode, inputs: readonly string[]): Result<
       const empty = block.columns.find((column) => column.name.trim().length === 0 || column.expression.trim().length === 0)
       if (empty !== undefined) return incomplete('a derived column needs a name and an expression')
       return ok(`SELECT *, ${block.columns.map((column) => `${column.expression} AS ${identifier(column.name)}`).join(', ')} FROM ${only}`)
+    }
+    case 'calendar-events': {
+      if (only === null) return incomplete('nothing is wired in')
+      if (block.column === '') return incomplete('choose the date column')
+      if (block.name.trim().length === 0) return incomplete('the new column needs a name')
+      const days = calendarWindowDays(block.window)
+      if (!validCalendarDay(days.from) || !validCalendarDay(days.to)) return incomplete('the window needs a day and month at each end')
+      return ok(`SELECT *, ${calendarShareSql(block.column, block.interpretation, block.span, days)} AS ${identifier(block.name)} FROM ${only}`)
     }
     case 'join': {
       const [left, right] = inputs
@@ -443,6 +514,7 @@ export function describePipelineProblem(problem: PipelineProblem, name: (id: Pip
 }
 
 const identifierSchema = z.string().min(1)
+const calendarDaySchema = z.object({ day: z.number().int().min(1).max(31), month: z.number().int().min(1).max(12) }).strict()
 
 const blockSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('input'), file: z.discriminatedUnion('kind', [z.object({ kind: z.literal('chosen'), alias: z.string().min(1) }).strict(), z.object({ kind: z.literal('empty') }).strict()]) }).strict(),
@@ -456,6 +528,21 @@ const blockSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('select-columns'), mode: z.enum(['keep', 'drop']), columns: z.array(identifierSchema), renames: z.array(z.object({ from: identifierSchema, to: identifierSchema }).strict()) }).strict(),
   z.object({ kind: z.literal('derive-columns'), columns: z.array(z.object({ name: z.string(), expression: z.string() }).strict()) }).strict(),
+  z.object({
+    kind: z.literal('calendar-events'),
+    column: z.string(),
+    interpretation: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('timestamp') }).strict(),
+      z.object({ kind: z.literal('iso-week') }).strict(),
+      z.object({ kind: z.literal('date-format'), format: z.enum(['%d/%m/%Y', '%m/%d/%Y', '%Y-%m-%d']) }).strict(),
+    ]),
+    span: z.enum(['day', 'week', 'month']),
+    window: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('year-end') }).strict(),
+      z.object({ kind: z.literal('custom'), from: calendarDaySchema, to: calendarDaySchema }).strict(),
+    ]),
+    name: z.string(),
+  }).strict(),
   z.object({ kind: z.literal('join'), how: z.enum(['inner', 'left', 'right', 'full', 'cross']), keys: z.array(z.object({ left: identifierSchema, right: identifierSchema }).strict()) }).strict(),
   z.object({ kind: z.literal('union'), by: z.enum(['name', 'position']), distinct: z.boolean() }).strict(),
   z.object({ kind: z.literal('aggregate'), groupBy: z.array(identifierSchema), measures: z.array(z.discriminatedUnion('function', [

@@ -22,7 +22,7 @@ test('build the March cohort AI adoption example bundle', async ({ page }) => {
   await expect(page.getByRole('checkbox', { name: 'adopted', exact: true })).toBeVisible()
   for (const column of ['adopted', 'bugs_per_kloc']) await page.getByRole('checkbox', { name: column, exact: true }).check()
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByText(/Prepared panel/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^Panel, / })).toBeVisible({ timeout: 120_000 })
 
   await createDag(page, 'March cohort adoption')
   await addArrow(page, 'adopted', 'bugs_per_kloc', 'The three March teams wrote their code with the assistant from month 13 onward.')

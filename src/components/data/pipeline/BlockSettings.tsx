@@ -6,8 +6,9 @@ import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { button, caption, field, fieldLabel, iconControl, literal, num } from '@/components/ui/recipes'
-import { blockSql, conditionWithTest, measureWithFunction, type AggregateFunction, type AggregateMeasure, type JoinKind, type PipelineBlock, type PipelineBlockId, type PipelineNode, type RowCondition, type RowTest } from '@/domain/pipeline'
+import { blockSql, calendarShareName, calendarWindowDays, conditionWithTest, measureWithFunction, type AggregateFunction, type AggregateMeasure, type CalendarWindow, type JoinKind, type PipelineBlock, type PipelineBlockId, type PipelineNode, type RowCondition, type RowTest } from '@/domain/pipeline'
 import type { PreviewColumn } from '@/data/pipeline'
+import { CALENDAR_TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
 import { usePythonSession } from './PythonProvider'
 import { formatDuration } from '@/lib/format/number'
 import { usePythonRun, usePythonRuntime } from './usePythonRun'
@@ -16,6 +17,8 @@ import { assertNever } from '@/domain/dop'
 /** CodeMirror and the Python mode load with the first script block, not with the canvas. */
 const PythonEditor = lazy(() => import('@/components/ui/PythonEditor').then((module) => ({ default: module.PythonEditor })))
 export const preloadPythonEditor = (): void => { void import('@/components/ui/PythonEditor') }
+/** The calendar and its date library load with the first custom window, not with the canvas. */
+const CalendarWindowPicker = lazy(() => import('@/components/ui/CalendarWindowPicker').then((module) => ({ default: module.CalendarWindowPicker })))
 
 const ROW_TEST_OPTIONS = (
   <>
@@ -118,6 +121,47 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
         <p className={caption('m-0')}>An expression in DuckDB's SQL over the input's columns: {firstInputColumns.length === 0 ? 'wire an input in to see them' : firstInputColumns.map((column) => column.name).join(', ')}.</p>
       </Rows>
     )
+    case 'calendar-events': {
+      const days = calendarWindowDays(block.window)
+      const setWindow = (window: CalendarWindow) => onChange({ ...block, window, name: block.name === calendarShareName(block.window) ? calendarShareName(window) : block.name })
+      return (
+        <div className="space-y-3">
+          <div className="grid gap-1.5 @md/card:grid-cols-2">
+            <label className="block"><span className={fieldLabel}>Date column</span>
+              <ColumnPick label="Date column" columns={firstInputColumns} value={block.column} onChange={(column) => onChange({ ...block, column })} />
+            </label>
+            <label className="block"><span className={fieldLabel}>Time interpretation</span>
+              <Select aria-label="Time interpretation" className={field('text')} value={block.interpretation.kind === 'date-format' ? block.interpretation.format : block.interpretation.kind} onChange={(event) => { const choice = CALENDAR_TIME_INTERPRETATIONS.find((entry) => entry.value === event.target.value); if (choice) onChange({ ...block, interpretation: choice.interpretation }) }}>
+                {CALENDAR_TIME_INTERPRETATIONS.map((entry) => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+              </Select>
+            </label>
+          </div>
+          <div className="space-y-1">
+            <span className={fieldLabel}>Each row covers</span>
+            <SegmentedControl size="sm" ariaLabel="Days each row covers" value={block.span} onChange={(span) => onChange({ ...block, span })} options={[{ value: 'day', label: 'One day' }, { value: 'week', label: 'One week' }, { value: 'month', label: 'One month' }]} />
+            <p className={caption('m-0')}>Days are counted from the row's date.</p>
+          </div>
+          <div className="space-y-1">
+            <span className={fieldLabel}>Window</span>
+            <SegmentedControl size="sm" ariaLabel="Calendar window" value={block.window.kind} onChange={(kind) => setWindow(kind === 'year-end' ? { kind } : { kind, from: days.from, to: days.to })} options={[{ value: 'year-end', label: 'Year-end shutdown' }, { value: 'custom', label: 'Custom window' }]} />
+            {block.window.kind === 'year-end'
+              ? <p className={caption('m-0')}>24 December to 2 January, every year in the series.</p>
+              : (
+                <div className="space-y-1">
+                  <Suspense fallback={<div className={field('text', 'h-[30px]')} aria-busy />}>
+                    <CalendarWindowPicker from={days.from} to={days.to} onChange={(window) => setWindow({ kind: 'custom', ...window })} />
+                  </Suspense>
+                  <p className={caption('m-0')}>Repeats every year.</p>
+                </div>
+              )}
+          </div>
+          <label className="block"><span className={fieldLabel}>Column name</span>
+            <input aria-label="Calendar column name" className={field('mono', 'mt-1')} value={block.name} placeholder={calendarShareName(block.window)} onChange={(event) => onChange({ ...block, name: event.target.value })} />
+          </label>
+          <p className={caption('m-0')}>Adds a column that marks the rows falling in a declared calendar window, such as the year-end shutdown. The value is the share of the row's days inside the window, so a week that straddles the window's edge carries a fraction. Declare it before fitting: a calendar event is a common cause of activity and outcomes that a trend term cannot represent.</p>
+        </div>
+      )
+    }
     case 'join': {
       const left = inputColumns[0] ?? []
       const right = inputColumns[1] ?? []

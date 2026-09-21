@@ -128,6 +128,7 @@ pub mod id_star;
 pub mod idc_star;
 pub mod identified_expression;
 pub mod ingarch;
+pub mod interrupted_series;
 pub mod kci;
 pub mod linear_mediation;
 pub mod logistic;

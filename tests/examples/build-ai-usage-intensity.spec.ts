@@ -18,7 +18,7 @@ test('build the AI usage intensity example bundle', async ({ page }) => {
     await page.getByRole('checkbox', { name: column, exact: true }).check()
   }
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByText(/Prepared cross-section/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^Cross-section, / })).toBeVisible({ timeout: 120_000 })
 
   await createDag(page, 'AI usage, volume and defects')
   // Three common causes of usage and defects, then the path that runs through code volume.

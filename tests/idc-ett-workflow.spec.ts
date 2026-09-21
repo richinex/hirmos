@@ -26,7 +26,7 @@ test('a fresh IDC*-only project reaches and runs binary ETT estimation', async (
   await page.getByRole('radio', { name: 'Independent observations' }).click()
   for (const column of ['Z', 'X', 'Y']) await page.getByRole('checkbox', { name: column, exact: true }).check()
   await page.getByRole('button', { name: /Create prepared dataset version/ }).click()
-  await expect(page.getByText('Prepared cross-section · 100 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Cross-section, 100 rows' })).toBeVisible({ timeout: 30_000 })
 
   await page.getByRole('button', { name: /Build a DAG/ }).click()
   await page.getByRole('button', { name: /Substantive knowledge/ }).click()

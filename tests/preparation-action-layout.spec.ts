@@ -38,13 +38,11 @@ test('preparation keeps its horizontal anchor when cancellation appears', async 
   for (const theme of ['dark', 'light']) {
     await page.evaluate((name) => document.documentElement.setAttribute('data-theme', name), theme)
     await expect.poll(() => prepare.evaluate((element) => getComputedStyle(element).boxShadow)).not.toBe('none')
+    // The busy button keeps an opaque surface on both faces; the signal fill, not the well.
     await expect.poll(() => prepare.evaluate((element) => {
-      const sample = document.createElement('span')
-      sample.style.backgroundColor = 'var(--color-raised)'
-      document.body.append(sample)
-      const expected = getComputedStyle(sample).backgroundColor
-      sample.remove()
-      return getComputedStyle(element).backgroundColor === expected
+      const colour = getComputedStyle(element).backgroundColor
+      const alpha = colour.startsWith('rgba') ? Number(colour.slice(colour.lastIndexOf(',') + 1, -1)) : 1
+      return alpha === 1 && colour !== 'transparent'
     })).toBe(true)
     await page.screenshot({ path: info.outputPath(`prepared-button-${theme}.png`) })
   }

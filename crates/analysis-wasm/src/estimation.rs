@@ -432,6 +432,147 @@ pub(crate) fn backdoor_linear(
     })
 }
 
+/// The interrupted time series of Lopez Bernal, Cummins and Gasparrini on one prepared column:
+/// the design from the declared impact model, fitted as the paper's quasi-Poisson model for a
+/// count or by OLS with Newey-West errors for a continuous series.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn interrupted_series(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    outcome: usize,
+    model: InterruptedModel,
+    intervention_row: usize,
+    lag: usize,
+    impact: InterruptedImpact,
+    seasonal: InterruptedSeasonal,
+    ljung_box_lags: usize,
+) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::interrupted_series::{fit_continuous, fit_count, Harmonics, ImpactModel, InterruptedSeriesDesign, ResidualCorrelation};
+    validate_dense_matrix("interrupted series", values, rows, columns)?;
+    if outcome >= columns {
+        return Err("interrupted series received a column outside the matrix".to_owned());
+    }
+    if intervention_row == 0 || intervention_row + lag >= rows {
+        return Err("interrupted series needs rows before and after the intervention row".to_owned());
+    }
+    let core_impact = match impact {
+        InterruptedImpact::Level => ImpactModel::Level,
+        InterruptedImpact::LevelAndSlope => ImpactModel::LevelAndSlope,
+        InterruptedImpact::Slope => ImpactModel::Slope,
+        InterruptedImpact::TemporaryLevel { until } => {
+            if until <= intervention_row + lag || until > rows {
+                return Err("a temporary level change must end after it starts and within the series".to_owned());
+            }
+            ImpactModel::TemporaryLevel { until }
+        }
+    };
+    // The phase is the row's time, 1..=n: a sine and cosine pair at the period absorbs any shift of
+    // origin, so this is the paper's harmonic(month, ...) on a regular grid.
+    let harmonics = match seasonal {
+        InterruptedSeasonal::None => None,
+        InterruptedSeasonal::Harmonic { pairs, period } => {
+            if pairs == 0 || !(period > 0.0) {
+                return Err("harmonic terms need at least one pair and a positive period".to_owned());
+            }
+            Some(Harmonics { pairs, period, phase: (1..=rows).map(|t| t as f64).collect() })
+        }
+    };
+    let spec = InterruptedSeriesDesign { intervention_row, lag, impact: core_impact, harmonics };
+    let y: Vec<f64> = (0..rows).map(|row| values[outcome * rows + row]).collect();
+    let terms_of = |names: &[String], params: &[f64], bse: &[f64], pvalues: &[f64], conf: &dyn Fn(usize) -> [f64; 2]| -> Vec<InterruptedTermEvidence> {
+        names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| InterruptedTermEvidence { name: name.clone(), coefficient: params[i], standard_error: bse[i], p_value: pvalues[i], interval: conf(i) })
+            .collect()
+    };
+    let seasonal_of = |deseasonalised: Option<Vec<f64>>, counterfactual: Option<Vec<f64>>| match (seasonal, deseasonalised, counterfactual) {
+        (InterruptedSeasonal::Harmonic { pairs, period }, Some(fitted), Some(counterfactual)) => InterruptedSeasonalEvidence::Harmonic {
+            pairs,
+            period,
+            deseasonalised: fitted.into_iter().zip(counterfactual).map(|(fitted, counterfactual)| InterruptedDeseasonalisedEvidence { fitted, counterfactual }).collect(),
+        },
+        _ => InterruptedSeasonalEvidence::None,
+    };
+    let correlations = |c: &ResidualCorrelation| -> (Vec<CorrelationEvidence>, Vec<CorrelationEvidence>) {
+        let pair = |values: &[f64], limits: &[f64]| values.iter().zip(limits).map(|(&value, &limit)| CorrelationEvidence { value, limit }).collect();
+        (pair(&c.acf, &c.acf_limits), pair(&c.pacf, &c.pacf_limits))
+    };
+    let boxes = |b: &(Vec<f64>, Vec<f64>)| -> Vec<LjungBoxEvidence> { b.0.iter().zip(&b.1).map(|(&statistic, &p_value)| LjungBoxEvidence { statistic, p_value }).collect() };
+    let path_of = |observed: &[f64], fitted: &[f64], counterfactual: &[f64], residual: &[f64]| -> Vec<InterruptedRowEvidence> {
+        (0..observed.len()).map(|r| InterruptedRowEvidence { observed: observed[r], fitted: fitted[r], counterfactual: counterfactual[r], residual: residual[r] }).collect()
+    };
+    match model {
+        InterruptedModel::Continuous { hac_max_lags } => {
+            // statsmodels' bandwidth when `maxlags` is not given: floor(4 (n/100)^(2/9)).
+            let max_lags = hac_max_lags
+                .unwrap_or_else(|| (4.0 * (rows as f64 / 100.0).powf(2.0 / 9.0)).floor() as usize);
+            let fit = fit_continuous(&y, &spec, max_lags, ljung_box_lags);
+            let terms = terms_of(&fit.names, &fit.fit.params, &fit.fit.bse, &fit.fit.pvalues, &|i| [fit.fit.conf_int[i].0, fit.fit.conf_int[i].1]);
+            let (residual_acf, residual_pacf) = correlations(&fit.correlation);
+            Ok(AnalysisResult::InterruptedSeries {
+                observations: rows,
+                outcome,
+                model: InterruptedModelEvidence::Continuous { hac_max_lags: max_lags },
+                intervention_row,
+                lag,
+                impact,
+                seasonal: seasonal_of(fit.deseasonalised, fit.deseasonalised_counterfactual),
+                terms,
+                path: path_of(&y, &fit.fitted, &fit.counterfactual, &fit.fit.resid),
+                ljung_box: boxes(&fit.ljung_box),
+                residual_acf,
+                residual_pacf,
+                converged: true,
+            })
+        }
+        InterruptedModel::Count { exposure } => {
+            if exposure.is_some_and(|column| column >= columns) {
+                return Err("interrupted series received an exposure column outside the matrix".to_owned());
+            }
+            if y.iter().any(|value| *value < 0.0 || value.fract() != 0.0) {
+                return Err("a count model needs a non-negative integer outcome".to_owned());
+            }
+            if y.iter().all(|value| *value == 0.0) {
+                return Err("a count model is undefined when every outcome is zero".to_owned());
+            }
+            let exposure_values: Option<Vec<f64>> = exposure.map(|column| (0..rows).map(|row| values[column * rows + row]).collect());
+            if exposure_values.as_ref().is_some_and(|e| e.iter().any(|v| !(*v > 0.0))) {
+                return Err("the exposure must be positive on every row".to_owned());
+            }
+            let fit = fit_count(&y, exposure_values.as_deref(), &spec, ljung_box_lags);
+            let z = ndtri(0.975);
+            let terms = terms_of(&fit.names, &fit.fit.params, &fit.fit.bse, &fit.fit.pvalues, &|i| [fit.fit.params[i] - z * fit.fit.bse[i], fit.fit.params[i] + z * fit.fit.bse[i]]);
+            // The paper's rate: each count scaled to the mean exposure, so rows are comparable and
+            // sit on the standardised curves.
+            let observed: Vec<f64> = match &exposure_values {
+                Some(e) => {
+                    let mean = e.iter().sum::<f64>() / e.len() as f64;
+                    y.iter().zip(e).map(|(count, exposure)| count * mean / exposure).collect()
+                }
+                None => y.clone(),
+            };
+            let (residual_acf, residual_pacf) = correlations(&fit.correlation);
+            Ok(AnalysisResult::InterruptedSeries {
+                observations: rows,
+                outcome,
+                model: InterruptedModelEvidence::Count { exposure, dispersion: fit.fit.scale },
+                intervention_row,
+                lag,
+                impact,
+                seasonal: seasonal_of(fit.deseasonalised, fit.deseasonalised_counterfactual),
+                terms,
+                path: path_of(&observed, &fit.standardised, &fit.standardised_counterfactual, &fit.fit.resid_deviance),
+                ljung_box: boxes(&fit.ljung_box),
+                residual_acf,
+                residual_pacf,
+                converged: fit.fit.converged,
+            })
+        }
+    }
+}
+
 pub(crate) fn count_glm(
     values: &[f64],
     rows: usize,

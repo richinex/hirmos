@@ -45,7 +45,7 @@ const prepare = async (page: Page, fixture: Fixture) => {
     if (node.kind === 'observed') await page.getByRole('checkbox', { name: node.name, exact: true }).check()
   }
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByText(/Prepared cross-section/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^Cross-section, / })).toBeVisible({ timeout: 30_000 })
 }
 
 const buildDag = async (page: Page, fixture: Fixture) => {
@@ -115,11 +115,11 @@ for (const fixture of selected) {
       await page.getByRole('button', { name: 'Identify the effect' }).click()
 
       await expect(page.getByRole('heading', { name: 'Choose a valid adjustment set' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Minimal set 1 · A, Z' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Minimal set 2 · B, Z' })).toBeVisible()
-      await expect(page.getByRole('button', { name: 'Canonical set · A, B, Z' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Minimal set 1, A, Z' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Minimal set 2, B, Z' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Canonical set, A, B, Z' })).toBeVisible()
 
-      await page.getByRole('button', { name: 'Minimal set 1 · A, Z' }).click()
+      await page.getByRole('button', { name: 'Minimal set 1, A, Z' }).click()
       const canvas = page.getByTestId('canvas')
       await expect(canvas.getByText('Minimal adjustment set 1', { exact: false })).toBeVisible()
       await expect(canvas.getByText('Canonical set: A, B, Z.', { exact: true })).toBeVisible()

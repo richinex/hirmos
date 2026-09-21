@@ -107,7 +107,8 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   await expect(page.getByText('Strongest candidate', { exact: true }).filter({ visible: true })).toBeVisible()
   expect(await page.locator('body').evaluate((el) => el.scrollWidth <= window.innerWidth + 1)).toBe(true)
   await page.screenshot({ path: info.outputPath('results.png') })
-  if (phone) await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  // The export control sits in the rail's sheet, which closes after every chapter choice.
+  await page.getByRole('button', { name: 'Expand chapter list' }).click()
   const download = page.waitForEvent('download', { timeout: 30_000 })
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
   const exported = await download

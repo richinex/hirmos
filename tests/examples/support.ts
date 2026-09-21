@@ -39,8 +39,8 @@ export const createProject = async (page: Page, example: ShippedExample): Promis
 }
 
 const STRUCTURE = {
-  'time series': { radio: /Regular time series/, prepared: 'Prepared time series' },
-  'cross-section': { radio: /Independent observations/, prepared: 'Prepared cross-section' },
+  'time series': { radio: /Regular time series/, prepared: /^Time series, / },
+  'cross-section': { radio: /Independent observations/, prepared: /^Cross-section, / },
 } as const
 
 /** Choose the observation structure, its keys, and the columns, then create the prepared version. */
@@ -158,7 +158,7 @@ export const runDiscovery = async (page: Page, options: {
 export const exportBundle = async (page: Page, example: ShippedExample): Promise<void> => {
   await chapter(page, /Data studio/i)
   // The storage and export controls sit in a collapsed panel until the reader opens it.
-  const panel = page.locator('details', { has: page.getByText('Source file · storage and export') })
+  const panel = page.locator('details', { has: page.getByText(/Source file\s+storage and export/) })
   if (!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))) await panel.locator('summary').click()
   await page.getByRole('checkbox', { name: /Include the source file/ }).check()
   const download = page.waitForEvent('download')

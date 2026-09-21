@@ -12,6 +12,7 @@ export function runSurvivalForest(values: Float64Array, rows: number, columns: n
   return post('survival-forest-succeeded', { kind: 'survival-forest', request, values, rows, columns, design }, values)
 }
 import type { CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
+import type { InterruptedImpact, InterruptedModel, InterruptedSeasonal, InterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import type { MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
@@ -87,6 +88,7 @@ type InstrumentalVariableOutcome = Result<InstrumentalVariableEvidence, Analysis
 type CountGlmOutcome = Result<CountGlmEvidence, AnalysisWorkerProblem>
 type NegativeBinomialIngarchOutcome = Result<NegativeBinomialIngarchEvidence, AnalysisWorkerProblem>
 type CountSeriesInterventionScanOutcome = Result<CountSeriesInterventionScanEvidence, AnalysisWorkerProblem>
+type InterruptedSeriesOutcome = Result<InterruptedSeriesEvidence, AnalysisWorkerProblem>
 type CausalEffectsOutcome = Result<CausalEffectsEvidence, AnalysisWorkerProblem>
 type CausalImpactOutcome = Result<CausalImpactEvidence, AnalysisWorkerProblem>
 type LinearRefutationOutcome = Result<LinearRefutationEvidence, AnalysisWorkerProblem>
@@ -931,6 +933,19 @@ export function runCountSeriesInterventionScan(values: Float64Array, rows: numbe
 }, onProgress?: (progress: AnalysisProgress) => void): Promise<CountSeriesInterventionScanOutcome> {
   const request = newWorkerRequestId()
   return post('count-series-intervention-scan-succeeded', { kind: 'count-series-intervention-scan', request, values, rows, columns, ...design }, values, onProgress)
+}
+
+export function runInterruptedSeries(values: Float64Array, rows: number, columns: number, design: {
+  readonly outcome: number
+  readonly model: InterruptedModel
+  readonly interventionRow: number
+  readonly lag: number
+  readonly impact: InterruptedImpact
+  readonly seasonal: InterruptedSeasonal
+  readonly ljungBoxLags: number
+}, onProgress?: (progress: AnalysisProgress) => void): Promise<InterruptedSeriesOutcome> {
+  const request = newWorkerRequestId()
+  return post('interrupted-series-succeeded', { kind: 'interrupted-series', request, values, rows, columns, ...design }, values, onProgress)
 }
 
 export function runCausalEffectsTotal(values: Float64Array, rows: number, columns: number, design: {

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./themes.css";
 @import "./dashboard.css";
+@import "react-day-picker/style.css";
 
 /* The phone's pane openers: a lifted block at rest, inset while its sheet is open, the way the texture
    chapter presses a menu item in. Only mobile workbench openers use this class. */
@@ -700,3 +701,37 @@ mark.passage-bound {
   .panel-scroll { height: auto !important; overflow: visible !important; }
   [data-print-full] { width: auto !important; }
 }
+
+/* The calendar of a window picker, drawn with the house tokens: the day cells on the 24px unit, the
+   selected ends in the base blue at its link strength (the one blue with a value on both faces) under
+   panel-coloured numerals, the run between them on the raised chip surface, and the same radius as
+   every other control. */
+.rdp-root {
+  --rdp-accent-color: var(--color-link);
+  --rdp-accent-background-color: var(--color-raised);
+  --rdp-day-height: 2rem;
+  --rdp-day-width: 2rem;
+  --rdp-day_button-height: 1.875rem;
+  --rdp-day_button-width: 1.875rem;
+  --rdp-day_button-border-radius: var(--radius-md);
+  --rdp-selected-border: 2px solid var(--color-link);
+  --rdp-range_start-color: var(--color-panel);
+  --rdp-range_end-color: var(--color-panel);
+  --rdp-range_middle-color: var(--color-ink);
+  --rdp-today-color: var(--color-signal-text);
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-nav_button-width: 1.75rem;
+  --rdp-nav-height: 2rem;
+  --rdp-months-gap: 1.5rem;
+  --rdp-weekday-opacity: 1;
+  font-size: var(--text-label);
+  color: var(--color-ink);
+}
+.rdp-caption_label { font-weight: 500; color: var(--color-ink); font-size: var(--text-body); }
+.rdp-selected { font-weight: 500; font-size: inherit; }
+.rdp-range_middle .rdp-day_button { border-color: transparent; }
+.rdp-weekday { color: var(--color-faint); font-weight: 400; }
+.rdp-chevron { fill: var(--color-muted); }
+.rdp-day_button:hover:not(:disabled) { background: var(--color-well); }
+.rdp-selected .rdp-day_button:hover { background: none; }
+.rdp-outside { opacity: 0.4; }

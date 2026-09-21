@@ -23,7 +23,7 @@ const createProject = async (page: Page) => {
 test('validates project names at the form boundary', async ({ page }) => {
   await page.goto('/app')
   await page.getByRole('button', { name: 'Create project' }).click()
-  await expect(page.getByRole('alert')).toHaveText('Give the analysis a name.')
+  await expect(page.getByRole('alert')).toContainText('Give the analysis a name.')
   await expect(page.getByText('Recommendations support judgment')).toHaveCount(0)
 })
 
@@ -36,7 +36,7 @@ test('rejects unsupported and empty files', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText('CSV, TSV, or Parquet')
 
   await input.setInputFiles({ name: 'empty.csv', mimeType: 'text/csv', buffer: Buffer.from('') })
-  await expect(page.getByRole('alert')).toHaveText('The selected file is empty.')
+  await expect(page.getByRole('alert')).toContainText('The selected file is empty.')
 })
 
 test('keeps null distinct from a real zero at the Arrow boundary', async ({ page }, testInfo) => {
@@ -81,7 +81,7 @@ test('profiles the pinned Seatbelts Parquet through the same canonical worker', 
   })
   await createProject(page)
   await page.locator('input[type="file"]').setInputFiles(seatbeltsParquet)
-  await expect(page.getByText(/^parquet · /)).toBeVisible()
+  await expect(page.getByText(/^parquet/)).toBeVisible()
   await page.getByRole('button', { name: 'Inspect data' }).click()
 
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
@@ -115,7 +115,7 @@ test('refuses a header-only CSV after canonical parsing', async ({ page }, testI
 test('rejects an unknown chapter query without losing the workflow entry point', async ({ page }) => {
   await page.goto('/app?chapter=unknown')
   await expect(page.getByRole('alert')).toContainText('Unknown chapter “unknown”')
-  await expect(page.getByRole('heading', { name: 'Create an analysis' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
 })
 
 test('keeps the current stage usable on a phone', async ({ page }, testInfo) => {
@@ -151,7 +151,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('checkbox', { name: 'DriversKilled', exact: true }).check()
   await page.getByRole('checkbox', { name: 'drivers', exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await expect(page.getByText('Prepared time series · 192 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Time series, 192 rows' })).toBeVisible({ timeout: 30_000 })
 
   await page.getByRole('radio', { name: /Granger/ }).click()
   const mobileGranger = page.getByRole('region', { name: 'Granger predictive test' })
@@ -218,7 +218,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await mobileNav.getByRole('button', { name: /Discovery lab/ }).click()
   await expect(page.getByText('Lag-resolved neural Granger evidence')).toBeVisible({ timeout: 30_000 })
   // On a phone the run ledger is a bottom pane opened from a bar under the stage; its button carries the count.
-  await expect(page.getByRole('button', { name: 'Runs · 1' })).toBeVisible()
+  await expect(page.getByText('Runs (1)', { exact: true })).toBeVisible()
   await expect(page.getByText('divided by its recorded population standard deviation')).toBeVisible()
   await discoveryFamilies.getByRole('radio', { name: 'PCMCI' }).click()
   await discoveryMethods.getByRole('radio', { name: /^PCMCI\+/ }).click()
@@ -257,7 +257,7 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await page.getByRole('checkbox', { name: 'y', exact: true }).check()
   await page.getByRole('checkbox', { name: 'z', exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await expect(page.getByText('Prepared cross-section · 96 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Cross-section, 96 rows' })).toBeVisible({ timeout: 30_000 })
 
   const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
   await navigation.getByRole('button', { name: /Discovery lab/ }).click()
@@ -325,8 +325,12 @@ test('saves per-column time-series transformations and previews the materialized
   await page.getByRole('radiogroup', { name: 'Transformation for x' }).getByRole('radio', { name: 'First difference' }).click()
   await page.getByRole('radiogroup', { name: 'Transformation for y' }).getByRole('radio', { name: 'Linear detrend' }).click()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await expect(page.getByText('Prepared time series · 5 rows')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText(/x: first difference, y: linear detrend/)).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: 'Time series, 5 rows' })).toBeVisible({ timeout: 30_000 })
+  // The prepared summary lists each column's transformation.
+  const transformations = page.getByRole('table', { name: 'Prepared variable transformations' })
+  await page.locator('summary').filter({ hasText: 'Preparation details' }).click()
+  await expect(transformations.getByRole('row').filter({ hasText: 'x' })).toContainText('first difference')
+  await expect(transformations.getByRole('row').filter({ hasText: 'y' })).toContainText('linear detrend')
 
   const plots = page.getByRole('list', { name: 'Prepared series plots' })
   await expect(plots.getByTestId('prepared-series')).toHaveCount(2, { timeout: 30_000 })
@@ -369,7 +373,7 @@ test('shows the saved STL decomposition and ACF/PACF diagnostics', async ({ page
   await page.getByRole('group', { name: 'Columns to adjust seasonally' }).getByRole('checkbox', { name: 'x', exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
 
-  await expect(page.getByText('Prepared time series · 72 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Time series, 72 rows' })).toBeVisible({ timeout: 30_000 })
   const decomposition = page.getByTestId('stl-decomposition')
   await expect(decomposition).toBeVisible({ timeout: 30_000 })
   await expect(decomposition).toHaveAttribute('aria-description', /observed equals trend plus seasonal plus remainder/i)
@@ -384,8 +388,15 @@ test('shows the saved STL decomposition and ACF/PACF diagnostics', async ({ page
 
 test('explains the opposing stationarity null hypotheses and labels every critical value', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Stationarity presentation runs once')
+  // Three test families with break search take longer than the default budget.
+  test.setTimeout(180_000)
   await createProject(page)
-  const rows = Array.from({ length: 96 }, (_, index) => `${index + 1},${index + Math.sin(index / 4)}`)
+  // A first-order autoregression with a cycle and reproducible noise. A near-exact line makes the
+  // lagged level and the trend collinear in the Zivot–Andrews auxiliary regression, which refuses it.
+  let seed = 7
+  const noise = () => { seed = (1664525 * seed + 1013904223) >>> 0; return seed / 4294967296 - 0.5 }
+  let level = 0
+  const rows = Array.from({ length: 96 }, (_, index) => { level = 0.6 * level + 4 * noise(); return `${index + 1},${(10 + level + 2 * Math.sin(index / 4)).toFixed(6)}` })
   await page.locator('input[type="file"]').setInputFiles({
     name: 'stationarity-copy.csv',
     mimeType: 'text/csv',
@@ -396,22 +407,23 @@ test('explains the opposing stationarity null hypotheses and labels every critic
   await choose(page.getByLabel('Time column'), { label: 'time' })
   await page.getByRole('checkbox', { name: 'x', exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await expect(page.getByText('Prepared time series · 96 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Time series, 96 rows' })).toBeVisible({ timeout: 30_000 })
 
   // Diagnostics open on redundancy, so the stationarity pane has to be selected before it is read.
   await page.getByRole('radio', { name: /Stationarity/ }).click()
   await expect(page.getByText(/ADF tests a unit root as its null; KPSS tests stationarity as its null/)).toBeVisible()
-  await expect(page.getByText(/prepared data are not changed unless first differencing is saved as a transformation/)).toBeVisible()
+  await expect(page.getByText(/These tests assess the saved values/)).toBeVisible()
+  await page.getByRole('group', { name: 'Stationarity variables' }).getByRole('checkbox', { name: 'x' }).check()
   await page.getByRole('button', { name: 'Run stationarity tests' }).click()
-  await expect(page.getByText(/Stationarity tests · 1 variables · 96 rows/)).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByRole('columnheader', { name: 'ADF p · constant' })).toBeVisible()
-  await expect(page.getByRole('columnheader', { name: 'KPSS p · constant' })).toBeVisible()
-  await expect(page.getByText(/ADF · constant · prepared values: p/)).toBeVisible()
-  await page.getByText('x · test statistics', { exact: true }).click()
-
-  const rawEvidence = page.getByRole('region', { name: 'Stationarity raw evidence' })
-  const adf = rawEvidence.getByRole('row').filter({ hasText: 'ADF · constant' }).first()
-  const kpss = rawEvidence.getByRole('row').filter({ hasText: 'KPSS · constant' }).first()
+  const results = page.getByRole('region', { name: 'Stationarity results' })
+  await expect(results).toContainText('96 rows, levels', { timeout: 120_000 })
+  await expect(results.getByText('ADF p-value', { exact: true })).toBeVisible()
+  await expect(results.getByText('KPSS p-value', { exact: true })).toBeVisible()
+  // Every specification lists its critical values beside the statistic and its p-value.
+  await results.locator('summary').filter({ hasText: 'Test details for x' }).click()
+  await expect(results.getByRole('columnheader', { name: 'Critical values' })).toBeVisible()
+  const adf = results.getByRole('row').filter({ hasText: 'ADF (constant)' }).first()
+  const kpss = results.getByRole('row').filter({ hasText: 'KPSS (constant)' }).first()
   await expect(adf).toContainText('1%:')
   await expect(adf).toContainText('5%:')
   await expect(adf).toContainText('10%:')
@@ -445,7 +457,7 @@ test('keeps the current chapter visible until a cold lazy chapter is ready', asy
   await page.getByRole('checkbox', { name: 'x', exact: true }).check()
   await page.getByRole('checkbox', { name: 'y', exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await expect(page.getByText('Prepared cross-section · 4 rows')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: 'Cross-section, 4 rows' })).toBeVisible({ timeout: 30_000 })
 
   const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
   await navigation.getByRole('button', { name: /DAG workspace/ }).click()

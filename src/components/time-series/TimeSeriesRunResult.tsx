@@ -9,6 +9,7 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { TimeSeriesEquation } from './TimeSeriesEquation'
 import { LongRunCharts } from './LongRunCharts'
 import { ArdlModelResult } from './ArdlModelResult'
+import { InterruptedSeriesResult } from './InterruptedSeriesResult'
 import { VecmForecastChart } from './VecmForecastChart'
 import { resultSurface, resultTitle, table, td, th } from '@/components/ui/recipes'
 
@@ -16,6 +17,7 @@ const number = (value: number) => formatStatistic('raw', value).text
 
 export function TimeSeriesRunResult({ run }: { readonly run: TimeSeriesRun }) {
   if (run.kind === 'ardl-model') return <ArdlModelResult run={run} />
+  if (run.kind === 'interrupted-series') return <InterruptedSeriesResult run={run} />
   const content = (() => {
     switch (run.kind) {
       case 'ardl': {

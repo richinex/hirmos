@@ -15,7 +15,9 @@ for (const filename of ['Seatbelts.csv', 'team-adoption-and-code-quality-observa
     await expect(header.getByRole('heading')).toHaveCount(1)
     await expect(header.getByLabel('Dataset size').locator('dt')).toHaveText(['rows', 'columns', 'numeric'])
     await expect(header.getByLabel('Dataset size').locator('dd > [aria-hidden]')).toHaveText(['2', '2', '2'])
-    await expect(header.getByRole('button')).toHaveCount(0)
+    // The header carries the one action on the source, editing it; nothing else competes with the name.
+    await expect(header.getByRole('button')).toHaveCount(1)
+    await expect(header.getByRole('button', { name: 'Edit data', exact: true })).toBeVisible()
     for (const theme of ['light', 'dark']) {
       await page.evaluate(theme => { document.documentElement.dataset.theme = theme }, theme)
       await heading.scrollIntoViewIfNeeded()

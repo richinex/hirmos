@@ -85,6 +85,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'dml-refutation-batch',
     'ardl-pss',
     'vecm',
+    'interrupted-series',
     'synthetic-control',
     'panel-intervention',
     'negbin-nuts',

@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { plotTimeSchema } from './longRun'
 import { ardlModelRequestSchema, ardlModelEvidenceSchema } from './ardlModel'
 import { ardlEvidenceSchema, vecmEvidenceSchema } from './estimation'
+import { declaredImpactSchema, describeImpact, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, rowIndex, sameImpact } from './interruptedSeries'
 import { assertNever, brand, err, ok, type Result } from './dop'
 import type { ColumnId } from './dataset'
 import type { PreparedDatasetVersionId } from './preprocessing'
@@ -46,6 +47,25 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
     variables: z.tuple([column, column]).rest(column),
     specification: z.object({ maxLags: z.number().int().min(1).max(24), deterministic: z.enum(['n', 'co', 'ci', 'coli']), significance: z.union([z.literal(90), z.literal(95), z.literal(99)]), forecastSteps: z.number().int().min(1).max(200).nullable().optional() }).strict(),
     evidence: vecmEvidenceSchema,
+  }).strict(),
+  z.object({
+    ...identity,
+    kind: z.literal('interrupted-series'),
+    outcome: column,
+    specification: z.object({
+      /** The fit, with the column a count model's exposure came from. */
+      model: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('continuous'), hacMaxLags: z.number().int().nonnegative().nullable() }).strict(),
+        z.object({ kind: z.literal('count'), exposure: column.nullable() }).strict(),
+      ]),
+      /** The first screen row after the event, numbered from 1. */
+      interventionRow: z.number().int().min(2).transform((value) => brand<number, 'RowNumber'>(value)),
+      lag: z.number().int().nonnegative(),
+      impact: declaredImpactSchema,
+      seasonal: interruptedSeasonalSchema,
+      ljungBoxLags: z.number().int().positive(),
+    }).strict(),
+    evidence: interruptedSeriesEvidenceSchema,
   }).strict(),
 ]).superRefine((run, ctx) => {
   const fail = (message: string) => ctx.addIssue({ code: 'custom', message })
@@ -119,6 +139,14 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
       }
       return
     }
+    case 'interrupted-series': {
+      const { specification: s, evidence: e } = run
+      if (s.model.kind !== e.model.kind || rowIndex(s.interventionRow) !== e.interventionRow || s.lag !== e.lag || !sameImpact(s.impact, e.impact)) fail('The interrupted-series result does not match its specification.')
+      if (s.seasonal.kind !== e.seasonal.kind || (s.seasonal.kind === 'harmonic' && e.seasonal.kind === 'harmonic' && (s.seasonal.pairs !== e.seasonal.pairs || s.seasonal.period !== e.seasonal.period))) fail('The seasonal terms differ from the requested ones.')
+      if (s.model.kind === 'continuous' && e.model.kind === 'continuous' && s.model.hacMaxLags !== null && e.model.hacMaxLags !== s.model.hacMaxLags) fail('The Newey–West bandwidth differs from the requested one.')
+      if (s.model.kind === 'count' && e.model.kind === 'count' && (s.model.exposure === null) !== (e.model.exposure === null)) fail('An exposure column must be recorded with the count model that used it.')
+      return
+    }
     default: return assertNever(run)
   }
 })
@@ -137,12 +165,13 @@ export const timeSeriesRunLabel = (run: TimeSeriesRun): string => {
     case 'ardl-model': return `ARDL for ${run.outcome.name}`
     case 'ardl': return `ARDL for ${run.outcome.name} and ${run.predictor.name}`
     case 'vecm': return `VECM for ${run.variables.map((variable) => variable.name).join(', ')}`
+    case 'interrupted-series': return `Interrupted series for ${run.outcome.name}, ${describeImpact(run.specification.impact)}`
     default: return assertNever(run)
   }
 }
 
 /** A run can only enter the history of the prepared series it actually used. */
 export const timeSeriesRunMatches = (run: TimeSeriesRun, prepared: { readonly id: PreparedDatasetVersionId; readonly columns: readonly ColumnId[] }): boolean => {
-  const variables = run.kind === 'ardl-model' ? [run.outcome, ...run.predictors, ...run.fixed] : run.kind === 'ardl' ? [run.outcome, run.predictor] : run.variables
+  const variables = run.kind === 'ardl-model' ? [run.outcome, ...run.predictors, ...run.fixed] : run.kind === 'ardl' ? [run.outcome, run.predictor] : run.kind === 'interrupted-series' ? [run.outcome, ...(run.specification.model.kind === 'count' && run.specification.model.exposure !== null ? [run.specification.model.exposure] : [])] : run.variables
   return run.preparedDataset === prepared.id && variables.every((variable) => prepared.columns.includes(variable.id))
 }

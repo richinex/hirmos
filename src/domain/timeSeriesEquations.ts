@@ -75,6 +75,29 @@ export function timeSeriesEquations(run: TimeSeriesRun | CountSeriesModelArtifac
         reference: 'Johansen (1991), §2, equations (2.1)–(2.2); statsmodels VECM uses the equivalent equilibrium term at t−1.',
       }
     }
+    case 'interrupted-series': {
+      const { specification: s, evidence: e } = run
+      const count = s.model.kind === 'count'
+      const step = s.impact.kind === 'slope' ? '' : `+\\beta_2 X_t`
+      const slope = s.impact.kind === 'levelAndSlope' || s.impact.kind === 'slope' ? `+\\beta_3 (t-T_0) X_t` : ''
+      const seasonal = s.seasonal.kind === 'none' ? '' : `+\\sum_{k=1}^{${s.seasonal.pairs}}\\left[\\gamma_k\\sin\\tfrac{2\\pi k t}{${number(s.seasonal.period)}}+\\delta_k\\cos\\tfrac{2\\pi k t}{${number(s.seasonal.period)}}\\right]`
+      const left = count ? `\\log E[Y_t]=\\log N_t+` : 'Y_t='
+      const plainLeft = count ? 'Log of the expected count = log of the exposure + ' : 'Series at t = '
+      const plainStep = s.impact.kind === 'slope' ? '' : ' + level change × after-event indicator'
+      const plainSlope = slope === '' ? '' : ' + slope change × rows since the event × after-event indicator'
+      const plainSeasonal = seasonal === '' ? '' : ' + harmonic seasonal terms'
+      const fitted = e.terms.map((term) => `${term.name}=${texNumber(term.coefficient)}`).join(',\;')
+      return {
+        general: [expression(`${left}\\beta_0+\\beta_1 t${step}${slope}${seasonal}${count ? '' : '+\\varepsilon_t'}`, `${plainLeft}constant + trend × t${plainStep}${plainSlope}${plainSeasonal}${count ? '' : ' + error'}`)],
+        definitions: [
+          `Y is ${run.outcome.name}; t is the row number from 1. X is 1 from row ${s.interventionRow}${s.lag > 0 ? ` plus a lag of ${s.lag}` : ''}${s.impact.kind === 'temporaryLevel' ? ` until row ${s.impact.until}` : ''} and 0 before; T₀ is the row before the change, so the slope term is 1 on the first changed row.`,
+          s.model.kind === 'count' ? `N is ${s.model.exposure?.name ?? 'one'}, the exposure, entering as an offset with coefficient one. The dispersion is estimated from Pearson residuals (quasi-Poisson), not fixed at one.` : `Standard errors are Newey–West with bandwidth ${e.model.kind === 'continuous' ? e.model.hacMaxLags : 0}.`,
+          s.seasonal.kind === 'none' ? 'No seasonal terms are included.' : `The harmonic terms are ${s.seasonal.pairs} sine and cosine pairs at period ${number(s.seasonal.period)}, as tsModel::harmonic builds them.`,
+        ],
+        fitted: { kind: 'available', title: 'Fitted coefficients', expressions: [expression(fitted, e.terms.map((term) => `${term.name} = ${number(term.coefficient)}`).join('; '))], explanation: count ? 'A coefficient exponentiated is a rate ratio; the result table lists them with their intervals.' : 'Coefficients are in the units of the series per row; the result table lists their intervals.' },
+        reference: 'Lopez Bernal, Cummins and Gasparrini (2017), International Journal of Epidemiology 46(1), 348–355, equation (1) and the additional material; the slope change is parameterised as in the 2020 corrigendum.',
+      }
+    }
     default: return assertNever(run)
   }
 }

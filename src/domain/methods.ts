@@ -162,6 +162,7 @@ export const T_LEARNER_METHOD_ID = methodId('t-learner')
 export const DML_REFUTATION_METHOD_ID = methodId('dml-refutation-batch')
 export const ARDL_PSS_METHOD_ID = methodId('ardl-pss')
 export const VECM_METHOD_ID = methodId('vecm')
+export const INTERRUPTED_SERIES_METHOD_ID = methodId('interrupted-series')
 export const SYNTHETIC_CONTROL_METHOD_ID = methodId('synthetic-control')
 export const PANEL_INTERVENTION_METHOD_ID = methodId('panel-intervention')
 export const NEGBIN_NUTS_METHOD_ID = methodId('negbin-nuts')
@@ -217,6 +218,8 @@ const KPSS_1992 = paper('Testing the Null Hypothesis of Stationarity against the
 const ZIVOT_ANDREWS_1992 = paper('Further Evidence on the Great Crash, the Oil-Price Shock, and the Unit-Root Hypothesis (Zivot and Andrews, 1992)', 'Journal of Business & Economic Statistics 10(3), 251–270')
 const GRANGER_1969 = paper('Investigating Causal Relations by Econometric Models and Cross-spectral Methods (Granger, 1969)', 'Econometrica 37(3), 424–438')
 const PSS_2001 = paper('Bounds Testing Approaches to the Analysis of Level Relationships (Pesaran, Shin and Smith, 2001)', 'Journal of Applied Econometrics 16(3), 289–326; cases I–V')
+const LOPEZ_BERNAL_2017 = paper('Interrupted time series regression for the evaluation of public health interventions: a tutorial (Lopez Bernal, Cummins and Gasparrini, 2017; corrigendum 2020)', 'International Journal of Epidemiology 46(1), 348–355')
+const BHASKARAN_2013 = paper('Time series regression studies in environmental epidemiology (Bhaskaran, Gasparrini, Hajat, Smeeth and Armstrong, 2013)', 'International Journal of Epidemiology 42(4), 1187–1195')
 const JOHANSEN_1988 = paper('Statistical Analysis of Cointegration Vectors (Johansen, 1988)', 'Journal of Economic Dynamics and Control 12(2–3), 231–254')
 const CAMERON_TRIVEDI = paper('Regression Analysis of Count Data, 2nd ed. (Cameron and Trivedi, 2013)', '§§3.2–3.5; overdispersion in §3.4')
 const HOFFMAN_GELMAN_2014 = paper('The No-U-Turn Sampler: Adaptively Setting Path Lengths in Hamiltonian Monte Carlo (Hoffman and Gelman, 2014)', 'Journal of Machine Learning Research 15(47), 1593–1623')
@@ -2319,6 +2322,57 @@ const DYNAMIC_LINEAR_SCM: MethodDefinition = {
   ],
 }
 
+const INTERRUPTED_SERIES: MethodDefinition = {
+  id: INTERRUPTED_SERIES_METHOD_ID,
+  name: 'Interrupted series',
+  family: 'estimation',
+  summary: 'Estimate how an event at a declared row changed the level or trend of a series. State the impact model before fitting. This is a single-series design: it cannot separate the event from anything else that changed at the same time.',
+  caveats: [
+    {
+      id: caveatId('its-impact-model-declared'),
+      category: 'functional-form',
+      requirement: 'The impact model was chosen before fitting, from what is known about the event.',
+      consequenceIfUnmet: 'A shape chosen from the data overstates the effect.',
+      sources: [LOPEZ_BERNAL_2017],
+    },
+    {
+      id: caveatId('its-no-concurrent-change'),
+      category: 'identification',
+      requirement: 'Nothing else changed at the intervention row.',
+      consequenceIfUnmet: 'The estimate attributes any concurrent change to the event.',
+      sources: [LOPEZ_BERNAL_2017],
+    },
+    {
+      id: caveatId('its-seasonality'),
+      category: 'stationarity-and-dynamics',
+      requirement: 'Seasonality is represented, by harmonic terms at the period or by seasonal adjustment in Data studio.',
+      consequenceIfUnmet: 'An uneven split of seasons before and after biases the level change.',
+      sources: [LOPEZ_BERNAL_2017, BHASKARAN_2013],
+    },
+    {
+      id: caveatId('its-residual-autocorrelation'),
+      category: 'noise-and-dependence',
+      requirement: 'Residuals are not serially correlated after adjustment; check the Ljung–Box test in the result.',
+      consequenceIfUnmet: 'Intervals are too narrow. Newey–West errors widen them but do not repair a misspecified trend.',
+      sources: [LOPEZ_BERNAL_2017, statsmodels('statsmodels/regression/linear_model.py#RegressionResults.get_robustcov_results'), hirmos('crates/causal-core/src/interrupted_series.rs')],
+    },
+    {
+      id: caveatId('its-rows-each-side'),
+      category: 'finite-sample',
+      requirement: 'Enough rows on each side of the event.',
+      consequenceIfUnmet: 'The estimate has little power; interpret with caution.',
+      sources: [LOPEZ_BERNAL_2017],
+    },
+    {
+      id: caveatId('its-count-model'),
+      category: 'functional-form',
+      requirement: 'A count is fitted as a quasi-Poisson model with the log of an exposure as the offset, the dispersion estimated from Pearson residuals; a continuous series by least squares.',
+      consequenceIfUnmet: 'A Poisson fit with the dispersion fixed at one understates the intervals of an overdispersed count.',
+      sources: [LOPEZ_BERNAL_2017, statsmodels('statsmodels/genmod/generalized_linear_model.py#GLM.estimate_scale'), hirmos('crates/causal-core/src/glm.rs#poisson_glm_with')],
+    },
+  ],
+}
+
 export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   ADF,
   KPSS,
@@ -2357,6 +2411,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   DML_REFUTATION,
   ARDL_PSS,
   VECM,
+  INTERRUPTED_SERIES,
   SYNTHETIC_CONTROL,
   PANEL_INTERVENTION,
   NEGBIN_NUTS,
@@ -2387,7 +2442,7 @@ export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REF
 export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
-export const TIME_SERIES_METHODS = { ardl: ARDL_PSS, vecm: VECM } as const
+export const TIME_SERIES_METHODS = { ardl: ARDL_PSS, vecm: VECM, interrupted: INTERRUPTED_SERIES } as const
 export const COUNT_SERIES_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [COUNT_SERIES_INTERVENTION_SCAN]
 export const CROSS_SECTIONAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [PC_STABLE, FCI, DIRECT_LINGAM]
 export const TEMPORAL_DISCOVERY_METHODS: NonEmptyArray<MethodDefinition> = [

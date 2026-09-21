@@ -181,12 +181,13 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
     return () => window.removeEventListener('keydown', escape)
   }, [open, phone, onClose])
 
-  const navigate = (id: ChapterId) => { onNavigate(id); if (phone) onClose() }
+  // The rail is a sheet over the stage on every screen, so choosing a chapter puts it away.
+  const navigate = (id: ChapterId) => { onNavigate(id); onClose() }
   const entries = new Map(chapters.map(chapter => [chapter.id, chapter]))
   return <>
     {phone && !visible && <div aria-hidden className="absolute inset-y-0 left-0 z-(--z-overlay) w-3 touch-none" {...slide.handlers('edge')} />}
     {phone && visible && <div aria-hidden className="dashboard-scrim" onClick={onClose} {...panelHandlers} />}
-    <aside ref={column} className="dashboard-sidebar band-texture" data-open={visible} inert={phone && !visible ? true : undefined}
+    <div ref={column} className="dashboard-sidebar band-texture" data-open={visible} inert={phone && !visible ? true : undefined}
       style={drag === null ? undefined : { transform: 'translateX(' + drag.offset + 'px)', transition: 'none' }}
       onClickCapture={event => { slide.clickGuard(event) }} {...panelHandlers}>
       <div className="dashboard-brand">
@@ -229,6 +230,6 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
         </button>
         {onExport !== null && <button type="button" className="dashboard-nav-label dashboard-nav-close" aria-label="Export project" title="Export project" onClick={onExport}><Icon name="download" size={18} /></button>}
       </div>}
-    </aside>
+    </div>
   </>
 }

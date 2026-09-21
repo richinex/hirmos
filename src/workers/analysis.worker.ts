@@ -27,6 +27,7 @@ import {
 import { assertNever } from '@/domain/dop'
 import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
 import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
+import { parseInterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { parsePandasResamplingEvidence } from '@/domain/resampling'
@@ -353,6 +354,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'negativeBinomialIngarch', rows: command.rows, columns: command.columns, outcome: command.outcome, link: command.link, regressors: command.regressors, pastObservationLags: command.pastObservationLags, pastMeanLags: command.pastMeanLags, externalRegressors: command.externalRegressors, horizon: command.horizon, baselineRegressors: command.baselineRegressors, interventionRegressor: command.interventionRegressor, controlValue: command.controlValue, treatmentValue: command.treatmentValue, schedule: command.schedule }
     case 'count-series-intervention-scan':
       return { kind: 'countSeriesInterventionScan', rows: command.rows, columns: command.columns, outcome: command.outcome, link: command.link, pastObservationLags: command.pastObservationLags, pastMeanLags: command.pastMeanLags, candidateReferencePoints: command.candidateReferencePoints, delta: command.delta }
+    case 'interrupted-series':
+      return { kind: 'interruptedSeries', rows: command.rows, columns: command.columns, outcome: command.outcome, model: command.model, interventionRow: command.interventionRow, lag: command.lag, impact: command.impact, seasonal: command.seasonal, ljungBoxLags: command.ljungBoxLags }
     case 'causal-effects-total':
       return { kind: 'causalEffectsTotal', rows: command.rows, columns: command.columns, statLag: command.statLag, graph: command.graph, x: command.x, y: command.y, hidden: command.hidden, estimator: command.estimator, interventions: command.interventions, uncertainty: command.uncertainty }
     case 'causal-impact':
@@ -732,6 +735,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parseCountSeriesInterventionScanEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'count-series-intervention-scan-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'interrupted-series': {
+        const result = parseInterruptedSeriesEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'interrupted-series-succeeded', request: command.request, result: result.value })
         return
       }
       case 'causal-effects-total': {

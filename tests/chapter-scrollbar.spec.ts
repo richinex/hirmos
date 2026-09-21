@@ -45,6 +45,8 @@ test('chapter scrollbar follows scrolling without shifting navigation', async ({
   const hidden = 'rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)'
   await expect(nav).toHaveCSS('scrollbar-color', hidden)
   expect(await nav.evaluate(element => element.scrollHeight > element.clientHeight)).toBe(true)
+  // The rail slides open; measure once its width has settled.
+  await expect.poll(async () => { const first = await nav.evaluate(element => element.clientWidth); await page.waitForTimeout(200); return first === await nav.evaluate(element => element.clientWidth) }).toBe(true)
   const before = await nav.evaluate(element => ({ width: element.clientWidth, left: element.getBoundingClientRect().left }))
   await nav.evaluate(element => { element.scrollTop = 100 })
   await expect(nav).toHaveAttribute('data-scrolling', 'true')

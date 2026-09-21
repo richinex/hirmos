@@ -21,7 +21,8 @@ test('temporal structure survives chapter navigation and keeps the fitted settin
   await chapter(page, /DAG workspace/)
   await chapter(page, /Data studio/)
   await expect(page.getByRole('radio', { name: 'Regular time series' })).toBeChecked()
-  await expect(page.getByRole('button', { name: 'Create prepared dataset version' })).toHaveCount(0)
+  // The saved recipe keeps its button, disabled until a setting changes.
+  await expect(page.getByRole('button', { name: 'Create prepared dataset version' })).toBeDisabled()
   await expect(page.getByRole('radio', { name: /Breaks/ })).toBeChecked()
   await page.getByRole('radio', { name: /Breaks/ }).check()
   await expect(page.getByRole('spinbutton', { name: 'Min segment' })).toHaveValue('7')

@@ -17,7 +17,7 @@ test('build the company-wide AI adoption example bundle', async ({ page }) => {
   await choose(page, 'Time column', 'month')
   for (const column of ['ai_active', 'legacy_bugs_per_kloc', 'bugs_per_kloc']) await page.getByRole('checkbox', { name: column, exact: true }).check()
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByText(/Prepared time series/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^Time series, / })).toBeVisible({ timeout: 120_000 })
 
   await createDag(page, 'AI rollout and code quality')
   await addArrow(page, 'ai_active', 'bugs_per_kloc', 'The rollout changed how product code is written from the switch-on month.')

@@ -8,7 +8,7 @@ import { TapNote, Tooltip } from '@/components/ui/Tooltip'
 import { button, caption, chromeAction, label, literal, num } from '@/components/ui/recipes'
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
-import { blockLabel, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineNode, type RowTest } from '@/domain/pipeline'
+import { blockLabel, describeCalendarWindow, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineNode, type RowTest } from '@/domain/pipeline'
 import type { SqlPreparationInput } from '@/domain/sourceInputs'
 import { type PipelineResume, type SelectedSource } from '@/domain/workflow'
 import {
@@ -81,6 +81,7 @@ const summarise = (block: PipelineBlock): string => {
     case 'filter-rows': return block.conditions.length === 0 ? 'every row' : block.conditions.map((c) => `${c.column} ${testWord(c.test)}${'value' in c ? ` ${c.value}` : ''}`).join(block.match === 'all' ? ' and ' : ' or ')
     case 'select-columns': return block.columns.length === 0 ? 'every column' : `${block.mode} ${block.columns.join(', ')}`
     case 'derive-columns': return block.columns.length === 0 ? 'no new columns yet' : block.columns.map((c) => c.name || '?').join(', ')
+    case 'calendar-events': return block.column === '' ? 'choose the date column' : `${block.name || '?'}: ${describeCalendarWindow(block.window)} over ${block.column}`
     case 'join': return `${block.how}${block.keys.length === 0 ? '' : ` on ${block.keys.map((k) => k.left === k.right ? k.left : `${k.left} = ${k.right}`).join(', ')}`}`
     case 'union': return `by ${block.by}${block.distinct ? ', distinct' : ''}`
     case 'aggregate': return `${block.groupBy.length === 0 ? 'all rows' : `by ${block.groupBy.join(', ')}`}, ${block.measures.map((m) => m.as || m.function).join(', ') || 'no measures yet'}`

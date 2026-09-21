@@ -61,6 +61,10 @@ pub struct PoissonGlm {
     pub pvalues: Vec<f64>,
     /// `fittedvalues`, which for a GLM is the mean rather than the linear predictor.
     pub fitted: Vec<f64>,
+    /// `resid_deviance`: the signed square root of each observation's deviance.
+    pub resid_deviance: Vec<f64>,
+    /// `resid_pearson`: the residual over the square root of the variance function.
+    pub resid_pearson: Vec<f64>,
     pub deviance: f64,
     pub df_resid: f64,
     pub scale: f64,
@@ -68,46 +72,90 @@ pub struct PoissonGlm {
     pub iterations: usize,
 }
 
-/// Poisson deviance, with `endog / mu` clipped away from zero as statsmodels' `_clean` does.
+/// `GLM.fit(scale=...)`: the Poisson default of 1, or Pearson's chi-square over the residual
+/// degrees of freedom (`scale="X2"`), which is the quasi-Poisson dispersion R reports.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Dispersion {
+    Fixed,
+    Pearson,
+}
+
+/// Each observation's deviance, `_resid_dev`, with `endog / mu` clipped away from zero as
+/// statsmodels' `_clean` does.
+fn poisson_unit_deviance(y: f64, mu: f64) -> f64 {
+    let ratio = (y / mu).max(FLOAT_EPS);
+    2.0 * (y * ratio.ln() - (y - mu))
+}
+
 fn poisson_deviance(y: &[f64], mu: &[f64]) -> f64 {
-    y.iter()
-        .zip(mu)
-        .map(|(&yi, &m)| {
-            let ratio = (yi / m).max(FLOAT_EPS);
-            2.0 * (yi * ratio.ln() - (yi - m))
-        })
-        .sum()
+    y.iter().zip(mu).map(|(&yi, &m)| poisson_unit_deviance(yi, m)).sum()
+}
+
+/// `_estimate_x2_scale`: squared residuals over the variance function, over `df_resid`.
+fn pearson_scale(y: &[f64], mu: &[f64], df_resid: f64) -> f64 {
+    y.iter().zip(mu).map(|(&yi, &m)| (yi - m) * (yi - m) / m).sum::<f64>() / df_resid
 }
 
 /// `sm.GLM(y, x, family=sm.families.Poisson()).fit()`.
 pub fn poisson_glm(y: &[f64], x: &DMatrix<f64>) -> PoissonGlm {
+    poisson_glm_with(y, x, None, Dispersion::Fixed)
+}
+
+/// `sm.GLM(y, x, family=sm.families.Poisson(), offset=offset).fit(scale=...)`: the IRLS fit
+/// with an offset carried in the linear predictor at coefficient one, and the dispersion
+/// estimated as asked.
+pub fn poisson_glm_with(
+    y: &[f64],
+    x: &DMatrix<f64>,
+    offset: Option<&[f64]>,
+    dispersion: Dispersion,
+) -> PoissonGlm {
     let n = y.len();
+    let k = x.ncols();
+    let df_resid = (n - k) as f64;
+    let offset: Vec<f64> = match offset {
+        Some(values) => {
+            assert_eq!(values.len(), n, "offset is not the same length as endog");
+            values.to_vec()
+        }
+        None => vec![0.0; n],
+    };
+    let estimate_scale = |mu: &[f64]| match dispersion {
+        Dispersion::Fixed => 1.0,
+        Dispersion::Pearson => pearson_scale(y, mu, df_resid),
+    };
     let mean = y.iter().sum::<f64>() / n as f64;
-    // starting_mu is (y + ybar) / 2.
+    // starting_mu is (y + ybar) / 2, and the first linear predictor is its link, without the offset.
     let mut mu: Vec<f64> = y.iter().map(|v| (v + mean) / 2.0).collect();
     let mut lin_pred: Vec<f64> = mu.iter().map(|m| m.ln()).collect();
-    let mut dev = poisson_deviance(y, &mu);
+    let mut scale = estimate_scale(&mu);
+    // The deviance history is kept scaled by the current dispersion, as `_update_history` records it.
+    let mut dev = poisson_deviance(y, &mu) / scale;
 
     let (atol, maxiter) = (1e-8, 100);
     let mut converged = false;
     let mut iterations = 0;
     let mut weights = vec![0.0; n];
     let mut wlsendog = DVector::<f64>::zeros(n);
-    let mut params = DVector::<f64>::zeros(x.ncols());
+    let mut params = DVector::<f64>::zeros(k);
 
     for it in 0..maxiter {
         iterations = it + 1;
-        // For the log link the IRLS weight is 1 / (g'(mu)^2 Var(mu)) = mu.
+        // For the log link the IRLS weight is 1 / (g'(mu)^2 Var(mu)) = mu, and the working
+        // response is taken net of the offset.
         for i in 0..n {
             weights[i] = mu[i];
-            wlsendog[i] = lin_pred[i] + (y[i] - mu[i]) / mu[i];
+            wlsendog[i] = lin_pred[i] + (y[i] - mu[i]) / mu[i] - offset[i];
         }
         params = wls_lstsq(x, &wlsendog, &weights);
         for i in 0..n {
-            lin_pred[i] = (0..x.ncols()).map(|j| x[(i, j)] * params[j]).sum();
+            lin_pred[i] = (0..k).map(|j| x[(i, j)] * params[j]).sum::<f64>() + offset[i];
             mu[i] = lin_pred[i].exp();
         }
-        let new_dev = poisson_deviance(y, &mu);
+        // `_update_history` records the new deviance under the scale still in force; the scale is
+        // re-estimated from the new mean only afterwards.
+        let new_dev = poisson_deviance(y, &mu) / scale;
+        scale = estimate_scale(&mu);
         converged = (new_dev - dev).abs() <= atol;
         dev = new_dev;
         if converged {
@@ -117,23 +165,29 @@ pub fn poisson_glm(y: &[f64], x: &DMatrix<f64>) -> PoissonGlm {
 
     // statsmodels refits the final weighted problem to get the covariance.
     let (_, xtwx_inv) = wls_pinv(x, &wlsendog, &weights);
-    let scale = 1.0; // Poisson carries no dispersion parameter.
-    let k = x.ncols();
     let bse: Vec<f64> = (0..k).map(|i| (scale * xtwx_inv[(i, i)]).sqrt()).collect();
     let tvalues: Vec<f64> = (0..k).map(|i| params[i] / bse[i]).collect();
     let pvalues = tvalues
         .iter()
         .map(|t| 2.0 * (1.0 - norm_cdf(t.abs())))
         .collect();
+    let resid_deviance = y
+        .iter()
+        .zip(&mu)
+        .map(|(&yi, &m)| (yi - m).signum() * poisson_unit_deviance(yi, m).max(0.0).sqrt())
+        .collect();
+    let resid_pearson = y.iter().zip(&mu).map(|(&yi, &m)| (yi - m) / m.sqrt()).collect();
 
     PoissonGlm {
         params: params.iter().copied().collect(),
         bse,
         tvalues,
         pvalues,
+        deviance: poisson_deviance(y, &mu),
         fitted: mu,
-        deviance: dev,
-        df_resid: (n - k) as f64,
+        resid_deviance,
+        resid_pearson,
+        df_resid,
         scale,
         converged,
         iterations,

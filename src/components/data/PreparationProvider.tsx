@@ -39,17 +39,24 @@ export function createPreparationSession() {
 }
 const Context = createContext<ReturnType<typeof createPreparationSession> | null>(null)
 
-function ProjectPreparation({ children }: { readonly children: ReactNode }) {
-  const [session] = useState(createPreparationSession)
+type ProjectSession = { readonly project: string; readonly session: ReturnType<typeof createPreparationSession> }
+
+/**
+ * One preparation session per project. The project id and its session are held as one value, so a
+ * session can never belong to another project; when the project changes the pair is replaced during
+ * render, the old session is disposed by the effect's cleanup, and the children stay mounted, so state
+ * held above the chapters (a notice, the open rail) survives opening a project.
+ */
+export function PreparationProvider({ children }: { readonly children: ReactNode }) {
+  const project = useWorkflow(state => 'project' in state.workflow ? state.workflow.project.id : '')
+  const [current, setCurrent] = useState<ProjectSession>(() => ({ project, session: createPreparationSession() }))
+  // A state change during render makes React render again with the new pair before anything commits.
+  if (current.project !== project) setCurrent({ project, session: createPreparationSession() })
+  const session = current.session
   const discard = useWorkflow(state => state.workflow.kind === 'awaiting-data')
   useLayoutEffect(() => { session.activate(); return session.dispose }, [session])
   useLayoutEffect(() => { if (discard) session.clear() }, [session, discard])
   return <Context.Provider value={session}>{children}</Context.Provider>
-}
-
-export function PreparationProvider({ children }: { readonly children: ReactNode }) {
-  const project = useWorkflow(state => 'project' in state.workflow ? state.workflow.project.id : '')
-  return <ProjectPreparation key={project}>{children}</ProjectPreparation>
 }
 
 export function usePreparationSession() {

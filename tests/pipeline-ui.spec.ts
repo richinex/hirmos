@@ -209,6 +209,37 @@ test.describe('pipeline canvas', () => {
     await expect(page.locator('.react-flow__edge')).toHaveCount(0)
   })
 
+  test('marks the year-end shutdown from a calendar-events block and picks a custom window on the calendar', async ({ page }) => {
+    await openEditor(page)
+    const weeks = { name: 'weeks.csv', mimeType: 'text/csv', buffer: Buffer.from('week_start,merged\n2023-12-18,40\n2023-12-25,3\n2024-01-01,12\n2024-01-08,38\n') }
+    await giveFile(page, 'input-1', weeks)
+    await expect(block(page, 'input-1')).toContainText('4 rows, 2 columns', { timeout: 30_000 })
+    const calendar = await addBlock(page, 'Calendar events', 'calendar-events')
+    await wire(page, 'input-1', calendar)
+    await expect(block(page, calendar)).toContainText('choose the date column')
+
+    await block(page, calendar).click()
+    await pick(page, 'Date column', 'week_start')
+    await expect(block(page, calendar)).toContainText('holiday_share: year-end shutdown, 24 Dec to 2 Jan over week_start')
+    await expect(block(page, calendar)).toContainText('4 rows, 3 columns')
+    const table = page.getByRole('region', { name: 'Calendar events' }).getByRole('table')
+    await expect(table).toContainText('0.1429')
+    await expect(table).toContainText('0.2857')
+
+    await page.getByRole('radio', { name: 'Custom window' }).click({ force: true })
+    await expect(page.getByLabel('Calendar column name')).toHaveValue('calendar_share')
+    const window = page.getByRole('button', { name: 'Window of the year' })
+    await expect(window).toHaveText(/24 Dec to 2 Jan/)
+    await window.click()
+    // The calendar opens on the window's December and the January after; the picked days are stored without a year.
+    await expect(page.getByRole('dialog')).toContainText('December')
+    await page.getByRole('dialog').getByRole('button', { name: /^Wednesday, January 1st, 2025/ }).click()
+    await page.getByRole('dialog').getByRole('button', { name: /^Friday, January 3rd, 2025/ }).click()
+    await expect(window).toHaveText(/1 Jan to 3 Jan/)
+    await expect(block(page, calendar)).toContainText('calendar_share: 1 Jan to 3 Jan over week_start')
+    await expect(page.getByRole('region', { name: 'Calendar events' }).getByRole('table')).toContainText('0.4286')
+  })
+
   test('runs a script block in Pyodide, shows its errors by line, and uses its table as the source', async ({ page }) => {
     test.setTimeout(240_000)
     await startPipeline(page)
@@ -417,8 +448,8 @@ test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pa
   // The palette is one row of glyphs on a phone, every block kind in view, never a stack.
   const palette = page.getByRole('toolbar', { name: 'Add a block' })
   expect(await palette.evaluate((el) => el.clientHeight)).toBeLessThan(60)
-  const chips = await palette.getByRole('button').evaluateAll((buttons) => buttons.map((button) => { const box = button.getBoundingClientRect(); return { name: button.getAttribute('aria-label'), inView: box.width > 0 && box.right <= document.documentElement.clientWidth } }))
-  expect(chips.map((chip) => chip.name)).toEqual(['Input file', 'Filter rows', 'Sort and limit', 'Select columns', 'Derive columns', 'Join', 'Union', 'Group and aggregate', 'Script'])
+  const chips = await palette.locator('button[draggable]').evaluateAll((buttons) => buttons.map((button) => { const box = button.getBoundingClientRect(); return { name: button.getAttribute('aria-label'), inView: box.width > 0 && box.right <= document.documentElement.clientWidth } }))
+  expect(chips.map((chip) => chip.name)).toEqual(['Input file', 'Filter rows', 'Sort and limit', 'Select columns', 'Derive columns', 'Calendar events', 'Join', 'Union', 'Group and aggregate', 'Script'])
   expect(chips.every((chip) => chip.inView)).toBe(true)
 
   // The canvas takes the stage's height, so its controls sit along the foot of the screen, not mid-way.

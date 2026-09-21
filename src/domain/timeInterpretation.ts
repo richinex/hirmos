@@ -19,6 +19,25 @@ export const timePreviewSchema = z.object({
 }).strict()
 export type TimePreview = z.infer<typeof timePreviewSchema>
 
+/** The readings that yield a calendar date; a numeric index has none. */
+export type CalendarTimeInterpretation = Exclude<TimeInterpretation, { kind: 'source-type' | 'ordinal' }>
+
+/**
+ * DuckDB owns calendar arithmetic. The SQL for one column read as a timestamp: a cast, a format,
+ * or an ISO week whose round trip rejects overflowing week numbers. Invalid text becomes NULL.
+ */
+export function timestampSql(column: string, interpretation: CalendarTimeInterpretation, sqlString: (value: string) => string): string {
+  switch (interpretation.kind) {
+    case 'timestamp': return `TRY_CAST(${column} AS TIMESTAMPTZ)`
+    case 'date-format': return `try_strptime(CAST(${column} AS VARCHAR), ${sqlString(interpretation.format)})`
+    case 'iso-week': {
+      const text = `CAST(${column} AS VARCHAR)`
+      const parsed = `try_strptime(${text} || '-1', '%G-W%V-%u')`
+      return `CASE WHEN strftime(${parsed}, '%G-W%V') = ${text} THEN ${parsed} ELSE NULL END`
+    }
+  }
+}
+
 export const TIME_INTERPRETATIONS: readonly { readonly label: string; readonly value: string; readonly interpretation: TimeInterpretation }[] = [
   { label: 'Source type', value: 'source-type', interpretation: { kind: 'source-type' } },
   { label: 'ISO date or timestamp', value: 'timestamp', interpretation: { kind: 'timestamp' } },
@@ -28,3 +47,7 @@ export const TIME_INTERPRETATIONS: readonly { readonly label: string; readonly v
   { label: 'Year-month-day (2024-12-31)', value: '%Y-%m-%d', interpretation: { kind: 'date-format', format: '%Y-%m-%d' } },
   { label: 'Numeric time index', value: 'ordinal', interpretation: { kind: 'ordinal' } },
 ]
+
+/** The same list where only a calendar reading makes sense. */
+export const CALENDAR_TIME_INTERPRETATIONS: readonly { readonly label: string; readonly value: string; readonly interpretation: CalendarTimeInterpretation }[] =
+  TIME_INTERPRETATIONS.flatMap((entry) => entry.interpretation.kind === 'source-type' || entry.interpretation.kind === 'ordinal' ? [] : [{ ...entry, interpretation: entry.interpretation }])

@@ -30,12 +30,13 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await choose(page.getByLabel('Time column'), 'rownames')
   for (const column of ['DriversKilled', 'kms', 'PetrolPrice', 'law']) await page.getByRole('checkbox', { name: column, exact: true }).check()
   await page.getByRole('button', { name: /Create prepared/ }).click()
-  await expect(page.getByText(/Prepared time series/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^Time series, / })).toBeVisible({ timeout: 30_000 })
 
   // diagnostics: the section opens on multicollinearity, so choose the stationarity tests first
   await page.getByRole('radio', { name: /Stationarity/ }).click()
+  await page.getByRole('button', { name: 'Select all stationarity variables' }).click()
   await page.getByRole('button', { name: /Run stationarity/ }).click()
-  await expect(page.getByText(/Stationarity tests · \d+ variables · 192 rows/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByRole('region', { name: 'Stationarity results' })).toContainText('192 rows', { timeout: 120_000 })
   await page.getByRole('radio', { name: /Breaks/ }).click()
   await page.getByRole('button', { name: /Analyse temporal structure/ }).click()
   await expect(page.getByText(/4 series checked/)).toBeVisible({ timeout: 120_000 })
@@ -97,21 +98,34 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await page.getByRole('spinbutton', { name: 'Warmup' }).fill('200')
   await page.getByRole('spinbutton', { name: 'Draws' }).fill('400')
   await page.getByRole('button', { name: /Run Bayesian/ }).click()
-  await expect(page.getByText('Runs · 1')).toBeVisible({ timeout: 180_000 })
+  await expect(page.getByText('Runs (1)', { exact: true })).toBeVisible({ timeout: 180_000 })
   // The discrete Bayesian network do-query is refused for this study, so the example records two estimates.
   await page.getByRole('radio', { name: /Adjusted linear regression/ }).click()
   await page.getByRole('button', { name: /Run adjusted linear/ }).click()
-  await expect(page.getByText('Runs · 2')).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible({ timeout: 120_000 })
 
   // one probe, one counterfactual
   await chapter(page, /Sensitivity/)
+  // The probes refit the linear back-door estimate, so that run is the one to choose.
+  const runPicker = page.locator('label').filter({ hasText: 'Estimation run' }).getByRole('combobox')
+  await runPicker.click()
+  await page.getByRole('listbox').getByRole('option', { name: /Adjusted linear regression/ }).click()
   await page.getByRole('button', { name: /^Run (refuters|perturbation)/ }).click()
-  await expect(page.getByText('Probes · 1')).toBeVisible({ timeout: 180_000 })
+  await expect(page.getByText('Probes (1)', { exact: true })).toBeVisible({ timeout: 180_000 })
   await chapter(page, /Counterfactual/)
   await page.getByLabel(/First intervention/).fill('10000')
   await page.getByLabel(/Second intervention/).fill('20000')
   await page.getByRole('button', { name: /Run counterfactual/ }).click()
-  await expect(page.getByText(/Counterfactuals · 1|Runs · 1/)).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText('Runs (1)', { exact: true })).toBeVisible({ timeout: 120_000 })
+
+  // the law as an interrupted series: a count with a level change from row 170, February 1983
+  await chapter(page, /Time-series analysis/)
+  await page.getByRole('radio', { name: 'Interrupted series', exact: true }).click()
+  await choose(page.getByRole('combobox', { name: 'Series', exact: true }), 'DriversKilled')
+  await page.getByRole('radio', { name: 'Count', exact: true }).click({ force: true })
+  await page.getByRole('spinbutton', { name: 'Intervention row' }).fill('170')
+  await page.getByRole('button', { name: 'Fit interrupted series', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Time-series result' }).filter({ visible: true })).toContainText('Interrupted series for DriversKilled, level change', { timeout: 60_000 })
 
   // export with the source file inside
   const example = shippedExampleById(EXAMPLE_PROJECT_ID)

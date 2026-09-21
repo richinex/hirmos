@@ -29,7 +29,7 @@ function Relationships({ departures, startRow, axis }: { readonly departures: re
   </>
 }
 
-export function LongRunCharts({ run }: { readonly run: Exclude<TimeSeriesRun, {kind: 'ardl-model'}> }) {
+export function LongRunCharts({ run }: { readonly run: Extract<TimeSeriesRun, { kind: 'ardl' | 'vecm' }> }) {
   if (run.plotTime === undefined || run.evidence.longRun === undefined) return null
   switch (run.kind) {
     case 'ardl': {

@@ -1,4 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Icon } from '@/components/Icon'
+import { iconControl } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 
 type Overflow = 'none' | 'right' | 'both' | 'left'
@@ -34,7 +36,21 @@ export function BlockToolbar({ children }: { readonly children: ReactNode }) {
     </div>
     {(['left', 'right'] as const).map((side) => {
       const visible = overflow === 'both' || overflow === side
-      return <div key={side} aria-hidden data-overflow-edge={side} className={cn('pointer-events-none absolute inset-y-0 w-6 transition-opacity duration-(--motion-fast) motion-reduce:transition-none', side === 'left' ? 'left-0 bg-linear-to-r from-raised to-transparent' : 'right-0 bg-linear-to-l from-raised to-transparent', visible ? 'opacity-100' : 'invisible opacity-0')} />
+      const page = () => viewport.current?.scrollBy({ left: (side === 'right' ? 1 : -1) * viewport.current.clientWidth * 0.7, behavior: 'smooth' })
+      return (
+        <div key={side} data-overflow-edge={side} className={cn('absolute inset-y-0 flex w-14 items-center transition-opacity duration-(--motion-fast) motion-reduce:transition-none', side === 'left' ? 'left-0 justify-start bg-linear-to-r from-raised from-40% to-transparent' : 'right-0 justify-end bg-linear-to-l from-raised from-40% to-transparent', visible ? 'opacity-100' : 'invisible opacity-0')}>
+          <button
+            type="button"
+            className={iconControl('quiet', 'mx-1 h-7 w-7 bg-panel text-muted lift hover:text-ink')}
+            aria-label={side === 'right' ? 'Scroll to more blocks' : 'Scroll back'}
+            title={side === 'right' ? 'More blocks to the right' : 'Blocks to the left'}
+            tabIndex={-1}
+            onClick={page}
+          >
+            <Icon name={side === 'right' ? 'chevron_right' : 'chevron_left'} size={18} />
+          </button>
+        </div>
+      )
     })}
   </div>
 }

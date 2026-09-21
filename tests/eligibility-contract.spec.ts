@@ -61,8 +61,7 @@ test('eligibility preserves every pre-run evaluation and does not overstate disc
 test('estimator chips use the prepared treatment and outcome before a run', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Example workflow runs once')
   await page.goto('/app')
-  const example = page.getByRole('row', { name: /Seat-belt law and road deaths/ })
-  await example.getByRole('button', { name: 'Open' }).click()
+  await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible({ timeout: 30_000 })
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByRole('button', { name: 'Checking treatment and outcome…' })).toBeHidden({ timeout: 30_000 })

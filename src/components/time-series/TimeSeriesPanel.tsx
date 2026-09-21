@@ -12,6 +12,7 @@ import { CountSeriesCard } from './CountSeriesCard'
 import { TimeSeriesRunResult } from './TimeSeriesRunResult'
 import { TimeSeriesHistory } from './TimeSeriesHistory'
 import { ArdlModelPanel } from './ArdlModelPanel'
+import { InterruptedSeriesPanel } from './InterruptedSeriesPanel'
 import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
@@ -147,8 +148,9 @@ export function TimeSeriesPanel(props: Props) {
   const [busy, setBusy] = useState(false)
   const report = props.onActivity
   const onActivity = useCallback((activity: RunActivity | null) => { setBusy(activity !== null); report?.(activity) }, [report])
-  const selector = <SegmentedControl variant="line" size="sm" ariaLabel="Time-series analysis type" value={analysis} onChange={setAnalysis} disabled={busy} options={[{ value: 'count', label: 'Count models' }, { value: 'ardl', label: 'ARDL' }, { value: 'vecm', label: 'VECM' }]} />
+  const selector = <SegmentedControl variant="line" size="sm" ariaLabel="Time-series analysis type" value={analysis} onChange={setAnalysis} disabled={busy} options={[{ value: 'count', label: 'Count models' }, { value: 'ardl', label: 'ARDL' }, { value: 'vecm', label: 'VECM' }, { value: 'interrupted', label: 'Interrupted series' }]} />
   if (analysis === 'ardl') return <ArdlModelPanel {...props} selector={selector} onActivity={onActivity} />
+  if (analysis === 'interrupted') return <InterruptedSeriesPanel {...props} selector={selector} onActivity={onActivity} />
   if (analysis === 'vecm') return <LongRunModel key={analysis} {...props} model={analysis} selector={selector} onActivity={onActivity} />
   return <WorkbenchLayout id="time-series-count" bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Count-model runs (${props.counts.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={props.counts} onDelete={(entry) => props.onDeleteCount(entry.id)} /> }} inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={COUNT_SERIES_DIAGNOSTIC_METHODS[0]} prepared={props.prepared} source={props.source.name} /> }} stage={<section className="@container/panel flex flex-col gap-5">
     <TimeSeriesHeading />

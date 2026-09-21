@@ -1,6 +1,6 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { inspectCalendar } from './calendar'
-import type { TimeInterpretation, TimePreview } from '@/domain/timeInterpretation'
+import { timestampSql, type TimeInterpretation, type TimePreview } from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
 import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
@@ -416,13 +416,9 @@ function timeExpression(column: string, numeric: boolean, interpretation: TimeIn
   switch (interpretation.kind) {
     case 'source-type': return timeExpression(column, numeric, { kind: numeric ? 'ordinal' : 'timestamp' })
     case 'ordinal': return { kind: 'ordinal', sql: `TRY_CAST(${column} AS DOUBLE)` }
-    case 'timestamp': return { kind: 'calendar', sql: `epoch_ms(TRY_CAST(${column} AS TIMESTAMPTZ))` }
-    case 'date-format': return { kind: 'calendar', sql: `epoch_ms(try_strptime(CAST(${column} AS VARCHAR), ${sqlString(interpretation.format)}))` }
-    case 'iso-week': {
-      const text = `CAST(${column} AS VARCHAR)`
-      const parsed = `try_strptime(${text} || '-1', '%G-W%V-%u')`
-      return { kind: 'calendar', sql: `CASE WHEN strftime(${parsed}, '%G-W%V') = ${text} THEN epoch_ms(${parsed}) ELSE NULL END` }
-    }
+    case 'timestamp':
+    case 'date-format':
+    case 'iso-week': return { kind: 'calendar', sql: `epoch_ms(${timestampSql(column, interpretation, sqlString)})` }
     default: return assertNever(interpretation)
   }
 }

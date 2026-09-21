@@ -5,6 +5,7 @@ import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence
 import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
+import { interruptedImpactSchema, interruptedModelSchema, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, parseInterruptedSeriesEvidence, type InterruptedImpact, type InterruptedModel, type InterruptedSeasonal, type InterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
@@ -632,6 +633,20 @@ export type AnalysisWorkerCommand =
       readonly delta: number
     }
   | {
+      readonly kind: 'interrupted-series'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly outcome: number
+      readonly model: InterruptedModel
+      readonly interventionRow: number
+      readonly lag: number
+      readonly impact: InterruptedImpact
+      readonly seasonal: InterruptedSeasonal
+      readonly ljungBoxLags: number
+    }
+  | {
       readonly kind: 'causal-effects-total'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1060,6 +1075,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'count-glm-succeeded'; readonly request: WorkerRequestId; readonly result: CountGlmEvidence }
   | { readonly kind: 'negative-binomial-ingarch-succeeded'; readonly request: WorkerRequestId; readonly result: NegativeBinomialIngarchEvidence }
   | { readonly kind: 'count-series-intervention-scan-succeeded'; readonly request: WorkerRequestId; readonly result: CountSeriesInterventionScanEvidence }
+  | { readonly kind: 'interrupted-series-succeeded'; readonly request: WorkerRequestId; readonly result: InterruptedSeriesEvidence }
   | { readonly kind: 'causal-effects-succeeded'; readonly request: WorkerRequestId; readonly result: CausalEffectsEvidence }
   | { readonly kind: 'causal-impact-succeeded'; readonly request: WorkerRequestId; readonly result: CausalImpactEvidence }
   | { readonly kind: 'linear-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: LinearRefutationEvidence }
@@ -1708,6 +1724,24 @@ const commandSchema = z.discriminatedUnion('kind', [
     delta: z.number().finite().min(0).max(1),
   }).strict(),
   z.object({
+    kind: z.literal('interrupted-series'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().positive().max(64),
+    outcome: z.number().int().nonnegative(),
+    model: interruptedModelSchema,
+    interventionRow: z.number().int().positive(),
+    lag: z.number().int().nonnegative(),
+    impact: interruptedImpactSchema,
+    seasonal: interruptedSeasonalSchema,
+    ljungBoxLags: z.number().int().positive().max(48),
+  }).strict().superRefine((value, context) => {
+    if (value.outcome >= value.columns || (value.model.kind === 'count' && value.model.exposure !== null && value.model.exposure >= value.columns)) context.addIssue({ code: 'custom', message: 'The interrupted series refers to a column outside the matrix.' })
+    if (value.interventionRow + value.lag >= value.rows) context.addIssue({ code: 'custom', message: 'The change must start inside the series.' })
+    if (value.impact.kind === 'temporaryLevel' && (value.impact.until <= value.interventionRow + value.lag || value.impact.until > value.rows)) context.addIssue({ code: 'custom', message: 'A temporary level change must end after it starts and within the series.' })
+  }),
+  z.object({
     kind: z.literal('causal-effects-total'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -2133,6 +2167,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('count-glm-succeeded'), request: requestSchema, result: countGlmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('negative-binomial-ingarch-succeeded'), request: requestSchema, result: negativeBinomialIngarchEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count-series-intervention-scan-succeeded'), request: requestSchema, result: countSeriesInterventionScanEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('interrupted-series-succeeded'), request: requestSchema, result: interruptedSeriesEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-effects-succeeded'), request: requestSchema, result: causalEffectsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-impact-succeeded'), request: requestSchema, result: causalImpactEvidenceSchema }).strict(),
   z.object({ kind: z.literal('linear-refutation-succeeded'), request: requestSchema, result: linearRefutationEvidenceSchema }).strict(),
@@ -2422,6 +2457,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'count-series-intervention-scan-succeeded') {
     const result = parseCountSeriesInterventionScanEvidence(parsed.data.result)
     return result.ok ? ok({ kind: 'count-series-intervention-scan-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'interrupted-series-succeeded') {
+    const result = parseInterruptedSeriesEvidence(parsed.data.result)
+    return result.ok ? ok({ kind: 'interrupted-series-succeeded', request: request.value, result: result.value }) : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'causal-effects-succeeded') {
     const result = parseCausalEffectsEvidence(parsed.data.result)

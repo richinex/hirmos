@@ -72,7 +72,9 @@ test('the standalone survival chapter renders in desktop and phone workbenches',
   await expect(page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Run survival analysis' })).toBeVisible()
   await expect(page.locator('main#stage')).toHaveCSS('display', 'flex')
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toHaveCSS('scrollbar-width', 'none')
+  // Idle scrollbars are thin and transparent everywhere; they show only while scrolling.
+  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toHaveCSS('scrollbar-width', 'thin')
+  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toHaveCSS('scrollbar-color', 'rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)')
 })
 
 test('does not expose an implementation error when a no-covariate example run is refused', async ({ page }, testInfo) => {
@@ -151,12 +153,12 @@ test('runs right-censored flexsurv on the exact breast-cancer package data', asy
   await createPreparedProject(page, 'flexsurv breast cancer', 'flexsurv_bc.csv', ['censrec', 'recyrs'])
 
   await chooseColumn(page, 'Duration', 'recyrs')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'censrec')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'censrec')
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('5')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
   await expect(page.getByRole('heading', { name: 'Weibull AFT' }).first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('686 observations · 299 events').first()).toBeVisible()
+  await expect(page.getByText(/686 observations\s+299 events/).first()).toBeVisible()
   await expect(page.getByText('Survival runs (1)')).toBeVisible()
 
   await page
@@ -175,7 +177,7 @@ test('runs start-stop and multi-state flexsurv on the exact bosms3 package data'
   await page.getByRole('radio', { name: 'Start–stop' }).click()
   await chooseColumn(page, 'Start time', 'Tstart')
   await chooseColumn(page, 'Stop time', 'Tstop')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'status')
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('12')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
   await expect(page.getByRole('heading', { name: 'Weibull PH' }).first()).toBeVisible({ timeout: 120_000 })
@@ -183,7 +185,7 @@ test('runs start-stop and multi-state flexsurv on the exact bosms3 package data'
   await page.getByRole('radio', { name: 'Multi-state' }).click()
   await chooseColumn(page, 'Start time', 'Tstart')
   await chooseColumn(page, 'Stop time', 'Tstop')
-  await chooseColumn(page, 'Event · 1 transition, 0 censored', 'status')
+  await chooseColumn(page, 'Event 1 transition, 0 censored', 'status')
   await chooseColumn(page, 'Origin state', 'from')
   await chooseColumn(page, 'Destination state', 'to')
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('12')
@@ -347,7 +349,7 @@ test('fits a penalised Weibull AFT as lifelines does on the kidney data', async 
 
   await page.getByRole('radio', { name: 'Penalised AFT' }).click()
   await chooseColumn(page, 'Duration', 'time')
-  await chooseColumn(page, 'Event · 1 observed, 0 censored', 'status')
+  await chooseColumn(page, 'Event 1 observed, 0 censored', 'status')
   for (const covariate of ['age', 'sex']) {
     await page.getByRole('checkbox', { name: covariate, exact: true }).check()
   }
@@ -389,9 +391,9 @@ test('converts the exact mstate wide illness-death data before fitting', async (
   const stateTwo = page.getByRole('group', { name: 'State 2' })
   const stateThree = page.getByRole('group', { name: 'State 3' })
   await chooseColumnWithin(page, stateTwo, 'Time reached or last followed', 'time2')
-  await chooseColumnWithin(page, stateTwo, 'Reached · 1 yes, 0 censored', 'status2')
+  await chooseColumnWithin(page, stateTwo, 'Reached 1 yes, 0 censored', 'status2')
   await chooseColumnWithin(page, stateThree, 'Time reached or last followed', 'time3')
-  await chooseColumnWithin(page, stateThree, 'Reached · 1 yes, 0 censored', 'status3')
+  await chooseColumnWithin(page, stateThree, 'Reached 1 yes, 0 censored', 'status3')
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('12')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
 
@@ -418,7 +420,7 @@ test('recovers the planted start-stop Weibull PH truth through the chapter', asy
   await page.getByRole('spinbutton', { name: 'Prediction horizon' }).fill('36')
   await page.getByRole('button', { name: 'Run survival analysis' }).click()
   await expect(page.getByRole('heading', { name: 'Weibull PH' }).first()).toBeVisible({ timeout: 120_000 })
-  await expect(page.getByText('455 intervals · 132 events').first()).toBeVisible()
+  await expect(page.getByText(/455 intervals\s+132 events/).first()).toBeVisible()
 
   const table = page.getByRole('region', { name: 'Fitted parameters' }).first()
   const cells = async (parameter: string) => (await table.getByRole('row', { name: new RegExp(`^${parameter}\\b`) }).first().innerText()).split('\t')

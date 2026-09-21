@@ -20,12 +20,13 @@ test('block toolbar reveals overflow without moving the canvas', async ({ page }
   const scroll = toolbar.locator('[data-block-scroll]')
   await expect(toolbar).toBeVisible()
   const top = (await page.getByTestId('block-output').boundingBox())!.y
-  await expect(toolbar.getByRole('button', { name: /Scroll blocks/ })).toHaveCount(0)
   const right = toolbar.locator('[data-overflow-edge="right"]')
   const left = toolbar.locator('[data-overflow-edge="left"]')
   await expect(right).toBeVisible()
-  await scroll.evaluate(e => e.scrollTo({ left: e.scrollWidth, behavior: 'instant' }))
+  // The arrow on the clipped edge pages the toolbar; the fade alone was too quiet a sign that more blocks lie beyond.
+  await right.getByRole('button', { name: 'Scroll to more blocks' }).click()
   await expect.poll(() => scroll.evaluate(e => e.scrollLeft)).toBeGreaterThan(0)
+  await scroll.evaluate(e => e.scrollTo({ left: e.scrollWidth, behavior: 'instant' }))
   await expect(left).toBeVisible()
   await expect(right).toBeHidden()
   expect((await page.getByTestId('block-output').boundingBox())!.y).toBe(top)

@@ -123,3 +123,59 @@ test('previews 128-bit sums and decimals as numbers, not as Arrow words', async 
   expect(preview.columns).toEqual(['year:BIGINT', 'total:HUGEINT', 'spent:DOUBLE', 'spent_exact:DECIMAL(38,2)'])
   expect(preview.rows).toEqual([['integer:1997', 'integer:22', 'number:3.75', 'number:3.75'], ['integer:1998', 'integer:234', 'number:9.99', 'number:9.99']])
 })
+
+// The calendar-events block against shares worked out by hand. Monday-start weeks around one year end
+// under the year-end preset: 18 Dec holds only the 24th (1/7), 25 Dec is inside throughout (1), 1 Jan
+// holds the 1st and 2nd (2/7), 8 Jan none. Then a month and a single day from the same dates, a window
+// that does not wrap the year (1 to 3 Jan), and a row without a date.
+test('marks the share of each row inside a calendar window', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'The DuckDB calendar test runs once')
+  await page.goto('/app')
+  const shares = await page.evaluate(async () => {
+    const sql = await import(new URL('/src/data/sqlPreparation.ts', window.location.href).href)
+    const pipeline = await import(new URL('/src/data/pipeline.ts', window.location.href).href)
+    const files = [new File(['week_start,year_week\n2023-12-18,2023-W51\n2023-12-25,2023-W52\n2024-01-01,2024-W01\n2024-01-08,2024-W02\n2024-12-30,2025-W01\n,\n'], 'weeks.csv', { type: 'text/csv' })]
+    const inputs = await sql.prepareSqlInputs(files)
+    if (!inputs.ok) throw new Error(`inputs: ${inputs.error.kind}`)
+    const alias = inputs.value[0].alias
+    const graph = {
+      nodes: [
+        { id: 'in', block: { kind: 'input', file: { kind: 'chosen', alias } }, position: { x: 0, y: 0 } },
+        { id: 'week', block: { kind: 'calendar-events', column: 'week_start', interpretation: { kind: 'timestamp' }, span: 'week', window: { kind: 'year-end' }, name: 'holiday_share' }, position: { x: 0, y: 1 } },
+        { id: 'month', block: { kind: 'calendar-events', column: 'week_start', interpretation: { kind: 'timestamp' }, span: 'month', window: { kind: 'year-end' }, name: 'month_share' }, position: { x: 0, y: 2 } },
+        { id: 'day', block: { kind: 'calendar-events', column: 'week_start', interpretation: { kind: 'timestamp' }, span: 'day', window: { kind: 'year-end' }, name: 'day_share' }, position: { x: 0, y: 3 } },
+        { id: 'newyear', block: { kind: 'calendar-events', column: 'week_start', interpretation: { kind: 'timestamp' }, span: 'week', window: { kind: 'custom', from: { day: 1, month: 1 }, to: { day: 3, month: 1 } }, name: 'new_year_share' }, position: { x: 0, y: 4 } },
+        // The ISO week label read directly, as Data studio reads it: the same shares as the date column.
+        { id: 'iso', block: { kind: 'calendar-events', column: 'year_week', interpretation: { kind: 'iso-week' }, span: 'week', window: { kind: 'year-end' }, name: 'iso_share' }, position: { x: 0, y: 5 } },
+        { id: 'out', block: { kind: 'output' }, position: { x: 0, y: 6 } },
+      ],
+      edges: [{ from: 'in', to: 'week', port: 0 }, { from: 'week', to: 'month', port: 0 }, { from: 'month', to: 'day', port: 0 }, { from: 'day', to: 'newyear', port: 0 }, { from: 'newyear', to: 'iso', port: 0 }, { from: 'iso', to: 'out', port: 0 }],
+    }
+    const session = await pipeline.openPipeline(inputs.value)
+    if (!session.ok) throw new Error(`open: ${session.error.kind}`)
+    try {
+      const ran = await pipeline.runPipeline(session.value, graph)
+      if (!ran.ok) throw new Error(`run: ${pipeline.describePipelineRunProblem(ran.error, (blockId: string) => blockId)}`)
+      const outcome = ran.value.outcomes.get('iso')
+      if (outcome?.kind !== 'ran') throw new Error(`calendar block ${outcome?.kind}: ${outcome?.kind === 'failed' ? outcome.detail : ''}`)
+      const shown = await pipeline.previewBlock(session.value, ran.value.views.get('iso'), 'iso', outcome)
+      if (!shown.ok) throw new Error(`preview: ${shown.error.kind}`)
+      return {
+        columns: shown.value.columns.map((column: { name: string; type: string }) => `${column.name}:${column.type}`),
+        rows: shown.value.rows.map((row: readonly { kind: string; value?: unknown }[]) => row.map((cell) => cell.kind === 'null' ? null : cell.kind === 'number' ? Math.round(Number(cell.value) * 1e6) / 1e6 : cell.value)),
+      }
+    } finally {
+      await pipeline.closePipeline(session.value)
+    }
+  })
+  expect(shares.columns).toEqual(['week_start:DATE', 'year_week:VARCHAR', 'holiday_share:DOUBLE', 'month_share:DOUBLE', 'day_share:DOUBLE', 'new_year_share:DOUBLE', 'iso_share:DOUBLE'])
+  const r = (n: number, d: number) => Math.round((n / d) * 1e6) / 1e6
+  expect(shares.rows).toEqual([
+    ['2023-12-18T00:00:00.000Z', '2023-W51', r(1, 7), r(8 + 2, 31), 0, 0, r(1, 7)],
+    ['2023-12-25T00:00:00.000Z', '2023-W52', 1, r(7 + 2, 31), 1, 0, 1],
+    ['2024-01-01T00:00:00.000Z', '2024-W01', r(2, 7), r(2, 31), 1, r(3, 7), r(2, 7)],
+    ['2024-01-08T00:00:00.000Z', '2024-W02', 0, 0, 0, 0, 0],
+    ['2024-12-30T00:00:00.000Z', '2025-W01', r(4, 7), r(2 + 2, 31), 1, r(3, 7), r(4, 7)],
+    [null, null, null, null, null, null, null],
+  ])
+})

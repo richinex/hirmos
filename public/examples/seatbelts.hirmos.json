@@ -1,7 +1,7 @@
 {
   "kind": "hirmos-bundle",
   "version": 1,
-  "exportedAt": "2026-09-09T14:37:06.298Z",
+  "exportedAt": "2026-09-21T14:29:57.778Z",
   "application": {
     "name": "hirmos",
     "build": "0.1.0"
@@ -9,14 +9,14 @@
   "project": {
     "kind": "hirmos-project",
     "version": 1,
-    "savedAt": "2026-09-09T14:37:06.293Z",
+    "savedAt": "2026-09-21T14:29:57.776Z",
     "origin": {
       "kind": "user"
     },
     "project": {
       "id": "d95e0c7b-44ec-4dee-a929-784cfd923eeb",
       "name": "Seat-belt law and road deaths",
-      "createdAt": "2026-09-09T14:36:55.085Z"
+      "createdAt": "2026-09-21T14:29:44.917Z"
     },
     "source": {
       "name": "Seatbelts.csv",
@@ -29,7 +29,7 @@
       }
     },
     "profile": {
-      "id": "duckdb-wasm:1.30.0:61f8faf2aba26fc848054e34e1abedbb292e01aa535cb2d3a9ecce8570b52567",
+      "id": "duckdb-wasm:1.33.1-dev57.0:61f8faf2aba26fc848054e34e1abedbb292e01aa535cb2d3a9ecce8570b52567",
       "source": {
         "fingerprint": "61f8faf2aba26fc848054e34e1abedbb292e01aa535cb2d3a9ecce8570b52567",
         "fileName": "Seatbelts.csv",
@@ -41,8 +41,8 @@
       },
       "parser": {
         "kind": "duckdb-wasm",
-        "packageVersion": "1.30.0",
-        "engineVersion": "v1.3.2"
+        "packageVersion": "1.33.1-dev57.0",
+        "engineVersion": "v1.5.4"
       },
       "rowCount": 192,
       "columns": [
@@ -570,9 +570,9 @@
       ]
     },
     "prepared": {
-      "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-      "recipe": "c7f733fd-1b9e-4c66-808e-8381ab2d0454",
-      "sourceProfile": "duckdb-wasm:1.30.0:61f8faf2aba26fc848054e34e1abedbb292e01aa535cb2d3a9ecce8570b52567",
+      "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+      "recipe": "f30efde1-5def-4bdb-9d5c-d845d48fa2ca",
+      "sourceProfile": "duckdb-wasm:1.33.1-dev57.0:61f8faf2aba26fc848054e34e1abedbb292e01aa535cb2d3a9ecce8570b52567",
       "observations": 192,
       "columns": [
         "1:DriversKilled",
@@ -627,8 +627,8 @@
     },
     "stationarity": {
       "kind": "stationarity-evidence",
-      "id": "be44a231-f48d-4b68-a1fc-bd4a739d9452",
-      "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
+      "id": "c0814bce-e15a-445c-8915-7cc6260bef87",
+      "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
       "observations": 192,
       "diagnosticTransform": {
         "kind": "levels"
@@ -689,8 +689,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -3.262417632150222,
-                "pValue": 0.812722680784476,
+                "statistic": -3.2624176321481726,
+                "pValue": 0.8127226807853845,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -711,8 +711,8 @@
                 "breakIndex": 28
               },
               "levelAndTrend": {
-                "statistic": -3.8619521155800602,
-                "pValue": 0.5960563182061367,
+                "statistic": -3.8619521155771257,
+                "pValue": 0.5960563182080088,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -776,8 +776,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -3.262417632150222,
-                "pValue": 0.812722680784476,
+                "statistic": -3.2624176321481726,
+                "pValue": 0.8127226807853845,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -798,8 +798,8 @@
                 "breakIndex": 28
               },
               "levelAndTrend": {
-                "statistic": -3.8619521155800602,
-                "pValue": 0.5960563182061367,
+                "statistic": -3.8619521155771257,
+                "pValue": 0.5960563182080088,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -810,96 +810,14 @@
               }
             }
           },
-          "differenced": {
-            "kind": "stationarityBattery",
-            "observations": 191,
-            "adf": {
-              "constant": {
-                "statistic": -6.030250125069621,
-                "pValue": 1.4236355186486792e-7,
-                "usedLag": 12,
-                "observations": 178,
-                "criticalValues": [
-                  -3.467631519151906,
-                  -2.8779183721695567,
-                  -2.575501353364474
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": -5.9987931754087915,
-                "pValue": 0.0000022097256301970328,
-                "usedLag": 12,
-                "observations": 178,
-                "criticalValues": [
-                  -4.010551134950615,
-                  -3.4354484051922847,
-                  -3.1417036905168882
-                ]
-              }
-            },
-            "kpss": {
-              "constant": {
-                "statistic": 0.08777711290561109,
-                "pValue": 0.1,
-                "usedLag": 21,
-                "criticalValues": [
-                  0.347,
-                  0.463,
-                  0.574,
-                  0.739
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": 0.0851767037545149,
-                "pValue": 0.1,
-                "usedLag": 21,
-                "criticalValues": [
-                  0.119,
-                  0.146,
-                  0.176,
-                  0.216
-                ]
-              }
-            },
-            "zivotAndrews": {
-              "level": {
-                "statistic": -6.403453566018303,
-                "pValue": 0.00040596511248491325,
-                "criticalValues": [
-                  -5.27644,
-                  -4.81067,
-                  -4.56618
-                ],
-                "baseLags": 12,
-                "breakIndex": 56
-              },
-              "trend": {
-                "statistic": -6.2758809375394025,
-                "pValue": 0.0030693399791817243,
-                "criticalValues": [
-                  -5.03421,
-                  -4.4058,
-                  -4.13678
-                ],
-                "baseLags": 12,
-                "breakIndex": 60
-              },
-              "levelAndTrend": {
-                "statistic": -6.542989672336991,
-                "pValue": 0.0009965098837710097,
-                "criticalValues": [
-                  -5.57556,
-                  -5.07332,
-                  -4.82668
-                ],
-                "baseLags": 12,
-                "breakIndex": 80
-              }
-            }
-          },
+          "differenced": null,
           "assessment": {
-            "kind": "differenceStationary",
-            "order": 1,
+            "kind": "inconclusive",
+            "conflicts": [
+              {
+                "kind": "difference-battery-missing"
+              }
+            ],
             "evidence": [
               {
                 "test": "adf",
@@ -923,18 +841,6 @@
                 "test": "kpss",
                 "specification": "ct",
                 "series": "levels",
-                "pValue": 0.1
-              },
-              {
-                "test": "adf",
-                "specification": "c",
-                "series": "first-difference",
-                "pValue": 1.4236355186486792e-7
-              },
-              {
-                "test": "kpss",
-                "specification": "c",
-                "series": "first-difference",
                 "pValue": 0.1
               }
             ]
@@ -995,8 +901,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -4.037964115681867,
-                "pValue": 0.3290404198270753,
+                "statistic": -4.037964115671845,
+                "pValue": 0.32904041983322396,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -1006,8 +912,8 @@
                 "breakIndex": 58
               },
               "trend": {
-                "statistic": -3.1364690302606157,
-                "pValue": 0.572215033056085,
+                "statistic": -3.1364690302525338,
+                "pValue": 0.5722150330612485,
                 "criticalValues": [
                   -5.03421,
                   -4.4058,
@@ -1017,8 +923,8 @@
                 "breakIndex": 120
               },
               "levelAndTrend": {
-                "statistic": -4.367834390048486,
-                "pValue": 0.27822277336155166,
+                "statistic": -4.367834390033774,
+                "pValue": 0.27822277336940715,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -1082,8 +988,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -4.037964115681867,
-                "pValue": 0.3290404198270753,
+                "statistic": -4.037964115671845,
+                "pValue": 0.32904041983322396,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -1093,8 +999,8 @@
                 "breakIndex": 58
               },
               "trend": {
-                "statistic": -3.1364690302606157,
-                "pValue": 0.572215033056085,
+                "statistic": -3.1364690302525338,
+                "pValue": 0.5722150330612485,
                 "criticalValues": [
                   -5.03421,
                   -4.4058,
@@ -1104,8 +1010,8 @@
                 "breakIndex": 120
               },
               "levelAndTrend": {
-                "statistic": -4.367834390048486,
-                "pValue": 0.27822277336155166,
+                "statistic": -4.367834390033774,
+                "pValue": 0.27822277336940715,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -1116,96 +1022,14 @@
               }
             }
           },
-          "differenced": {
-            "kind": "stationarityBattery",
-            "observations": 191,
-            "adf": {
-              "constant": {
-                "statistic": -4.453541410652852,
-                "pValue": 0.00023835279319370608,
-                "usedLag": 13,
-                "observations": 177,
-                "criticalValues": [
-                  -3.467845319799907,
-                  -2.878011745497439,
-                  -2.575551186759871
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": -4.454989488405451,
-                "pValue": 0.001786711583581672,
-                "usedLag": 13,
-                "observations": 177,
-                "criticalValues": [
-                  -4.010849052566411,
-                  -3.435591125164623,
-                  -3.1417872287873205
-                ]
-              }
-            },
-            "kpss": {
-              "constant": {
-                "statistic": 0.012932288491560435,
-                "pValue": 0.1,
-                "usedLag": 4,
-                "criticalValues": [
-                  0.347,
-                  0.463,
-                  0.574,
-                  0.739
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": 0.009669690475379205,
-                "pValue": 0.1,
-                "usedLag": 4,
-                "criticalValues": [
-                  0.119,
-                  0.146,
-                  0.176,
-                  0.216
-                ]
-              }
-            },
-            "zivotAndrews": {
-              "level": {
-                "statistic": -5.204452140016862,
-                "pValue": 0.014442963708636736,
-                "criticalValues": [
-                  -5.27644,
-                  -4.81067,
-                  -4.56618
-                ],
-                "baseLags": 13,
-                "breakIndex": 55
-              },
-              "trend": {
-                "statistic": -4.868258628209425,
-                "pValue": 0.016587637486063,
-                "criticalValues": [
-                  -5.03421,
-                  -4.4058,
-                  -4.13678
-                ],
-                "baseLags": 13,
-                "breakIndex": 62
-              },
-              "levelAndTrend": {
-                "statistic": -5.19279933676155,
-                "pValue": 0.036648563297699104,
-                "criticalValues": [
-                  -5.57556,
-                  -5.07332,
-                  -4.82668
-                ],
-                "baseLags": 13,
-                "breakIndex": 55
-              }
-            }
-          },
+          "differenced": null,
           "assessment": {
-            "kind": "differenceStationary",
-            "order": 1,
+            "kind": "inconclusive",
+            "conflicts": [
+              {
+                "kind": "difference-battery-missing"
+              }
+            ],
             "evidence": [
               {
                 "test": "adf",
@@ -1229,18 +1053,6 @@
                 "test": "kpss",
                 "specification": "ct",
                 "series": "levels",
-                "pValue": 0.1
-              },
-              {
-                "test": "adf",
-                "specification": "c",
-                "series": "first-difference",
-                "pValue": 0.00023835279319370608
-              },
-              {
-                "test": "kpss",
-                "specification": "c",
-                "series": "first-difference",
                 "pValue": 0.1
               }
             ]
@@ -1301,8 +1113,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -3.87842140432882,
-                "pValue": 0.42728475895998635,
+                "statistic": -3.8784214043285914,
+                "pValue": 0.4272847589601419,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -1312,8 +1124,8 @@
                 "breakIndex": 100
               },
               "trend": {
-                "statistic": -3.186858115441154,
-                "pValue": 0.5405229882031832,
+                "statistic": -3.186858115440995,
+                "pValue": 0.5405229882032798,
                 "criticalValues": [
                   -5.03421,
                   -4.4058,
@@ -1323,8 +1135,8 @@
                 "breakIndex": 111
               },
               "levelAndTrend": {
-                "statistic": -3.9677582873044304,
-                "pValue": 0.5254204788943977,
+                "statistic": -3.9677582873041657,
+                "pValue": 0.5254204788945797,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -1388,8 +1200,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -3.87842140432882,
-                "pValue": 0.42728475895998635,
+                "statistic": -3.8784214043285914,
+                "pValue": 0.4272847589601419,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -1399,8 +1211,8 @@
                 "breakIndex": 100
               },
               "trend": {
-                "statistic": -3.186858115441154,
-                "pValue": 0.5405229882031832,
+                "statistic": -3.186858115440995,
+                "pValue": 0.5405229882032798,
                 "criticalValues": [
                   -5.03421,
                   -4.4058,
@@ -1410,8 +1222,8 @@
                 "breakIndex": 111
               },
               "levelAndTrend": {
-                "statistic": -3.9677582873044304,
-                "pValue": 0.5254204788943977,
+                "statistic": -3.9677582873041657,
+                "pValue": 0.5254204788945797,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -1422,96 +1234,14 @@
               }
             }
           },
-          "differenced": {
-            "kind": "stationarityBattery",
-            "observations": 191,
-            "adf": {
-              "constant": {
-                "statistic": -7.212077177987901,
-                "pValue": 2.2213960219493143e-10,
-                "usedLag": 3,
-                "observations": 187,
-                "criticalValues": [
-                  -3.465811691080702,
-                  -2.877123351472649,
-                  -2.5750770662586864
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": -7.202388567391362,
-                "pValue": 4.900847472415024e-9,
-                "usedLag": 3,
-                "observations": 187,
-                "criticalValues": [
-                  -4.00801576357394,
-                  -3.4342334139298014,
-                  -3.140992402675066
-                ]
-              }
-            },
-            "kpss": {
-              "constant": {
-                "statistic": 0.05850203456541756,
-                "pValue": 0.1,
-                "usedLag": 4,
-                "criticalValues": [
-                  0.347,
-                  0.463,
-                  0.574,
-                  0.739
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": 0.042498582729329944,
-                "pValue": 0.1,
-                "usedLag": 4,
-                "criticalValues": [
-                  0.119,
-                  0.146,
-                  0.176,
-                  0.216
-                ]
-              }
-            },
-            "zivotAndrews": {
-              "level": {
-                "statistic": -7.6624715877974605,
-                "pValue": 0.00001,
-                "criticalValues": [
-                  -5.27644,
-                  -4.81067,
-                  -4.56618
-                ],
-                "baseLags": 3,
-                "breakIndex": 72
-              },
-              "trend": {
-                "statistic": -7.237694281220592,
-                "pValue": 0.0026750103223618107,
-                "criticalValues": [
-                  -5.03421,
-                  -4.4058,
-                  -4.13678
-                ],
-                "baseLags": 3,
-                "breakIndex": 59
-              },
-              "levelAndTrend": {
-                "statistic": -7.874058398146055,
-                "pValue": 0.0009550016800312788,
-                "criticalValues": [
-                  -5.57556,
-                  -5.07332,
-                  -4.82668
-                ],
-                "baseLags": 3,
-                "breakIndex": 72
-              }
-            }
-          },
+          "differenced": null,
           "assessment": {
-            "kind": "differenceStationary",
-            "order": 1,
+            "kind": "inconclusive",
+            "conflicts": [
+              {
+                "kind": "difference-battery-missing"
+              }
+            ],
             "evidence": [
               {
                 "test": "adf",
@@ -1535,18 +1265,6 @@
                 "test": "kpss",
                 "specification": "ct",
                 "series": "levels",
-                "pValue": 0.1
-              },
-              {
-                "test": "adf",
-                "specification": "c",
-                "series": "first-difference",
-                "pValue": 2.2213960219493143e-10
-              },
-              {
-                "test": "kpss",
-                "specification": "c",
-                "series": "first-difference",
                 "pValue": 0.1
               }
             ]
@@ -1607,8 +1325,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -5.417148675814314,
-                "pValue": 0.005650152845979408,
+                "statistic": -5.417148675814318,
+                "pValue": 0.005650152845979322,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -1618,8 +1336,8 @@
                 "breakIndex": 163
               },
               "trend": {
-                "statistic": -4.381119505186867,
-                "pValue": 0.05401543908843106,
+                "statistic": -4.381119505186871,
+                "pValue": 0.054015439088430484,
                 "criticalValues": [
                   -5.03421,
                   -4.4058,
@@ -1629,8 +1347,8 @@
                 "breakIndex": 153
               },
               "levelAndTrend": {
-                "statistic": -4.704320371988475,
-                "pValue": 0.13565844103872232,
+                "statistic": -4.704320371988484,
+                "pValue": 0.13565844103871944,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -1694,8 +1412,8 @@
             },
             "zivotAndrews": {
               "level": {
-                "statistic": -5.417148675814314,
-                "pValue": 0.005650152845979408,
+                "statistic": -5.417148675814318,
+                "pValue": 0.005650152845979322,
                 "criticalValues": [
                   -5.27644,
                   -4.81067,
@@ -1705,8 +1423,8 @@
                 "breakIndex": 163
               },
               "trend": {
-                "statistic": -4.381119505186867,
-                "pValue": 0.05401543908843106,
+                "statistic": -4.381119505186871,
+                "pValue": 0.054015439088430484,
                 "criticalValues": [
                   -5.03421,
                   -4.4058,
@@ -1716,8 +1434,8 @@
                 "breakIndex": 153
               },
               "levelAndTrend": {
-                "statistic": -4.704320371988475,
-                "pValue": 0.13565844103872232,
+                "statistic": -4.704320371988484,
+                "pValue": 0.13565844103871944,
                 "criticalValues": [
                   -5.57556,
                   -5.07332,
@@ -1728,96 +1446,14 @@
               }
             }
           },
-          "differenced": {
-            "kind": "stationarityBattery",
-            "observations": 191,
-            "adf": {
-              "constant": {
-                "statistic": -13.784048752090223,
-                "pValue": 9.182413276142175e-26,
-                "usedLag": 0,
-                "observations": 190,
-                "criticalValues": [
-                  -3.4652439354133255,
-                  -2.8768752281673717,
-                  -2.574944653739612
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": -13.876958381466359,
-                "pValue": 1.4263290975466813e-21,
-                "usedLag": 0,
-                "observations": 190,
-                "criticalValues": [
-                  -4.00722493293483,
-                  -3.43385428838023,
-                  -3.1407704096807114
-                ]
-              }
-            },
-            "kpss": {
-              "constant": {
-                "statistic": 0.23184109922987356,
-                "pValue": 0.1,
-                "usedLag": 1,
-                "criticalValues": [
-                  0.347,
-                  0.463,
-                  0.574,
-                  0.739
-                ]
-              },
-              "constantAndTrend": {
-                "statistic": 0.05418682819129333,
-                "pValue": 0.1,
-                "usedLag": 2,
-                "criticalValues": [
-                  0.119,
-                  0.146,
-                  0.176,
-                  0.216
-                ]
-              }
-            },
-            "zivotAndrews": {
-              "level": {
-                "statistic": -14.156058135498961,
-                "pValue": 0.00001,
-                "criticalValues": [
-                  -5.27644,
-                  -4.81067,
-                  -4.56618
-                ],
-                "baseLags": 0,
-                "breakIndex": 162
-              },
-              "trend": {
-                "statistic": -13.915964821267403,
-                "pValue": 0.0009995438507140275,
-                "criticalValues": [
-                  -5.03421,
-                  -4.4058,
-                  -4.13678
-                ],
-                "baseLags": 0,
-                "breakIndex": 124
-              },
-              "levelAndTrend": {
-                "statistic": -14.741997443279725,
-                "pValue": 0.0007408310608664545,
-                "criticalValues": [
-                  -5.57556,
-                  -5.07332,
-                  -4.82668
-                ],
-                "baseLags": 0,
-                "breakIndex": 162
-              }
-            }
-          },
+          "differenced": null,
           "assessment": {
-            "kind": "differenceStationary",
-            "order": 1,
+            "kind": "inconclusive",
+            "conflicts": [
+              {
+                "kind": "difference-battery-missing"
+              }
+            ],
             "evidence": [
               {
                 "test": "adf",
@@ -1842,18 +1478,6 @@
                 "specification": "ct",
                 "series": "levels",
                 "pValue": 0.01
-              },
-              {
-                "test": "adf",
-                "specification": "c",
-                "series": "first-difference",
-                "pValue": 9.182413276142175e-26
-              },
-              {
-                "test": "kpss",
-                "specification": "c",
-                "series": "first-difference",
-                "pValue": 0.1
               }
             ]
           }
@@ -1863,9 +1487,9 @@
     "grangerEvidence": [
       {
         "kind": "granger-evidence",
-        "id": "3b2b3a11-59e9-41c7-a381-18ed81be2dd0",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:36:59.036Z",
+        "id": "0d177adf-14c6-43be-9ee9-00a0f916014a",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:48.092Z",
         "method": "granger-ssr-f",
         "target": {
           "id": "1:DriversKilled",
@@ -1924,7 +1548,7 @@
                   }
                 ]
               },
-              "missingEvidence": "kms is I(1) in levels, so the F test can reject spuriously; a differenced version is the safer test. DriversKilled is I(1) in levels, so the F test can reject spuriously; a differenced version is the safer test."
+              "missingEvidence": "kms's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). DriversKilled's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1)."
             }
           ]
         },
@@ -1966,9 +1590,9 @@
           "tauMax": 2,
           "pcAlpha": 0.05
         },
-        "id": "39927968-615c-4cad-ae6b-8c3b7f46105d",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:36:59.200Z",
+        "id": "40db99ac-f38e-4cb5-9016-bf9d8f2edbef",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:48.316Z",
         "method": "pcmci-plus-parcorr",
         "variables": [
           {
@@ -2038,7 +1662,7 @@
                   }
                 ]
               },
-              "missingEvidence": "DriversKilled, kms, PetrolPrice, law are I(1) in levels, so links found on levels can be spurious; a differenced version is the safer input."
+              "missingEvidence": "DriversKilled's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). kms's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). PetrolPrice's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). law's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1)."
             },
             {
               "kind": "unresolved",
@@ -2368,9 +1992,9 @@
           "tauMax": 2,
           "pcAlpha": 0.05
         },
-        "id": "831c1679-3d13-4d88-b0c7-7b4b9068694c",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:36:59.489Z",
+        "id": "0ef39c92-0776-4f35-899f-760f7d24652e",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:48.776Z",
         "method": "lpcmci-parcorr",
         "variables": [
           {
@@ -2434,7 +2058,7 @@
                   }
                 ]
               },
-              "missingEvidence": "DriversKilled, kms, PetrolPrice, law are I(1) in levels, so links found on levels can be spurious; a differenced version is the safer input."
+              "missingEvidence": "DriversKilled's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). kms's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). PetrolPrice's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). law's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1)."
             },
             {
               "kind": "unresolved",
@@ -2760,9 +2384,9 @@
     "dagDocuments": [
       {
         "kind": "dag-document",
-        "id": "ff4c3bb1-31b7-483d-a71a-51bf868486bc",
+        "id": "22f9069a-179a-42e9-97ba-0a2c5f1d79ab",
         "name": "Traffic and fatalities",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
         "dataset": {
           "kind": "time-series",
           "observations": 192
@@ -2774,33 +2398,33 @@
         "history": [
           {
             "kind": "draft",
-            "id": "5d356b22-c0cb-43be-aea1-f754d653944b",
+            "id": "ce350509-17e7-4e9a-ac89-2b15f5bea620",
             "parent": null,
-            "createdAt": "2026-09-09T14:37:00.466Z",
+            "createdAt": "2026-09-21T14:29:49.734Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -2818,33 +2442,33 @@
           },
           {
             "kind": "draft",
-            "id": "2388a97f-ec74-4b32-b9a3-7dd4772f707a",
-            "parent": "5d356b22-c0cb-43be-aea1-f754d653944b",
-            "createdAt": "2026-09-09T14:37:00.775Z",
+            "id": "e24860d6-9324-44f9-aa1f-938e5b0541ae",
+            "parent": "ce350509-17e7-4e9a-ac89-2b15f5bea620",
+            "createdAt": "2026-09-21T14:29:50.059Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -2852,9 +2476,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -2872,33 +2496,33 @@
           },
           {
             "kind": "draft",
-            "id": "4ae04ad8-9ff6-40b2-87ed-15346436529e",
-            "parent": "2388a97f-ec74-4b32-b9a3-7dd4772f707a",
-            "createdAt": "2026-09-09T14:37:00.957Z",
+            "id": "8f60db5e-b682-4b5d-b80d-265ae8ee3867",
+            "parent": "e24860d6-9324-44f9-aa1f-938e5b0541ae",
+            "createdAt": "2026-09-21T14:29:50.250Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -2906,9 +2530,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -2920,9 +2544,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -2940,33 +2564,33 @@
           },
           {
             "kind": "draft",
-            "id": "feead511-fbc5-40a4-b507-99720debfe27",
-            "parent": "4ae04ad8-9ff6-40b2-87ed-15346436529e",
-            "createdAt": "2026-09-09T14:37:01.115Z",
+            "id": "04bf9511-813f-49bf-9aff-886dabe7f53d",
+            "parent": "8f60db5e-b682-4b5d-b80d-265ae8ee3867",
+            "createdAt": "2026-09-21T14:29:50.467Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -2974,9 +2598,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -2988,9 +2612,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3002,9 +2626,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3025,33 +2649,33 @@
         "audit": [
           {
             "kind": "draft",
-            "id": "5d356b22-c0cb-43be-aea1-f754d653944b",
+            "id": "ce350509-17e7-4e9a-ac89-2b15f5bea620",
             "parent": null,
-            "createdAt": "2026-09-09T14:37:00.466Z",
+            "createdAt": "2026-09-21T14:29:49.734Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -3069,33 +2693,33 @@
           },
           {
             "kind": "draft",
-            "id": "2388a97f-ec74-4b32-b9a3-7dd4772f707a",
-            "parent": "5d356b22-c0cb-43be-aea1-f754d653944b",
-            "createdAt": "2026-09-09T14:37:00.775Z",
+            "id": "e24860d6-9324-44f9-aa1f-938e5b0541ae",
+            "parent": "ce350509-17e7-4e9a-ac89-2b15f5bea620",
+            "createdAt": "2026-09-21T14:29:50.059Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -3103,9 +2727,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3123,33 +2747,33 @@
           },
           {
             "kind": "draft",
-            "id": "4ae04ad8-9ff6-40b2-87ed-15346436529e",
-            "parent": "2388a97f-ec74-4b32-b9a3-7dd4772f707a",
-            "createdAt": "2026-09-09T14:37:00.957Z",
+            "id": "8f60db5e-b682-4b5d-b80d-265ae8ee3867",
+            "parent": "e24860d6-9324-44f9-aa1f-938e5b0541ae",
+            "createdAt": "2026-09-21T14:29:50.250Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -3157,9 +2781,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3171,9 +2795,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3191,33 +2815,33 @@
           },
           {
             "kind": "draft",
-            "id": "feead511-fbc5-40a4-b507-99720debfe27",
-            "parent": "4ae04ad8-9ff6-40b2-87ed-15346436529e",
-            "createdAt": "2026-09-09T14:37:01.115Z",
+            "id": "04bf9511-813f-49bf-9aff-886dabe7f53d",
+            "parent": "8f60db5e-b682-4b5d-b80d-265ae8ee3867",
+            "createdAt": "2026-09-21T14:29:50.467Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -3225,9 +2849,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3239,9 +2863,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3253,9 +2877,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3273,33 +2897,33 @@
           },
           {
             "kind": "draft",
-            "id": "0e8544b3-4f17-4917-b0a7-321bf5b0cc94",
-            "parent": "feead511-fbc5-40a4-b507-99720debfe27",
-            "createdAt": "2026-09-09T14:37:01.282Z",
+            "id": "15755df2-363c-485b-9e91-a9c0bf31abcb",
+            "parent": "04bf9511-813f-49bf-9aff-886dabe7f53d",
+            "createdAt": "2026-09-21T14:29:50.626Z",
             "graph": {
               "kind": "editable-dag",
               "nodes": [
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "column": "1:DriversKilled",
                   "name": "DriversKilled"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "column": "5:kms",
                   "name": "kms"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 },
                 {
                   "kind": "observed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                   "column": "8:law",
                   "name": "law"
                 }
@@ -3307,9 +2931,9 @@
               "edges": [
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3321,9 +2945,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3335,9 +2959,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3349,9 +2973,9 @@
                 },
                 {
                   "kind": "directed",
-                  "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                  "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
-                  "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                  "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                  "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
+                  "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                   "timing": {
                     "kind": "contemporaneous"
                   },
@@ -3370,33 +2994,33 @@
         ],
         "current": {
           "kind": "draft",
-          "id": "0e8544b3-4f17-4917-b0a7-321bf5b0cc94",
-          "parent": "feead511-fbc5-40a4-b507-99720debfe27",
-          "createdAt": "2026-09-09T14:37:01.282Z",
+          "id": "15755df2-363c-485b-9e91-a9c0bf31abcb",
+          "parent": "04bf9511-813f-49bf-9aff-886dabe7f53d",
+          "createdAt": "2026-09-21T14:29:50.626Z",
           "graph": {
             "kind": "editable-dag",
             "nodes": [
               {
                 "kind": "observed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                 "column": "1:DriversKilled",
                 "name": "DriversKilled"
               },
               {
                 "kind": "observed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                 "column": "5:kms",
                 "name": "kms"
               },
               {
                 "kind": "observed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                 "column": "6:PetrolPrice",
                 "name": "PetrolPrice"
               },
               {
                 "kind": "observed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
                 "column": "8:law",
                 "name": "law"
               }
@@ -3404,9 +3028,9 @@
             "edges": [
               {
                 "kind": "directed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-                "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+                "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -3418,9 +3042,9 @@
               },
               {
                 "kind": "directed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-                "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+                "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -3432,9 +3056,9 @@
               },
               {
                 "kind": "directed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
-                "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
+                "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -3446,9 +3070,9 @@
               },
               {
                 "kind": "directed",
-                "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-                "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
-                "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+                "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+                "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
+                "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
                 "timing": {
                   "kind": "contemporaneous"
                 },
@@ -3470,17 +3094,17 @@
     "interventionQueries": [
       {
         "kind": "intervention-query",
-        "id": "1608117d-dd17-4b24-9fb1-62a65e77d87b",
-        "dagDocument": "ff4c3bb1-31b7-483d-a71a-51bf868486bc",
-        "dagRevision": "0e8544b3-4f17-4917-b0a7-321bf5b0cc94",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:37:01.720Z",
+        "id": "df73c922-5b8a-4ae6-a61c-54b4590cb6ab",
+        "dagDocument": "22f9069a-179a-42e9-97ba-0a2c5f1d79ab",
+        "dagRevision": "15755df2-363c-485b-9e91-a9c0bf31abcb",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:51.014Z",
         "set": {
-          "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+          "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
           "name": "kms"
         },
         "read": {
-          "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+          "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
           "name": "DriversKilled"
         },
         "route": {
@@ -3540,10 +3164,10 @@
               "2"
             ],
             "expectations": [
-              125.57299718397864,
-              120.78737324526975
+              125.57299718397866,
+              120.78737324526972
             ],
-            "effect": -4.785623938708895,
+            "effect": -4.785623938708937,
             "distributionLow": [
               [
                 "0",
@@ -3561,7 +3185,7 @@
             "distributionHigh": [
               [
                 "0",
-                0.32425787870887274
+                0.3242578787088727
               ],
               [
                 "1",
@@ -3569,7 +3193,7 @@
               ],
               [
                 "2",
-                0.2663075720355862
+                0.26630757203558614
               ]
             ],
             "minimalAdjustmentSet": [
@@ -3583,9 +3207,9 @@
       }
     ],
     "studyDraft": {
-      "dagDocument": "ff4c3bb1-31b7-483d-a71a-51bf868486bc",
-      "treatment": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
-      "outcome": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+      "dagDocument": "22f9069a-179a-42e9-97ba-0a2c5f1d79ab",
+      "treatment": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
+      "outcome": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
       "estimand": "average-treatment-effect",
       "modifier": null,
       "grouping": {
@@ -3603,23 +3227,23 @@
     "studies": [
       {
         "kind": "study-specification",
-        "id": "7100d9ec-1ee9-4d6f-aab1-8c57ddd16c14",
-        "createdAt": "2026-09-09T14:37:02.683Z",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
+        "id": "48c812cf-43da-41cb-b395-db04097e9e79",
+        "createdAt": "2026-09-21T14:29:51.985Z",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
         "dataset": {
           "kind": "time-series",
           "observations": 192
         },
-        "dagDocument": "ff4c3bb1-31b7-483d-a71a-51bf868486bc",
-        "dagRevision": "0e8544b3-4f17-4917-b0a7-321bf5b0cc94",
+        "dagDocument": "22f9069a-179a-42e9-97ba-0a2c5f1d79ab",
+        "dagRevision": "15755df2-363c-485b-9e91-a9c0bf31abcb",
         "dagName": "Traffic and fatalities",
         "treatment": {
-          "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+          "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
           "column": "5:kms",
           "name": "kms"
         },
         "outcome": {
-          "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+          "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
           "column": "1:DriversKilled",
           "name": "DriversKilled"
         },
@@ -3649,22 +3273,22 @@
         "graph": {
           "nodes": [
             {
-              "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+              "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
               "name": "DriversKilled",
               "column": "1:DriversKilled"
             },
             {
-              "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+              "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
               "name": "kms",
               "column": "5:kms"
             },
             {
-              "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+              "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
               "name": "PetrolPrice",
               "column": "6:PetrolPrice"
             },
             {
-              "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+              "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
               "name": "law",
               "column": "8:law"
             }
@@ -3694,25 +3318,25 @@
           "nodes": [
             {
               "kind": "observed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
               "column": "1:DriversKilled",
               "name": "DriversKilled"
             },
             {
               "kind": "observed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
               "column": "5:kms",
               "name": "kms"
             },
             {
               "kind": "observed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
               "column": "6:PetrolPrice",
               "name": "PetrolPrice"
             },
             {
               "kind": "observed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
               "column": "8:law",
               "name": "law"
             }
@@ -3720,9 +3344,9 @@
           "edges": [
             {
               "kind": "directed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms@t",
-              "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-              "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms@t",
+              "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+              "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -3734,9 +3358,9 @@
             },
             {
               "kind": "directed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-              "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
-              "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+              "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
+              "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -3748,9 +3372,9 @@
             },
             {
               "kind": "directed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-              "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
-              "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+              "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
+              "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -3762,9 +3386,9 @@
             },
             {
               "kind": "directed",
-              "id": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law->91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled@t",
-              "cause": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
-              "effect": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+              "id": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law->2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled@t",
+              "cause": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
+              "effect": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
               "timing": {
                 "kind": "contemporaneous"
               },
@@ -3781,9 +3405,9 @@
     "identifications": [
       {
         "kind": "identification",
-        "id": "3ef05b0e-ad17-40c1-b6da-427c8fcbbaa4",
-        "study": "7100d9ec-1ee9-4d6f-aab1-8c57ddd16c14",
-        "createdAt": "2026-09-09T14:37:02.721Z",
+        "id": "2240a977-e1a1-48d2-ba35-3f8313855fb6",
+        "study": "48c812cf-43da-41cb-b395-db04097e9e79",
+        "createdAt": "2026-09-21T14:29:52.012Z",
         "method": "backdoor-identification",
         "evidence": {
           "kind": "backdoorIdentification",
@@ -3848,7 +3472,7 @@
             "ordinal": 0,
             "variables": [
               {
-                "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                 "column": "6:PetrolPrice",
                 "name": "PetrolPrice"
               }
@@ -3856,12 +3480,12 @@
           },
           "canonicalAdjustmentSet": [
             {
-              "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+              "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
               "column": "6:PetrolPrice",
               "name": "PetrolPrice"
             },
             {
-              "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+              "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
               "column": "8:law",
               "name": "law"
             }
@@ -3871,7 +3495,7 @@
             "sets": [
               [
                 {
-                  "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                  "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                   "column": "6:PetrolPrice",
                   "name": "PetrolPrice"
                 }
@@ -3891,7 +3515,7 @@
             {
               "kind": "graph-assumption",
               "id": "graph-theory",
-              "statement": "The graph “Traffic and fatalities” (revision 0e8544b3) states the causes of kms and DriversKilled; a missing arrow claims there is no direct cause."
+              "statement": "The graph “Traffic and fatalities” (revision 15755df2) states the causes of kms and DriversKilled; a missing arrow claims there is no direct cause."
             },
             {
               "kind": "graph-assumption",
@@ -3939,11 +3563,11 @@
     ],
     "estimationRuns": [
       {
-        "id": "676ce2b0-3cfb-486f-9f15-b1dd6dbf9829",
-        "study": "7100d9ec-1ee9-4d6f-aab1-8c57ddd16c14",
-        "identification": "3ef05b0e-ad17-40c1-b6da-427c8fcbbaa4",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:37:03.718Z",
+        "id": "04526672-0601-4710-bfc0-578490d6cce5",
+        "study": "48c812cf-43da-41cb-b395-db04097e9e79",
+        "identification": "2240a977-e1a1-48d2-ba35-3f8313855fb6",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:53.043Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -4084,17 +3708,17 @@
         "method": "negbin-nuts",
         "columns": [
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
             "column": "5:kms",
             "name": "kms"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
             "column": "1:DriversKilled",
             "name": "DriversKilled"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
             "column": "6:PetrolPrice",
             "name": "PetrolPrice"
           }
@@ -4121,7 +3745,7 @@
             "kind": "contemporaneous",
             "variables": [
               {
-                "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                 "column": "6:PetrolPrice",
                 "name": "PetrolPrice"
               }
@@ -4135,11 +3759,11 @@
         }
       },
       {
-        "id": "f4f6d87b-5bb4-40c7-b5f9-1b227e4f2fe4",
-        "study": "7100d9ec-1ee9-4d6f-aab1-8c57ddd16c14",
-        "identification": "3ef05b0e-ad17-40c1-b6da-427c8fcbbaa4",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:37:03.897Z",
+        "id": "2fbd21dd-2f9b-4f64-98f9-9ffec0374ab0",
+        "study": "48c812cf-43da-41cb-b395-db04097e9e79",
+        "identification": "2240a977-e1a1-48d2-ba35-3f8313855fb6",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:53.215Z",
         "eligibility": {
           "kind": "caution",
           "satisfied": [
@@ -4305,7 +3929,7 @@
                   }
                 ]
               },
-              "missingEvidence": "kms, DriversKilled, PetrolPrice are I(1) on the prepared scale, so a regression on those values can show a spurious relation. Create a differenced prepared version or use a suitable cointegration method."
+              "missingEvidence": "kms's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). DriversKilled's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1). PetrolPrice's stationarity evidence is inconclusive: The first difference was not tested, so the series cannot be called I(1)."
             }
           ]
         },
@@ -4346,17 +3970,17 @@
         "method": "backdoor-linear-regression",
         "columns": [
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
             "column": "5:kms",
             "name": "kms"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
             "column": "1:DriversKilled",
             "name": "DriversKilled"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
             "column": "6:PetrolPrice",
             "name": "PetrolPrice"
           }
@@ -4383,7 +4007,7 @@
             "kind": "contemporaneous",
             "variables": [
               {
-                "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+                "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
                 "column": "6:PetrolPrice",
                 "name": "PetrolPrice"
               }
@@ -4399,23 +4023,23 @@
     ],
     "sensitivityRuns": [
       {
-        "id": "8c2b1a19-9b68-45b3-8f47-e31450850436",
-        "estimationRun": "f4f6d87b-5bb4-40c7-b5f9-1b227e4f2fe4",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:37:04.785Z",
+        "id": "dc3be998-56ff-4f84-a5df-aa98361e77b7",
+        "estimationRun": "2fbd21dd-2f9b-4f64-98f9-9ffec0374ab0",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:54.159Z",
         "columns": [
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
             "column": "5:kms",
             "name": "kms"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
             "column": "1:DriversKilled",
             "name": "DriversKilled"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
             "column": "6:PetrolPrice",
             "name": "PetrolPrice"
           }
@@ -4541,11 +4165,11 @@
     "counterfactualRuns": [
       {
         "kind": "dynamic-linear-scm-run",
-        "id": "554971ab-0be2-490e-9b06-35e18c080c74",
-        "study": "7100d9ec-1ee9-4d6f-aab1-8c57ddd16c14",
-        "identification": "3ef05b0e-ad17-40c1-b6da-427c8fcbbaa4",
-        "preparedDataset": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2",
-        "createdAt": "2026-09-09T14:37:05.706Z",
+        "id": "41f3e7e1-e397-47d4-a07c-8f90eccbcd33",
+        "study": "48c812cf-43da-41cb-b395-db04097e9e79",
+        "identification": "2240a977-e1a1-48d2-ba35-3f8313855fb6",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:55.523Z",
         "method": "dynamic-linear-scm-counterfactual",
         "configuration": {
           "kind": "dynamic-linear-scm",
@@ -4570,22 +4194,22 @@
         },
         "nodes": [
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:1:DriversKilled",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:1:DriversKilled",
             "column": "1:DriversKilled",
             "name": "DriversKilled"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:5:kms",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:5:kms",
             "column": "5:kms",
             "name": "kms"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:6:PetrolPrice",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:6:PetrolPrice",
             "column": "6:PetrolPrice",
             "name": "PetrolPrice"
           },
           {
-            "node": "91ef111f-0e4d-45a7-9bbb-c0c0efcbcba2:8:law",
+            "node": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a:8:law",
             "column": "8:law",
             "name": "law"
           }
@@ -8114,7 +7738,2415 @@
         }
       }
     ],
-    "survivalRuns": []
+    "survivalRuns": [],
+    "timeSeriesRuns": [
+      {
+        "plotTime": {
+          "kind": "ordinal",
+          "values": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            73,
+            74,
+            75,
+            76,
+            77,
+            78,
+            79,
+            80,
+            81,
+            82,
+            83,
+            84,
+            85,
+            86,
+            87,
+            88,
+            89,
+            90,
+            91,
+            92,
+            93,
+            94,
+            95,
+            96,
+            97,
+            98,
+            99,
+            100,
+            101,
+            102,
+            103,
+            104,
+            105,
+            106,
+            107,
+            108,
+            109,
+            110,
+            111,
+            112,
+            113,
+            114,
+            115,
+            116,
+            117,
+            118,
+            119,
+            120,
+            121,
+            122,
+            123,
+            124,
+            125,
+            126,
+            127,
+            128,
+            129,
+            130,
+            131,
+            132,
+            133,
+            134,
+            135,
+            136,
+            137,
+            138,
+            139,
+            140,
+            141,
+            142,
+            143,
+            144,
+            145,
+            146,
+            147,
+            148,
+            149,
+            150,
+            151,
+            152,
+            153,
+            154,
+            155,
+            156,
+            157,
+            158,
+            159,
+            160,
+            161,
+            162,
+            163,
+            164,
+            165,
+            166,
+            167,
+            168,
+            169,
+            170,
+            171,
+            172,
+            173,
+            174,
+            175,
+            176,
+            177,
+            178,
+            179,
+            180,
+            181,
+            182,
+            183,
+            184,
+            185,
+            186,
+            187,
+            188,
+            189,
+            190,
+            191,
+            192
+          ]
+        },
+        "id": "6cd4d08d-6536-482c-8185-55c9d7f5b861",
+        "preparedDataset": "2c51bb4d-4ed2-4f34-a074-be17ab16a32a",
+        "createdAt": "2026-09-21T14:29:56.591Z",
+        "kind": "interrupted-series",
+        "outcome": {
+          "id": "1:DriversKilled",
+          "name": "DriversKilled"
+        },
+        "specification": {
+          "model": {
+            "kind": "count",
+            "exposure": null
+          },
+          "interventionRow": 170,
+          "lag": 0,
+          "impact": {
+            "kind": "level"
+          },
+          "seasonal": {
+            "kind": "harmonic",
+            "pairs": 2,
+            "period": 12
+          },
+          "ljungBoxLags": 12
+        },
+        "evidence": {
+          "kind": "interruptedSeries",
+          "observations": 192,
+          "outcome": 0,
+          "model": {
+            "kind": "count",
+            "exposure": null,
+            "dispersion": 2.2709151553989373
+          },
+          "interventionRow": 169,
+          "lag": 0,
+          "impact": {
+            "kind": "level"
+          },
+          "seasonal": {
+            "kind": "harmonic",
+            "pairs": 2,
+            "period": 12,
+            "deseasonalised": [
+              {
+                "fitted": 129.37718008959484,
+                "counterfactual": 129.37718008959484
+              },
+              {
+                "fitted": 129.2545208976305,
+                "counterfactual": 129.2545208976305
+              },
+              {
+                "fitted": 129.13197799570568,
+                "counterfactual": 129.13197799570568
+              },
+              {
+                "fitted": 129.00955127356855,
+                "counterfactual": 129.00955127356855
+              },
+              {
+                "fitted": 128.88724062107218,
+                "counterfactual": 128.88724062107218
+              },
+              {
+                "fitted": 128.7650459281739,
+                "counterfactual": 128.7650459281739
+              },
+              {
+                "fitted": 128.64296708493532,
+                "counterfactual": 128.64296708493532
+              },
+              {
+                "fitted": 128.52100398152257,
+                "counterfactual": 128.52100398152257
+              },
+              {
+                "fitted": 128.39915650820535,
+                "counterfactual": 128.39915650820535
+              },
+              {
+                "fitted": 128.27742455535792,
+                "counterfactual": 128.27742455535792
+              },
+              {
+                "fitted": 128.15580801345823,
+                "counterfactual": 128.15580801345823
+              },
+              {
+                "fitted": 128.03430677308816,
+                "counterfactual": 128.03430677308816
+              },
+              {
+                "fitted": 127.91292072493334,
+                "counterfactual": 127.91292072493334
+              },
+              {
+                "fitted": 127.7916497597828,
+                "counterfactual": 127.7916497597828
+              },
+              {
+                "fitted": 127.67049376852938,
+                "counterfactual": 127.67049376852938
+              },
+              {
+                "fitted": 127.54945264216929,
+                "counterfactual": 127.54945264216929
+              },
+              {
+                "fitted": 127.42852627180204,
+                "counterfactual": 127.42852627180204
+              },
+              {
+                "fitted": 127.30771454863054,
+                "counterfactual": 127.30771454863054
+              },
+              {
+                "fitted": 127.18701736396049,
+                "counterfactual": 127.18701736396049
+              },
+              {
+                "fitted": 127.06643460920098,
+                "counterfactual": 127.06643460920098
+              },
+              {
+                "fitted": 126.94596617586396,
+                "counterfactual": 126.94596617586396
+              },
+              {
+                "fitted": 126.82561195556418,
+                "counterfactual": 126.82561195556418
+              },
+              {
+                "fitted": 126.70537184001934,
+                "counterfactual": 126.70537184001934
+              },
+              {
+                "fitted": 126.58524572104939,
+                "counterfactual": 126.58524572104939
+              },
+              {
+                "fitted": 126.4652334905772,
+                "counterfactual": 126.4652334905772
+              },
+              {
+                "fitted": 126.34533504062803,
+                "counterfactual": 126.34533504062803
+              },
+              {
+                "fitted": 126.22555026332945,
+                "counterfactual": 126.22555026332945
+              },
+              {
+                "fitted": 126.10587905091147,
+                "counterfactual": 126.10587905091147
+              },
+              {
+                "fitted": 125.98632129570589,
+                "counterfactual": 125.98632129570589
+              },
+              {
+                "fitted": 125.86687689014695,
+                "counterfactual": 125.86687689014695
+              },
+              {
+                "fitted": 125.74754572677077,
+                "counterfactual": 125.74754572677077
+              },
+              {
+                "fitted": 125.6283276982153,
+                "counterfactual": 125.6283276982153
+              },
+              {
+                "fitted": 125.50922269722045,
+                "counterfactual": 125.50922269722045
+              },
+              {
+                "fitted": 125.39023061662746,
+                "counterfactual": 125.39023061662746
+              },
+              {
+                "fitted": 125.2713513493795,
+                "counterfactual": 125.2713513493795
+              },
+              {
+                "fitted": 125.1525847885211,
+                "counterfactual": 125.1525847885211
+              },
+              {
+                "fitted": 125.03393082719825,
+                "counterfactual": 125.03393082719825
+              },
+              {
+                "fitted": 124.91538935865832,
+                "counterfactual": 124.91538935865832
+              },
+              {
+                "fitted": 124.79696027624954,
+                "counterfactual": 124.79696027624954
+              },
+              {
+                "fitted": 124.67864347342162,
+                "counterfactual": 124.67864347342162
+              },
+              {
+                "fitted": 124.56043884372517,
+                "counterfactual": 124.56043884372517
+              },
+              {
+                "fitted": 124.4423462808117,
+                "counterfactual": 124.4423462808117
+              },
+              {
+                "fitted": 124.3243656784337,
+                "counterfactual": 124.3243656784337
+              },
+              {
+                "fitted": 124.206496930444,
+                "counterfactual": 124.206496930444
+              },
+              {
+                "fitted": 124.08873993079645,
+                "counterfactual": 124.08873993079645
+              },
+              {
+                "fitted": 123.9710945735453,
+                "counterfactual": 123.9710945735453
+              },
+              {
+                "fitted": 123.85356075284525,
+                "counterfactual": 123.85356075284525
+              },
+              {
+                "fitted": 123.73613836295137,
+                "counterfactual": 123.73613836295137
+              },
+              {
+                "fitted": 123.61882729821905,
+                "counterfactual": 123.61882729821905
+              },
+              {
+                "fitted": 123.50162745310355,
+                "counterfactual": 123.50162745310355
+              },
+              {
+                "fitted": 123.3845387221605,
+                "counterfactual": 123.3845387221605
+              },
+              {
+                "fitted": 123.26756100004542,
+                "counterfactual": 123.26756100004542
+              },
+              {
+                "fitted": 123.15069418151364,
+                "counterfactual": 123.15069418151364
+              },
+              {
+                "fitted": 123.03393816142047,
+                "counterfactual": 123.03393816142047
+              },
+              {
+                "fitted": 122.91729283472048,
+                "counterfactual": 122.91729283472048
+              },
+              {
+                "fitted": 122.80075809646826,
+                "counterfactual": 122.80075809646826
+              },
+              {
+                "fitted": 122.68433384181769,
+                "counterfactual": 122.68433384181769
+              },
+              {
+                "fitted": 122.56801996602212,
+                "counterfactual": 122.56801996602212
+              },
+              {
+                "fitted": 122.45181636443428,
+                "counterfactual": 122.45181636443428
+              },
+              {
+                "fitted": 122.3357229325058,
+                "counterfactual": 122.3357229325058
+              },
+              {
+                "fitted": 122.21973956578778,
+                "counterfactual": 122.21973956578778
+              },
+              {
+                "fitted": 122.10386615993018,
+                "counterfactual": 122.10386615993018
+              },
+              {
+                "fitted": 121.98810261068193,
+                "counterfactual": 121.98810261068193
+              },
+              {
+                "fitted": 121.87244881389091,
+                "counterfactual": 121.87244881389091
+              },
+              {
+                "fitted": 121.75690466550341,
+                "counterfactual": 121.75690466550341
+              },
+              {
+                "fitted": 121.64147006156468,
+                "counterfactual": 121.64147006156468
+              },
+              {
+                "fitted": 121.52614489821845,
+                "counterfactual": 121.52614489821845
+              },
+              {
+                "fitted": 121.41092907170687,
+                "counterfactual": 121.41092907170687
+              },
+              {
+                "fitted": 121.29582247837062,
+                "counterfactual": 121.29582247837062
+              },
+              {
+                "fitted": 121.1808250146483,
+                "counterfactual": 121.1808250146483
+              },
+              {
+                "fitted": 121.06593657707704,
+                "counterfactual": 121.06593657707704
+              },
+              {
+                "fitted": 120.95115706229191,
+                "counterfactual": 120.95115706229191
+              },
+              {
+                "fitted": 120.83648636702601,
+                "counterfactual": 120.83648636702601
+              },
+              {
+                "fitted": 120.72192438811047,
+                "counterfactual": 120.72192438811047
+              },
+              {
+                "fitted": 120.60747102247386,
+                "counterfactual": 120.60747102247386
+              },
+              {
+                "fitted": 120.49312616714283,
+                "counterfactual": 120.49312616714283
+              },
+              {
+                "fitted": 120.37888971924154,
+                "counterfactual": 120.37888971924154
+              },
+              {
+                "fitted": 120.26476157599168,
+                "counterfactual": 120.26476157599168
+              },
+              {
+                "fitted": 120.15074163471249,
+                "counterfactual": 120.15074163471249
+              },
+              {
+                "fitted": 120.03682979282023,
+                "counterfactual": 120.03682979282023
+              },
+              {
+                "fitted": 119.92302594782876,
+                "counterfactual": 119.92302594782876
+              },
+              {
+                "fitted": 119.80932999734897,
+                "counterfactual": 119.80932999734897
+              },
+              {
+                "fitted": 119.69574183908884,
+                "counterfactual": 119.69574183908884
+              },
+              {
+                "fitted": 119.58226137085344,
+                "counterfactual": 119.58226137085344
+              },
+              {
+                "fitted": 119.4688884905444,
+                "counterfactual": 119.4688884905444
+              },
+              {
+                "fitted": 119.35562309616046,
+                "counterfactual": 119.35562309616046
+              },
+              {
+                "fitted": 119.24246508579697,
+                "counterfactual": 119.24246508579697
+              },
+              {
+                "fitted": 119.1294143576459,
+                "counterfactual": 119.1294143576459
+              },
+              {
+                "fitted": 119.01647080999581,
+                "counterfactual": 119.01647080999581
+              },
+              {
+                "fitted": 118.90363434123144,
+                "counterfactual": 118.90363434123144
+              },
+              {
+                "fitted": 118.7909048498341,
+                "counterfactual": 118.7909048498341
+              },
+              {
+                "fitted": 118.67828223438133,
+                "counterfactual": 118.67828223438133
+              },
+              {
+                "fitted": 118.56576639354675,
+                "counterfactual": 118.56576639354675
+              },
+              {
+                "fitted": 118.45335722610021,
+                "counterfactual": 118.45335722610021
+              },
+              {
+                "fitted": 118.34105463090717,
+                "counterfactual": 118.34105463090717
+              },
+              {
+                "fitted": 118.22885850692931,
+                "counterfactual": 118.22885850692931
+              },
+              {
+                "fitted": 118.11676875322402,
+                "counterfactual": 118.11676875322402
+              },
+              {
+                "fitted": 118.00478526894436,
+                "counterfactual": 118.00478526894436
+              },
+              {
+                "fitted": 117.89290795333909,
+                "counterfactual": 117.89290795333909
+              },
+              {
+                "fitted": 117.78113670575223,
+                "counterfactual": 117.78113670575223
+              },
+              {
+                "fitted": 117.66947142562348,
+                "counterfactual": 117.66947142562348
+              },
+              {
+                "fitted": 117.55791201248785,
+                "counterfactual": 117.55791201248785
+              },
+              {
+                "fitted": 117.4464583659755,
+                "counterfactual": 117.4464583659755
+              },
+              {
+                "fitted": 117.33511038581196,
+                "counterfactual": 117.33511038581196
+              },
+              {
+                "fitted": 117.22386797181743,
+                "counterfactual": 117.22386797181743
+              },
+              {
+                "fitted": 117.11273102390743,
+                "counterfactual": 117.11273102390743
+              },
+              {
+                "fitted": 117.00169944209227,
+                "counterfactual": 117.00169944209227
+              },
+              {
+                "fitted": 116.89077312647707,
+                "counterfactual": 116.89077312647707
+              },
+              {
+                "fitted": 116.77995197726173,
+                "counterfactual": 116.77995197726173
+              },
+              {
+                "fitted": 116.66923589474047,
+                "counterfactual": 116.66923589474047
+              },
+              {
+                "fitted": 116.55862477930236,
+                "counterfactual": 116.55862477930236
+              },
+              {
+                "fitted": 116.4481185314308,
+                "counterfactual": 116.4481185314308
+              },
+              {
+                "fitted": 116.3377170517035,
+                "counterfactual": 116.3377170517035
+              },
+              {
+                "fitted": 116.22742024079261,
+                "counterfactual": 116.22742024079261
+              },
+              {
+                "fitted": 116.11722799946409,
+                "counterfactual": 116.11722799946409
+              },
+              {
+                "fitted": 116.00714022857828,
+                "counterfactual": 116.00714022857828
+              },
+              {
+                "fitted": 115.89715682908944,
+                "counterfactual": 115.89715682908944
+              },
+              {
+                "fitted": 115.78727770204573,
+                "counterfactual": 115.78727770204573
+              },
+              {
+                "fitted": 115.6775027485892,
+                "counterfactual": 115.6775027485892
+              },
+              {
+                "fitted": 115.56783186995534,
+                "counterfactual": 115.56783186995534
+              },
+              {
+                "fitted": 115.45826496747358,
+                "counterfactual": 115.45826496747358
+              },
+              {
+                "fitted": 115.34880194256681,
+                "counterfactual": 115.34880194256681
+              },
+              {
+                "fitted": 115.23944269675133,
+                "counterfactual": 115.23944269675133
+              },
+              {
+                "fitted": 115.13018713163694,
+                "counterfactual": 115.13018713163694
+              },
+              {
+                "fitted": 115.02103514892646,
+                "counterfactual": 115.02103514892646
+              },
+              {
+                "fitted": 114.91198665041613,
+                "counterfactual": 114.91198665041613
+              },
+              {
+                "fitted": 114.80304153799523,
+                "counterfactual": 114.80304153799523
+              },
+              {
+                "fitted": 114.69419971364607,
+                "counterfactual": 114.69419971364607
+              },
+              {
+                "fitted": 114.58546107944397,
+                "counterfactual": 114.58546107944397
+              },
+              {
+                "fitted": 114.4768255375568,
+                "counterfactual": 114.4768255375568
+              },
+              {
+                "fitted": 114.36829299024546,
+                "counterfactual": 114.36829299024546
+              },
+              {
+                "fitted": 114.25986333986346,
+                "counterfactual": 114.25986333986346
+              },
+              {
+                "fitted": 114.1515364888568,
+                "counterfactual": 114.1515364888568
+              },
+              {
+                "fitted": 114.04331233976419,
+                "counterfactual": 114.04331233976419
+              },
+              {
+                "fitted": 113.93519079521631,
+                "counterfactual": 113.93519079521631
+              },
+              {
+                "fitted": 113.82717175793658,
+                "counterfactual": 113.82717175793658
+              },
+              {
+                "fitted": 113.71925513074044,
+                "counterfactual": 113.71925513074044
+              },
+              {
+                "fitted": 113.61144081653552,
+                "counterfactual": 113.61144081653552
+              },
+              {
+                "fitted": 113.50372871832151,
+                "counterfactual": 113.50372871832151
+              },
+              {
+                "fitted": 113.39611873919014,
+                "counterfactual": 113.39611873919014
+              },
+              {
+                "fitted": 113.28861078232471,
+                "counterfactual": 113.28861078232471
+              },
+              {
+                "fitted": 113.18120475100062,
+                "counterfactual": 113.18120475100062
+              },
+              {
+                "fitted": 113.0739005485849,
+                "counterfactual": 113.0739005485849
+              },
+              {
+                "fitted": 112.96669807853624,
+                "counterfactual": 112.96669807853624
+              },
+              {
+                "fitted": 112.85959724440461,
+                "counterfactual": 112.85959724440461
+              },
+              {
+                "fitted": 112.75259794983168,
+                "counterfactual": 112.75259794983168
+              },
+              {
+                "fitted": 112.6457000985504,
+                "counterfactual": 112.6457000985504
+              },
+              {
+                "fitted": 112.53890359438499,
+                "counterfactual": 112.53890359438499
+              },
+              {
+                "fitted": 112.43220834125084,
+                "counterfactual": 112.43220834125084
+              },
+              {
+                "fitted": 112.32561424315455,
+                "counterfactual": 112.32561424315455
+              },
+              {
+                "fitted": 112.2191212041934,
+                "counterfactual": 112.2191212041934
+              },
+              {
+                "fitted": 112.11272912855591,
+                "counterfactual": 112.11272912855591
+              },
+              {
+                "fitted": 112.00643792052135,
+                "counterfactual": 112.00643792052135
+              },
+              {
+                "fitted": 111.90024748445973,
+                "counterfactual": 111.90024748445973
+              },
+              {
+                "fitted": 111.79415772483182,
+                "counterfactual": 111.79415772483182
+              },
+              {
+                "fitted": 111.68816854618866,
+                "counterfactual": 111.68816854618866
+              },
+              {
+                "fitted": 111.58227985317211,
+                "counterfactual": 111.58227985317211
+              },
+              {
+                "fitted": 111.47649155051431,
+                "counterfactual": 111.47649155051431
+              },
+              {
+                "fitted": 111.37080354303774,
+                "counterfactual": 111.37080354303774
+              },
+              {
+                "fitted": 111.26521573565519,
+                "counterfactual": 111.26521573565519
+              },
+              {
+                "fitted": 111.15972803336933,
+                "counterfactual": 111.15972803336933
+              },
+              {
+                "fitted": 111.05434034127319,
+                "counterfactual": 111.05434034127319
+              },
+              {
+                "fitted": 110.94905256454965,
+                "counterfactual": 110.94905256454965
+              },
+              {
+                "fitted": 110.84386460847149,
+                "counterfactual": 110.84386460847149
+              },
+              {
+                "fitted": 110.73877637840145,
+                "counterfactual": 110.73877637840145
+              },
+              {
+                "fitted": 110.63378777979163,
+                "counterfactual": 110.63378777979163
+              },
+              {
+                "fitted": 110.52889871818411,
+                "counterfactual": 110.52889871818411
+              },
+              {
+                "fitted": 110.4241090992104,
+                "counterfactual": 110.4241090992104
+              },
+              {
+                "fitted": 110.31941882859147,
+                "counterfactual": 110.31941882859147
+              },
+              {
+                "fitted": 96.43845897334432,
+                "counterfactual": 110.2148278121378
+              },
+              {
+                "fitted": 96.34702813953139,
+                "counterfactual": 110.11033595574887
+              },
+              {
+                "fitted": 96.25568398895106,
+                "counterfactual": 110.00594316541364
+              },
+              {
+                "fitted": 96.16442643942119,
+                "counterfactual": 109.90164934721014
+              },
+              {
+                "fitted": 96.07325540883754,
+                "counterfactual": 109.79745440730541
+              },
+              {
+                "fitted": 95.98217081517379,
+                "counterfactual": 109.69335825195557
+              },
+              {
+                "fitted": 95.89117257648115,
+                "counterfactual": 109.58936078750531
+              },
+              {
+                "fitted": 95.80026061088876,
+                "counterfactual": 109.48546192038845
+              },
+              {
+                "fitted": 95.7094348366033,
+                "counterfactual": 109.38166155712732
+              },
+              {
+                "fitted": 95.61869517190901,
+                "counterfactual": 109.27795960433298
+              },
+              {
+                "fitted": 95.52804153516766,
+                "counterfactual": 109.17435596870507
+              },
+              {
+                "fitted": 95.43747384481821,
+                "counterfactual": 109.07085055703142
+              },
+              {
+                "fitted": 95.34699201937713,
+                "counterfactual": 108.96744327618849
+              },
+              {
+                "fitted": 95.25659597743814,
+                "counterfactual": 108.86413403314097
+              },
+              {
+                "fitted": 95.16628563767206,
+                "counterfactual": 108.76092273494173
+              },
+              {
+                "fitted": 95.07606091882697,
+                "counterfactual": 108.65780928873185
+              },
+              {
+                "fitted": 94.98592173972767,
+                "counterfactual": 108.5547936017402
+              },
+              {
+                "fitted": 94.89586801927624,
+                "counterfactual": 108.45187558128384
+              },
+              {
+                "fitted": 94.80589967645147,
+                "counterfactual": 108.34905513476764
+              },
+              {
+                "fitted": 94.71601663030907,
+                "counterfactual": 108.24633216968425
+              },
+              {
+                "fitted": 94.6262187999815,
+                "counterfactual": 108.1437065936141
+              },
+              {
+                "fitted": 94.53650610467767,
+                "counterfactual": 108.04117831422496
+              },
+              {
+                "fitted": 94.4468784636833,
+                "counterfactual": 107.93874723927247
+              }
+            ]
+          },
+          "terms": [
+            {
+              "name": "const",
+              "coefficient": 4.90616565014824,
+              "standardError": 0.02040565631574903,
+              "pValue": 0,
+              "interval": [
+                4.866171298688469,
+                4.9461600016080105
+              ]
+            },
+            {
+              "name": "time",
+              "coefficient": -0.0009485241035223543,
+              "standardError": 0.00021208107368174655,
+              "pValue": 0.000007732489363254658,
+              "interval": [
+                -0.001364195369741163,
+                -0.0005328528373035455
+              ]
+            },
+            {
+              "name": "step",
+              "coefficient": -0.13352636725449202,
+              "standardError": 0.039069386498595086,
+              "pValue": 0.0006315905952793965,
+              "interval": [
+                -0.21010095768981385,
+                -0.0569517768191702
+              ]
+            },
+            {
+              "name": "sin1",
+              "coefficient": -0.10307315409885895,
+              "standardError": 0.014263260172509538,
+              "pValue": 4.956035581926699e-13,
+              "interval": [
+                -0.1310286303391022,
+                -0.0751176778586157
+              ]
+            },
+            {
+              "name": "sin2",
+              "coefficient": -0.0545164812877567,
+              "standardError": 0.013932080880557434,
+              "pValue": 0.00009114979094393405,
+              "interval": [
+                -0.08182285804334835,
+                -0.027210104532165047
+              ]
+            },
+            {
+              "name": "cos1",
+              "coefficient": 0.12071223729757523,
+              "standardError": 0.013717529023966486,
+              "pValue": 0,
+              "interval": [
+                0.09382637445371804,
+                0.14759810014143243
+              ]
+            },
+            {
+              "name": "cos2",
+              "coefficient": 0.0782271260645829,
+              "standardError": 0.013952008625948297,
+              "pValue": 2.060159398631356e-8,
+              "interval": [
+                0.05088169164573207,
+                0.10557256048343373
+              ]
+            }
+          ],
+          "path": [
+            {
+              "observed": 107,
+              "fitted": 141.19209207479724,
+              "counterfactual": 141.19209207479724,
+              "residual": -3.007256656242611
+            },
+            {
+              "observed": 97,
+              "fitted": 120.18527734392877,
+              "counterfactual": 120.18527734392877,
+              "residual": -2.1890147804894964
+            },
+            {
+              "observed": 102,
+              "fitted": 112.39503879761959,
+              "counterfactual": 112.39503879761959,
+              "residual": -0.9962393184809292
+            },
+            {
+              "observed": 87,
+              "fitted": 116.84526754119527,
+              "counterfactual": 116.84526754119527,
+              "residual": -2.893190334210168
+            },
+            {
+              "observed": 119,
+              "fitted": 125.42058999856425,
+              "counterfactual": 125.42058999856425,
+              "residual": -0.578310251975519
+            },
+            {
+              "observed": 106,
+              "fitted": 128.7650459281739,
+              "counterfactual": 128.7650459281739,
+              "residual": -2.0701275848976284
+            },
+            {
+              "observed": 110,
+              "fitted": 126.27014246890802,
+              "counterfactual": 126.27014246890802,
+              "residual": -1.4808016308165606
+            },
+            {
+              "observed": 106,
+              "fitted": 126.61602580252834,
+              "counterfactual": 126.61602580252834,
+              "residual": -1.8855802660416845
+            },
+            {
+              "observed": 107,
+              "fitted": 137.3421092919221,
+              "counterfactual": 137.3421092919221,
+              "residual": -2.694428965665579
+            },
+            {
+              "observed": 134,
+              "fitted": 156.71041196172075,
+              "counterfactual": 156.71041196172075,
+              "residual": -1.8608598983184006
+            },
+            {
+              "observed": 147,
+              "fitted": 170.3976029086394,
+              "counterfactual": 170.3976029086394,
+              "residual": -1.8359819045316748
+            },
+            {
+              "observed": 180,
+              "fitted": 162.99552138573154,
+              "counterfactual": 162.99552138573154,
+              "residual": 1.3097054460496849
+            },
+            {
+              "observed": 125,
+              "fitted": 139.59411441835505,
+              "counterfactual": 139.59411441835505,
+              "residual": -1.2577384005239867
+            },
+            {
+              "observed": 134,
+              "fitted": 118.82504969231805,
+              "counterfactual": 118.82504969231805,
+              "residual": 1.3639520756074652
+            },
+            {
+              "observed": 110,
+              "fitted": 111.12297916556585,
+              "counterfactual": 111.12297916556585,
+              "residual": -0.10670965481875486
+            },
+            {
+              "observed": 102,
+              "fitted": 115.52284130578725,
+              "counterfactual": 115.52284130578725,
+              "residual": -1.2839818193437935
+            },
+            {
+              "observed": 103,
+              "fitted": 124.00111035540303,
+              "counterfactual": 124.00111035540303,
+              "residual": -1.943333516678629
+            },
+            {
+              "observed": 111,
+              "fitted": 127.30771454863054,
+              "counterfactual": 127.30771454863054,
+              "residual": -1.4779568556252363
+            },
+            {
+              "observed": 120,
+              "fitted": 124.84104779812296,
+              "counterfactual": 124.84104779812296,
+              "residual": -0.4361184988123177
+            },
+            {
+              "observed": 129,
+              "fitted": 125.18301650854622,
+              "counterfactual": 125.18301650854622,
+              "residual": 0.3394397004098237
+            },
+            {
+              "observed": 122,
+              "fitted": 135.7877048014717,
+              "counterfactual": 135.7877048014717,
+              "residual": -1.2041314495405706
+            },
+            {
+              "observed": 183,
+              "fitted": 154.936801746256,
+              "counterfactual": 154.936801746256,
+              "residual": 2.1911646437399854
+            },
+            {
+              "observed": 169,
+              "fitted": 168.46908440481945,
+              "counterfactual": 168.46908440481945,
+              "residual": 0.0408825058104792
+            },
+            {
+              "observed": 190,
+              "fitted": 161.1507778349627,
+              "counterfactual": 161.1507778349627,
+              "residual": 2.2093749752096357
+            },
+            {
+              "observed": 134,
+              "fitted": 138.01422228322605,
+              "counterfactual": 138.01422228322605,
+              "residual": -0.343372491714176
+            },
+            {
+              "observed": 108,
+              "fitted": 117.48021676546134,
+              "counterfactual": 117.48021676546134,
+              "residual": -0.8868309170450862
+            },
+            {
+              "observed": 104,
+              "fitted": 109.86531639412813,
+              "counterfactual": 109.86531639412813,
+              "residual": -0.5646717791827724
+            },
+            {
+              "observed": 117,
+              "fitted": 114.21538196792596,
+              "counterfactual": 114.21538196792596,
+              "residual": 0.2595092157572074
+            },
+            {
+              "observed": 157,
+              "fitted": 122.59769603658279,
+              "counterfactual": 122.59769603658279,
+              "residual": 2.976472825474736
+            },
+            {
+              "observed": 148,
+              "fitted": 125.86687689014695,
+              "counterfactual": 125.86687689014695,
+              "residual": 1.918864595232647
+            },
+            {
+              "observed": 130,
+              "fitted": 123.42812727221585,
+              "counterfactual": 123.42812727221585,
+              "residual": 0.586401003607109
+            },
+            {
+              "observed": 140,
+              "fitted": 123.76622566419248,
+              "counterfactual": 123.76622566419248,
+              "residual": 1.4289391330633245
+            },
+            {
+              "observed": 136,
+              "fitted": 134.25089268187105,
+              "counterfactual": 134.25089268187105,
+              "residual": 0.15063257124666113
+            },
+            {
+              "observed": 140,
+              "fitted": 153.18326481856482,
+              "counterfactual": 153.18326481856482,
+              "residual": -1.0810199286411957
+            },
+            {
+              "observed": 187,
+              "fitted": 166.5623924029926,
+              "counterfactual": 166.5623924029926,
+              "residual": 1.5527521816636423
+            },
+            {
+              "observed": 150,
+              "fitted": 159.3269126417042,
+              "counterfactual": 159.3269126417042,
+              "residual": -0.7463040782463468
+            },
+            {
+              "observed": 159,
+              "fitted": 136.4522109818918,
+              "counterfactual": 136.4522109818918,
+              "residual": 1.8804475451644946
+            },
+            {
+              "observed": 143,
+              "fitted": 116.15060432961948,
+              "counterfactual": 116.15060432961948,
+              "residual": 2.403518570901503
+            },
+            {
+              "observed": 114,
+              "fitted": 108.62188754314997,
+              "counterfactual": 108.62188754314997,
+              "residual": 0.5118528032859752
+            },
+            {
+              "observed": 127,
+              "fitted": 112.92272013591568,
+              "counterfactual": 112.92272013591568,
+              "residual": 1.29854627432695
+            },
+            {
+              "observed": 159,
+              "fitted": 121.21016521868108,
+              "counterfactual": 121.21016521868108,
+              "residual": 3.2739299515240243
+            },
+            {
+              "observed": 156,
+              "fitted": 124.4423462808117,
+              "counterfactual": 124.4423462808117,
+              "residual": 2.7204592506558254
+            },
+            {
+              "observed": 138,
+              "fitted": 122.03119783616062,
+              "counterfactual": 122.03119783616062,
+              "residual": 1.4156393398996492
+            },
+            {
+              "observed": 120,
+              "fitted": 122.36546971301081,
+              "counterfactual": 122.36546971301081,
+              "residual": -0.2145340815601217
+            },
+            {
+              "observed": 117,
+              "fitted": 132.73147382695802,
+              "counterfactual": 132.73147382695802,
+              "residual": -1.3938703354231126
+            },
+            {
+              "observed": 170,
+              "fitted": 151.44957399407235,
+              "counterfactual": 151.44957399407235,
+              "residual": 1.4780697595902312
+            },
+            {
+              "observed": 168,
+              "fitted": 164.6772798761341,
+              "counterfactual": 164.6772798761341,
+              "residual": 0.258063254735116
+            },
+            {
+              "observed": 198,
+              "fitted": 157.52368950979888,
+              "counterfactual": 157.52368950979888,
+              "residual": 3.0998522520063974
+            },
+            {
+              "observed": 144,
+              "fitted": 134.9078781434373,
+              "counterfactual": 134.9078781434373,
+              "residual": 0.7742377449295739
+            },
+            {
+              "observed": 146,
+              "fitted": 114.83604012298747,
+              "counterfactual": 114.83604012298747,
+              "residual": 2.7895599791669854
+            },
+            {
+              "observed": 109,
+              "fitted": 107.39253151659153,
+              "counterfactual": 107.39253151659153,
+              "residual": 0.15473100985911079
+            },
+            {
+              "observed": 131,
+              "fitted": 111.64468833519494,
+              "counterfactual": 111.64468833519494,
+              "residual": 1.7823770049100138
+            },
+            {
+              "observed": 151,
+              "fitted": 119.8383381361098,
+              "counterfactual": 119.8383381361098,
+              "residual": 2.7349230319212015
+            },
+            {
+              "observed": 140,
+              "fitted": 123.03393816142047,
+              "counterfactual": 123.03393816142047,
+              "residual": 1.4962914831124483
+            },
+            {
+              "observed": 153,
+              "fitted": 120.650078506703,
+              "counterfactual": 120.650078506703,
+              "residual": 2.826386645923853
+            },
+            {
+              "observed": 140,
+              "fitted": 120.98056717599142,
+              "counterfactual": 120.98056717599142,
+              "residual": 1.6866037013085797
+            },
+            {
+              "observed": 161,
+              "fitted": 131.22925138400578,
+              "counterfactual": 131.22925138400578,
+              "residual": 2.508816317367184
+            },
+            {
+              "observed": 168,
+              "fitted": 149.73550465942427,
+              "counterfactual": 149.73550465942427,
+              "residual": 1.4637076590663578
+            },
+            {
+              "observed": 152,
+              "fitted": 162.81350259301024,
+              "counterfactual": 162.81350259301024,
+              "residual": -0.8571143429204516
+            },
+            {
+              "observed": 136,
+              "fitted": 155.74087481743206,
+              "counterfactual": 155.74087481743206,
+              "residual": -1.617166735289308
+            },
+            {
+              "observed": 113,
+              "fitted": 133.38102368733186,
+              "counterfactual": 133.38102368733186,
+              "residual": -1.8128053671674862
+            },
+            {
+              "observed": 100,
+              "fitted": 113.53635383337841,
+              "counterfactual": 113.53635383337841,
+              "residual": -1.2969688194757412
+            },
+            {
+              "observed": 103,
+              "fitted": 106.17708904165902,
+              "counterfactual": 106.17708904165902,
+              "residual": -0.30988587781290433
+            },
+            {
+              "observed": 103,
+              "fitted": 110.38112098663836,
+              "counterfactual": 110.38112098663836,
+              "residual": -0.7106026553455475
+            },
+            {
+              "observed": 121,
+              "fitted": 118.48203705782264,
+              "counterfactual": 118.48203705782264,
+              "residual": 0.2305130927378231
+            },
+            {
+              "observed": 134,
+              "fitted": 121.64147006156468,
+              "counterfactual": 121.64147006156468,
+              "residual": 1.1023231938913345
+            },
+            {
+              "observed": 133,
+              "fitted": 119.28459034891294,
+              "counterfactual": 119.28459034891294,
+              "residual": 1.2328081630047536
+            },
+            {
+              "observed": 129,
+              "fitted": 119.61133862806025,
+              "counterfactual": 119.61133862806025,
+              "residual": 0.8475765730972827
+            },
+            {
+              "observed": 144,
+              "fitted": 129.74403072821872,
+              "counterfactual": 129.74403072821872,
+              "residual": 1.2296338491425527
+            },
+            {
+              "observed": 154,
+              "fitted": 148.04083474338464,
+              "counterfactual": 148.04083474338464,
+              "residual": 0.48654087212279284
+            },
+            {
+              "observed": 156,
+              "fitted": 160.97081908653655,
+              "counterfactual": 160.97081908653655,
+              "residual": -0.39383376309154167
+            },
+            {
+              "observed": 163,
+              "fitted": 153.97823758686226,
+              "counterfactual": 153.97823758686226,
+              "residual": 0.7201138730895559
+            },
+            {
+              "observed": 122,
+              "fitted": 131.87144979750795,
+              "counterfactual": 131.87144979750795,
+              "residual": -0.8706918410321401
+            },
+            {
+              "observed": 92,
+              "fitted": 112.25137707615649,
+              "counterfactual": 112.25137707615649,
+              "residual": -1.973713794825746
+            },
+            {
+              "observed": 117,
+              "fitted": 104.97540264816921,
+              "counterfactual": 104.97540264816921,
+              "residual": 1.1522185033178247
+            },
+            {
+              "observed": 95,
+              "fitted": 109.13185438510473,
+              "counterfactual": 109.13185438510473,
+              "residual": -1.3836623627788485
+            },
+            {
+              "observed": 96,
+              "fitted": 117.14108626429044,
+              "counterfactual": 117.14108626429044,
+              "residual": -2.0169886252863303
+            },
+            {
+              "observed": 108,
+              "fitted": 120.26476157599168,
+              "counterfactual": 120.26476157599168,
+              "residual": -1.1382468542746513
+            },
+            {
+              "observed": 108,
+              "fitted": 117.93455645300294,
+              "counterfactual": 117.93455645300294,
+              "residual": -0.928120293630864
+            },
+            {
+              "observed": 106,
+              "fitted": 118.25760667483212,
+              "counterfactual": 118.25760667483212,
+              "residual": -1.1475393677162793
+            },
+            {
+              "observed": 140,
+              "fitted": 128.2756194375168,
+              "counterfactual": 128.2756194375168,
+              "residual": 1.0199872462051867
+            },
+            {
+              "observed": 114,
+              "fitted": 146.36534468806545,
+              "counterfactual": 146.36534468806545,
+              "residual": -2.7842054949807533
+            },
+            {
+              "observed": 158,
+              "fitted": 159.14899062249455,
+              "counterfactual": 159.14899062249455,
+              "residual": -0.09118814341905172
+            },
+            {
+              "observed": 161,
+              "fitted": 152.23554945449996,
+              "counterfactual": 152.23554945449996,
+              "residual": 0.7036831927233518
+            },
+            {
+              "observed": 102,
+              "fitted": 130.37896089673114,
+              "counterfactual": 130.37896089673114,
+              "residual": -2.5848666884451985
+            },
+            {
+              "observed": 127,
+              "fitted": 110.98094337242217,
+              "counterfactual": 110.98094337242217,
+              "residual": 1.4860505958350145
+            },
+            {
+              "observed": 125,
+              "fitted": 103.78731664814774,
+              "counterfactual": 103.78731664814774,
+              "residual": 2.016711277620711
+            },
+            {
+              "observed": 101,
+              "fitted": 107.89672667822771,
+              "counterfactual": 107.89672667822771,
+              "residual": -0.671223995492591
+            },
+            {
+              "observed": 97,
+              "fitted": 115.81531202473501,
+              "counterfactual": 115.81531202473501,
+              "residual": -1.79921584824887
+            },
+            {
+              "observed": 112,
+              "fitted": 118.90363434123144,
+              "counterfactual": 118.90363434123144,
+              "residual": -0.6393911655311801
+            },
+            {
+              "observed": 112,
+              "fitted": 116.59980191140653,
+              "counterfactual": 116.59980191140653,
+              "residual": -0.4288288510826738
+            },
+            {
+              "observed": 113,
+              "fitted": 116.91919592962803,
+              "counterfactual": 116.91919592962803,
+              "residual": -0.36450874194152977
+            },
+            {
+              "observed": 108,
+              "fitted": 126.82382726760646,
+              "counterfactual": 126.82382726760646,
+              "residual": -1.715642532166307
+            },
+            {
+              "observed": 128,
+              "fitted": 144.70881742048272,
+              "counterfactual": 144.70881742048272,
+              "residual": -1.4170917703470165
+            },
+            {
+              "observed": 154,
+              "fitted": 157.34778116860141,
+              "counterfactual": 157.34778116860141,
+              "residual": -0.26784147260917945
+            },
+            {
+              "observed": 162,
+              "fitted": 150.5125846413174,
+              "counterfactual": 150.5125846413174,
+              "residual": 0.924797943616606
+            },
+            {
+              "observed": 112,
+              "fitted": 128.90336362126376,
+              "counterfactual": 128.90336362126376,
+              "residual": -1.5232732595624765
+            },
+            {
+              "observed": 79,
+              "fitted": 109.72488812744379,
+              "counterfactual": 109.72488812744379,
+              "residual": -3.089060507083459
+            },
+            {
+              "observed": 82,
+              "fitted": 102.6126771156591,
+              "counterfactual": 102.6126771156591,
+              "residual": -2.1094140062912667
+            },
+            {
+              "observed": 127,
+              "fitted": 106.67557784544663,
+              "counterfactual": 106.67557784544663,
+              "residual": 1.9098285743257595
+            },
+            {
+              "observed": 108,
+              "fitted": 114.50454257462023,
+              "counterfactual": 114.50454257462023,
+              "residual": -0.6137582690906038
+            },
+            {
+              "observed": 110,
+              "fitted": 117.55791201248785,
+              "counterfactual": 117.55791201248785,
+              "residual": -0.7047459265540793
+            },
+            {
+              "observed": 123,
+              "fitted": 115.28015379611887,
+              "counterfactual": 115.28015379611887,
+              "residual": 0.7111952665299317
+            },
+            {
+              "observed": 103,
+              "fitted": 115.59593299075375,
+              "counterfactual": 115.59593299075375,
+              "residual": -1.1938501320690713
+            },
+            {
+              "observed": 97,
+              "fitted": 125.38846612733269,
+              "counterfactual": 125.38846612733269,
+              "residual": -2.641217996618952
+            },
+            {
+              "observed": 140,
+              "fitted": 143.0710383244295,
+              "counterfactual": 143.0710383244295,
+              "residual": -0.2576762015777028
+            },
+            {
+              "observed": 165,
+              "fitted": 155.56695736392967,
+              "counterfactual": 155.56695736392967,
+              "residual": 0.7488419401089947
+            },
+            {
+              "observed": 183,
+              "fitted": 148.80911992359938,
+              "counterfactual": 148.80911992359938,
+              "residual": 2.7046252247557026
+            },
+            {
+              "observed": 148,
+              "fitted": 127.44446679581053,
+              "counterfactual": 127.44446679581053,
+              "residual": 1.7749013871707355
+            },
+            {
+              "observed": 111,
+              "fitted": 108.48304860933241,
+              "counterfactual": 108.48304860933241,
+              "residual": 0.24072841425476796
+            },
+            {
+              "observed": 116,
+              "fitted": 101.45133186686367,
+              "counterfactual": 101.45133186686367,
+              "residual": 1.4118126461533387
+            },
+            {
+              "observed": 115,
+              "fitted": 105.4682496772742,
+              "counterfactual": 105.4682496772742,
+              "residual": 0.9146577711076868
+            },
+            {
+              "observed": 100,
+              "fitted": 113.20860809339972,
+              "counterfactual": 113.20860809339972,
+              "residual": -1.2668118105095956
+            },
+            {
+              "observed": 106,
+              "fitted": 116.22742024079261,
+              "counterfactual": 116.22742024079261,
+              "residual": -0.9631119962077335
+            },
+            {
+              "observed": 134,
+              "fitted": 113.97544113629208,
+              "counterfactual": 113.97544113629208,
+              "residual": 1.8244192451423218
+            },
+            {
+              "observed": 125,
+              "fitted": 114.2876464190315,
+              "counterfactual": 114.2876464190315,
+              "residual": 0.9869680869107456
+            },
+            {
+              "observed": 117,
+              "fitted": 123.96935005430973,
+              "counterfactual": 123.96935005430973,
+              "residual": -0.6319502059664791
+            },
+            {
+              "observed": 122,
+              "fitted": 141.45179521267417,
+              "counterfactual": 141.45179521267417,
+              "residual": -1.6753304102494766
+            },
+            {
+              "observed": 153,
+              "fitted": 153.80628848867454,
+              "counterfactual": 153.80628848867454,
+              "residual": -0.0650704070751149
+            },
+            {
+              "observed": 178,
+              "fitted": 147.12493460402263,
+              "counterfactual": 147.12493460402263,
+              "residual": 2.463407803186497
+            },
+            {
+              "observed": 114,
+              "fitted": 126.00208140875178,
+              "counterfactual": 126.00208140875178,
+              "residual": -1.086907511670599
+            },
+            {
+              "observed": 94,
+              "fitted": 107.25526392795959,
+              "counterfactual": 107.25526392795959,
+              "residual": -1.30773050337982
+            },
+            {
+              "observed": 128,
+              "fitted": 100.30313044030162,
+              "counterfactual": 100.30313044030162,
+              "residual": 2.6509622214639235
+            },
+            {
+              "observed": 119,
+              "fitted": 104.27458575479993,
+              "counterfactual": 104.27458575479993,
+              "residual": 1.4099567427390758
+            },
+            {
+              "observed": 111,
+              "fitted": 111.92734068251428,
+              "counterfactual": 111.92734068251428,
+              "residual": -0.08777535331868247
+            },
+            {
+              "observed": 110,
+              "fitted": 114.91198665041613,
+              "counterfactual": 114.91198665041613,
+              "residual": -0.4615445411323923
+            },
+            {
+              "observed": 114,
+              "fitted": 112.68549489608432,
+              "counterfactual": 112.68549489608432,
+              "residual": 0.12359109298019377
+            },
+            {
+              "observed": 118,
+              "fitted": 112.99416671559123,
+              "counterfactual": 112.99416671559123,
+              "residual": 0.46750688990046757
+            },
+            {
+              "observed": 115,
+              "fitted": 122.5662951908298,
+              "counterfactual": 122.5662951908298,
+              "residual": -0.6906548159080419
+            },
+            {
+              "observed": 132,
+              "fitted": 139.85087829946812,
+              "counterfactual": 139.85087829946812,
+              "residual": -0.670235318078531
+            },
+            {
+              "observed": 153,
+              "fitted": 152.06554643426102,
+              "counterfactual": 152.06554643426102,
+              "residual": 0.07570044375118261
+            },
+            {
+              "observed": 171,
+              "fitted": 145.4598104830606,
+              "counterfactual": 145.4598104830606,
+              "residual": 2.059809408389157
+            },
+            {
+              "observed": 115,
+              "fitted": 124.57602058765625,
+              "counterfactual": 124.57602058765625,
+              "residual": -0.869321149055171
+            },
+            {
+              "observed": 95,
+              "fitted": 106.04137501411097,
+              "counterfactual": 106.04137501411097,
+              "residual": -1.0916882614151036
+            },
+            {
+              "observed": 92,
+              "fitted": 99.16792407739923,
+              "counterfactual": 99.16792407739923,
+              "residual": -0.7287365683937673
+            },
+            {
+              "observed": 100,
+              "fitted": 103.09443142942399,
+              "counterfactual": 103.09443142942399,
+              "residual": -0.30630771190918993
+            },
+            {
+              "observed": 95,
+              "fitted": 110.66057434363958,
+              "counterfactual": 110.66057434363958,
+              "residual": -1.5260762901411813
+            },
+            {
+              "observed": 114,
+              "fitted": 113.61144081653552,
+              "counterfactual": 113.61144081653552,
+              "residual": 0.03643333044171626
+            },
+            {
+              "observed": 102,
+              "fitted": 111.41014795276061,
+              "counterfactual": 111.41014795276061,
+              "residual": -0.9045399541472222
+            },
+            {
+              "observed": 104,
+              "fitted": 111.71532629991032,
+              "counterfactual": 111.71532629991032,
+              "residual": -0.7386116311522797
+            },
+            {
+              "observed": 132,
+              "fitted": 121.17911976004069,
+              "counterfactual": 121.17911976004069,
+              "residual": 0.9688783578013427
+            },
+            {
+              "observed": 136,
+              "fitted": 138.26808017336643,
+              "counterfactual": 138.26808017336643,
+              "residual": -0.19341551462944834
+            },
+            {
+              "observed": 117,
+              "fitted": 150.34450567379187,
+              "counterfactual": 150.34450567379187,
+              "residual": -2.8305901566493157
+            },
+            {
+              "observed": 137,
+              "fitted": 143.81353183071883,
+              "counterfactual": 143.81353183071883,
+              "residual": -0.5727396136750891
+            },
+            {
+              "observed": 111,
+              "fitted": 123.16609957506773,
+              "counterfactual": 123.16609957506773,
+              "residual": -1.1150738576932266
+            },
+            {
+              "observed": 106,
+              "fitted": 104.84122459887966,
+              "counterfactual": 104.84122459887966,
+              "residual": 0.11296297897647087
+            },
+            {
+              "observed": 98,
+              "fitted": 98.04556570319579,
+              "counterfactual": 98.04556570319579,
+              "residual": -0.004602117923698502
+            },
+            {
+              "observed": 84,
+              "fitted": 101.927633802822,
+              "counterfactual": 101.927633802822,
+              "residual": -1.8320182489989494
+            },
+            {
+              "observed": 94,
+              "fitted": 109.4081449571797,
+              "counterfactual": 109.4081449571797,
+              "residual": -1.5098560745510168
+            },
+            {
+              "observed": 105,
+              "fitted": 112.32561424315455,
+              "counterfactual": 112.32561424315455,
+              "residual": -0.6989263967981196
+            },
+            {
+              "observed": 123,
+              "fitted": 110.14923507503997,
+              "counterfactual": 110.14923507503997,
+              "residual": 1.2017212153275822
+            },
+            {
+              "observed": 109,
+              "fitted": 110.45095948809995,
+              "counterfactual": 110.45095948809995,
+              "residual": -0.13836479284300507
+            },
+            {
+              "observed": 130,
+              "fitted": 119.80764404239713,
+              "counterfactual": 119.80764404239713,
+              "residual": 0.9184213161241692
+            },
+            {
+              "observed": 153,
+              "fitted": 136.70319577035622,
+              "counterfactual": 136.70319577035622,
+              "residual": 1.367437869187331
+            },
+            {
+              "observed": 134,
+              "fitted": 148.64294323282815,
+              "counterfactual": 148.64294323282815,
+              "residual": -1.2216122533365248
+            },
+            {
+              "observed": 99,
+              "fitted": 142.18588535857955,
+              "counterfactual": 142.18588535857955,
+              "residual": -3.8331085137714482
+            },
+            {
+              "observed": 115,
+              "fitted": 121.77213570457127,
+              "counterfactual": 121.77213570457127,
+              "residual": -0.6195179944666651
+            },
+            {
+              "observed": 104,
+              "fitted": 103.65465719328917,
+              "counterfactual": 103.65465719328917,
+              "residual": 0.03390120363480088
+            },
+            {
+              "observed": 131,
+              "fitted": 96.93590990728936,
+              "counterfactual": 96.93590990728936,
+              "residual": 3.2821347720344622
+            },
+            {
+              "observed": 108,
+              "fitted": 100.77404170713547,
+              "counterfactual": 100.77404170713547,
+              "residual": 0.7114602816065596
+            },
+            {
+              "observed": 103,
+              "fitted": 108.16989026100491,
+              "counterfactual": 108.16989026100491,
+              "residual": -0.5011227146492979
+            },
+            {
+              "observed": 115,
+              "fitted": 111.05434034127319,
+              "counterfactual": 111.05434034127319,
+              "residual": 0.37222889843482415
+            },
+            {
+              "observed": 122,
+              "fitted": 108.90259290168876,
+              "counterfactual": 108.90259290168876,
+              "residual": 1.2310905160631647
+            },
+            {
+              "observed": 122,
+              "fitted": 109.20090247144282,
+              "counterfactual": 109.20090247144282,
+              "residual": 1.2019750026576947
+            },
+            {
+              "observed": 125,
+              "fitted": 118.45169035237504,
+              "counterfactual": 118.45169035237504,
+              "residual": 0.5962505807076626
+            },
+            {
+              "observed": 137,
+              "fitted": 135.15602234729002,
+              "counterfactual": 135.15602234729002,
+              "residual": 0.15825406549079077
+            },
+            {
+              "observed": 138,
+              "fitted": 146.96063866050113,
+              "counterfactual": 146.96063866050113,
+              "residual": -0.7468689929605553
+            },
+            {
+              "observed": 152,
+              "fitted": 140.57666019217186,
+              "counterfactual": 140.57666019217186,
+              "residual": 0.9508404858568242
+            },
+            {
+              "observed": 120,
+              "fitted": 120.3939483771244,
+              "counterfactual": 120.3939483771244,
+              "residual": -0.03592312360493407
+            },
+            {
+              "observed": 95,
+              "fitted": 89.67177981737397,
+              "counterfactual": 102.48151906815019,
+              "residual": 0.5572320101038475
+            },
+            {
+              "observed": 100,
+              "fitted": 83.85938273274259,
+              "counterfactual": 95.83881292499743,
+              "residual": 1.710124690631319
+            },
+            {
+              "observed": 89,
+              "fitted": 87.1797555841434,
+              "counterfactual": 99.6335056853866,
+              "residual": 0.194276827793269
+            },
+            {
+              "observed": 82,
+              "fitted": 93.57791386321165,
+              "counterfactual": 106.94564982942795,
+              "residual": -1.2229079625209733
+            },
+            {
+              "observed": 89,
+              "fitted": 96.07325540883754,
+              "counterfactual": 109.79745440730541,
+              "residual": -0.7307739792001731
+            },
+            {
+              "observed": 60,
+              "fitted": 94.21177587815713,
+              "counterfactual": 107.6700599203563,
+              "residual": -3.7788195580072967
+            },
+            {
+              "observed": 84,
+              "fitted": 94.46984387800126,
+              "counterfactual": 107.96499329516794,
+              "residual": -1.0980697632903593
+            },
+            {
+              "observed": 113,
+              "fitted": 102.47271260052634,
+              "counterfactual": 117.11108301545309,
+              "residual": 1.0228651667786426
+            },
+            {
+              "observed": 126,
+              "fitted": 116.92365210680482,
+              "counterfactual": 133.62635945561613,
+              "residual": 0.8288597521170975
+            },
+            {
+              "observed": 122,
+              "fitted": 127.13584115387235,
+              "counterfactual": 145.29737400095064,
+              "residual": -0.4586081669787661
+            },
+            {
+              "observed": 118,
+              "fitted": 121.61305301225175,
+              "counterfactual": 138.98564784365198,
+              "residual": -0.32927313834592786
+            },
+            {
+              "observed": 92,
+              "fitted": 104.15296256381599,
+              "counterfactual": 119.0313590376623,
+              "residual": -1.2151833651177928
+            },
+            {
+              "observed": 86,
+              "fitted": 88.6568964874659,
+              "counterfactual": 101.32165823414263,
+              "residual": -0.2836021751006202
+            },
+            {
+              "observed": 81,
+              "fitted": 82.91028269519248,
+              "counterfactual": 94.75413261873092,
+              "residual": -0.21060764001889468
+            },
+            {
+              "observed": 84,
+              "fitted": 86.19307637661537,
+              "counterfactual": 98.50587797211531,
+              "residual": -0.23723298486963754
+            },
+            {
+              "observed": 87,
+              "fitted": 92.51882186101463,
+              "counterfactual": 105.73526505242077,
+              "residual": -0.5796122641193406
+            },
+            {
+              "observed": 90,
+              "fitted": 94.98592173972767,
+              "counterfactual": 108.5547936017402,
+              "residual": -0.5161591090890595
+            },
+            {
+              "observed": 79,
+              "fitted": 93.14550998029569,
+              "counterfactual": 106.45147644664861,
+              "residual": -1.505338308219153
+            },
+            {
+              "observed": 96,
+              "fitted": 93.40065722946957,
+              "counterfactual": 106.74307183746902,
+              "residual": 0.2677272689939447
+            },
+            {
+              "observed": 122,
+              "fitted": 101.31295143597077,
+              "counterfactual": 115.78564834534886,
+              "residual": 1.9906680985175205
+            },
+            {
+              "observed": 120,
+              "fitted": 115.60033873400427,
+              "counterfactual": 132.11400891541282,
+              "residual": 0.40664847910117824
+            },
+            {
+              "observed": 137,
+              "fitted": 125.69694871654497,
+              "counterfactual": 143.65293376508936,
+              "residual": 0.9935988547516972
+            },
+            {
+              "observed": 154,
+              "fitted": 120.23666614391097,
+              "counterfactual": 137.41264218478932,
+              "residual": 2.94964949956748
+            }
+          ],
+          "ljungBox": [
+            {
+              "statistic": 24.164765665719646,
+              "pValue": 8.843550774210431e-7
+            },
+            {
+              "statistic": 28.167720234941665,
+              "pValue": 7.646404470436422e-7
+            },
+            {
+              "statistic": 33.01804337965942,
+              "pValue": 3.192571326318348e-7
+            },
+            {
+              "statistic": 35.91077112109456,
+              "pValue": 3.0186151904343197e-7
+            },
+            {
+              "statistic": 39.329800350227494,
+              "pValue": 2.038128884659996e-7
+            },
+            {
+              "statistic": 43.075217206807814,
+              "pValue": 1.1271332563370492e-7
+            },
+            {
+              "statistic": 45.17169565586721,
+              "pValue": 1.2665575745013547e-7
+            },
+            {
+              "statistic": 54.95193560152366,
+              "pValue": 4.510911333619786e-9
+            },
+            {
+              "statistic": 60.56508095618608,
+              "pValue": 1.0432123486250371e-9
+            },
+            {
+              "statistic": 60.76808067395152,
+              "pValue": 2.592724402195982e-9
+            },
+            {
+              "statistic": 61.027085769667316,
+              "pValue": 5.9722529883704734e-9
+            },
+            {
+              "statistic": 67.78886138195989,
+              "pValue": 8.283301207264316e-10
+            }
+          ],
+          "residualAcf": [
+            {
+              "value": 1,
+              "limit": 0
+            },
+            {
+              "value": 0.35201121344025954,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.14289454560577008,
+              "limit": 0.15800619219246437
+            },
+            {
+              "value": 0.15687898096286218,
+              "limit": 0.1605709223476588
+            },
+            {
+              "value": 0.12083179456633024,
+              "limit": 0.16360878851845953
+            },
+            {
+              "value": 0.13101491238063093,
+              "limit": 0.1653846137064105
+            },
+            {
+              "value": 0.13675873442793654,
+              "limit": 0.16744828330034595
+            },
+            {
+              "value": 0.10204214661229218,
+              "limit": 0.1696682935874903
+            },
+            {
+              "value": 0.219802276986986,
+              "limit": 0.17089175540872223
+            },
+            {
+              "value": 0.1660646558683494,
+              "limit": 0.17645749593812673
+            },
+            {
+              "value": -0.03149429794558059,
+              "limit": 0.17955713780989732
+            },
+            {
+              "value": 0.03547659763750467,
+              "limit": 0.17966762770022593
+            },
+            {
+              "value": 0.18076533510005882,
+              "limit": 0.17980772822157565
+            }
+          ],
+          "residualPacf": [
+            {
+              "value": 1,
+              "limit": 0
+            },
+            {
+              "value": 0.35201121344025954,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.021667513913818902,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.11424440758248909,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.034138447345374225,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.07666115916793018,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.05986330324763013,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.02064120983985293,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.17819328835011705,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.0171535419066052,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": -0.14953978626262052,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.042580412275163536,
+              "limit": 0.14144821675952146
+            },
+            {
+              "value": 0.15190744610191179,
+              "limit": 0.14144821675952146
+            }
+          ],
+          "converged": true
+        }
+      }
+    ],
+    "rootCause": {
+      "selection": null,
+      "runs": [],
+      "checks": [],
+      "effects": [],
+      "influences": []
+    }
   },
   "data": {
     "kind": "source-file",

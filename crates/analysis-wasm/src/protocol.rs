@@ -1210,6 +1210,18 @@ pub(crate) enum AnalysisCommand {
         candidate_reference_points: Vec<usize>,
         delta: f64,
     },
+    InterruptedSeries {
+        rows: usize,
+        columns: usize,
+        outcome: usize,
+        model: InterruptedModel,
+        /// The first row after the event, 0-based.
+        intervention_row: usize,
+        lag: usize,
+        impact: InterruptedImpact,
+        seasonal: InterruptedSeasonal,
+        ljung_box_lags: usize,
+    },
     CausalEffectsTotal {
         rows: usize,
         columns: usize,
@@ -1507,6 +1519,94 @@ pub(crate) enum IngarchInterventionSchedule {
     Point,
     Persistent,
     Decaying { delta: f64 },
+}
+
+/// Which fit the series gets, with only the settings that fit needs.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum InterruptedModel {
+    /// OLS with Newey-West errors; statsmodels' bandwidth when none is given.
+    Continuous { hac_max_lags: Option<usize> },
+    /// The paper's quasi-Poisson model; the exposure column's log is the offset when given.
+    Count { exposure: Option<usize> },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum InterruptedModelEvidence {
+    Continuous { hac_max_lags: usize },
+    Count { exposure: Option<usize>, dispersion: f64 },
+}
+
+/// The impact model declared before fitting: how the event is assumed to act.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum InterruptedImpact {
+    Level,
+    LevelAndSlope,
+    Slope,
+    /// A level change that ends at `until` (exclusive, 0-based row).
+    TemporaryLevel { until: usize },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum InterruptedSeasonal {
+    None,
+    /// `pairs` sine and cosine pairs at `period` rows.
+    Harmonic { pairs: usize, period: f64 },
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum InterruptedSeasonalEvidence {
+    None,
+    /// With the fit and counterfactual at one fixed phase per row: the deseasonalised trend.
+    Harmonic { pairs: usize, period: f64, deseasonalised: Vec<InterruptedDeseasonalisedEvidence> },
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InterruptedDeseasonalisedEvidence {
+    pub(crate) fitted: f64,
+    pub(crate) counterfactual: f64,
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InterruptedTermEvidence {
+    pub(crate) name: String,
+    pub(crate) coefficient: f64,
+    pub(crate) standard_error: f64,
+    pub(crate) p_value: f64,
+    /// Normal 95% limits; exponentiated they are the rate ratio's limits of a count model.
+    pub(crate) interval: [f64; 2],
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct InterruptedRowEvidence {
+    pub(crate) observed: f64,
+    pub(crate) fitted: f64,
+    /// The fit with the event's terms at zero.
+    pub(crate) counterfactual: f64,
+    /// The ordinary residual of a continuous fit; the deviance residual of a count.
+    pub(crate) residual: f64,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct LjungBoxEvidence {
+    pub(crate) statistic: f64,
+    pub(crate) p_value: f64,
+}
+
+/// A correlation at one lag with the positive 95% limit drawn around zero.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CorrelationEvidence {
+    pub(crate) value: f64,
+    pub(crate) limit: f64,
 }
 
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
@@ -2553,6 +2653,24 @@ pub(crate) enum AnalysisResult {
         candidates: Vec<IngarchScanCandidateEvidence>,
         strongest_reference_point: usize,
         delta: f64,
+    },
+    InterruptedSeries {
+        observations: usize,
+        outcome: usize,
+        model: InterruptedModelEvidence,
+        intervention_row: usize,
+        lag: usize,
+        impact: InterruptedImpact,
+        seasonal: InterruptedSeasonalEvidence,
+        /// One term per design column: const, time, step, slope_change, sin1.., cos1..; absent shapes leave their column out.
+        terms: Vec<InterruptedTermEvidence>,
+        /// One row per observation on the scale of the plotted series: itself for a continuous
+        /// series, the count standardised to the mean exposure for a count.
+        path: Vec<InterruptedRowEvidence>,
+        ljung_box: Vec<LjungBoxEvidence>,
+        residual_acf: Vec<CorrelationEvidence>,
+        residual_pacf: Vec<CorrelationEvidence>,
+        converged: bool,
     },
     CausalEffectsTotal {
         observations: usize,

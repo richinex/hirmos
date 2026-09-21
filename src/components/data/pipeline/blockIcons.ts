@@ -7,6 +7,7 @@ export const blockIcon = (kind: PipelineBlockKind): string => {
     case 'filter-rows': return 'filter_alt'
     case 'select-columns': return 'view_column'
     case 'derive-columns': return 'function'
+    case 'calendar-events': return 'event'
     case 'join': return 'join_inner'
     case 'union': return 'stacks'
     case 'aggregate': return 'functions'
@@ -23,7 +24,7 @@ export type PaletteKind = Exclude<PipelineBlockKind, 'output'>
 export const PALETTE_GROUPS: readonly { readonly label: string; readonly kinds: readonly PaletteKind[] }[] = [
   { label: 'Files', kinds: ['input'] },
   { label: 'Rows', kinds: ['filter-rows', 'sort-limit'] },
-  { label: 'Columns', kinds: ['select-columns', 'derive-columns'] },
+  { label: 'Columns', kinds: ['select-columns', 'derive-columns', 'calendar-events'] },
   { label: 'Tables', kinds: ['join', 'union', 'aggregate'] },
   { label: 'Code', kinds: ['script'] },
 ]

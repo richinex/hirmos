@@ -60,6 +60,15 @@ export interface ShippedExample {
 
 const id = (value: string): SavedProjectHeader['id'] => value as SavedProjectHeader['id']
 
+/** The walkthrough example: the one the tests, the builder and the release stamp refer to by name. */
+const SEATBELTS: ShippedExample = {
+  id: id('d95e0c7b-44ec-4dee-a929-784cfd923eeb'),
+  name: 'Seat-belt law and road deaths',
+  sourceName: 'Seatbelts.csv',
+  bundleUrl: '/examples/seatbelts.hirmos.json',
+  question: 'effect', approach: 'Back-door adjustment', shape: 'time series', size: '192 months', estimationRuns: 2, glyph: 'dag', collection: null,
+}
+
 export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = [
   {
     id: id('b8b5903d-29ce-462e-a655-5b3b18f08c4b'),
@@ -68,13 +77,7 @@ export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = 
     bundleUrl: '/examples/microservices-rca.hirmos.json',
     question: 'root-cause', approach: 'Unusual request, distribution change and shift intervention', shape: 'cross-section', size: '10,000 baseline requests', estimationRuns: 0, glyph: 'dag', collection: null,
   },
-  {
-    id: id('d95e0c7b-44ec-4dee-a929-784cfd923eeb'),
-    name: 'Seat-belt law and road deaths',
-    sourceName: 'Seatbelts.csv',
-    bundleUrl: '/examples/seatbelts.hirmos.json',
-    question: 'effect', approach: 'Back-door adjustment', shape: 'time series', size: '192 months', estimationRuns: 2, glyph: 'dag', collection: null,
-  },
+  SEATBELTS,
   {
     id: id('7c2f1b3e-5a64-4d1e-9b0a-2e6f8c1d4a71'),
     name: 'AI adoption, company-wide',
@@ -175,9 +178,7 @@ export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = 
   },
 ]
 
-const SEATBELTS = SHIPPED_EXAMPLES[0]
-
-/** The first example's identity, kept under its old names for the tests and the builder that use them. */
+/** The seat-belt example's identity, kept under its old names for the tests and the builder that use them. */
 export const EXAMPLE_BUNDLE_URL = SEATBELTS.bundleUrl
 export const EXAMPLE_PROJECT_ID = SEATBELTS.id
 export const EXAMPLE_PROJECT_NAME = SEATBELTS.name
