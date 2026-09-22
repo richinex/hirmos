@@ -21,6 +21,7 @@ fn matrix(v: &Value) -> DMatrix<f64> {
 
 fn maxdev(got: &[f64], want: &[f64]) -> f64 {
     assert_eq!(got.len(), want.len(), "length mismatch");
+    assert!(got.iter().chain(want).all(|v| v.is_finite()), "non-finite comparison");
     got.iter().zip(want).map(|(a, b)| (a - b).abs()).fold(0.0f64, f64::max)
 }
 
@@ -80,14 +81,9 @@ fn stationary_covariance_matches_the_lyapunov_solution() {
     }
 }
 
-// The optimiser is the crate's L-BFGS-B at scipy's settings on the same objective, gradient
-// and start, and the likelihood at either run's optimum reproduces the other's to 1e-6. The
-// parameters themselves agree to the tolerance the likelihood surface can resolve: on an
-// error model with one coefficient the two runs take the same iterations and land within 5e-5;
-// with two or three the constant, the AR terms and the variance share a flat ridge along which
-// the projected gradient falls below `pgtol` at points 1e-3 apart in relative terms. That is
-// the optimiser's tolerance, the same as the causal-impact port meets, not a difference in
-// the model.
+// Fixed-parameter parity is checked separately from independent optimization. These
+// fixture-specific fit tolerances allow different stopping points; they do not establish
+// interchangeable uncertainty in a rank-deficient fit. See the boundary diagnostic test.
 struct Tolerance {
     /// On each parameter, relative to `max(|value|, 1)`.
     params: f64,
@@ -104,14 +100,13 @@ const RIDGE: Tolerance = Tolerance { params: 2e-3, llf: 2e-4, bse: 5e-3 };
 /// paths have drifted apart along the ridge, so only the likelihood is close; the point each
 /// stops at is not an optimum and the standard errors read from it differ accordingly.
 const ITERATION_LIMIT: Tolerance = Tolerance { params: 1e-2, llf: 2e-4, bse: 5e-2 };
-/// ARMA(2, 1) on the short design converges with its MA root at 0.999, on the invertibility
-/// boundary the transform enforces: the OPG information is steep there, so the variance's
-/// standard error moves by a factor of two between converged points 4e-4 apart in the MA term.
-/// The scores themselves agree to 1e-10 (`per_observation_scores_match_complex_step`).
+/// The short-design boundary fit has numerically rank-deficient OPG information. This
+/// scaled tolerance is a fixture check, not a 5% relative standard-error guarantee.
 const BOUNDARY: Tolerance = Tolerance { params: 2e-3, llf: 2e-4, bse: 5e-2 };
 
 fn relative_maxdev(got: &[f64], want: &[f64]) -> f64 {
     assert_eq!(got.len(), want.len(), "length mismatch");
+    assert!(got.iter().chain(want).all(|v| v.is_finite()), "non-finite comparison");
     got.iter().zip(want).map(|(a, b)| (a - b).abs() / b.abs().max(1.0)).fold(0.0f64, f64::max)
 }
 
@@ -158,17 +153,17 @@ fn ma1_errors_fit_matches_statsmodels() {
 }
 
 #[test]
-fn arma11_errors_fit_reaches_the_iteration_limit_as_statsmodels_does() {
+fn arma11_errors_fit_at_the_default_limit_is_close_to_the_reference() {
     check_fit(&fixture(), "x3_arma11", ITERATION_LIMIT);
 }
 
 #[test]
-fn ar2_errors_fit_reaches_the_iteration_limit_as_statsmodels_does() {
+fn ar2_errors_fit_at_the_default_limit_is_close_to_the_reference() {
     check_fit(&fixture(), "x3_ar2", ITERATION_LIMIT);
 }
 
 #[test]
-fn arma21_errors_on_the_short_design_reaches_the_iteration_limit_as_statsmodels_does() {
+fn arma21_errors_on_the_short_design_at_the_default_limit_is_close_to_the_reference() {
     check_fit(&fixture(), "x1_arma21", ITERATION_LIMIT);
 }
 
@@ -187,7 +182,7 @@ fn arma21_errors_fit_converges_with_more_iterations() {
     check_fit(&fixture(), "x1_arma21_converged", BOUNDARY);
 }
 
-/// The scores by central differences against statsmodels' complex-step scores at the
+/// The scores by complex step against statsmodels' complex-step scores at the
 /// library's optimum: the OPG matrix the covariance inverts is built from these.
 #[test]
 fn per_observation_scores_match_complex_step() {
@@ -206,3 +201,51 @@ fn per_observation_scores_match_complex_step() {
         }
     }
 }
+
+#[test]
+fn time_varying_ma2_scores_match_fresh_docker_oracle_without_freezing() {
+    let root: Value = serde_json::from_str(include_str!("../oracle/fixtures/arma_ma2_docker.json")).unwrap();
+    let c = &root["case"];
+    let x = matrix(&c["x"]);
+    let y = floats(&c["y"]);
+    let params = floats(&c["params"]);
+    let got = score_obs(&params, &y, &x, ArmaOrder { p: 0, q: 2 });
+    let want = matrix(&c["reference"]["scores"]);
+    assert!(maxdev(got.as_slice(), want.as_slice()) < 1e-11);
+    assert!((loglike(&params, &y, &x, ArmaOrder { p: 0, q: 2 }) - c["reference"]["llf"].as_f64().unwrap()).abs() < 1e-11);
+}
+
+#[test]
+fn extreme_normal_tail_does_not_round_to_zero() {
+    let root = fixture();
+    let (c, x, order) = case(&root, "x3_ar1");
+    let fit = fit(&floats(&root["y"]), &x, order, 50);
+    let expected = floats(&c["pvalues"])[1];
+    assert!(expected > 0.0 && expected < 1e-16);
+    assert!((fit.pvalues[1] / expected - 1.0).abs() < 1e-3);
+    assert_eq!(fit.covariance_status, CovarianceStatus::FullRank);
+}
+
+#[test]
+fn boundary_fit_reports_discarded_information_directions() {
+    let root = fixture();
+    let (_, x, order) = case(&root, "x1_arma21_converged");
+    let fit = fit(&floats(&root["y"]), &x, order, 500);
+    assert!(fit.converged);
+    assert!(matches!(fit.covariance_status, CovarianceStatus::RankDeficient { rank: 6, parameters: 7 }));
+    assert!(fit.bse.iter().all(|value| value.is_finite()));
+}
+
+#[test]
+fn converged_boundary_scores_have_explicit_per_entry_tolerances() {
+    let root = fixture();
+    let (c, x, order) = case(&root, "x1_arma21_converged");
+    let scores = score_obs(&floats(&c["params"]), &floats(&root["y"]), &x, order);
+    let expected = matrix(&c["score_obs"]);
+    // A separate boundary check, not the claim that every score agrees to 1e-10.
+    assert!(relative_maxdev(scores.as_slice(), expected.as_slice()) < 1e-8);
+}
+
+#[test]
+#[should_panic(expected = "non-finite comparison")]
+fn comparison_rejects_nan() { maxdev(&[f64::NAN], &[0.0]); }

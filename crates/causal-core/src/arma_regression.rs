@@ -1,5 +1,5 @@
 //! Regression with ARMA errors: statsmodels `SARIMAX(y, exog, order=(p, 0, q), trend='n')` at
-//! its defaults, ported line by line. The error-model half of the dynamic harmonic regression of
+//! its defaults. The error-model half of the dynamic harmonic regression of
 //! Hyndman and Athanasopoulos (FPP3 §10.5): the regressors carry the mean, an ARMA(p, q)
 //! process carries the serial dependence, and the whole is fitted by maximum likelihood.
 //!
@@ -37,7 +37,7 @@ impl ArmaOrder {
 }
 
 fn norm_sf(x: f64) -> f64 {
-    1.0 - spec_math::cephes64::ndtr(x)
+    spec_math::cephes64::ndtr(-x)
 }
 
 /// `numpy.linalg.pinv(a).dot(b)`.
@@ -306,7 +306,9 @@ pub fn kalman_filter(params: &[f64], y: &[f64], x: &DMatrix<f64>, order: ArmaOrd
             // The double-precision filter measures the change as ddot(diff, diff) and, at
             // convergence, keeps the current period's F and gain for every later period.
             let change: f64 = (&p_next - &p).iter().map(|value| value * value).sum();
-            if t > 0 && change < CONVERGENCE_TOL {
+            // SARIMAX marks regression models time-varying even for a constant regressor.
+            // Match that policy rather than freezing a derivative before it has settled.
+            if k_exog == 0 && t > 0 && change < CONVERGENCE_TOL {
                 converged = true;
                 frozen = Some((f, gain));
             }
@@ -320,7 +322,15 @@ pub fn loglike(params: &[f64], y: &[f64], x: &DMatrix<f64>, order: ArmaOrder) ->
     kalman_filter(params, y, x, order).llf
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CovarianceStatus {
+    FullRank,
+    RankDeficient { rank: usize, parameters: usize },
+}
+
 pub struct ArmaRegressionFit {
+    /// Whether the OPG pseudoinverse discarded any parameter directions.
+    pub covariance_status: CovarianceStatus,
     pub order: ArmaOrder,
     pub k_exog: usize,
     /// `[beta, ar, ma, sigma2]`.
@@ -407,11 +417,9 @@ fn loglikeobs_complex(params: &[Complex<f64>], y: &[f64], x: &DMatrix<f64>, orde
             let p_filtered = &p - &gain * gain.transpose() / f;
             let predicted = &transition * p_filtered * transition.transpose() + &state_cov;
             let p_next = (&predicted + predicted.transpose()) * Complex::new(0.5, 0.0);
-            // statsmodels checks convergence on the real filter; under a complex step the
-            // squared change is taken on the real parts, which is what the imaginary
-            // perturbation leaves unchanged.
-            let change: f64 = (&p_next - &p).iter().map(|value| value.re * value.re).sum();
-            if t > 0 && change < CONVERGENCE_TOL {
+            // The complex Cython filter takes abs(sum(delta * delta)), without conjugation.
+            let change = (&p_next - &p).iter().map(|value| value * value).sum::<Complex<f64>>().norm();
+            if k_exog == 0 && t > 0 && change < CONVERGENCE_TOL {
                 converged = true;
                 frozen = Some((f, gain));
             }
@@ -477,7 +485,11 @@ pub fn fit(y: &[f64], x: &DMatrix<f64>, order: ArmaOrder, max_iter: usize) -> Ar
     // scores (`nobs * opg_information_matrix`).
     let scores = score_obs(&params, y, x, order);
     let information = scores.transpose() * &scores;
-    let cov = linalg::pseudo_inverse(&information, PINV_RCOND).expect("pseudo-inverse of the information matrix").matrix;
+    let inverse = linalg::pseudo_inverse(&information, PINV_RCOND).expect("pseudo-inverse of the information matrix");
+    let cutoff = inverse.singular_values[0] * PINV_RCOND;
+    let rank = inverse.singular_values.iter().filter(|&&value| value > cutoff).count();
+    let covariance_status = if rank == k { CovarianceStatus::FullRank } else { CovarianceStatus::RankDeficient { rank, parameters: k } };
+    let cov = inverse.matrix;
     let bse: Vec<f64> = (0..k).map(|j| cov[(j, j)].sqrt()).collect();
     let pvalues: Vec<f64> = (0..k).map(|j| 2.0 * norm_sf((params[j] / bse[j]).abs())).collect();
     let z975 = spec_math::cephes64::ndtri(0.975);
@@ -490,6 +502,7 @@ pub fn fit(y: &[f64], x: &DMatrix<f64>, order: ArmaOrder, max_iter: usize) -> Ar
         .collect();
     let df_model = k as f64;
     ArmaRegressionFit {
+        covariance_status,
         order,
         k_exog,
         aic: -2.0 * filtered.llf + 2.0 * df_model,

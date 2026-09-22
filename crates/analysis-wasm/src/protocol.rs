@@ -1537,6 +1537,7 @@ pub(crate) enum LinearErrorModel {
 #[derive(Clone, serde::Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ArmaErrorEvidence {
+    pub(crate) covariance: ArmaCovarianceEvidence,
     pub(crate) p: usize,
     pub(crate) q: usize,
     pub(crate) ar: Vec<InterruptedTermEvidence>,
@@ -1547,6 +1548,14 @@ pub(crate) struct ArmaErrorEvidence {
     pub(crate) bic: f64,
     pub(crate) iterations: usize,
     pub(crate) converged: bool,
+}
+
+/// Numerical rank retained by the OPG pseudoinverse, independent of optimiser convergence.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum ArmaCovarianceEvidence {
+    FullRank,
+    RankDeficient { rank: usize, parameters: usize },
 }
 
 /// The adjusted linear regression's coefficient under an ARMA error process, beside the OLS

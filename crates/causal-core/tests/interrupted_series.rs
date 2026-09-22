@@ -15,6 +15,7 @@ fn floats(v: &Value) -> Vec<f64> {
 
 fn maxdev(got: &[f64], want: &[f64]) -> f64 {
     assert_eq!(got.len(), want.len(), "length mismatch");
+    assert!(got.iter().chain(want).all(|value| value.is_finite()), "non-finite comparison");
     got.iter().zip(want).map(|(a, b)| (a - b).abs()).fold(0.0f64, f64::max)
 }
 

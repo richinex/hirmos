@@ -93,6 +93,11 @@ export const interruptedTermSchema = z.object({
 export type InterruptedTermEvidence = z.infer<typeof interruptedTermSchema>
 
 const armaErrorShape = {
+  // Older saved runs have no covariance diagnostic; absence does not imply full rank.
+  covariance: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('fullRank') }).strict(),
+    z.object({ kind: z.literal('rankDeficient'), rank: z.number().int().nonnegative(), parameters: z.number().int().positive() }).strict(),
+  ]).refine((value) => value.kind === 'fullRank' || value.rank < value.parameters, { message: 'A deficient covariance must have fewer retained directions than parameters.' }).optional(),
   p: z.number().int().min(0).max(MAX_ARMA_ORDER),
   q: z.number().int().min(0).max(MAX_ARMA_ORDER),
   ar: z.array(interruptedTermSchema),
@@ -110,6 +115,12 @@ const ORDER_MESSAGE = { message: 'The fitted error terms must match the declared
 /** An ARMA(p, q) error process as fitted with the regression: `SARIMAX(y, exog, order=(p, 0, q))`. */
 export const armaErrorFieldsSchema = z.object(armaErrorShape).strict().refine(wholeOrder, ORDER_MESSAGE)
 export type ArmaErrorEvidence = z.infer<typeof armaErrorFieldsSchema>
+
+export function armaUncertaintyWarning(evidence: ArmaErrorEvidence): string | null {
+  const covariance = evidence.covariance
+  if (covariance === undefined || covariance.kind === 'fullRank') return null
+  return `The uncertainty calculation retained ${covariance.rank} of ${covariance.parameters} parameter directions. Standard errors and intervals are numerically fragile, even if the optimiser converged.`
+}
 /** The same process as a variant of a continuous series' error model. */
 export const armaErrorEvidenceSchema = z.object({ kind: z.literal('arma'), ...armaErrorShape }).strict()
 

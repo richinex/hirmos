@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ArmaUncertaintyAlert } from '@/components/estimation/ArmaUncertaintyAlert'
 import { Metadata } from '@/components/ui/Metadata'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { interruptedCorrelationOption, interruptedFitOption, interruptedResidualOption } from '@/charts/data/interruptedSeries'
@@ -74,7 +75,7 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   const errors = e.model.kind === 'continuous' ? e.model.errors : null
   const uncertainty = e.model.kind === 'count' ? `Intervals come from the quasi-Poisson fit with dispersion ${three(e.model.dispersion)}.`
     : e.model.errors.kind === 'neweyWest' ? `Intervals use Newey–West standard errors with bandwidth ${e.model.errors.maxLags}.`
-    : `The terms were fitted jointly with ARMA(${e.model.errors.p}, ${e.model.errors.q}) errors by maximum likelihood; intervals use outer-product-of-gradients standard errors.${e.model.errors.converged ? '' : ` The optimiser stopped at its limit of ${e.model.errors.iterations} iterations without converging; raise the limit before reading the numbers.`}`
+    : `The terms were fitted jointly with ARMA(${e.model.errors.p}, ${e.model.errors.q}) errors by maximum likelihood; intervals use outer-product-of-gradients standard errors.${e.model.errors.converged ? '' : ` The optimiser stopped after ${e.model.errors.iterations} iterations without converging; review the specification and optimiser settings before reading the numbers.`}`
   const statements: NonEmptyArray<InterpretationStatement> = [
     { kind: 'magnitude', text: level === null ? reading(slope!, count, 'slope change', 'per row') : reading(level, count, s.impact.kind === 'temporaryLevel' ? 'temporary level change' : 'level change', 'in the units of the series') },
     ...(level !== null && slope !== null ? [{ kind: 'magnitude' as const, text: reading(slope, count, 'slope change', 'per row') }] : []),
@@ -102,6 +103,7 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   return <section className={resultSurface('text-body text-muted')} aria-label="Time-series result">
     <h3 className={`${resultTitle} m-0`}>{timeSeriesRunLabel(run)}</h3>
     <ResultInterpretation interpretation={{ kind: 'result-interpretation', statements }} />
+    {errors !== null && errors.kind === 'arma' && <ArmaUncertaintyAlert evidence={errors} />}
     <MetricGrid label="Interrupted series summary">{tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} value={tile.value} context={tile.context} />)}</MetricGrid>
     {run.plotTime !== undefined && <div className="grid min-w-0 gap-6">
       <div className="min-w-0">

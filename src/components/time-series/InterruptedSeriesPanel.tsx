@@ -146,7 +146,7 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
               <SegmentedControl size="sm" ariaLabel="Outcome type" value={model.kind} onChange={(kind) => set('model', kind === 'count' ? { kind, exposure: null } : { kind, errors: { kind: 'neweyWest', maxLags: '' } })} options={[{ value: 'continuous', label: 'Continuous' }, { value: 'count', label: 'Count' }]} />
             </div>
             {model.kind === 'count' && <label className="block"><ParameterLabel className={fieldLabel} label="Exposure" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.exposure} />
-              <Select className={field('text', 'mt-1')} value={model.exposure ?? ''} onChange={(e) => set('model', { kind: 'count', exposure: columns.find((c) => c.id === e.target.value)?.id ?? null })}><option value="">None</option>{columns.filter((c) => c.id !== draft.outcome).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
+              <Select aria-label="Exposure" className={field('text', 'mt-1')} value={model.exposure ?? ''} onChange={(e) => set('model', { kind: 'count', exposure: columns.find((c) => c.id === e.target.value)?.id ?? null })}><option value="">None</option>{columns.filter((c) => c.id !== draft.outcome).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
             </label>}
           </div>
           <div className="grid gap-4 @lg/panel:grid-cols-2">

@@ -43,6 +43,7 @@ import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
+import { ArmaUncertaintyAlert } from './ArmaUncertaintyAlert'
 import {
   additive,
   adjustmentLabels,
@@ -639,8 +640,9 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
         </p>
       )}
       {run.kind === 'backdoor-linear-run' && armaReading(run)?.errors.converged === false && (
-        <Alert tone="warn" live={false} className="mt-3"><p className="m-0">The ARMA fit stopped at its iteration limit without converging; raise the limit and run again before reading the estimate.</p></Alert>
+        <Alert tone="warn" live={false} className="mt-3"><p className="m-0">The ARMA fit stopped without converging; review the specification and optimiser settings before reading the estimate.</p></Alert>
       )}
+      {run.kind === 'backdoor-linear-run' && <ArmaUncertaintyAlert evidence={armaReading(run)?.errors} />}
       {run.kind === 'count-glm-run' && !run.evidence.converged && (
         <Alert tone="warn" live={false} className="mt-3"><p className="m-0">The optimiser did not converge; treat the estimate and its interval as provisional.</p></Alert>
       )}

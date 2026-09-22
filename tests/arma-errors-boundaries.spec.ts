@@ -1,9 +1,43 @@
 import { expect, test } from '@playwright/test'
+import { readFileSync } from 'node:fs'
+import { armaErrorFieldsSchema, armaUncertaintyWarning } from '../src/domain/interruptedSeries'
 import { continuousErrorsSchema, describeErrors, interruptedModelSchema, linearErrorModelSchema, parseInterruptedSeriesEvidence, sameErrors } from '../src/domain/interruptedSeries'
 import { backdoorLinearEvidenceSchema, describeCovariance, linearReading } from '../src/domain/estimation'
 
 const term = (name: string) => ({ name, coefficient: 0.1, standardError: 0.05, pValue: 0.04, interval: [0.0, 0.2] })
 const arma = { kind: 'arma', p: 1, q: 1, ar: [term('ar.L1')], ma: [term('ma.L1')], sigma2: 1.5, logLikelihood: -10, aic: 30, bic: 32, iterations: 12, converged: true }
+
+test('the built WASM preserves a deficient covariance through interrupted-series evidence', async ({ page }) => {
+  const fixture = JSON.parse(readFileSync(new URL('../crates/causal-core/oracle/fixtures/arma_regression.json', import.meta.url), 'utf8'))
+  await page.goto('/')
+  const result = await page.evaluate(async (values: number[]) => {
+    const modulePath = '/src/generated/analysis-wasm/hirmos_analysis.js'
+    const wasm = await import(modulePath)
+    await wasm.default()
+    return JSON.parse(wasm.runAnalysis(JSON.stringify({
+      kind: 'interruptedSeries', rows: values.length, columns: 1, outcome: 0,
+      model: { kind: 'continuous', errors: { kind: 'arma', p: 2, q: 1, maxIter: 500 } },
+      interventionRow: 36, lag: 0, impact: { kind: 'level' }, seasonal: { kind: 'none' }, ljungBoxLags: 12,
+    }), new Float64Array(values), new Uint8Array(), new Uint8Array(), () => {}))
+  }, fixture.y)
+  const parsed = parseInterruptedSeriesEvidence(result)
+  expect(parsed.ok).toBe(true)
+  expect(result.model.errors.covariance).toEqual({ kind: 'rankDeficient', rank: 6, parameters: 7 })
+  expect(result.model.errors.converged).toBe(true)
+  expect(armaUncertaintyWarning(result.model.errors)).toContain('numerically fragile')
+})
+
+test('covariance diagnostics distinguish saved unknowns from a deficient fit', () => {
+  const { kind: _kind, ...fields } = arma
+  const legacy = armaErrorFieldsSchema.parse(fields)
+  expect(legacy.covariance).toBeUndefined()
+  expect(armaUncertaintyWarning(legacy)).toBeNull()
+  const deficient = armaErrorFieldsSchema.parse({ ...fields, covariance: { kind: 'rankDeficient', rank: 6, parameters: 7 } })
+  expect(armaUncertaintyWarning(deficient)).toContain('6 of 7')
+  expect(armaUncertaintyWarning(deficient)).toContain('even if the optimiser converged')
+  expect(armaUncertaintyWarning(armaErrorFieldsSchema.parse({ ...fields, covariance: { kind: 'fullRank' } }))).toBeNull()
+  expect(armaErrorFieldsSchema.safeParse({ ...fields, covariance: { kind: 'rankDeficient', rank: 7, parameters: 7 } }).success).toBe(false)
+})
 
 test('an error model carries only its own settings and needs at least one ARMA term', () => {
   expect(continuousErrorsSchema.safeParse({ kind: 'neweyWest', maxLags: null }).success).toBe(true)

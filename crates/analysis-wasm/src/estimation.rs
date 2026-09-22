@@ -41,6 +41,10 @@ fn arma_error_evidence(fit: &ArmaRegressionFit) -> ArmaErrorEvidence {
     };
     let k = fit.k_exog;
     ArmaErrorEvidence {
+        covariance: match &fit.covariance_status {
+            hirmos_causal_core::arma_regression::CovarianceStatus::FullRank => ArmaCovarianceEvidence::FullRank,
+            hirmos_causal_core::arma_regression::CovarianceStatus::RankDeficient { rank, parameters } => ArmaCovarianceEvidence::RankDeficient { rank: *rank, parameters: *parameters },
+        },
         p: fit.order.p,
         q: fit.order.q,
         ar: (0..fit.order.p).map(|i| term(k + i, format!("ar.L{}", i + 1))).collect(),
