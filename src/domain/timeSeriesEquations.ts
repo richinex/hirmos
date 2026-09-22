@@ -21,7 +21,7 @@ const texNumber = (value: number): string => number(value).replace(/e([+-]?\d+)/
 const errorsDefinition = (errors: ContinuousErrorEvidence): string => {
   switch (errors.kind) {
     case 'neweyWest': return `Standard errors are Newey–West with bandwidth ${errors.maxLags}.`
-    case 'arma': return `The error u follows an ARMA(${errors.p}, ${errors.q}) process fitted jointly with the terms by maximum likelihood (statsmodels SARIMAX); standard errors come from the outer product of the scores. Innovation variance ${number(errors.sigma2)}, log likelihood ${number(errors.logLikelihood)}, AIC ${number(errors.aic)}.`
+    case 'arma': return `The error u follows an ARMA(${errors.p}, ${errors.q}) process fitted jointly with the terms by maximum likelihood. Standard errors use the inverse or pseudoinverse of the outer-product-of-gradients information matrix. Innovation variance ${number(errors.sigma2)}, log likelihood ${number(errors.logLikelihood)}, AIC ${number(errors.aic)}.`
     default: return assertNever(errors)
   }
 }
@@ -111,11 +111,11 @@ export function timeSeriesEquations(run: TimeSeriesRun | CountSeriesModelArtifac
           ...(e.model.kind === 'continuous' && e.model.errors.kind === 'arma' ? [expression(armaTex(e.model.errors), armaPlain(e.model.errors))] : []),
         ],
         definitions: [
-          `Y is ${run.outcome.name}; t is the row number from 1. X is 1 from row ${s.interventionRow}${s.lag > 0 ? ` plus a lag of ${s.lag}` : ''}${s.impact.kind === 'temporaryLevel' ? ` until row ${s.impact.until}` : ''} and 0 before; T₀ is the row before the change, so the slope term is 1 on the first changed row.`,
+          `Y is ${run.outcome.name}; t is the row number from 1. X is 1 from row ${s.interventionRow}${s.lag > 0 ? ` plus a lag of ${s.lag}` : ''}${s.impact.kind === 'temporaryLevel' ? ` up to, but not including, row ${s.impact.until}` : ''}. X is 0 otherwise. T₀ is the row before the change. The slope term is 1 on the first changed row.`,
           s.model.kind === 'count' || e.model.kind !== 'continuous' ? `N is ${s.model.kind === 'count' ? s.model.exposure?.name ?? 'one' : 'one'}, the exposure, entering as an offset with coefficient one. The dispersion is estimated from Pearson residuals (quasi-Poisson), not fixed at one.` : errorsDefinition(e.model.errors),
-          s.seasonal.kind === 'none' ? 'No seasonal terms are included.' : `The harmonic terms are ${s.seasonal.pairs} sine and cosine pairs at period ${number(s.seasonal.period)}, as tsModel::harmonic builds them.`,
+          s.seasonal.kind === 'none' ? 'No seasonal terms are included.' : `The harmonic terms are ${s.seasonal.pairs} sine and cosine pairs at period ${number(s.seasonal.period)}, used to represent the seasonal cycle.`,
         ],
-        fitted: { kind: 'available', title: 'Fitted coefficients', expressions: [expression(fitted, e.terms.map((term) => `${term.name} = ${number(term.coefficient)}`).join('; '))], explanation: count ? 'A coefficient exponentiated is a rate ratio; the result table lists them with their intervals.' : 'Coefficients are in the units of the series per row; the result table lists their intervals.' },
+        fitted: { kind: 'available', title: 'Fitted coefficients', expressions: [expression(fitted, e.terms.map((term) => `${term.name} = ${number(term.coefficient)}`).join('; '))], explanation: count ? 'Exponentiating the level coefficient gives its rate ratio. Exponentiating the slope-change coefficient compares post-change and pre-change per-row rate multipliers.' : 'Level coefficients use the units of the series. Trend and slope-change coefficients use those units per row.' },
         reference: 'Lopez Bernal, Cummins and Gasparrini (2017), International Journal of Epidemiology 46(1), 348–355, equation (1) and the additional material; the slope change is parameterised as in the 2020 corrigendum.',
       }
     }

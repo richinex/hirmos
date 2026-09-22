@@ -45,7 +45,7 @@ const continuousErrors = (draft: ContinuousErrorsDraft): { readonly kind: 'ready
       const q = integer(draft.q) ?? 0
       const maxIter = integer(draft.maxIter)
       if (p < 0 || q < 0 || p > MAX_ARMA_ORDER || q > MAX_ARMA_ORDER) return { kind: 'problem', detail: `ARMA orders are whole numbers from 0 to ${MAX_ARMA_ORDER}.` }
-      if (p + q === 0) return { kind: 'problem', detail: 'ARMA errors need at least one autoregressive or moving-average term; with none, the fit is the Newey–West one.' }
+      if (p + q === 0) return { kind: 'problem', detail: 'Choose at least one AR or MA term for this option. For least squares with serial-dependence-adjusted intervals, choose Newey–West.' }
       if (maxIter === null || maxIter < 1) return { kind: 'problem', detail: 'Give the optimiser a positive number of iterations.' }
       return { kind: 'ready', errors: { kind: 'arma', p, q, maxIter } }
     }

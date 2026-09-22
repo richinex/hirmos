@@ -37,7 +37,7 @@ test('fits the paper\'s smoking-ban model through the UI and reads it as the pap
   await expect(result).toContainText('The interval excludes one.')
   await expect(result).toContainText('dispersion 2.262')
   const tiles = result.locator('[aria-label="Interrupted series summary"]')
-  await expect(tiles).toContainText('Trend per 12 rows, rate ratio')
+  await expect(tiles).toContainText('Pre-intervention trend per 12 rows, rate ratio')
   await expect(tiles).toContainText('1.067')
   await expect(tiles).toContainText('2.262')
   // The paper's figures: the fit with its counterfactual, the deseasonalised trend, the residuals, the ACF and PACF.
@@ -54,8 +54,13 @@ test('fits the paper\'s smoking-ban model through the UI and reads it as the pap
   await page.getByRole('radio', { name: 'Level and slope change', exact: true }).click({ force: true })
   await fit.click()
   await expect(result.filter({ hasText: 'level and slope change' })).toHaveCount(1, { timeout: 60_000 })
-  await expect(result).toContainText('Slope change per row, rate ratio')
+  await expect(result).toContainText('Change in per-row rate multiplier')
   await expect(result.getByRole('table', { name: 'Fitted terms' }).locator('tbody tr').nth(3)).toContainText('0.00148')
+  await expect(result).toContainText('so this slope change is uncertain under the fitted model.')
+  await expect(result).toContainText('At the first affected row, add the level and slope coefficients')
+  await expect(result).not.toContainText('no effect at all')
+  await expect(result).toContainText('Bars outside the dashed bands suggest residual correlation.')
+  await expect(result).not.toContainText('wider Newey–West bandwidth')
   // The same design on the standardised count as a continuous series with AR(1) errors: the
   // statsmodels SARIMAX fixture (crates/causal-core/oracle/fixtures/arma_regression.json) fits
   // the rate; the count at the mean population is the rate times a constant, so the step and

@@ -1246,7 +1246,7 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
       id: caveatId('linear-serial-dependence'),
       category: 'noise-and-dependence',
       requirement: 'On time-series rows use the HAC (Newey–West) interval or fit an ARMA error process with the coefficients; the classical interval assumes independent errors.',
-      consequenceIfUnmet: 'Autocorrelated errors make the classical interval too narrow.',
+      consequenceIfUnmet: 'Autocorrelated errors can make classical intervals unreliable.',
       sources: [NEWEY_WEST_1987, statsmodels('statsmodels/stats/sandwich_covariance.py#cov_hac_simple'), HYNDMAN_FPP_DHR, statsmodels('statsmodels/tsa/statespace/sarimax.py#SARIMAX')],
     },
     {
@@ -1639,7 +1639,7 @@ const LJUNG_BOX: MethodDefinition = {
   family: 'diagnostic',
   summary: 'Cumulative autocorrelation statistic of the residuals at each lag with a chi-square p-value.',
   caveats: [
-    { id: caveatId('ljung-box-null'), category: 'interpretation', requirement: 'A small p-value rejects white-noise residuals up to that lag; it does not say which lags are missing.', consequenceIfUnmet: 'Autocorrelation is read as a specific dynamic model.', sources: [LJUNG_BOX_1978, statsmodels('statsmodels/stats/diagnostic.py#acorr_ljungbox')] },
+    { id: caveatId('ljung-box-null'), category: 'interpretation', requirement: 'A small p-value indicates residual autocorrelation through the tested lag. It does not identify which model terms are missing.', consequenceIfUnmet: 'Autocorrelation is read as a specific dynamic model.', sources: [LJUNG_BOX_1978, statsmodels('statsmodels/stats/diagnostic.py#acorr_ljungbox')] },
   ],
 }
 
@@ -2328,41 +2328,41 @@ const INTERRUPTED_SERIES: MethodDefinition = {
   id: INTERRUPTED_SERIES_METHOD_ID,
   name: 'Interrupted series',
   family: 'estimation',
-  summary: 'Allows us to estimate the effect of a single intervention at a specific point in time on a time series.',
+  summary: 'Estimates changes after an intervention, compared with the modelled continuation of the series without it.',
   caveats: [
     {
       id: caveatId('its-impact-model-declared'),
       category: 'functional-form',
       requirement: 'The impact model was chosen before fitting, from what is known about the event.',
-      consequenceIfUnmet: 'A shape chosen from the data overstates the effect.',
+      consequenceIfUnmet: 'Choosing the shape to obtain a stronger result can overstate the evidence.',
       sources: [LOPEZ_BERNAL_2017, HERRERA_ITS],
     },
     {
       id: caveatId('its-no-concurrent-change'),
       category: 'identification',
-      requirement: 'Nothing else changed at the intervention row.',
-      consequenceIfUnmet: 'The estimate attributes any concurrent change to the event.',
+      requirement: 'Consider other changes around the intervention that could affect the outcome.',
+      consequenceIfUnmet: 'The model cannot separate the intervention from unaccounted concurrent changes.',
       sources: [LOPEZ_BERNAL_2017],
     },
     {
       id: caveatId('its-seasonality'),
       category: 'stationarity-and-dynamics',
       requirement: 'Seasonality is represented, by harmonic terms at the period or by seasonal adjustment in Data studio.',
-      consequenceIfUnmet: 'An uneven split of seasons before and after biases the level change.',
+      consequenceIfUnmet: 'Unaccounted seasonality can be mistaken for an intervention-related change.',
       sources: [LOPEZ_BERNAL_2017, BHASKARAN_2013],
     },
     {
       id: caveatId('its-residual-autocorrelation'),
       category: 'noise-and-dependence',
-      requirement: 'Residuals are not serially correlated after adjustment; check the Ljung–Box test in the result.',
-      consequenceIfUnmet: 'Intervals are too narrow. Newey–West errors widen them but do not repair a misspecified trend.',
+      requirement: 'Check residual autocorrelation. For ARMA fits, these checks use the one-step prediction errors.',
+      consequenceIfUnmet: 'Newey–West adjusts standard errors for serial dependence. It does not remove that dependence or correct a misspecified trend.',
       sources: [LOPEZ_BERNAL_2017, statsmodels('statsmodels/regression/linear_model.py#RegressionResults.get_robustcov_results'), hirmos('crates/causal-core/src/interrupted_series.rs')],
     },
     {
       id: caveatId('its-arma-errors'),
       category: 'noise-and-dependence',
-      requirement: 'With ARMA errors, the order was chosen before fitting and the optimiser converged; the terms and the error process are estimated together by maximum likelihood.',
-      consequenceIfUnmet: 'An order chosen from the result, or a fit stopped at its iteration limit, gives an interval that is not the model\'s.',
+      requirement: 'Choose ARMA orders using subject knowledge, diagnostics or information criteria. Check convergence and the remaining autocorrelation.',
+      consequenceIfUnmet: 'Non-convergence or a poorly specified error model can make estimates and intervals unreliable. Report any model selection.',
       sources: [HYNDMAN_FPP_DHR, statsmodels('statsmodels/tsa/statespace/sarimax.py#SARIMAX'), hirmos('crates/causal-core/src/arma_regression.rs#fit')],
     },
     {
@@ -2375,7 +2375,7 @@ const INTERRUPTED_SERIES: MethodDefinition = {
     {
       id: caveatId('its-count-model'),
       category: 'functional-form',
-      requirement: 'A count is fitted as a quasi-Poisson model with the log of an exposure as the offset, the dispersion estimated from Pearson residuals; a continuous series by least squares.',
+      requirement: 'Counts use quasi-Poisson regression, with a log offset when exposure is supplied. Continuous outcomes use least squares or joint maximum likelihood with ARMA errors.',
       consequenceIfUnmet: 'A Poisson fit with the dispersion fixed at one understates the intervals of an overdispersed count.',
       sources: [LOPEZ_BERNAL_2017, statsmodels('statsmodels/genmod/generalized_linear_model.py#GLM.estimate_scale'), hirmos('crates/causal-core/src/glm.rs#poisson_glm_with')],
     },

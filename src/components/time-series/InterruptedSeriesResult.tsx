@@ -46,7 +46,7 @@ const significant = (value: number) => formatEstimate(value, { kind: 'additive',
 const termName = (name: string): string => {
   switch (name) {
     case 'const': return 'Constant'
-    case 'time': return 'Trend per row'
+    case 'time': return 'Pre-intervention trend per row'
     case 'step': return 'Level change'
     case 'slope_change': return 'Slope change per row'
     default: return name.startsWith('sin') ? `Sine ${name.slice(3)}` : name.startsWith('cos') ? `Cosine ${name.slice(3)}` : name
@@ -57,9 +57,11 @@ const termName = (name: string): string => {
 function reading(term: InterruptedTermEvidence, count: boolean, what: string, unit: string): string {
   const crosses = term.interval[0] <= 0 && term.interval[1] >= 0
   const estimate = count
-    ? `The ${what} is a rate ratio of ${ratio(term)}, ${formatP(term.pValue).text}`
+    ? term.name === 'slope_change'
+      ? `The ratio of post-change to pre-change per-row rate multipliers is ${ratio(term)}, ${formatP(term.pValue).text}`
+      : `The ${what} is a rate ratio of ${ratio(term)}, ${formatP(term.pValue).text}`
     : `The ${what} is ${additive(term)} ${unit}, ${formatP(term.pValue).text}`
-  return `${estimate}. ${crosses ? `The interval includes ${count ? 'one' : 'zero'}, so the data cannot distinguish this from the intervention having no effect at all.` : `The interval excludes ${count ? 'one' : 'zero'}.`}`
+  return `${estimate}. ${crosses ? `The interval includes ${count ? 'one' : 'zero'}, so this ${what} is uncertain under the fitted model.` : `The interval excludes ${count ? 'one' : 'zero'}.`}`
 }
 
 export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
@@ -80,7 +82,8 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
     { kind: 'magnitude', text: level === null ? reading(slope!, count, 'slope change', 'per row') : reading(level, count, s.impact.kind === 'temporaryLevel' ? 'temporary level change' : 'level change', 'in the units of the series') },
     ...(level !== null && slope !== null ? [{ kind: 'magnitude' as const, text: reading(slope, count, 'slope change', 'per row') }] : []),
     { kind: 'uncertainty', text: `${uncertainty} The impact model was declared as a ${describeImpact(s.impact)}${s.lag > 0 ? ` with a lag of ${s.lag} rows` : ''}; a single series cannot separate the event from anything else that changed at the same row.` },
-    ...(lastBox === undefined ? [] : [{ kind: 'uncertainty' as const, text: lastBox.pValue < 0.05 ? `The Ljung–Box test at ${e.ljungBox.length} lags rejects white-noise residuals (${formatP(lastBox.pValue).text}); the intervals may still be too narrow.` : `The Ljung–Box test at ${e.ljungBox.length} lags does not reject white-noise residuals (${formatP(lastBox.pValue).text}).` }]),
+    ...(level !== null && slope !== null ? [{ kind: 'qualification' as const, text: count ? 'At the first affected row, add the level and slope coefficients, then exponentiate to obtain the fitted rate ratio.' : 'At the first affected row, the fitted difference is the level coefficient plus the slope coefficient.' }] : []),
+    ...(lastBox === undefined ? [] : [{ kind: 'uncertainty' as const, text: lastBox.pValue < 0.05 ? `The Ljung–Box test finds residual autocorrelation through lag ${e.ljungBox.length} (${formatP(lastBox.pValue).text}). Review the model and its uncertainty assumptions.` : `The Ljung–Box test finds no evidence of residual autocorrelation through lag ${e.ljungBox.length} (${formatP(lastBox.pValue).text}). This does not establish model adequacy.` }]),
   ]
   // The paper's trend: exp(coef × 12) per year for a monthly count; here per cycle of the period when there is one.
   const cycle = period === null ? null : Number.isInteger(period) ? String(period) : number(period)
@@ -88,8 +91,8 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   const plain = (label: string, text: string) => ({ label, value: formatWords(text), context: null })
   const tiles: readonly { readonly label: string; readonly value: Formatted; readonly context: string | null }[] = [
     ...(level === null ? [] : [{ label: count ? 'Level change, rate ratio' : 'Level change', ...effectTile(level, count) }]),
-    ...(slope === null ? [] : [{ label: count ? 'Slope change per row, rate ratio' : 'Slope change per row', ...effectTile(slope, count) }]),
-    plain(cycle === null ? (count ? 'Trend per row, rate ratio' : 'Trend per row') : count ? `Trend per ${cycle} rows, rate ratio` : `Trend per ${cycle} rows`, cycle === null && count ? three(Math.exp(trendValue)) : three(trendValue)),
+    ...(slope === null ? [] : [{ label: count ? 'Change in per-row rate multiplier' : 'Slope change per row', ...effectTile(slope, count) }]),
+    plain(cycle === null ? (count ? 'Pre-intervention trend per row, rate ratio' : 'Pre-intervention trend per row') : count ? `Pre-intervention trend per ${cycle} rows, rate ratio` : `Pre-intervention trend per ${cycle} rows`, cycle === null && count ? three(Math.exp(trendValue)) : three(trendValue)),
     ...(e.model.kind === 'count' ? [plain('Dispersion', three(e.model.dispersion))] : []),
     ...(errors !== null && errors.kind === 'arma' ? [plain('Innovation variance', three(errors.sigma2)), plain('AIC', three(errors.aic))] : []),
   ]
@@ -109,7 +112,7 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
       <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Series, fit, and the counterfactual</h4>
         <ExpandableChart option={interruptedFitOption({ title: 'Series, fit, and the counterfactual', axis: run.plotTime, observed, fitted, counterfactual, fittedName: 'Fitted', interventionRow: e.interventionRow, outcomeName: run.outcome.name }, theme)} label="Interrupted series fit" className="mt-1 h-72" window={window} onWindow={setWindow} />
-        <p className="m-0 mt-1 text-label text-muted">Values in {scale}; the shaded band is the period after the event. The dashed line continues the fit with the event's terms at zero. The gap between the lines is the fitted effect, not a forecast.</p>
+        <p className="m-0 mt-1 text-label text-muted">Values in {scale}; the shaded band is the period after the event. The dashed line continues the fit with the event's terms at zero. The gap is the model-estimated difference, not a forecast.</p>
       </div>
       {e.seasonal.kind === 'harmonic' && <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Deseasonalised trend</h4>
@@ -119,13 +122,13 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
       <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Residuals over time</h4>
         <EChart option={interruptedResidualOption({ axis: run.plotTime, residuals, interventionRow: e.interventionRow, kind: residualKind }, theme)} label="Residuals over time" className="mt-1 h-48" />
-        {residualKind === 'standardised' && <p className="m-0 mt-1 text-label text-muted">One-step-ahead forecast errors divided by their standard deviation: what is left after the ARMA process has predicted the error.</p>}
+        {residualKind === 'standardised' && <p className="m-0 mt-1 text-label text-muted">Observed values minus their one-step-ahead predictions, divided by the forecast error standard deviation.</p>}
       </div>
       {e.residualAcf.length > 1 && <div className="grid min-w-0 gap-4 @lg/panel:grid-cols-2">
         <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Autocorrelation of residuals</h4><EChart option={interruptedCorrelationOption({ title: 'Autocorrelation', correlations: e.residualAcf }, theme)} label="Residual autocorrelation" className="mt-1 h-48" /></div>
         <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Partial autocorrelation of residuals</h4><EChart option={interruptedCorrelationOption({ title: 'Partial autocorrelation', correlations: e.residualPacf }, theme)} label="Residual partial autocorrelation" className="mt-1 h-48" /></div>
       </div>}
-      <p className="m-0 text-label text-muted">Bars outside the dashed band mean serial correlation remains at that lag; consider more seasonal terms{errors === null ? '' : errors.kind === 'neweyWest' ? ' or a wider Newey–West bandwidth' : ' or a higher ARMA order'}.</p>
+      <p className="m-0 text-label text-muted">Bars outside the dashed bands suggest residual correlation. The bands apply to each lag separately. Review the pattern alongside the Ljung–Box test.</p>
     </div>}
     <EvidenceTable<TermRow>
       frame="none"
