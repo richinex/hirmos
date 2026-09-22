@@ -638,6 +638,7 @@ pub fn run_analysis(
             adjustment,
             hac_max_lags,
             level,
+            error_model,
         } => backdoor_linear(
             values,
             rows,
@@ -647,6 +648,7 @@ pub fn run_analysis(
             &adjustment,
             hac_max_lags,
             level,
+            error_model,
         ),
         AnalysisCommand::FrontdoorTwoStage {
             rows,

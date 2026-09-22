@@ -7,7 +7,7 @@ import { ratioForestHeight, ratioForestOption, type RatioEstimate } from '@/char
 import { useChartTheme } from '@/charts/theme'
 import type { VisibleWindow } from '@/charts/window'
 import { Icon } from '@/components/Icon'
-import { EvidenceTable, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
+import { EvidenceTable, figureColumn, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { SegmentedControl, type SegmentOption } from '@/components/ui/SegmentedControl'
 import { caption, iconControl, label, num } from '@/components/ui/recipes'
@@ -81,8 +81,6 @@ const familyShape = (family: ParametricSurvivalFamily): { readonly baseline: rea
 
 const asNumber = (value: EvidenceValue): number => typeof value === 'number' ? value : Number(value)
 const statistic = (value: number): string => formatStatistic('raw', value).text
-const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => number, print: (value: number) => string = statistic): EvidenceColumn<Row> =>
-  ({ id, header, align: 'right', value, format: (value) => print(asNumber(value)) })
 const interval = (bounds: readonly [number, number] | null): string => bounds === null ? '—' : `${statistic(bounds[0])} to ${statistic(bounds[1])}`
 
 interface ParameterRow {

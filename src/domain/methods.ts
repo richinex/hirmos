@@ -218,6 +218,7 @@ const KPSS_1992 = paper('Testing the Null Hypothesis of Stationarity against the
 const ZIVOT_ANDREWS_1992 = paper('Further Evidence on the Great Crash, the Oil-Price Shock, and the Unit-Root Hypothesis (Zivot and Andrews, 1992)', 'Journal of Business & Economic Statistics 10(3), 251–270')
 const GRANGER_1969 = paper('Investigating Causal Relations by Econometric Models and Cross-spectral Methods (Granger, 1969)', 'Econometrica 37(3), 424–438')
 const PSS_2001 = paper('Bounds Testing Approaches to the Analysis of Level Relationships (Pesaran, Shin and Smith, 2001)', 'Journal of Applied Econometrics 16(3), 289–326; cases I–V')
+const HERRERA_ITS = paper('Why interrupted time series might be your new favorite data tool (Herrera, Medium)', 'https://medium.com/@JuanPabloHerrera/why-interrupted-time-series-might-be-your-new-favorite-data-tool-399d260a9cd9')
 const LOPEZ_BERNAL_2017 = paper('Interrupted time series regression for the evaluation of public health interventions: a tutorial (Lopez Bernal, Cummins and Gasparrini, 2017; corrigendum 2020)', 'International Journal of Epidemiology 46(1), 348–355')
 const BHASKARAN_2013 = paper('Time series regression studies in environmental epidemiology (Bhaskaran, Gasparrini, Hajat, Smeeth and Armstrong, 2013)', 'International Journal of Epidemiology 42(4), 1187–1195')
 const JOHANSEN_1988 = paper('Statistical Analysis of Cointegration Vectors (Johansen, 1988)', 'Journal of Economic Dynamics and Control 12(2–3), 231–254')
@@ -251,6 +252,7 @@ const SHAPIRO_WILK_1965 = paper('An Analysis of Variance Test for Normality (Com
 const KILLICK_2012 = paper('Optimal Detection of Changepoints with a Linear Computational Cost (Killick, Fearnhead and Eckley, 2012)', 'Journal of the American Statistical Association 107(500), 1590–1598; PELT')
 const CLEVELAND_1990 = paper('STL: A Seasonal-Trend Decomposition Procedure Based on Loess (Cleveland, Cleveland, McRae and Terpenning, 1990)', 'Journal of Official Statistics 6(1), 3–73')
 const HYNDMAN_FPP = paper('Forecasting: Principles and Practice, 3rd ed. (Hyndman and Athanasopoulos, 2021)', '§4.3, strength of trend and seasonality')
+const HYNDMAN_FPP_DHR = paper('Forecasting: Principles and Practice, 3rd ed. (Hyndman and Athanasopoulos, 2021)', '§10.5, dynamic harmonic regression: Fourier terms for the season with ARMA errors')
 const ABADIE_CATTANEO_2018 = paper('Econometric Methods for Program Evaluation (Abadie and Cattaneo, 2018)', 'Annual Review of Economics 10, 465–503; doi:10.1146/annurev-economics-080217-053402; ATE and ATT target populations')
 const VAN_DER_ZANDER_2014 = paper('Constructing Separators and Adjustment Sets in Ancestral Graphs (van der Zander, Liśkiewicz and Textor, 2014)', 'UAI 2014, 907–916; proper back-door graph and minimal adjustment-set construction')
 const TAKATA_2010 = paper('Space-optimal, backtracking algorithms to list the minimal vertex separators of a graph (Takata, 2010)', 'Discrete Applied Mathematics 158, 1660–1667; doi:10.1016/j.dam.2010.05.013')
@@ -1224,7 +1226,7 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
   id: BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
   name: 'Adjusted linear regression',
   family: 'estimation',
-  summary: 'Least squares of the outcome on the treatment and the adjustment set; the treatment coefficient is the effect, with a classical or Newey–West interval.',
+  summary: 'Least squares of the outcome on the treatment and the adjustment set; the treatment coefficient is the effect, with a classical or Newey–West interval, or the same design fitted with ARMA errors by maximum likelihood.',
   caveats: [
     {
       id: caveatId('linear-identified-adjustment'),
@@ -1243,9 +1245,9 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
     {
       id: caveatId('linear-serial-dependence'),
       category: 'noise-and-dependence',
-      requirement: 'On time-series rows use the HAC (Newey–West) interval; the classical interval assumes independent errors.',
+      requirement: 'On time-series rows use the HAC (Newey–West) interval or fit an ARMA error process with the coefficients; the classical interval assumes independent errors.',
       consequenceIfUnmet: 'Autocorrelated errors make the classical interval too narrow.',
-      sources: [NEWEY_WEST_1987, statsmodels('statsmodels/stats/sandwich_covariance.py#cov_hac_simple')],
+      sources: [NEWEY_WEST_1987, statsmodels('statsmodels/stats/sandwich_covariance.py#cov_hac_simple'), HYNDMAN_FPP_DHR, statsmodels('statsmodels/tsa/statespace/sarimax.py#SARIMAX')],
     },
     {
       id: caveatId('linear-hac-bandwidth'),
@@ -2326,14 +2328,14 @@ const INTERRUPTED_SERIES: MethodDefinition = {
   id: INTERRUPTED_SERIES_METHOD_ID,
   name: 'Interrupted series',
   family: 'estimation',
-  summary: 'Estimate how an event at a declared row changed the level or trend of a series. State the impact model before fitting. This is a single-series design: it cannot separate the event from anything else that changed at the same time.',
+  summary: 'Allows us to estimate the effect of a single intervention at a specific point in time on a time series.',
   caveats: [
     {
       id: caveatId('its-impact-model-declared'),
       category: 'functional-form',
       requirement: 'The impact model was chosen before fitting, from what is known about the event.',
       consequenceIfUnmet: 'A shape chosen from the data overstates the effect.',
-      sources: [LOPEZ_BERNAL_2017],
+      sources: [LOPEZ_BERNAL_2017, HERRERA_ITS],
     },
     {
       id: caveatId('its-no-concurrent-change'),
@@ -2355,6 +2357,13 @@ const INTERRUPTED_SERIES: MethodDefinition = {
       requirement: 'Residuals are not serially correlated after adjustment; check the Ljung–Box test in the result.',
       consequenceIfUnmet: 'Intervals are too narrow. Newey–West errors widen them but do not repair a misspecified trend.',
       sources: [LOPEZ_BERNAL_2017, statsmodels('statsmodels/regression/linear_model.py#RegressionResults.get_robustcov_results'), hirmos('crates/causal-core/src/interrupted_series.rs')],
+    },
+    {
+      id: caveatId('its-arma-errors'),
+      category: 'noise-and-dependence',
+      requirement: 'With ARMA errors, the order was chosen before fitting and the optimiser converged; the terms and the error process are estimated together by maximum likelihood.',
+      consequenceIfUnmet: 'An order chosen from the result, or a fit stopped at its iteration limit, gives an interval that is not the model\'s.',
+      sources: [HYNDMAN_FPP_DHR, statsmodels('statsmodels/tsa/statespace/sarimax.py#SARIMAX'), hirmos('crates/causal-core/src/arma_regression.rs#fit')],
     },
     {
       id: caveatId('its-rows-each-side'),

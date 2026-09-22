@@ -1,6 +1,7 @@
 import { assertNever } from './dop'
 import type { CountSeriesModelArtifact } from './countSeries'
 import type { TimeSeriesRun } from './timeSeries'
+import type { ContinuousErrorEvidence } from './interruptedSeries'
 
 interface Expression { readonly tex: string; readonly plain: string }
 type Fitted =
@@ -17,6 +18,23 @@ const number = (value: number): string => Number(value.toPrecision(7)).toString(
 const texNumber = (value: number): string => number(value).replace(/e([+-]?\d+)/, '\\times 10^{$1}')
 
 /** Equations use the saved model settings, never the current setup controls. */
+const errorsDefinition = (errors: ContinuousErrorEvidence): string => {
+  switch (errors.kind) {
+    case 'neweyWest': return `Standard errors are Newey–West with bandwidth ${errors.maxLags}.`
+    case 'arma': return `The error u follows an ARMA(${errors.p}, ${errors.q}) process fitted jointly with the terms by maximum likelihood (statsmodels SARIMAX); standard errors come from the outer product of the scores. Innovation variance ${number(errors.sigma2)}, log likelihood ${number(errors.logLikelihood)}, AIC ${number(errors.aic)}.`
+    default: return assertNever(errors)
+  }
+}
+
+const armaTex = (errors: Extract<ContinuousErrorEvidence, { kind: 'arma' }>): string => {
+  const ar = errors.ar.map((term, i) => `\\phi_{${i + 1}} u_{t-${i + 1}}`).join('+')
+  const ma = errors.ma.map((term, i) => `\\theta_{${i + 1}} \\varepsilon_{t-${i + 1}}`).join('+')
+  return `u_t=${ar === '' ? '' : `${ar}+`}\\varepsilon_t${ma === '' ? '' : `+${ma}`}`
+}
+
+const armaPlain = (errors: Extract<ContinuousErrorEvidence, { kind: 'arma' }>): string =>
+  `error at t = ${errors.ar.map((term, i) => `${term.name} × error at t−${i + 1}`).concat('innovation at t', errors.ma.map((term, i) => `${term.name} × innovation at t−${i + 1}`)).join(' + ')}`
+
 export function timeSeriesEquations(run: TimeSeriesRun | CountSeriesModelArtifact): TimeSeriesEquations {
   switch (run.kind) {
     case 'ardl-model': {
@@ -88,10 +106,13 @@ export function timeSeriesEquations(run: TimeSeriesRun | CountSeriesModelArtifac
       const plainSeasonal = seasonal === '' ? '' : ' + harmonic seasonal terms'
       const fitted = e.terms.map((term) => `${term.name}=${texNumber(term.coefficient)}`).join(',\;')
       return {
-        general: [expression(`${left}\\beta_0+\\beta_1 t${step}${slope}${seasonal}${count ? '' : '+\\varepsilon_t'}`, `${plainLeft}constant + trend × t${plainStep}${plainSlope}${plainSeasonal}${count ? '' : ' + error'}`)],
+        general: [
+          expression(`${left}\\beta_0+\\beta_1 t${step}${slope}${seasonal}${count ? '' : '+u_t'}`, `${plainLeft}constant + trend × t${plainStep}${plainSlope}${plainSeasonal}${count ? '' : ' + error'}`),
+          ...(e.model.kind === 'continuous' && e.model.errors.kind === 'arma' ? [expression(armaTex(e.model.errors), armaPlain(e.model.errors))] : []),
+        ],
         definitions: [
           `Y is ${run.outcome.name}; t is the row number from 1. X is 1 from row ${s.interventionRow}${s.lag > 0 ? ` plus a lag of ${s.lag}` : ''}${s.impact.kind === 'temporaryLevel' ? ` until row ${s.impact.until}` : ''} and 0 before; T₀ is the row before the change, so the slope term is 1 on the first changed row.`,
-          s.model.kind === 'count' ? `N is ${s.model.exposure?.name ?? 'one'}, the exposure, entering as an offset with coefficient one. The dispersion is estimated from Pearson residuals (quasi-Poisson), not fixed at one.` : `Standard errors are Newey–West with bandwidth ${e.model.kind === 'continuous' ? e.model.hacMaxLags : 0}.`,
+          s.model.kind === 'count' || e.model.kind !== 'continuous' ? `N is ${s.model.kind === 'count' ? s.model.exposure?.name ?? 'one' : 'one'}, the exposure, entering as an offset with coefficient one. The dispersion is estimated from Pearson residuals (quasi-Poisson), not fixed at one.` : errorsDefinition(e.model.errors),
           s.seasonal.kind === 'none' ? 'No seasonal terms are included.' : `The harmonic terms are ${s.seasonal.pairs} sine and cosine pairs at period ${number(s.seasonal.period)}, as tsModel::harmonic builds them.`,
         ],
         fitted: { kind: 'available', title: 'Fitted coefficients', expressions: [expression(fitted, e.terms.map((term) => `${term.name} = ${number(term.coefficient)}`).join('; '))], explanation: count ? 'A coefficient exponentiated is a rate ratio; the result table lists them with their intervals.' : 'Coefficients are in the units of the series per row; the result table lists their intervals.' },

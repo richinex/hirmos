@@ -5,7 +5,7 @@ import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence
 import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type AalenEvidence, type ForestEvidence, type ForestSettings } from '@/domain/survivalRegression'
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
-import { interruptedImpactSchema, interruptedModelSchema, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, parseInterruptedSeriesEvidence, type InterruptedImpact, type InterruptedModel, type InterruptedSeasonal, type InterruptedSeriesEvidence } from '@/domain/interruptedSeries'
+import { interruptedImpactSchema, interruptedModelSchema, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, linearErrorModelSchema, parseInterruptedSeriesEvidence, type InterruptedImpact, type InterruptedModel, type InterruptedSeasonal, type InterruptedSeriesEvidence, type LinearErrorModel } from '@/domain/interruptedSeries'
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
@@ -550,6 +550,7 @@ export type AnalysisWorkerCommand =
       readonly adjustment: readonly number[]
       readonly hacMaxLags: number | null
       readonly level: number
+      readonly errorModel: LinearErrorModel
     }
   | {
       readonly kind: 'frontdoor-two-stage'
@@ -1628,6 +1629,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     adjustment: z.array(z.number().int().nonnegative()),
     hacMaxLags: z.number().int().nonnegative().nullable(),
     level: z.number().gt(0.5).lt(1),
+    errorModel: linearErrorModelSchema,
   }).strict(),
   z.object({
     kind: z.literal('frontdoor-two-stage'),

@@ -16,7 +16,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { MethodCaveats } from '@/components/MethodCaveats'
 import { EligibilityView } from '@/components/EligibilityView'
-import { EvidenceTable, type EvidenceColumn } from '@/components/table/EvidenceTable'
+import { EvidenceTable, figureColumn, type EvidenceColumn } from '@/components/table/EvidenceTable'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterHelp, ParameterLabel } from '@/components/ui/ParameterLabel'
 import {
@@ -485,8 +485,6 @@ const linkColumns = <Row extends LinkRow>(): readonly EvidenceColumn<Row>[] => [
   { id: 'lag', header: 'Lag', align: 'right', value: (row) => row.lag },
 ]
 
-const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => number, print: (value: number) => string = statistic): EvidenceColumn<Row> =>
-  ({ id, header, align: 'right', value, format: (value) => print(asNumber(value)) })
 
 type RpcmciConfiguration = Extract<DiscoveryConfiguration, { readonly kind: 'rpcmci' }>
 

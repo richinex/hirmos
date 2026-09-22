@@ -1,4 +1,4 @@
-import { chapter } from './examples/support'
+import { chapter, identifyEffect } from './examples/support'
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 
@@ -65,7 +65,7 @@ test('T-learner bootstrap runs through Estimation and exports row intervals', as
   for (const name of ['x0', 'x1']) await page.getByRole('group', { name: 'Effect modifiers' }).getByRole('checkbox', { name: new RegExp('^' + name) }).check()
   await page.getByRole('radio', { name: /Observed choice/ }).check()
   await page.getByRole('textbox', { name: 'Assignment sentence' }).fill('This verification study adjusts for x0 and x1.')
-  await page.getByRole('button', { name: 'Identify the effect' }).click()
+  await identifyEffect(page)
   await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: 'Bootstrap intervals', exact: true }).check()
   await page.getByLabel('Learner seed', { exact: true }).fill('7')

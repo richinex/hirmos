@@ -3,6 +3,7 @@ import { matchesTLearnerUncertainty, tLearnerUncertaintyEvidenceSchema } from '.
 import { vecmForecastSchema } from './vecmForecast'
 import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
 import type { ColumnId } from './dataset'
+import { armaErrorFieldsSchema } from './interruptedSeries'
 import type { DagDocument, EditableDag } from './dag'
 import { assertNever, brand, err, flattenNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { CaveatEvaluation, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
@@ -41,13 +42,22 @@ import { formatStatistic } from '@/lib/format/number'
 
 export type EstimationRunId = Brand<string, 'EstimationRunId'>
 
-export type CovarianceChoice = 'hac' | 'classical'
+/**
+ * How the adjusted regression's errors are treated: independent (the classical interval),
+ * serially correlated with a Newey–West interval, or an ARMA(p, q) process fitted jointly with
+ * the coefficients by maximum likelihood, whose coefficient and interval then replace the OLS ones.
+ */
+export type LinearErrors =
+  | { readonly kind: 'classical' }
+  | { readonly kind: 'hac' }
+  | { readonly kind: 'arma'; readonly p: number; readonly q: number; readonly maxIter: number }
+export type CovarianceChoice = LinearErrors['kind']
 
 export const CONFIDENCE_LEVEL = 0.95
 
 export interface BackdoorLinearConfiguration {
   readonly kind: 'backdoor-linear-regression'
-  readonly covariance: CovarianceChoice
+  readonly errors: LinearErrors
   readonly level: typeof CONFIDENCE_LEVEL
 }
 
@@ -311,7 +321,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
 
 export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorConfiguration => {
   switch (estimator) {
-    case 'backdoor-linear-regression': return { kind: estimator, covariance: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical', level: CONFIDENCE_LEVEL }
+    case 'backdoor-linear-regression': return { kind: estimator, errors: { kind: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical' }, level: CONFIDENCE_LEVEL }
     case 'frontdoor-two-stage': return { kind: estimator, interventions: [0, 1], simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
     case 'instrumental-variable': return { kind: estimator, simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
     case 'poisson-glm':
@@ -372,9 +382,26 @@ export const backdoorLinearEvidenceSchema = z.object({
   hacInterval: z.tuple([z.number().finite(), z.number().finite()]),
   hacPValue: z.number().min(0).max(1),
   durbinWatson: z.number().finite().nonnegative(),
+  /** The same design refitted with an ARMA error process, when one was requested. */
+  errorModel: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('neweyWest') }).strict(),
+    z.object({
+      kind: z.literal('arma'),
+      estimate: z.number().finite(),
+      standardError: z.number().finite().nonnegative(),
+      interval: z.tuple([z.number().finite(), z.number().finite()]),
+      pValue: z.number().min(0).max(1),
+      errors: armaErrorFieldsSchema,
+    }).strict(),
+  ]),
 }).strict()
 
 export type BackdoorLinearEvidence = z.infer<typeof backdoorLinearEvidenceSchema>
+export type ArmaReading = Extract<BackdoorLinearEvidence['errorModel'], { kind: 'arma' }>
+
+/** The ARMA reading a run was configured for, and only then. */
+export const armaReading = (run: { readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }): ArmaReading | null =>
+  run.configuration.errors.kind === 'arma' && run.evidence.errorModel.kind === 'arma' ? run.evidence.errorModel : null
 
 /** DoWhy's generic bootstrap, shared by the front-door and instrumental-variable estimators. */
 const bootstrapUncertaintySchema = z.discriminatedUnion('kind', [
@@ -1501,7 +1528,8 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (adjustment === null) violate('linear-identified-adjustment', 'No measured back-door adjustment set was found, so this adjusted regression cannot run.')
       else satisfy('linear-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
       if (panel) leave('linear-serial-dependence', 'Rows repeat within units; neither interval accounts for within-unit correlation.')
-      else if (timeSeries && configuration.covariance === 'classical') violate('linear-serial-dependence', 'The rows are a time series and the classical interval assumes independent errors. Choose the HAC interval.')
+      else if (timeSeries && configuration.errors.kind === 'classical') violate('linear-serial-dependence', 'The rows are a time series and the classical interval assumes independent errors. Choose the HAC interval or an ARMA error process.')
+      else if (configuration.errors.kind === 'arma') satisfy('linear-serial-dependence', `An ARMA(${configuration.errors.p}, ${configuration.errors.q}) error process is fitted with the coefficients by maximum likelihood; the interval comes from that fit.`)
       else satisfy('linear-serial-dependence', timeSeries ? 'Heteroskedasticity and autocorrelation consistent (HAC) Newey–West interval selected for time-series rows.' : 'The prepared dataset holds independent rows, so the classical interval applies.')
       satisfy('linear-hac-bandwidth', 'The run records the bandwidth from the default rule.')
       leave('linear-functional-form', 'Check linearity with the residual diagnostics in the sensitivity chapter.')
@@ -1952,14 +1980,15 @@ export function causalEstimateFrom(
   const adjustment = appliedContemporaneousAdjustment(adjustmentSet)
   switch (run.kind) {
     case 'backdoor-linear-run': {
-      const hac = run.configuration.covariance === 'hac'
       const { evidence } = run
+      const reading = linearReading(run)
+      if (reading === null) return null
       return {
         kind: 'causal-estimate',
         estimand: study.estimand,
-        effect: { kind: 'additive', value: evidence.estimate, unit: '' },
-        interval: { kind: 'confidence', level: evidence.level, lower: hac ? evidence.hacInterval[0] : evidence.interval[0], upper: hac ? evidence.hacInterval[1] : evidence.interval[1] },
-        standardError: hac ? evidence.hacStandardError : evidence.standardError,
+        effect: { kind: 'additive', value: reading.estimate, unit: '' },
+        interval: { kind: 'confidence', level: evidence.level, lower: reading.interval[0], upper: reading.interval[1] },
+        standardError: reading.standardError,
         adjustment,
         sample: { observations: evidence.observations, parameters: evidence.parameters, degreesOfFreedom: evidence.degreesOfFreedom },
       }
@@ -2189,11 +2218,26 @@ export function causalEstimateFrom(
   }
 }
 
-export function describeCovariance(choice: CovarianceChoice): string {
-  switch (choice) {
+export function describeCovariance(errors: LinearErrors): string {
+  switch (errors.kind) {
     case 'hac': return 'Newey–West HAC'
     case 'classical': return 'Classical'
-    default: return assertNever(choice)
+    case 'arma': return `ARMA(${errors.p}, ${errors.q}) errors`
+    default: return assertNever(errors)
+  }
+}
+
+/** The coefficient, its standard error and interval under the configured error treatment; null when the evidence holds no ARMA fit for an ARMA configuration. */
+export function linearReading(run: { readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }): { readonly estimate: number; readonly standardError: number; readonly interval: readonly [number, number] } | null {
+  const { evidence } = run
+  switch (run.configuration.errors.kind) {
+    case 'classical': return { estimate: evidence.estimate, standardError: evidence.standardError, interval: evidence.interval }
+    case 'hac': return { estimate: evidence.estimate, standardError: evidence.hacStandardError, interval: evidence.hacInterval }
+    case 'arma': {
+      const reading = armaReading(run)
+      return reading === null ? null : { estimate: reading.estimate, standardError: reading.standardError, interval: reading.interval }
+    }
+    default: return assertNever(run.configuration.errors)
   }
 }
 

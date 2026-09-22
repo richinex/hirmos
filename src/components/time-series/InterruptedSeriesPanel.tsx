@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
-import type { InterruptedDraft, TimeSeriesEvent } from '@/domain/timeSeriesDraft'
+import type { ContinuousErrorsDraft, InterruptedDraft, TimeSeriesEvent } from '@/domain/timeSeriesDraft'
 import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { newTimeSeriesRunId, parseTimeSeriesRun } from '@/domain/timeSeries'
-import { impactForKernel, rowIndex, rowNumber, type DeclaredImpact, type InterruptedModel, type InterruptedSeasonal } from '@/domain/interruptedSeries'
+import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, impactForKernel, rowIndex, rowNumber, type ContinuousErrors, type DeclaredImpact, type InterruptedModel, type InterruptedSeasonal } from '@/domain/interruptedSeries'
 import { isNumericDuckDbType, type ColumnId } from '@/domain/dataset'
-import { isNonEmpty } from '@/domain/dop'
+import { assertNever, isNonEmpty } from '@/domain/dop'
 import { TIME_SERIES_METHODS } from '@/domain/methods'
 import { seasonalPeriodOf } from '@/domain/seasonal'
 import { effectiveFrequency } from '@/domain/resampling'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
+import { ParameterLabel } from '@/components/ui/ParameterLabel'
+import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Orb } from '@/components/ui/Orb'
@@ -28,6 +30,27 @@ const integer = (text: string): number | null => {
   if (trimmed === '') return null
   const value = Number(trimmed)
   return Number.isInteger(value) ? value : null
+}
+
+/** The error model as typed, or the reason it cannot be requested yet. */
+const continuousErrors = (draft: ContinuousErrorsDraft): { readonly kind: 'ready'; readonly errors: ContinuousErrors } | { readonly kind: 'problem'; readonly detail: string } => {
+  switch (draft.kind) {
+    case 'neweyWest': {
+      const maxLags = integer(draft.maxLags)
+      if (draft.maxLags.trim() !== '' && (maxLags === null || maxLags < 0)) return { kind: 'problem', detail: 'The Newey–West bandwidth is a whole number of lags, or blank for the automatic one.' }
+      return { kind: 'ready', errors: { kind: 'neweyWest', maxLags } }
+    }
+    case 'arma': {
+      const p = integer(draft.p) ?? 0
+      const q = integer(draft.q) ?? 0
+      const maxIter = integer(draft.maxIter)
+      if (p < 0 || q < 0 || p > MAX_ARMA_ORDER || q > MAX_ARMA_ORDER) return { kind: 'problem', detail: `ARMA orders are whole numbers from 0 to ${MAX_ARMA_ORDER}.` }
+      if (p + q === 0) return { kind: 'problem', detail: 'ARMA errors need at least one autoregressive or moving-average term; with none, the fit is the Newey–West one.' }
+      if (maxIter === null || maxIter < 1) return { kind: 'problem', detail: 'Give the optimiser a positive number of iterations.' }
+      return { kind: 'ready', errors: { kind: 'arma', p, q, maxIter } }
+    }
+    default: return assertNever(draft)
+  }
 }
 
 export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly selector: ReactNode }) {
@@ -52,12 +75,15 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
   const impact: DeclaredImpact | null = draft.impact.kind === 'temporaryLevel' ? (until === null ? null : { kind: 'temporaryLevel', until: rowNumber(until) }) : draft.impact
   const seasonal: InterruptedSeasonal = pairs > 0 && period !== null ? { kind: 'harmonic', pairs, period } : { kind: 'none' }
   const firstChanged = interventionRow === null ? null : interventionRow + lag
+  const errors = model.kind === 'continuous' ? continuousErrors(model.errors) : null
+  const armaDraft = model.kind === 'continuous' && model.errors.kind === 'arma' ? model.errors : null
   const problem = draft.outcome === null ? 'Choose the series.'
     : interventionRow === null || firstChanged === null || interventionRow < 2 || firstChanged > rows ? `Give the intervention row: a number from 2 to ${rows - lag}, the first row after the event.`
     : impact === null || (impact.kind === 'temporaryLevel' && (impact.until <= firstChanged || impact.until > rows + 1)) ? 'A temporary level change needs an end row after it starts and at most one past the last row.'
     : lag < 0 ? 'The lag cannot be negative.'
     : pairs < 0 || pairs > 12 ? 'Choose between 0 and 12 harmonic pairs.'
     : model.kind === 'count' && model.exposure === draft.outcome ? 'The exposure cannot be the series itself.'
+    : errors !== null && errors.kind === 'problem' ? errors.detail
     : null
   const ready = problem === null && job.kind !== 'running'
 
@@ -76,7 +102,8 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
       if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const { values, rowCount, columns: used, timeAxis } = matrix.value
       if (timeAxis === null) { fail('The prepared series has no time key.'); return }
-      const requested: InterruptedModel = model.kind === 'continuous' ? { kind: 'continuous', hacMaxLags: integer(model.hacMaxLags) } : { kind: 'count', exposure: exposure === null ? null : 1 }
+      if (errors !== null && errors.kind === 'problem') return
+      const requested: InterruptedModel = errors !== null ? { kind: 'continuous', errors: errors.errors } : { kind: 'count', exposure: exposure === null ? null : 1 }
       const ljungBoxLags = Math.max(1, Math.min(period ?? 12, Math.floor(rowCount / 4)))
       const evidence = await runInterruptedSeries(values, rowCount, used.length, { outcome: 0, model: requested, interventionRow: rowIndex(interventionRow), lag, impact: impactForKernel(impact), seasonal, ljungBoxLags })
       if (!session.current(current)) return
@@ -115,44 +142,50 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
               <Select className={field('text', 'mt-1')} value={draft.outcome ?? ''} onChange={(e) => set('outcome', columns.find((c) => c.id === e.target.value)?.id ?? null)}><option value="">Choose the series</option>{columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
             </label>
             <div className="space-y-1">
-              <span className={fieldLabel}>Outcome type</span>
-              <SegmentedControl size="sm" ariaLabel="Outcome type" value={model.kind} onChange={(kind) => set('model', kind === 'count' ? { kind, exposure: null } : { kind, hacMaxLags: '' })} options={[{ value: 'continuous', label: 'Continuous' }, { value: 'count', label: 'Count' }]} />
-              <p className={`${fieldHint} m-0`}>{count ? 'A quasi-Poisson model, as the reference tutorial fits a count.' : 'Least squares with Newey–West errors.'}</p>
+              <ParameterLabel className={fieldLabel} label="Outcome type" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.outcomeType} />
+              <SegmentedControl size="sm" ariaLabel="Outcome type" value={model.kind} onChange={(kind) => set('model', kind === 'count' ? { kind, exposure: null } : { kind, errors: { kind: 'neweyWest', maxLags: '' } })} options={[{ value: 'continuous', label: 'Continuous' }, { value: 'count', label: 'Count' }]} />
             </div>
-            {model.kind === 'count' && <label className="block"><span className={fieldLabel}>Exposure</span>
+            {model.kind === 'count' && <label className="block"><ParameterLabel className={fieldLabel} label="Exposure" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.exposure} />
               <Select className={field('text', 'mt-1')} value={model.exposure ?? ''} onChange={(e) => set('model', { kind: 'count', exposure: columns.find((c) => c.id === e.target.value)?.id ?? null })}><option value="">None</option>{columns.filter((c) => c.id !== draft.outcome).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
-              <span className={fieldHint}>The population or denominator the count is a rate of; its log enters as an offset.</span>
             </label>}
           </div>
           <div className="grid gap-4 @lg/panel:grid-cols-2">
-            <label className="block"><span className={fieldLabel}>Intervention row</span>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Intervention row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.interventionRow} />
               <input aria-label="Intervention row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.interventionRow} onChange={(e) => set('interventionRow', e.target.value)} />
-              <span className={fieldHint}>The first row after the event. Rows before it are the pre-period.</span>
             </label>
-            <label className="block"><span className={fieldLabel}>Lag</span>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Lag" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.lag} />
               <input aria-label="Lag" type="number" min={0} className={field('text', 'mt-1')} value={draft.lag} onChange={(e) => set('lag', e.target.value)} />
-              <span className={fieldHint}>Rows after the intervention row before the change is assumed to start.</span>
             </label>
           </div>
           <div className="space-y-1">
-            <span className={fieldLabel}>Impact model</span>
+            <ParameterLabel className={fieldLabel} label="Impact model" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.impactModel[draft.impact.kind]} />
             <SegmentedControl size="sm" wrap ariaLabel="Impact model" value={draft.impact.kind} onChange={(kind) => set('impact', kind === 'temporaryLevel' ? { kind, until: '' } : { kind })} options={[{ value: 'level', label: 'Level change' }, { value: 'levelAndSlope', label: 'Level and slope change' }, { value: 'slope', label: 'Slope change' }, { value: 'temporaryLevel', label: 'Temporary level change' }]} />
-            <p className={`${fieldHint} m-0`}>Choose from what is known about the event, not from the data. Sensitivity to other shapes is reported separately.</p>
-            {draft.impact.kind === 'temporaryLevel' && <label className="block max-w-xs"><span className={fieldLabel}>Until row</span>
+            {draft.impact.kind === 'temporaryLevel' && <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Until row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.untilRow} />
               <input aria-label="Until row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.impact.until} onChange={(e) => set('impact', { kind: 'temporaryLevel', until: e.target.value })} />
-              <span className={fieldHint}>The first row on which the level is back to normal.</span>
             </label>}
           </div>
           <div className="grid gap-4 @lg/panel:grid-cols-2">
-            <label className="block"><span className={fieldLabel}>Seasonal terms</span>
+            <label className="block"><ParameterLabel className={fieldLabel} label="Seasonal terms" help={period === null ? ESTIMATION_PARAMETER_HELP.interruptedSeries.noSeasonalPeriod : ESTIMATION_PARAMETER_HELP.interruptedSeries.seasonalTerms} />
               <input aria-label="Seasonal terms" type="number" min={0} max={12} className={field('text', 'mt-1')} value={period === null ? '0' : draft.harmonicPairs} disabled={period === null} onChange={(e) => set('harmonicPairs', e.target.value)} />
-              <span className={fieldHint}>{period === null ? 'Yearly rows have no seasonal period.' : `Sine and cosine pairs at the sampling period of ${period}, as the reference tutorial fits them; 0 for none.`}</span>
             </label>
-            {model.kind === 'continuous' && <label className="block"><span className={fieldLabel}>Newey–West bandwidth</span>
-              <input aria-label="Newey–West bandwidth" type="number" min={0} className={field('text', 'mt-1')} placeholder="Automatic" value={model.hacMaxLags} onChange={(e) => set('model', { kind: 'continuous', hacMaxLags: e.target.value })} />
-              <span className={fieldHint}>Robust to serial correlation in the residuals; not a fix for a misspecified trend. Blank uses floor(4(n/100)^(2/9)).</span>
-            </label>}
           </div>
+          {model.kind === 'continuous' && <div className="space-y-2">
+            <ParameterLabel className={fieldLabel} label="Error model" help={model.errors.kind === 'neweyWest' ? ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWest : ESTIMATION_PARAMETER_HELP.interruptedSeries.armaErrors} />
+            <SegmentedControl size="sm" ariaLabel="Error model" value={model.errors.kind} onChange={(kind) => set('model', { kind: 'continuous', errors: kind === 'arma' ? { kind, p: '1', q: '0', maxIter: String(DEFAULT_ARMA_ITERATIONS) } : { kind, maxLags: '' } })} options={[{ value: 'neweyWest', label: 'Newey–West' }, { value: 'arma', label: 'ARMA errors' }]} />
+            {armaDraft === null ? <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Newey–West bandwidth" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWestBandwidth} />
+              <input aria-label="Newey–West bandwidth" type="number" min={0} className={field('text', 'mt-1')} placeholder="Automatic" value={model.errors.kind === 'neweyWest' ? model.errors.maxLags : ''} onChange={(e) => set('model', { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: e.target.value } })} />
+            </label> : <div className="grid gap-4 @lg/panel:grid-cols-3">
+              <label className="block"><ParameterLabel className={fieldLabel} label="Autoregressive order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder} />
+                <input aria-label="Autoregressive order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={armaDraft.p} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, p: e.target.value } })} />
+              </label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Moving-average order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.movingAverageOrder} />
+                <input aria-label="Moving-average order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={armaDraft.q} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, q: e.target.value } })} />
+              </label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Optimiser iterations" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.armaIterations} />
+                <input aria-label="Optimiser iterations" type="number" min={1} className={field('text', 'mt-1')} value={armaDraft.maxIter} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, maxIter: e.target.value } })} />
+              </label>
+            </div>}
+          </div>}
           {problem !== null && draft.outcome !== null && <p role="status" className="m-0 text-body text-muted">{problem}</p>}
         </fieldset>
         <div className="mt-4 flex flex-wrap items-center gap-3">

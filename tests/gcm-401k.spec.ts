@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { identifyEffect } from './examples/support'
 
 test('401k intervention effects reproduce the reference through the Run button', async ({ page }, info) => {
   test.setTimeout(1_200_000)
@@ -84,7 +85,7 @@ test('401k intervention effects reproduce the reference through the Run button',
   for (const name of model.names.slice(2)) await page.getByRole('group', { name: 'Effect modifiers' }).getByRole('checkbox', { name: new RegExp('^' + name + '(?:\\s|$)') }).check()
   await page.getByRole('radio', { name: /Observed choice/ }).check()
   await page.getByRole('textbox', { name: 'Assignment sentence' }).fill('Compare eligibility using the same sixteen adjustment variables as the GCM reference.')
-  await page.getByRole('button', { name: 'Identify the effect' }).click()
+  await identifyEffect(page)
   await navigation.getByRole('button', { name: /Estimation/ }).click()
   await page.getByRole('radio', { name: 'Bootstrap intervals', exact: true }).check()
   await page.getByLabel('Learner seed', { exact: true }).fill('7')

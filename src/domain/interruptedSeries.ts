@@ -45,9 +45,34 @@ export const impactForKernel = (impact: DeclaredImpact): InterruptedImpact =>
 export const sameImpact = (declared: DeclaredImpact, fitted: InterruptedImpact): boolean =>
   declared.kind === fitted.kind && (declared.kind !== 'temporaryLevel' || fitted.kind !== 'temporaryLevel' || rowIndex(declared.until) === fitted.until)
 
-/** The fit requested: least squares with Newey–West errors, or the paper's quasi-Poisson model. */
+/** The largest ARMA order the kernel fits; a state of 13 is already past what a monthly or weekly series supports. */
+export const MAX_ARMA_ORDER = 12
+/** statsmodels' `maxiter` for the state-space fit; the result records whether the optimiser converged inside it. */
+export const DEFAULT_ARMA_ITERATIONS = 50
+
+/**
+ * How a continuous series' terms are fitted: least squares with Newey–West errors (the kernel's
+ * bandwidth when `maxLags` is null), or maximum likelihood with an ARMA(p, q) error process,
+ * the error model of Hyndman and Athanasopoulos's dynamic harmonic regression.
+ */
+export const continuousErrorsSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('neweyWest'), maxLags: z.number().int().nonnegative().nullable() }).strict(),
+  z.object({ kind: z.literal('arma'), p: z.number().int().min(0).max(MAX_ARMA_ORDER), q: z.number().int().min(0).max(MAX_ARMA_ORDER), maxIter: z.number().int().positive() }).strict()
+    .refine((errors) => errors.p + errors.q > 0, { message: 'ARMA errors need at least one autoregressive or moving-average term.' }),
+])
+export type ContinuousErrors = z.infer<typeof continuousErrorsSchema>
+
+/** The error process an adjusted regression is asked for beside its Newey–West reading. */
+export const linearErrorModelSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('neweyWest') }).strict(),
+  z.object({ kind: z.literal('arma'), p: z.number().int().min(0).max(MAX_ARMA_ORDER), q: z.number().int().min(0).max(MAX_ARMA_ORDER), maxIter: z.number().int().positive() }).strict()
+    .refine((errors) => errors.p + errors.q > 0, { message: 'ARMA errors need at least one autoregressive or moving-average term.' }),
+])
+export type LinearErrorModel = z.infer<typeof linearErrorModelSchema>
+
+/** The fit requested: a continuous series with its error model, or the paper's quasi-Poisson model. */
 export const interruptedModelSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('continuous'), hacMaxLags: z.number().int().nonnegative().nullable() }).strict(),
+  z.object({ kind: z.literal('continuous'), errors: continuousErrorsSchema }).strict(),
   z.object({ kind: z.literal('count'), exposure: z.number().int().nonnegative().nullable() }).strict(),
 ])
 export type InterruptedModel = z.infer<typeof interruptedModelSchema>
@@ -58,8 +83,44 @@ export const interruptedSeasonalSchema = z.discriminatedUnion('kind', [
 ])
 export type InterruptedSeasonal = z.infer<typeof interruptedSeasonalSchema>
 
+export const interruptedTermSchema = z.object({
+  name: z.string().min(1),
+  coefficient: z.number().finite(),
+  standardError: z.number().finite().nonnegative(),
+  pValue: z.number().finite().min(0).max(1),
+  interval: z.tuple([z.number().finite(), z.number().finite()]),
+}).strict()
+export type InterruptedTermEvidence = z.infer<typeof interruptedTermSchema>
+
+const armaErrorShape = {
+  p: z.number().int().min(0).max(MAX_ARMA_ORDER),
+  q: z.number().int().min(0).max(MAX_ARMA_ORDER),
+  ar: z.array(interruptedTermSchema),
+  ma: z.array(interruptedTermSchema),
+  sigma2: z.number().finite().positive(),
+  logLikelihood: z.number().finite(),
+  aic: z.number().finite(),
+  bic: z.number().finite(),
+  iterations: z.number().int().nonnegative(),
+  converged: z.boolean(),
+}
+const wholeOrder = (e: { readonly p: number; readonly q: number; readonly ar: readonly unknown[]; readonly ma: readonly unknown[] }): boolean => e.ar.length === e.p && e.ma.length === e.q
+const ORDER_MESSAGE = { message: 'The fitted error terms must match the declared order.' }
+
+/** An ARMA(p, q) error process as fitted with the regression: `SARIMAX(y, exog, order=(p, 0, q))`. */
+export const armaErrorFieldsSchema = z.object(armaErrorShape).strict().refine(wholeOrder, ORDER_MESSAGE)
+export type ArmaErrorEvidence = z.infer<typeof armaErrorFieldsSchema>
+/** The same process as a variant of a continuous series' error model. */
+export const armaErrorEvidenceSchema = z.object({ kind: z.literal('arma'), ...armaErrorShape }).strict()
+
+export const continuousErrorEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('neweyWest'), maxLags: z.number().int().nonnegative() }).strict(),
+  armaErrorEvidenceSchema,
+]).refine((errors) => errors.kind === 'neweyWest' || wholeOrder(errors), ORDER_MESSAGE)
+export type ContinuousErrorEvidence = z.infer<typeof continuousErrorEvidenceSchema>
+
 const interruptedModelEvidenceSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('continuous'), hacMaxLags: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('continuous'), errors: continuousErrorEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count'), exposure: z.number().int().nonnegative().nullable(), dispersion: z.number().finite().positive() }).strict(),
 ])
 
@@ -73,15 +134,6 @@ const interruptedSeasonalEvidenceSchema = z.discriminatedUnion('kind', [
     deseasonalised: z.array(z.object({ fitted: z.number().finite(), counterfactual: z.number().finite() }).strict()),
   }).strict(),
 ])
-
-export const interruptedTermSchema = z.object({
-  name: z.string().min(1),
-  coefficient: z.number().finite(),
-  standardError: z.number().finite().nonnegative(),
-  pValue: z.number().finite().min(0).max(1),
-  interval: z.tuple([z.number().finite(), z.number().finite()]),
-}).strict()
-export type InterruptedTermEvidence = z.infer<typeof interruptedTermSchema>
 
 export const interruptedSeriesEvidenceSchema = z.object({
   kind: z.literal('interruptedSeries'),
@@ -136,6 +188,23 @@ export const trendTerm = (e: InterruptedSeriesEvidence): InterruptedTermEvidence
 /** `exp(coefficient)` with its limits: the rate ratio a count model's term reads as, `ci.lin(model, Exp = TRUE)`. */
 export const rateRatioOf = (term: InterruptedTermEvidence): { readonly ratio: number; readonly interval: readonly [number, number] } =>
   ({ ratio: Math.exp(term.coefficient), interval: [Math.exp(term.interval[0]), Math.exp(term.interval[1])] })
+
+/** The requested error model and the fitted one name the same process. */
+export const sameErrors = (requested: ContinuousErrors, fitted: ContinuousErrorEvidence): boolean => {
+  switch (requested.kind) {
+    case 'neweyWest': return fitted.kind === 'neweyWest' && (requested.maxLags === null || requested.maxLags === fitted.maxLags)
+    case 'arma': return fitted.kind === 'arma' && requested.p === fitted.p && requested.q === fitted.q
+    default: return assertNever(requested)
+  }
+}
+
+export function describeErrors(errors: ContinuousErrors | ContinuousErrorEvidence): string {
+  switch (errors.kind) {
+    case 'neweyWest': return errors.maxLags === null ? 'Newey–West errors' : `Newey–West errors, bandwidth ${errors.maxLags}`
+    case 'arma': return `ARMA(${errors.p}, ${errors.q}) errors`
+    default: return assertNever(errors)
+  }
+}
 
 export function describeImpact(impact: DeclaredImpact): string {
   switch (impact.kind) {

@@ -555,6 +555,22 @@ export type AdjustmentSetChoice =
   | { readonly kind: 'canonical' }
   | { readonly kind: 'minimal'; readonly ordinal: number }
 
+export type IdentifiedBackdoor = Extract<BackdoorIdentificationEvidence['result'], { readonly kind: 'identified' }>
+
+const sameIndexSet = (left: readonly number[], right: readonly number[]): boolean => {
+  const a = [...left].sort((x, y) => x - y)
+  const b = [...right].sort((x, y) => x - y)
+  return a.length === b.length && a.every((value, index) => value === b[index])
+}
+
+/**
+ * Whether identification leaves a choice of adjustment set to make: several minimal sets, or a
+ * canonical set that adds outcome predictors to the only minimal set. With no choice the minimal set
+ * is the identification; with one, the study is recorded only once the set is chosen.
+ */
+export const offersAdjustmentChoice = (result: IdentifiedBackdoor): boolean =>
+  result.minimalSets.length > 1 || !sameIndexSet(result.minimalSets[0], result.canonicalSet)
+
 export type AdjustmentSetSelection =
   | { readonly kind: 'canonical'; readonly variables: readonly StudyVariable[] }
   | { readonly kind: 'minimal'; readonly ordinal: number; readonly variables: readonly StudyVariable[] }

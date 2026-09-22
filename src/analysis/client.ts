@@ -12,7 +12,7 @@ export function runSurvivalForest(values: Float64Array, rows: number, columns: n
   return post('survival-forest-succeeded', { kind: 'survival-forest', request, values, rows, columns, design }, values)
 }
 import type { CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
-import type { InterruptedImpact, InterruptedModel, InterruptedSeasonal, InterruptedSeriesEvidence } from '@/domain/interruptedSeries'
+import type { InterruptedImpact, InterruptedModel, InterruptedSeasonal, InterruptedSeriesEvidence, LinearErrorModel } from '@/domain/interruptedSeries'
 import type { MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { GrangerSsrEvidence } from '@/domain/granger'
 import type {
@@ -717,6 +717,7 @@ export function runBackdoorLinear(
     readonly adjustment: readonly number[]
     readonly hacMaxLags: number | null
     readonly level: number
+    readonly errorModel: LinearErrorModel
   },
 ): Promise<BackdoorLinearOutcome> {
   const request = newWorkerRequestId()

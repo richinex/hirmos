@@ -39,8 +39,11 @@ export interface CountDraft {
   readonly delta: number
 }
 /** Field text as typed; the panel parses it when the run is requested. Each choice keeps only its own settings. */
+export type ContinuousErrorsDraft =
+  | { readonly kind: 'neweyWest'; readonly maxLags: string }
+  | { readonly kind: 'arma'; readonly p: string; readonly q: string; readonly maxIter: string }
 export type InterruptedModelDraft =
-  | { readonly kind: 'continuous'; readonly hacMaxLags: string }
+  | { readonly kind: 'continuous'; readonly errors: ContinuousErrorsDraft }
   | { readonly kind: 'count'; readonly exposure: ColumnId | null }
 export type InterruptedImpactDraft =
   | { readonly kind: 'level' }
@@ -92,7 +95,7 @@ export function retainTimeSeriesDraft(current: TimeSeriesDraft | null, workflow:
     ardl: { outcome: null, roles: {}, mode: 'search', starting: {}, fixedOrders: {}, minimum: '1', outcomeLag: '2', holdBack: '', terms: 'constant', horizon: '12', future: { kind: 'none' } },
     longRun: { ardl: longRunDraft('ardl', workflow.timeSeriesRuns), vecm: longRunDraft('vecm', workflow.timeSeriesRuns) },
     count: { outcome: null, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], candidateStart: Math.max(1, Math.floor(prepared.observations * 0.2)), candidateEnd: Math.max(1, Math.floor(prepared.observations * 0.8)), delta: 1 },
-    interrupted: { outcome: null, model: { kind: 'continuous', hacMaxLags: '' }, interventionRow: '', lag: '0', impact: { kind: 'level' }, harmonicPairs: '2' },
+    interrupted: { outcome: null, model: { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: '' } }, interventionRow: '', lag: '0', impact: { kind: 'level' }, harmonicPairs: '2' },
   }
 }
 

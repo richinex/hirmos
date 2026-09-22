@@ -172,3 +172,36 @@ fn lag_and_temporary_shapes() {
     let change: Vec<f64> = (0..20).map(|r| slope.x[(r, 2)]).collect();
     assert_eq!(&change[10..16], [0.0, 0.0, 1.0, 2.0, 3.0, 4.0]);
 }
+
+/// The step-change design with AR(1) errors reaches statsmodels' SARIMAX fit on the same
+/// columns (`oracle/arma_regression.py`, `x3_ar1`): the regression mean is what the paper's
+/// figures draw, and the serial-correlation tests read the standardised innovations.
+#[test]
+fn rate_model3_with_ar1_errors_matches_statsmodels_sarimax() {
+    use hirmos_causal_core::arma_regression::{ArmaOrder, DEFAULT_MAX_ITER};
+    let root = fixture();
+    let arma: Value = serde_json::from_str(include_str!("../oracle/fixtures/arma_regression.json")).unwrap();
+    let want = &arma["x3_ar1"];
+    let fit = fit_continuous_arma(&floats(&root["rate"]), &spec(&root, ImpactModel::Level), ArmaOrder { p: 1, q: 0 }, DEFAULT_MAX_ITER, 12);
+    assert_eq!(fit.names, ["const", "time", "step", "sin1", "sin2", "cos1", "cos2"]);
+    // The design's phase is the row index rather than the month, the same angles to rounding;
+    // the optimiser's path along the ridge shared by the constant, the AR term and the variance
+    // then ends within its tolerance of the library's point (see tests/arma_regression.rs).
+    let relative = |got: &[f64], want: &[f64]| got.iter().zip(want).map(|(a, b)| (a - b).abs() / b.abs().max(1.0)).fold(0.0f64, f64::max);
+    let params = floats(&want["params"]);
+    assert!(relative(&fit.fit.params, &params) < 2e-3, "params {:?} vs {:?}", fit.fit.params, params);
+    assert!(relative(&fit.fit.bse, &floats(&want["bse"])) < 5e-3, "bse");
+    assert!((fit.fit.llf - want["llf"].as_f64().unwrap()).abs() < 1e-6, "llf");
+    assert!(fit.fit.converged);
+    let standardized = floats(&want["standardized_forecasts_error"]);
+    assert!(relative(&fit.fit.standardized_resid, &standardized) < 1e-3, "standardised residuals");
+    // The mean function at the fitted coefficients, with the step at zero for the counterfactual.
+    let x: Vec<Vec<f64>> = serde_json::from_value(arma["x3"].clone()).unwrap();
+    for (r, row) in x.iter().enumerate() {
+        let mean: f64 = row.iter().zip(&fit.fit.params).map(|(a, b)| a * b).sum();
+        assert!((fit.fitted[r] - mean).abs() < 1e-9);
+        let counterfactual = mean - row[2] * fit.fit.params[2];
+        assert!((fit.counterfactual[r] - counterfactual).abs() < 1e-9);
+    }
+    assert_eq!(fit.ljung_box.0.len(), 12);
+}

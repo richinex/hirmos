@@ -1152,6 +1152,8 @@ pub(crate) enum AnalysisCommand {
         adjustment: Vec<usize>,
         hac_max_lags: Option<usize>,
         level: f64,
+        /// The error process beside the Newey-West interval: none, or an ARMA fitted by maximum likelihood.
+        error_model: LinearErrorModel,
     },
     FrontdoorTwoStage {
         rows: usize,
@@ -1521,21 +1523,71 @@ pub(crate) enum IngarchInterventionSchedule {
     Decaying { delta: f64 },
 }
 
+/// The error process of a linear fit: independent errors with a Newey-West interval, or an
+/// ARMA(p, q) process fitted by maximum likelihood with the regression (statsmodels SARIMAX).
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum LinearErrorModel {
+    NeweyWest,
+    Arma { p: usize, q: usize, max_iter: usize },
+}
+
+/// An ARMA(p, q) error process as fitted: its coefficients, variance, likelihood and the
+/// optimiser's outcome.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ArmaErrorEvidence {
+    pub(crate) p: usize,
+    pub(crate) q: usize,
+    pub(crate) ar: Vec<InterruptedTermEvidence>,
+    pub(crate) ma: Vec<InterruptedTermEvidence>,
+    pub(crate) sigma2: f64,
+    pub(crate) log_likelihood: f64,
+    pub(crate) aic: f64,
+    pub(crate) bic: f64,
+    pub(crate) iterations: usize,
+    pub(crate) converged: bool,
+}
+
+/// The adjusted linear regression's coefficient under an ARMA error process, beside the OLS
+/// and Newey-West readings of the same design.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum LinearErrorEvidence {
+    NeweyWest,
+    Arma { estimate: f64, standard_error: f64, interval: [f64; 2], p_value: f64, errors: ArmaErrorEvidence },
+}
+
 /// Which fit the series gets, with only the settings that fit needs.
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum InterruptedModel {
-    /// OLS with Newey-West errors; statsmodels' bandwidth when none is given.
-    Continuous { hac_max_lags: Option<usize> },
+    Continuous { errors: ContinuousErrors },
     /// The paper's quasi-Poisson model; the exposure column's log is the offset when given.
     Count { exposure: Option<usize> },
 }
 
+/// How a continuous series' terms are fitted: OLS with Newey-West errors (statsmodels'
+/// bandwidth when none is given), or by maximum likelihood with ARMA(p, q) errors.
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum ContinuousErrors {
+    NeweyWest { max_lags: Option<usize> },
+    Arma { p: usize, q: usize, max_iter: usize },
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum InterruptedModelEvidence {
-    Continuous { hac_max_lags: usize },
+    Continuous { errors: ContinuousErrorEvidence },
     Count { exposure: Option<usize>, dispersion: f64 },
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum ContinuousErrorEvidence {
+    NeweyWest { max_lags: usize },
+    Arma(ArmaErrorEvidence),
 }
 
 /// The impact model declared before fitting: how the event is assumed to act.
@@ -2557,6 +2609,7 @@ pub(crate) enum AnalysisResult {
         hac_interval: [f64; 2],
         hac_p_value: f64,
         durbin_watson: f64,
+        error_model: LinearErrorEvidence,
     },
     FrontdoorTwoStage {
         observations: usize,

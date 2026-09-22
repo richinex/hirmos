@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import { shippedExampleById, EXAMPLE_PROJECT_ID } from '../../src/domain/example'
-import { exportBundle } from './support'
+import { exportBundle, identifyEffect } from './support'
 
 /**
  * Builds the shipped example: the Seatbelts walkthrough run end to end through the product's own
@@ -89,7 +89,7 @@ test('build the Seatbelts example bundle', async ({ page }) => {
   await page.getByRole('radio', { name: /Observed choice/ }).click()
   await page.getByPlaceholder(/who or what set the treatment/).fill('Distance driven each month followed fuel prices and the season; nobody assigned it.')
   await page.getByPlaceholder(/Why this holds here/).nth(1).fill("One month of driving does not change another month's deaths.")
-  await page.getByRole('button', { name: /Identify the effect/ }).click()
+  await identifyEffect(page)
   await expect(page.getByText(/Identified by back-door adjustment/).first()).toBeVisible({ timeout: 60_000 })
   await page.getByRole('button', { name: /Continue to estimation/ }).click()
 

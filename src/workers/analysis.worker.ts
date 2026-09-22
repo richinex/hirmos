@@ -323,6 +323,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         adjustment: command.adjustment,
         hacMaxLags: command.hacMaxLags,
         level: command.level,
+        errorModel: command.errorModel,
       }
     case 'frontdoor-two-stage':
       return {

@@ -3,8 +3,10 @@
 //! regression of one series on time, an intervention indicator, an optional change of slope
 //! centred on the last pre-intervention row, and the harmonic seasonal terms of
 //! `tsModel::harmonic`. A count is fitted as the paper's quasi-Poisson model with an offset;
-//! a continuous series by OLS with Newey-West errors.
+//! a continuous series by OLS with Newey-West errors, or by maximum likelihood with ARMA errors,
+//! the dynamic harmonic regression of Hyndman and Athanasopoulos (FPP3 §10.5).
 
+use crate::arma_regression::{fit as fit_arma, ArmaOrder, ArmaRegressionFit};
 use crate::estimation::{ols_hac, HacOls};
 use crate::glm::{poisson_glm_with, Dispersion, PoissonGlm};
 use crate::tsdiag::ljung_box;
@@ -167,6 +169,38 @@ pub fn fit_continuous(y: &[f64], spec: &InterruptedSeriesDesign, maxlags: usize,
     let ljung_box = ljung_box(&fit.resid, ljung_box_lags);
     let correlation = residual_correlation(&fit.resid, ljung_box_lags);
     ContinuousFit { names: d.names, fit, fitted, counterfactual, deseasonalised, deseasonalised_counterfactual, ljung_box, correlation }
+}
+
+pub struct ContinuousArmaFit {
+    pub names: Vec<String>,
+    pub fit: ArmaRegressionFit,
+    /// The regression mean `x beta` and the same with the event's columns at zero: the curves
+    /// the paper draws, with the error process's own prediction left out of them.
+    pub fitted: Vec<f64>,
+    pub counterfactual: Vec<f64>,
+    pub deseasonalised: Option<Vec<f64>>,
+    pub deseasonalised_counterfactual: Option<Vec<f64>>,
+    /// Ljung-Box on the standardised one-step-ahead forecast errors, the residuals statsmodels'
+    /// serial-correlation test reads for a state-space fit.
+    pub ljung_box: (Vec<f64>, Vec<f64>),
+    pub correlation: ResidualCorrelation,
+}
+
+/// The paper's design fitted to a continuous series with ARMA(p, q) errors by maximum
+/// likelihood: `SARIMAX(y, exog = design, order = (p, 0, q))`.
+pub fn fit_continuous_arma(y: &[f64], spec: &InterruptedSeriesDesign, order: ArmaOrder, max_iter: usize, ljung_box_lags: usize) -> ContinuousArmaFit {
+    let d = design(y.len(), spec);
+    let fit = fit_arma(y, &d.x, order, max_iter);
+    let predict = |m: &DMatrix<f64>| -> Vec<f64> {
+        (0..m.nrows()).map(|r| (0..m.ncols()).map(|c| m[(r, c)] * fit.params[c]).sum()).collect()
+    };
+    let fitted = predict(&d.x);
+    let counterfactual = predict(&d.counterfactual);
+    let deseasonalised = d.deseasonalised.as_ref().map(&predict);
+    let deseasonalised_counterfactual = d.deseasonalised_counterfactual.as_ref().map(&predict);
+    let ljung_box = ljung_box(&fit.standardized_resid, ljung_box_lags);
+    let correlation = residual_correlation(&fit.standardized_resid, ljung_box_lags);
+    ContinuousArmaFit { names: d.names, fit, fitted, counterfactual, deseasonalised, deseasonalised_counterfactual, ljung_box, correlation }
 }
 
 pub struct CountFit {

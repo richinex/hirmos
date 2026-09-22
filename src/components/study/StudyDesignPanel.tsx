@@ -39,6 +39,7 @@ import {
   estimableIdentification,
   estimandSentence,
   identifiedExpression,
+  offersAdjustmentChoice,
   identifiedExpressionTex,
   CONSISTENCY_STATEMENT,
   DESIGN_ASSUMPTIONS,
@@ -295,7 +296,7 @@ function AdjustmentSetChoicePanel({ study, evidence, onChoose }: {
   return (
     <section className="mt-4 border-t border-hair pt-4" aria-labelledby="adjustment-set-choice-title">
       <h4 id="adjustment-set-choice-title" className="m-0 text-body font-medium text-ink">Choose a valid adjustment set</h4>
-      <p className={prose('mb-0 mt-1 text-muted')}>The graph has several minimal valid sets. Choose using measurement quality, observed support and the planned model—not the estimate, which has not been run.</p>
+      <p className={prose('mb-0 mt-1 text-muted')}>{evidence.result.kind === 'identified' && evidence.result.minimalSets.length > 1 ? 'The graph has several minimal valid sets.' : 'The minimal set closes every back-door path. The canonical set adds predictors of the outcome: they close no path, and can narrow the interval.'} Choose using measurement quality, observed support and the planned model—not the estimate, which has not been run.</p>
       <div className="mt-3 grid gap-2">
         {evidence.result.minimalSets.map((set, ordinal) => (
           <button key={set.join('|')} type="button" className={button('outline', 'justify-start text-left')} onClick={() => onChoose({ kind: 'minimal', ordinal })}>
@@ -395,7 +396,10 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         session.fail(id, describeAnalysisWorkerProblem(outcome.error))
         return
       }
-      if (outcome.value.result.kind === 'identified' && outcome.value.result.minimalSets.length > 1) {
+      // The choice is put to the person whenever the graph leaves one: several minimal sets, or a
+      // canonical set that adds outcome predictors to the only minimal set. A study is recorded
+      // with its identification once, so the set is chosen before, never switched after.
+      if (outcome.value.result.kind === 'identified' && offersAdjustmentChoice(outcome.value.result)) {
         offerAdjustment({ study: ready.value, evidence: outcome.value })
         session.finish(id)
         return

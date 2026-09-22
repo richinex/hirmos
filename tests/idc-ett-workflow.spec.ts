@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { identifyEffect } from './examples/support'
 
 const choose = async (trigger: Locator, label: string) => {
   await trigger.click()
@@ -48,7 +49,7 @@ test('a fresh IDC*-only project reaches and runs binary ETT estimation', async (
   await page.getByRole('radio', { name: /Treated rows \(ATT\)/ }).click()
   await page.getByRole('radio', { name: 'Observed choice' }).click()
   await page.getByLabel('Assignment sentence').fill('Treatment was selected by observed units rather than assigned by the analyst.')
-  await page.getByRole('button', { name: 'Identify the effect' }).click()
+  await identifyEffect(page)
   const identifiedStudy = page.getByRole('article', { name: /among treated rows identification/ })
   await expect(identifiedStudy.getByText('Identified by IDC*', { exact: false })).toBeVisible({ timeout: 30_000 })
   const treated = identifiedStudy.getByText(/P\(Y @ \+X: \+Y \| X: \+X\) =/)

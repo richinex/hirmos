@@ -8,6 +8,7 @@ import { button, literal, num, table as tableCn, td, tdText, tr } from '@/compon
 import { fontFor, lineCountAt, lineHeightFor, useTextMetricsVersion } from '@/lib/textMetrics'
 import { toCsv } from '@/lib/csv'
 import { cn } from '@/lib/utils'
+import { formatStatistic } from '@/lib/format/number'
 
 /**
  * A sortable evidence table over plain rows: the same shell, header cells, density switch and count
@@ -41,6 +42,10 @@ export interface EvidenceColumn<Row> {
   /** Mono for marks and identifiers; figures already print in tabular numerals. */
   readonly mono?: boolean
 }
+
+/** A right-aligned figure column: sorted on the number, printed as a statistic unless told otherwise. */
+export const figureColumn = <Row,>(id: string, header: string, value: (row: Row) => number, print: (value: number) => string = (value) => formatStatistic('raw', value).text): EvidenceColumn<Row> =>
+  ({ id, header, align: 'right', value, format: (value) => print(typeof value === 'number' ? value : Number(value)) })
 
 type CellMeta = { readonly align: 'left' | 'right'; readonly mono: boolean }
 

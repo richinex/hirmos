@@ -56,11 +56,34 @@ test('fits the paper\'s smoking-ban model through the UI and reads it as the pap
   await expect(result.filter({ hasText: 'level and slope change' })).toHaveCount(1, { timeout: 60_000 })
   await expect(result).toContainText('Slope change per row, rate ratio')
   await expect(result.getByRole('table', { name: 'Fitted terms' }).locator('tbody tr').nth(3)).toContainText('0.00148')
-  // Both runs land in the Results ledger with the same reading.
+  // The same design on the standardised count as a continuous series with AR(1) errors: the
+  // statsmodels SARIMAX fixture (crates/causal-core/oracle/fixtures/arma_regression.json) fits
+  // the rate; the count at the mean population is the rate times a constant, so the step and
+  // the error process read the same and the level change scales with it.
+  await page.getByRole('radio', { name: 'Level change', exact: true }).click({ force: true })
+  await page.getByRole('radio', { name: 'Continuous', exact: true }).click({ force: true })
+  await page.getByRole('radio', { name: 'ARMA errors', exact: true }).click({ force: true })
+  await expect(page.getByRole('spinbutton', { name: 'Autoregressive order' })).toHaveValue('1')
+  await expect(page.getByRole('spinbutton', { name: 'Moving-average order' })).toHaveValue('0')
+  await expect(page.getByRole('spinbutton', { name: 'Optimiser iterations' })).toHaveValue('50')
+  await page.getByRole('spinbutton', { name: 'Moving-average order' }).fill('1')
+  await page.getByRole('spinbutton', { name: 'Autoregressive order' }).fill('0')
+  await fit.click()
+  await expect(result.filter({ hasText: 'ARMA(0, 1) errors' })).toHaveCount(1, { timeout: 90_000 })
+  await expect(result).toContainText('The terms were fitted jointly with ARMA(0, 1) errors by maximum likelihood')
+  const errorTable = result.getByRole('table', { name: 'Error process' })
+  await expect(errorTable).toContainText('ma.L1')
+  await expect(errorTable).toContainText('converged in')
+  await expect(result.getByRole('figure', { name: 'Residuals over time' }).or(result.locator('[aria-label="Residuals over time"]')).first()).toBeVisible()
+  await expect(result).toContainText('Innovation variance')
+  await page.screenshot({ path: info.outputPath('sicily-arma.png'), fullPage: true })
+
+  // Every run lands in the Results ledger with the same reading.
   await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Results/ }).click()
   const ledger = page.getByRole('region', { name: 'Time-series result' })
-  await expect(ledger).toHaveCount(2)
-  await expect(ledger.first()).toContainText('level and slope change')
+  await expect(ledger).toHaveCount(3)
+  await expect(ledger.first()).toContainText('ARMA(0, 1) errors')
+  await expect(ledger.nth(1)).toContainText('level and slope change')
   await expect(ledger.last()).toContainText('rate ratio of 0.885 [0.839, 0.933] 95% CI')
   await page.screenshot({ path: info.outputPath('sicily-ledger.png'), fullPage: true })
   expect(errors).toEqual([])

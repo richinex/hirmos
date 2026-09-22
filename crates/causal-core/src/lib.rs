@@ -106,6 +106,7 @@ pub use var_lingam::{
 };
 
 pub mod ardl;
+pub mod arma_regression;
 pub mod bayesian_gaussian;
 pub mod bfgs;
 pub mod causal_impact;

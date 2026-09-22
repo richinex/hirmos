@@ -42,9 +42,11 @@ import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
+import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
 import {
   additive,
   adjustmentLabels,
+  armaReading,
   boundsReading,
   causalEstimateFrom,
   contemporaneousAdjustmentVariables,
@@ -322,6 +324,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'R squared', value: formatStatistic('score', evidence.rSquared), context: `${formatCount(evidence.parameters).text} parameters` },
           { label: 'Residual SD', value: formatStatistic('sd', evidence.residualSd), context: <Metadata><span>{formatCount(evidence.degreesOfFreedom).text} degrees of freedom</span><span>Durbin–Watson {formatStatistic('raw', evidence.durbinWatson).text}</span></Metadata> },
           { label: 'Newey–West bandwidth', value: formatCount(evidence.hacMaxLags, { noun: 'lag' }), context: `heteroskedasticity and autocorrelation consistent p ${formatP(evidence.hacPValue, { withLabel: false }).text}` },
+          ...(evidence.errorModel.kind === 'arma' ? [
+            { label: `ARMA(${evidence.errorModel.errors.p}, ${evidence.errorModel.errors.q}) errors`, value: formatWords([...evidence.errorModel.errors.ar, ...evidence.errorModel.errors.ma].map((term) => `${term.name} ${formatStatistic('raw', term.coefficient).text}`).join(', ')), context: <Metadata><span>innovation variance {formatStatistic('raw', evidence.errorModel.errors.sigma2).text}</span><span>AIC {formatStatistic('raw', evidence.errorModel.errors.aic).text}</span><span>{evidence.errorModel.errors.converged ? `converged in ${evidence.errorModel.errors.iterations} iterations` : `stopped at ${evidence.errorModel.errors.iterations} iterations`}</span></Metadata> },
+          ] : []),
         ]
       }
       case 'count-glm-run': {
@@ -565,7 +570,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
         curve,
       }, theme)
   }, [curves, curveIndex, adjustmentVariables, study.outcome.name, study.treatment.name, theme])
-  const stamp = <RunMeta>{[describeEstimator(run.configuration.kind), ...(run.kind === 'backdoor-linear-run' ? [describeCovariance(run.configuration.covariance)] : []), formatTime(run.createdAt)]}</RunMeta>
+  const stamp = <RunMeta>{[describeEstimator(run.configuration.kind), ...(run.kind === 'backdoor-linear-run' ? [describeCovariance(run.configuration.errors)] : []), formatTime(run.createdAt)]}</RunMeta>
   // A grouped effect draws each group's interval on the shared axis, the whole-population average last.
   const groupChart = useMemo(() => (estimate.effect.kind === 'byGroup'
     ? runComparisonOption([
@@ -628,8 +633,13 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       {run.kind === 'backdoor-linear-run' && (
         <p className="mb-0 mt-3 text-body text-muted">
           {estimate.interval.kind === 'confidence' && (estimate.interval.lower > 0 || estimate.interval.upper < 0) ? 'The interval excludes zero.' : 'The interval includes zero: the data do not rule out no effect.'}{' '}
-          For comparison, the {run.configuration.covariance === 'hac' ? 'classical' : 'HAC'} interval is <span className={num('text-bone')}>{intervalText({ ...estimate, interval: { kind: 'confidence', level: run.evidence.level, lower: run.configuration.covariance === 'hac' ? run.evidence.interval[0] : run.evidence.hacInterval[0], upper: run.configuration.covariance === 'hac' ? run.evidence.interval[1] : run.evidence.hacInterval[1] } })}</span>.
+          {run.configuration.errors.kind === 'arma'
+            ? <>For comparison, least squares gives <span className={num('text-bone')}>{formatStatistic('raw', run.evidence.estimate).text}</span> with a Newey–West interval of <span className={num('text-bone')}>{intervalText({ ...estimate, effect: { kind: 'additive', value: run.evidence.estimate, unit: '' }, interval: { kind: 'confidence', level: run.evidence.level, lower: run.evidence.hacInterval[0], upper: run.evidence.hacInterval[1] } })}</span>.</>
+            : <>For comparison, the {run.configuration.errors.kind === 'hac' ? 'classical' : 'HAC'} interval is <span className={num('text-bone')}>{intervalText({ ...estimate, interval: { kind: 'confidence', level: run.evidence.level, lower: run.configuration.errors.kind === 'hac' ? run.evidence.interval[0] : run.evidence.hacInterval[0], upper: run.configuration.errors.kind === 'hac' ? run.evidence.interval[1] : run.evidence.hacInterval[1] } })}</span>.</>}
         </p>
+      )}
+      {run.kind === 'backdoor-linear-run' && armaReading(run)?.errors.converged === false && (
+        <Alert tone="warn" live={false} className="mt-3"><p className="m-0">The ARMA fit stopped at its iteration limit without converging; raise the limit and run again before reading the estimate.</p></Alert>
       )}
       {run.kind === 'count-glm-run' && !run.evidence.converged && (
         <Alert tone="warn" live={false} className="mt-3"><p className="m-0">The optimiser did not converge; treat the estimate and its interval as provisional.</p></Alert>
@@ -951,7 +961,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         case 'backdoor-linear-regression': {
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
           const matrix = await materialise(columns)
-          const evidence = await analysis.runBackdoorLinear(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), hacMaxLags: null, level: configuration.level })
+          const errorModel: LinearErrorModel = configuration.errors.kind === 'arma' ? { kind: 'arma', p: configuration.errors.p, q: configuration.errors.q, maxIter: configuration.errors.maxIter } : { kind: 'neweyWest' }
+          const evidence = await analysis.runBackdoorLinear(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), hacMaxLags: null, level: configuration.level, errorModel })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'backdoor-linear-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1241,9 +1252,19 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'backdoor-linear-regression':
         return (
           <div>
-            <ParameterLabel className={fieldLabel} label="Interval" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.interval} />
-            <SegmentedControl className="mt-1" ariaLabel="Interval covariance" value={configuration.covariance} onChange={(covariance) => configure({ ...configuration, covariance })} options={[{ value: 'hac', label: 'Newey–West HAC' }, { value: 'classical', label: 'Classical' }]} />
-            <p className={cn(fieldHint, 'max-w-[65ch]')}>95% confidence level. Heteroskedasticity and autocorrelation consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of floor(4 (n/100)^(2/9)) lags. The classical interval assumes independent errors.</p>
+            <ParameterLabel className={fieldLabel} label="Errors" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.interval} />
+            <SegmentedControl className="mt-1" ariaLabel="Error treatment" value={configuration.errors.kind} onChange={(kind) => configure({ ...configuration, errors: kind === 'arma' ? { kind, p: 1, q: 0, maxIter: DEFAULT_ARMA_ITERATIONS } : { kind } })} options={[{ value: 'hac', label: 'Newey–West HAC' }, { value: 'classical', label: 'Classical' }, { value: 'arma', label: 'ARMA errors' }]} />
+            <p className={cn(fieldHint, 'max-w-[65ch]')}>{configuration.errors.kind === 'arma'
+              ? '95% confidence level.'
+              : '95% confidence level. Heteroskedasticity and autocorrelation consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of floor(4 (n/100)^(2/9)) lags. The classical interval assumes independent errors.'}</p>
+            {configuration.errors.kind === 'arma' && <div className="mt-3 grid gap-3 @md/panel:grid-cols-3">
+              <label className="block"><ParameterLabel className={fieldLabel} label="Autoregressive order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder} />
+                <input aria-label="Autoregressive order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={configuration.errors.p} onChange={(event) => configure({ ...configuration, errors: { kind: 'arma', p: Number(event.target.value), q: configuration.errors.kind === 'arma' ? configuration.errors.q : 0, maxIter: configuration.errors.kind === 'arma' ? configuration.errors.maxIter : DEFAULT_ARMA_ITERATIONS } })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Moving-average order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.movingAverageOrder} />
+                <input aria-label="Moving-average order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={configuration.errors.q} onChange={(event) => configure({ ...configuration, errors: { kind: 'arma', p: configuration.errors.kind === 'arma' ? configuration.errors.p : 1, q: Number(event.target.value), maxIter: configuration.errors.kind === 'arma' ? configuration.errors.maxIter : DEFAULT_ARMA_ITERATIONS } })} /></label>
+              <label className="block"><ParameterLabel className={fieldLabel} label="Optimiser iterations" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.armaIterations} />
+                <input aria-label="Optimiser iterations" type="number" min={1} className={field('text', 'mt-1')} value={configuration.errors.maxIter} onChange={(event) => configure({ ...configuration, errors: { kind: 'arma', p: configuration.errors.kind === 'arma' ? configuration.errors.p : 1, q: configuration.errors.kind === 'arma' ? configuration.errors.q : 0, maxIter: Number(event.target.value) } })} /></label>
+            </div>}
           </div>
         )
       case 'dml-plr':
@@ -1659,7 +1680,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     const comparable = runs.filter((run) => run.study === identification?.study && run.estimate.effect.kind === 'additive')
     if (comparable.length < 2) return null
     const rows: RunComparisonRow[] = comparable.map((run, index) => ({
-      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? `, ${describeCovariance(run.configuration.covariance)}` : ''}, ${formatTime(run.createdAt)}`,
+      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? `, ${describeCovariance(run.configuration.errors)}` : ''}, ${formatTime(run.createdAt)}`,
       estimate: run.estimate.effect.kind === 'additive' ? run.estimate.effect.value : 0,
       lower: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.lower,
       upper: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.upper,

@@ -292,6 +292,20 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
 
   const configuration = Reflect.get(value, 'configuration')
   const evidence = Reflect.get(value, 'evidence')
+  // An adjusted regression saved before the error process was a choice: its covariance name
+  // becomes the error treatment, and its evidence records that no ARMA fit was made.
+  if (Reflect.get(value, 'kind') === 'backdoor-linear-run'
+    && typeof configuration === 'object' && configuration !== null
+    && typeof evidence === 'object' && evidence !== null) {
+    const covariance = Reflect.get(configuration, 'covariance')
+    const { covariance: _legacyCovariance, ...rest } = configuration as Record<string, unknown>
+    return {
+      ...value,
+      estimate: upgradedEstimate,
+      configuration: covariance === 'hac' || covariance === 'classical' ? { ...rest, errors: { kind: covariance } } : configuration,
+      evidence: { errorModel: { kind: 'neweyWest' }, ...evidence },
+    }
+  }
   if (Reflect.get(value, 'kind') === 't-learner-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null) {

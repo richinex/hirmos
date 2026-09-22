@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { plotTimeSchema } from './longRun'
 import { ardlModelRequestSchema, ardlModelEvidenceSchema } from './ardlModel'
 import { ardlEvidenceSchema, vecmEvidenceSchema } from './estimation'
-import { declaredImpactSchema, describeImpact, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, rowIndex, sameImpact } from './interruptedSeries'
+import { continuousErrorsSchema, declaredImpactSchema, describeImpact, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, rowIndex, sameErrors, sameImpact } from './interruptedSeries'
 import { assertNever, brand, err, ok, type Result } from './dop'
 import type { ColumnId } from './dataset'
 import type { PreparedDatasetVersionId } from './preprocessing'
@@ -55,7 +55,7 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
     specification: z.object({
       /** The fit, with the column a count model's exposure came from. */
       model: z.discriminatedUnion('kind', [
-        z.object({ kind: z.literal('continuous'), hacMaxLags: z.number().int().nonnegative().nullable() }).strict(),
+        z.object({ kind: z.literal('continuous'), errors: continuousErrorsSchema }).strict(),
         z.object({ kind: z.literal('count'), exposure: column.nullable() }).strict(),
       ]),
       /** The first screen row after the event, numbered from 1. */
@@ -143,7 +143,7 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
       const { specification: s, evidence: e } = run
       if (s.model.kind !== e.model.kind || rowIndex(s.interventionRow) !== e.interventionRow || s.lag !== e.lag || !sameImpact(s.impact, e.impact)) fail('The interrupted-series result does not match its specification.')
       if (s.seasonal.kind !== e.seasonal.kind || (s.seasonal.kind === 'harmonic' && e.seasonal.kind === 'harmonic' && (s.seasonal.pairs !== e.seasonal.pairs || s.seasonal.period !== e.seasonal.period))) fail('The seasonal terms differ from the requested ones.')
-      if (s.model.kind === 'continuous' && e.model.kind === 'continuous' && s.model.hacMaxLags !== null && e.model.hacMaxLags !== s.model.hacMaxLags) fail('The Newey–West bandwidth differs from the requested one.')
+      if (s.model.kind === 'continuous' && e.model.kind === 'continuous' && !sameErrors(s.model.errors, e.model.errors)) fail('The fitted error model differs from the requested one.')
       if (s.model.kind === 'count' && e.model.kind === 'count' && (s.model.exposure === null) !== (e.model.exposure === null)) fail('An exposure column must be recorded with the count model that used it.')
       return
     }

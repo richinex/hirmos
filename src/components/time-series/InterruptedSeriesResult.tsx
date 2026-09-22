@@ -6,17 +6,21 @@ import { useChartTheme } from '@/charts/theme'
 import type { VisibleWindow } from '@/charts/window'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
-import { label, resultSurface, resultTitle, table, td, th } from '@/components/ui/recipes'
+import { label, resultSurface, resultTitle } from '@/components/ui/recipes'
+import { EvidenceTable, figureColumn } from '@/components/table/EvidenceTable'
 import { describeImpact, levelTerm, rateRatioOf, slopeTerm, trendTerm, type InterruptedTermEvidence } from '@/domain/interruptedSeries'
 import { timeSeriesRunLabel, type TimeSeriesRun } from '@/domain/timeSeries'
 import type { NonEmptyArray } from '@/domain/dop'
 import type { InterpretationStatement } from '@/domain/resultInterpretation'
 import { formatTime } from '@/lib/format/date'
-import { formatEstimate, formatInterval, formatP, formatStatistic, formatWords } from '@/lib/format/number'
+import { formatEstimate, formatInterval, formatP, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
 import { EChart } from '@/charts/EChart'
 import { TimeSeriesEquation } from './TimeSeriesEquation'
 
 type Run = Extract<TimeSeriesRun, { kind: 'interrupted-series' }>
+interface TermRow { readonly key: string; readonly term: string; readonly coefficient: number; readonly standardError: number; readonly ratio: ReturnType<typeof rateRatioOf>; readonly interval: readonly [number, number]; readonly pValue: number }
+interface ErrorTermRow { readonly key: string; readonly term: string; readonly coefficient: number; readonly standardError: number; readonly interval: readonly [number, number]; readonly pValue: number }
+interface LjungBoxRow { readonly lags: number; readonly statistic: number; readonly pValue: number }
 const number = (value: number) => formatStatistic('raw', value).text
 const CI95 = { kind: 'confidence', level: 0.95 } as const
 const THREE = { precision: { kind: 'decimals', places: 3 } } as const
@@ -24,6 +28,18 @@ const THREE = { precision: { kind: 'decimals', places: 3 } } as const
 const ratio = (term: InterruptedTermEvidence) => { const r = rateRatioOf(term); return formatInterval(r.ratio, r.interval[0], r.interval[1], CI95, { kind: 'ratio', label: 'RR' }, THREE).text }
 const additive = (term: InterruptedTermEvidence, unit = '') => formatInterval(term.coefficient, term.interval[0], term.interval[1], CI95, { kind: 'additive', unit }).text
 const three = (value: number) => formatEstimate(value, { kind: 'additive', unit: '' }, THREE).text
+
+/** A tile's figure is the estimate alone, at the interval's precision; the interval is its context line. */
+const effectTile = (term: InterruptedTermEvidence, count: boolean): { readonly value: Formatted; readonly context: string } => {
+  if (count) {
+    const r = rateRatioOf(term)
+    const interval = formatInterval(r.ratio, r.interval[0], r.interval[1], CI95, { kind: 'ratio', label: 'RR' }, THREE)
+    return { value: formatEstimate(r.ratio, { kind: 'ratio', label: 'RR' }, THREE), context: `${interval.bounds.lower} to ${interval.bounds.upper}, ${interval.typeLabel}` }
+  }
+  const interval = formatInterval(term.coefficient, term.interval[0], term.interval[1], CI95, { kind: 'additive', unit: '' })
+  const halfWidth = Math.abs(term.interval[1] - term.interval[0]) / 3.92
+  return { value: formatEstimate(term.coefficient, { kind: 'additive', unit: '' }, halfWidth > 0 ? { precision: { kind: 'matchSe', se: halfWidth } } : {}), context: `${interval.bounds.lower} to ${interval.bounds.upper}, ${interval.typeLabel}` }
+}
 const significant = (value: number) => formatEstimate(value, { kind: 'additive', unit: '' }, { precision: { kind: 'significant', digits: 3 } }).text
 
 const termName = (name: string): string => {
@@ -42,7 +58,7 @@ function reading(term: InterruptedTermEvidence, count: boolean, what: string, un
   const estimate = count
     ? `The ${what} is a rate ratio of ${ratio(term)}, ${formatP(term.pValue).text}`
     : `The ${what} is ${additive(term)} ${unit}, ${formatP(term.pValue).text}`
-  return `${estimate}. ${crosses ? `The interval includes ${count ? 'one' : 'zero'}, so the data do not distinguish this change from none.` : `The interval excludes ${count ? 'one' : 'zero'}.`}`
+  return `${estimate}. ${crosses ? `The interval includes ${count ? 'one' : 'zero'}, so the data cannot distinguish this from the intervention having no effect at all.` : `The interval excludes ${count ? 'one' : 'zero'}.`}`
 }
 
 export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
@@ -55,7 +71,10 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   const [window, setWindow] = useState<VisibleWindow | null>(null)
   const lastBox = e.ljungBox.at(-1)
   const period = e.seasonal.kind === 'harmonic' ? e.seasonal.period : null
-  const uncertainty = e.model.kind === 'count' ? `Intervals come from the quasi-Poisson fit with dispersion ${three(e.model.dispersion)}.` : `Intervals use Newey–West standard errors with bandwidth ${e.model.hacMaxLags}.`
+  const errors = e.model.kind === 'continuous' ? e.model.errors : null
+  const uncertainty = e.model.kind === 'count' ? `Intervals come from the quasi-Poisson fit with dispersion ${three(e.model.dispersion)}.`
+    : e.model.errors.kind === 'neweyWest' ? `Intervals use Newey–West standard errors with bandwidth ${e.model.errors.maxLags}.`
+    : `The terms were fitted jointly with ARMA(${e.model.errors.p}, ${e.model.errors.q}) errors by maximum likelihood; intervals use outer-product-of-gradients standard errors.${e.model.errors.converged ? '' : ` The optimiser stopped at its limit of ${e.model.errors.iterations} iterations without converging; raise the limit before reading the numbers.`}`
   const statements: NonEmptyArray<InterpretationStatement> = [
     { kind: 'magnitude', text: level === null ? reading(slope!, count, 'slope change', 'per row') : reading(level, count, s.impact.kind === 'temporaryLevel' ? 'temporary level change' : 'level change', 'in the units of the series') },
     ...(level !== null && slope !== null ? [{ kind: 'magnitude' as const, text: reading(slope, count, 'slope change', 'per row') }] : []),
@@ -65,12 +84,15 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   // The paper's trend: exp(coef × 12) per year for a monthly count; here per cycle of the period when there is one.
   const cycle = period === null ? null : Number.isInteger(period) ? String(period) : number(period)
   const trendValue = period === null ? trend.coefficient : count ? Math.exp(trend.coefficient * period) : trend.coefficient * period
-  const tiles = [
-    ...(level === null ? [] : [[count ? 'Level change, rate ratio' : 'Level change', count ? ratio(level) : additive(level)] as const]),
-    ...(slope === null ? [] : [[count ? 'Slope change per row, rate ratio' : 'Slope change per row', count ? ratio(slope) : additive(slope)] as const]),
-    [cycle === null ? (count ? 'Trend per row, rate ratio' : 'Trend per row') : count ? `Trend per ${cycle} rows, rate ratio` : `Trend per ${cycle} rows`, cycle === null && count ? three(Math.exp(trendValue)) : three(trendValue)] as const,
-    ...(e.model.kind === 'count' ? [['Dispersion', three(e.model.dispersion)] as const] : []),
+  const plain = (label: string, text: string) => ({ label, value: formatWords(text), context: null })
+  const tiles: readonly { readonly label: string; readonly value: Formatted; readonly context: string | null }[] = [
+    ...(level === null ? [] : [{ label: count ? 'Level change, rate ratio' : 'Level change', ...effectTile(level, count) }]),
+    ...(slope === null ? [] : [{ label: count ? 'Slope change per row, rate ratio' : 'Slope change per row', ...effectTile(slope, count) }]),
+    plain(cycle === null ? (count ? 'Trend per row, rate ratio' : 'Trend per row') : count ? `Trend per ${cycle} rows, rate ratio` : `Trend per ${cycle} rows`, cycle === null && count ? three(Math.exp(trendValue)) : three(trendValue)),
+    ...(e.model.kind === 'count' ? [plain('Dispersion', three(e.model.dispersion))] : []),
+    ...(errors !== null && errors.kind === 'arma' ? [plain('Innovation variance', three(errors.sigma2)), plain('AIC', three(errors.aic))] : []),
   ]
+  const residualKind = count ? 'deviance' : errors !== null && errors.kind === 'arma' ? 'standardised' : 'ordinary'
   const exposureName = s.model.kind === 'count' ? s.model.exposure?.name ?? null : null
   const scale = count ? (exposureName === null ? 'counts' : `counts at the mean ${exposureName}`) : 'the units of the series'
   const observed = e.path.map((row) => row.observed)
@@ -80,7 +102,7 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   return <section className={resultSurface('text-body text-muted')} aria-label="Time-series result">
     <h3 className={`${resultTitle} m-0`}>{timeSeriesRunLabel(run)}</h3>
     <ResultInterpretation interpretation={{ kind: 'result-interpretation', statements }} />
-    <MetricGrid label="Interrupted series summary">{tiles.map(([title, value]) => <MetricTile key={title} label={title} value={formatWords(value)} />)}</MetricGrid>
+    <MetricGrid label="Interrupted series summary">{tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} value={tile.value} context={tile.context} />)}</MetricGrid>
     {run.plotTime !== undefined && <div className="grid min-w-0 gap-6">
       <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Series, fit, and the counterfactual</h4>
@@ -94,18 +116,64 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
       </div>}
       <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Residuals over time</h4>
-        <EChart option={interruptedResidualOption({ axis: run.plotTime, residuals, interventionRow: e.interventionRow, kind: count ? 'deviance' : 'ordinary' }, theme)} label="Residuals over time" className="mt-1 h-48" />
+        <EChart option={interruptedResidualOption({ axis: run.plotTime, residuals, interventionRow: e.interventionRow, kind: residualKind }, theme)} label="Residuals over time" className="mt-1 h-48" />
+        {residualKind === 'standardised' && <p className="m-0 mt-1 text-label text-muted">One-step-ahead forecast errors divided by their standard deviation: what is left after the ARMA process has predicted the error.</p>}
       </div>
       {e.residualAcf.length > 1 && <div className="grid min-w-0 gap-4 @lg/panel:grid-cols-2">
         <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Autocorrelation of residuals</h4><EChart option={interruptedCorrelationOption({ title: 'Autocorrelation', correlations: e.residualAcf }, theme)} label="Residual autocorrelation" className="mt-1 h-48" /></div>
         <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Partial autocorrelation of residuals</h4><EChart option={interruptedCorrelationOption({ title: 'Partial autocorrelation', correlations: e.residualPacf }, theme)} label="Residual partial autocorrelation" className="mt-1 h-48" /></div>
       </div>}
-      <p className="m-0 text-label text-muted">Bars outside the dashed band mean serial correlation remains at that lag; consider more seasonal terms{count ? '' : ' or a wider Newey–West bandwidth'}.</p>
+      <p className="m-0 text-label text-muted">Bars outside the dashed band mean serial correlation remains at that lag; consider more seasonal terms{errors === null ? '' : errors.kind === 'neweyWest' ? ' or a wider Newey–West bandwidth' : ' or a higher ARMA order'}.</p>
     </div>}
-    <div className="overflow-x-auto"><table className={table} aria-label="Fitted terms"><thead><tr><th className={th()}>Term</th><th className={th()}>Coefficient</th><th className={th()}>Standard error</th>{count ? <th className={th()}>Rate ratio (95% interval)</th> : <th className={th()}>95% interval</th>}<th className={th()}>p</th></tr></thead><tbody>
-      {e.terms.map((term) => { const r = rateRatioOf(term); return <tr key={term.name}><td className={td()}>{termName(term.name)}</td><td className={td()}>{significant(term.coefficient)}</td><td className={td()}>{significant(term.standardError)}</td>{count ? <td className={td()}>{three(r.ratio)} ({three(r.interval[0])} to {three(r.interval[1])})</td> : <td className={td()}>{number(term.interval[0])} to {number(term.interval[1])}</td>}<td className={td()}>{formatP(term.pValue, { withLabel: false }).text}</td></tr> })}
-    </tbody></table></div>
-    {e.ljungBox.length > 0 && <details><summary className="cursor-pointer text-body text-ink">Ljung–Box tests</summary><div className="mt-3 overflow-x-auto"><table className={table} aria-label="Ljung–Box tests"><thead><tr><th className={th()}>Lags</th><th className={th()}>Q</th><th className={th()}>p</th></tr></thead><tbody>{e.ljungBox.map((box, i) => <tr key={i}><td className={td()}>{i + 1}</td><td className={td()}>{number(box.statistic)}</td><td className={td()}>{formatP(box.pValue, { withLabel: false }).text}</td></tr>)}</tbody></table></div></details>}
+    <EvidenceTable<TermRow>
+      frame="none"
+      title="Fitted terms"
+      rows={e.terms.map((term) => ({ key: term.name, term: termName(term.name), coefficient: term.coefficient, standardError: term.standardError, ratio: rateRatioOf(term), interval: term.interval, pValue: term.pValue }))}
+      rowKey={(row) => row.key}
+      noun="term"
+      empty="The fit reported no terms."
+      exportName="interrupted-series-terms"
+      columns={[
+        { id: 'term', header: 'Term', value: (row) => row.term },
+        figureColumn<TermRow>('coefficient', 'Coefficient', (row) => row.coefficient, significant),
+        figureColumn<TermRow>('standard-error', 'Standard error', (row) => row.standardError, significant),
+        count
+          ? { id: 'rate-ratio', header: 'Rate ratio (95% interval)', align: 'right', value: (row) => row.ratio.ratio, format: (_, row) => `${three(row.ratio.ratio)} (${three(row.ratio.interval[0])} to ${three(row.ratio.interval[1])})` }
+          : { id: 'interval', header: '95% interval', align: 'right', value: (row) => row.interval[0], format: (_, row) => `${number(row.interval[0])} to ${number(row.interval[1])}` },
+        figureColumn<TermRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+      ]}
+    />
+    {errors !== null && errors.kind === 'arma' && <EvidenceTable<ErrorTermRow>
+      frame="none"
+      title="Error process"
+      rows={[...errors.ar, ...errors.ma].map((term) => ({ key: term.name, term: term.name, coefficient: term.coefficient, standardError: term.standardError, interval: term.interval, pValue: term.pValue }))}
+      rowKey={(row) => row.key}
+      noun="term"
+      empty="The error process has no terms."
+      exportName="interrupted-series-error-process"
+      columns={[
+        { id: 'term', header: 'Error term', value: (row) => row.term },
+        figureColumn<ErrorTermRow>('coefficient', 'Coefficient', (row) => row.coefficient, significant),
+        figureColumn<ErrorTermRow>('standard-error', 'Standard error', (row) => row.standardError, significant),
+        { id: 'interval', header: '95% interval', align: 'right', value: (row) => row.interval[0], format: (_, row) => `${number(row.interval[0])} to ${number(row.interval[1])}` },
+        figureColumn<ErrorTermRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+      ]}
+    />}
+    {errors !== null && errors.kind === 'arma' && <p className="m-0 text-label text-muted"><Metadata><span>innovation variance {significant(errors.sigma2)}</span><span>log likelihood {number(errors.logLikelihood)}</span><span>AIC {number(errors.aic)}</span><span>BIC {number(errors.bic)}</span><span>{errors.converged ? `converged in ${errors.iterations} iterations` : `stopped at ${errors.iterations} iterations`}</span></Metadata></p>}
+    {e.ljungBox.length > 0 && <details><summary className="cursor-pointer text-body text-ink">Ljung–Box tests</summary><div className="mt-3"><EvidenceTable<LjungBoxRow>
+      frame="none"
+      title="Ljung–Box tests"
+      rows={e.ljungBox.map((box, i) => ({ lags: i + 1, statistic: box.statistic, pValue: box.pValue }))}
+      rowKey={(row) => String(row.lags)}
+      noun="lag"
+      empty="No Ljung–Box test was run."
+      exportName="interrupted-series-ljung-box"
+      columns={[
+        figureColumn<LjungBoxRow>('lags', 'Lags', (row) => row.lags, (value) => String(value)),
+        figureColumn<LjungBoxRow>('q', 'Q', (row) => row.statistic, number),
+        figureColumn<LjungBoxRow>('p', 'p', (row) => row.pValue, (value) => formatP(value, { withLabel: false }).text),
+      ]}
+    /></div></details>}
     <TimeSeriesEquation run={run} />
     <p className="m-0 text-label text-faint"><Metadata><span>{e.observations} observations</span><span>{e.interventionRow} before the event</span><span>{formatTime(run.createdAt)}</span></Metadata></p>
   </section>

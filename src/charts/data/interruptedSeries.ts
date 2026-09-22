@@ -44,7 +44,7 @@ export function interruptedFitOption(view: {
         markArea: { silent: true, itemStyle: { color: theme.well, opacity: 0.6 }, data: [[{ xAxis: times[view.interventionRow] }, { xAxis: times[times.length - 1] }]] },
       },
       { name: view.fittedName, type: 'line', symbol: 'none', data: at(view.fitted), itemStyle: { color: theme.signal }, lineStyle: { color: theme.signal, width: 1.5 } },
-      { name: 'Without the event', type: 'line', symbol: 'none', data: at(view.counterfactual), itemStyle: { color: theme.signal }, lineStyle: { color: theme.signal, width: 1.5, type: 'dashed' } },
+      { name: 'Without the event', type: 'line', symbol: 'none', data: at(view.counterfactual), itemStyle: { color: theme.info }, lineStyle: { color: theme.info, width: 1.5, type: 'dashed' } },
     ],
   }
 }
@@ -53,10 +53,10 @@ export function interruptedResidualOption(view: {
   readonly axis: PlotTime
   readonly residuals: readonly number[]
   readonly interventionRow: number
-  readonly kind: 'deviance' | 'ordinary'
+  readonly kind: 'deviance' | 'ordinary' | 'standardised'
 }, theme: ChartTheme): EChartsCoreOption {
   const times = view.axis.values
-  const title = `${view.kind === 'deviance' ? 'Deviance residuals' : 'Residuals'} over time`
+  const title = `${view.kind === 'deviance' ? 'Deviance residuals' : view.kind === 'standardised' ? 'Standardised residuals' : 'Residuals'} over time`
   return {
     ...baseOption(theme, title),
     grid: gridAuto({ top: 24, bottom: 30 }),

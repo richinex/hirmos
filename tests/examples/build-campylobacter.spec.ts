@@ -27,7 +27,7 @@ test('build the campylobacter example bundle', async ({ page }) => {
   })
 
   await runEstimator(page, {
-    family: /^Dynamics/, estimator: /Negative-binomial INGARCH/, choices: ['Additive', 'Persistent'],
+    family: /^Count intervention/, estimator: /Negative-binomial INGARCH/, choices: ['Additive', 'Persistent'],
     run: /^Run negative-binomial INGARCH/i,
   })
   await exportBundle(page, example)

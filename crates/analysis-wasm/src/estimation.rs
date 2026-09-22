@@ -5,10 +5,54 @@ use hirmos_causal_core::causal_effects::numpy_percentile;
 use hirmos_causal_core::frontdoor::{
     frontdoor_two_stage_with_progress, FrontdoorInput, FrontdoorOptions,
 };
+use hirmos_causal_core::arma_regression::{fit as fit_arma_regression, ArmaOrder, ArmaRegressionFit};
 use hirmos_causal_core::{
     fit_tlearner, group_effects, instrumental_variable_with_progress, DowhyBootstrap, IvEstimator,
     IvInput, IvOptions,
 };
+
+/// The ARMA order and iteration limit a request declares, checked against the sample: an
+/// ARMA(0, 0) is the OLS fit already reported, and the state needs rows to start from.
+fn arma_order(name: &str, rows: usize, p: usize, q: usize, max_iter: usize) -> Result<ArmaOrder, String> {
+    if p + q == 0 {
+        return Err(format!("{name} ARMA errors need at least one autoregressive or moving-average term"));
+    }
+    if p > 12 || q > 12 {
+        return Err(format!("{name} ARMA errors are fitted up to order 12"));
+    }
+    if rows <= 3 * q.max(p) + p + q + 2 {
+        return Err(format!("{name} has too few rows to start ARMA({p}, {q}) errors"));
+    }
+    if max_iter == 0 {
+        return Err(format!("{name} needs at least one optimiser iteration"));
+    }
+    Ok(ArmaOrder { p, q })
+}
+
+/// The fitted error process as evidence: its coefficients with normal intervals, the variance,
+/// the likelihood and the optimiser's outcome.
+fn arma_error_evidence(fit: &ArmaRegressionFit) -> ArmaErrorEvidence {
+    let term = |i: usize, name: String| InterruptedTermEvidence {
+        name,
+        coefficient: fit.params[i],
+        standard_error: fit.bse[i],
+        p_value: fit.pvalues[i],
+        interval: [fit.conf_int[i].0, fit.conf_int[i].1],
+    };
+    let k = fit.k_exog;
+    ArmaErrorEvidence {
+        p: fit.order.p,
+        q: fit.order.q,
+        ar: (0..fit.order.p).map(|i| term(k + i, format!("ar.L{}", i + 1))).collect(),
+        ma: (0..fit.order.q).map(|i| term(k + fit.order.p + i, format!("ma.L{}", i + 1))).collect(),
+        sigma2: fit.params[fit.params.len() - 1],
+        log_likelihood: fit.llf,
+        aic: fit.aic,
+        bic: fit.bic,
+        iterations: fit.iterations,
+        converged: fit.converged,
+    }
+}
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn binary_ett(
@@ -346,6 +390,7 @@ pub(crate) fn backdoor_linear(
     adjustment: &[usize],
     hac_max_lags: Option<usize>,
     level: f64,
+    error_model: LinearErrorModel,
 ) -> Result<AnalysisResult, String> {
     validate_dense_matrix("backdoor linear estimate", values, rows, columns)?;
     let mut used = vec![treatment, outcome];
@@ -408,6 +453,20 @@ pub(crate) fn backdoor_linear(
     let max_lags = hac_max_lags
         .unwrap_or_else(|| (4.0 * (rows as f64 / 100.0).powf(2.0 / 9.0)).floor() as usize);
     let hac = ols_hac(&y, &design, max_lags);
+    let error_model = match error_model {
+        LinearErrorModel::NeweyWest => LinearErrorEvidence::NeweyWest,
+        LinearErrorModel::Arma { p, q, max_iter } => {
+            let order = arma_order("backdoor linear estimate", rows, p, q, max_iter)?;
+            let fit = fit_arma_regression(&y, &design, order, max_iter);
+            LinearErrorEvidence::Arma {
+                estimate: fit.params[1],
+                standard_error: fit.bse[1],
+                interval: [fit.conf_int[1].0, fit.conf_int[1].1],
+                p_value: fit.pvalues[1],
+                errors: arma_error_evidence(&fit),
+            }
+        }
+    };
     Ok(AnalysisResult::BackdoorLinear {
         observations: rows,
         parameters,
@@ -429,6 +488,7 @@ pub(crate) fn backdoor_linear(
         hac_interval: [hac.conf_int[1].0, hac.conf_int[1].1],
         hac_p_value: hac.pvalues[1],
         durbin_watson: durbin_watson(&hac.resid),
+        error_model,
     })
 }
 
@@ -448,7 +508,7 @@ pub(crate) fn interrupted_series(
     seasonal: InterruptedSeasonal,
     ljung_box_lags: usize,
 ) -> Result<AnalysisResult, String> {
-    use hirmos_causal_core::interrupted_series::{fit_continuous, fit_count, Harmonics, ImpactModel, InterruptedSeriesDesign, ResidualCorrelation};
+    use hirmos_causal_core::interrupted_series::{fit_continuous, fit_continuous_arma, fit_count, Harmonics, ImpactModel, InterruptedSeriesDesign, ResidualCorrelation};
     validate_dense_matrix("interrupted series", values, rows, columns)?;
     if outcome >= columns {
         return Err("interrupted series received a column outside the matrix".to_owned());
@@ -504,28 +564,56 @@ pub(crate) fn interrupted_series(
         (0..observed.len()).map(|r| InterruptedRowEvidence { observed: observed[r], fitted: fitted[r], counterfactual: counterfactual[r], residual: residual[r] }).collect()
     };
     match model {
-        InterruptedModel::Continuous { hac_max_lags } => {
-            // statsmodels' bandwidth when `maxlags` is not given: floor(4 (n/100)^(2/9)).
-            let max_lags = hac_max_lags
-                .unwrap_or_else(|| (4.0 * (rows as f64 / 100.0).powf(2.0 / 9.0)).floor() as usize);
-            let fit = fit_continuous(&y, &spec, max_lags, ljung_box_lags);
-            let terms = terms_of(&fit.names, &fit.fit.params, &fit.fit.bse, &fit.fit.pvalues, &|i| [fit.fit.conf_int[i].0, fit.fit.conf_int[i].1]);
-            let (residual_acf, residual_pacf) = correlations(&fit.correlation);
-            Ok(AnalysisResult::InterruptedSeries {
-                observations: rows,
-                outcome,
-                model: InterruptedModelEvidence::Continuous { hac_max_lags: max_lags },
-                intervention_row,
-                lag,
-                impact,
-                seasonal: seasonal_of(fit.deseasonalised, fit.deseasonalised_counterfactual),
-                terms,
-                path: path_of(&y, &fit.fitted, &fit.counterfactual, &fit.fit.resid),
-                ljung_box: boxes(&fit.ljung_box),
-                residual_acf,
-                residual_pacf,
-                converged: true,
-            })
+        InterruptedModel::Continuous { errors } => {
+            match errors {
+                ContinuousErrors::NeweyWest { max_lags } => {
+                    // statsmodels' bandwidth when `maxlags` is not given: floor(4 (n/100)^(2/9)).
+                    let max_lags = max_lags
+                        .unwrap_or_else(|| (4.0 * (rows as f64 / 100.0).powf(2.0 / 9.0)).floor() as usize);
+                    let fit = fit_continuous(&y, &spec, max_lags, ljung_box_lags);
+                    let terms = terms_of(&fit.names, &fit.fit.params, &fit.fit.bse, &fit.fit.pvalues, &|i| [fit.fit.conf_int[i].0, fit.fit.conf_int[i].1]);
+                    let (residual_acf, residual_pacf) = correlations(&fit.correlation);
+                    Ok(AnalysisResult::InterruptedSeries {
+                        observations: rows,
+                        outcome,
+                        model: InterruptedModelEvidence::Continuous { errors: ContinuousErrorEvidence::NeweyWest { max_lags } },
+                        intervention_row,
+                        lag,
+                        impact,
+                        seasonal: seasonal_of(fit.deseasonalised, fit.deseasonalised_counterfactual),
+                        terms,
+                        path: path_of(&y, &fit.fitted, &fit.counterfactual, &fit.fit.resid),
+                        ljung_box: boxes(&fit.ljung_box),
+                        residual_acf,
+                        residual_pacf,
+                        converged: true,
+                    })
+                }
+                ContinuousErrors::Arma { p, q, max_iter } => {
+                    let order = arma_order("interrupted series", rows, p, q, max_iter)?;
+                    let fit = fit_continuous_arma(&y, &spec, order, max_iter, ljung_box_lags);
+                    // The design's terms only; the error process is reported beside them.
+                    let terms = terms_of(&fit.names, &fit.fit.params[..fit.names.len()], &fit.fit.bse, &fit.fit.pvalues, &|i| [fit.fit.conf_int[i].0, fit.fit.conf_int[i].1]);
+                    let (residual_acf, residual_pacf) = correlations(&fit.correlation);
+                    let converged = fit.fit.converged;
+                    Ok(AnalysisResult::InterruptedSeries {
+                        observations: rows,
+                        outcome,
+                        model: InterruptedModelEvidence::Continuous { errors: ContinuousErrorEvidence::Arma(arma_error_evidence(&fit.fit)) },
+                        intervention_row,
+                        lag,
+                        impact,
+                        seasonal: seasonal_of(fit.deseasonalised, fit.deseasonalised_counterfactual),
+                        terms,
+                        // The residual is the standardised one-step-ahead forecast error.
+                        path: path_of(&y, &fit.fitted, &fit.counterfactual, &fit.fit.standardized_resid),
+                        ljung_box: boxes(&fit.ljung_box),
+                        residual_acf,
+                        residual_pacf,
+                        converged,
+                    })
+                }
+            }
         }
         InterruptedModel::Count { exposure } => {
             if exposure.is_some_and(|column| column >= columns) {

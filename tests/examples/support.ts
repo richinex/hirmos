@@ -102,6 +102,8 @@ export const identify = async (page: Page, options: {
   readonly interference?: string
   /** What the identification step must conclude; back-door adjustment unless the graph needs more. */
   readonly result?: RegExp
+  /** The adjustment set to take when the graph offers a choice; the first minimal set by default. */
+  readonly adjustment?: RegExp
 }): Promise<void> => {
   await chapter(page, /Study design/)
   await choose(page, 'Causal graph', options.graph)
@@ -111,8 +113,20 @@ export const identify = async (page: Page, options: {
   await page.getByRole('textbox', { name: 'Assignment sentence' }).fill(options.sentence)
   if (options.consistency !== undefined) await page.getByRole('textbox', { name: 'Consistency rationale' }).fill(options.consistency)
   if (options.interference !== undefined) await page.getByRole('textbox', { name: 'No-interference rationale' }).fill(options.interference)
-  await page.getByRole('button', { name: 'Identify the effect' }).click()
+  await identifyEffect(page, options.adjustment)
   await expect(page.getByText(options.result ?? /Identified by back-door adjustment/).first()).toBeVisible({ timeout: 60_000 })
+}
+
+/**
+ * Identify the effect and, when the graph leaves a choice of adjustment set (several minimal sets, or
+ * a canonical set that adds outcome predictors), take the named one; the first minimal set unless told.
+ */
+export const identifyEffect = async (page: Page, adjustment: RegExp = /^Minimal set 1/): Promise<void> => {
+  await page.getByRole('button', { name: 'Identify the effect' }).click()
+  const offered = page.getByRole('heading', { name: 'Choose a valid adjustment set' })
+  const recorded = page.getByText(/Identified by|not identified/i).first()
+  await expect(offered.or(recorded).first()).toBeVisible({ timeout: 60_000 })
+  if (await offered.isVisible()) await page.getByRole('button', { name: adjustment }).first().click()
 }
 
 /** Pick an estimator in the Estimation chapter, set its options, run it, and wait for the result. */
@@ -151,7 +165,7 @@ export const runDiscovery = async (page: Page, options: {
   await page.getByRole('button', { name: options.run }).first().click()
   await page.waitForTimeout(3_000)
   await page.waitForFunction(() => document.querySelector('[aria-busy="true"]') === null, null, { timeout: options.timeout ?? 1_200_000 })
-  await expect(page.getByText('Discovery runs').first()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('list', { name: 'Discovery runs' })).toBeVisible({ timeout: 60_000 })
 }
 
 /** Export with the source file inside, then write the bundle under the catalog's fixed id. */
