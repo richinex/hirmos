@@ -116,6 +116,10 @@ function DerivedRow({ entry }: { readonly entry: IdentificationBasisEntry }) {
 const plural = (count: number, noun: string): string => `${count} ${noun}${count === 1 ? '' : 's'}`
 
 export function IdentificationRecord({ identification }: { readonly identification: Identification }) {
+  if (identification.kind === 'cutoff-design') return <section aria-label="Identification record" className="mb-3">
+    <span className="block text-body font-medium text-ink">Cutoff design</span>
+    <ul className="mt-2 list-none space-y-2 p-0">{identification.basis.map(entry => <DerivedRow key={entry.id} entry={entry} />)}</ul>
+  </section>
   if (identification.kind === 'backdoor-not-identified') {
     return (
       <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">

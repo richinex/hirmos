@@ -8,6 +8,7 @@ test-results-*/
 .claude/
 crates/analysis-wasm/target/
 crates/causal-core/target/
+crates/structural-timeseries/target/
 *.local
 .DS_Store
 

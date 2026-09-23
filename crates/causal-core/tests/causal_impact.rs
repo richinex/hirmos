@@ -39,7 +39,7 @@ fn causal_impact_matches_statsmodels() {
     assert!(d <= 1e-9, "forecast error deviation {d}");
     let _ = loglike(&want_start, &y[..n_pre], &exog[..n_pre]);
 
-    let impact = causal_impact(&y, &exog, n_pre, 100);
+    let impact = causal_impact(&y, &exog, n_pre, n_pre..y.len(), 100);
     let want_p: Vec<f64> = serde_json::from_value(root["fit_params"].clone()).unwrap();
     let d = maxdev(&impact.params, &want_p);
     println!(
@@ -67,5 +67,74 @@ fn causal_impact_matches_statsmodels() {
     assert!(
         (impact.cumulative - want_cum).abs() <= 1e-2,
         "cumulative impact"
+    );
+}
+
+/// A narrowed evaluation window reports fewer rows of the same forecast. It must not move the
+/// fit, the counterfactual or its standard errors, because the window says what is summarised
+/// and the pre-intervention rows say what is fitted.
+#[test]
+fn a_narrowed_window_reports_the_same_forecast() {
+    let root: Value =
+        serde_json::from_str(include_str!("../oracle/fixtures/causal_impact.json")).unwrap();
+    let y: Vec<f64> = serde_json::from_value(root["y"].clone()).unwrap();
+    let exog: Vec<Vec<f64>> = serde_json::from_value(root["exog"].clone()).unwrap();
+    let n_pre = root["n_pre"].as_u64().unwrap() as usize;
+
+    let full = causal_impact(&y, &exog, n_pre, n_pre..y.len(), 100);
+    for end in [n_pre + 1, n_pre + 7, y.len()] {
+        let windowed = causal_impact(&y, &exog, n_pre, n_pre..end, 100);
+        let rows = end - n_pre;
+        assert_eq!(windowed.counterfactual.len(), rows, "window {end} rows");
+        assert_eq!(windowed.params, full.params, "window {end} parameters");
+        assert_eq!(
+            maxdev(&windowed.counterfactual, &full.counterfactual[..rows]),
+            0.0,
+            "window {end} counterfactual"
+        );
+        assert_eq!(
+            maxdev(&windowed.counterfactual_se, &full.counterfactual_se[..rows]),
+            0.0,
+            "window {end} standard errors"
+        );
+        assert_eq!(
+            maxdev(&windowed.pointwise, &full.pointwise[..rows]),
+            0.0,
+            "window {end} pointwise effects"
+        );
+        let want: f64 = full.pointwise[..rows].iter().sum();
+        assert!(
+            (windowed.cumulative - want).abs() <= 1e-9,
+            "window {end} cumulative"
+        );
+    }
+}
+
+/// The same invariant for the Bayesian route, which narrows the summary rather than the chain:
+/// one seed, one posterior, and the evaluated rows read off it.
+#[test]
+fn a_narrowed_bayesian_window_reports_the_same_posterior() {
+    use hirmos_causal_core::bayesian_impact::{fit, Plan};
+    use nalgebra::DMatrix;
+    let root: Value =
+        serde_json::from_str(include_str!("../oracle/fixtures/causal_impact.json")).unwrap();
+    let y: Vec<f64> = serde_json::from_value(root["y"].clone()).unwrap();
+    let exog: Vec<Vec<f64>> = serde_json::from_value(root["exog"].clone()).unwrap();
+    let n_pre = root["n_pre"].as_u64().unwrap() as usize;
+    let x = DMatrix::from_fn(y.len(), exog[0].len(), |row, column| exog[row][column]);
+
+    let plan = |end: usize| {
+        Plan::new(&y, &x, n_pre, n_pre..end, 60, 20, 1234, 0.01).expect("plan")
+    };
+    let full = fit(&plan(y.len())).expect("full window");
+    let windowed = fit(&plan(n_pre + 1)).expect("single row");
+    assert_eq!(windowed.post_path.len(), 1);
+    assert_eq!(windowed.means, full.means, "posterior means");
+    let (narrow, wide) = (&windowed.post_path[0], &full.post_path[0]);
+    assert_eq!(narrow.predicted.mean, wide.predicted.mean, "predicted mean");
+    assert_eq!(narrow.effect.mean, wide.effect.mean, "pointwise effect");
+    assert_eq!(
+        windowed.summaries.average.absolute.mean, narrow.effect.mean,
+        "the average over one row is that row"
     );
 }

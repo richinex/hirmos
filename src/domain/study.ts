@@ -4,7 +4,7 @@ import { analyseDagCausalFlow, describeDagCausalRole, type DagCausalFlow, type D
 import { inspectDagStudyBinding, type DagStudyBindingProblem } from './dagValidation'
 import type { ColumnId } from './dataset'
 import { assertNever, brand, err, isNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID, type MethodSource } from './methods'
+import { BACKDOOR_IDENTIFICATION_METHOD_ID, COUNTERFACTUAL_IDENTIFICATION_METHOD_ID, GRAPHICAL_IDENTIFICATION_METHOD_ID, RD_DESIGN_METHOD_ID, type MethodSource } from './methods'
 import type { PreparedDatasetArtifact, PreparedDatasetVersionId } from './preprocessing'
 
 /**
@@ -27,6 +27,7 @@ export type ModifierGrouping =
   | { readonly kind: 'quantiles'; readonly bins: number }
 
 export type Estimand =
+  | { readonly kind: 'local-cutoff-effect'; readonly scale: 'additive'; readonly running: StudyVariable; readonly cutoff: number; readonly assignment: 'at-or-above' }
   | { readonly kind: 'average-treatment-effect'; readonly scale: 'additive' }
   | { readonly kind: 'average-treatment-effect-on-treated'; readonly scale: 'additive'; readonly treatedValue: 1 }
   /** The average effect within each group of an effect modifier: an ATE stratified by a variable other than the treatment. */
@@ -127,6 +128,7 @@ export interface StudySpecification {
 }
 
 export interface StudyDesignDraft {
+  readonly cutoff?: { readonly variable: DagNodeId | null; readonly value: string }
   readonly dagDocument: DagDocumentId | null
   readonly treatment: DagNodeId | null
   readonly outcome: DagNodeId | null
@@ -142,6 +144,7 @@ export interface StudyDesignDraft {
 }
 
 export type StudyDesignProblem =
+  | { readonly kind: 'cutoff-required' }
   | { readonly kind: 'dag-required' }
   | { readonly kind: 'unknown-dag'; readonly document: DagDocumentId }
   | { readonly kind: 'dag-not-validated'; readonly name: string }
@@ -258,6 +261,12 @@ function modifierVariable(document: DagDocument, treatment: DagNodeId, outcome: 
 /** The target from the draft; a conditional effect needs observed modifiers that the treatment does not reach. */
 function estimandOf(draft: StudyDesignDraft, document: DagDocument, treatment: DagNodeId, outcome: DagNodeId): Result<Estimand, StudyDesignProblem> {
   switch (draft.estimand) {
+    case 'local-cutoff-effect': {
+      if (draft.cutoff?.variable == null || draft.cutoff.value.trim() === '' || !Number.isFinite(Number(draft.cutoff.value))) return err({ kind: 'cutoff-required' })
+      const running = modifierVariable(document, treatment, outcome, draft.cutoff.variable)
+      if (!running.ok) return running
+      return ok({ kind: 'local-cutoff-effect', scale: 'additive', running: running.value, cutoff: Number(draft.cutoff.value), assignment: 'at-or-above' })
+    }
     case 'average-treatment-effect': return ok({ kind: 'average-treatment-effect', scale: 'additive' })
     case 'average-treatment-effect-on-treated': return ok({ kind: 'average-treatment-effect-on-treated', scale: 'additive', treatedValue: 1 })
     case 'conditional-average-treatment-effect': {
@@ -279,7 +288,7 @@ function estimandOf(draft: StudyDesignDraft, document: DagDocument, treatment: D
   }
 }
 
-const DESIGN_PROBLEMS: ReadonlySet<StudyDesignProblem['kind']> = new Set(['assignment-required', 'assignment-description-required', 'randomised-needs-experimental-dag', 'modifier-required', 'latent-modifier', 'modifier-is-endpoint', 'modifier-after-treatment'])
+const DESIGN_PROBLEMS: ReadonlySet<StudyDesignProblem['kind']> = new Set(['cutoff-required', 'assignment-required', 'assignment-description-required', 'randomised-needs-experimental-dag', 'modifier-required', 'latent-modifier', 'modifier-is-endpoint', 'modifier-after-treatment'])
 
 /** The bound graph, treatment and outcome before the design fields are complete, for role and path previews; never recorded. */
 export function previewStudyBinding(draft: StudyDesignDraft, documents: readonly DagDocument[], prepared: PreparedDatasetArtifact): StudySpecification | null {
@@ -293,6 +302,7 @@ export function previewStudyBinding(draft: StudyDesignDraft, documents: readonly
 
 export const estimandSentence = (study: StudySpecification): string => {
   switch (study.estimand.kind) {
+    case 'local-cutoff-effect': return `Local effect of ${study.treatment.name} on ${study.outcome.name} at ${study.estimand.running.name} = ${study.estimand.cutoff}`
     case 'average-treatment-effect': return `Average effect of ${study.treatment.name} on ${study.outcome.name}`
     case 'average-treatment-effect-on-treated': return `Average effect of ${study.treatment.name} on ${study.outcome.name} among treated rows`
     case 'conditional-average-treatment-effect': return `Effect of ${study.treatment.name} on ${study.outcome.name} within groups of ${study.estimand.modifier.name}`
@@ -305,6 +315,7 @@ export const estimandSentence = (study: StudySpecification): string => {
 export const describeEstimand = (study: StudySpecification): string => {
   const effect = 'the total effect through every causal path, mediators included, on the additive scale'
   switch (study.estimand.kind) {
+    case 'local-cutoff-effect': return `The additive treatment effect at ${study.estimand.running.name} = ${study.estimand.cutoff}, where treatment switches from 0 below the cutoff to 1 at or above it. This is not an average effect over all prepared rows.`
     case 'average-treatment-effect': return `Average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over all ${study.population.observations} prepared rows.`
     case 'average-treatment-effect-on-treated': return `Average treatment effect on the treated of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over prepared rows with ${study.treatment.name} = 1.`
     case 'conditional-average-treatment-effect': return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged within each group of ${study.estimand.modifier.name} (${describeGrouping(study.estimand.grouping)}) over the ${study.population.observations} prepared rows.`
@@ -323,6 +334,7 @@ export function identifiedExpression(study: StudySpecification, adjustmentSet: r
   const y = study.outcome.name
   const z = adjustmentSet.map((variable) => variable.name).join(', ')
   switch (study.estimand.kind) {
+    case 'local-cutoff-effect': return `τ(${study.estimand.cutoff}) = lim(x↓c) E[${y} | ${study.estimand.running.name}=x] − lim(x↑c) E[${y} | ${study.estimand.running.name}=x], c=${study.estimand.cutoff}; under continuity and sharp assignment.`
     case 'average-treatment-effect':
       return adjustmentSet.length === 0
         ? `ATE(t₁,t₀) = E[${y} | ${t}=t₁] − E[${y} | ${t}=t₀]`
@@ -357,6 +369,7 @@ export function identifiedExpressionTex(study: StudySpecification, adjustmentSet
   const y = texName(study.outcome.name)
   const z = adjustmentSet.map((variable) => texName(variable.name)).join(', ')
   switch (study.estimand.kind) {
+    case 'local-cutoff-effect': return String.raw`\tau(c)=\lim_{x\downarrow c}\mathbb{E}[${y}\mid ${texName(study.estimand.running.name)}=x]-\lim_{x\uparrow c}\mathbb{E}[${y}\mid ${texName(study.estimand.running.name)}=x],\quad c=${study.estimand.cutoff}`
     case 'average-treatment-effect':
       return adjustmentSet.length === 0
         ? String.raw`\mathrm{ATE}(t_1,t_0) = \mathbb{E}[${y} \mid ${t}=t_1] - \mathbb{E}[${y} \mid ${t}=t_0]`
@@ -585,6 +598,7 @@ export type InstrumentSet =
   | { readonly kind: 'not-identified' }
 
 export type Identification =
+  | { readonly kind: 'cutoff-design'; readonly strategy: 'sharp-rd-continuity'; readonly basis: NonEmptyArray<IdentificationBasisEntry> }
   | {
       readonly kind: 'identified'
       readonly strategy: 'backdoor-adjustment'
@@ -628,6 +642,7 @@ export type Identification =
 /** The strategy an identification record settled on, named once for every view that shows it. */
 export function describeIdentificationStrategy(identification: Identification): string {
   switch (identification.kind) {
+    case 'cutoff-design': return 'Sharp RD continuity assumptions'
     case 'identified': return 'Back-door adjustment'
     case 'graphically-identified': return identification.frontdoor.kind === 'identified' ? 'Front-door identification' : 'General ID expression'
     case 'counterfactually-identified': return 'IDC* counterfactual identification'
@@ -640,6 +655,7 @@ export function describeIdentificationStrategy(identification: Identification): 
 /** Whether some estimator in the catalogue can take this record: an ID expression alone has no evaluator yet. */
 export function estimableIdentification(identification: Identification): boolean {
   switch (identification.kind) {
+    case 'cutoff-design': return true
     case 'identified':
     case 'counterfactually-identified':
     case 'instrument-identified':
@@ -655,6 +671,7 @@ export function estimableIdentification(identification: Identification): boolean
 
 export function identificationAllowsEstimation(kind: Identification['kind']): boolean {
   switch (kind) {
+    case 'cutoff-design': return true
     case 'identified':
     case 'graphically-identified':
     case 'counterfactually-identified':
@@ -672,7 +689,7 @@ export interface IdentificationArtifact {
   readonly id: IdentificationId
   readonly study: StudyId
   readonly createdAt: string
-  readonly method: typeof BACKDOOR_IDENTIFICATION_METHOD_ID | typeof GRAPHICAL_IDENTIFICATION_METHOD_ID | typeof COUNTERFACTUAL_IDENTIFICATION_METHOD_ID
+  readonly method: typeof BACKDOOR_IDENTIFICATION_METHOD_ID | typeof GRAPHICAL_IDENTIFICATION_METHOD_ID | typeof COUNTERFACTUAL_IDENTIFICATION_METHOD_ID | typeof RD_DESIGN_METHOD_ID
   readonly evidence: BackdoorIdentificationEvidence
   readonly result: Identification
 }
@@ -720,6 +737,12 @@ export function identificationFrom(
   evidence: BackdoorIdentificationEvidence,
   choice: AdjustmentSetChoice = { kind: 'canonical' },
 ): Result<Identification, IdentificationConstructionProblem> {
+  if (study.estimand.kind === 'local-cutoff-effect') return ok({
+    kind: 'cutoff-design', strategy: 'sharp-rd-continuity', basis: [
+      { kind: 'graph-assumption', id: 'rd-continuity', statement: 'Both potential-outcome regression functions are continuous at the cutoff; no other intervention changes there.' },
+      { kind: 'qualification', id: 'rd-design-not-graph-test', statement: 'The DAG does not establish continuity or rule out precise manipulation of the running variable. Sharp assignment is checked against the data when fitting.' },
+    ],
+  })
   const latent = study.graph.nodes.filter((node) => node.column === null).map((node) => node.name)
   const variablesFrom = (indexes: readonly number[]): readonly StudyVariable[] => indexes.flatMap((index): StudyVariable[] => {
     const node = study.graph.nodes[index]
@@ -956,6 +979,7 @@ export const selectedAdjustmentSet = (identification: Extract<Identification, { 
 /** The instruments an instrumental-variable estimate may use, whichever strategy the record settled on. */
 export function identifiedInstruments(identification: Identification): NonEmptyArray<StudyVariable> | null {
   switch (identification.kind) {
+    case 'cutoff-design': return null
     case 'instrument-identified': return identification.instruments
     case 'identified':
     case 'graphically-identified': return identification.instruments.kind === 'identified' ? identification.instruments.instruments : null
@@ -967,6 +991,7 @@ export function identifiedInstruments(identification: Identification): NonEmptyA
 
 export function describeStudyDesignProblem(problem: StudyDesignProblem): string {
   switch (problem.kind) {
+    case 'cutoff-required': return 'Choose a measured running variable and enter a finite cutoff.'
     case 'dag-required': return 'Choose a validated causal graph.'
     case 'unknown-dag': return 'The chosen causal graph no longer exists. Select another graph.'
     case 'dag-not-validated': return `Resolve the structural issues in “${problem.name}” in the DAG workspace.`

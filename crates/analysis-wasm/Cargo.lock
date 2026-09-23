@@ -2680,10 +2680,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "hirmos-structural-timeseries"
+version = "0.1.0"
+dependencies = [
+ "hirmos-causal-core",
+ "jiff",
+ "nalgebra",
+ "rand_core 0.9.5",
+ "rand_distr 0.5.1",
+ "spec_math",
+]
+
+[[package]]
 name = "hirmos-wasm"
 version = "0.1.0"
 dependencies = [
  "hirmos-causal-core",
+ "hirmos-structural-timeseries",
  "jiff",
  "js-sys",
  "nalgebra",

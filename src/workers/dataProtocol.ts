@@ -71,7 +71,7 @@ export type DataWorkerCommand =
     }
   | { readonly kind: 'inspect-panel'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId }
   | { readonly kind: 'materialize-panel-keys'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId }
-  | { readonly kind: 'materialize-panel'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly outcomeColumn: ColumnId; readonly treatmentColumn: ColumnId }
+  | { readonly kind: 'materialize-panel'; readonly request: ImportRequestId; readonly file: File; readonly profile: DatasetProfile; readonly unitColumn: ColumnId; readonly timeColumn: ColumnId; readonly outcomeColumn: ColumnId; readonly treatmentColumn: ColumnId; readonly covariates?: readonly ColumnId[] }
 
 export type DataWorkerEvent =
   | { readonly kind: 'time-preview-succeeded'; readonly request: ImportRequestId; readonly preview: TimePreview }
@@ -143,7 +143,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('inspect-panel'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string() }).strict(),
   z.object({ kind: z.literal('materialize-panel-keys'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string() }).strict(),
-  z.object({ kind: z.literal('materialize-panel'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string(), outcomeColumn: z.string(), treatmentColumn: z.string() }).strict(),
+  z.object({ kind: z.literal('materialize-panel'), request: requestSchema, file: z.instanceof(File), profile: z.unknown(), unitColumn: z.string(), timeColumn: z.string(), outcomeColumn: z.string(), treatmentColumn: z.string(), covariates: z.array(z.string()).default([]) }).strict(),
 ])
 
 const columnProfileProblemSchema = z.discriminatedUnion('kind', [
@@ -282,7 +282,15 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
         const outcomeColumn = known.get(data.outcomeColumn)
         const treatmentColumn = known.get(data.treatmentColumn)
         if (outcomeColumn === undefined || treatmentColumn === undefined) return err({ kind: 'invalid-command', detail: 'Panel values are outside the supplied profile.' })
-        return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn, outcomeColumn, treatmentColumn })
+        const covariates: ColumnId[] = []
+        const selected = new Set([unitColumn, timeColumn, outcomeColumn, treatmentColumn])
+        for (const raw of data.covariates) {
+          const column = known.get(raw)
+          if (column === undefined || selected.has(column)) return err({ kind: 'invalid-command', detail: 'Panel covariates must be distinct from the keys, outcome and treatment.' })
+          covariates.push(column)
+          selected.add(column)
+        }
+        return ok({ kind: data.kind, request: request.value, file: data.file, profile: profile.value, unitColumn, timeColumn, outcomeColumn, treatmentColumn, covariates })
       }
       default: return assertNever(data)
     }

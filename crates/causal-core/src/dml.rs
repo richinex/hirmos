@@ -268,7 +268,7 @@ fn cv_predict(
     out
 }
 
-fn solve_score(psi_a: &[f64], psi_b: &[f64]) -> DmlResult {
+pub(crate) fn solve_score(psi_a: &[f64], psi_b: &[f64]) -> DmlResult {
     let n = psi_a.len() as f64;
     let mean_a = psi_a.iter().sum::<f64>() / n;
     let mean_b = psi_b.iter().sum::<f64>() / n;

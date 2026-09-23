@@ -688,8 +688,9 @@ export async function materializePanelLong(
   timeColumnId: ColumnId,
   outcomeColumnId: ColumnId,
   treatmentColumnId: ColumnId,
+  covariateIds: readonly ColumnId[] = [],
 ): Promise<Result<PanelLongMatrix, PanelDataProblem>> {
-  const duplicate = firstDuplicate([unitColumnId, timeColumnId, outcomeColumnId, treatmentColumnId])
+  const duplicate = firstDuplicate([unitColumnId, timeColumnId, outcomeColumnId, treatmentColumnId, ...covariateIds])
   if (duplicate !== null) return err({ kind: 'duplicate-column', id: duplicate })
   const boundUnit = panelColumn(profile, unitColumnId)
   if (!boundUnit.ok) return boundUnit
@@ -703,7 +704,13 @@ export async function materializePanelLong(
   const timeColumn = boundTime.value
   const outcomeColumn = boundOutcome.value
   const treatmentColumn = boundTreatment.value
-  for (const column of [outcomeColumn, treatmentColumn]) {
+  const numericColumns = [outcomeColumn, treatmentColumn]
+  for (const id of covariateIds) {
+    const bound = panelColumn(profile, id)
+    if (!bound.ok) return bound
+    numericColumns.push(bound.value)
+  }
+  for (const column of numericColumns) {
     if (!isNumericDuckDbType(column.duckdbType)) return err({ kind: 'non-numeric-column', name: column.name, duckdbType: column.duckdbType })
   }
   const running = await verifiedPanelSource(source, profile)
@@ -715,8 +722,7 @@ export async function materializePanelLong(
   const relation = sourceRelation(source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
-  const outcomeName = sqlIdentifier(outcomeColumn.name)
-  const treatmentName = sqlIdentifier(treatmentColumn.name)
+  const numericProjection = numericColumns.map((column, index) => `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS value_${index}`).join(', ')
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<PanelLongMatrix, PanelDataProblem>
   try {
@@ -725,19 +731,17 @@ export async function materializePanelLong(
       SELECT CAST(${unit} AS VARCHAR) AS unit_label,
              (dense_rank() OVER (ORDER BY ${time}) - 1)::INTEGER AS time_code,
              CAST(${time} AS VARCHAR) AS time_label,
-             CAST(${outcomeName} AS DOUBLE) AS outcome,
-             CAST(${treatmentName} AS DOUBLE) AS treatment
+             ${numericProjection}
       FROM ${relation}
     `)
     const unitVector = table.getChild('unit_label')
     const timeVector = table.getChild('time_code')
     const timeLabelVector = table.getChild('time_label')
-    const outcomeVector = table.getChild('outcome')
-    const treatmentVector = table.getChild('treatment')
+    const numericVectors = numericColumns.map((column, index) => ({ column, vector: table.getChild(`value_${index}`) }))
     const units: string[] = []
     const periodCodes: number[] = []
     const periodsByCode = new Map<number, string>()
-    const values = new Float64Array(table.numRows * 2)
+    const values = new Float64Array(table.numRows * numericColumns.length)
     let problem: PanelDataProblem | null = null
     for (let row = 0; row < table.numRows; row += 1) {
       const unitValue = unitVector?.get(row)
@@ -755,7 +759,7 @@ export async function materializePanelLong(
       units.push(String(unitValue))
       periodCodes.push(periodCode)
       periodsByCode.set(periodCode, periodLabel)
-      for (const [columnIndex, pair] of [[0, { vector: outcomeVector, column: outcomeColumn }], [1, { vector: treatmentVector, column: treatmentColumn }]] as const) {
+      for (const [columnIndex, pair] of numericVectors.entries()) {
         const value = pair.vector?.get(row)
         if (value === null || value === undefined) { problem = { kind: 'missing-value', name: pair.column.name, row }; break }
         if (typeof value !== 'number' || !Number.isFinite(value)) { problem = { kind: 'non-finite-value', name: pair.column.name, row }; break }
@@ -768,7 +772,7 @@ export async function materializePanelLong(
       .map(([code, label]): PanelPeriod => ({ code, label }))
     outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
       ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel query returned no rows.' })
-      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods, values })
+      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods, values, covariates: covariateIds })
   } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
   try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })

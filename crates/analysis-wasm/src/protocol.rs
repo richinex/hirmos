@@ -2,6 +2,113 @@
 
 use super::*;
 
+#[derive(Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum StructuralVersion { GaussianComponentsV1 }
+#[derive(Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum StructuralTrend { Level, Linear, Semilocal }
+#[derive(Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum StructuralSeasonality {
+    None,
+    Seasonal { seasons: usize, duration: usize },
+    Harmonic { period: f64, pairs: usize },
+}
+#[derive(Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct StructuralModel {
+    pub version: StructuralVersion,
+    pub trend: StructuralTrend,
+    pub seasonality: StructuralSeasonality,
+}
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum StructuralComponent { Trend, Seasonal, Predictor { column: usize } }
+#[derive(Serialize)]
+pub(crate) struct StructuralContribution {
+    pub component: StructuralComponent,
+    pub mean: Vec<f64>, pub lower: Vec<f64>, pub upper: Vec<f64>,
+}
+#[derive(Serialize)]
+pub(crate) struct ControlInclusion { pub column: usize, pub probability: f64 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ImpactPosterior {
+    pub control_inclusion: Vec<ControlInclusion>,
+    pub observations: usize, pub n_pre: usize, pub n_post: usize, pub post_end: usize,
+    pub outcome: usize, pub controls: Vec<usize>,
+    pub draws: usize, pub warmup: usize, pub seed: u32, pub level: f64,
+    pub pre_intervention_path: PreInterventionPath,
+    pub counterfactual: Vec<f64>, pub counterfactual_se: Vec<f64>,
+    pub counterfactual_lower: Vec<f64>, pub counterfactual_upper: Vec<f64>,
+    pub pointwise: Vec<f64>, pub pointwise_lower: Vec<f64>, pub pointwise_upper: Vec<f64>,
+    pub cumulative_lower: Vec<f64>, pub cumulative_upper: Vec<f64>,
+    pub cumulative: f64, pub average: f64,
+    pub average_summary: ImpactSummary, pub cumulative_summary: ImpactSummary,
+}
+
+#[derive(Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase", deny_unknown_fields)]
+pub(crate) enum AdjustedDidSpecification {
+    Regression,
+    DoublyRobust { folds: usize, seed: u32, trimming: f64, normalization: DidNormalization },
+}
+#[derive(Serialize, serde::Deserialize, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum DidNormalization { InSample, Population }
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum AdjustedDidInference {
+    IndependentErrors { degrees_of_freedom: usize, coefficients: Vec<f64>, standard_errors: Vec<f64>, intervals: Vec<[f64; 2]> },
+    CrossFitted { propensity: Vec<f64>, optimizer_status: Vec<PropensityStatus> },
+}
+#[derive(Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum PropensityStatus { ProjectedGradient, FunctionTolerance, IterationLimit, LineSearchFailed }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PosteriorQuantity {
+    pub mean: f64,
+    pub lower: f64,
+    pub upper: f64,
+    pub sd: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RdEstimateEvidence {
+    pub value: f64,
+    pub standard_error: f64,
+    pub interval: [f64; 2],
+}
+
+/// What the model says the outcome was doing before the intervention, so the counterfactual can
+/// be judged against the rows it was fitted on. `steps` carries the row each value belongs to,
+/// because the least-squares route leaves out its diffuse first row.
+#[derive(Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum PreInterventionPath {
+    Fitted { steps: Vec<usize>, observed: Vec<f64>, counterfactual: Vec<f64>, se: Vec<f64> },
+    Sampled { steps: Vec<usize>, observed: Vec<f64>, counterfactual: Vec<f64>, lower: Vec<f64>, upper: Vec<f64> },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ImpactSummary {
+    pub actual: f64,
+    pub predicted: PosteriorQuantity,
+    pub absolute: PosteriorQuantity,
+    pub relative: PosteriorQuantity,
+    pub tail_probability: f64,
+}
+
+#[derive(Default, Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum PanelPrimary { Did, #[default] SyntheticDid }
+
+
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) enum BootstrapMethod { Percentile, Pivot, Normal }
@@ -1238,13 +1345,35 @@ pub(crate) enum AnalysisCommand {
         interventions: [f64; 2],
         uncertainty: CausalEffectsUncertainty,
     },
+    SharpRd {
+        rows: usize,
+        cutoff: f64,
+    },
     CausalImpact {
         rows: usize,
         columns: usize,
         outcome: usize,
         controls: Vec<usize>,
         n_pre: usize,
+        post_end: usize,
         max_iter: usize,
+    },
+    StructuralCausalImpact {
+        rows: usize, columns: usize, outcome: usize, controls: Vec<usize>,
+        n_pre: usize, post_end: usize, draws: usize, warmup: usize, seed: u32,
+        model: StructuralModel,
+    },
+    BayesianCausalImpact {
+        rows: usize,
+        columns: usize,
+        outcome: usize,
+        controls: Vec<usize>,
+        n_pre: usize,
+        post_end: usize,
+        draws: usize,
+        warmup: usize,
+        seed: u32,
+        prior_level_sd: f64,
     },
     LinearRefutation {
         rows: usize,
@@ -1342,7 +1471,12 @@ pub(crate) enum AnalysisCommand {
         cross_fit_folds: usize,
         alpha: f64,
     },
+    PanelAdjusted {
+        rows: usize, columns: usize, units: Vec<String>, times: Vec<i64>, specification: AdjustedDidSpecification,
+    },
     PanelIntervention {
+        #[serde(default)]
+        primary: PanelPrimary,
         rows: usize,
         /// One unit label and ordered time code per long-form observation.
         units: Vec<String>,
@@ -2753,8 +2887,10 @@ pub(crate) enum AnalysisResult {
         observations: usize,
         n_pre: usize,
         n_post: usize,
+        post_end: usize,
         outcome: usize,
         controls: Vec<usize>,
+        pre_intervention_path: PreInterventionPath,
         counterfactual: Vec<f64>,
         counterfactual_se: Vec<f64>,
         pointwise: Vec<f64>,
@@ -2762,6 +2898,40 @@ pub(crate) enum AnalysisResult {
         average: f64,
         params: Vec<f64>,
         log_likelihood: f64,
+    },
+    StructuralCausalImpact {
+        model: StructuralModel,
+        contributions: Vec<StructuralContribution>,
+        #[serde(flatten)]
+        posterior: ImpactPosterior,
+    },
+    BayesianCausalImpact {
+        observations: usize,
+        control_inclusion: Vec<ControlInclusion>,
+        n_pre: usize,
+        n_post: usize,
+        post_end: usize,
+        outcome: usize,
+        controls: Vec<usize>,
+        draws: usize,
+        warmup: usize,
+        seed: u32,
+        prior_level_sd: f64,
+        level: f64,
+        pre_intervention_path: PreInterventionPath,
+        counterfactual: Vec<f64>,
+        counterfactual_se: Vec<f64>,
+        counterfactual_lower: Vec<f64>,
+        counterfactual_upper: Vec<f64>,
+        pointwise: Vec<f64>,
+        pointwise_lower: Vec<f64>,
+        pointwise_upper: Vec<f64>,
+        cumulative_lower: Vec<f64>,
+        cumulative_upper: Vec<f64>,
+        cumulative: f64,
+        average: f64,
+        average_summary: ImpactSummary,
+        cumulative_summary: ImpactSummary,
     },
     LinearRefutation {
         observations: usize,
@@ -2854,6 +3024,41 @@ pub(crate) enum AnalysisResult {
         donor_placebo: DonorPlaceboInferenceEvidence,
         conformal_band: SyntheticPredictionBandEvidence,
         gaussian_band: SyntheticPredictionBandEvidence,
+    },
+    SharpRd {
+        cutoff: f64,
+        target: String,
+        assignment: String,
+        kernel: String,
+        bandwidth_selection: String,
+        polynomial_order: usize,
+        bias_order: usize,
+        nearest_neighbors: usize,
+        bandwidth: f64,
+        bias_bandwidth: f64,
+        conventional: RdEstimateEvidence,
+        bias_corrected: RdEstimateEvidence,
+        robust: RdEstimateEvidence,
+        observations: [usize; 2],
+        effective_observations: [usize; 2],
+        left_coefficients: Vec<f64>,
+        right_coefficients: Vec<f64>,
+        points: Vec<[f64; 2]>,
+    },
+    PanelAdjusted {
+        observations: usize, units: Vec<String>, times: Vec<i64>, control_units: usize, treated_units: usize,
+        n_pre: usize, n_post: usize, covariates: usize, specification: AdjustedDidSpecification,
+        estimate: f64, standard_error: f64, interval: [f64; 2], group_means: [[f64; 2]; 2], inference: AdjustedDidInference,
+    },
+    PanelDid {
+        observations: usize,
+        units: Vec<String>,
+        times: Vec<i64>,
+        control_units: usize,
+        treated_units: usize,
+        n_pre: usize,
+        n_post: usize,
+        did: PanelMethodEvidence,
     },
     PanelIntervention {
         observations: usize,

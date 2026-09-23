@@ -1,4 +1,5 @@
 import { RunDetails } from '@/components/ui/RunDetails'
+import { EvidenceTable } from '@/components/table/EvidenceTable'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { initialEstimationDraft, estimationSelection, samePanelBinding, sameStudyDataBinding, type EstimationEvent, type PanelBinding, type StudyDataBinding } from '@/domain/estimationDraft'
@@ -8,6 +9,13 @@ import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { TLearnerUncertainty } from './TLearnerUncertainty'
+import { CausalImpactInference } from './CausalImpactInference'
+import { SharpRdResult } from './SharpRdResult'
+import { BayesianImpactResult } from './BayesianImpactResult'
+import { ImpactEffectPanel } from './ImpactEffectPanel'
+import { AdjustedDidControls } from './AdjustedDidControls'
+import { AdjustedDidResult } from './AdjustedDidResult'
+import { describePanelDataProblem } from '@/domain/panel'
 import { TLearnerIntervals } from './TLearnerIntervals'
 import { Orb } from '@/components/ui/Orb'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -60,6 +68,8 @@ import {
   headlineValue,
   intervalTypeOf,
   interventionStartFromTreatment,
+  evaluatedEnd,
+  preInterventionPoints,
   methodIdOf,
   newEstimationRunId,
   stationaryMarksOf,
@@ -234,6 +244,11 @@ function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArti
   const periods = panelPeriodDisplay(run)
   const preLabels = periods.labels.slice(0, evidence.nPre)
   const postLabels = periods.labels.slice(evidence.nPre)
+  if (evidence.kind === 'panelAdjusted') return <AdjustedDidResult evidence={evidence} labels={periods.labels} covariates={run.columns.slice(2).map(column => column.name)} />
+  if (evidence.kind === 'panelDid') return <EvidenceTable
+    title="Post-period differences" frame="none" rows={evidence.did.effectCurve.map((value, index) => ({ key: String(index), period: postLabels[index] ?? String(index), value }))}
+    rowKey={(row) => row.key} noun="period" empty="No post-period differences." exportName="did-period-effects"
+    columns={[{ id: 'period', header: 'Period', value: (row) => row.period }, { id: 'effect', header: 'Difference', value: (row) => formatStatistic('raw', row.value).text }]} />
   const estimates = [
     ['Difference-in-differences', evidence.did, null, null],
     ['Synthetic control', evidence.syntheticControl, evidence.syntheticControlPlacebo, evidence.syntheticControlInTime],
@@ -397,6 +412,14 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       }
       case 'panel-intervention-run': {
         const { evidence } = run
+        if (evidence.kind === 'panelAdjusted') return [
+          { label: 'Method', value: formatWords(evidence.specification.kind === 'regression' ? 'Regression DiD' : 'Doubly robust DiD'), context: 'Average effect on the treated group' },
+          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: 'One before and one after period' },
+        ]
+        if (evidence.kind === 'panelDid') return [
+          { label: 'Method', value: formatWords('Conventional difference-in-differences'), context: 'Change in treated outcomes minus change in comparison outcomes' },
+          { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: `${evidence.nPre} pre- and ${evidence.nPost} post-periods` },
+        ]
         const topWeights = evidence.syntheticDid.omega
           .map((weight, index) => ({ weight, unit: evidence.units[index] ?? `control ${index + 1}` }))
           .sort((left, right) => right.weight - left.weight)
@@ -485,12 +508,19 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           ...(evidence.uncertainty.kind === 'bootstrap' ? [{ label: 'Bootstrap', value: formatCount(evidence.uncertainty.samples), context: <Metadata><span>{Math.round(evidence.uncertainty.confidenceLevel * 100)}% percentile interval</span><span>block {evidence.uncertainty.resolvedBlockLength}</span><span>seed {evidence.uncertainty.seed}</span></Metadata> }] : []),
         ]
       }
+      case 'sharp-rd-run': return [
+        { label: 'Estimation bandwidth', value: formatStatistic('raw', run.evidence.bandwidth), context: 'mserd, triangular kernel' },
+        { label: 'Bias bandwidth', value: formatStatistic('raw', run.evidence.biasBandwidth), context: 'local quadratic bias correction' },
+        { label: 'Local sample', value: formatCount(run.evidence.effectiveObservations[0] + run.evidence.effectiveObservations[1]), context: `${run.evidence.effectiveObservations[0]} below; ${run.evidence.effectiveObservations[1]} at or above cutoff` },
+      ]
       case 'causal-impact-run': {
         const { evidence } = run
         return [
           { label: 'Cumulative effect', value: formatStatistic('raw', evidence.cumulative), context: `over ${formatCount(evidence.nPost).text} post rows` },
           { label: 'Average effect', value: formatStatistic('raw', evidence.average), context: `pre window ${formatCount(evidence.nPre).text} rows` },
-          { label: 'Log likelihood', value: formatStatistic('raw', evidence.logLikelihood), context: `${formatCount(evidence.controls.length).text} controls` },
+          ...(evidence.kind !== 'causalImpact'
+            ? [{ label: 'Posterior draws', value: formatCount(evidence.draws), context: `${evidence.warmup} warmup iterations` }]
+            : [{ label: 'Log likelihood', value: formatStatistic('raw', evidence.logLikelihood), context: `${formatCount(evidence.controls.length).text} controls` }]),
         ]
       }
       default: return assertNever(run)
@@ -539,11 +569,12 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
   const chart = useMemo(() => (estimate.effect.kind === 'path'
     ? impactPathOption({
       outcome: study.outcome.name,
+      before: run.kind === 'causal-impact-run' ? preInterventionPoints(run.evidence.preInterventionPath) : [],
       points: estimate.effect.values,
       stepLabel,
       ghost: ghostRun !== null && ghostRun.estimate.effect.kind === 'path' ? { name: `${describeEstimator(ghostRun.configuration.kind)}, ${formatTime(ghostRun.createdAt)}`, points: ghostRun.estimate.effect.values } : undefined,
     }, theme)
-    : null), [estimate.effect, stepLabel, study.outcome.name, theme, ghostRun])
+    : null), [estimate.effect, run, stepLabel, study.outcome.name, theme, ghostRun])
   // Runs recorded before the histogram was added carry no draws, so they keep the summary alone.
   const posterior = useMemo(() => (run.kind === 'bayesian-gaussian-run' && (run.evidence.histogramCounts ?? []).length > 0
     ? posteriorDensityOption({
@@ -648,6 +679,9 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       )}
       <ResultInterpretation interpretation={interpretEstimationResult(run, study, stepLabel)} className="mt-3" />
       <Diagnostics run={run} />
+      {run.kind === 'causal-impact-run' && <ImpactEffectPanel evidence={run.evidence} stepLabel={stepLabel} />}
+      {run.kind === 'causal-impact-run' && run.evidence.kind !== 'causalImpact' && <BayesianImpactResult evidence={run.evidence} columnNames={run.columns.map(column => column.name)} />}
+      {run.kind === 'sharp-rd-run' && <SharpRdResult evidence={run.evidence} running={run.columns[0].name} outcome={study.outcome.name} />}
       {run.kind === 'synthetic-control-run' ? <SyntheticControlEvidenceDetails run={run} /> : null}
       {run.kind === 'panel-intervention-run' ? <PanelEvidenceDetails run={run} /> : null}
     </>
@@ -874,6 +908,19 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         onRun(run)
         dispatch({ type: 'run-finished' })
       }
+      if (configuration.kind === 'sharp-rd') {
+        if (study.estimand.kind !== 'local-cutoff-effect' || identification.result.kind !== 'cutoff-design') {
+          dispatch({ type: 'run-failed', detail: 'Record the cutoff-local study before fitting sharp RD.' }); return
+        }
+        const columns: NonEmptyArray<StudyVariable> = [study.estimand.running, study.outcome, study.treatment]
+        const matrix = await materialise(columns)
+        const evidence = await analysis.runSharpRd(matrix.values, matrix.rowCount, study.estimand.cutoff)
+        if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+        const run = { kind: 'sharp-rd-run', configuration, evidence: evidence.value } as const
+        const estimate = causalEstimateFrom(study, identification, run)
+        finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate }, 'The RD result no longer matches the recorded cutoff-local study.')
+        return
+      }
       if (configuration.kind === 'frontdoor-two-stage') {
         if (identification.result.kind !== 'graphically-identified' || identification.result.frontdoor.kind !== 'identified' || identification.result.frontdoor.mediators.length !== 1) {
           dispatch({ type: 'run-failed', detail: 'This identification record does not contain one observed front-door mediator.' })
@@ -1048,13 +1095,27 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             dispatch({ type: 'run-failed', detail: 'The panel treatment-layout check has not completed for this study.' })
             return
           }
+          if (configuration.primary === 'adjusted') {
+            const { materializePanelInWorker } = await import('@/data/client')
+            const materialized = await materializePanelInWorker(source.file, profile, { unit: panelBinding.unit, time: panelBinding.time, outcome: panelBinding.outcome, treatment: panelBinding.treatment, covariates: configuration.covariates })
+            if (!session.current(current)) return
+            if (!materialized.ok) { dispatch({ type: 'run-failed', detail: describePanelDataProblem(materialized.error) }); return }
+            const matrix = materialized.value
+            const evidence = await analysis.runAdjustedDid(matrix.values, matrix.rowCount, 2+configuration.covariates.length, matrix.units, matrix.periodCodes, configuration.specification)
+            if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+            const columns: NonEmptyArray<StudyVariable> = [study.outcome, study.treatment, ...configuration.covariates.map(column => ({ column, node: study.outcome.node, name: profile.columns.find(c => c.id === column)?.name ?? String(column) }))]
+            const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: mapNonEmpty(state.panelPreflight.layout.periods, period => period.label) } as const
+            const estimate = causalEstimateFrom(study, identification, run)
+            finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate }, 'The adjusted panel result does not match its study target.')
+            return
+          }
           const matrix = state.panelPreflight.matrix
           const evidence = await analysis.runPanelIntervention(
             matrix.values.slice(),
             matrix.rowCount,
             matrix.units,
             matrix.periodCodes,
-            { placeboReplications: configuration.placeboReplications, seed: configuration.seed },
+            { placeboReplications: configuration.placeboReplications, seed: configuration.seed, primary: configuration.primary },
             (progress) => dispatch({ type: 'run-progressed', progress }),
           )
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
@@ -1205,7 +1266,20 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             if (!start.ok) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} does not switch on once: ${start.error.detail} Give the intervention row instead.` }); return }
             nPre = start.value
           }
-          const evidence = await analysis.runCausalImpact(matrix.values, matrix.rowCount, columns.length, { outcome: 1, controls: controlVariables.map((_, index) => index + 2), nPre, maxIter: configuration.maxIter })
+          const postEnd = evaluatedEnd(configuration.window, matrix.rowCount)
+          if (postEnd <= nPre) { dispatch({ type: 'run-failed', detail: `The evaluated window ends at row ${postEnd}, which is not after the intervention row. Choose a later row.` }); return }
+          const design = { outcome: 1, controls: controlVariables.map((_, index) => index + 2), nPre, postEnd }
+          const evidence = configuration.inference === undefined
+            ? await analysis.runCausalImpact(matrix.values, matrix.rowCount, columns.length, { ...design, maxIter: configuration.maxIter })
+            : configuration.inference.kind === 'structural'
+            ? await analysis.runStructuralCausalImpact(matrix.values, matrix.rowCount, columns.length, {
+                ...design, draws:configuration.inference.draws, warmup:configuration.inference.warmup,
+                seed:configuration.inference.seed, model:configuration.inference.model,
+              })
+            : await analysis.runBayesianCausalImpact(matrix.values, matrix.rowCount, columns.length, {
+                ...design, draws: configuration.inference.draws, warmup: configuration.inference.warmup,
+                seed: configuration.inference.seed, priorLevelSd: configuration.inference.priorLevelSd,
+              })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'causal-impact-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1233,6 +1307,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
 
   const controls = ((): React.ReactNode => {
     switch (configuration.kind) {
+      case 'sharp-rd': return <p className={prose('m-0 text-muted')}>{study?.estimand.kind === 'local-cutoff-effect' ? `Treatment is 1 where ${study.estimand.running.name} is at least ${study.estimand.cutoff}, and 0 below. ` : 'Choose a cutoff-local study. '}Local-linear fits use a triangular kernel, automatic mserd bandwidth and nearest-neighbor variance with three neighbors. The headline uses robust bias-corrected inference.</p>
       case 'frontdoor-two-stage':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
@@ -1365,12 +1440,16 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return (
           <div className="grid gap-2">
             <p className={prose('m-0 text-faint')}>
-              Hirmos uses synthetic difference-in-differences as the main result and shows conventional difference-in-differences and synthetic control beside it. The main method is fixed before the estimates appear.
+              Choose the method before fitting. Conventional DiD can use one period before and one after adoption.
             </p>
-            <div className="grid gap-3 @md/panel:grid-cols-2">
+            <SegmentedControl ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'regression' || primary === 'doublyRobust'
+              ? { kind: 'panel-intervention', primary: 'adjusted', covariates: [], specification: primary === 'regression' ? { kind: 'regression' } : { kind: 'doublyRobust', folds: 2, seed: 1234, trimming: 0.01, normalization: 'in-sample' } }
+              : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Regression' }, { value: 'doublyRobust', label: 'Doubly robust' }, { value: 'syntheticDid', label: 'Synthetic' }]} />
+            {configuration.primary === 'adjusted' && <AdjustedDidControls configuration={configuration} candidates={controlCandidates.filter(c => prepared.kind !== 'prepared-panel' || (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn))} onChange={configure} />}
+            {configuration.primary !== 'did' && configuration.primary !== 'adjusted' && <div className="grid gap-3 @md/panel:grid-cols-2">
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo replications" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboReplications} /><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
-            </div>
+            </div>}
             {panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
             {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted"><Metadata><span>Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units</span><span>{panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods</span><span>adoption at {panelPreflight.layout.adoption.label}.</span></Metadata></p>}
           </div>
@@ -1533,12 +1612,22 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'causal-impact':
         return (
           <div className="grid gap-3">
+            <CausalImpactInference configuration={configuration} onChange={configure} />
             <div>
               <ParameterLabel className={fieldLabel} label="Intervention start" help={ESTIMATION_PARAMETER_HELP.causalImpact.interventionStart} />
               <div className="mt-1 flex flex-wrap items-center gap-2">
                 <RadioList legend="Intervention start" legendHidden value={configuration.start.kind} onChange={(kind) => configure({ ...configuration, start: kind === 'from-treatment' ? { kind: 'from-treatment' } : { kind: 'row', row: Math.max(9, Math.floor(prepared.observations / 2)) } })} options={[{ value: 'from-treatment', label: `Where ${study?.treatment.name ?? 'the treatment'} turns on` }, { value: 'row', label: 'At a row' }]} />
                 {configuration.start.kind === 'row' && (
                   <label className="text-body text-ink">First post-intervention row<input type="number" min={9} max={prepared.observations} aria-label="First post-intervention row" className={field('text', 'ml-2 w-28')} value={configuration.start.row} onChange={(event) => configure({ ...configuration, start: { kind: 'row', row: Math.max(9, Math.min(prepared.observations, Number(event.target.value) || 9)) } })} /></label>
+                )}
+              </div>
+            </div>
+            <div>
+              <ParameterLabel className={fieldLabel} label="Evaluated window" help={ESTIMATION_PARAMETER_HELP.causalImpact.evaluationWindow} />
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <RadioList legend="Evaluated window" legendHidden value={configuration.window.kind} onChange={(kind) => configure({ ...configuration, window: kind === 'through-last-row' ? { kind: 'through-last-row' } : { kind: 'to-row', row: prepared.observations } })} options={[{ value: 'through-last-row', label: 'Through the last row' }, { value: 'to-row', label: 'To a row' }]} />
+                {configuration.window.kind === 'to-row' && (
+                  <label className="text-body text-ink">Last evaluated row<input type="number" min={1} max={prepared.observations} aria-label="Last evaluated row" className={field('text', 'ml-2 w-28')} value={configuration.window.row} onChange={(event) => configure({ ...configuration, window: { kind: 'to-row', row: Math.max(1, Math.min(prepared.observations, Number(event.target.value) || 1)) } })} /></label>
                 )}
               </div>
             </div>
@@ -1612,7 +1701,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                     const definition = methodDefinition(methodIdOf(id))
                     const candidateEligibility = eligibilityByEstimator.get(id)
                     return definition.ok && candidateEligibility !== undefined
-                      ? [{ value: id, label: definition.value.name, hint: eligibilityHint(candidateEligibility), disabled: candidateEligibility.kind === 'refused', title: candidateEligibility.kind === 'refused' ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}` : undefined }]
+                      ? [{ value: id, label: definition.value.name, hint: id === 'panel-intervention' && candidateEligibility.kind === 'refused' ? 'Review the selected panel method and its requirements below.' : eligibilityHint(candidateEligibility), disabled: candidateEligibility.kind === 'refused' && id !== 'panel-intervention', title: candidateEligibility.kind === 'refused' ? `${definition.value.name}: ${candidateEligibility.violations[0]?.evidence ?? 'a requirement is not met'}` : undefined }]
                       : []
                   })}
                 />

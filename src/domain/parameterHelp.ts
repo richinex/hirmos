@@ -169,6 +169,7 @@ export const ESTIMATION_PARAMETER_HELP = {
   },
   causalImpact: {
     interventionStart: 'First observation in the post-intervention period.',
+    evaluationWindow: 'The rows the effect is summarised over. This does not change the fit.',
     controlSeries: 'Unaffected series used to predict the outcome without intervention.',
   },
 } as const

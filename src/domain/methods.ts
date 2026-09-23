@@ -165,7 +165,19 @@ export const VECM_METHOD_ID = methodId('vecm')
 export const INTERRUPTED_SERIES_METHOD_ID = methodId('interrupted-series')
 export const SYNTHETIC_CONTROL_METHOD_ID = methodId('synthetic-control')
 export const PANEL_INTERVENTION_METHOD_ID = methodId('panel-intervention')
+export const SHARP_RD_METHOD_ID = methodId('sharp-rd')
+export const RD_DESIGN_METHOD_ID = methodId('sharp-rd-design')
+
+const SHARP_RD: MethodDefinition = {
+  id: SHARP_RD_METHOD_ID, name: 'Sharp regression discontinuity', family: 'estimation',
+  summary: 'Estimate the treatment effect at an assignment cutoff with local-linear regressions, automatic bandwidth selection and robust bias-corrected inference.',
+  caveats: [
+    { id: caveatId('rd-design'), category: 'identification', requirement: 'Treatment switches from 0 below the cutoff to 1 at or above it; both potential-outcome means are continuous there.', consequenceIfUnmet: 'The outcome discontinuity need not identify a treatment effect.', sources: [{ kind: 'paper', title: 'Robust nonparametric confidence intervals for regression-discontinuity designs', locator: 'https://doi.org/10.3982/ECTA11757' }] },
+    { id: caveatId('rd-sample'), category: 'sampling-structure', requirement: 'Observations are independently sampled with adequate running-variable support on both sides.', consequenceIfUnmet: 'Nearest-neighbor uncertainty does not account for serial or within-unit dependence.', sources: [{ kind: 'hirmos-constraint', locator: 'crates/causal-core/src/rd.rs; sharp local-linear, triangular kernel, NN(3), mserd' }] },
+  ],
+}
 export const NEGBIN_NUTS_METHOD_ID = methodId('negbin-nuts')
+const RD_DESIGN: MethodDefinition = { ...SHARP_RD, id: RD_DESIGN_METHOD_ID, name: 'Sharp RD design', family: 'identification', summary: 'Record a cutoff-local target and continuity assumptions. A graph alone does not verify these assumptions.' }
 export const BAYESIAN_GAUSSIAN_METHOD_ID = methodId('bayesian-gaussian')
 export const DISCRETE_BN_METHOD_ID = methodId('discrete-bn-query')
 export const BINARY_ETT_METHOD_ID = methodId('binary-ett-idc-star')
@@ -1535,7 +1547,7 @@ const CAUSAL_IMPACT: MethodDefinition = {
   id: CAUSAL_IMPACT_METHOD_ID,
   name: 'Causal impact',
   family: 'estimation',
-  summary: 'A local level model with a static regression on control series, fitted on the pre-period and forecast forward; the effect is the gap to the forecast.',
+  summary: 'Fit a state-space model with optional static control regression before the intervention. Compare observed outcomes with its no-intervention prediction. Bayesian models can include trend and seasonal components.',
   caveats: [
     {
       id: caveatId('impact-time-series'),
@@ -1562,7 +1574,7 @@ const CAUSAL_IMPACT: MethodDefinition = {
       id: caveatId('impact-controls'),
       category: 'functional-form',
       requirement: 'Control series predict the outcome through a static linear regression.',
-      consequenceIfUnmet: 'With weak control series, the counterfactual is driven primarily by the local-level component.',
+      consequenceIfUnmet: 'With weak control series, the counterfactual is driven primarily by the selected trend and seasonal components.',
       sources: [statsmodels('statsmodels/tsa/statespace/structural.py#exog')],
     },
     {
@@ -1983,7 +1995,7 @@ const PANEL_INTERVENTION: MethodDefinition = {
   id: PANEL_INTERVENTION_METHOD_ID,
   name: 'Panel difference-in-differences',
   family: 'estimation',
-  summary: 'Compares treated and untreated units before and after a shared adoption date. Synthetic difference-in-differences is the main result; conventional difference-in-differences and synthetic control are shown beside it.',
+  summary: 'Compare changes in treated and comparison units around a shared adoption date. Choose conventional, regression, doubly robust or synthetic DiD before fitting. The target is the average effect on the treated group.',
   caveats: [
     {
       id: caveatId('panel-balanced-layout'), category: 'sampling-structure',
@@ -1993,7 +2005,7 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-parallel-trends'), category: 'identification',
-      requirement: 'Absent treatment, treated and control outcomes would have followed parallel trends after accounting for the fitted unit and time weights.',
+      requirement: 'Absent treatment, treated and comparison outcomes would follow parallel trends under the selected specification: unadjusted, conditional on covariates, or after synthetic weighting.',
       consequenceIfUnmet: 'The post-period contrast combines the intervention with an untreated trend difference.',
       sources: [ARKHANGELSKY_2021, CALLAWAY_SANTANNA_2021],
     },
@@ -2011,13 +2023,13 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-pre-fit'), category: 'finite-sample',
-      requirement: 'The control pre-period contains enough variation for the synthetic weights; report the unit and time weights and compare all three estimators.',
+      requirement: 'Synthetic DiD needs pre-period variation to fit weights. Regression and doubly robust DiD need exactly two periods and adequate covariate support; DR DiD also needs treatment overlap within its folds.',
       consequenceIfUnmet: 'Synthetic weights may be unstable or undefined even when conventional DID is computable.',
       sources: [ARKHANGELSKY_2021, ABADIE_2021, synthdid('R/solver.R; R/synthdid.R')],
     },
     {
       id: caveatId('panel-no-interval'), category: 'finite-sample',
-      requirement: 'The placebo standard-error calculation needs more comparison units than treated units and enough pre-treatment periods to fit the weights.',
+      requirement: 'Use the uncertainty for the selected method: regression uses classical independent-error Student-t intervals; DR DiD uses cross-fitted scores with independent units; synthetic placebo inference needs more comparison units than treated units.',
       consequenceIfUnmet: 'The point estimate remains available, but this uncertainty calculation is not.',
       sources: [ARKHANGELSKY_2021],
     },
@@ -2383,6 +2395,8 @@ const INTERRUPTED_SERIES: MethodDefinition = {
 }
 
 export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
+  SHARP_RD,
+  RD_DESIGN,
   ADF,
   KPSS,
   ZIVOT_ANDREWS,
@@ -2443,12 +2457,12 @@ export const REFUTER_METHODS: NonEmptyArray<MethodDefinition> = [PLACEBO_REFUTER
 export const SENSITIVITY_DIAGNOSTIC_METHODS: NonEmptyArray<MethodDefinition> = [LJUNG_BOX, SHAPIRO_WILK]
 export const SERIES_STRUCTURE_METHODS: NonEmptyArray<MethodDefinition> = [PELT, STL]
 
-export const IDENTIFICATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_IDENTIFICATION, GRAPHICAL_IDENTIFICATION, COUNTERFACTUAL_IDENTIFICATION]
+export const IDENTIFICATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_IDENTIFICATION, GRAPHICAL_IDENTIFICATION, COUNTERFACTUAL_IDENTIFICATION, RD_DESIGN]
 export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_SCM, DYNAMIC_LINEAR_SCM]
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [SHARP_RD, BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
 export const TIME_SERIES_METHODS = { ardl: ARDL_PSS, vecm: VECM, interrupted: INTERRUPTED_SERIES } as const

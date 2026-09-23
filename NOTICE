@@ -89,3 +89,11 @@ Rust crates linked into the wasm binary (licences as declared on crates.io):
   matrixmultiply, rawpointer — MIT OR Apache-2.0
   bytemuck, safe_arch, wide — Zlib OR Apache-2.0 OR MIT
   memchr — Unlicense OR MIT
+Structural time-series components
+--------------------------------
+crates/structural-timeseries preserves Rust ports of R bsts 0.9.11 and
+BOOM 0.9.16 numerical routines. Copyright Google LLC and Steven L. Scott,
+as specified in the source modules. BOOM-derived routines are distributed
+under LGPL-2.1-or-later; the text is in licenses/bsts-boom/LICENSE.
+The new impact adapter and Hirmos integration use the project's GPL-3.0-or-later
+license. Preserved source attribution and reproduction notes accompany the crate.

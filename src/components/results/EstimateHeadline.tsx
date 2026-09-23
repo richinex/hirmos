@@ -2,7 +2,7 @@ import { FigureParts, IntervalFigure } from '@/components/ui/figures'
 import { Metadata } from '@/components/ui/Metadata'
 import { label, num, td, th } from '@/components/ui/recipes'
 import { additive, headlineValue, intervalTypeOf, summariseRowEffects, type CausalEstimate } from '@/domain/estimation'
-import { formatCount, formatEstimate, formatPercent, formatStatistic, type EffectScale, type Formatted } from '@/lib/format/number'
+import { formatCount, formatEstimate, formatInterval, formatPercent, formatStatistic, type EffectScale, type Formatted } from '@/lib/format/number'
 
 /** The scale an estimate's figures are printed on. */
 export const EXPECTED_COUNT_RATIO = { kind: 'ratio', label: 'ECR' } as const
@@ -143,6 +143,10 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
     )
   }
   const figure = headlineFigure(estimate)
+  // A path-valued estimate can still carry an interval for its aggregate, as the sampled route does.
+  const interval = estimate.interval.kind === 'none'
+    ? null
+    : formatInterval(headlineValue(estimate.effect), estimate.interval.lower, estimate.interval.upper, intervalTypeOf(estimate.interval), scaleOf(estimate))
   const span = estimate.effect.kind === 'path'
     ? `Cumulative over ${formatCount(estimate.effect.values.length).text} post-intervention ${stepLabel}s, averaging ${formatStatistic('raw', estimate.effect.aggregate.average).text} per ${stepLabel}.`
     : ''
@@ -150,7 +154,7 @@ export function EstimateHeadline({ estimate, sentence, scaleLine, sampleLine, st
     <figure className="m-0" data-testid={testId}>
       <figcaption className="text-title text-ink">{sentence}</figcaption>
       <p className={num(`mb-0 mt-1 text-metric font-semibold leading-none tracking-tight ${accent ? 'text-signal-text' : 'text-ink'}`)} title={figure.exact}><FigureParts value={figure} /></p>
-      <p className={num('mb-0 mt-1 text-body text-bone')}><Metadata>{span.length > 0 && <span>{span}</span>}<span>No interval</span><span>{sampleLine}</span></Metadata></p>
+      <p className={num('mb-0 mt-1 text-body text-bone')}><Metadata>{span.length > 0 && <span>{span}</span>}{interval === null ? <span>No interval</span> : <span>[{interval.bounds.lower}, {interval.bounds.upper}] <span className="text-ink">{interval.typeLabel}</span></span>}<span>{sampleLine}</span></Metadata></p>
       {estimate.interval.kind === 'none' && <p className="mb-0 mt-1 text-body text-muted">{estimate.interval.reason}</p>}
       <p className={label('mb-0 mt-2 text-muted')}>{scaleLine}</p>
     </figure>

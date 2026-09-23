@@ -963,9 +963,30 @@ export function runCausalEffectsTotal(values: Float64Array, rows: number, column
   return post('causal-effects-succeeded', { kind: 'causal-effects-total', request, values, rows, columns, ...design }, values, onProgress)
 }
 
-export function runCausalImpact(values: Float64Array, rows: number, columns: number, design: { readonly outcome: number; readonly controls: readonly number[]; readonly nPre: number; readonly maxIter: number }): Promise<CausalImpactOutcome> {
+export function runSharpRd(values: Float64Array, rows: number, cutoff: number): Promise<Result<SharpRdEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return post('sharp-rd-succeeded', { kind: 'sharp-rd', request, values, rows, cutoff }, values)
+}
+
+export function runCausalImpact(values: Float64Array, rows: number, columns: number, design: { readonly outcome: number; readonly controls: readonly number[]; readonly nPre: number; readonly postEnd: number; readonly maxIter: number }): Promise<CausalImpactOutcome> {
   const request = newWorkerRequestId()
   return post('causal-impact-succeeded', { kind: 'causal-impact', request, values, rows, columns, ...design }, values)
+}
+
+export function runStructuralCausalImpact(values: Float64Array, rows: number, columns: number, design: {
+  readonly outcome: number; readonly controls: readonly number[]; readonly nPre: number; readonly postEnd: number;
+  readonly draws: number; readonly warmup: number; readonly seed: number; readonly model: import('@/domain/structuralImpact').StructuralModel;
+}): Promise<CausalImpactOutcome> {
+  const request = newWorkerRequestId()
+  return post('causal-impact-succeeded', { kind:'structural-causal-impact', request, values, rows, columns, ...design }, values)
+}
+
+export function runBayesianCausalImpact(values: Float64Array, rows: number, columns: number, design: {
+  readonly outcome: number; readonly controls: readonly number[]; readonly nPre: number; readonly postEnd: number;
+  readonly draws: number; readonly warmup: number; readonly seed: number; readonly priorLevelSd: number;
+}): Promise<CausalImpactOutcome> {
+  const request = newWorkerRequestId()
+  return post('causal-impact-succeeded', { kind: 'bayesian-causal-impact', request, values, rows, columns, ...design }, values)
 }
 
 export function runLinearRefutation(values: Float64Array, rows: number, columns: number, design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]; readonly simulations: number; readonly subsetFraction: number; readonly seed: number; readonly ljungBoxLags: number }): Promise<LinearRefutationOutcome> {
@@ -1055,12 +1076,23 @@ export function runSyntheticControl(values: Float64Array, rows: number, columns:
   return post('synthetic-control-succeeded', { kind: 'synthetic-control', request, values, rows, columns, ...design }, values)
 }
 
+export function runAdjustedDid(values: Float64Array, rows: number, columns: number, units: readonly string[], times: readonly number[], specification: AdjustedDidSpecification): Promise<PanelInterventionOutcome> {
+  const request = newWorkerRequestId()
+  return new Promise(resolve => {
+    pending.set(request, pendingRun('panel-intervention-succeeded', resolve))
+    const command: AnalysisWorkerCommand = { kind: 'panel-adjusted', request, values, rows, columns, units, times, specification }
+    try { analysisWorker().postMessage(command, [values.buffer]) }
+    catch (cause: unknown) { pending.delete(request); resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) })) }
+  })
+
+}
+
 export function runPanelIntervention(
   values: Float64Array,
   rows: number,
   units: readonly string[],
   times: readonly number[],
-  inference: { readonly placeboReplications: number; readonly seed: number },
+  inference: { readonly placeboReplications: number; readonly seed: number; readonly primary?: 'did' | 'syntheticDid' },
   onProgress?: (progress: AnalysisProgress) => void,
 ): Promise<PanelInterventionOutcome> {
   const request = newWorkerRequestId()
@@ -1152,3 +1184,5 @@ export function resolveMissingnessInWorker(values: Float64Array, rows: number, c
   const copy = Float64Array.from(values)
   return post('missingness-resolved', { kind: 'resolve-missingness', request, values: copy, rows, columns, validity, resolution }, copy)
 }
+import type { SharpRdEvidence } from '@/domain/sharpRd'
+import type { AdjustedDidSpecification } from '@/domain/adjustedDid'

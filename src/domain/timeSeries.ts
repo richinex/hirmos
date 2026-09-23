@@ -12,6 +12,7 @@ const column = z.object({
   name: z.string().min(1),
 }).strict()
 const identity = {
+  windowContext: windowContextSchema.optional(),
   plotTime: plotTimeSchema.optional(),
   id: z.string().min(1).transform((value) => brand<string, 'TimeSeriesRunId'>(value)),
   preparedDataset: z.string().min(1).transform((value) => brand<string, 'PreparedDatasetVersionId'>(value)),
@@ -175,3 +176,4 @@ export const timeSeriesRunMatches = (run: TimeSeriesRun, prepared: { readonly id
   const variables = run.kind === 'ardl-model' ? [run.outcome, ...run.predictors, ...run.fixed] : run.kind === 'ardl' ? [run.outcome, run.predictor] : run.kind === 'interrupted-series' ? [run.outcome, ...(run.specification.model.kind === 'count' && run.specification.model.exposure !== null ? [run.specification.model.exposure] : [])] : run.variables
   return run.preparedDataset === prepared.id && variables.every((variable) => prepared.columns.includes(variable.id))
 }
+import { windowContextSchema } from './windowEvidence'

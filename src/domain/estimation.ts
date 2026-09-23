@@ -1,4 +1,7 @@
 import { z } from 'zod'
+import { sameStructuralModel, structuralModelSchema, structuralImpactSettingsSchema, structuralContributionSchema } from './structuralImpact'
+import type { SharpRdConfiguration, SharpRdEvidence } from './sharpRd'
+import { SHARP_RD_METHOD_ID } from './methods'
 import { matchesTLearnerUncertainty, tLearnerUncertaintyEvidenceSchema } from './tLearner'
 import { vecmForecastSchema } from './vecmForecast'
 import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
@@ -149,12 +152,42 @@ export type InterventionStart =
   | { readonly kind: 'from-treatment' }
   | { readonly kind: 'row'; readonly row: number }
 
-export interface CausalImpactConfiguration {
+/** Which post-intervention rows the effect is summarised over. The fit is unaffected. */
+export type EvaluationWindow =
+  | { readonly kind: 'through-last-row' }
+  | { readonly kind: 'to-row'; readonly row: number }
+
+/** The exclusive end of the evaluated window, as a row count from the start of the series. */
+export const evaluatedEnd = (window: EvaluationWindow, observations: number): number => {
+  switch (window.kind) {
+    case 'through-last-row': return observations
+    case 'to-row': return Math.min(window.row, observations)
+    default: return assertNever(window)
+  }
+}
+
+export const describeEvaluationWindow = (window: EvaluationWindow): string =>
+  window.kind === 'through-last-row' ? 'through the last row' : `through row ${window.row}`
+
+const localLevelImpactSettingsSchema = z.object({
+  kind: z.literal('bayesian'),
+  draws: z.number().int().min(2),
+  warmup: z.number().int().nonnegative(),
+  seed: z.number().int().min(0).max(0xffffffff),
+  priorLevelSd: z.number().finite().positive(),
+}).strict()
+export const bayesianImpactSettingsSchema = z.discriminatedUnion('kind', [localLevelImpactSettingsSchema, structuralImpactSettingsSchema])
+export type BayesianImpactSettings = z.infer<typeof bayesianImpactSettingsSchema>
+
+export type CausalImpactConfiguration = {
   readonly kind: 'causal-impact'
   readonly start: InterventionStart
+  readonly window: EvaluationWindow
   readonly controls: readonly ColumnId[]
-  readonly maxIter: number
-}
+} & (
+  | { readonly inference?: undefined; readonly maxIter: number }
+  | { readonly inference: BayesianImpactSettings }
+)
 
 export interface DoubleMlConfiguration {
   readonly kind: 'dml-plr' | 'dml-irm'
@@ -199,8 +232,15 @@ export interface SyntheticControlConfiguration {
   readonly alpha: number
 }
 
-export interface PanelInterventionConfiguration {
+export type PanelInterventionConfiguration = {
   readonly kind: 'panel-intervention'
+  readonly primary: 'adjusted'
+  readonly covariates: readonly ColumnId[]
+  readonly specification: AdjustedDidSpecification
+} | {
+  readonly kind: 'panel-intervention'
+  /** Absent in older saved runs, whose primary result is synthetic DiD. */
+  readonly primary?: 'did' | 'syntheticDid'
   readonly placeboReplications: number
   readonly seed: number
 }
@@ -230,6 +270,7 @@ export interface BinaryEttConfiguration {
 }
 
 export type EstimatorConfiguration =
+  | SharpRdConfiguration
   | BackdoorLinearConfiguration
   | FrontdoorTwoStageConfiguration
   | InstrumentalVariableConfiguration
@@ -288,7 +329,7 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
     id: 'intervention-comparison',
     name: 'Intervention and comparative designs',
     description: 'Post-intervention comparisons using a forecast counterfactual or untreated comparison units.',
-    estimators: ['causal-impact', 'synthetic-control', 'panel-intervention'],
+    estimators: ['causal-impact', 'synthetic-control', 'panel-intervention', 'sharp-rd'],
   },
 ]
 
@@ -308,6 +349,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
     case 'ardl-pss': return ARDL_PSS_METHOD_ID
     case 'vecm': return VECM_METHOD_ID
     case 'synthetic-control': return SYNTHETIC_CONTROL_METHOD_ID
+    case 'sharp-rd': return SHARP_RD_METHOD_ID
     case 'panel-intervention': return PANEL_INTERVENTION_METHOD_ID
     case 'negbin-nuts': return NEGBIN_NUTS_METHOD_ID
     case 'bayesian-gaussian': return BAYESIAN_GAUSSIAN_METHOD_ID
@@ -342,6 +384,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
         alpha: 0.05,
       }
     }
+    case 'sharp-rd': return { kind: estimator }
     case 'panel-intervention': return { kind: estimator, placeboReplications: 100, seed: 0 }
     case 'negbin-nuts': return { kind: estimator, warmup: 500, samples: 1000, seed: 0 }
     case 'bayesian-gaussian': return { kind: estimator, warmup: 500, samples: 1000, seed: 41 }
@@ -355,6 +398,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
       return {
         kind: estimator,
         start: { kind: 'from-treatment' },
+        window: { kind: 'through-last-row' },
         controls: study === null ? [] : prepared.columns.filter((column) => column !== study.treatment.column && column !== study.outcome.column && !affected.has(column)),
         maxIter: 100,
       }
@@ -750,7 +794,7 @@ const panelInTimeEvidenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unavailable'), reason: z.string().min(1) }).strict(),
 ])
 
-export const panelInterventionEvidenceSchema = z.object({
+const syntheticPanelEvidenceSchema = z.object({
   kind: z.literal('panelIntervention'),
   observations: z.number().int().positive(),
   units: z.array(z.string().min(1)).min(2),
@@ -779,6 +823,22 @@ export const panelInterventionEvidenceSchema = z.object({
   }
 })
 
+const conventionalPanelEvidenceSchema = z.object({
+  kind: z.literal('panelDid'),
+  observations: z.number().int().positive(),
+  units: z.array(z.string().min(1)).min(2),
+  times: z.array(z.number().int().nonnegative()).min(2),
+  controlUnits: z.number().int().positive(),
+  treatedUnits: z.number().int().positive(),
+  nPre: z.number().int().positive(),
+  nPost: z.number().int().positive(),
+  did: panelMethodEvidenceSchema,
+}).strict().superRefine((e, ctx) => {
+  if (e.controlUnits + e.treatedUnits !== e.units.length || e.nPre + e.nPost !== e.times.length || e.observations !== e.units.length * e.times.length) ctx.addIssue({ code: 'custom', message: 'DiD panel dimensions do not match.' })
+  if (e.did.omega.length !== e.controlUnits || e.did.lambda.length !== e.nPre || e.did.effectCurve.length !== e.nPost) ctx.addIssue({ code: 'custom', message: 'DiD weights or period effects do not match the panel.' })
+})
+
+export const panelInterventionEvidenceSchema = z.union([syntheticPanelEvidenceSchema, conventionalPanelEvidenceSchema, adjustedDidEvidenceSchema])
 export type PanelInterventionEvidence = z.infer<typeof panelInterventionEvidenceSchema>
 
 export const negbinNutsEvidenceSchema = z.object({
@@ -1016,11 +1076,34 @@ function causalEffectsFitMatches(requested: TotalEffectEstimator, returned: Caus
   }
 }
 
-export const causalImpactEvidenceSchema = z.object({
+/** The fitted window drawn beside the forecast, so the counterfactual can be judged against the
+ * rows it was fitted on. Runs saved before it was reported carry `notReported`. */
+const preInterventionStepsSchema = {
+  steps: z.array(z.number().int().nonnegative()),
+  observed: z.array(z.number().finite()),
+  counterfactual: z.array(z.number().finite()),
+}
+const notReportedPathSchema = z.object({ kind: z.literal('notReported') }).strict()
+const fittedPreInterventionPathSchema = z.object({
+  kind: z.literal('fitted'), ...preInterventionStepsSchema,
+  se: z.array(z.number().finite().nonnegative()),
+}).strict()
+const sampledPreInterventionPathSchema = z.object({
+  kind: z.literal('sampled'), ...preInterventionStepsSchema,
+  lower: z.array(z.number().finite()), upper: z.array(z.number().finite()),
+}).strict()
+export const preInterventionPathSchema = z.discriminatedUnion('kind', [
+  notReportedPathSchema, fittedPreInterventionPathSchema, sampledPreInterventionPathSchema,
+])
+export type PreInterventionPath = z.infer<typeof preInterventionPathSchema>
+
+const maximumLikelihoodImpactEvidenceSchema = z.object({
   kind: z.literal('causalImpact'),
+  preInterventionPath: z.discriminatedUnion('kind', [notReportedPathSchema, fittedPreInterventionPathSchema]),
   observations: z.number().int().positive(),
   nPre: z.number().int().positive(),
   nPost: z.number().int().positive(),
+  postEnd: z.number().int().positive(),
   outcome: z.number().int().nonnegative(),
   controls: z.array(z.number().int().nonnegative()),
   counterfactual: z.array(z.number().finite()),
@@ -1032,7 +1115,49 @@ export const causalImpactEvidenceSchema = z.object({
   logLikelihood: z.number().finite(),
 }).strict()
 
+const posteriorQuantitySchema = z.object({
+  mean: z.number().finite(), lower: z.number().finite(), upper: z.number().finite(),
+  sd: z.number().finite().nonnegative(),
+}).strict().refine((value) => value.lower <= value.upper, 'Posterior bounds must be ordered.')
+const impactSummarySchema = z.object({
+  actual: z.number().finite(), predicted: posteriorQuantitySchema,
+  absolute: posteriorQuantitySchema, relative: posteriorQuantitySchema,
+  tailProbability: z.number().positive().max(1),
+}).strict()
+export const bayesianImpactEvidenceSchema = z.object({
+  kind: z.literal('bayesianCausalImpact'),
+  // Older saved runs did not record inclusion indicators. Absence is not zero inclusion.
+  controlInclusion: z.array(z.object({ column:z.number().int().nonnegative(), probability:z.number().finite().min(0).max(1) }).strict()).optional(),
+  observations: z.number().int().positive(), nPre: z.number().int().min(8), nPost: z.number().int().positive(),
+  postEnd: z.number().int().positive(),
+  outcome: z.number().int().nonnegative(), controls: z.array(z.number().int().nonnegative()),
+  draws: z.number().int().min(2), warmup: z.number().int().nonnegative(), seed: z.number().int().min(0).max(0xffffffff),
+  priorLevelSd: z.number().finite().positive(), level: z.literal(0.95),
+  preInterventionPath: z.discriminatedUnion('kind', [notReportedPathSchema, sampledPreInterventionPathSchema]),
+  counterfactual: z.array(z.number().finite()), counterfactualSe: z.array(z.number().finite().nonnegative()),
+  counterfactualLower: z.array(z.number().finite()), counterfactualUpper: z.array(z.number().finite()),
+  pointwise: z.array(z.number().finite()), pointwiseLower: z.array(z.number().finite()), pointwiseUpper: z.array(z.number().finite()),
+  cumulativeLower: z.array(z.number().finite()), cumulativeUpper: z.array(z.number().finite()),
+  cumulative: z.number().finite(), average: z.number().finite(),
+  averageSummary: impactSummarySchema, cumulativeSummary: impactSummarySchema,
+}).strict()
+export const structuralImpactEvidenceSchema = bayesianImpactEvidenceSchema.omit({ kind:true, priorLevelSd:true }).extend({
+  kind: z.literal('structuralCausalImpact'), model: structuralModelSchema,
+  contributions: z.array(structuralContributionSchema).min(1),
+}).strict()
+export const causalImpactEvidenceSchema = z.discriminatedUnion('kind', [maximumLikelihoodImpactEvidenceSchema, bayesianImpactEvidenceSchema, structuralImpactEvidenceSchema])
 export type CausalImpactEvidence = z.infer<typeof causalImpactEvidenceSchema>
+
+export function impactInferenceMatches(configuration: { readonly inference?: BayesianImpactSettings }, evidence: CausalImpactEvidence): boolean {
+  if (configuration.inference === undefined) return evidence.kind === 'causalImpact'
+  const settings = configuration.inference
+  if (settings.kind === 'structural') return evidence.kind === 'structuralCausalImpact'
+    && settings.draws === evidence.draws && settings.warmup === evidence.warmup && settings.seed === evidence.seed
+    && sameStructuralModel(settings.model, evidence.model)
+  return evidence.kind === 'bayesianCausalImpact' && settings.draws === evidence.draws
+    && settings.warmup === evidence.warmup && settings.seed === evidence.seed
+    && settings.priorLevelSd === evidence.priorLevelSd
+}
 
 export type EstimationEvidenceProblem = { readonly kind: 'invalid-estimation-evidence'; readonly detail: string }
 
@@ -1112,9 +1237,53 @@ export function parseCausalEffectsEvidence(value: unknown): Result<CausalEffects
 export function parseCausalImpactEvidence(value: unknown): Result<CausalImpactEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(causalImpactEvidenceSchema, value)
   if (!parsed.ok) return parsed
-  const { nPost, counterfactual, counterfactualSe, pointwise } = parsed.value
+  const { nPost, postEnd, counterfactual, counterfactualSe, pointwise } = parsed.value
+  if (parsed.value.nPre + nPost !== postEnd || postEnd > parsed.value.observations) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The evaluated window does not run from the intervention row to its end inside the observations.' })
+  }
+  if (parsed.value.kind !== 'causalImpact') {
+    const evidence = parsed.value
+    const inclusion = evidence.controlInclusion
+    if (inclusion !== undefined && (inclusion.length !== evidence.controls.length
+      || new Set(inclusion.map(item => item.column)).size !== inclusion.length
+      || inclusion.some(item => !evidence.controls.includes(item.column)))) {
+      return err({ kind:'invalid-estimation-evidence', detail:'Control inclusion probabilities must match the fitted control columns.' })
+    }
+    const bands = [[evidence.counterfactualLower,evidence.counterfactualUpper],
+      [evidence.pointwiseLower,evidence.pointwiseUpper], [evidence.cumulativeLower,evidence.cumulativeUpper]]
+    if (bands.some(([lower,upper]) => lower.length !== nPost || upper.length !== nPost || lower.some((value,index) => value > upper[index]))) {
+      return err({ kind: 'invalid-estimation-evidence', detail: 'The posterior bands must cover the post-intervention window with ordered bounds.' })
+    }
+  }
+  if (parsed.value.kind === 'structuralCausalImpact') {
+    const evidence = parsed.value
+    const keys = evidence.contributions.map(c => c.component.kind === 'predictor' ? `predictor:${c.component.column}` : c.component.kind)
+    const expected = ['trend', ...(evidence.model.seasonality.kind === 'none' ? [] : ['seasonal']), ...evidence.controls.map(c => `predictor:${c}`)]
+    if (keys.length !== expected.length || new Set(keys).size !== keys.length || expected.some(k => !keys.includes(k))
+      || evidence.contributions.some(c => c.mean.length !== postEnd || c.lower.length !== postEnd || c.upper.length !== postEnd || c.lower.some((v,i) => v > c.upper[i]))) {
+      return err({ kind:'invalid-estimation-evidence', detail:'The component paths do not match the model, predictors or evaluated window.' })
+    }
+    const path = evidence.preInterventionPath
+    if (path.kind !== 'sampled' || path.steps.length !== evidence.nPre || path.steps.some((v,i) => v !== i)) {
+      return err({ kind:'invalid-estimation-evidence', detail:'The composed model needs a complete sampled training path.' })
+    }
+    const prediction = [...path.counterfactual,...evidence.counterfactual]
+    if (prediction.some((value,t) => Math.abs(value-evidence.contributions.reduce((s,c) => s+c.mean[t],0)) > 1e-8*(1+Math.abs(value)))) {
+      return err({ kind:'invalid-estimation-evidence', detail:'The component means do not reconstruct the latent prediction.' })
+    }
+  }
   if (counterfactual.length !== nPost || counterfactualSe.length !== nPost || pointwise.length !== nPost) {
     return err({ kind: 'invalid-estimation-evidence', detail: 'The counterfactual path does not cover the post-intervention window.' })
+  }
+  const before = parsed.value.preInterventionPath
+  if (before.kind !== 'notReported') {
+    const bands = before.kind === 'fitted' ? [before.se] : [before.lower, before.upper]
+    const rows = before.steps.length
+    if (rows === 0 || rows > parsed.value.nPre
+      || [before.observed, before.counterfactual, ...bands].some((series) => series.length !== rows)
+      || before.steps.some((step, index) => step >= parsed.value.nPre || (index > 0 && step <= before.steps[index - 1]))) {
+      return err({ kind: 'invalid-estimation-evidence', detail: 'The pre-intervention path must cover rows of the fitted window in order.' })
+    }
   }
   return parsed
 }
@@ -1296,6 +1465,7 @@ interface RunIdentity {
 }
 
 export type EstimationRunArtifact =
+  | RunIdentity & { readonly kind: 'sharp-rd-run'; readonly method: typeof SHARP_RD_METHOD_ID; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
   | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
   | RunIdentity & { readonly kind: 'frontdoor-two-stage-run'; readonly method: typeof FRONTDOOR_TWO_STAGE_METHOD_ID; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
   | RunIdentity & { readonly kind: 'instrumental-variable-run'; readonly method: typeof INSTRUMENTAL_VARIABLE_METHOD_ID; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
@@ -1455,6 +1625,12 @@ const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evide
 const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
 
 function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
+  if (configuration.kind === 'panel-intervention') return estimand.kind === 'average-treatment-effect-on-treated'
+    ? reported('The panel comparison targets the average effect on the treated group.')
+    : notReported('Panel DiD targets the treated group. Record an ATT study before running; existing saved runs retain their original labels.')
+  if (configuration.kind === 'sharp-rd') return estimand.kind === 'local-cutoff-effect'
+    ? reported('The study and estimator both target the local effect at the recorded cutoff.')
+    : notReported('Sharp RD estimates the average treatment effect at the cutoff. For a time-based design, this is the event time. In Study design, choose “At an assignment cutoff (sharp RD)”. Then set the running variable and cutoff.')
   // The T-learner reports one effect per row and no average target, so it is decided before the per-target rules.
   if (configuration.kind === 't-learner') {
     return estimand.kind === 'conditional-average-treatment-effect-per-row'
@@ -1462,6 +1638,7 @@ function targetCompatibility(estimand: Estimand, configuration: EstimatorConfigu
       : notReported('The T-learner reports one effect per row, but the study records an average target.')
   }
   switch (estimand.kind) {
+    case 'local-cutoff-effect': return notReported('This cutoff-local target requires the sharp RD estimator.')
     case 'average-treatment-effect':
       if (configuration.kind === 'binary-ett-idc-star') return notReported('The binary IDC* evaluator reports ETT/ATT, but this study records ATE.')
       if (configuration.kind === 'dml-irm' && configuration.att) return notReported('The DML configuration reports ATT, but the study records ATE.')
@@ -1524,6 +1701,13 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
   }
 
   switch (configuration.kind) {
+    case 'sharp-rd': {
+      if (identification.kind !== 'cutoff-design' || context.study?.estimand.kind !== 'local-cutoff-effect') violate('rd-design', 'Record a cutoff-local study and its running variable before fitting sharp RD.')
+      else leave('rd-design', 'Justify continuity of potential outcomes, no precise manipulation and no other change at the cutoff. The fit checks sharp assignment, not these causal assumptions.')
+      if (prepared.kind !== 'prepared-cross-section') violate('rd-sample', 'This RD implementation requires independent observations; it does not provide clustered or time-series uncertainty.')
+      else leave('rd-sample', 'The fit checks support on both sides and selects the mserd bandwidth. Inspect observations near the cutoff.')
+      break
+    }
     case 'backdoor-linear-regression': {
       if (adjustment === null) violate('linear-identified-adjustment', 'No measured back-door adjustment set was found, so this adjusted regression cannot run.')
       else satisfy('linear-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
@@ -1592,19 +1776,39 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         }
         default: assertNever(context.panelPreflight)
       }
-      leave('panel-parallel-trends', 'Parallel untreated trends cannot be established from the panel shape; compare pre-period paths and the three estimators.')
+      leave('panel-parallel-trends', 'Parallel untreated trends cannot be established from the panel shape. Inspect pre-treatment paths when multiple pre-periods are available and justify the comparison substantively.')
       leave('panel-no-anticipation', 'Confirm that outcomes were not affected before the treatment indicator first turns on.')
       if (context.study?.designAssumptions.noInterference.rationale === null || context.study === null) {
         leave('panel-no-spillovers', 'The study has no recorded rationale for no interference between units.')
       } else {
         satisfy('panel-no-spillovers', `Recorded study rationale: ${context.study.designAssumptions.noInterference.rationale}`)
       }
-      if (context.panelPreflight.kind === 'ready') {
+      if (configuration.primary === 'adjusted') {
+        if (!adjustedDidConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the DiD covariate selection and inference settings before running.')
+        const layout = context.panelPreflight.kind === 'ready' ? context.panelPreflight.layout : null
+        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1)) violate('panel-balanced-layout', 'Regression and DR DiD require exactly one before and one after period.')
+        satisfy('panel-pre-fit', 'This two-period fit does not estimate synthetic weights.')
+        if (configuration.specification.kind === 'doublyRobust') {
+          if (configuration.covariates.length === 0) violate('panel-pre-fit', 'Select at least one baseline covariate for DR DiD.')
+          if (layout !== null && configuration.specification.folds > Math.min(layout.controls.length, layout.treated.length)) violate('panel-pre-fit', 'The fold count cannot exceed the smaller treatment group.')
+          leave('panel-parallel-trends', 'DR DiD requires conditional parallel trends and treatment overlap given baseline covariates. Clipping propensity estimates does not establish overlap.')
+        }
+      } else if (configuration.primary === 'did') {
+        satisfy('panel-pre-fit', 'Conventional DiD does not require synthetic weights or pre-period variation.')
+      } else if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controlPreDifferenceSd === null) {
+        violate('panel-pre-fit', 'Synthetic DiD needs non-constant control changes before adoption. Choose conventional DiD for this panel.')
+      } else if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controlPreDifferenceSd !== null) {
         satisfy('panel-pre-fit', `${context.panelPreflight.layout.controls.length} controls and ${context.panelPreflight.layout.prePeriods} pre-periods provide non-constant control changes. Their standard deviation is ${context.panelPreflight.layout.controlPreDifferenceSd.toPrecision(4)}. The run reports all fitted weights.`)
       } else {
         leave('panel-pre-fit', 'The run checks control variation before treatment and reports the fitted unit and time weights.')
       }
-      if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controls.length > context.panelPreflight.layout.treated.length) {
+      if (configuration.primary === 'adjusted') {
+        leave('panel-no-interval', configuration.specification.kind === 'regression'
+          ? 'Classical Student-t intervals assume independent, homoskedastic errors. They are not unit-clustered intervals.'
+          : 'Cross-fitted score intervals assume independent units and adequate treatment overlap.')
+      } else if (configuration.primary === 'did') {
+        leave('panel-no-interval', 'This conventional DiD fit reports a point estimate without a confidence interval.')
+      } else if (context.panelPreflight.kind === 'ready' && context.panelPreflight.layout.controls.length > context.panelPreflight.layout.treated.length) {
         satisfy('panel-no-interval', '')
       } else {
         leave('panel-no-interval', 'Placebo standard errors need more controls than treated units. The point estimates remain runnable and the result records whether inference was available.')
@@ -1831,10 +2035,11 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     case 'causal-impact': {
       if (!timeSeries) violate('impact-time-series', 'An intervention analysis needs an ordered time series. This prepared dataset holds independent rows.')
       else satisfy('impact-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series.`)
+      if (configuration.inference !== undefined && !bayesianImpactSettingsSchema.safeParse(configuration.inference).success) violate('impact-pre-period', 'Review the sampling settings and the selected model. Seasonal counts and durations must be positive; harmonic pairs must be below half the period.')
       if (configuration.start.kind === 'row') satisfy('impact-intervention-time', `Intervention starts at row ${configuration.start.row}.`)
       else leave('impact-intervention-time', 'The intervention start is read from the treatment column when the run starts: it must be zero before and non-zero after one point.')
       leave('impact-pre-period', 'The pre-period length is checked at run time; at least 8 rows are required and more is better.')
-      if (configuration.controls.length === 0) leave('impact-controls', 'Choose control series, or accept a counterfactual based only on a local level.')
+      if (configuration.controls.length === 0) leave('impact-controls', 'Choose control series, or accept a counterfactual based only on the selected state model.')
       else satisfy('impact-controls', `${configuration.controls.length} control series enter the static regression.`)
       {
         const affected = affectedNodes(context.study).filter((node) => configuration.controls.includes(node.column))
@@ -1901,6 +2106,7 @@ export function causalEstimateFrom(
   study: StudySpecification,
   identification: IdentificationArtifact,
   run:
+    | { readonly kind: 'sharp-rd-run'; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
     | { readonly kind: 'backdoor-linear-run'; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
     | { readonly kind: 'frontdoor-two-stage-run'; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
     | { readonly kind: 'instrumental-variable-run'; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
@@ -1919,6 +2125,16 @@ export function causalEstimateFrom(
     | { readonly kind: 'causal-effects-run'; readonly configuration: CausalEffectsConfiguration; readonly evidence: CausalEffectsEvidence; readonly graphVariables: readonly (StudyVariable | null)[] }
     | { readonly kind: 'causal-impact-run'; readonly configuration: CausalImpactConfiguration; readonly evidence: CausalImpactEvidence },
 ): CausalEstimate | null {
+  if (run.kind === 'sharp-rd-run') {
+    if (study.estimand.kind !== 'local-cutoff-effect' || identification.result.kind !== 'cutoff-design' || study.estimand.cutoff !== run.evidence.cutoff) return null
+    const { robust, observations } = run.evidence
+    return { kind: 'causal-estimate', estimand: study.estimand,
+      effect: { kind: 'additive', value: robust.value, unit: '' },
+      interval: { kind: 'confidence', level: 0.95, lower: robust.interval[0], upper: robust.interval[1] },
+      standardError: robust.standardError, adjustment: { kind: 'none' },
+      sample: { observations: observations[0] + observations[1], parameters: 4, degreesOfFreedom: null },
+    }
+  }
   if (run.kind === 'frontdoor-two-stage-run') {
     if (identification.result.kind !== 'graphically-identified' || identification.result.frontdoor.kind !== 'identified' || identification.result.frontdoor.mediators.length !== 1) return null
     const interval = run.evidence.uncertainty
@@ -2108,6 +2324,22 @@ export function causalEstimateFrom(
     }
     case 'panel-intervention-run': {
       const { evidence } = run
+      if (run.configuration.primary === 'adjusted') {
+        if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'panelAdjusted'
+          || !sameDidSpecification(run.configuration.specification, evidence.specification) || run.configuration.covariates.length !== evidence.covariates) return null
+        return { kind: 'causal-estimate', estimand: study.estimand, effect: { kind: 'additive', value: evidence.estimate, unit: '' },
+          interval: { kind: 'confidence', level: 0.95, lower: evidence.interval[0], upper: evidence.interval[1] }, standardError: evidence.standardError,
+          adjustment: { kind: 'none' }, sample: { observations: evidence.observations, parameters: evidence.inference.kind === 'independentErrors' ? 4+evidence.covariates : evidence.covariates, degreesOfFreedom: evidence.inference.kind === 'independentErrors' ? evidence.inference.degreesOfFreedom : null } }
+      }
+      if (evidence.kind === 'panelAdjusted') return null
+      if ((run.configuration.primary === 'did') !== (evidence.kind === 'panelDid')) return null
+      if (evidence.kind === 'panelDid') return {
+        kind: 'causal-estimate', estimand: study.estimand,
+        effect: { kind: 'additive', value: evidence.did.estimate, unit: '' },
+        interval: { kind: 'none', reason: 'This conventional DiD result does not yet report an uncertainty interval.' },
+        standardError: null, adjustment: { kind: 'none' },
+        sample: { observations: evidence.observations, parameters: 4, degreesOfFreedom: null },
+      }
       const placeboStandardError = evidence.syntheticDidPlacebo.kind === 'available' ? evidence.syntheticDidPlacebo.standardError : null
       return {
         kind: 'causal-estimate', estimand: study.estimand,
@@ -2193,13 +2425,14 @@ export function causalEstimateFrom(
     }
     case 'causal-impact-run': {
       const { evidence } = run
+      if (!impactInferenceMatches(run.configuration, evidence)) return null
       const z = 1.959963984540054
       const points = evidence.pointwise.map((effect, index): TimeEffectPoint => ({
         step: evidence.nPre + index + 1,
         actual: evidence.counterfactual[index] + effect,
         counterfactual: evidence.counterfactual[index],
-        lower: evidence.counterfactual[index] - z * evidence.counterfactualSe[index],
-        upper: evidence.counterfactual[index] + z * evidence.counterfactualSe[index],
+        lower: evidence.kind !== 'causalImpact' ? evidence.counterfactualLower[index] : evidence.counterfactual[index] - z * evidence.counterfactualSe[index],
+        upper: evidence.kind !== 'causalImpact' ? evidence.counterfactualUpper[index] : evidence.counterfactual[index] + z * evidence.counterfactualSe[index],
         effect,
       }))
       if (!isNonEmpty(points)) return null
@@ -2207,15 +2440,98 @@ export function causalEstimateFrom(
         kind: 'causal-estimate',
         estimand: study.estimand,
         effect: { kind: 'path', values: points, aggregate: { cumulative: evidence.cumulative, average: evidence.average } },
-        interval: { kind: 'none', reason: 'The shaded range is a pointwise forecast band for each no-intervention period. It is not a confidence interval for the average or cumulative difference.' },
+        interval: evidence.kind !== 'causalImpact'
+          ? { kind: 'credible', level: evidence.level, summary: 'ETI', lower: evidence.cumulativeSummary.absolute.lower, upper: evidence.cumulativeSummary.absolute.upper }
+          : { kind: 'none', reason: 'The shaded range is a pointwise forecast band for each no-intervention period. It is not a confidence interval for the average or cumulative difference.' },
         standardError: null,
         adjustment: { kind: 'none' },
-        sample: { observations: evidence.observations, parameters: evidence.params.length, degreesOfFreedom: null },
+        sample: { observations: evidence.observations, parameters: evidence.kind === 'causalImpact' ? evidence.params.length : evidence.kind === 'bayesianCausalImpact' ? evidence.controls.length + (evidence.controls.length > 0 ? 1 : 0) + 2 : evidence.controls.length + ({ level:2, linear:3, semilocal:5 }[evidence.model.trend]) + (evidence.model.seasonality.kind === 'none' ? 0 : 1), degreesOfFreedom: null },
       }
     }
     default:
       return assertNever(run)
   }
+}
+
+/** The fitted window as chart points, so the counterfactual can be seen tracking the outcome
+ * before the intervention. Row indices arrive zero-based and are reported as steps. */
+export function preInterventionPoints(path: PreInterventionPath): readonly TimeEffectPoint[] {
+  if (path.kind === 'notReported') return []
+  const z = 1.959963984540054
+  return path.steps.map((step, index): TimeEffectPoint => {
+    const counterfactual = path.counterfactual[index]
+    const margin = path.kind === 'fitted' ? z * path.se[index] : 0
+    return {
+      step: step + 1,
+      actual: path.observed[index],
+      counterfactual,
+      lower: path.kind === 'fitted' ? counterfactual - margin : path.lower[index],
+      upper: path.kind === 'fitted' ? counterfactual + margin : path.upper[index],
+      effect: path.observed[index] - counterfactual,
+    }
+  })
+}
+
+export type EffectBand =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'interval'; readonly lower: number; readonly upper: number }
+
+export interface ImpactEffectPoint {
+  readonly step: number
+  readonly effect: number
+  readonly band: EffectBand
+}
+
+const NORMAL_95 = 1.959963984540054
+const interval = (lower: number, upper: number): EffectBand => ({ kind: 'interval', lower, upper })
+
+/** The fitted window's differences. The outcome is fixed, so the band on the difference is the
+ * band on the counterfactual reflected about it. */
+const preInterventionEffects = (path: PreInterventionPath): readonly ImpactEffectPoint[] => {
+  if (path.kind === 'notReported') return []
+  return path.steps.map((step, index): ImpactEffectPoint => {
+    const effect = path.observed[index] - path.counterfactual[index]
+    return {
+      step: step + 1,
+      effect,
+      band: path.kind === 'fitted'
+        ? interval(effect - NORMAL_95 * path.se[index], effect + NORMAL_95 * path.se[index])
+        : interval(path.observed[index] - path.upper[index], path.observed[index] - path.lower[index]),
+    }
+  })
+}
+
+/** The difference at each row, across the fitted window and the evaluated one. */
+export function impactPointwisePath(evidence: CausalImpactEvidence): readonly ImpactEffectPoint[] {
+  const after = evidence.pointwise.map((effect, index): ImpactEffectPoint => ({
+    step: evidence.nPre + index + 1,
+    effect,
+    band: evidence.kind === 'causalImpact'
+      ? interval(effect - NORMAL_95 * evidence.counterfactualSe[index], effect + NORMAL_95 * evidence.counterfactualSe[index])
+      : interval(evidence.pointwiseLower[index], evidence.pointwiseUpper[index]),
+  }))
+  return [...preInterventionEffects(evidence.preInterventionPath), ...after]
+}
+
+/** The differences accumulated from the intervention. Before it the total is zero by
+ * construction, not by estimation, so it carries no band. The least-squares route carries none
+ * either: its forecast errors share the level's uncertainty, so summing their variances would
+ * understate the range. */
+export function impactCumulativePath(evidence: CausalImpactEvidence): readonly ImpactEffectPoint[] {
+  let total = 0
+  const after = evidence.pointwise.map((effect, index): ImpactEffectPoint => {
+    total += effect
+    return {
+      step: evidence.nPre + index + 1,
+      effect: total,
+      band: evidence.kind === 'causalImpact'
+        ? { kind: 'none' }
+        : interval(evidence.cumulativeLower[index], evidence.cumulativeUpper[index]),
+    }
+  })
+  const before = preInterventionEffects(evidence.preInterventionPath)
+    .map((point): ImpactEffectPoint => ({ step: point.step, effect: 0, band: { kind: 'none' } }))
+  return [...before, ...after]
 }
 
 export function describeCovariance(errors: LinearErrors): string {
@@ -2243,6 +2559,7 @@ export function linearReading(run: { readonly configuration: BackdoorLinearConfi
 
 /** The estimator the chapter opens with for a record: the one its strategy calls for, else the plain adjustment route for the row structure. */
 export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorId {
+  if (study?.estimand.kind === 'local-cutoff-effect') return 'sharp-rd'
   // A conditional target is reported only by the DML estimators; the partially linear one runs for any treatment.
   if (study?.estimand.kind === 'conditional-average-treatment-effect') return 'dml-plr'
   // The per-row target is reported only by the T-learner.
@@ -2250,6 +2567,7 @@ export function defaultEstimatorFor(identification: Identification | null, prepa
   const fallback: EstimatorId = prepared.kind === 'prepared-panel' ? 'panel-intervention' : 'backdoor-linear-regression'
   if (identification === null) return fallback
   switch (identification.kind) {
+    case 'cutoff-design': return 'sharp-rd'
     case 'instrument-identified': return 'instrumental-variable'
     case 'graphically-identified': return identification.frontdoor.kind === 'identified' ? 'frontdoor-two-stage' : 'instrumental-variable'
     case 'counterfactually-identified': return 'binary-ett-idc-star'
@@ -2274,6 +2592,7 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'ardl-pss': return 'ARDL long run'
     case 'vecm': return 'VECM'
     case 'synthetic-control': return 'Synthetic control'
+    case 'sharp-rd': return 'Sharp regression discontinuity'
     case 'panel-intervention': return 'Panel difference-in-differences'
     case 'negbin-nuts': return 'Bayesian negative binomial'
     case 'bayesian-gaussian': return 'Bayesian Gaussian regression'
@@ -2314,3 +2633,4 @@ export function interventionStartFromTreatment(values: readonly number[]): Resul
   if (values.slice(first).some((value) => value === 0)) return err({ kind: 'not-a-step', detail: 'The treatment switches off again after it starts.' })
   return ok(first)
 }
+import { adjustedDidEvidenceSchema, adjustedDidConfigurationSchema, sameDidSpecification, type AdjustedDidSpecification } from './adjustedDid'

@@ -18,6 +18,10 @@ export const choose = async (page: Page, label: string, option: string): Promise
 }
 
 export const chapter = async (page: Page, name: RegExp) => {
+  if (await page.getByRole('dialog').isVisible()) {
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+  }
   const toggle = page.getByRole('button', { name: 'Expand chapter list' })
   if (await toggle.isVisible()) await toggle.click()
   const destination = page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name })
@@ -72,7 +76,11 @@ export const addArrow = async (page: Page, cause: string, effect: string, ration
   }
   await page.getByRole('textbox', { name: /Rationale/i }).first().fill(rationale)
   await page.getByRole('button', { name: 'Add the arrow' }).click()
-  await expect(page.getByText(new RegExp(`${cause}.*→ ${effect}`)).first()).toBeVisible()
+  if (await page.getByRole('dialog', { name: 'Inspector', exact: true }).isVisible()) {
+    await expect(page.getByRole('combobox', { name: 'Proposed cause' })).toHaveAttribute('data-placeholder', '')
+  } else {
+    await expect(page.getByText(new RegExp(`${cause}.*→ ${effect}`)).first()).toBeVisible()
+  }
 }
 
 export const addUnmeasured = async (page: Page, name: string): Promise<void> => {
@@ -88,11 +96,14 @@ export const createDag = async (page: Page, name: string): Promise<void> => {
   await page.getByRole('button', { name: 'Create DAG draft' }).click()
   // With discovery evidence present the inspector opens on Evidence; the arrow controls are under Selection.
   const cause = page.getByRole('combobox', { name: 'Proposed cause' })
+  const inspector = page.getByRole('button', { name: 'Inspector', exact: true })
+  if (await inspector.isVisible()) await inspector.click()
   await expect(cause).toBeVisible({ timeout: 5_000 }).catch(() => page.getByRole('radio', { name: 'Selection', exact: true }).first().check())
   await expect(cause).toBeVisible()
 }
 
 export const identify = async (page: Page, options: {
+  readonly target?: RegExp
   readonly graph: string
   readonly treatment: string
   readonly outcome: string
@@ -109,6 +120,7 @@ export const identify = async (page: Page, options: {
   await choose(page, 'Causal graph', options.graph)
   await choose(page, 'Treatment', options.treatment)
   await choose(page, 'Outcome', options.outcome)
+  if (options.target !== undefined) await page.getByRole('radio', { name: options.target }).click()
   await page.getByRole('radio', { name: new RegExp(options.mechanism) }).click()
   await page.getByRole('textbox', { name: 'Assignment sentence' }).fill(options.sentence)
   if (options.consistency !== undefined) await page.getByRole('textbox', { name: 'Consistency rationale' }).fill(options.consistency)

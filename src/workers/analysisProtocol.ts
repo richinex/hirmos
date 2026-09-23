@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { structuralModelSchema, type StructuralModel } from '@/domain/structuralImpact'
 import { rootCauseRequestSchema, rootCauseEvidenceSchema, type RootCauseRequest, type RootCauseEvidence } from '@/domain/rootCauseAnalysis'
 import { rootCauseCheckRequestSchema, rootCauseChecksSchema, type RootCauseCheckRequest, type RootCauseChecks } from '@/domain/rootCauseAnalysis'
 import { ardlModelEvidenceSchema, ardlModelRequestSchema, type ArdlModelEvidence, type ArdlModelRequest } from '@/domain/ardlModel'
@@ -663,6 +664,43 @@ export type AnalysisWorkerCommand =
       readonly uncertainty: CausalEffectsUncertainty
     }
   | {
+      readonly kind: 'sharp-rd'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly cutoff: number
+    }
+  | {
+      readonly kind: 'structural-causal-impact'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly outcome: number
+      readonly controls: readonly number[]
+      readonly nPre: number
+      readonly postEnd: number
+      readonly draws: number
+      readonly warmup: number
+      readonly seed: number
+      readonly model: StructuralModel
+    }
+  | {
+      readonly kind: 'bayesian-causal-impact'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly outcome: number
+      readonly controls: readonly number[]
+      readonly nPre: number
+      readonly postEnd: number
+      readonly draws: number
+      readonly warmup: number
+      readonly seed: number
+      readonly priorLevelSd: number
+    }
+  | {
       readonly kind: 'causal-impact'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -671,6 +709,7 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly controls: readonly number[]
       readonly nPre: number
+      readonly postEnd: number
       readonly maxIter: number
     }
   | {
@@ -807,7 +846,18 @@ export type AnalysisWorkerCommand =
       readonly alpha: number
     }
   | {
+      readonly kind: 'panel-adjusted'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly units: readonly string[]
+      readonly times: readonly number[]
+      readonly specification: AdjustedDidSpecification
+    }
+  | {
       readonly kind: 'panel-intervention'
+      readonly primary?: 'did' | 'syntheticDid'
       readonly request: WorkerRequestId
       readonly values: Float64Array
       readonly rows: number
@@ -1078,6 +1128,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'count-series-intervention-scan-succeeded'; readonly request: WorkerRequestId; readonly result: CountSeriesInterventionScanEvidence }
   | { readonly kind: 'interrupted-series-succeeded'; readonly request: WorkerRequestId; readonly result: InterruptedSeriesEvidence }
   | { readonly kind: 'causal-effects-succeeded'; readonly request: WorkerRequestId; readonly result: CausalEffectsEvidence }
+  | { readonly kind: 'sharp-rd-succeeded'; readonly request: WorkerRequestId; readonly result: SharpRdEvidence }
   | { readonly kind: 'causal-impact-succeeded'; readonly request: WorkerRequestId; readonly result: CausalImpactEvidence }
   | { readonly kind: 'linear-refutation-succeeded'; readonly request: WorkerRequestId; readonly result: LinearRefutationEvidence }
   | { readonly kind: 'unobserved-confounding-succeeded'; readonly request: WorkerRequestId; readonly result: UnobservedConfoundingEvidence }
@@ -1759,6 +1810,10 @@ const commandSchema = z.discriminatedUnion('kind', [
     uncertainty: causalEffectsUncertaintySchema,
   }).strict(),
   z.object({
+    kind: z.literal('sharp-rd'), request: requestSchema,
+    values: z.instanceof(Float64Array), rows: z.number().int().positive(), cutoff: z.number().finite(),
+  }).strict(),
+  z.object({
     kind: z.literal('causal-impact'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -1767,7 +1822,26 @@ const commandSchema = z.discriminatedUnion('kind', [
     outcome: z.number().int().nonnegative(),
     controls: z.array(z.number().int().nonnegative()),
     nPre: z.number().int().min(8),
+    postEnd: z.number().int().positive(),
     maxIter: z.number().int().min(1).max(2000),
+  }).strict(),
+  z.object({
+    kind: z.literal('structural-causal-impact'), request: requestSchema,
+    values: z.instanceof(Float64Array), rows: z.number().int().positive(),
+    columns: z.number().int().positive(), outcome: z.number().int().nonnegative(),
+    controls: z.array(z.number().int().nonnegative()), nPre: z.number().int().min(8),
+    postEnd: z.number().int().positive(),
+    draws: z.number().int().min(2), warmup: z.number().int().nonnegative(),
+    seed: z.number().int().min(0).max(0xffffffff), model: structuralModelSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('bayesian-causal-impact'), request: requestSchema,
+    values: z.instanceof(Float64Array), rows: z.number().int().positive(),
+    columns: z.number().int().positive(), outcome: z.number().int().nonnegative(),
+    controls: z.array(z.number().int().nonnegative()), nPre: z.number().int().min(8),
+    postEnd: z.number().int().positive(),
+    draws: z.number().int().min(2), warmup: z.number().int().nonnegative(),
+    seed: z.number().int().min(0).max(0xffffffff), priorLevelSd: z.number().finite().positive(),
   }).strict(),
   z.object({
     kind: z.literal('linear-refutation'),
@@ -1901,7 +1975,13 @@ const commandSchema = z.discriminatedUnion('kind', [
     alpha: z.number().gt(0).lt(1),
   }).strict(),
   z.object({
+    kind: z.literal('panel-adjusted'), request: requestSchema, values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(), columns: z.number().int().min(2),
+    units: z.array(z.string().min(1)).min(1), times: z.array(z.number().int().nonnegative()).min(1), specification: adjustedDidSpecificationSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('panel-intervention'),
+    primary: z.enum(['did', 'syntheticDid']).optional(),
     request: requestSchema,
     values: z.instanceof(Float64Array),
     rows: z.number().int().positive(),
@@ -2171,6 +2251,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('count-series-intervention-scan-succeeded'), request: requestSchema, result: countSeriesInterventionScanEvidenceSchema }).strict(),
   z.object({ kind: z.literal('interrupted-series-succeeded'), request: requestSchema, result: interruptedSeriesEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-effects-succeeded'), request: requestSchema, result: causalEffectsEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('sharp-rd-succeeded'), request: requestSchema, result: sharpRdEvidenceSchema }).strict(),
   z.object({ kind: z.literal('causal-impact-succeeded'), request: requestSchema, result: causalImpactEvidenceSchema }).strict(),
   z.object({ kind: z.literal('linear-refutation-succeeded'), request: requestSchema, result: linearRefutationEvidenceSchema }).strict(),
   z.object({ kind: z.literal('unobserved-confounding-succeeded'), request: requestSchema, result: unobservedConfoundingEvidenceSchema }).strict(),
@@ -2248,6 +2329,9 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   }
   if (parsed.data.kind === 'granger-ssr-f' && parsed.data.values.length !== parsed.data.rows * 2) {
     return err({ kind: 'invalid-command', detail: 'The Granger matrix must contain exactly two columns.' })
+  }
+  if (parsed.data.kind === 'panel-adjusted' && (parsed.data.values.length !== parsed.data.rows * parsed.data.columns || parsed.data.units.length !== parsed.data.rows || parsed.data.times.length !== parsed.data.rows)) {
+    return err({ kind: 'invalid-command', detail: 'Adjusted DiD values and keys must describe the same rows.' })
   }
   if (parsed.data.kind === 'panel-intervention' && (
     parsed.data.values.length !== parsed.data.rows * 2
@@ -2524,6 +2608,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = syntheticControlEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'synthetic-control-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
+  if (parsed.data.kind === 'sharp-rd-succeeded') {
+    const result = sharpRdEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
   if (parsed.data.kind === 'panel-intervention-succeeded') {
     const result = panelInterventionEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'panel-intervention-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
@@ -2574,11 +2662,17 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
       ? ok({ kind: 'pandas-resampling-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
-  const result = parseStationarityBattery(parsed.data.result)
-  return result.ok
-    ? ok({ kind: 'stationarity-succeeded', request: request.value, result: result.value })
-    : err({ kind: 'invalid-event', detail: result.error.detail })
+  if (parsed.data.kind === 'stationarity-succeeded') {
+    const result = parseStationarityBattery(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'stationarity-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  const exhaustive: never = parsed.data
+  return exhaustive
 }
 import { tLearnerUncertaintySchema, type TLearnerUncertainty } from '@/domain/tLearner'
 import { gcmEffectsRequestSchema, gcmEffectsEvidenceSchema, type GcmEffectsRequest, type GcmEffectsEvidence } from '@/domain/gcmEffects'
 import { gcmInfluenceRequestSchema, gcmInfluenceEvidenceSchema, type GcmInfluenceRequest, type GcmInfluenceEvidence } from '@/domain/gcmInfluence'
+import { sharpRdEvidenceSchema, type SharpRdEvidence } from '@/domain/sharpRd'
+import { adjustedDidSpecificationSchema, type AdjustedDidSpecification } from '@/domain/adjustedDid'

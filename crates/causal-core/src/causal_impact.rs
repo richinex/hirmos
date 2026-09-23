@@ -12,6 +12,7 @@
 use crate::linalg;
 use crate::ucm::hpfilter;
 use nalgebra::{DMatrix, DVector};
+use std::ops::Range;
 
 const APPROXIMATE_DIFFUSE_VARIANCE: f64 = 1e6;
 const LOGLIKELIHOOD_BURN: usize = 1;
@@ -54,6 +55,9 @@ pub struct FilterOutput {
     pub llf: f64,
     pub loglikeobs: Vec<f64>,
     pub forecasts_error: Vec<f64>,
+    /// One-step-ahead prediction of the observation, and its variance F = P + H.
+    pub predicted: Vec<f64>,
+    pub predicted_variance: Vec<f64>,
     /// Predicted state and its variance one step past the sample.
     pub final_state: f64,
     pub final_state_cov: f64,
@@ -71,11 +75,15 @@ pub fn kalman_filter(params: &[f64], y: &[f64], exog: &[Vec<f64>]) -> FilterOutp
     let mut p = APPROXIMATE_DIFFUSE_VARIANCE;
     let mut lls: Vec<f64> = Vec::with_capacity(y.len());
     let mut errors = Vec::with_capacity(y.len());
+    let mut predicted = Vec::with_capacity(y.len());
+    let mut predicted_variance = Vec::with_capacity(y.len());
     for (t, &obs) in y.iter().enumerate() {
         let v = obs - regression_mean(&exog[t], beta) - a;
         let f = p + h;
         lls.push(-0.5 * (LN_2PI + f.ln() + v * v / f));
         errors.push(v);
+        predicted.push(obs - v);
+        predicted_variance.push(f);
         // Update, then predict through T = 1.
         a += p / f * v;
         p -= p * p / f;
@@ -91,6 +99,8 @@ pub fn kalman_filter(params: &[f64], y: &[f64], exog: &[Vec<f64>]) -> FilterOutp
         llf,
         loglikeobs: lls,
         forecasts_error: errors,
+        predicted,
+        predicted_variance,
         final_state: a,
         final_state_cov: p,
     }
@@ -158,7 +168,12 @@ pub fn fit(y: &[f64], exog: &[Vec<f64>], max_iter: usize) -> ImpactFit {
 }
 
 pub struct Impact {
-    /// The counterfactual path over the post-intervention window.
+    /// One-step predictions over the fitted window, from the burn-in row onward, with the row
+    /// each one belongs to. The diffuse first row carries no usable prediction and is left out.
+    pub pre_steps: Vec<usize>,
+    pub pre_counterfactual: Vec<f64>,
+    pub pre_counterfactual_se: Vec<f64>,
+    /// The counterfactual path over the evaluated window.
     pub counterfactual: Vec<f64>,
     /// Its forecast standard errors.
     pub counterfactual_se: Vec<f64>,
@@ -169,9 +184,16 @@ pub struct Impact {
     pub llf: f64,
 }
 
-/// Fit the pre-intervention window, forecast the counterfactual across the post window, and
-/// difference it against what actually happened.
-pub fn causal_impact(y: &[f64], exog: &[Vec<f64>], n_pre: usize, max_iter: usize) -> Impact {
+/// Fit the pre-intervention window, forecast the counterfactual from the intervention row, and
+/// difference it against what actually happened across the evaluated window. `post` narrows
+/// what is reported, not what is fitted: the forecast recursion runs from `n_pre` either way.
+pub fn causal_impact(
+    y: &[f64],
+    exog: &[Vec<f64>],
+    n_pre: usize,
+    post: Range<usize>,
+    max_iter: usize,
+) -> Impact {
     let fitted = fit(&y[..n_pre], &exog[..n_pre], max_iter);
     let filt = kalman_filter(&fitted.params, &y[..n_pre], &exog[..n_pre]);
     let (h, q) = (fitted.params[0], fitted.params[1]);
@@ -179,14 +201,21 @@ pub fn causal_impact(y: &[f64], exog: &[Vec<f64>], n_pre: usize, max_iter: usize
 
     // The level is a random walk, so the forecast stays flat while its variance grows by Q.
     let mut p = filt.final_state_cov;
-    let mut counterfactual = Vec::new();
-    let mut se = Vec::new();
-    for row in exog.iter().skip(n_pre) {
-        counterfactual.push(filt.final_state + regression_mean(row, beta));
-        se.push((p + h).sqrt());
+    let mut counterfactual = Vec::with_capacity(post.len());
+    let mut se = Vec::with_capacity(post.len());
+    for (index, row) in exog
+        .iter()
+        .enumerate()
+        .skip(n_pre)
+        .take(post.end.saturating_sub(n_pre))
+    {
+        if post.contains(&index) {
+            counterfactual.push(filt.final_state + regression_mean(row, beta));
+            se.push((p + h).sqrt());
+        }
         p += q;
     }
-    let pointwise: Vec<f64> = y[n_pre..]
+    let pointwise: Vec<f64> = y[post]
         .iter()
         .zip(&counterfactual)
         .map(|(a, c)| a - c)
@@ -194,6 +223,12 @@ pub fn causal_impact(y: &[f64], exog: &[Vec<f64>], n_pre: usize, max_iter: usize
     let cumulative: f64 = pointwise.iter().sum();
     let average = cumulative / pointwise.len() as f64;
     Impact {
+        pre_steps: (LOGLIKELIHOOD_BURN..n_pre).collect(),
+        pre_counterfactual: filt.predicted[LOGLIKELIHOOD_BURN..].to_vec(),
+        pre_counterfactual_se: filt.predicted_variance[LOGLIKELIHOOD_BURN..]
+            .iter()
+            .map(|variance| variance.sqrt())
+            .collect(),
         counterfactual,
         counterfactual_se: se,
         pointwise,

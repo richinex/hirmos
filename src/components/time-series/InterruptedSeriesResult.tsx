@@ -130,6 +130,7 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
       </div>}
       <p className="m-0 text-label text-muted">Bars outside the dashed bands suggest residual correlation. The bands apply to each lag separately. Review the pattern alongside the Ljung–Box test.</p>
     </div>}
+    <WindowEvidence context={run.windowContext} seasonal={period === null ? undefined : {rows:e.observations,period,before:e.interventionRow}} />
     <EvidenceTable<TermRow>
       frame="none"
       title="Fitted terms"
@@ -183,3 +184,4 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
     <p className="m-0 text-label text-faint"><Metadata><span>{e.observations} observations</span><span>{e.interventionRow} before the event</span><span>{formatTime(run.createdAt)}</span></Metadata></p>
   </section>
 }
+import { WindowEvidence } from './WindowEvidence'

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { sharpRdConfigurationSchema, parseSharpRdEvidence, sharpRdRecordMatches } from './sharpRd'
 import { EMPTY_ROOT_CAUSE, rootCauseWorkspaceSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
 import type { CounterfactualRunArtifact } from './counterfactual'
 import type { DagDocument } from './dag'
@@ -10,7 +11,7 @@ import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import { brand, err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
-import { tLearnerEvidenceSchema } from './estimation'
+import { tLearnerEvidenceSchema, parseCausalImpactEvidence, bayesianImpactSettingsSchema, impactInferenceMatches } from './estimation'
 import { matchesTLearnerUncertainty, tLearnerUncertaintySchema } from './tLearner'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
@@ -236,6 +237,8 @@ export const taggedJsonReviver = revive
 /** Add preparation fields introduced while the version-1 envelope remained stable. */
 const upgradePreparedTransformRecord = (value: ParsedEnvelope['prepared']): Result<ParsedEnvelope['prepared'], SnapshotProblem> => {
   if (value === null || Reflect.get(value, 'kind') !== 'prepared-time-series') return ok(value)
+  const coverage = Reflect.get(value, 'calendarCoverage')
+  if (coverage !== undefined && !calendarEdgeSchema.safeParse(coverage).success) return err({kind:'invalid-snapshot',detail:'The saved calendar coverage is invalid.'})
   const columns = Reflect.get(value, 'columns')
   if (!Array.isArray(columns) || !columns.every((column) => typeof column === 'string')) {
     return err({ kind: 'invalid-snapshot', detail: 'prepared time series: columns are missing' })
@@ -313,6 +316,17 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
       configuration: { uncertainty: { kind: 'none' }, ...configuration },
       evidence: { uncertainty: { kind: 'none' }, ...evidence } }
   }
+  // An impact run saved before the evaluated window was a choice covered every row after the
+  // intervention, so its window runs through the last row and its window ends at the last row.
+  if (Reflect.get(value, 'kind') === 'causal-impact-run'
+    && typeof configuration === 'object' && configuration !== null
+    && typeof evidence === 'object' && evidence !== null) {
+    const observations = Reflect.get(evidence, 'observations')
+    return { ...value, estimate: upgradedEstimate,
+      configuration: { window: { kind: 'through-last-row' }, ...configuration },
+      evidence: { preInterventionPath: { kind: 'notReported' },
+        ...(typeof observations === 'number' ? { postEnd: observations } : {}), ...evidence } }
+  }
   if (Reflect.get(value, 'kind') === 'synthetic-control-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null) {
@@ -335,7 +349,8 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
   }
   if (Reflect.get(value, 'kind') === 'panel-intervention-run'
     && typeof configuration === 'object' && configuration !== null
-    && typeof evidence === 'object' && evidence !== null) {
+    && typeof evidence === 'object' && evidence !== null
+    && Reflect.get(evidence, 'kind') !== 'panelDid' && Reflect.get(evidence, 'kind') !== 'panelAdjusted') {
     return {
       ...value,
       estimate: upgradedEstimate,
@@ -488,6 +503,47 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
   for (const run of estimationRuns) {
+    if (run.kind === 'panel-intervention-run' && ((typeof run.evidence === 'object' && run.evidence !== null && Reflect.get(run.evidence, 'kind') === 'panelAdjusted')
+      || (typeof run.configuration === 'object' && run.configuration !== null && Reflect.get(run.configuration, 'primary') === 'adjusted'))) {
+      const study = parsed.data.studies.find(candidate => candidate.id === run.study)
+      const identification = parsed.data.identifications.find(candidate => candidate.id === run.identification)
+      if (!adjustedDidRecordMatches(run, study) || identification?.study !== run.study || prepared.value === null || Reflect.get(prepared.value, 'id') !== run.preparedDataset) {
+        return err({ kind: 'invalid-snapshot', detail: 'The saved adjusted DiD result does not match its specification, ATT study or prepared panel.' })
+      }
+    }
+    if (run.kind === 'sharp-rd-run') {
+      const configuration = sharpRdConfigurationSchema.safeParse(run.configuration)
+      const evidence = parseSharpRdEvidence(run.evidence)
+      const study = parsed.data.studies.find(candidate => candidate.id === run.study)
+      const identification = parsed.data.identifications.find(candidate => candidate.id === run.identification)
+      if (!configuration.success || !evidence.ok || !sharpRdRecordMatches(run, study, identification, evidence.value)) {
+        return err({ kind: 'invalid-snapshot', detail: 'The saved sharp RD result does not match its cutoff-local study and robust inference.' })
+      }
+    }
+    if (run.kind === 'causal-impact-run') {
+      const start = z.discriminatedUnion('kind', [
+        z.object({ kind:z.literal('from-treatment') }).strict(),
+        z.object({ kind:z.literal('row'), row:z.number().int().min(9) }).strict(),
+      ])
+      const window = z.discriminatedUnion('kind', [
+        z.object({ kind:z.literal('through-last-row') }).strict(),
+        z.object({ kind:z.literal('to-row'), row:z.number().int().positive() }).strict(),
+      ])
+      const common = { kind:z.literal('causal-impact'), start, window, controls:z.array(z.string().min(1)) }
+      const configuration = z.union([
+        z.object({ ...common, maxIter:z.number().int().min(1).max(2000) }).strict(),
+        z.object({ ...common, inference:bayesianImpactSettingsSchema }).strict(),
+      ]).safeParse(run.configuration)
+      const evidence = parseCausalImpactEvidence(run.evidence)
+      if (!configuration.success || !evidence.ok
+          || !impactInferenceMatches({ inference:'inference' in configuration.data ? configuration.data.inference : undefined }, evidence.value)
+          || configuration.data.controls.length !== evidence.value.controls.length
+          || new Set(configuration.data.controls).size !== configuration.data.controls.length
+          || (configuration.data.start.kind === 'row' && configuration.data.start.row - 1 !== evidence.value.nPre)
+          || (configuration.data.window.kind === 'to-row' && configuration.data.window.row !== evidence.value.postEnd)) {
+        return err({ kind:'invalid-snapshot', detail:'The saved causal-impact result does not match its inference settings.' })
+      }
+    }
     if (run.kind !== 't-learner-run') continue
     const evidence = tLearnerEvidenceSchema.safeParse(run.evidence)
     const settings = z.object({ kind: z.literal('t-learner'), seed: z.number().int().min(0).max(0xffffffff), uncertainty: tLearnerUncertaintySchema }).strict().safeParse(run.configuration)
@@ -527,3 +583,5 @@ export function describeSnapshotProblem(problem: SnapshotProblem): string {
     default: { const exhaustive: never = problem; return exhaustive }
   }
 }
+import { adjustedDidRecordMatches } from './adjustedDid'
+import { calendarEdgeSchema } from './windowEvidence'

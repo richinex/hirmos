@@ -205,6 +205,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
   const treatment = plainName(study.treatment.name)
   const outcome = plainName(study.outcome.name)
   switch (run.kind) {
+    case 'sharp-rd-run': return `Local difference in ${outcome} at the assignment cutoff, not an average across the prepared population.`
     case 'backdoor-linear-run':
     case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
       ? `Difference in ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group.`
@@ -237,6 +238,7 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
   const treatment = plainName(study.treatment.name)
   const outcome = plainName(study.outcome.name)
   switch (study.estimand.kind) {
+    case 'local-cutoff-effect': return `Local effect on ${outcome} at ${plainName(study.estimand.running.name)} = ${number(study.estimand.cutoff)}`
     case 'average-treatment-effect': return `Effect of changing ${treatment} on ${outcome}`
     case 'average-treatment-effect-on-treated': return `Effect of changing ${treatment} on ${outcome} among treated rows`
     case 'conditional-average-treatment-effect': return `Effect of changing ${treatment} on ${outcome} within groups of ${plainName(study.estimand.modifier.name)}`
@@ -260,6 +262,11 @@ export function resultSampleLine(run: EstimationRunArtifact): string {
 export function interpretEstimationResult(run: EstimationRunArtifact, study: StudySpecification, stepLabel: string): ResultInterpretation {
   const { estimate } = run
   switch (run.kind) {
+    case 'sharp-rd-run': return { kind: 'result-interpretation', statements: [
+      { kind: 'magnitude', text: `At the assignment cutoff, the estimated treatment effect on ${plainName(study.outcome.name)} is ${number(run.evidence.robust.value)}. The headline uses bias correction and its robust standard error.` },
+      additiveIntervalForOutcome(estimate.interval, study.outcome.name),
+      { kind: 'qualification', text: 'This is a local effect at the cutoff. A causal interpretation requires continuous potential-outcome means there, no precise manipulation of assignment, no other intervention at the same cutoff, and independent observations. The fitted jump alone does not establish those conditions.' },
+    ] }
     case 'frontdoor-two-stage-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const mediator = plainName(run.columns[run.evidence.mediator]?.name ?? 'the mediator')
@@ -401,11 +408,16 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       ] }
     }
     case 'panel-intervention-run': {
-      const primary = run.evidence.syntheticDid.estimate
+      if (run.evidence.kind === 'panelAdjusted') return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `For the treated group, the estimated average effect on ${plainName(study.outcome.name)} is ${directionalDifference(run.evidence.estimate)} after adoption.` },
+        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
+        { kind: 'qualification', text: run.evidence.specification.kind === 'regression' ? 'Interpretation requires parallel untreated trends, no anticipation or spillovers, and an appropriate regression specification. The Student-t interval assumes independent, homoskedastic errors; it is not clustered by unit.' : 'Interpretation requires conditional parallel trends, no anticipation or spillovers, treatment overlap and an adequate nuisance model. Cross-fitting does not establish these causal conditions. Covariates are measured before treatment.' },
+      ] }
+      const primary = run.evidence.kind === 'panelDid' ? run.evidence.did.estimate : run.evidence.syntheticDid.estimate
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `After adoption, ${plainName(study.outcome.name)} for the units that adopted averaged ${gap(primary)} the value estimated for them without adoption per ${stepLabel}.` },
         noInterval('No confidence interval is shown for this result.'),
-        { kind: 'qualification', text: 'This can be interpreted as an adoption effect only if the comparison units show what would have happened to the treated units without adoption, no effect began early, and treatment of one unit did not affect another. Agreement among the three estimates does not establish those conditions.' },
+        { kind: 'qualification', text: 'This can be interpreted as an adoption effect only if the comparison units show what would have happened to the treated units without adoption, no effect began early, and treatment of one unit did not affect another. The estimates do not establish those conditions.' },
       ] }
     }
     case 'negbin-nuts-run': {
@@ -478,7 +490,9 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         : ''
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `After the intervention, observed ${plainName(study.outcome.name)} averaged ${gap(average)} its estimated no-intervention outcome per ${stepLabel}. Across ${run.evidence.nPost} ${stepLabel}s, the differences sum to ${number(cumulative)}.${baseline}` },
-        noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No interval for the aggregate effect is available.'),
+        run.evidence.kind !== 'causalImpact'
+          ? { kind: 'qualification', text: `The 95% equal-tailed posterior interval for the average difference is ${number(run.evidence.averageSummary.absolute.lower)} to ${number(run.evidence.averageSummary.absolute.upper)}. For the cumulative difference it is ${number(run.evidence.cumulativeSummary.absolute.lower)} to ${number(run.evidence.cumulativeSummary.absolute.upper)}. These ranges are conditional on the model and priors; they do not account for an incorrect causal design.` }
+          : noInterval(estimate.interval.kind === 'none' ? estimate.interval.reason : 'No interval for the aggregate effect is available.'),
         { kind: 'qualification', text: 'This can be interpreted as an intervention effect only if the selected control series show what would have happened to the outcome without intervention, their relationship with the outcome remains stable, the controls are not themselves affected, and no other outcome-specific change begins with the intervention.' },
       ] }
     }

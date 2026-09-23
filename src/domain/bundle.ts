@@ -41,6 +41,7 @@ export const bundleFileName = (bundle: ProjectBundle): string => `hirmos-${safeN
 export type BundleProblem =
   | { readonly kind: 'not-json'; readonly detail: string }
   | { readonly kind: 'not-a-bundle'; readonly detail: string }
+  | { readonly kind: 'snapshot-not-bundle' }
   | { readonly kind: 'unsupported-bundle-version'; readonly version: number }
   | { readonly kind: 'project-invalid'; readonly problem: SnapshotProblem }
 
@@ -60,7 +61,11 @@ export function parseBundle(raw: string): Result<ProjectBundle, BundleProblem> {
   let value: unknown
   try { value = JSON.parse(raw, taggedJsonReviver) } catch (cause) { return err({ kind: 'not-json', detail: cause instanceof Error ? cause.message : String(cause) }) }
   const parsed = bundleSchema.safeParse(value)
-  if (!parsed.success) return err({ kind: 'not-a-bundle', detail: z.prettifyError(parsed.error) })
+  if (!parsed.success) {
+    // A saved project is the app's own record, not the file Export writes.
+    const snapshot = typeof value === 'object' && value !== null && Reflect.get(value, 'kind') === 'hirmos-project'
+    return err(snapshot ? { kind: 'snapshot-not-bundle' } : { kind: 'not-a-bundle', detail: z.prettifyError(parsed.error) })
+  }
   if (parsed.data.version !== 1) return err({ kind: 'unsupported-bundle-version', version: parsed.data.version })
   const project = parseSnapshotValue(parsed.data.project)
   if (!project.ok) return err({ kind: 'project-invalid', problem: project.error })
@@ -71,6 +76,7 @@ export function describeBundleProblem(problem: BundleProblem): string {
   switch (problem.kind) {
     case 'not-json': return `The file is not JSON: ${problem.detail}`
     case 'not-a-bundle': return `The file is not a Hirmos project bundle: ${problem.detail}`
+    case 'snapshot-not-bundle': return 'This looks like a saved project snapshot and not an export bundle'
     case 'unsupported-bundle-version': return `The bundle was written by a newer version (${problem.version}).`
     case 'project-invalid': return `The bundle's project record could not be read: ${problem.problem.kind}`
     default: { const exhaustive: never = problem; return exhaustive }

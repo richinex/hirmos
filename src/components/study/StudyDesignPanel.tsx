@@ -69,6 +69,7 @@ import {
 
 const ledgerLabel = (result: IdentificationArtifact['result']): string => {
   switch (result.kind) {
+    case 'cutoff-design': return 'cutoff design recorded'
     case 'identified': return 'back-door identified'
     case 'graphically-identified': return 'ID expression derived'
     case 'counterfactually-identified': return 'IDC* expressions derived'
@@ -79,10 +80,11 @@ const ledgerLabel = (result: IdentificationArtifact['result']): string => {
 }
 
 const ASSIGNMENT_KINDS: readonly AssignmentMechanism['kind'][] = ['randomised', 'policy-change', 'observed-choice']
-const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'conditional-average-treatment-effect', 'conditional-average-treatment-effect-per-row']
+const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'local-cutoff-effect', 'conditional-average-treatment-effect', 'conditional-average-treatment-effect-per-row']
 
 const estimandLabel = (kind: Estimand['kind']): string => {
   switch (kind) {
+    case 'local-cutoff-effect': return 'At an assignment cutoff (sharp RD)'
     case 'average-treatment-effect': return 'All prepared rows (ATE)'
     case 'average-treatment-effect-on-treated': return 'Treated rows (ATT)'
     case 'conditional-average-treatment-effect': return 'Within groups of a variable (CATE)'
@@ -93,6 +95,7 @@ const estimandLabel = (kind: Estimand['kind']): string => {
 
 const estimandHint = (kind: Estimand['kind']): string => {
   switch (kind) {
+    case 'local-cutoff-effect': return 'Estimate the effect at a cutoff where treatment switches from 0 to 1. This local contrast is not a population-wide ATE.'
     case 'average-treatment-effect': return 'Average the treatment contrast over the prepared population.'
     case 'average-treatment-effect-on-treated': return 'Average the treatment contrast among rows with treatment = 1. Current ETT estimators require a binary treatment; eligibility also depends on the identifying strategy.'
     case 'conditional-average-treatment-effect': return 'Average the treatment contrast within each group of an effect modifier, a variable the treatment does not reach. The double machine learning estimators report the group effects.'
@@ -148,6 +151,7 @@ function IdentificationOutcome({ study, identification, onOpenDag }: {
 }) {
   const result = identification.result
   switch (result.kind) {
+    case 'cutoff-design': return <Alert tone="info" live={false} className="mt-3"><p className="m-0">Sharp RD design recorded</p><p className="mb-0 mt-1">The local effect relies on continuity at the cutoff and no precise manipulation of the running variable. The graph alone cannot verify these assumptions.</p><Formula tex={identifiedExpressionTex(study, [])} plain={identifiedExpression(study, [])} /></Alert>
     case 'identified': {
       const selectedLabel = result.adjustment.kind === 'canonical' ? 'Canonical adjustment set' : `Minimal adjustment set ${result.adjustment.ordinal + 1}`
       return (
@@ -368,7 +372,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       id: newIdentificationId(),
       study: study.id,
       createdAt: new Date().toISOString(),
-      method: result.value.kind === 'graphically-identified'
+      method: result.value.kind === 'cutoff-design' ? RD_DESIGN_METHOD_ID : result.value.kind === 'graphically-identified'
         ? GRAPHICAL_IDENTIFICATION_METHOD_ID
         : result.value.kind === 'counterfactually-identified'
           ? COUNTERFACTUAL_IDENTIFICATION_METHOD_ID
@@ -399,7 +403,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       // The choice is put to the person whenever the graph leaves one: several minimal sets, or a
       // canonical set that adds outcome predictors to the only minimal set. A study is recorded
       // with its identification once, so the set is chosen before, never switched after.
-      if (outcome.value.result.kind === 'identified' && offersAdjustmentChoice(outcome.value.result)) {
+      if (ready.value.estimand.kind !== 'local-cutoff-effect' && outcome.value.result.kind === 'identified' && offersAdjustmentChoice(outcome.value.result)) {
         offerAdjustment({ study: ready.value, evidence: outcome.value })
         session.finish(id)
         return
@@ -482,6 +486,12 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                 onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
                 options={ESTIMAND_KINDS.map((kind) => ({ value: kind, label: estimandLabel(kind), hint: estimandHint(kind) }))}
               />
+              {state.draft.estimand === 'local-cutoff-effect' && <div className="grid gap-3 @lg/panel:grid-cols-2">
+                <label className="block"><span className={fieldLabel}>Running variable</span><Select aria-label="Running variable" className={field('text', 'mt-1')} value={state.draft.cutoff?.variable ?? ''} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: event.target.value === '' ? null : event.target.value as DagNodeId, value: draft.cutoff?.value ?? '0' } })}>
+                  <option value="">Choose a variable</option>{modifierCandidates.map(({ node, allowed }) => <option key={node.id} value={node.id} disabled={!allowed}>{node.name}</option>)}
+                </Select></label>
+                <label className="block"><span className={fieldLabel}>Assignment cutoff</span><input aria-label="Assignment cutoff" type="number" step="any" className={field('text', 'mt-1')} value={state.draft.cutoff?.value ?? '0'} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: draft.cutoff?.variable ?? null, value: event.target.value } })} /></label>
+              </div>}
               {state.draft.estimand === 'conditional-average-treatment-effect' && (
                 <div className="grid gap-3 @lg/panel:grid-cols-2">
                   <label className="block">
@@ -687,3 +697,4 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
     />
   )
 }
+import { RD_DESIGN_METHOD_ID } from '@/domain/methods'

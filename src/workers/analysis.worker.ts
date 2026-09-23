@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { sameStructuralModel } from '@/domain/structuralImpact'
 import { ardlModelResponseSchema } from '@/domain/ardlModel'
 import { rootCauseResponseSchema } from '@/domain/rootCauseAnalysis'
 import { rootCauseChecksResponseSchema } from '@/domain/rootCauseAnalysis'
@@ -359,8 +360,13 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'interruptedSeries', rows: command.rows, columns: command.columns, outcome: command.outcome, model: command.model, interventionRow: command.interventionRow, lag: command.lag, impact: command.impact, seasonal: command.seasonal, ljungBoxLags: command.ljungBoxLags }
     case 'causal-effects-total':
       return { kind: 'causalEffectsTotal', rows: command.rows, columns: command.columns, statLag: command.statLag, graph: command.graph, x: command.x, y: command.y, hidden: command.hidden, estimator: command.estimator, interventions: command.interventions, uncertainty: command.uncertainty }
+    case 'sharp-rd': return { kind: 'sharpRd', rows: command.rows, cutoff: command.cutoff }
     case 'causal-impact':
-      return { kind: 'causalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, maxIter: command.maxIter }
+      return { kind: 'causalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, postEnd: command.postEnd, maxIter: command.maxIter }
+    case 'structural-causal-impact':
+      return { kind:'structuralCausalImpact', rows:command.rows, columns:command.columns, outcome:command.outcome, controls:command.controls, nPre:command.nPre, postEnd:command.postEnd, draws:command.draws, warmup:command.warmup, seed:command.seed, model:command.model }
+    case 'bayesian-causal-impact':
+      return { kind: 'bayesianCausalImpact', rows: command.rows, columns: command.columns, outcome: command.outcome, controls: command.controls, nPre: command.nPre, postEnd: command.postEnd, draws: command.draws, warmup: command.warmup, seed: command.seed, priorLevelSd: command.priorLevelSd }
     case 'linear-refutation':
       return { kind: 'linearRefutation', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, simulations: command.simulations, subsetFraction: command.subsetFraction, seed: command.seed, ljungBoxLags: command.ljungBoxLags }
     case 'unobserved-confounding':
@@ -390,7 +396,9 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'synthetic-control':
       return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
     case 'panel-intervention':
-      return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed }
+      return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
+    case 'panel-adjusted':
+      return { kind: 'panelAdjusted', rows: command.rows, columns: command.columns, units: command.units, times: command.times, specification: command.specification }
     case 'negbin-nuts':
       return { kind: 'negbinNuts', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, confounder: command.confounder, warmup: command.warmup, samples: command.samples, seed: command.seed }
     case 'bayesian-gaussian':
@@ -750,9 +758,29 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'causal-effects-succeeded', request: command.request, result: result.value })
         return
       }
+      case 'sharp-rd': {
+        const result = parseSharpRdEvidence(decoded)
+        if (!result.ok) throw new Error(result.error.detail)
+        if (result.value.cutoff !== command.cutoff || result.value.points.length !== command.rows) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: 'The RD result does not match the requested cutoff or sample.' }); return
+        }
+        emit({ kind: 'sharp-rd-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'structural-causal-impact':
+      case 'bayesian-causal-impact':
       case 'causal-impact': {
         const result = parseCausalImpactEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        const e = result.value
+        const settingsMatch = command.kind === 'structural-causal-impact'
+          ? e.kind === 'structuralCausalImpact' && e.draws === command.draws && e.warmup === command.warmup && e.seed === command.seed && sameStructuralModel(e.model,command.model)
+          : command.kind === 'bayesian-causal-impact'
+          ? e.kind === 'bayesianCausalImpact' && e.draws === command.draws && e.warmup === command.warmup && e.seed === command.seed && e.priorLevelSd === command.priorLevelSd
+          : e.kind === 'causalImpact'
+        if (!settingsMatch || e.observations !== command.rows || e.nPre !== command.nPre || e.postEnd !== command.postEnd || e.outcome !== command.outcome || e.controls.length !== command.controls.length || e.controls.some((value,index) => value !== command.controls[index])) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: 'The impact result does not match its requested model, columns or intervention window.' }); return
+        }
         emit({ kind: 'causal-impact-succeeded', request: command.request, result: result.value })
         return
       }
@@ -834,9 +862,15 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'synthetic-control-succeeded', request: command.request, result: result.data })
         return
       }
+      case 'panel-adjusted':
       case 'panel-intervention': {
         const result = panelInterventionEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        const evidence = result.data
+        const matches = command.kind === 'panel-adjusted'
+          ? evidence.kind === 'panelAdjusted' && sameDidSpecification(command.specification,evidence.specification) && evidence.covariates === command.columns-2
+          : command.primary === 'did' ? evidence.kind === 'panelDid' : evidence.kind === 'panelIntervention'
+        if (!matches || evidence.observations !== command.rows) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The panel result does not match the requested estimator and data dimensions.' }); return }
         emit({ kind: 'panel-intervention-succeeded', request: command.request, result: result.data })
         return
       }
@@ -908,3 +942,5 @@ self.onmessage = (message: MessageEvent<unknown>) => {
 }
 import { gcmEffectsResponseSchema } from '@/domain/gcmEffects'
 import { gcmInfluenceResponseSchema } from '@/domain/gcmInfluence'
+import { parseSharpRdEvidence } from '@/domain/sharpRd'
+import { sameDidSpecification } from '@/domain/adjustedDid'

@@ -455,6 +455,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         resolvedMatrix = resolved.value.matrix
       }
       let resampling: ResamplingRecord = { kind: 'none' }
+      const sourceTime = resolvedMatrix?.timeAxis ?? ('timeAxis' in matrix.value ? matrix.value.timeAxis : null)
+      const lastSourceTimestamp = sourceTime?.kind === 'calendar' ? sourceTime.timestamps.at(-1) ?? null : null
+      let coverageCap: number | null = null
 
       if (recipe.value.kind === 'regular-series') {
         if (recipe.value.resampling.kind === 'daily-downsample') {
@@ -476,6 +479,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           if (!grouped.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(grouped.error) }); return }
           observations = grouped.value.rowCount
           resampling = grouped.value.record
+          const lastBin = grouped.value.timestamps.at(-1)
+          if (lastBin !== undefined) coverageCap = rowCoverageEnd(lastBin, recipe.value.resampling.targetFrequency === 'weekly' ? 'week' : 'month')
         }
         const leadingRows = transformWarmup(recipe.value.seriesTransforms)
         if (observations <= leadingRows) {
@@ -489,7 +494,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       if (!artifact.ok) { dispatch({ type: 'preparation-failed', detail: 'The unit and time columns were not saved. Select both panel keys and create the prepared dataset version again.' }); return }
       preparation.finish(id)
       saveRecipe(profile.id, JSON.stringify(recipe.value))
-      onPrepared(artifact.value)
+      const sampling = recipe.value.sampling
+      const calendarCoverage = sampling.kind === 'regular-series'
+        ? calendarEdgeFor(source.recipe, profile.columns.find(c => c.id === sampling.timeColumn)?.name ?? '', lastSourceTimestamp,
+          sampling.frequency === 'daily' ? 'day' : sampling.frequency === 'weekly' ? 'week' : sampling.frequency === 'monthly' ? 'month' : null, coverageCap, sampling.interpretation)
+        : { kind: 'unavailable' as const, reason: 'non-calendar' as const }
+      onPrepared({ ...artifact.value, calendarCoverage })
     } catch (cause: unknown) {
       dispatch({
         type: 'preparation-failed',
@@ -1166,3 +1176,4 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
     </section>
   )
 }
+import { calendarEdgeFor, rowCoverageEnd } from '@/domain/windowEvidence'

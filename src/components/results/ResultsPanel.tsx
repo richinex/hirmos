@@ -54,6 +54,7 @@ const appliedAdjustment = (adjustment: AppliedAdjustment): React.ReactNode => {
 
 const identificationMethod = (identification: IdentificationArtifact): string => {
   switch (identification.result.kind) {
+    case 'cutoff-design': return 'sharp RD continuity assumptions'
     case 'identified': return 'back-door adjustment'
     case 'graphically-identified': return 'general ID expression'
     case 'counterfactually-identified': return 'IDC* counterfactual expressions'

@@ -112,6 +112,7 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
       const exposureColumn = used[1]
       const saved = parseTimeSeriesRun({
         kind: 'interrupted-series', id: newTimeSeriesRunId(), preparedDataset: props.prepared.id, createdAt: new Date().toISOString(),
+        windowContext: windowContext(props.prepared),
         outcome: { id: outcome.id, name: outcome.name },
         specification: {
           model: requested.kind === 'continuous' ? requested : { kind: 'count', exposure: exposureColumn === undefined ? null : { id: exposureColumn.id, name: exposureColumn.name } },
@@ -199,3 +200,4 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
       {runs.slice(-1).map((saved) => <TimeSeriesRunResult key={saved.id} run={saved} />)}
     </section>} />
 }
+import { windowContext } from '@/domain/windowEvidence'

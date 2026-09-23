@@ -15,6 +15,9 @@ export function TimeSeriesRequirements({ method, prepared, source }: {
         <ul className="m-0 mt-2 list-none space-y-3 p-0">{method.caveats.map((caveat) => <li key={caveat.id} className="text-body"><p className="m-0 text-ink">{caveat.requirement}</p><p className="m-0 text-faint">{caveat.consequenceIfUnmet}</p></li>)}</ul>
       </RequirementsFold>
     </section>
+    <WindowEvidence context={windowContext(prepared)} />
     <section><h3 className="m-0 text-body font-medium text-ink">Prepared data</h3><dl className="m-0 mt-2 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-body"><dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}>{prepared.observations}</dd><dt className="text-faint">Columns</dt><dd className={num('m-0 text-ink')}>{prepared.columns.length}</dd><dt className="text-faint">Source</dt><dd className="m-0 break-words text-ink">{source}</dd></dl></section>
   </div>
 }
+import { windowContext } from '@/domain/windowEvidence'
+import { WindowEvidence } from './WindowEvidence'

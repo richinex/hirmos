@@ -1,0 +1,118 @@
+import { expect,test } from '@playwright/test'
+import { addArrow,chapter,choose,createDag,identify,fixture,prepare } from './examples/support'
+import { readFile } from 'node:fs/promises'
+
+test('composed impact worker validates paths, model identity and pre-only fitting',async ({page})=>{
+  test.setTimeout(180_000)
+  await page.goto('/app')
+  const checked = await page.evaluate(async()=>{
+    const analysis = await import(new URL('/src/analysis/client.ts',location.href).href)
+    const domain = await import(new URL('/src/domain/estimation.ts',location.href).href)
+    const y = Array.from({length:54},(_,i)=>20+.08*i+Math.sin(.4*i)+2*Number(i%12<2)+Math.cos(.7*i))
+    const x = y.map((_,i)=>Number(i%12<2))
+    const values = new Float64Array([...y,...x])
+    const model = {version:'gaussian-components-v1',trend:'semilocal',seasonality:{kind:'harmonic',period:12,pairs:2}}
+    const design = {outcome:0,controls:[1],nPre:48,postEnd:54,draws:80,warmup:40,seed:1234,model}
+    const run = await analysis.runStructuralCausalImpact(values.slice(),54,2,design)
+    if (!run.ok) throw new Error(JSON.stringify(run))
+    const changed = values.slice()
+    for (let i=48;i<54;i++) changed[i]+=100
+    const other = await analysis.runStructuralCausalImpact(changed,54,2,design)
+    if (!other.ok) throw new Error(JSON.stringify(other))
+    const again = await analysis.runStructuralCausalImpact(values.slice(),54,2,design)
+    const configuration = {inference:{kind:'structural',draws:80,warmup:40,seed:1234,model}}
+    const wrong = {inference:{...configuration.inference,model:{...model,trend:'linear'}}}
+    const malformed = {...run.value,contributions:run.value.contributions.slice(1)}
+    const brokenSum = structuredClone(run.value)
+    brokenSum.contributions[0].mean[0]+=10
+    const noVariation = values.slice()
+    noVariation.fill(0,54,54+48)
+    const rejected = await analysis.runStructuralCausalImpact(noVariation,54,2,design)
+    const {controlInclusion,...oldEvidence}=run.value
+    const legacy=domain.parseCausalImpactEvidence(oldEvidence)
+    const badInclusion=[[],[{column:0,probability:0.5}],[{column:1,probability:1.1}],[{column:1,probability:0.5},{column:1,probability:0.5}]].map(controlInclusion=>domain.parseCausalImpactEvidence({...run.value,controlInclusion}).ok)
+    return {run,again,other,legacy,badInclusion,valid:domain.impactInferenceMatches(configuration,run.value),wrong:domain.impactInferenceMatches(wrong,run.value),malformed:domain.parseCausalImpactEvidence(malformed).ok,brokenSum:domain.parseCausalImpactEvidence(brokenSum).ok,rejected}
+  })
+  expect(checked.run).toEqual(checked.again)
+  expect(checked.other.value.counterfactual).toEqual(checked.run.value.counterfactual)
+  expect(checked.other.value.average-checked.run.value.average).toBeCloseTo(100,9)
+  expect(checked.valid).toBe(true)
+  expect(checked.wrong).toBe(false)
+  expect(checked.malformed).toBe(false)
+  expect(checked.brokenSum).toBe(false)
+  expect(checked.rejected.ok).toBe(false)
+  expect(checked.run.value.controlInclusion).toEqual([{column:1,probability:1}])
+  expect(checked.legacy.ok).toBe(true)
+  expect(checked.legacy.value.controlInclusion).toBeUndefined()
+  expect(checked.badInclusion).toEqual([false,false,false,false])
+})
+
+test('composed impact through controls, component plot, cancellation and restoration',async ({page},info)=>{
+  test.setTimeout(300_000)
+  page.setDefaultTimeout(20_000)
+  await page.goto('/app')
+  await page.getByRole('textbox',{name:'Project name'}).fill('Structural impact walkthrough')
+  await page.getByRole('button',{name:'Create project',exact:true}).click()
+  await page.locator('input[type=file]').setInputFiles(fixture('chapter-impact.csv'))
+  await page.getByRole('button',{name:'Inspect data',exact:true}).click()
+  await expect(page.getByText('Choose the observation structure',{exact:true})).toBeVisible({timeout:60_000})
+  await prepare(page,{structure:'time series',time:'time',columns:['D','Y','X_1','X_2']})
+  await createDag(page,'Structural impact graph')
+  for (const cause of ['D','X_1','X_2']) await addArrow(page,cause,'Y','Declared relationship for the source-example comparison.')
+  await identify(page,{graph:'Structural impact graph',treatment:'D',outcome:'Y',mechanism:'Policy change',sentence:'Compare the outcome with the no-intervention prediction using unaffected controls.'})
+  await chapter(page,/Estimation/)
+  await page.getByRole('radio',{name:/^Interventions/}).click()
+  await page.getByRole('radio',{name:/^Causal impact/}).click()
+  await page.getByRole('radio',{name:'Bayesian',exact:true}).click()
+  await page.getByRole('radio',{name:'BSTS components',exact:true}).click()
+  await expect(page.getByRole('radio',{name:'Local level',exact:true})).toBeChecked()
+  await page.getByRole('radio',{name:'Semilocal',exact:true}).click()
+  await page.getByRole('radio',{name:'Harmonics',exact:true}).click()
+  await page.getByRole('spinbutton',{name:'Structural period',exact:true}).fill('12')
+  await page.getByRole('spinbutton',{name:'Structural harmonic pairs',exact:true}).fill('1')
+  await page.getByRole('spinbutton',{name:'Posterior draws',exact:true}).fill('100')
+  await page.getByRole('spinbutton',{name:'Warmup iterations',exact:true}).fill('50')
+  for (const c of ['X_1','X_2']) await page.getByRole('checkbox',{name:c,exact:true}).check()
+  await page.getByRole('button',{name:/^Run causal impact/i}).click()
+  await expect(page.getByTestId('structural-impact-components').first()).toBeVisible({timeout:90_000})
+  await choose(page,'Model contribution','Seasonality')
+  await page.getByTestId('structural-impact-components').first().scrollIntoViewIfNeeded()
+  await page.screenshot({path:info.outputPath('structural-seasonality.png')})
+  expect(await page.locator('body').evaluate(e=>e.scrollWidth<=innerWidth+1)).toBe(true)
+  await choose(page,'Model contribution','X_1')
+  await page.screenshot({path:info.outputPath('structural-predictor.png')})
+  const open = page.getByRole('button',{name:'Expand chapter list',exact:true})
+  if (await open.isVisible()) await open.click()
+  const download = page.waitForEvent('download')
+  await page.getByRole('button',{name:'Export project',exact:true}).click()
+  const path = await (await download).path()
+  if (!path) throw new Error('No export')
+  const snapshot = JSON.parse(await readFile(path,'utf8')).project
+  expect(snapshot.estimationRuns).toHaveLength(1)
+  const run = snapshot.estimationRuns[0]
+  expect(run.evidence.kind).toBe('structuralCausalImpact')
+  expect(run.evidence.controlInclusion).toHaveLength(2)
+  expect(run.evidence.model.trend).toBe('semilocal')
+  expect(run.configuration.inference.model).toEqual(run.evidence.model)
+  const validation = await page.evaluate(async s=>{
+    const p = await import(new URL('/src/domain/persistence.ts',location.href).href)
+    const good=p.parseSnapshotValue(s)
+    const bad=structuredClone(s)
+    bad.estimationRuns[0].configuration.inference.model.trend='linear'
+    return {good:good.ok,bad:p.parseSnapshotValue(bad).ok}
+  },snapshot)
+  expect(validation).toEqual({good:true,bad:false})
+  await chapter(page,/Estimation/)
+  await page.getByRole('spinbutton',{name:'Posterior draws',exact:true}).fill('100000')
+  await page.getByRole('button',{name:/^Run causal impact/i}).click()
+  await expect(page.getByRole('button',{name:'Cancel run',exact:true})).toBeVisible()
+  await chapter(page,/Study design/)
+  await chapter(page,/Estimation/)
+  await page.getByRole('button',{name:'Cancel run',exact:true}).click()
+  await expect(page.getByRole('button',{name:'Cancel run',exact:true})).toHaveCount(0)
+  await page.reload()
+  await page.getByRole('button',{name:/^Open Structural impact walkthrough/}).click()
+  await page.locator('input[type=file]').setInputFiles(fixture('chapter-impact.csv'))
+  await chapter(page,/Estimation/)
+  await expect(page.getByTestId('structural-impact-components').first()).toBeVisible()
+})

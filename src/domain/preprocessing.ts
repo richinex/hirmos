@@ -140,6 +140,7 @@ export interface VariableStationarityEvidence {
 }
 
 interface PreparedDatasetIdentity {
+  readonly calendarCoverage?: import('./windowEvidence').CalendarEdge
   readonly id: PreparedDatasetVersionId
   readonly recipe: TransformRecipeId
   readonly sourceProfile: DatasetProfile['id']

@@ -563,6 +563,8 @@ test('validates, materializes, and estimates a balanced long panel through both 
   }).strict().safeParse(raw)
   expect(parsed.success, parsed.success ? '' : z.prettifyError(parsed.error)).toBe(true)
   if (!parsed.success) return
+  expect(parsed.data.estimated.value.kind).toBe('panelIntervention')
+  if (parsed.data.estimated.value.kind !== 'panelIntervention') return
   expect(Math.abs(parsed.data.estimated.value.syntheticDid.estimate - 4)).toBeLessThan(0.1)
   expect(Math.abs(parsed.data.estimated.value.syntheticControl.estimate - 4)).toBeLessThan(0.1)
   expect(parsed.data.estimated.value.syntheticControlPlacebo.kind).toBe('available')

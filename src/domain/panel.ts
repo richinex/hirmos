@@ -18,6 +18,7 @@ export interface PanelStructureEvidence {
 
 /** Long-form panel values in source-row order. Values are outcome then treatment, column-major. */
 export interface PanelLongMatrix {
+  readonly covariates?: readonly ColumnId[]
   readonly kind: 'panel-long-matrix'
   readonly sourceFingerprint: SourceFingerprint
   readonly rowCount: number
@@ -139,7 +140,7 @@ export interface PanelInterventionLayout {
   readonly prePeriods: number
   readonly postPeriods: number
   readonly adoption: PanelPeriod
-  readonly controlPreDifferenceSd: number
+  readonly controlPreDifferenceSd: number | null
 }
 
 export type PanelInterventionLayoutProblem =
@@ -304,11 +305,9 @@ export function assessPanelInterventionLayout(matrix: PanelLongMatrix): Result<P
       differences.push(current - previous)
     }
   }
-  if (differences.length < 2) return err({ kind: 'degenerate-control-pre-period' })
-  const mean = differences.reduce((sum, value) => sum + value, 0) / differences.length
-  const variance = differences.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (differences.length - 1)
-  const controlPreDifferenceSd = Math.sqrt(variance)
-  if (!Number.isFinite(controlPreDifferenceSd) || controlPreDifferenceSd === 0) return err({ kind: 'degenerate-control-pre-period' })
+  const mean = differences.length === 0 ? 0 : differences.reduce((sum, value) => sum + value, 0) / differences.length
+  const variance = differences.length < 2 ? 0 : differences.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (differences.length - 1)
+  const controlPreDifferenceSd = variance > 0 && Number.isFinite(variance) ? Math.sqrt(variance) : null
 
   const adoption = periods[firstTreated]
   if (adoption === undefined) return err({ kind: 'no-post-period' })
@@ -339,6 +338,7 @@ const structureSchema = z.object({
 }).strict()
 
 const longMatrixSchema = z.object({
+  covariates: z.array(z.string()).default([]),
   kind: z.literal('panel-long-matrix'),
   sourceFingerprint: z.string(),
   rowCount: z.number().int().positive(),
@@ -348,7 +348,7 @@ const longMatrixSchema = z.object({
   values: z.instanceof(Float64Array),
 }).strict()
 
-const keyMatrixSchema = longMatrixSchema.omit({ values: true }).extend({ kind: z.literal('panel-key-matrix') }).strict()
+const keyMatrixSchema = longMatrixSchema.omit({ values: true, covariates: true }).extend({ kind: z.literal('panel-key-matrix') }).strict()
 
 /** Rows are 0-based source indices; messages print them 1-based, as the preview table and the Rust façade do. */
 export const panelDataProblemSchema = z.discriminatedUnion('kind', [
@@ -405,7 +405,7 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
   if (parsed.data.sourceFingerprint !== profile.source.fingerprint || parsed.data.rowCount !== profile.rowCount) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long panel belongs to another source or row count.' })
   }
-  if (parsed.data.units.length !== parsed.data.rowCount || parsed.data.periodCodes.length !== parsed.data.rowCount || parsed.data.values.length !== parsed.data.rowCount * 2) {
+  if (parsed.data.units.length !== parsed.data.rowCount || parsed.data.periodCodes.length !== parsed.data.rowCount || parsed.data.values.length !== parsed.data.rowCount * (2 + parsed.data.covariates.length)) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel buffers do not match the row count.' })
   }
   if (parsed.data.values.some((value) => !Number.isFinite(value))) {
@@ -413,6 +413,12 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
   }
   if (!isNonEmpty(parsed.data.units) || !isNonEmpty(parsed.data.periodCodes) || !isNonEmpty(parsed.data.periods)) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long-panel buffers must contain at least one row.' })
+  }
+  const covariates: ColumnId[] = []
+  for (const raw of parsed.data.covariates) {
+    const column = bindColumn(profile, raw)
+    if (column === null || covariates.includes(column)) return err({ kind: 'invalid-panel-boundary', detail: 'Panel covariates must be distinct columns in this source.' })
+    covariates.push(column)
   }
   const units = parsed.data.units
   const periodCodes = parsed.data.periodCodes
@@ -433,6 +439,7 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
     periodCodes,
     periods,
     values: parsed.data.values,
+    covariates,
   })
 }
 

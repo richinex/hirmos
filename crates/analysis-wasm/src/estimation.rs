@@ -1,6 +1,121 @@
 //! Estimator façades: regression, count models, CausalEffects, causal impact, DML, ARDL, VECM, synthetic control, panel DID / SC / SDID, NUTS, discrete BN.
 
+pub(crate) fn panel_intervention_selected(
+    primary: PanelPrimary,
+    values: &[f64], rows: usize, units: &[String], times: &[i64],
+    placebo_replications: usize, seed: u64,
+    progress: impl Fn(&'static str, usize, usize),
+) -> Result<AnalysisResult, String> {
+    match primary {
+        PanelPrimary::SyntheticDid => panel_intervention(values, rows, units, times, placebo_replications, seed, progress),
+        PanelPrimary::Did => {
+            validate_dense_matrix("panel DiD", values, rows, 2)?;
+            if units.len() != rows || times.len() != rows { return Err("Panel DiD needs one unit and time key per row".to_owned()); }
+            let observations = (0..rows).map(|row| hirmos_causal_core::panel::PanelObservation {
+                unit: units[row].clone(), time: times[row], outcome: values[row], treatment: values[rows + row],
+            }).collect::<Vec<_>>();
+            let panel = hirmos_causal_core::panel::panel_matrices(&observations).map_err(panel_problem)?;
+            progress("validated-panel", 1, 2);
+            let did = hirmos_causal_core::panel::did_estimate(&panel.y, panel.n0, panel.t0).map_err(panel_problem)?;
+            progress("difference-in-differences", 2, 2);
+            Ok(AnalysisResult::PanelDid { observations: rows, treated_units: panel.y.nrows()-panel.n0, control_units: panel.n0,
+                n_pre: panel.t0, n_post: panel.y.ncols()-panel.t0, units: panel.units, times: panel.times, did: panel_method_evidence(did) })
+        }
+    }
+}
+
 use super::*;
+
+pub(crate) fn panel_adjusted(values: &[f64], rows: usize, columns: usize, units: &[String], times: &[i64], specification: AdjustedDidSpecification) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::{did, did_regression, panel, lbfgsb::LbfgsbTermination};
+    validate_dense_matrix("adjusted DiD", values, rows, columns)?;
+    if columns < 2 || units.len() != rows || times.len() != rows { return Err("DiD needs aligned outcomes, treatment and unit/time keys.".into()); }
+    let observations = (0..rows).map(|i| panel::PanelObservation { unit: units[i].clone(), time: times[i], outcome: values[i], treatment: values[rows+i] }).collect::<Vec<_>>();
+    let panel = panel::panel_matrices(&observations).map_err(panel_problem)?;
+    if panel.times.len() != 2 || panel.t0 != 1 { return Err("This DiD specification requires exactly one period before and one after adoption.".into()); }
+    // Lookup by keys: source query order is not the canonical control/treated order.
+    let index: std::collections::BTreeMap<_,_> = (0..rows).map(|i| ((units[i].as_str(), times[i]), i)).collect();
+    let mut ordered = Vec::with_capacity(rows);
+    for unit in &panel.units { for time in &panel.times {
+        ordered.push(*index.get(&(unit.as_str(), *time)).ok_or("A panel unit/time key is missing.")?);
+    }}
+    let covariates = DMatrix::from_fn(rows, columns-2, |i,j| values[(j+2)*rows+ordered[i]]);
+    let summary = did_regression::summarize(&panel).map_err(|_| "Observed panel group means could not be computed.")?;
+    let group_means = [[summary.control.before,summary.control.after],[summary.treated.before,summary.treated.after]];
+    let (estimate, standard_error, interval, inference) = match &specification {
+        AdjustedDidSpecification::Regression => {
+            let fit = did_regression::fit(&panel, &covariates).map_err(|error| match error {
+                did_regression::Error::RankDeficient => "The DiD design is rank deficient. Remove constant or redundant covariates.",
+                did_regression::Error::NoResidualDegreesOfFreedom => "There are too few observations for this DiD specification.",
+                did_regression::Error::NonFinite => "DiD requires finite outcomes and covariates.",
+                did_regression::Error::Decomposition => "The DiD regression decomposition failed.",
+                did_regression::Error::InvalidLayout | did_regression::Error::CovariateShape => "DiD needs two matched periods and aligned covariates.",
+            })?;
+            (fit.coefficients[3],fit.standard_errors[3],fit.intervals[3],AdjustedDidInference::IndependentErrors { degrees_of_freedom: fit.residual_degrees_of_freedom, coefficients: fit.coefficients, standard_errors: fit.standard_errors, intervals: fit.intervals })
+        }
+        AdjustedDidSpecification::DoublyRobust { folds, seed, trimming, normalization } => {
+            let baseline = DMatrix::from_fn(panel.units.len(),columns-2,|i,j| covariates[(2*i,j)]);
+            let sample = did::PairedSample::from_panel(&panel,&baseline).map_err(|_| "DR DiD needs finite paired outcomes and at least one baseline covariate.")?;
+            let normalization = match normalization { DidNormalization::InSample => did::Normalization::InSample, DidNormalization::Population => did::Normalization::Population };
+            let plan = did::prepare(&sample,*folds,*seed,*trimming,normalization).map_err(|violations| violations.into_iter().map(|v| match v {
+                did::Violation::TooFewFolds { .. } => "Use at least two folds.".to_owned(),
+                did::Violation::TooManyFolds { smaller_group, .. } => format!("The fold count exceeds the smaller group ({smaller_group} units)."),
+                did::Violation::InvalidTrimming { .. } => "Trimming must be greater than zero and less than one half.".to_owned(),
+            }).collect::<Vec<_>>().join(" "))?;
+            let fit = did::fit(&plan).map_err(|error| match error {
+                did::Error::Regression => "A cross-fitted outcome or propensity regression failed. Check covariate rank and fold sizes.",
+                did::Error::PropensityBoundary => "Estimated propensity reached a probability boundary. Check treatment overlap.",
+                did::Error::MissingGroup | did::Error::NonBinary => "DR DiD needs both treated and comparison units with binary assignment.",
+                did::Error::NonFinite => "DR DiD produced non-finite values. Check covariate scale and overlap.",
+                did::Error::Shape | did::Error::RequiresTwoPeriods => "DR DiD requires aligned baseline covariates and two paired periods.",
+            })?;
+            let optimizer_status = fit.propensity_termination.into_iter().map(|status| match status {
+                LbfgsbTermination::ProjectedGradient => PropensityStatus::ProjectedGradient,
+                LbfgsbTermination::FunctionTolerance => PropensityStatus::FunctionTolerance,
+                LbfgsbTermination::IterationLimit => PropensityStatus::IterationLimit,
+                LbfgsbTermination::LineSearchFailed => PropensityStatus::LineSearchFailed,
+            }).collect();
+            (fit.estimate.coef,fit.estimate.se,[fit.estimate.ci_low,fit.estimate.ci_high],AdjustedDidInference::CrossFitted { propensity: fit.propensity, optimizer_status })
+        }
+    };
+    Ok(AnalysisResult::PanelAdjusted { observations: rows, control_units: panel.n0, treated_units: panel.units.len()-panel.n0, n_pre:1,n_post:1,covariates:columns-2,
+        units:panel.units,times:panel.times,specification,estimate,standard_error,interval,group_means,inference })
+}
+
+/// The transport has exactly three columns: running variable, outcome, treatment.
+/// Sharp assignment is checked against the recorded cutoff, not inferred from Y.
+pub(crate) fn sharp_rd(values: &[f64], rows: usize, cutoff: f64) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::rd;
+    validate_dense_matrix("Sharp RD", values, rows, 3)?;
+    if !cutoff.is_finite() { return Err("Enter a finite cutoff.".to_owned()); }
+    let x = &values[..rows];
+    let y = &values[rows..2 * rows];
+    let treatment = &values[2 * rows..];
+    if let Some(row) = (0..rows).find(|&i| treatment[i] != f64::from(x[i] >= cutoff)) {
+        return Err(format!("Sharp RD requires treatment = 1 at or above the cutoff and 0 below it. Row {} does not follow that rule. Fuzzy assignment is not supported by this fit.", row + 1));
+    }
+    let explain = |error| match error {
+        rd::Error::Shape => "The running variable and outcome must have the same non-zero number of rows.",
+        rd::Error::NonFinite => "RD needs finite running-variable and outcome values.",
+        rd::Error::MissingSide => "RD needs observations on both sides of the cutoff.",
+        rd::Error::InsufficientSupport => "There are too few distinct running-variable values near the cutoff for this local-linear fit and its bias correction.",
+        rd::Error::Singular => "The local RD design is singular. Inspect the running-variable support near the cutoff.",
+        rd::Error::InvalidBandwidth => "The automatic bandwidth could not be estimated from these observations.",
+    }.to_owned();
+    let data = rd::SharpData::new(x, y, cutoff).map_err(explain)?;
+    let fit = rd::fit(&data).map_err(explain)?;
+    let estimate = |value: rd::Estimate| RdEstimateEvidence { value: value.value, standard_error: value.standard_error, interval: value.interval };
+    Ok(AnalysisResult::SharpRd {
+        cutoff, target: "local-at-cutoff".to_owned(), assignment: "at-or-above".to_owned(),
+        kernel: "triangular".to_owned(), bandwidth_selection: "mserd".to_owned(),
+        polynomial_order: 1, bias_order: 2, nearest_neighbors: 3,
+        bandwidth: fit.bandwidth.estimation, bias_bandwidth: fit.bandwidth.bias,
+        conventional: estimate(fit.conventional), bias_corrected: estimate(fit.bias_corrected), robust: estimate(fit.robust),
+        observations: fit.observations, effective_observations: fit.effective_observations,
+        left_coefficients: fit.left_coefficients, right_coefficients: fit.right_coefficients,
+        points: x.iter().zip(y).map(|(&x, &y)| [x, y]).collect(),
+    })
+}
 use hirmos_causal_core::causal_effects::numpy_percentile;
 use hirmos_causal_core::frontdoor::{
     frontdoor_two_stage_with_progress, FrontdoorInput, FrontdoorOptions,
@@ -1419,6 +1534,143 @@ fn causal_effects_wright_error(error: WrightEffectError) -> String {
     }
 }
 
+pub(crate) fn structural_causal_impact_evidence(
+    values: &[f64], rows: usize, columns: usize, outcome: usize,
+    controls: &[usize], n_pre: usize, post_end: usize, draws: usize, warmup: usize,
+    seed: u32, model: StructuralModel,
+) -> Result<AnalysisResult, String> {
+    use hirmos_structural_timeseries::impact::{self, Seasonality, Trend};
+    use hirmos_causal_core::bayesian_impact::summary;
+    validate_dense_matrix("structural causal impact", values, rows, columns)?;
+    let unique: std::collections::BTreeSet<_> = controls.iter().copied().collect();
+    if outcome >= columns || unique.len() != controls.len() || controls.iter().any(|&c| c >= columns || c == outcome) {
+        return Err("Choose distinct outcome and predictor columns.".to_owned());
+    }
+    if n_pre < 8 || n_pre >= post_end || post_end > rows {
+        return Err("Choose at least eight training rows and an evaluation window after them.".to_owned());
+    }
+    let data = DMatrix::from_column_slice(rows, columns, values);
+    for column in std::iter::once(&outcome).chain(controls) {
+        let first = data[(0,*column)];
+        if (0..n_pre).all(|t| data[(t,*column)] == first) {
+            return Err(format!("Column {} has no variation before the intervention. Its association cannot be learned from that window.",column+1));
+        }
+    }
+    let y: Vec<_> = (0..post_end).map(|t|data[(t,outcome)]).collect();
+    let x = DMatrix::from_fn(post_end,controls.len(),|t,j|data[(t,controls[j])]);
+    let trend = match model.trend { StructuralTrend::Level => Trend::Level, StructuralTrend::Linear => Trend::Linear, StructuralTrend::Semilocal => Trend::Semilocal };
+    let seasonality = match model.seasonality {
+        StructuralSeasonality::None => Ok(Seasonality::None),
+        StructuralSeasonality::Seasonal { seasons, duration } => Seasonality::seasonal(seasons,duration),
+        StructuralSeasonality::Harmonic { period, pairs } => Seasonality::harmonic(period,pairs),
+    }.map_err(|_| "Review the seasonal period, duration and harmonic pairs.".to_owned())?;
+    let plan = impact::Plan::new(&y[..n_pre],x,trend,seasonality,draws,warmup,seed)
+        .map_err(|_| "The training data or sampling settings cannot define this structural model.".to_owned())?;
+    let fit = impact::fit(&plan, |_| std::ops::ControlFlow::Continue(()))
+        .map_err(|_| "The structural model could not complete sampling. No partial result was saved. Review the predictors, seasonal specification and training window.".to_owned())?;
+    let predictions = summary::Predictions::new(&y,&fit.means,&fit.paths,n_pre..post_end,0.05)
+        .map_err(|_| "The posterior paths could not be summarised.".to_owned())?;
+    let aggregate = summary::summarize(&predictions)
+        .map_err(|_| "The posterior effect summary is undefined, including its relative effect.".to_owned())?;
+    let post = summary::post_path(&predictions).map_err(|_| "The posterior effect path is undefined.".to_owned())?;
+    let before = summary::Predictions::new(&y,&fit.means,&fit.paths,0..n_pre,0.05)
+        .and_then(|p| summary::post_path(&p)).map_err(|_| "The training path could not be summarised.".to_owned())?;
+    let quantity = |q: &summary::Quantity| PosteriorQuantity { mean:q.mean, lower:q.interval.lower, upper:q.interval.upper, sd:q.sd };
+    let report = |s: &summary::Summary| ImpactSummary { actual:s.actual,predicted:quantity(&s.predicted),absolute:quantity(&s.absolute),relative:quantity(&s.relative),tail_probability:s.tail_probability };
+    let contributions = fit.contributions.iter().map(|c| StructuralContribution {
+        component: match c.component { impact::Component::Trend => StructuralComponent::Trend, impact::Component::Seasonal => StructuralComponent::Seasonal, impact::Component::Predictor(j) => StructuralComponent::Predictor { column: controls[j] } },
+        mean: c.paths.iter().map(|p|p.iter().sum::<f64>()/p.len() as f64).collect(),
+        lower: c.paths.iter().map(|p|hirmos_causal_core::negbin_nuts::quantile(p,0.025)).collect(),
+        upper: c.paths.iter().map(|p|hirmos_causal_core::negbin_nuts::quantile(p,0.975)).collect(),
+    }).collect();
+    Ok(AnalysisResult::StructuralCausalImpact { model, contributions, posterior: ImpactPosterior {
+        control_inclusion: controls.iter().zip(&fit.inclusion_probabilities).map(|(&column,&probability)| ControlInclusion { column,probability }).collect(),
+        observations: rows, n_pre, n_post:post_end-n_pre, post_end, outcome, controls:controls.to_vec(), draws, warmup, seed, level:0.95,
+        pre_intervention_path: PreInterventionPath::Sampled { steps:(0..n_pre).collect(),observed:y[..n_pre].to_vec(),counterfactual:before.iter().map(|p|p.predicted.mean).collect(),lower:before.iter().map(|p|p.predicted.interval.lower).collect(),upper:before.iter().map(|p|p.predicted.interval.upper).collect() },
+        counterfactual:post.iter().map(|p|p.predicted.mean).collect(),counterfactual_se:post.iter().map(|p|p.predicted.sd).collect(),
+        counterfactual_lower:post.iter().map(|p|p.predicted.interval.lower).collect(),counterfactual_upper:post.iter().map(|p|p.predicted.interval.upper).collect(),
+        pointwise:post.iter().map(|p|p.effect.mean).collect(),pointwise_lower:post.iter().map(|p|p.effect.interval.lower).collect(),pointwise_upper:post.iter().map(|p|p.effect.interval.upper).collect(),
+        cumulative_lower:post.iter().map(|p|p.cumulative.interval.lower).collect(),cumulative_upper:post.iter().map(|p|p.cumulative.interval.upper).collect(),
+        cumulative:aggregate.cumulative.absolute.mean,average:aggregate.average.absolute.mean,
+        average_summary:report(&aggregate.average),cumulative_summary:report(&aggregate.cumulative),
+    } })
+}
+
+pub(crate) fn bayesian_causal_impact_evidence(
+    values: &[f64], rows: usize, columns: usize, outcome: usize,
+    controls: &[usize], n_pre: usize, post_end: usize, draws: usize, warmup: usize,
+    seed: u32, prior_level_sd: f64,
+) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::bayesian_impact::{self, summary};
+    validate_dense_matrix("Bayesian causal impact", values, rows, columns)?;
+    let unique: std::collections::BTreeSet<_> = controls.iter().copied().collect();
+    if outcome >= columns || unique.len() != controls.len()
+        || controls.iter().any(|&column| column >= columns || column == outcome) {
+        return Err("Choose distinct outcome and control columns.".to_owned());
+    }
+    if n_pre < 8 || n_pre >= rows {
+        return Err("Bayesian causal impact needs at least eight pre-intervention rows and one post-intervention row.".to_owned());
+    }
+    if post_end <= n_pre || post_end > rows {
+        return Err("The evaluated window must end after the intervention row and within the observations.".to_owned());
+    }
+    let data = DMatrix::from_column_slice(rows, columns, values);
+    let y: Vec<_> = (0..rows).map(|t| data[(t,outcome)]).collect();
+    let x = DMatrix::from_fn(rows, controls.len(), |t,j| data[(t,controls[j])]);
+    let plan = bayesian_impact::Plan::new(&y, &x, n_pre, n_pre..post_end, draws, warmup, seed, prior_level_sd)
+        .map_err(bayesian_impact_problem)?;
+    let fit = bayesian_impact::fit(&plan)
+        .map_err(bayesian_impact_problem)?;
+    // The sampler already produced a predictive path for every row; read the fitted window off
+    // it with the same summariser the evaluated window uses.
+    let before = summary::Predictions::new(&y, &fit.means, &fit.paths, 0..n_pre, 0.05)
+        .and_then(|predictions| summary::post_path(&predictions))
+        .map_err(|_| "The pre-intervention path could not be summarised.".to_owned())?;
+    let pre_intervention_path = PreInterventionPath::Sampled {
+        steps: (0..n_pre).collect(),
+        observed: y[..n_pre].to_vec(),
+        counterfactual: before.iter().map(|point| point.predicted.mean).collect(),
+        lower: before.iter().map(|point| point.predicted.interval.lower).collect(),
+        upper: before.iter().map(|point| point.predicted.interval.upper).collect(),
+    };
+    let quantity = |q: &summary::Quantity| PosteriorQuantity { mean:q.mean, lower:q.interval.lower, upper:q.interval.upper, sd:q.sd };
+    let aggregate = |s: &summary::Summary| ImpactSummary {
+        actual:s.actual, predicted:quantity(&s.predicted), absolute:quantity(&s.absolute),
+        relative:quantity(&s.relative), tail_probability:s.tail_probability,
+    };
+    Ok(AnalysisResult::BayesianCausalImpact {
+        control_inclusion: controls.iter().zip(&fit.inclusion_probabilities).map(|(&column,&probability)| ControlInclusion { column,probability }).collect(),
+        observations:rows, n_pre, n_post:post_end-n_pre, post_end, outcome, controls:controls.to_vec(),
+        draws, warmup, seed, prior_level_sd, level:0.95, pre_intervention_path,
+        counterfactual:fit.post_path.iter().map(|p|p.predicted.mean).collect(),
+        counterfactual_se:fit.post_path.iter().map(|p|p.predicted.sd).collect(),
+        counterfactual_lower:fit.post_path.iter().map(|p|p.predicted.interval.lower).collect(),
+        counterfactual_upper:fit.post_path.iter().map(|p|p.predicted.interval.upper).collect(),
+        pointwise:fit.post_path.iter().map(|p|p.effect.mean).collect(),
+        pointwise_lower:fit.post_path.iter().map(|p|p.effect.interval.lower).collect(),
+        pointwise_upper:fit.post_path.iter().map(|p|p.effect.interval.upper).collect(),
+        cumulative_lower:fit.post_path.iter().map(|p|p.cumulative.interval.lower).collect(),
+        cumulative_upper:fit.post_path.iter().map(|p|p.cumulative.interval.upper).collect(),
+        cumulative:fit.summaries.cumulative.absolute.mean, average:fit.summaries.average.absolute.mean,
+        average_summary:aggregate(&fit.summaries.average),
+        cumulative_summary:aggregate(&fit.summaries.cumulative),
+    })
+}
+
+fn bayesian_impact_problem(error: hirmos_causal_core::bayesian_impact::Error) -> String {
+    use hirmos_causal_core::bayesian_impact::Error;
+    match error {
+        Error::Shape => "Outcome and control columns must have matching row counts.",
+        Error::NonFinite => "The outcome and controls must contain finite values; resolve missing or infinite values before fitting.",
+        Error::Window => "Choose a pre-intervention fitting window followed by a nonempty post-intervention window.",
+        Error::ConstantOutcome => "The outcome has no usable variation before the intervention.",
+        Error::ConstantControl => "A control has no usable variation before the intervention. Remove constant controls.",
+        Error::Settings => "Choose at least two posterior draws, nonnegative warmup and a finite positive level-prior standard deviation.",
+        Error::Singular => "The control regression is singular. Check for duplicate or linearly dependent control columns.",
+        Error::Numerical => "Posterior sampling could not produce finite, valid quantities. Inspect the outcome scale and control dependence; no result was saved.",
+    }.to_owned()
+}
+
 pub(crate) fn causal_impact_evidence(
     values: &[f64],
     rows: usize,
@@ -1426,6 +1678,7 @@ pub(crate) fn causal_impact_evidence(
     outcome: usize,
     controls: &[usize],
     n_pre: usize,
+    post_end: usize,
     max_iter: usize,
 ) -> Result<AnalysisResult, String> {
     validate_dense_matrix("causal impact", values, rows, columns)?;
@@ -1441,6 +1694,9 @@ pub(crate) fn causal_impact_evidence(
     if n_pre < 8 || n_pre >= rows {
         return Err("causal impact needs at least 8 pre-intervention rows and at least one post-intervention row".to_owned());
     }
+    if post_end <= n_pre || post_end > rows {
+        return Err("The evaluated window must end after the intervention row and within the observations.".to_owned());
+    }
     if !(1..=2000).contains(&max_iter) {
         return Err("causal impact maxIter must be between 1 and 2000".to_owned());
     }
@@ -1449,12 +1705,19 @@ pub(crate) fn causal_impact_evidence(
     let exog: Vec<Vec<f64>> = (0..rows)
         .map(|row| controls.iter().map(|&column| data[(row, column)]).collect())
         .collect();
-    let impact = causal_impact(&y, &exog, n_pre, max_iter);
+    let impact = causal_impact(&y, &exog, n_pre, n_pre..post_end, max_iter);
     Ok(AnalysisResult::CausalImpact {
         observations: rows,
         n_pre,
-        n_post: rows - n_pre,
+        n_post: post_end - n_pre,
+        post_end,
         outcome,
+        pre_intervention_path: PreInterventionPath::Fitted {
+            observed: impact.pre_steps.iter().map(|&row| y[row]).collect(),
+            steps: impact.pre_steps,
+            counterfactual: impact.pre_counterfactual,
+            se: impact.pre_counterfactual_se,
+        },
         controls: controls.to_vec(),
         counterfactual: impact.counterfactual,
         counterfactual_se: impact.counterfactual_se,
@@ -3671,16 +3934,30 @@ mod tests {
         let mut values = Vec::new();
         values.extend(&y);
         values.extend(&control);
-        let json = causal_impact_evidence(&values, rows, 2, 0, &[1], n_pre, 100)
+        let json = causal_impact_evidence(&values, rows, 2, 0, &[1], n_pre, rows, 100)
             .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
             .expect("impact should serialize");
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
         assert_eq!(value["kind"], "causalImpact");
         assert_eq!(value["nPost"], rows - n_pre);
+        assert_eq!(value["postEnd"], rows);
         assert_eq!(value["pointwise"].as_array().unwrap().len(), rows - n_pre);
         let average = value["average"].as_f64().unwrap();
         assert!((average - 3.0).abs() < 0.5, "average effect {average}");
-        assert!(causal_impact_evidence(&values, rows, 2, 0, &[1], 4, 100).is_err());
+        assert!(causal_impact_evidence(&values, rows, 2, 0, &[1], 4, rows, 100).is_err());
+
+        // The evaluated window narrows what is reported; the forecast behind it does not move.
+        let narrowed = serde_json::to_value(
+            causal_impact_evidence(&values, rows, 2, 0, &[1], n_pre, n_pre + 1, 100).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(narrowed["nPost"], 1);
+        assert_eq!(narrowed["postEnd"], n_pre + 1);
+        assert_eq!(narrowed["pointwise"].as_array().unwrap().len(), 1);
+        assert_eq!(narrowed["pointwise"][0], value["pointwise"][0]);
+        assert_eq!(narrowed["counterfactual"][0], value["counterfactual"][0]);
+        assert!(causal_impact_evidence(&values, rows, 2, 0, &[1], n_pre, n_pre, 100).is_err());
+        assert!(causal_impact_evidence(&values, rows, 2, 0, &[1], n_pre, rows + 1, 100).is_err());
     }
 
     /// Two cointegrated random walks: x is a walk and y follows 2x plus stationary noise.

@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { choose, chapter } from './examples/support'
 
 const CITIES = 'id,city,population\n1,Lyon,513000\n2,Nantes,318000\n3,Lille,232000\n4,Nice,342000\n'
 const REGIONS = 'id,region\n1,Auvergne-Rhône-Alpes\n2,Pays de la Loire\n3,Hauts-de-France\n4,Provence-Alpes-Côte d\'Azur\n'
@@ -207,6 +208,38 @@ test.describe('pipeline canvas', () => {
     await page.getByRole('button', { name: 'Remove block' }).click()
     await expect(page.locator('.react-flow__node')).toHaveCount(3)
     await expect(page.locator('.react-flow__edge')).toHaveCount(0)
+  })
+
+  test('retains calendar window evidence through pipeline preparation', async ({page}, info) => {
+    test.setTimeout(120000)
+    await openEditor(page)
+    const csv='date,y\n'+Array.from({length:60},(_,i)=>`${new Date(Date.UTC(2022,10,21+7*i)).toISOString().slice(0,10)},${i<8||i>=58?'':10+i*.2+Math.sin(i*.7)}`).join('\n')
+    await giveFile(page,'input-1',{name:'calendar-window.csv',mimeType:'text/csv',buffer:Buffer.from(csv)})
+    await expect(block(page,'input-1')).toContainText('60 rows, 2 columns')
+    const calendar=await addBlock(page,'Calendar events','calendar-events')
+    await wire(page,'input-1',calendar)
+    await block(page,calendar).click()
+    await pick(page,'Date column','date')
+    await expect(block(page,calendar)).toContainText('60 rows, 3 columns')
+    await wire(page,calendar,'output')
+    await expect(block(page,'output')).toContainText('60 rows, 3 columns')
+    await useAsSource(page).click()
+    await page.getByRole('button',{name:'Inspect data',exact:true}).click()
+    await page.getByRole('radio',{name:/Regular time series/}).click()
+    await choose(page,'Time column','date')
+    await choose(page,'Source frequency','Weekly')
+    await page.getByRole('checkbox',{name:'y',exact:true}).check()
+    await page.getByRole('radio',{name:'Complete contiguous interval',exact:true}).click()
+    await page.getByRole('button',{name:/Create prepared dataset/}).click()
+    await expect(page.getByRole('heading',{name:'Build a DAG or run discovery',exact:true})).toBeVisible()
+    await chapter(page,/Time-series analysis/)
+    await page.getByRole('radio',{name:'Interrupted series',exact:true}).click()
+    const evidence=page.getByRole('region',{name:'Analysis window'})
+    await expect(evidence).toContainText('kept 50 of 60 source rows')
+    await expect(evidence).toContainText('Coverage ends on 31 December 2023')
+    await expect(evidence).toContainText('This is before the end of')
+    await evidence.scrollIntoViewIfNeeded()
+    await page.screenshot({path:info.outputPath('calendar-window.png')})
   })
 
   test('marks the year-end shutdown from a calendar-events block and picks a custom window on the calendar', async ({ page }) => {

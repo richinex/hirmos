@@ -6,6 +6,7 @@ use crate::lbfgsb::lbfgsb;
 pub struct Logistic {
     pub coef: Vec<f64>,
     pub intercept: f64,
+    pub termination: crate::lbfgsb::LbfgsbTermination,
 }
 
 /// closs_grad_half_binomial: loss and gradient per sample with log1pexp's branch cutoffs.
@@ -29,9 +30,18 @@ fn closs_grad(y: f64, raw: f64) -> (f64, f64) {
 }
 
 pub fn fit_logistic(x: &[Vec<f64>], y: &[f64]) -> Logistic {
+    fit_with_penalty(x, y, true)
+}
+
+/// The chapter's sklearn LogisticRegression(penalty=None), retaining optimizer status.
+pub fn fit_unpenalized(x: &[Vec<f64>], y: &[f64]) -> Logistic {
+    fit_with_penalty(x, y, false)
+}
+
+fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool) -> Logistic {
     let n = x.len();
     let p = x[0].len();
-    let l2 = 1.0 / n as f64;
+    let l2 = if penalized { 1.0 / n as f64 } else { 0.0 };
     let n_dof = p + 1;
     let res = lbfgsb(
         &vec![0.0; n_dof],
@@ -73,10 +83,26 @@ pub fn fit_logistic(x: &[Vec<f64>], y: &[f64]) -> Logistic {
     Logistic {
         coef: res.x[..p].to_vec(),
         intercept: res.x[p],
+        termination: res.termination,
     }
 }
 
 impl Logistic {
+    pub fn predict_probability(&self, x: &[Vec<f64>]) -> Vec<f64> {
+        x.iter()
+            .map(|row| {
+                let raw =
+                    self.intercept + row.iter().zip(&self.coef).map(|(v, c)| v * c).sum::<f64>();
+                if raw >= 0.0 {
+                    1.0 / (1.0 + (-raw).exp())
+                } else {
+                    let e = raw.exp();
+                    e / (1.0 + e)
+                }
+            })
+            .collect()
+    }
+
     /// predict: class 1 where the decision function is positive.
     pub fn predict(&self, x: &[Vec<f64>]) -> Vec<f64> {
         x.iter()

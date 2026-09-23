@@ -809,14 +809,20 @@ pub fn run_analysis(
             uncertainty,
             progress,
         ),
+        AnalysisCommand::SharpRd { rows, cutoff } => estimation::sharp_rd(&values, rows, cutoff),
         AnalysisCommand::CausalImpact {
             rows,
             columns,
             outcome,
             controls,
             n_pre,
+            post_end,
             max_iter,
-        } => causal_impact_evidence(values, rows, columns, outcome, &controls, n_pre, max_iter),
+        } => causal_impact_evidence(values, rows, columns, outcome, &controls, n_pre, post_end, max_iter),
+        AnalysisCommand::StructuralCausalImpact { rows, columns, outcome, controls, n_pre, post_end, draws, warmup, seed, model } =>
+            structural_causal_impact_evidence(values, rows, columns, outcome, &controls, n_pre, post_end, draws, warmup, seed, model),
+        AnalysisCommand::BayesianCausalImpact { rows, columns, outcome, controls, n_pre, post_end, draws, warmup, seed, prior_level_sd } =>
+            bayesian_causal_impact_evidence(values, rows, columns, outcome, &controls, n_pre, post_end, draws, warmup, seed, prior_level_sd),
         AnalysisCommand::LinearRefutation {
             rows,
             columns,
@@ -987,13 +993,16 @@ pub fn run_analysis(
             cross_fit_folds,
             alpha,
         ),
+        AnalysisCommand::PanelAdjusted { rows, columns, units, times, specification } => panel_adjusted(values, rows, columns, &units, &times, specification),
         AnalysisCommand::PanelIntervention {
+            primary,
             rows,
             units,
             times,
             placebo_replications,
             seed,
-        } => panel_intervention(
+        } => panel_intervention_selected(
+            primary,
             values,
             rows,
             &units,
