@@ -1845,6 +1845,7 @@ mod tests {
             | AnalysisCommand::BackdoorLinear { .. }
             | AnalysisCommand::FrontdoorTwoStage { .. }
             | AnalysisCommand::InstrumentalVariable { .. }
+            | AnalysisCommand::CountRegression { .. }
             | AnalysisCommand::CountGlm { .. }
             | AnalysisCommand::NegativeBinomialIngarch { .. }
             | AnalysisCommand::CountSeriesInterventionScan { .. }

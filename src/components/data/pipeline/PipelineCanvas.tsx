@@ -13,6 +13,7 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  useUpdateNodeInternals,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -51,6 +52,9 @@ const PORT_STYLE: React.CSSProperties = { width: 10, height: 10, background: 'va
 
 function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
   const { node, ports, outcome } = data
+  const updateNodeInternals = useUpdateNodeInternals()
+  // Adding an input moves the existing handles without resizing the card.
+  useEffect(() => { updateNodeInternals(node.id) }, [node.id, ports, updateNodeInternals])
   const running = usePythonRun(node.id)
   const failed = outcome?.kind === 'failed'
   const skipped = outcome?.kind === 'skipped'

@@ -1,3 +1,4 @@
+import {CountRegressionResult} from './CountRegressionResult'
 import { Metadata } from '@/components/ui/Metadata'
 import { boundsReading } from '@/domain/estimation'
 import { assertNever } from '@/domain/dop'
@@ -16,6 +17,7 @@ import { resultSurface, resultTitle, table, td, th } from '@/components/ui/recip
 const number = (value: number) => formatStatistic('raw', value).text
 
 export function TimeSeriesRunResult({ run }: { readonly run: TimeSeriesRun }) {
+  if (run.kind === 'count-regression') return <CountRegressionResult run={run}/>
   if (run.kind === 'ardl-model') return <ArdlModelResult run={run} />
   if (run.kind === 'interrupted-series') return <InterruptedSeriesResult run={run} />
   const content = (() => {

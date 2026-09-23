@@ -7,6 +7,7 @@ import { JobsProvider } from '@/analysis/JobsProvider'
 import { WorkflowProvider, useWorkflow } from '@/components/WorkflowProvider'
 import { PreparationProvider } from '@/components/data/PreparationProvider'
 import { Icon } from '@/components/Icon'
+import { ThemeControl } from '@/components/ThemeControl'
 import { DataDropZone } from '@/components/data/DataDropZone'
 import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
@@ -14,7 +15,6 @@ import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
 import { useShellLayout } from '@/components/shell/useShellLayout'
 import { button, chromeAction, field, fieldHint, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
-import { useTheme, THEME_LABELS, type ThemeChoice } from '@/components/ui/useTheme'
 import { formatDay, formatTimestamp } from '@/lib/format/date'
 import { formatBytes } from '@/lib/format/number'
 import { DataStudio } from '@/components/data/DataStudio'
@@ -112,10 +112,6 @@ type Chapter = Omit<ChapterEntry, 'status'>
 
 const CHAPTERS: readonly Chapter[] = CHAPTER_IDS.map((id) => ({ id, ...CHAPTER_METADATA[id] }))
 
-const THEME_ICON: Record<ThemeChoice, string> = {
-  light: 'light_mode', dark: 'dark_mode', system: 'brightness_auto',
-}
-
 function SourceSummary({ source }: { readonly source: SelectedSource }) {
   const sourceDetail = (() => {
     switch (source.recipe.kind) {
@@ -157,7 +153,6 @@ function App() {
   const [navOpen, setNavOpen] = useState(false)
   const openNav = useCallback(() => setNavOpen(true), [])
   const closeNav = useCallback(() => setNavOpen(false), [])
-  const theme = useTheme()
   const profiled = workflow.kind === 'profiled' ? workflow : null
   const currentPrepared = profiled?.prepared ?? null
   const discoverySession = useWorkflow(state => state.discovery)
@@ -467,7 +462,7 @@ function App() {
     if (chapter === 'data') return project !== null
     if (chapter === 'survival') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'root-cause') return workflow.kind === 'profiled' && workflow.prepared !== null
-    if (chapter === 'time-series') return workflow.kind === 'profiled' && workflow.prepared?.kind === 'prepared-time-series'
+    if (chapter === 'time-series') return workflow.kind === 'profiled' && (workflow.prepared?.kind === 'prepared-time-series' || workflow.prepared?.kind === 'prepared-panel')
     if (chapter === 'discovery') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'study') return validatedDag
@@ -483,7 +478,7 @@ function App() {
     switch (chapter) {
       case 'projects': return project === null ? 'not-started' : 'done'
       case 'data': return project === null ? 'locked' : prepared ? 'done' : 'in-progress'
-      case 'time-series': return workflow.kind !== 'profiled' || workflow.prepared?.kind !== 'prepared-time-series' ? 'locked' : workflow.timeSeriesRuns.length + workflow.countSeriesModels.length > 0 ? 'done' : 'not-started'
+      case 'time-series': return workflow.kind !== 'profiled' || (workflow.prepared?.kind !== 'prepared-time-series' && workflow.prepared?.kind !== 'prepared-panel') ? 'locked' : workflow.timeSeriesRuns.length + workflow.countSeriesModels.length > 0 ? 'done' : 'not-started'
       case 'survival': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
@@ -613,11 +608,7 @@ function App() {
             </span>
           </button>
         )}
-        <button type="button" onClick={theme.cycle} aria-label="Change theme"
-          title={`Theme: ${THEME_LABELS[theme.choice]}. Switch to ${THEME_LABELS[theme.next]}`}
-          className={iconControl('quiet', 'text-muted')}>
-          <Icon name={THEME_ICON[theme.next]} size={16} />
-        </button>
+        <ThemeControl />
       </div>
     </>
   )
@@ -1083,7 +1074,7 @@ function App() {
                     </Suspense>
                     </ChapterBoundary>
                   )}
-                  {activeChapter === 'time-series' && workflow.prepared?.kind === 'prepared-time-series' && (
+                  {activeChapter === 'time-series' && (workflow.prepared?.kind === 'prepared-time-series' || workflow.prepared?.kind === 'prepared-panel') && (
                     <ChapterBoundary chapter="Time-series analysis">
                     <Suspense fallback={<ChapterSkeleton label="Loading time-series analysis…" />}>
                       <TimeSeriesPanel key={workflow.prepared.id} source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}

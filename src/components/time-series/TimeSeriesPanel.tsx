@@ -1,3 +1,4 @@
+import {CountRegressionPanel} from './CountRegressionPanel'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { LongRunDraft, TimeSeriesDraft } from '@/domain/timeSeriesDraft'
@@ -141,14 +142,19 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
     </section>} />
 }
 
-export function TimeSeriesPanel(props: Props) {
+export function TimeSeriesPanel(props:Omit<Props,'prepared'>&{readonly prepared:Extract<PreparedDatasetArtifact,{kind:'prepared-panel'|'prepared-time-series'}>}) {
+  if(props.prepared.kind==='prepared-panel') return <CountRegressionPanel {...props}/>
+  return <RegularTimeSeriesPanel {...props} prepared={props.prepared}/>
+}
+function RegularTimeSeriesPanel(props: Props) {
   const analysis = useTimeSeriesDraft(props.prepared.id, state => state.analysis)
   const change = useWorkflow(state => state.changeTimeSeries)
   const setAnalysis = (analysis: TimeSeriesDraft['analysis']) => change(props.prepared.id, { type: 'analysis', analysis })
   const [busy, setBusy] = useState(false)
   const report = props.onActivity
   const onActivity = useCallback((activity: RunActivity | null) => { setBusy(activity !== null); report?.(activity) }, [report])
-  const selector = <SegmentedControl variant="line" size="sm" ariaLabel="Time-series analysis type" value={analysis} onChange={setAnalysis} disabled={busy} options={[{ value: 'count', label: 'Count models' }, { value: 'ardl', label: 'ARDL' }, { value: 'vecm', label: 'VECM' }, { value: 'interrupted', label: 'Interrupted series' }]} />
+  const selector = <SegmentedControl variant="line" size="sm" ariaLabel="Time-series analysis type" value={analysis} onChange={setAnalysis} disabled={busy} options={[{ value: 'count', label: 'Count models' }, { value: 'ardl', label: 'ARDL' }, { value: 'vecm', label: 'VECM' }, { value: 'interrupted', label: 'Interrupted series' }, {value:'regression',label:'Count regression'}]} />
+  if (analysis === 'regression') return <CountRegressionPanel {...props} selector={selector} onActivity={onActivity}/>
   if (analysis === 'ardl') return <ArdlModelPanel {...props} selector={selector} onActivity={onActivity} />
   if (analysis === 'interrupted') return <InterruptedSeriesPanel {...props} selector={selector} onActivity={onActivity} />
   if (analysis === 'vecm') return <LongRunModel key={analysis} {...props} model={analysis} selector={selector} onActivity={onActivity} />

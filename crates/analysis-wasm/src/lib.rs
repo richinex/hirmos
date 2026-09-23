@@ -89,6 +89,7 @@ use wasm_bindgen::prelude::*;
 
 mod missingness;
 mod staggered_did;
+mod count_regression;
 mod calendar;
 
 use missingness::{resolve_missingness, MissingnessExecution, MissingnessResolution};
@@ -995,6 +996,7 @@ pub fn run_analysis(
             alpha,
         ),
         AnalysisCommand::PanelAdjusted { rows, columns, units, times, specification } => panel_adjusted(values, rows, columns, &units, &times, specification),
+        AnalysisCommand::CountRegression { request } => count_regression::run(values, request).map(|evidence| AnalysisResult::CountRegression { evidence }),
         AnalysisCommand::StaggeredDid { request } => staggered_did::run(values, request).map(|evidence| AnalysisResult::StaggeredDid { evidence }),
         AnalysisCommand::PanelIntervention {
             primary,

@@ -538,7 +538,7 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         return { ...state, survivalRuns: state.survivalRuns.filter((run) => run.id !== event.run) }
       }
       if (event.type === 'time-series-run-created'
-        && state.prepared?.kind === 'prepared-time-series'
+        && (state.prepared?.kind === 'prepared-time-series' || state.prepared?.kind === 'prepared-panel' && event.run.kind === 'count-regression')
         && timeSeriesRunMatches(event.run, state.prepared)) {
         return { ...state, timeSeriesRuns: [...state.timeSeriesRuns, event.run] }
       }

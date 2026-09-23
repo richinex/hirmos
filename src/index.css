@@ -269,6 +269,40 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   button, summary, th, nav { user-select: none; }
 }
 
+/* A theme change is a whole-page repaint, so it arrives as a diagonal front rather than a flash.
+   The browser holds the old frame underneath, still, and reveals the new palette behind a 45°
+   edge that crosses the viewport corner to corner. Going back retraces the way it came.
+
+   Only the clip path animates, on a composited snapshot, so the cost does not scale with what is
+   on the page. The triangles overshoot to 200% so the front stays 45° at any aspect ratio. */
+@keyframes theme-sweep-from-bottom-right {
+  from { clip-path: polygon(100% 100%, 100% 100%, 100% 100%); }
+  to { clip-path: polygon(100% 100%, -100% 100%, 100% -100%); }
+}
+@keyframes theme-sweep-from-top-left {
+  from { clip-path: polygon(0% 0%, 0% 0%, 0% 0%); }
+  to { clip-path: polygon(0% 0%, 200% 0%, 0% 200%); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-theme-transition]::view-transition-group(root) {
+    animation-duration: 520ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  /* The outgoing frame is a backdrop, not a participant: animating it too would double the work. */
+  html[data-theme-transition]::view-transition-old(root) {
+    z-index: -1;
+    animation: none;
+  }
+  html[data-theme-transition]::view-transition-new(root) {
+    animation-name: theme-sweep-from-top-left;
+    animation-fill-mode: both;
+  }
+  html[data-theme='dark'][data-theme-transition]::view-transition-new(root) {
+    animation-name: theme-sweep-from-bottom-right;
+  }
+}
+
 /* A checkbox or radio beside its words is a 16px box on a 24px line. On a coarse pointer the label row
    takes the 40px height the buttons already take, and the box grows to 20px, so the target is the row
    and not the box. Fine pointers see no change. */

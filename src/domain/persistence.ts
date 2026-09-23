@@ -485,7 +485,8 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   if (!prepared.ok) return prepared
   if (parsed.data.timeSeriesRuns.length > 0) {
     const series = prepared.value as PreparedDatasetArtifact | null
-    if (series?.kind !== 'prepared-time-series' || !Array.isArray(series.columns)
+    if ((series?.kind !== 'prepared-time-series' && series?.kind !== 'prepared-panel') || !Array.isArray(series.columns)
+      || series.kind === 'prepared-panel' && parsed.data.timeSeriesRuns.some(run=>run.kind!=='count-regression')
       || parsed.data.timeSeriesRuns.some((run) => !timeSeriesRunMatches(run, series))) {
       return err({ kind: 'invalid-snapshot', detail: 'A time-series run does not belong to the prepared time series in this project.' })
     }

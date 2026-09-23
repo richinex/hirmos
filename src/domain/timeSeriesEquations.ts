@@ -93,6 +93,7 @@ export function timeSeriesEquations(run: TimeSeriesRun | CountSeriesModelArtifac
         reference: 'Johansen (1991), §2, equations (2.1)–(2.2); statsmodels VECM uses the equivalent equilibrium term at t−1.',
       }
     }
+    case 'count-regression': return {general:[],definitions:['The design includes the recorded predictor terms and fixed effects.'],fitted:{kind:'unavailable',explanation:'Coefficients and joint contrasts are reported in the result table.'},reference:'statsmodels 0.14.6 NegativeBinomialP, GLM Binomial and sandwich covariance.'}
     case 'interrupted-series': {
       const { specification: s, evidence: e } = run
       const count = s.model.kind === 'count'

@@ -36,7 +36,7 @@ fn weighted_design(
 }
 
 /// `_MinimalWLS.fit(method="lstsq")`, used inside the GLM IRLS loop.
-fn wls_lstsq(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> DVector<f64> {
+pub(crate) fn wls_lstsq(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> DVector<f64> {
     let (design, outcome) = weighted_design(x, y, weights);
     least_squares::solve(&design, &outcome, -1.0)
         .expect("DGELSD weighted least-squares fit")
@@ -46,7 +46,7 @@ fn wls_lstsq(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> DVector<f64
 }
 
 /// The final `WLS.fit(method="pinv")`, including its normalized covariance.
-fn wls_pinv(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> (DVector<f64>, DMatrix<f64>) {
+pub(crate) fn wls_pinv(x: &DMatrix<f64>, y: &DVector<f64>, weights: &[f64]) -> (DVector<f64>, DMatrix<f64>) {
     let (design, outcome) = weighted_design(x, y, weights);
     let inverse = linalg::pseudo_inverse(&design, 1e-15).expect("weighted pseudoinverse");
     let params = (&inverse.matrix * outcome).column(0).into_owned();
@@ -197,9 +197,13 @@ pub fn poisson_glm_with(
 /// `Poisson(y, x).fit()`, the discrete model's Newton fit. Used for the starting values of
 /// the negative binomial, where statsmodels runs it as a preliminary step.
 pub fn poisson_mle(y: &[f64], x: &DMatrix<f64>) -> Vec<f64> {
+    poisson_mle_offset(y, x, &vec![0.0; y.len()]).expect("Poisson Hessian is singular")
+}
+
+fn poisson_mle_offset(y: &[f64], x: &DMatrix<f64>, offset: &[f64]) -> Result<Vec<f64>, &'static str> {
     let n = y.len();
     let k = x.ncols();
-    let mean = y.iter().sum::<f64>() / n as f64;
+    let mean = y.iter().zip(offset).map(|(y,o)| y / o.exp()).sum::<f64>() / n as f64;
     // statsmodels seeds the constant with the null model and the rest with 0.001.
     let mut params = DVector::from_fn(k, |i, _| if i == 0 { mean.ln() } else { 0.001 });
 
@@ -208,7 +212,7 @@ pub fn poisson_mle(y: &[f64], x: &DMatrix<f64>) -> Vec<f64> {
         let mut hess = DMatrix::<f64>::zeros(k, k);
         for r in 0..n {
             let eta: f64 = (0..k).map(|j| x[(r, j)] * params[j]).sum();
-            let mu = eta.exp();
+            let mu = (eta + offset[r]).exp();
             for i in 0..k {
                 score[i] += x[(r, i)] * (y[r] - mu);
                 for j in 0..k {
@@ -218,7 +222,7 @@ pub fn poisson_mle(y: &[f64], x: &DMatrix<f64>) -> Vec<f64> {
         }
         let score = DMatrix::from_column_slice(k, 1, score.as_slice());
         let step = linalg::solve(&hess, &score)
-            .expect("Poisson Hessian is singular")
+            .map_err(|_| "Poisson Hessian is singular")?
             .column(0)
             .into_owned();
         let moved = step.amax();
@@ -227,7 +231,7 @@ pub fn poisson_mle(y: &[f64], x: &DMatrix<f64>) -> Vec<f64> {
             break;
         }
     }
-    params.iter().copied().collect()
+    Ok(params.iter().copied().collect())
 }
 
 pub struct NegativeBinomialP {
@@ -247,6 +251,8 @@ pub struct NegativeBinomialP {
     pub line_search_failed: bool,
     /// Ordered objective and gradient calls made by scipy-compatible BFGS.
     pub evaluations: Vec<crate::bfgs::BfgsEvaluation>,
+    pub covariance: DMatrix<f64>,
+    pub scores: DMatrix<f64>,
 }
 
 struct NbP<'a> {
@@ -254,6 +260,7 @@ struct NbP<'a> {
     x: &'a DMatrix<f64>,
     /// The `2 - parameterization` exponent the score and Hessian use.
     p: f64,
+    offset: &'a [f64],
 }
 
 impl NbP<'_> {
@@ -261,7 +268,7 @@ impl NbP<'_> {
         (0..self.y.len())
             .map(|r| {
                 let eta: f64 = (0..self.x.ncols()).map(|j| self.x[(r, j)] * beta[j]).sum();
-                eta.exp()
+                (eta + self.offset[r]).exp()
             })
             .collect()
     }
@@ -282,10 +289,15 @@ impl NbP<'_> {
     }
 
     fn score(&self, params: &[f64]) -> Vec<f64> {
+        let scores = self.score_obs(params);
+        (0..scores.ncols()).map(|j| scores.column(j).iter().sum()).collect()
+    }
+
+    fn score_obs(&self, params: &[f64]) -> DMatrix<f64> {
         let k = params.len() - 1;
         let alpha = params[k];
         let mu = self.mu(&params[..k]);
-        let mut out = vec![0.0; k + 1];
+        let mut out = DMatrix::zeros(self.y.len(), k + 1);
         for (r, &m) in mu.iter().enumerate() {
             let y = self.y[r];
             let a1 = m.powf(self.p) / alpha;
@@ -296,9 +308,9 @@ impl NbP<'_> {
             let dgterm = dgpart + (a1 / a2).ln() + 1.0 - a3 / a2;
             let dparams = a4 * dgterm - a3 / a2 + y / m;
             for j in 0..k {
-                out[j] += self.x[(r, j)] * m * dparams;
+                out[(r,j)] = self.x[(r, j)] * m * dparams;
             }
-            out[k] += -a1 / alpha * dgterm;
+            out[(r,k)] = -a1 / alpha * dgterm;
         }
         out
     }
@@ -365,16 +377,38 @@ pub fn negative_binomial_p(
     x: &DMatrix<f64>,
     parameterization: f64,
 ) -> NegativeBinomialP {
+    negative_binomial_p_offset(y, x, parameterization, &vec![0.0; y.len()], 1e-5, 35)
+}
+
+/// Same NB-P likelihood and BFGS path with an explicit log-exposure offset.
+/// Validated public model boundaries must reject invalid shapes and counts first.
+pub fn negative_binomial_p_offset(
+    y: &[f64], x: &DMatrix<f64>, parameterization: f64, offset: &[f64],
+    tolerance: f64, max_iterations: usize,
+) -> NegativeBinomialP {
+    negative_binomial_fit(y,x,parameterization,offset,tolerance,max_iterations,false).expect("negative binomial fit failed")
+}
+
+/// Explicit statsmodels L-BFGS-B policy, not an automatic fallback for legacy fits.
+pub fn negative_binomial_p_bounded(y:&[f64], x:&DMatrix<f64>, offset:&[f64], tolerance:f64, max_iterations:usize)->Result<NegativeBinomialP,&'static str>{
+    negative_binomial_fit(y,x,2.0,offset,tolerance,max_iterations,true)
+}
+
+fn negative_binomial_fit(y:&[f64],x:&DMatrix<f64>,parameterization:f64,offset:&[f64],tolerance:f64,max_iterations:usize,bounded:bool)->Result<NegativeBinomialP,&'static str>{
+    if y.len() != offset.len() || x.nrows() != y.len() || x.ncols() == 0 || y.len() <= x.ncols() {
+        return Err("negative binomial input dimensions are invalid");
+    }
     let n = y.len();
     let k = x.ncols();
     let model = NbP {
         y,
         x,
         p: 2.0 - parameterization,
+        offset,
     };
 
     // Preliminary Poisson fit, then a moment estimate of the dispersion.
-    let beta0 = poisson_mle(y, x);
+    let beta0 = poisson_mle_offset(y, x, offset)?;
     let mu0 = model.mu(&beta0);
     let df_resid = (n - k) as f64;
     // NegativeBinomialP overrides the base dispersion estimate: squared residuals, and the
@@ -392,17 +426,30 @@ pub fn negative_binomial_p(
 
     // statsmodels minimises the average negative log-likelihood.
     let nobs = n as f64;
-    let res = crate::bfgs::fmin_bfgs(
+    let res = if bounded {
+        let mut lower=vec![0.0;k+1];lower[k]=1e-8;
+        let mut bounds=vec![0;k+1];bounds[k]=1;
+        let mut evaluations=Vec::new();
+        let result=crate::lbfgsb::lbfgsb(&start_params,&lower,&vec![0.0;k+1],&bounds,10,10.0,tolerance,20,max_iterations,|p|{
+            let f=-model.loglike(p)/nobs;
+            let g:Vec<f64>=model.score(p).iter().map(|v|-v/nobs).collect();
+            evaluations.push(crate::bfgs::BfgsEvaluation::Function{x:p.to_vec(),value:f});
+            evaluations.push(crate::bfgs::BfgsEvaluation::Gradient{x:p.to_vec(),value:g.clone()});
+            (f,g)
+        });
+        crate::bfgs::BfgsResult{x:result.x,fun:result.f,jac:Vec::new(),nfev:evaluations.len()/2,njev:evaluations.len()/2,nit:result.iterations,
+            warnflag:if result.termination.converged(){0}else{1},line_search_failed:result.termination==crate::lbfgsb::LbfgsbTermination::LineSearchFailed,wolfe2_calls:0,evaluations}
+    } else {crate::bfgs::fmin_bfgs(
         |p| -model.loglike(p) / nobs,
         |p| model.score(p).iter().map(|v| -v / nobs).collect(),
         &start_params,
-        1e-5,
-        35,
-    );
+        tolerance,
+        max_iterations,
+    )};
 
     let params = res.x.clone();
     let cov =
-        linalg::inverse(&(-model.hessian(&params))).expect("negative binomial Hessian is singular");
+        linalg::inverse(&(-model.hessian(&params))).map_err(|_|"negative binomial Hessian is singular")?;
     let bse: Vec<f64> = (0..k + 1).map(|i| cov[(i, i)].sqrt()).collect();
     let tvalues: Vec<f64> = (0..k + 1).map(|i| params[i] / bse[i]).collect();
     let pvalues = tvalues
@@ -410,10 +457,12 @@ pub fn negative_binomial_p(
         .map(|t| 2.0 * (1.0 - norm_cdf(t.abs())))
         .collect();
     let fitted = (0..n)
-        .map(|r| (0..k).map(|j| x[(r, j)] * params[j]).sum())
+        .map(|r| (0..k).map(|j| x[(r, j)] * params[j]).sum::<f64>() + offset[r])
         .collect();
 
-    NegativeBinomialP {
+    Ok(NegativeBinomialP {
+        scores: model.score_obs(&params),
+        covariance: cov,
         llf: model.loglike(&params),
         params,
         bse,
@@ -427,5 +476,11 @@ pub fn negative_binomial_p(
         nit: res.nit,
         line_search_failed: res.line_search_failed,
         evaluations: res.evaluations,
-    }
+    })
+}
+
+/// Conditional evaluations used to separate fitting differences from derivative parity.
+pub fn negative_binomial_evaluate(y: &[f64], x: &DMatrix<f64>, offset: &[f64], params: &[f64]) -> (f64, DMatrix<f64>, DMatrix<f64>) {
+    let model = NbP { y, x, p: 0.0, offset };
+    (model.loglike(params), model.score_obs(params), model.hessian(params))
 }

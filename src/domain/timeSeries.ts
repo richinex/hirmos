@@ -1,3 +1,4 @@
+import {countRegressionRequestSchema,countRegressionEvidenceSchema,sameCountRequest} from './countRegression'
 import { z } from 'zod'
 import { plotTimeSchema } from './longRun'
 import { ardlModelRequestSchema, ardlModelEvidenceSchema } from './ardlModel'
@@ -29,6 +30,7 @@ export const ARDL_TERMS = {
 export type ArdlTerms = keyof typeof ARDL_TERMS
 
 export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
+  z.object({...identity,kind:z.literal('count-regression'),outcome:column,variables:z.array(column).min(1),periods:z.array(z.string()),specification:countRegressionRequestSchema,evidence:countRegressionEvidenceSchema}).strict(),
   z.object({
     ...identity, kind: z.literal('ardl-model'), outcome: column,
     predictors: z.tuple([column]).rest(column), fixed: z.array(column),
@@ -72,6 +74,10 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
   const fail = (message: string) => ctx.addIssue({ code: 'custom', message })
   if (run.plotTime !== undefined && run.plotTime.values.length !== run.evidence.observations) fail('Chart dates must match the prepared observations.')
   switch (run.kind) {
+    case 'count-regression': {
+      if(!sameCountRequest(run.specification,run.evidence.request)||run.variables.length!==run.specification.columns||new Set(run.variables.map(c=>c.id)).size!==run.variables.length||run.variables[run.specification.outcome]?.id!==run.outcome.id)fail('The saved count regression does not match its variables and specification.')
+      return
+    }
     case 'ardl-model': {
       const { specification: s, evidence: e } = run
       const columns = [run.outcome, ...run.predictors, ...run.fixed]
@@ -163,6 +169,7 @@ export function parseTimeSeriesRun(value: unknown): Result<TimeSeriesRun, string
 
 export const timeSeriesRunLabel = (run: TimeSeriesRun): string => {
   switch (run.kind) {
+    case 'count-regression': return `Count regression for ${run.outcome.name}`
     case 'ardl-model': return `ARDL for ${run.outcome.name}`
     case 'ardl': return `ARDL for ${run.outcome.name} and ${run.predictor.name}`
     case 'vecm': return `VECM for ${run.variables.map((variable) => variable.name).join(', ')}`
@@ -173,7 +180,7 @@ export const timeSeriesRunLabel = (run: TimeSeriesRun): string => {
 
 /** A run can only enter the history of the prepared series it actually used. */
 export const timeSeriesRunMatches = (run: TimeSeriesRun, prepared: { readonly id: PreparedDatasetVersionId; readonly columns: readonly ColumnId[] }): boolean => {
-  const variables = run.kind === 'ardl-model' ? [run.outcome, ...run.predictors, ...run.fixed] : run.kind === 'ardl' ? [run.outcome, run.predictor] : run.kind === 'interrupted-series' ? [run.outcome, ...(run.specification.model.kind === 'count' && run.specification.model.exposure !== null ? [run.specification.model.exposure] : [])] : run.variables
+  const variables = run.kind === 'count-regression' ? run.variables : run.kind === 'ardl-model' ? [run.outcome, ...run.predictors, ...run.fixed] : run.kind === 'ardl' ? [run.outcome, run.predictor] : run.kind === 'interrupted-series' ? [run.outcome, ...(run.specification.model.kind === 'count' && run.specification.model.exposure !== null ? [run.specification.model.exposure] : [])] : run.variables
   return run.preparedDataset === prepared.id && variables.every((variable) => prepared.columns.includes(variable.id))
 }
 import { windowContextSchema } from './windowEvidence'

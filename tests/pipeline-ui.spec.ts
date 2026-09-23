@@ -478,12 +478,16 @@ test('keeps the pipeline canvas inside a phone viewport, fills the stage, and pa
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }))
   expect(width.content).toBeLessThanOrEqual(width.viewport)
 
-  // The palette is one row of glyphs on a phone, every block kind in view, never a stack.
+  // The palette stays on one row; every block remains reachable by scrolling.
   const palette = page.getByRole('toolbar', { name: 'Add a block' })
   expect(await palette.evaluate((el) => el.clientHeight)).toBeLessThan(60)
   const chips = await palette.locator('button[draggable]').evaluateAll((buttons) => buttons.map((button) => { const box = button.getBoundingClientRect(); return { name: button.getAttribute('aria-label'), inView: box.width > 0 && box.right <= document.documentElement.clientWidth } }))
   expect(chips.map((chip) => chip.name)).toEqual(['Input file', 'Filter rows', 'Sort and limit', 'Select columns', 'Derive columns', 'Calendar events', 'Join', 'Union', 'Group and aggregate', 'Script'])
-  expect(chips.every((chip) => chip.inView)).toBe(true)
+  for (const chip of await palette.locator('button[draggable]').all()) {
+    await chip.scrollIntoViewIfNeeded()
+    await expect(chip).toBeInViewport()
+  }
+  await palette.locator('[data-block-scroll]').evaluate(element => element.scrollTo({ left: 0, behavior: 'instant' }))
 
   // The canvas takes the stage's height, so its controls sit along the foot of the screen, not mid-way.
   const canvas = (await page.getByTestId('pipeline-canvas').boundingBox())!

@@ -1,3 +1,4 @@
+import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
 import { z } from 'zod'
 import { sameStructuralModel } from '@/domain/structuralImpact'
 import { ardlModelResponseSchema } from '@/domain/ardlModel'
@@ -397,6 +398,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
     case 'panel-intervention':
       return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
+    case 'count-regression': return {kind:'countRegression',request:command.model}
     case 'staggered-did': return {kind:'staggeredDid',request:command.model}
     case 'panel-adjusted':
       return { kind: 'panelAdjusted', rows: command.rows, columns: command.columns, units: command.units, times: command.times, specification: command.specification }
@@ -862,6 +864,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'synthetic-control-succeeded', request: command.request, result: result.data })
         return
+      }
+      case 'count-regression': {
+        const wrapper=z.object({kind:z.literal('countRegression'),evidence:countRegressionEvidenceSchema}).strict().safeParse(decoded)
+        if(!wrapper.success){fail(command.request,{kind:'worker-protocol-failed',detail:wrapper.error.message});return}
+        if(!sameCountRequest(wrapper.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The count regression result differs from the requested specification.'});return}
+        emit({kind:'count-regression-succeeded',request:command.request,result:wrapper.data.evidence});return
       }
       case 'staggered-did': {
         const wrapper=z.object({kind:z.literal('staggeredDid'),evidence:z.unknown()}).safeParse(decoded)

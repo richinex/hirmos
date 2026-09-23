@@ -987,6 +987,7 @@ pub(crate) enum IdentifiedDiscreteResult {
     deny_unknown_fields
 )]
 pub(crate) enum AnalysisCommand {
+    CountRegression { request: crate::count_regression::Request },
     StaggeredDid { request: crate::staggered_did::Request },
     RootCause { request: crate::root_cause::Request },
     GcmEffects { request: crate::gcm_effects::Request },
@@ -2347,6 +2348,7 @@ pub(crate) enum DagFalsificationEvidence {
     rename_all_fields = "camelCase"
 )]
 pub(crate) enum AnalysisResult {
+    CountRegression { evidence: crate::count_regression::Evidence },
     StaggeredDid { evidence: crate::staggered_did::Evidence },
     RootCause { evidence: crate::root_cause::Evidence },
     GcmEffects { evidence: crate::gcm_effects::Evidence },
