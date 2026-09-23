@@ -18,6 +18,7 @@ pub mod poisson_mixture;
 pub mod poisson_regression;
 mod poisson_table;
 pub mod prior;
+pub mod random;
 pub mod regression;
 pub mod run;
 pub mod semilocal;

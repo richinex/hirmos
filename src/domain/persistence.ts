@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { staggeredRecordMatches } from './staggeredDid'
 import { sharpRdConfigurationSchema, parseSharpRdEvidence, sharpRdRecordMatches } from './sharpRd'
 import { EMPTY_ROOT_CAUSE, rootCauseWorkspaceSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
 import type { CounterfactualRunArtifact } from './counterfactual'
@@ -350,7 +351,7 @@ const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<stri
   if (Reflect.get(value, 'kind') === 'panel-intervention-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null
-    && Reflect.get(evidence, 'kind') !== 'panelDid' && Reflect.get(evidence, 'kind') !== 'panelAdjusted') {
+    && Reflect.get(evidence, 'kind') !== 'panelDid' && Reflect.get(evidence, 'kind') !== 'panelAdjusted' && Reflect.get(evidence,'kind') !== 'staggeredDid') {
     return {
       ...value,
       estimate: upgradedEstimate,
@@ -503,6 +504,11 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
   for (const run of estimationRuns) {
+    if(run.kind==='panel-intervention-run' && ((typeof run.evidence==='object'&&run.evidence!==null&&Reflect.get(run.evidence,'kind')==='staggeredDid') || (typeof run.configuration==='object'&&run.configuration!==null&&Reflect.get(run.configuration,'primary')==='staggered'))) {
+      const study=parsed.data.studies.find(candidate=>candidate.id===run.study)
+      const identification=parsed.data.identifications.find(candidate=>candidate.id===run.identification)
+      if(!staggeredRecordMatches(run,study)||identification?.study!==run.study||prepared.value===null||Reflect.get(prepared.value,'id')!==run.preparedDataset) return err({kind:'invalid-snapshot',detail:'The saved staggered DiD result does not match its treated-group study, specification or prepared panel.'})
+    }
     if (run.kind === 'panel-intervention-run' && ((typeof run.evidence === 'object' && run.evidence !== null && Reflect.get(run.evidence, 'kind') === 'panelAdjusted')
       || (typeof run.configuration === 'object' && run.configuration !== null && Reflect.get(run.configuration, 'primary') === 'adjusted'))) {
       const study = parsed.data.studies.find(candidate => candidate.id === run.study)

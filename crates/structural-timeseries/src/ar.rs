@@ -217,7 +217,7 @@ pub(crate) fn truncated(
     sd: f64,
     low: f64,
     high: f64,
-    rng: &mut NpRng,
+    rng: &mut impl crate::random::NormalDraw,
 ) -> Result<f64, Error> {
     if !mean.is_finite() || !sd.is_finite() || sd <= 0. || low >= high {
         return Err(Error::InvalidTruncation);

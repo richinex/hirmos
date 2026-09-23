@@ -108,11 +108,7 @@ mod tests {
     #[test]
     fn ranger_inbag_counts() {
         let fixture: serde_json::Value = serde_json::from_str(
-            &std::fs::read_to_string(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/oracle/fixtures/ranger.json"
-            ))
-            .unwrap(),
+            include_str!("../../../oracle/fixtures/ranger.json"),
         )
         .unwrap();
         for case in fixture["cases"].as_array().unwrap() {

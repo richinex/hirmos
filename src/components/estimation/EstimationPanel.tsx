@@ -13,6 +13,9 @@ import { CausalImpactInference } from './CausalImpactInference'
 import { SharpRdResult } from './SharpRdResult'
 import { BayesianImpactResult } from './BayesianImpactResult'
 import { ImpactEffectPanel } from './ImpactEffectPanel'
+import { StaggeredDidControls } from './StaggeredDidControls'
+import { StaggeredDidResult } from './StaggeredDidResult'
+import { defaultStaggeredSpecification, staggeredInput } from '@/domain/staggeredDid'
 import { AdjustedDidControls } from './AdjustedDidControls'
 import { AdjustedDidResult } from './AdjustedDidResult'
 import { describePanelDataProblem } from '@/domain/panel'
@@ -49,7 +52,7 @@ import { button, chapterIntro, field, fieldHint, fieldLabel, label, literal, num
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import { assertNever, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
+import { assertNever, isNonEmpty, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
 import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
 import { ArmaUncertaintyAlert } from './ArmaUncertaintyAlert'
 import {
@@ -240,6 +243,7 @@ function panelPeriodDisplay(run: Extract<EstimationRunArtifact, { readonly kind:
 
 function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArtifact, { readonly kind: 'panel-intervention-run' }> }) {
   const { evidence } = run
+  if (evidence.kind === 'staggeredDid') return <StaggeredDidResult evidence={evidence} labels={panelPeriodDisplay(run).labels} />
   const controls = evidence.units.slice(0, evidence.controlUnits)
   const periods = panelPeriodDisplay(run)
   const preLabels = periods.labels.slice(0, evidence.nPre)
@@ -412,6 +416,11 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       }
       case 'panel-intervention-run': {
         const { evidence } = run
+        if (evidence.kind === 'staggeredDid') return [
+          {label:'Cohorts',value:formatCount(evidence.cohorts.keys.length),context:'Distinct first-treatment periods'},
+          {label:'Retained units',value:formatCount(evidence.units.length),context:String(evidence.times.length)+' periods'},
+          {label:'Overall ATT',value:formatWords('Dynamic aggregation'),context:'Equal average of supported nonnegative event-time effects'},
+        ]
         if (evidence.kind === 'panelAdjusted') return [
           { label: 'Method', value: formatWords(evidence.specification.kind === 'regression' ? 'Regression DiD' : 'Doubly robust DiD'), context: 'Average effect on the treated group' },
           { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: 'One before and one after period' },
@@ -527,7 +536,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
     }
   })()
   const adjustmentValue = formatWords(run.kind === 'panel-intervention-run'
-    ? 'Unit and time weights'
+    ? run.evidence.kind === 'staggeredDid' ? 'Adoption-cohort comparisons' : 'Unit and time weights'
     : run.kind === 'frontdoor-two-stage-run'
     ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}, stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
     : run.kind === 'instrumental-variable-run'
@@ -1091,6 +1100,24 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         }
         case 'panel-intervention': {
           if (prepared.kind !== 'prepared-panel') { dispatch({ type: 'run-failed', detail: 'Prepare a balanced long panel before running the panel intervention estimator.' }); return }
+          if (configuration.primary === 'staggered') {
+            if(panelBinding===null) {dispatch({type:'run-failed',detail:'Select panel unit, time, outcome and treatment columns.'});return}
+            const { materializePanelInWorker } = await import('@/data/client')
+            const materialized=await materializePanelInWorker(source.file,profile,{unit:panelBinding.unit,time:panelBinding.time,outcome:panelBinding.outcome,treatment:panelBinding.treatment,covariates:configuration.covariates})
+            if(!session.current(current)) return
+            if(!materialized.ok){dispatch({type:'run-failed',detail:describePanelDataProblem(materialized.error)});return}
+            const input=staggeredInput(materialized.value,configuration.specification)
+            if(!input.ok){dispatch({type:'run-failed',detail:input.error});return}
+            const evidence=await analysis.runStaggeredDid(input.value.values,input.value.model)
+            if(!evidence.ok){dispatch({type:'run-failed',detail:describeAnalysisWorkerProblem(evidence.error)});return}
+            const columns:NonEmptyArray<StudyVariable>=[study.outcome,study.treatment,...configuration.covariates.map(column=>({column,node:study.outcome.node,name:profile.columns.find(c=>c.id===column)?.name??String(column)}))]
+            const labels=evidence.value.times.map(time=>materialized.value.periods.find(p=>p.code===time)?.label??String(time))
+            if(!isNonEmpty(labels)){dispatch({type:'run-failed',detail:'No retained panel periods were returned.'});return}
+            const run={kind:'panel-intervention-run',configuration,evidence:evidence.value,timeLabels:labels} as const
+            const estimate=causalEstimateFrom(study,identification,run)
+            finish(estimate===null?null:{...identity,...run,method:methodIdOf(configuration.kind),columns,estimate},'The staggered DiD result does not match the treated-group study target.')
+            return
+          }
           if (panelBinding === null || state.panelPreflight.kind !== 'ready' || !samePanelBinding(state.panelPreflight.binding, panelBinding)) {
             dispatch({ type: 'run-failed', detail: 'The panel treatment-layout check has not completed for this study.' })
             return
@@ -1442,16 +1469,17 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <p className={prose('m-0 text-faint')}>
               Choose the method before fitting. Conventional DiD can use one period before and one after adoption.
             </p>
-            <SegmentedControl ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'regression' || primary === 'doublyRobust'
+            <SegmentedControl ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification} : primary === 'regression' || primary === 'doublyRobust'
               ? { kind: 'panel-intervention', primary: 'adjusted', covariates: [], specification: primary === 'regression' ? { kind: 'regression' } : { kind: 'doublyRobust', folds: 2, seed: 1234, trimming: 0.01, normalization: 'in-sample' } }
-              : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Regression' }, { value: 'doublyRobust', label: 'Doubly robust' }, { value: 'syntheticDid', label: 'Synthetic' }]} />
+              : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Regression' }, { value: 'doublyRobust', label: 'Doubly robust' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'}]} />
+            {configuration.primary === 'staggered' && <StaggeredDidControls configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} onChange={configure} />}
             {configuration.primary === 'adjusted' && <AdjustedDidControls configuration={configuration} candidates={controlCandidates.filter(c => prepared.kind !== 'prepared-panel' || (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn))} onChange={configure} />}
-            {configuration.primary !== 'did' && configuration.primary !== 'adjusted' && <div className="grid gap-3 @md/panel:grid-cols-2">
+            {configuration.primary !== 'did' && configuration.primary !== 'adjusted' && configuration.primary !== 'staggered' && <div className="grid gap-3 @md/panel:grid-cols-2">
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo replications" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboReplications} /><input type="number" min={2} max={2000} aria-label="Panel placebo replications" className={field('text', 'mt-1')} value={configuration.placeboReplications} onChange={(event) => configure({ ...configuration, placeboReplications: Math.max(2, Math.min(2000, Math.floor(Number(event.target.value) || 2))) })} /></label>
               <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
             </div>}
-            {panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
-            {panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted"><Metadata><span>Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units</span><span>{panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods</span><span>adoption at {panelPreflight.layout.adoption.label}.</span></Metadata></p>}
+            {configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
+            {configuration.primary !== 'staggered' && panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted"><Metadata><span>Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units</span><span>{panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods</span><span>adoption at {panelPreflight.layout.adoption.label}.</span></Metadata></p>}
           </div>
         )
       case 'negbin-nuts':
@@ -1715,8 +1743,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             {studyDataError !== null && <Alert tone="danger" className="mt-3"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             <JobNotice job={job} />
             <div className="mt-4 flex items-center gap-3">
-              <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
-                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
+              <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
+                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
               </button>
               {job.kind === 'running' && <><Orb state="solving" aria-label="Estimator running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
             </div>

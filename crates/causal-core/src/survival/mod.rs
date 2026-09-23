@@ -7,4 +7,4 @@ pub mod comparison_surv;
 pub mod coxph;
 pub mod flexsurv;
 pub mod nonparametric;
-mod r_rng;
+pub(crate) mod r_rng;

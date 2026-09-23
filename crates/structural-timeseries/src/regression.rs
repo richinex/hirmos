@@ -3,12 +3,11 @@
 //! Uses the reference's model weights, including its (DF/2 - 1) exponent.
 use crate::{
     defaults::Scale,
-    initial::Initial,
     lapack_cholesky::{dpotrf, dpotrs, Triangle},
     prior::{Limit, Prior, Statistics},
     Error,
 };
-use hirmos_causal_core::nprandom::{Mt19937, NpRng};
+use crate::random::Random;
 use nalgebra::{DMatrix, DVector};
 mod oda;
 mod swaps;
@@ -129,8 +128,8 @@ pub struct Regression {
     y: DVector<f64>,
     prior: Slab,
     included: Vec<bool>,
-    rng: NpRng,
-    variance_rng: Mt19937,
+    rng: Random,
+    order: Vec<usize>,
     coefficients: DVector<f64>,
     flips: FlipSweep,
     algorithm: Algorithm,
@@ -180,13 +179,14 @@ impl Regression {
         let included = prior.inclusion.iter().map(|p| p.0 == 1.0).collect();
         let coefficients = DVector::zeros(x.ncols());
         let swaps = swaps::Correlations::new(&x, 0.8)?;
+        let order = (0..x.ncols()).collect();
         Ok(Self {
             x,
             y,
             prior,
             included,
-            rng: NpRng::seeded(seed as u64),
-            variance_rng: Mt19937::seeded(seed.wrapping_add(1)),
+            rng: Random::new(seed as u64),
+            order,
             coefficients,
             flips: FlipSweep::All,
             algorithm: Algorithm::Ssvs,
@@ -275,8 +275,7 @@ impl Regression {
     fn step_ssvs(&mut self) -> Result<Draw, Error> {
         let mut included = self.included.clone();
         let mut rng = self.rng.clone();
-        let mut variance_rng = self.variance_rng.clone();
-        let mut order: Vec<_> = (0..included.len()).collect();
+        let mut order = self.order.clone();
         rng.shuffle(&mut order);
         let mut current = self.conditional(&included)?;
         if !current.log_weight.is_finite() {
@@ -286,7 +285,7 @@ impl Regression {
             FlipSweep::All => order.len(),
             FlipSweep::AtMost(n) => n.get().min(order.len()),
         };
-        for i in order.into_iter().take(attempts) {
+        for i in order.iter().copied().take(attempts) {
             included[i] = !included[i];
             let proposal = self.conditional(&included)?;
             let log_uniform = rng.next_f64().ln();
@@ -306,22 +305,20 @@ impl Regression {
                 self.y.len(),
                 current.residual_squares,
             )?)?
-            .draw(&mut variance_rng)?
+            .draw(&mut rng)?
             .value();
         let k = current.indices.len();
         let mut coefficients = vec![0.0; included.len()];
         if k > 0 {
-            let covariance =
-                solve(&factor(&current.precision)?, DMatrix::identity(k, k))? * variance;
-            let covariance = (&covariance + covariance.transpose()) * 0.5;
-            let beta = Initial::new(current.mean, covariance)?.draw(&mut rng);
+            let beta = draw_coefficients(&current.mean, &current.precision, variance,
+                || rng.standard_normal())?;
             for (i, j) in current.indices.iter().enumerate() {
                 coefficients[*j] = beta[i];
             }
         }
         self.included = included.clone();
         self.rng = rng;
-        self.variance_rng = variance_rng;
+        self.order = order;
         self.coefficients = DVector::from_vec(coefficients.clone());
         self.variance = variance;
         Ok(Draw {
@@ -331,3 +328,23 @@ impl Regression {
         })
     }
 }
+
+fn draw_coefficients(
+    mean: &DVector<f64>,
+    precision: &DMatrix<f64>,
+    variance: f64,
+    mut normal: impl FnMut() -> f64,
+) -> Result<DVector<f64>, Error> {
+    let lower = factor(&(precision / variance))?;
+    let z = DVector::from_fn(mean.len(), |_, _| normal());
+    let noise = lower
+        .lower_triangle()
+        .transpose()
+        .solve_upper_triangular(&z)
+        .ok_or(Error::Singular)?;
+    Ok(mean + noise)
+}
+
+#[cfg(test)]
+#[path = "tests/regression_stream.rs"]
+mod stream_tests;

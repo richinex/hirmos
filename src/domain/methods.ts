@@ -1995,7 +1995,7 @@ const PANEL_INTERVENTION: MethodDefinition = {
   id: PANEL_INTERVENTION_METHOD_ID,
   name: 'Panel difference-in-differences',
   family: 'estimation',
-  summary: 'Compare changes in treated and comparison units around a shared adoption date. Choose conventional, regression, doubly robust or synthetic DiD before fitting. The target is the average effect on the treated group.',
+  summary: 'Estimate average treatment effects on treated units. Staggered adoption estimates group-time effects and event-time, cohort and calendar averages. Conventional, regression, cross-fitted doubly robust and synthetic DiD use the shared-adoption design.',
   caveats: [
     {
       id: caveatId('panel-balanced-layout'), category: 'sampling-structure',

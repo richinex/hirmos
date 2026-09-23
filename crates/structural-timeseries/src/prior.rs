@@ -1,6 +1,6 @@
 //! Gaussian variance conditionals from BOOM GenericGaussianVarianceSampler.
 //! Copyright Google LLC and Steven L. Scott; LGPL-2.1-or-later.
-//! Sampling reuses the project's inverse-gamma machinery, not BOOM's RNG.
+//! Variance draws use the stream owned by the calling sampler.
 use crate::{defaults::Scale, state::Variance, Error};
 use hirmos_causal_core::nprandom::Mt19937;
 
@@ -132,7 +132,10 @@ impl Conditional {
         }
         Variance::new(value)
     }
-    pub fn draw(&self, rng: &mut Mt19937) -> Result<Variance, Error> {
+    pub fn draw(&self, rng: &mut impl VarianceDraw) -> Result<Variance, Error> {
+        rng.variance(self)
+    }
+    fn draw_numpy(&self, rng: &mut Mt19937) -> Result<Variance, Error> {
         if matches!(self.limit, Limit::Unbounded) {
             let value = hirmos_causal_core::ucm::invgamma_rvs(self.shape, self.scale, rng);
             if !value.is_finite() || value <= 0.0 {
@@ -203,10 +206,33 @@ impl Update {
             Self::Sample { initial, .. } => initial.variance(),
         }
     }
-    pub fn draw(self, stats: Statistics, rng: &mut Mt19937) -> Result<Variance, Error> {
+    pub fn draw(self, stats: Statistics, rng: &mut impl VarianceDraw) -> Result<Variance, Error> {
         match self {
             Self::Fixed(value) => Ok(value),
             Self::Sample { prior, .. } => prior.conditional(stats)?.draw(rng),
         }
+    }
+}
+
+/// The conditional is shared; each sampler owns its distribution stream.
+pub trait VarianceDraw {
+    fn variance(&mut self, conditional: &Conditional) -> Result<Variance, Error>;
+}
+impl VarianceDraw for Mt19937 {
+    fn variance(&mut self, conditional: &Conditional) -> Result<Variance, Error> {
+        conditional.draw_numpy(self)
+    }
+}
+impl VarianceDraw for crate::random::Random {
+    fn variance(&mut self, conditional: &Conditional) -> Result<Variance, Error> {
+        let precision = match conditional.limit {
+            Limit::Zero => return Variance::new(0.),
+            Limit::Unbounded => self.gamma(conditional.shape, 1. / conditional.scale)?,
+            Limit::At(sd) => self.truncated_gamma(conditional.shape, conditional.scale,
+                1. / sd.variance().value())?,
+        };
+        let variance = 1. / precision;
+        if !variance.is_finite() || variance <= 0. { return Err(Error::TailUnderflow); }
+        Variance::new(variance)
     }
 }

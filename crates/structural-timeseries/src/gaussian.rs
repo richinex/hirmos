@@ -5,7 +5,7 @@ use crate::{
     state::{System, Variance},
     Error,
 };
-use hirmos_causal_core::nprandom::NpRng;
+use crate::random::NormalDraw;
 use nalgebra::{DMatrix, DVector};
 
 pub struct Filter<'a> {
@@ -198,7 +198,7 @@ pub fn draw_states(
     system: &System,
     noise: Variance,
     y: &[Option<f64>],
-    rng: &mut NpRng,
+    rng: &mut impl NormalDraw,
 ) -> Result<Vec<DVector<f64>>, Error> {
     draw_states_impl(system, Noise::Constant(noise), y, rng)
 }
@@ -207,7 +207,7 @@ pub fn draw_states_with_noise(
     system: &System,
     noise: &[Variance],
     y: &[Option<f64>],
-    rng: &mut NpRng,
+    rng: &mut impl NormalDraw,
 ) -> Result<Vec<DVector<f64>>, Error> {
     draw_states_impl(system, Noise::Rows(noise), y, rng)
 }
@@ -215,7 +215,7 @@ fn draw_states_impl(
     system: &System,
     noise: Noise<'_>,
     y: &[Option<f64>],
-    rng: &mut NpRng,
+    rng: &mut impl NormalDraw,
 ) -> Result<Vec<DVector<f64>>, Error> {
     let conditional = smooth(&filter_impl(system, noise, y)?)?;
     let mut state = system.initial_distribution().draw(rng);
@@ -230,7 +230,9 @@ fn draw_states_impl(
             let (transition, innovation) = system.transition(t)?;
             state = transition * state;
             for j in 0..state.len() {
-                state[j] += innovation[(j, j)].sqrt() * rng.standard_normal();
+                if innovation[(j, j)] > 0. {
+                    state[j] += innovation[(j, j)].sqrt() * rng.standard_normal();
+                }
             }
         }
     }

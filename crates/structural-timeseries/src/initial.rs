@@ -4,7 +4,7 @@ use crate::{
     lapack_cholesky::{dpotrf, Triangle},
     Error,
 };
-use hirmos_causal_core::nprandom::NpRng;
+use crate::random::NormalDraw;
 use nalgebra::{DMatrix, DVector};
 
 #[derive(Clone)]
@@ -76,8 +76,12 @@ impl Initial {
     pub fn moments(&self) -> (DVector<f64>, DMatrix<f64>) {
         (self.mean.clone(), self.covariance.clone())
     }
-    pub fn draw(&self, rng: &mut NpRng) -> DVector<f64> {
-        let z = DVector::from_fn(self.dimension(), |_, _| rng.standard_normal());
+    pub fn draw(&self, rng: &mut impl NormalDraw) -> DVector<f64> {
+        // A known state coordinate has no innovation and consumes no random draw.
+        let z = DVector::from_fn(self.dimension(), |i, _| {
+            if self.factor.column(i).iter().all(|v| *v == 0.) { 0. }
+            else { rng.standard_normal() }
+        });
         &self.mean + &self.factor * z
     }
 }

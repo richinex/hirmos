@@ -160,10 +160,8 @@ impl Regression {
         let k = conditional.indices.len();
         self.coefficients.fill(0.0);
         if k > 0 {
-            let covariance =
-                solve(&factor(&conditional.precision)?, DMatrix::identity(k, k))? * self.variance;
-            let covariance = (&covariance + covariance.transpose()) * 0.5;
-            let beta = Initial::new(conditional.mean, covariance)?.draw(&mut self.rng);
+            let beta = draw_coefficients(&conditional.mean, &conditional.precision,
+                self.variance, || self.rng.standard_normal())?;
             for (i, j) in conditional.indices.iter().enumerate() {
                 self.coefficients[*j] = beta[i];
             }
@@ -178,7 +176,7 @@ impl Regression {
                 self.y.len(),
                 residual.norm_squared(),
             )?)?
-            .draw(&mut self.variance_rng)?
+            .draw(&mut self.rng)?
             .value();
         Ok(Draw {
             coefficients: self.coefficients.as_slice().to_vec(),

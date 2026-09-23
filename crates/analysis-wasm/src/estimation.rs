@@ -3525,7 +3525,7 @@ mod tests {
         values.extend(&t);
         values.extend(&y);
         values.extend(&w);
-        let json = backdoor_linear(&values, rows, 3, 0, 1, &[2], None, 0.95)
+        let json = backdoor_linear(&values, rows, 3, 0, 1, &[2], None, 0.95, LinearErrorModel::NeweyWest)
             .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
             .expect("estimate should serialize");
         let value: serde_json::Value = serde_json::from_str(&json).unwrap();
@@ -3539,9 +3539,9 @@ mod tests {
         assert!(value["hacPValue"].as_f64().unwrap() < 0.05);
         assert!(value["durbinWatson"].as_f64().unwrap() > 1.0);
 
-        assert!(backdoor_linear(&values, rows, 3, 0, 0, &[2], None, 0.95).is_err());
-        assert!(backdoor_linear(&values, rows, 3, 0, 1, &[2], Some(rows), 0.95).is_err());
-        assert!(backdoor_linear(&values, rows, 3, 0, 1, &[2], None, 0.4).is_err());
+        assert!(backdoor_linear(&values, rows, 3, 0, 0, &[2], None, 0.95, LinearErrorModel::NeweyWest).is_err());
+        assert!(backdoor_linear(&values, rows, 3, 0, 1, &[2], Some(rows), 0.95, LinearErrorModel::NeweyWest).is_err());
+        assert!(backdoor_linear(&values, rows, 3, 0, 1, &[2], None, 0.4, LinearErrorModel::NeweyWest).is_err());
     }
 
     #[test]

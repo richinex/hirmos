@@ -1076,6 +1076,11 @@ export function runSyntheticControl(values: Float64Array, rows: number, columns:
   return post('synthetic-control-succeeded', { kind: 'synthetic-control', request, values, rows, columns, ...design }, values)
 }
 
+export function runStaggeredDid(values:Float64Array, model:import('@/domain/staggeredDid').StaggeredRequest):Promise<Result<import('@/domain/staggeredDid').StaggeredEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('staggered-did-succeeded',{kind:'staggered-did',request,values,model},values)
+}
+
 export function runAdjustedDid(values: Float64Array, rows: number, columns: number, units: readonly string[], times: readonly number[], specification: AdjustedDidSpecification): Promise<PanelInterventionOutcome> {
   const request = newWorkerRequestId()
   return new Promise(resolve => {

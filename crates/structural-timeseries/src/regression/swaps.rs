@@ -69,7 +69,7 @@ impl Regression {
         &self,
         included: &mut Vec<bool>,
         current: &mut Conditional,
-        rng: &mut NpRng,
+        rng: &mut Random,
     ) -> Result<(), Error> {
         if matches!(self.swaps, Correlations::Disabled) {
             return Ok(());

@@ -397,6 +397,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'syntheticControl', rows: command.rows, columns: command.columns, treated: command.treated, donors: command.donors, nPre: command.nPre, crossFitFolds: command.crossFitFolds, alpha: command.alpha }
     case 'panel-intervention':
       return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
+    case 'staggered-did': return {kind:'staggeredDid',request:command.model}
     case 'panel-adjusted':
       return { kind: 'panelAdjusted', rows: command.rows, columns: command.columns, units: command.units, times: command.times, specification: command.specification }
     case 'negbin-nuts':
@@ -862,6 +863,14 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         emit({ kind: 'synthetic-control-succeeded', request: command.request, result: result.data })
         return
       }
+      case 'staggered-did': {
+        const wrapper=z.object({kind:z.literal('staggeredDid'),evidence:z.unknown()}).safeParse(decoded)
+        const raw=wrapper.success && typeof wrapper.data.evidence==='object' && wrapper.data.evidence!==null ? {...wrapper.data.evidence,kind:'staggeredDid'} : null
+        const result=staggeredEvidenceSchema.safeParse(raw)
+        if(!result.success) {fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(result.data.observations!==command.model.rows || result.data.covariates!==command.model.columns-1 || !sameStaggeredSpecification(result.data.specification,command.model.specification)) {fail(command.request,{kind:'worker-protocol-failed',detail:'The staggered DiD result does not match its requested specification.'});return}
+        emit({kind:'staggered-did-succeeded',request:command.request,result:result.data});return
+      }
       case 'panel-adjusted':
       case 'panel-intervention': {
         const result = panelInterventionEvidenceSchema.safeParse(decoded)
@@ -943,4 +952,5 @@ self.onmessage = (message: MessageEvent<unknown>) => {
 import { gcmEffectsResponseSchema } from '@/domain/gcmEffects'
 import { gcmInfluenceResponseSchema } from '@/domain/gcmInfluence'
 import { parseSharpRdEvidence } from '@/domain/sharpRd'
+import { staggeredEvidenceSchema, sameStaggeredSpecification } from '@/domain/staggeredDid'
 import { sameDidSpecification } from '@/domain/adjustedDid'

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { staggeredRequestSchema, staggeredEvidenceSchema, type StaggeredRequest, type StaggeredEvidence } from '@/domain/staggeredDid'
 import { structuralModelSchema, type StructuralModel } from '@/domain/structuralImpact'
 import { rootCauseRequestSchema, rootCauseEvidenceSchema, type RootCauseRequest, type RootCauseEvidence } from '@/domain/rootCauseAnalysis'
 import { rootCauseCheckRequestSchema, rootCauseChecksSchema, type RootCauseCheckRequest, type RootCauseChecks } from '@/domain/rootCauseAnalysis'
@@ -846,6 +847,12 @@ export type AnalysisWorkerCommand =
       readonly alpha: number
     }
   | {
+      readonly kind: 'staggered-did'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly model: StaggeredRequest
+    }
+  | {
       readonly kind: 'panel-adjusted'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1144,6 +1151,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'ardl-model-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlModelEvidence }
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
+  | { readonly kind: 'staggered-did-succeeded'; readonly request: WorkerRequestId; readonly result: StaggeredEvidence }
   | { readonly kind: 'panel-intervention-succeeded'; readonly request: WorkerRequestId; readonly result: PanelInterventionEvidence }
   | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
   | { readonly kind: 'bayesian-gaussian-succeeded'; readonly request: WorkerRequestId; readonly result: BayesianGaussianEvidence }
@@ -1975,6 +1983,9 @@ const commandSchema = z.discriminatedUnion('kind', [
     alpha: z.number().gt(0).lt(1),
   }).strict(),
   z.object({
+    kind: z.literal('staggered-did'), request: requestSchema, values:z.instanceof(Float64Array),model:staggeredRequestSchema,
+  }).strict(),
+  z.object({
     kind: z.literal('panel-adjusted'), request: requestSchema, values: z.instanceof(Float64Array),
     rows: z.number().int().positive(), columns: z.number().int().min(2),
     units: z.array(z.string().min(1)).min(1), times: z.array(z.number().int().nonnegative()).min(1), specification: adjustedDidSpecificationSchema,
@@ -2267,6 +2278,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('ardl-model-succeeded'), request: requestSchema, result: ardlModelEvidenceSchema }).strict(),
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
+  z.object({ kind:z.literal('staggered-did-succeeded'),request:requestSchema,result:staggeredEvidenceSchema }).strict(),
   z.object({ kind: z.literal('panel-intervention-succeeded'), request: requestSchema, result: panelInterventionEvidenceSchema }).strict(),
   z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('bayesian-gaussian-succeeded'), request: requestSchema, result: bayesianGaussianEvidenceSchema }).strict(),
@@ -2330,6 +2342,7 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
   if (parsed.data.kind === 'granger-ssr-f' && parsed.data.values.length !== parsed.data.rows * 2) {
     return err({ kind: 'invalid-command', detail: 'The Granger matrix must contain exactly two columns.' })
   }
+  if (parsed.data.kind === 'staggered-did' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Staggered DiD matrix dimensions disagree.'})
   if (parsed.data.kind === 'panel-adjusted' && (parsed.data.values.length !== parsed.data.rows * parsed.data.columns || parsed.data.units.length !== parsed.data.rows || parsed.data.times.length !== parsed.data.rows)) {
     return err({ kind: 'invalid-command', detail: 'Adjusted DiD values and keys must describe the same rows.' })
   }
@@ -2612,6 +2625,7 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = sharpRdEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
+  if (parsed.data.kind === 'staggered-did-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'panel-intervention-succeeded') {
     const result = panelInterventionEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'panel-intervention-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })

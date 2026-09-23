@@ -1805,7 +1805,13 @@ mod tests {
                 assert_eq!(pc_alpha, 0.05);
                 assert!(matches!(samples, TemporalSamples::Dense));
             }
-            AnalysisCommand::RootCause { .. }
+            AnalysisCommand::StaggeredDid { .. }
+            | AnalysisCommand::InterruptedSeries { .. }
+            | AnalysisCommand::SharpRd { .. }
+            | AnalysisCommand::StructuralCausalImpact { .. }
+            | AnalysisCommand::BayesianCausalImpact { .. }
+            | AnalysisCommand::PanelAdjusted { .. }
+            | AnalysisCommand::RootCause { .. }
             | AnalysisCommand::RootCauseChecks { .. }
             | AnalysisCommand::ArdlModel { .. }
             | AnalysisCommand::StationarityBattery

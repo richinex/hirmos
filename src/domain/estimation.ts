@@ -232,7 +232,9 @@ export interface SyntheticControlConfiguration {
   readonly alpha: number
 }
 
-export type PanelInterventionConfiguration = {
+import { staggeredEvidenceSchema, staggeredConfigurationSchema, sameStaggeredSpecification, type StaggeredConfiguration } from './staggeredDid'
+
+export type PanelInterventionConfiguration = StaggeredConfiguration | {
   readonly kind: 'panel-intervention'
   readonly primary: 'adjusted'
   readonly covariates: readonly ColumnId[]
@@ -838,7 +840,7 @@ const conventionalPanelEvidenceSchema = z.object({
   if (e.did.omega.length !== e.controlUnits || e.did.lambda.length !== e.nPre || e.did.effectCurve.length !== e.nPost) ctx.addIssue({ code: 'custom', message: 'DiD weights or period effects do not match the panel.' })
 })
 
-export const panelInterventionEvidenceSchema = z.union([syntheticPanelEvidenceSchema, conventionalPanelEvidenceSchema, adjustedDidEvidenceSchema])
+export const panelInterventionEvidenceSchema = z.union([syntheticPanelEvidenceSchema, conventionalPanelEvidenceSchema, adjustedDidEvidenceSchema, staggeredEvidenceSchema])
 export type PanelInterventionEvidence = z.infer<typeof panelInterventionEvidenceSchema>
 
 export const negbinNutsEvidenceSchema = z.object({
@@ -1757,6 +1759,17 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       break
     }
     case 'panel-intervention': {
+      if (configuration.primary === 'staggered') {
+        if (prepared.kind !== 'prepared-panel' || !prepared.panel.balanced) violate('panel-balanced-layout', 'Staggered DiD requires a balanced long panel with unit and time keys.')
+        else satisfy('panel-balanced-layout', 'A balanced panel is prepared. Each unit’s first treatment period is derived from its binary treatment indicator; treatment must remain on afterwards.')
+        if (!staggeredConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the event window and inference settings.')
+        else satisfy('panel-pre-fit', 'Group-time ATT compares adoption cohorts with the selected comparison group. Numeric covariates use the comparison baseline.')
+        leave('panel-parallel-trends', 'Identification requires parallel untreated trends, conditional on the selected covariates when adjustment is used, and treatment overlap.')
+        leave('panel-no-anticipation', configuration.specification.anticipation === 0 ? 'Assume no treatment effect before adoption.' : 'Assume no treatment effect before the specified anticipation window.')
+        leave('panel-no-spillovers', 'Treatment of one unit must not affect another unit’s outcome.')
+        leave('panel-no-interval', 'Inference treats panel units as independent clusters. Simultaneous bands cover the effects within each reported family; overall ATT intervals are pointwise.')
+        break
+      }
       if (prepared.kind !== 'prepared-panel') {
         violate('panel-balanced-layout', 'This estimator requires a long panel prepared with explicit unit and time keys.')
       } else if (!prepared.panel.balanced) {
@@ -2324,6 +2337,15 @@ export function causalEstimateFrom(
     }
     case 'panel-intervention-run': {
       const { evidence } = run
+      if (run.configuration.primary === 'staggered') {
+        if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'staggeredDid' || !sameStaggeredSpecification(run.configuration.specification,evidence.specification) || run.configuration.covariates.length !== evidence.covariates) return null
+        const point=evidence.overall.dynamic
+        if (point.kind==='reference') return null
+        return {kind:'causal-estimate',estimand:study.estimand,effect:{kind:'additive',value:point.estimate,unit:''},
+          interval:point.kind==='estimated'?{kind:'confidence',level:evidence.specification.confidence,lower:point.lower,upper:point.upper}:{kind:'none',reason:'The influence-function variance does not support an uncertainty interval.'},
+          standardError:point.kind==='estimated'?point.standardError:null,adjustment:{kind:'none'},sample:{observations:evidence.retainedObservations,parameters:evidence.covariates,degreesOfFreedom:null}}
+      }
+      if (evidence.kind === 'staggeredDid') return null
       if (run.configuration.primary === 'adjusted') {
         if (study.estimand.kind !== 'average-treatment-effect-on-treated' || evidence.kind !== 'panelAdjusted'
           || !sameDidSpecification(run.configuration.specification, evidence.specification) || run.configuration.covariates.length !== evidence.covariates) return null

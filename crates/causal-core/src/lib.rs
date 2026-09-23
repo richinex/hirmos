@@ -110,6 +110,7 @@ pub mod arma_regression;
 pub mod bayesian_gaussian;
 pub mod bayesian_impact;
 pub mod did;
+pub mod staggered_did;
 pub mod did_regression;
 pub mod rd;
 pub mod bfgs;

@@ -8,7 +8,7 @@ use crate::{
     state::{Normal, Variance},
     Error,
 };
-use hirmos_causal_core::nprandom::{Mt19937, NpRng};
+use crate::random::Random;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Support {
@@ -60,8 +60,7 @@ pub struct Sampler {
     variance_prior: Prior,
     support: Support,
     parameters: Parameters,
-    rng: NpRng,
-    variance_rng: Mt19937,
+    rng: Random,
 }
 impl Sampler {
     pub fn new(
@@ -84,8 +83,7 @@ impl Sampler {
             variance_prior,
             support,
             parameters: initial,
-            rng: NpRng::seeded(seed as u64),
-            variance_rng: Mt19937::seeded(seed.wrapping_add(1)),
+            rng: Random::new(seed as u64),
         })
     }
     pub fn parameters(&self) -> Parameters {
@@ -141,7 +139,7 @@ impl Sampler {
         let variance = next
             .variance_prior
             .conditional(Statistics::from_summary(slopes.len(), squares)?)?
-            .draw(&mut next.variance_rng)?;
+            .draw(&mut next.rng)?;
         next.parameters = Parameters::new(mu, phi, Scale::new(variance.value().sqrt())?)?;
         *self = next;
         Ok(())

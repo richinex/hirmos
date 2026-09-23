@@ -7,7 +7,7 @@ use crate::{
     state::{Component, Direct, Harmonics, Normal, Season, System, Variance},
     Error,
 };
-use hirmos_causal_core::nprandom::{Mt19937, NpRng};
+use crate::random::Random;
 use nalgebra::{DMatrix, DVector};
 
 #[derive(Clone)]
@@ -32,7 +32,7 @@ impl Parameter {
             update,
         }
     }
-    fn sample(&mut self, stats: Statistics, rng: &mut Mt19937) -> Result<(), Error> {
+    fn sample(&mut self, stats: Statistics, rng: &mut Random) -> Result<(), Error> {
         self.value = self.update.draw(stats, rng)?;
         Ok(())
     }
@@ -87,7 +87,7 @@ enum Mechanism {
 }
 
 #[derive(Clone)]
-pub struct Term(Mechanism);
+pub struct Term(Mechanism, Random);
 impl Term {
     pub fn semilocal(
         level: Update,
@@ -100,7 +100,7 @@ impl Term {
             slope,
             initial_level,
             initial_slope,
-        })
+        }, Random::new(0))
     }
     pub fn dynamic_ar(
         predictors: crate::state::Predictors,
@@ -116,7 +116,7 @@ impl Term {
         Ok(Self(Mechanism::DynamicAr {
             predictors,
             samplers,
-        }))
+        }, Random::new(0)))
     }
     pub fn dynamic(
         predictors: crate::state::Predictors,
@@ -137,16 +137,16 @@ impl Term {
         Ok(Self(Mechanism::Dynamic {
             predictors,
             innovations,
-        }))
+        }, Random::new(0)))
     }
     pub fn sparse_ar(sampler: crate::sparse_ar::Sampler) -> Self {
-        Self(Mechanism::SparseAr(sampler))
+        Self(Mechanism::SparseAr(sampler), Random::new(0))
     }
     pub fn ar_with_sampler(sampler: crate::ar::Sampler) -> Self {
-        Self(Mechanism::Ar(sampler))
+        Self(Mechanism::Ar(sampler), Random::new(0))
     }
     pub fn ar(order: std::num::NonZeroUsize, prior: Prior, seed: u32) -> Self {
-        Self(Mechanism::Ar(crate::ar::Sampler::new(order, prior, seed)))
+        Self(Mechanism::Ar(crate::ar::Sampler::new(order, prior, seed)), Random::new(0))
     }
     pub fn direct(cycle: Harmonics, prior: Prior, initial: Normal) -> Self {
         let innovations = vec![
@@ -160,10 +160,10 @@ impl Term {
             cycle,
             innovations,
             initial,
-        })
+        }, Random::new(0))
     }
     pub fn intercept(initial: Normal) -> Self {
-        Self(Mechanism::Intercept { initial })
+        Self(Mechanism::Intercept { initial }, Random::new(0))
     }
     pub fn harmonic(cycle: Harmonics, prior: Prior, initial: Normal) -> Self {
         // R's harmonic factory installs a sampler and leaves its initial SD at
@@ -175,13 +175,13 @@ impl Term {
                 initial: Scale::new(1.0).expect("unit scale"),
             }),
             initial,
-        })
+        }, Random::new(0))
     }
     pub fn level(innovation: Update, initial: Normal) -> Self {
         Self(Mechanism::Level {
             innovation: Parameter::new(innovation),
             initial,
-        })
+        }, Random::new(0))
     }
     pub fn trend(
         level: Update,
@@ -194,14 +194,14 @@ impl Term {
             slope: Parameter::new(slope),
             initial_level,
             initial_slope,
-        })
+        }, Random::new(0))
     }
     pub fn seasonal(season: Season, innovation: Update, initial: Normal) -> Self {
         Self(Mechanism::Seasonal {
             season,
             innovation: Parameter::new(innovation),
             initial,
-        })
+        }, Random::new(0))
     }
     fn component(&self) -> Component {
         match &self.0 {
@@ -302,10 +302,10 @@ impl Term {
         &mut self,
         states: &[DVector<f64>],
         offset: usize,
-        rng: &mut Mt19937,
     ) -> Result<(), Error> {
         let component = self.component();
         let dimension = component.dimension();
+        let rng = &mut self.1;
         let statistics = |residual: &dyn Fn(usize,&DVector<f64>,&DVector<f64>)->Option<f64>| -> Result<Statistics,Error> {
             let mut stats = Statistics::default();
             for t in 1..states.len() {
@@ -444,8 +444,8 @@ pub struct Chain {
     observation_model: Observation,
     observation: Variance,
     states: Vec<DVector<f64>>,
-    state_rng: NpRng,
-    variance_rng: Mt19937,
+    state_rng: Random,
+    variance_rng: Random,
 }
 
 pub struct Draw {
@@ -552,7 +552,7 @@ impl Chain {
         Self::start(terms, observation_prior, y, seed, system)
     }
     fn start(
-        terms: Vec<Term>,
+        mut terms: Vec<Term>,
         observation_prior: Prior,
         y: Vec<Option<f64>>,
         seed: u32,
@@ -561,7 +561,12 @@ impl Chain {
         if !y.iter().any(Option::is_some) {
             return Err(Error::Empty);
         }
-        let mut state_rng = NpRng::seeded(seed as u64);
+        // Parameter samplers own independent streams, as in BOOM. Derive seeds
+        // in u64 arithmetic, without its platform-dependent signed lround.
+        for (i, term) in terms.iter_mut().enumerate() {
+            term.1 = Random::new(seed as u64 + 4 + i as u64);
+        }
+        let mut state_rng = Random::new(seed as u64);
         // The R Gaussian manager leaves the observation model's starting SD at
         // one, ignoring SdPrior.initial.value as well as SdPrior.fixed.
         let observation = Variance::new(1.0)?;
@@ -574,7 +579,7 @@ impl Chain {
             observation,
             states,
             state_rng,
-            variance_rng: Mt19937::seeded(seed.wrapping_add(1)),
+            variance_rng: Random::new(seed.wrapping_add(1) as u64),
         })
     }
     pub fn step(&mut self) -> Result<Draw, Error> {
@@ -625,7 +630,7 @@ impl Chain {
         };
         let mut offset = 0;
         for term in &mut terms {
-            term.sample(&self.states, offset, &mut variance_rng)?;
+            term.sample(&self.states, offset)?;
             offset += term.component().dimension();
         }
         let mut initial = self.initial.clone();
@@ -716,3 +721,7 @@ impl Chain {
         )
     }
 }
+
+#[cfg(test)]
+#[path = "tests/chain_stream.rs"]
+mod chain_stream;

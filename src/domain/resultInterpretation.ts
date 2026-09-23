@@ -221,7 +221,7 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'vecm-run': return `Long-run relationship between ${outcome} and ${treatment}.`
     case 'synthetic-control-run':
     case 'causal-impact-run': return `Observed ${outcome} minus its estimated no-intervention outcome per ${stepLabel}.`
-    case 'panel-intervention-run': return `Average difference over treated units and post-adoption periods.`
+    case 'panel-intervention-run': return run.evidence.kind==='staggeredDid'?'Average of supported post-adoption event-time ATT estimates.':`Average difference over treated units and post-adoption periods.`
     case 'discrete-bn-run': return `Difference in expected ${outcome} in the high rather than low ${treatment} state.`
     case 'binary-ett-run': return `Expected ${outcome} under treatment minus no treatment among treated rows.`
     case 'causal-effects-run': {
@@ -250,6 +250,7 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
 /** Describe the evidence shape without presenting repeated panel cells as independent observations. */
 export function resultSampleLine(run: EstimationRunArtifact): string {
   if (run.kind !== 'panel-intervention-run') return `n = ${formatCount(run.estimate.sample.observations).text}`
+  if(run.evidence.kind==='staggeredDid') return `${run.evidence.units.length} retained units across ${run.evidence.times.length} periods; event-time support is reported separately`
   const treatedCells = run.evidence.treatedUnits * run.evidence.nPost
   return `${run.evidence.units.length} units × ${run.evidence.times.length} periods; the average covers ${treatedCells} treated-unit periods after adoption`
 }
@@ -408,6 +409,11 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       ] }
     }
     case 'panel-intervention-run': {
+      if(run.evidence.kind==='staggeredDid') return {kind:'result-interpretation',statements:[
+        {kind:'magnitude',text:'The headline is the equal-weight average of supported post-adoption event-time effects. Group-time ATT, cohort averages and calendar averages are reported separately.'},
+        estimate.interval.kind==='none'?noInterval(estimate.interval.reason):intervalStatement(estimate.interval,{kind:'additive'}),
+        {kind:'qualification',text:'Interpretation requires parallel untreated trends for the selected comparison group, treatment overlap, no effects before the specified anticipation window, and no interference between units. Adjustment covariates must not be affected by treatment.'},
+      ]}
       if (run.evidence.kind === 'panelAdjusted') return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `For the treated group, the estimated average effect on ${plainName(study.outcome.name)} is ${directionalDifference(run.evidence.estimate)} after adoption.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
