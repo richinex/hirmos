@@ -44,7 +44,7 @@ test('lag-aware preparation previews saved gaps without asking for another polic
   await expect(preview.getByTestId('prepared-series')).toBeVisible()
   await expect(preview.getByRole('alert')).toHaveCount(0)
   const values = await page.evaluate(async () => {
-    const charts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const charts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     const element = document.querySelector('[data-testid=prepared-series] [_echarts_instance_]') ?? document.querySelector('[data-testid=prepared-series]')
     return charts.getInstanceByDom(element).getOption().series[0].data.map((point: [number, number | null]) => point[1])
   })

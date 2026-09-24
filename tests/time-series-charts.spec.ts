@@ -35,11 +35,11 @@ test('count plots share one time window through theme changes and expansion', as
   await expect(page.getByRole('button', { name: 'Fit and scan', exact: true })).toHaveAttribute('aria-busy', 'true')
   await page.locator('[data-testid=count-fit-plot] [_echarts_instance_]').first().waitFor()
   await page.evaluate(async () => {
-    const echarts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const echarts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     echarts.getInstanceByDom(document.querySelector('[data-testid=count-fit-plot] [_echarts_instance_]')).dispatchAction({ type: 'dataZoom', startValue: 90, endValue: 110 })
   })
   const ranges = () => page.evaluate(async () => {
-    const echarts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const echarts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     return [...document.querySelectorAll('[_echarts_instance_]')].filter(el => el.checkVisibility()).map((el) => {
       const zoom = echarts.getInstanceByDom(el).getOption().dataZoom?.[0]
       return zoom ? [zoom.startValue, zoom.endValue] : null

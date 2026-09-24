@@ -5,8 +5,7 @@ test('causal model actions distinguish cancellation from failure', async ({ page
   await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string) => import(new URL(path, location.href).href)
-    const { default: React } = await load('/node_modules/.vite/deps/react.js')
-    const { default: { createRoot } } = await load('/node_modules/.vite/deps/react-dom_client.js')
+    const { React, createRoot } = await load('/tests/support/reactRuntime.ts')
     const { ActionRow } = await load('/src/components/root-cause/ActionRow.tsx')
     const render = (job: Job, action: 'analysis' | 'checks') =>
       React.createElement(ActionRow, { job, action, onRun() {}, onCancel() {} })

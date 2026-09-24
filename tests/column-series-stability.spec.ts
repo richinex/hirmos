@@ -36,13 +36,12 @@ test('preview column clicks update the existing bottom chart', async ({ page }, 
 test('series retains its chart through loading, stale replies and cached switches', async ({ page }) => {
   await page.goto('/app')
   await page.evaluate(async () => {
-    const { default: React } = await import(new URL('/node_modules/.vite/deps/react.js', location.href).href)
-    const { default: ReactDOM } = await import(new URL('/node_modules/.vite/deps/react-dom_client.js', location.href).href)
+    const { React, createRoot } = await import(new URL('/tests/support/reactRuntime.ts', location.href).href)
     const { ColumnSeriesPane } = await import(new URL('/src/components/data/ColumnSeriesPane.tsx', location.href).href)
     const host = document.createElement('div')
     host.style.cssText = 'position:fixed;inset:0;background:var(--color-panel);z-index:9999'
     document.body.append(host)
-    const root = ReactDOM.createRoot(host)
+    const root = createRoot(host)
     const columns = ['Alpha', 'Beta', 'Category'].map(name => ({ id: name, name, duckdbType: name === 'Category' ? 'VARCHAR' : 'DOUBLE', nullable: false, nullCount: 0 }))
     const ready = columns.map((column, i) => ({ kind: 'ready', column: column.id, profile: {}, series: i === 2 ? null : { column: column.id, values: new Float64Array(i === 0 ? [1, 2, 3] : [10, 20, 30]), missingCells: 0 } }))
     Object.assign(window, { renderSeries: (selected: number, status: string, reply = selected, key = 'first') => root.render(React.createElement(ColumnSeriesPane, {

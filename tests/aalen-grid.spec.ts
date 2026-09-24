@@ -4,8 +4,8 @@ test('coefficient grid handles many terms without creating every chart', async (
   await page.goto('/')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
-    const [{ default: { createElement } }, { default: { createRoot } }, { AalenCoefficients }] = await Promise.all([
-      load('/node_modules/.vite/deps/react.js'), load('/node_modules/.vite/deps/react-dom_client.js'), load('/src/components/survival/AalenCoefficients.tsx'),
+    const [{ createElement, createRoot }, { AalenCoefficients }] = await Promise.all([
+      load('/tests/support/reactRuntime.ts'), load('/src/components/survival/AalenCoefficients.tsx'),
     ])
     const host = document.createElement('div')
     host.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;background:white;padding:16px'

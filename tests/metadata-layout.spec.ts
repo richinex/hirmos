@@ -4,8 +4,7 @@ test('column identity and requirement tallies fit without repeated labels', asyn
   await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string) => import(/* @vite-ignore */ path)
-    const { default: React } = await load('/node_modules/.vite/deps/react.js')
-    const { default: { createRoot } } = await load('/node_modules/.vite/deps/react-dom_client.js')
+    const { React, createRoot } = await load('/tests/support/reactRuntime.ts')
     const { ColumnProfilePane } = await load('/src/components/data/ColumnProfilePane.tsx')
     const { MethodCaveats } = await load('/src/components/MethodCaveats.tsx')
     const h = React.createElement

@@ -1495,7 +1495,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
       {runs.length === 0 && <li className="px-3 py-2 text-faint">No survival runs yet.</li>}
       {[...runs].reverse().map((run) => (
         <li key={run.id} className="px-3 py-2">
-          <SurvivalRunResult run={run} current={false} open={false} onDelete={() => setPendingDelete(run)} />
+          <SurvivalRunResult run={run} current={false} open={false} onDelete={setPendingDelete} />
         </li>
       ))}
     </ul>

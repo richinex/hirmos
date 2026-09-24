@@ -4,8 +4,8 @@ test('table controls align on touch and desktop, including after search and wrap
   await page.goto('/')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
-    const [{ default: React }, { default: ReactDOM }, ui] = await Promise.all([
-      load('/node_modules/.vite/deps/react.js'), load('/node_modules/.vite/deps/react-dom_client.js'), load('/src/components/table/primitives.tsx'),
+    const [{ React, createRoot }, ui] = await Promise.all([
+      load('/tests/support/reactRuntime.ts'), load('/src/components/table/primitives.tsx'),
     ])
     const host = document.createElement('div')
     host.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;background:var(--color-panel);padding:16px'
@@ -22,7 +22,7 @@ test('table controls align on touch and desktop, including after search and wrap
           React.createElement(ui.DensityToggle, { density, onChange: setDensity })),
       })
     }
-    ReactDOM.createRoot(host).render(React.createElement(Controls))
+    createRoot(host).render(React.createElement(Controls))
   })
   const search = page.getByRole('searchbox', { name: 'Search columns' })
   const facet = page.getByRole('button', { name: 'Numeric 11' })

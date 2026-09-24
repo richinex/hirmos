@@ -5,21 +5,20 @@ test('expanding a dense scatter matrix does not redraw unchanged charts', async 
   await page.goto('/')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
-    const [React, ReactDOM, { ExpandableChart }, { scatterMatrixOption }, { readChartTheme }] = await Promise.all([
-      load('/node_modules/.vite/deps/react.js'), load('/node_modules/.vite/deps/react-dom_client.js'),
-      load('/src/charts/ExpandableChart.tsx'), load('/src/charts/data/scatterMatrix.ts'), load('/src/charts/theme.ts'),
+    const [{ React, createRoot }, { ExpandableChart }, { scatterMatrixOption }, { readChartTheme }] = await Promise.all([
+      load('/tests/support/reactRuntime.ts'), load('/src/charts/ExpandableChart.tsx'), load('/src/charts/data/scatterMatrix.ts'), load('/src/charts/theme.ts'),
     ])
     const host = document.createElement('div')
     document.getElementById('root')!.style.display = 'none'
     host.style.cssText = 'position:fixed;inset:100px 0 0;z-index:1;background:white;overflow:auto;padding:20px'
     document.body.append(host)
     const columns = Array.from({ length: 6 }, (_, c) => ({ name: `Variable ${c+1}`, values: Array.from({ length: 10000 }, (_, r) => 0.1+c+Math.sin(r*0.02+c)+r/10000) }))
-    ReactDOM.default.createRoot(host).render(React.default.createElement(ExpandableChart, { option: scatterMatrixOption(columns, readChartTheme()), label: 'Dense scatter lifecycle', testId: 'dense-scatter', defaultWidth: 1100, defaultHeight: 800, style: { height: 700 } }))
+    createRoot(host).render(React.createElement(ExpandableChart, { option: scatterMatrixOption(columns, readChartTheme()), label: 'Dense scatter lifecycle', testId: 'dense-scatter', defaultWidth: 1100, defaultHeight: 800, style: { height: 700 } }))
   })
   await expect(page.getByTestId('dense-scatter')).not.toHaveAttribute('aria-busy', 'true')
   await page.evaluate(async () => {
     await document.fonts.ready
-    const charts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const charts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     const chart = charts.getInstanceByDom(document.querySelector('[data-testid=dense-scatter]'))
     const prototype = Object.getPrototypeOf(chart)
     const calls: {method:string; expanded:boolean}[] = []

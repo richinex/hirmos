@@ -54,12 +54,12 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   await ardlCharts.scrollIntoViewIfNeeded()
   await page.screenshot({ path: info.outputPath('ardl-long-run.png') })
   await page.evaluate(async () => {
-    const charts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const charts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     const element = [...document.querySelectorAll('[aria-label="Time-series result"] [_echarts_instance_]')].find(el => el.checkVisibility())
     charts.getInstanceByDom(element).dispatchAction({ type: 'dataZoom', startValue: 30, endValue: 90 })
   })
   const ranges = () => page.evaluate(async () => {
-    const charts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const charts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     return [...document.querySelectorAll('[aria-label="Time-series result"] [_echarts_instance_]')].filter(el => el.checkVisibility()).slice(0, 2).map(el => {
       const zoom = charts.getInstanceByDom(el).getOption().dataZoom[0]
       return [zoom.startValue, zoom.endValue]

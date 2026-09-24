@@ -74,8 +74,8 @@ test('lag-grid uses DAG controls and pans, zooms and fits without remounting the
   await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
-    const [{ default: React }, { default: ReactDOM }, { LagGraphViews }] = await Promise.all([
-      load('/node_modules/.vite/deps/react.js'), load('/node_modules/.vite/deps/react-dom_client.js'), load('/src/components/discovery/LagGraphViews.tsx'),
+    const [{ React, createRoot }, { LagGraphViews }] = await Promise.all([
+      load('/tests/support/reactRuntime.ts'), load('/src/components/discovery/LagGraphViews.tsx'),
     ])
     document.getElementById('root')!.style.display = 'none'
     const host = document.createElement('div')
@@ -83,7 +83,7 @@ test('lag-grid uses DAG controls and pans, zooms and fits without remounting the
     document.body.append(host)
     const variables = Array.from({ length: 24 }, (_, i) => ({ id: `v${i}`, name: `Service ${i} with a long variable name`, latent: false }))
     const links = variables.slice(1).map((_, i) => ({ from: i, to: i + 1, lag: 1 + i % 8, fromEndpoint: 'tail', toEndpoint: 'arrow', mark: '-->', strength: { kind: 'signed-unit', value: 0.5 } }))
-    ReactDOM.createRoot(host).render(React.createElement(LagGraphViews, { graph: { variables, links, tauMax: 8, semantics: 'stationary-lag-graph' }, label: 'Lag viewport test', initial: 'lag-grid' }))
+    createRoot(host).render(React.createElement(LagGraphViews, { graph: { variables, links, tauMax: 8, semantics: 'stationary-lag-graph' }, label: 'Lag viewport test', initial: 'lag-grid' }))
   })
   const viewport = page.getByTestId('lag-graph-viewport')
   await expect(viewport.locator('[_echarts_instance_]')).toHaveCount(1)

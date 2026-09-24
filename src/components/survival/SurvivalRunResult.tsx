@@ -1,10 +1,10 @@
 import { Metadata } from '@/components/ui/Metadata'
 import { Alert } from '@/components/ui/Alert'
-import { useState, type ReactNode } from 'react'
+import { memo, useMemo, useState, type ReactNode } from 'react'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { comparisonMeasureOption, hazardCurveOption, observedSurvivalOption, restrictedMeanOption, stateOccupancyOption, survivalCurvesOption, transitionMapOption, transitionMatrixOption } from '@/charts/survival/curves'
 import { ratioForestHeight, ratioForestOption, type RatioEstimate } from '@/charts/survival/estimates'
-import { useChartTheme } from '@/charts/theme'
+import { useChartTheme, type ChartTheme } from '@/charts/theme'
 import type { VisibleWindow } from '@/charts/window'
 import { Icon } from '@/components/Icon'
 import { EvidenceTable, figureColumn, type EvidenceColumn, type EvidenceValue } from '@/components/table/EvidenceTable'
@@ -385,15 +385,51 @@ const hazardRatioIntervalPosition = (interval: readonly [number, number]): strin
  * fitted parameters, and the curves. `current` marks the newest run with the emphasised border, as
  * the other chapters' result cards do; the ledger shows the same card collapsed.
  */
-export function SurvivalRunResult({ run, current = true, open = true, onDelete }: {
+/** The two run variants that draw a fitted profile. */
+type FittedEvidence = Extract<SurvivalRunArtifact, { readonly kind: 'right-censored-survival-run' | 'start-stop-survival-run' }>['evidence']
+
+/**
+ * The fitted pair. The event-free chart carries the slider and the hazard chart follows its window,
+ * so both live here with that window: a zoom rebuilds neither option.
+ */
+function FittedCurves({ evidence, lastTime, theme }: {
+  readonly evidence: FittedEvidence
+  readonly lastTime: number
+  readonly theme: ChartTheme
+}) {
+  const [window, setWindow] = useState<VisibleWindow | null>(null)
+  const survivalOption = useMemo(() => survivalCurvesOption(
+    [{ name: 'fitted profile', points: evidence.predictionTimes.map((time, index) => [time, evidence.survival[index] ?? Number.NaN] as const) }],
+    'follow-up time',
+    theme,
+    { marks: Number.isFinite(evidence.median) && evidence.median <= lastTime ? [{ name: 'median', value: evidence.median }] : [] },
+  ), [evidence, lastTime, theme])
+  const hazardOption = useMemo(
+    () => hazardCurveOption(evidence.predictionTimes, evidence.hazard, 'follow-up time', theme),
+    [evidence, theme],
+  )
+  return (
+    <>
+      <div className="mt-3">
+        <p className={label('m-0 mb-2 text-muted')}>Event-free probability</p>
+        <ExpandableChart className="h-[260px]" label="Fitted event-free probability" testId="survival-curve" window={window} onWindow={setWindow} option={survivalOption} />
+      </div>
+      <div className="mt-3">
+        <p className={label('m-0 mb-2 text-muted')}>Hazard over follow-up</p>
+        <ExpandableChart className="h-[220px]" label="Fitted hazard" testId="hazard-curve" window={window} onWindow={setWindow} option={hazardOption} />
+      </div>
+    </>
+  )
+}
+
+/** Memoised: editing the panel's form must not rebuild the result's charts. */
+export const SurvivalRunResult = memo(function SurvivalRunResult({ run, current = true, open = true, onDelete }: {
   readonly run: SurvivalRunArtifact
   readonly current?: boolean
   readonly open?: boolean
-  readonly onDelete?: () => void
+  readonly onDelete?: (run: SurvivalRunArtifact) => void
 }) {
   const theme = useChartTheme()
-  // The event-free chart carries the slider; the hazard chart follows its window.
-  const [window, setWindow] = useState<VisibleWindow | null>(null)
   const summary = survivalRunSummary(run)
   const heading = (() => {
     switch (run.kind) {
@@ -526,14 +562,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             />
             <p className={caption('mb-0 mt-2')}>Baseline parameters are on their natural scale. A covariate's {shape.ratio} is exp(estimate) per unit of the covariate; the interval is for the estimate. Drawn at is the value the curve uses.</p>
           </div>
-          <div className="mt-3">
-            <p className={label('m-0 mb-2 text-muted')}>Event-free probability</p>
-            <ExpandableChart className="h-[260px]" label="Fitted event-free probability" testId="survival-curve" window={window} onWindow={setWindow} option={survivalCurvesOption([{ name: 'fitted profile', points: evidence.predictionTimes.map((time, index) => [time, evidence.survival[index] ?? Number.NaN] as const) }], 'follow-up time', theme, { marks: Number.isFinite(evidence.median) && evidence.median <= lastTime ? [{ name: 'median', value: evidence.median }] : [] })} />
-          </div>
-          <div className="mt-3">
-            <p className={label('m-0 mb-2 text-muted')}>Hazard over follow-up</p>
-            <ExpandableChart className="h-[220px]" label="Fitted hazard" testId="hazard-curve" window={window} onWindow={setWindow} option={hazardCurveOption(evidence.predictionTimes, evidence.hazard, 'follow-up time', theme)} />
-          </div>
+          <FittedCurves evidence={evidence} lastTime={lastTime} theme={theme} />
         </>
       }
       case 'cox-regression-run': {
@@ -843,7 +872,7 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
             <time dateTime={run.createdAt} className={num('ml-auto text-label text-faint')}>{formatTime(run.createdAt)}</time>
           </div>}
           {onDelete !== undefined && (
-            <button type="button" className={iconControl('danger')} aria-label={`Delete ${summary.method} run`} title="Delete this run" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete() }}>
+            <button type="button" className={iconControl('danger')} aria-label={`Delete ${summary.method} run`} title="Delete this run" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onDelete(run) }}>
               <Icon name="delete" size={16} />
             </button>
           )}
@@ -852,4 +881,4 @@ export function SurvivalRunResult({ run, current = true, open = true, onDelete }
       </details>
     </article>
   )
-}
+})

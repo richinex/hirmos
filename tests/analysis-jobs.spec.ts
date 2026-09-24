@@ -38,9 +38,7 @@ test('replacing prepared data invalidates jobs without remounting the view', asy
   await page.goto('/app')
   const result = await page.evaluate(async () => {
     const load = (path: string) => import(new URL(path, location.href).href)
-    const { default: React } = await load('/node_modules/.vite/deps/react.js')
-    const { default: { createRoot } } = await load('/node_modules/.vite/deps/react-dom_client.js')
-    const { default: { flushSync } } = await load('/node_modules/.vite/deps/react-dom.js')
+    const { React, createRoot, flushSync } = await load('/tests/support/reactRuntime.ts')
     const { JobsProvider, useJob } = await load('/src/analysis/JobsProvider.tsx')
     let mounts = 0
     let session: ReturnType<typeof useJob>

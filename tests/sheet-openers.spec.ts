@@ -5,8 +5,7 @@ test('mobile sheet openers have depth without changing size or dialog behaviour'
   await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string) => import(/* @vite-ignore */ path)
-    const { default: React } = await load('/node_modules/.vite/deps/react.js')
-    const { default: { createRoot } } = await load('/node_modules/.vite/deps/react-dom_client.js')
+    const { React, createRoot } = await load('/tests/support/reactRuntime.ts')
     const { WorkbenchLayout } = await load('/src/components/shell/WorkbenchLayout.tsx')
     const host = document.createElement('main')
     host.id = 'sheet-test'

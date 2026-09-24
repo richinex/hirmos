@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ArmaUncertaintyAlert } from '@/components/estimation/ArmaUncertaintyAlert'
 import { Metadata } from '@/components/ui/Metadata'
 import { ExpandableChart } from '@/charts/ExpandableChart'
@@ -103,30 +103,37 @@ export function InterruptedSeriesResult({ run }: { readonly run: Run }) {
   const fitted = e.path.map((row) => row.fitted)
   const counterfactual = e.path.map((row) => row.counterfactual)
   const residuals = e.path.map((row) => row.residual)
+  // The charts share one window, so a zoom re-renders this component; the options must not be rebuilt with it.
+  const plotTime = run.plotTime
+  const fitOption = useMemo(() => plotTime === undefined ? null : interruptedFitOption({ title: 'Series, fit, and the counterfactual', axis: plotTime, observed, fitted, counterfactual, fittedName: 'Fitted', interventionRow: e.interventionRow, outcomeName: run.outcome.name }, theme), [plotTime, observed, fitted, counterfactual, e.interventionRow, run.outcome.name, theme])
+  const deseasonalisedOption = useMemo(() => plotTime === undefined || e.seasonal.kind !== 'harmonic' ? null : interruptedFitOption({ title: 'Deseasonalised trend', axis: plotTime, observed, fitted: e.seasonal.deseasonalised.map((row) => row.fitted), counterfactual: e.seasonal.deseasonalised.map((row) => row.counterfactual), fittedName: 'Fitted, seasonal terms fixed', interventionRow: e.interventionRow, outcomeName: run.outcome.name }, theme), [plotTime, observed, e.seasonal, e.interventionRow, run.outcome.name, theme])
+  const residualOption = useMemo(() => plotTime === undefined ? null : interruptedResidualOption({ axis: plotTime, residuals, interventionRow: e.interventionRow, kind: residualKind }, theme), [plotTime, residuals, e.interventionRow, residualKind, theme])
+  const acfOption = useMemo(() => interruptedCorrelationOption({ title: 'Autocorrelation', correlations: e.residualAcf }, theme), [e.residualAcf, theme])
+  const pacfOption = useMemo(() => interruptedCorrelationOption({ title: 'Partial autocorrelation', correlations: e.residualPacf }, theme), [e.residualPacf, theme])
   return <section className={resultSurface('text-body text-muted')} aria-label="Time-series result">
     <h3 className={`${resultTitle} m-0`}>{timeSeriesRunLabel(run)}</h3>
     <ResultInterpretation interpretation={{ kind: 'result-interpretation', statements }} />
     {errors !== null && errors.kind === 'arma' && <ArmaUncertaintyAlert evidence={errors} />}
     <MetricGrid label="Interrupted series summary">{tiles.map((tile) => <MetricTile key={tile.label} label={tile.label} value={tile.value} context={tile.context} />)}</MetricGrid>
-    {run.plotTime !== undefined && <div className="grid min-w-0 gap-6">
+    {fitOption !== null && residualOption !== null && <div className="grid min-w-0 gap-6">
       <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Series, fit, and the counterfactual</h4>
-        <ExpandableChart option={interruptedFitOption({ title: 'Series, fit, and the counterfactual', axis: run.plotTime, observed, fitted, counterfactual, fittedName: 'Fitted', interventionRow: e.interventionRow, outcomeName: run.outcome.name }, theme)} label="Interrupted series fit" className="mt-1 h-72" window={window} onWindow={setWindow} />
+        <ExpandableChart option={fitOption} label="Interrupted series fit" className="mt-1 h-72" window={window} onWindow={setWindow} />
         <p className="m-0 mt-1 text-label text-muted">Values in {scale}; the shaded band is the period after the event. The dashed line continues the fit with the event's terms at zero. The gap is the model-estimated difference, not a forecast.</p>
       </div>
-      {e.seasonal.kind === 'harmonic' && <div className="min-w-0">
+      {deseasonalisedOption !== null && <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Deseasonalised trend</h4>
-        <ExpandableChart option={interruptedFitOption({ title: 'Deseasonalised trend', axis: run.plotTime, observed, fitted: e.seasonal.deseasonalised.map((row) => row.fitted), counterfactual: e.seasonal.deseasonalised.map((row) => row.counterfactual), fittedName: 'Fitted, seasonal terms fixed', interventionRow: e.interventionRow, outcomeName: run.outcome.name }, theme)} label="Deseasonalised trend" className="mt-1 h-72" window={window} onWindow={setWindow} />
+        <ExpandableChart option={deseasonalisedOption} label="Deseasonalised trend" className="mt-1 h-72" window={window} onWindow={setWindow} />
         <p className="m-0 mt-1 text-label text-muted">Every row predicted at one phase of the seasonal cycle, half a period in, so the level and slope changes show without the seasonal curve.</p>
       </div>}
       <div className="min-w-0">
         <h4 className={label('m-0 text-faint')}>Residuals over time</h4>
-        <EChart option={interruptedResidualOption({ axis: run.plotTime, residuals, interventionRow: e.interventionRow, kind: residualKind }, theme)} label="Residuals over time" className="mt-1 h-48" />
+        <EChart option={residualOption} label="Residuals over time" className="mt-1 h-48" />
         {residualKind === 'standardised' && <p className="m-0 mt-1 text-label text-muted">Observed values minus their one-step-ahead predictions, divided by the forecast error standard deviation.</p>}
       </div>
       {e.residualAcf.length > 1 && <div className="grid min-w-0 gap-4 @lg/panel:grid-cols-2">
-        <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Autocorrelation of residuals</h4><EChart option={interruptedCorrelationOption({ title: 'Autocorrelation', correlations: e.residualAcf }, theme)} label="Residual autocorrelation" className="mt-1 h-48" /></div>
-        <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Partial autocorrelation of residuals</h4><EChart option={interruptedCorrelationOption({ title: 'Partial autocorrelation', correlations: e.residualPacf }, theme)} label="Residual partial autocorrelation" className="mt-1 h-48" /></div>
+        <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Autocorrelation of residuals</h4><EChart option={acfOption} label="Residual autocorrelation" className="mt-1 h-48" /></div>
+        <div className="min-w-0"><h4 className={label('m-0 text-faint')}>Partial autocorrelation of residuals</h4><EChart option={pacfOption} label="Residual partial autocorrelation" className="mt-1 h-48" /></div>
       </div>}
       <p className="m-0 text-label text-muted">Bars outside the dashed bands suggest residual correlation. The bands apply to each lag separately. Review the pattern alongside the Ljung–Box test.</p>
     </div>}

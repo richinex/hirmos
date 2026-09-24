@@ -5,8 +5,8 @@ test('shared surfaces wrap long values and retain virtual table behaviour', asyn
   await page.goto('/app')
   await page.evaluate(async () => {
     const load = (path: string): Promise<any> => import(/* @vite-ignore */ path)
-    const [{ default: React }, { default: ReactDOM }, figures, evidence, formats] = await Promise.all([
-      load('/node_modules/.vite/deps/react.js'), load('/node_modules/.vite/deps/react-dom_client.js'),
+    const [{ React, createRoot }, figures, evidence, formats] = await Promise.all([
+      load('/tests/support/reactRuntime.ts'),
       load('/src/components/ui/figures.tsx'), load('/src/components/table/EvidenceTable.tsx'), load('/src/lib/format/number.ts'),
     ])
     const h = React.createElement
@@ -15,7 +15,7 @@ test('shared surfaces wrap long values and retain virtual table behaviour', asyn
     document.body.append(host)
     const rows = Array.from({ length: 500 }, (_, id) => ({ id, name: `Variable ${id} with a long explanatory name`, value: id - 250 }))
     const columns = [{ id: 'name', header: 'Variable', value: (r: any) => r.name }, { id: 'value', header: 'Estimate', align: 'right', value: (r: any) => r.value }]
-    ReactDOM.createRoot(host).render(h('div', null,
+    createRoot(host).render(h('div', null,
       h(figures.MetricGrid, { label: 'Stress metrics' },
         ...['Short label', 'A much longer metric label describing a model comparison', 'Uncertainty interval'].map((label, i) => h(figures.MetricTile, { key: label, label, value: formats.formatWords(i === 2 ? '−123,456.78 to 987,654.32' : '123,456,789.12'), context: 'Supporting information with enough words to wrap at small widths.' }))),
       h(evidence.EvidenceTable, { title: 'Stress estimates', rows, columns, rowKey: (r: any) => String(r.id), noun: 'variable', empty: 'No values', frame: 'none', exportName: 'stress' }),

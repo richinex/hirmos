@@ -37,8 +37,7 @@ test('multiple VECM relationships retain their values and calendar dates when se
     const evidence = JSON.parse(wasm.runAnalysis(JSON.stringify(entry.command), new Float64Array(entry.values), new Uint8Array(), new Uint8Array(), () => {}))
     const domain = await import(new URL('/src/domain/timeSeries.ts', location.href).href)
     const { LongRunCharts } = await import(new URL('/src/components/time-series/LongRunCharts.tsx', location.href).href)
-    const { default: React } = await import(new URL('/node_modules/.vite/deps/react.js', location.href).href)
-    const { default: ReactDOM } = await import(new URL('/node_modules/.vite/deps/react-dom_client.js', location.href).href)
+    const { React, createRoot } = await import(new URL('/tests/support/reactRuntime.ts', location.href).href)
     const values = Array.from({ length: evidence.observations }, (_, i) => Date.UTC(2000, i, 1))
     const parsed = domain.parseTimeSeriesRun({ kind: 'vecm', id: 'chart-review', preparedDataset: 'p', createdAt: '2026-09-13T10:00:00.000Z', variables: ['Output', 'Income', 'Spending'].map(id => ({ id, name: id })), specification: { maxLags: 3, deterministic: 'ci', significance: 95 }, evidence, plotTime: { kind: 'calendar', values } })
     if (!parsed.ok) throw Error(parsed.error)
@@ -47,7 +46,7 @@ test('multiple VECM relationships retain their values and calendar dates when se
     host.className = 'flex flex-col gap-4 text-muted'
     host.style.cssText = 'position:fixed;inset:0;z-index:9999;overflow:auto;padding:24px;background:var(--color-panel)'
     document.body.append(host)
-    ReactDOM.createRoot(host).render(React.createElement(LongRunCharts, { run: parsed.value }))
+    createRoot(host).render(React.createElement(LongRunCharts, { run: parsed.value }))
     // Display-state fixtures only: no numerical claims about these synthetic matrices.
     const hidden = [0, 3].map(rank => {
       const matrix = rank === 0 ? [] : Array.from({ length: 3 }, () => [0, 0, 0])
@@ -64,7 +63,7 @@ test('multiple VECM relationships retain their values and calendar dates when se
   await page.getByRole('option', { name: 'Relationship 2', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Departure from long-run relationship 2' })).toBeVisible()
   await expect.poll(() => page.evaluate(async () => {
-    const charts = await import(new URL('/node_modules/.vite/deps/echarts_core.js', location.href).href)
+    const charts = await import(new URL('/tests/support/echartsRuntime.ts', location.href).href)
     const element = document.querySelector('[data-testid=long-run-charts] [_echarts_instance_]')
     return element ? charts.getInstanceByDom(element).getOption().series[0].data[0] : null
   })).toEqual([expected.firstDate, expected.firstValue])
