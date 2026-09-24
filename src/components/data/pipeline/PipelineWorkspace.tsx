@@ -276,10 +276,20 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   const previewRows = useMemo<PreviewRow[]>(() => preview === null ? [] : preview.rows.map((cells, index) => ({ index, cells })), [preview])
   const previewVisible = shown !== null && selectedNode !== null && selectedOutcome?.kind === 'ran'
   const previewPending = previewVisible && (shown.data.id !== selected || shown.outcome !== selectedOutcome)
+  // A script that evaluated to one value reads as a number, not as a table of one cell.
+  const readout = selectedOutcome?.kind === 'ran' && selectedOutcome.shape?.kind === 'value' && preview !== null
+    ? { column: selectedOutcome.shape.column, cell: preview.rows[0]?.[0] ?? null }
+    : null
+
   const bottom = (
     <div className="flex h-full min-h-0 flex-col" data-testid="pipeline-preview" aria-busy={previewPending}>
       {!previewVisible && <p className={caption('m-3')}>{previewNotice(selectedNode === null ? undefined : outcomes.get(selectedNode.id), selectedNode === null)}</p>}
-      {preview !== null && shown !== null && (
+      {readout !== null && readout.cell !== null && (
+        <div hidden={!previewVisible} className={cn('min-h-0 flex-1 overflow-auto p-3', !previewVisible && 'hidden')} data-testid="pipeline-value">
+          <p className={num('m-0 text-title text-ink')}><PreviewCellText cell={readout.cell} decimals={columnDecimals(preview?.rows ?? [], 0)} /></p>
+        </div>
+      )}
+      {preview !== null && shown !== null && readout === null && (
           <div hidden={!previewVisible} className={cn('min-h-0 flex-1 overflow-auto p-3', !previewVisible && 'hidden')}>
             <EvidenceTable
               appearance="data"
@@ -420,7 +430,7 @@ function BlockStatus({ outcome, running }: { readonly outcome: BlockOutcome | un
   if (running) return <p className={caption('m-0')} data-testid="block-status">Running.</p>
   if (outcome === undefined) return <p className={caption('m-0')} data-testid="block-status">Not run yet.</p>
   switch (outcome.kind) {
-    case 'ran': return <p className={cn(label('m-0 text-muted'), num())} data-testid="block-status"><Metadata><span>{formatCount(outcome.rowCount).text} rows</span><span>{outcome.columns.length} {outcome.columns.length === 1 ? 'column' : 'columns'}</span></Metadata></p>
+    case 'ran': return <p className={cn(label('m-0 text-muted'), num())} data-testid="block-status"><Metadata><span>{formatCount(outcome.rowCount).text} {outcome.rowCount === 1 ? 'row' : 'rows'}</span><span>{outcome.columns.length} {outcome.columns.length === 1 ? 'column' : 'columns'}</span></Metadata></p>
     case 'waiting': return <p className={caption('m-0')} data-testid="block-status">Not run yet: {outcome.detail}.</p>
     case 'skipped': return <p className={caption('m-0')} data-testid="block-status">Not run: a block before it failed.</p>
     case 'failed': return <Alert tone="danger" testId="block-status"><p className="m-0">{outcome.detail}</p></Alert>

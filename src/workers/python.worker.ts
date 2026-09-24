@@ -1,4 +1,4 @@
-import { PYODIDE_INDEX_URL, PYTHON_PACKAGES, type PythonCommand, type PythonEvent } from './pythonProtocol'
+import { PYODIDE_INDEX_URL, PYTHON_PACKAGES, type PythonCommand, type PythonEvent, type ScriptShape } from './pythonProtocol'
 import harnessCode from './pythonScript.py?raw'
 
 interface PyodideRuntime {
@@ -12,7 +12,8 @@ interface PyodideRuntime {
   readonly globals: { get(name: string): unknown }
 }
 interface PyodideModule { loadPyodide(options: { indexURL: string }): Promise<PyodideRuntime> }
-type HarnessAnswer = readonly ['ok', number, readonly string[], string] | readonly ['error', string, string]
+type HarnessShape = 'table' | 'value'
+type HarnessAnswer = readonly ['ok', number, readonly string[], string, HarnessShape] | readonly ['error', string, string]
 interface Harness {
   (code: string, paths: readonly string[], output: string): { toJs(): HarnessAnswer; destroy(): void }
 }
@@ -65,9 +66,11 @@ const run = async (command: Extract<PythonCommand, { readonly kind: 'run' }>): P
       post({ kind: 'run-failed', request: command.request, detail: answer[1], stdout: answer[2] })
       return
     }
-    const [, rows, columns, stdout] = answer
+    const [, rows, columns, stdout, shape] = answer
     const bytes = pyodide.FS.readFile(output)
-    post({ kind: 'ran', request: command.request, prepared: { format: 'arrow-stream', bytes }, rows, columns: [...columns], stdout }, [bytes.buffer as ArrayBuffer])
+    // A value is the single cell of its own one-column table, so the column carries over unchanged.
+    const reported: ScriptShape = shape === 'value' && columns[0] !== undefined ? { kind: 'value', column: columns[0] } : { kind: 'table' }
+    post({ kind: 'ran', request: command.request, prepared: { format: 'arrow-stream', bytes }, rows, columns: [...columns], stdout, shape: reported }, [bytes.buffer as ArrayBuffer])
   } catch (cause) {
     post({ kind: 'run-failed', request: command.request, detail: describe(cause), stdout: '' })
   } finally {

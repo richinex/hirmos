@@ -19,6 +19,10 @@ export interface ActivePythonRun {
 
 /** A script that runs this long is taken for a runaway and stopped. */
 export const PYTHON_RUN_LIMIT_MS = 5 * 60_000
+/** A blocked or stalled download never rejects, so the wait for the runtime needs its own deadline. */
+export const PYTHON_LOAD_LIMIT_MS = 2 * 60_000
+/** Completes the sentence the panel opens with. The cause is the network, not the script. */
+export const PYTHON_UNREACHABLE = 'the download did not finish. A VPN or a firewall can block it. Check the connection, then reload the page.'
 
 type RunEvent = Extract<PythonEvent, { readonly kind: 'ran' | 'run-failed' }>
 
@@ -35,7 +39,10 @@ const arrowOf = async (connection: duckdb.AsyncDuckDBConnection, view: string): 
 })
 
 /** Owns one worker and its pending requests; snapshots contain status, never Arrow buffers. */
-export function createPythonRuntime(makeWorker: () => Worker = () => new Worker(new URL('../workers/python.worker.ts', import.meta.url), { type: 'module', name: 'hirmos-python' })) {
+export function createPythonRuntime(
+  makeWorker: () => Worker = () => new Worker(new URL('../workers/python.worker.ts', import.meta.url), { type: 'module', name: 'hirmos-python' }),
+  loadLimitMs: number = PYTHON_LOAD_LIMIT_MS,
+) {
   const store = createStore<RuntimeSnapshot>(() => ({ runtime: { kind: 'idle' }, active: null }))
   let worker: Worker | null = null
   let closed = false
@@ -69,8 +76,8 @@ export function createPythonRuntime(makeWorker: () => Worker = () => new Worker(
       const event = parsed.value
       switch (event.kind) {
         case 'loading': store.setState({ runtime: { kind: 'loading', detail: event.detail } }); return
-        case 'ready': store.setState({ runtime: { kind: 'ready', python: event.python } }); return
-        case 'start-failed': stopped(event.detail); return
+        case 'ready': settleLoading(); store.setState({ runtime: { kind: 'ready', python: event.python } }); return
+        case 'start-failed': settleLoading(); stopped(event.detail); return
         case 'ran': case 'run-failed': {
           const resolve = pending.get(event.request)
           pending.delete(event.request)
@@ -85,11 +92,19 @@ export function createPythonRuntime(makeWorker: () => Worker = () => new Worker(
     return created
   }
   const send = (command: PythonCommand, transfer: readonly ArrayBuffer[] = []) => pythonWorker().postMessage(command, [...transfer])
+  let loading: ReturnType<typeof setTimeout> | null = null
+  const settleLoading = () => { if (loading !== null) { clearTimeout(loading); loading = null } }
   const warm = () => {
     if (closed) return
     const state = store.getState().runtime
     if (state.kind !== 'idle' && state.kind !== 'failed') return
     store.setState({ runtime: { kind: 'loading', detail: 'Loading Python' } })
+    settleLoading()
+    loading = setTimeout(() => {
+      loading = null
+      if (closed || store.getState().runtime.kind !== 'loading') return
+      recycle(PYTHON_UNREACHABLE, { kind: 'failed', detail: PYTHON_UNREACHABLE })
+    }, loadLimitMs)
     try { send({ kind: 'start' }) } catch (cause) { recycle(String(cause), { kind: 'failed', detail: String(cause) }) }
   }
   const cancel = () => {
@@ -139,7 +154,7 @@ export function createPythonRuntime(makeWorker: () => Worker = () => new Worker(
             await connection.query('ROLLBACK')
             throw cause
           }
-          return current(request) ? ok({ stdout: event.stdout }) : err({ detail: 'The script session was closed.', stdout: event.stdout })
+          return current(request) ? ok({ stdout: event.stdout, shape: event.shape }) : err({ detail: 'The script session was closed.', stdout: event.stdout })
         } catch (cause) {
           return err({ detail: `prepared could not be read back: ${cause instanceof Error ? cause.message : String(cause)}`, stdout: event.stdout })
         } finally {

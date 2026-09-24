@@ -4,6 +4,7 @@ import { describeSqlPreparationProblem, materializeView, prepareSqlInputs, regis
 import type { PreviewCell } from '@/domain/dataset'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { compileDraft, compilePipeline, describePipelineProblem, type CompiledPipeline, type PipelineBlockId, type PipelineGraph, type PipelineProblem, type PipelineRecipe, type PipelineStep } from '@/domain/pipeline'
+import type { ScriptShape } from '@/workers/pythonProtocol'
 import { inputDescriptor, type SqlInputAlias, type SqlPreparationInput } from '@/domain/sourceInputs'
 
 export type PipelineRunProblem =
@@ -29,7 +30,7 @@ export interface BlockPreview {
 }
 
 export type BlockOutcome =
-  | { readonly kind: 'ran'; readonly rowCount: number; readonly columns: NonEmptyArray<PreviewColumn>; readonly stdout?: string }
+  | { readonly kind: 'ran'; readonly rowCount: number; readonly columns: NonEmptyArray<PreviewColumn>; readonly stdout?: string; readonly shape?: ScriptShape }
   | { readonly kind: 'failed'; readonly detail: string; readonly stdout?: string }
   | { readonly kind: 'skipped' }
   | { readonly kind: 'waiting'; readonly detail: string }
@@ -46,7 +47,7 @@ export interface PipelineRun {
  * Runs a script step: given the tables named by `inputs`, read from the connection, it registers the
  * rows the script assigned to `prepared` under `view`. The Python worker implements this.
  */
-export interface ScriptRun { readonly stdout: string }
+export interface ScriptRun { readonly stdout: string; readonly shape: ScriptShape }
 export interface ScriptFailure { readonly detail: string; readonly stdout: string }
 
 export interface ScriptRuntime {
@@ -179,10 +180,13 @@ export async function runPipeline(session: PipelineSession, graph: PipelineGraph
       if (step.inputIds.some((from) => stopped.has(from))) { outcomes.set(step.id, { kind: 'skipped' }); stopped.add(step.id); continue }
       const fail = (detail: string, stdout?: string) => { outcomes.set(step.id, { kind: 'failed', detail, stdout }); stopped.add(step.id) }
       let stdout: string | undefined
+      // Only a script can report a single value; every other block produces a table.
+      let shape: ScriptShape | undefined
       if (step.kind === 'script') {
         const ran = await session.scripts.run(step, connection, session.engine.db)
         if (!ran.ok) { fail(ran.error.detail, ran.error.stdout); continue }
         stdout = ran.value.stdout
+        shape = ran.value.shape
       } else {
         try {
           await connection.query(step.statement)
@@ -192,7 +196,7 @@ export async function runPipeline(session: PipelineSession, graph: PipelineGraph
         }
       }
       const described = await describeView(connection, step.view)
-      if (described.ok) outcomes.set(step.id, { kind: 'ran', ...described.value, stdout })
+      if (described.ok) outcomes.set(step.id, { kind: 'ran', ...described.value, stdout, shape })
       else fail(described.error.detail, stdout)
     }
     return ok({ views: draft.views, outcomes, complete })

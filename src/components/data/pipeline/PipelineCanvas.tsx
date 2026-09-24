@@ -63,7 +63,7 @@ function BlockCard({ data, selected }: NodeProps<CanvasNode>) {
     : outcome === undefined
       ? 'not run'
       : outcome.kind === 'ran'
-        ? `${formatCount(outcome.rowCount).text} rows, ${outcome.columns.length} ${outcome.columns.length === 1 ? 'column' : 'columns'}`
+        ? `${formatCount(outcome.rowCount).text} ${outcome.rowCount === 1 ? 'row' : 'rows'}, ${outcome.columns.length} ${outcome.columns.length === 1 ? 'column' : 'columns'}`
         : outcome.kind === 'failed' ? 'failed' : outcome.kind === 'waiting' ? 'waiting' : 'not run'
   return (
     <div

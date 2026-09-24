@@ -78,18 +78,36 @@ def _output_type(dtype, nested=False):
     return None
 
 
+# A scalar result travels as a one-row table under this name.
+_VALUE_COLUMN = "value"
+
+
+def _prepared_shape(prepared):
+    """What the script assigned: a table, a single value, or neither."""
+    if prepared is None:
+        return "missing"
+    if isinstance(prepared, (pd.DataFrame, pd.Series)):
+        return "table"
+    return "value" if pd.api.types.is_scalar(prepared) else "unsupported"
+
+
 def _prepared_table(prepared):
+    shape = _prepared_shape(prepared)
+    if shape == "missing":
+        raise ValueError("prepared is None; assign a table or a single value")
+    if shape == "unsupported":
+        raise TypeError(f"prepared must be a DataFrame, a Series or a single value, not {type(prepared).__name__}")
+    if shape == "value":
+        prepared = pd.DataFrame({_VALUE_COLUMN: [prepared]})
     if isinstance(prepared, pd.Series):
         prepared = prepared.to_frame()
-    if not isinstance(prepared, pd.DataFrame):
-        raise TypeError(f"prepared must be a DataFrame, not {type(prepared).__name__}")
     if any(name is not None for name in prepared.index.names):
         prepared = prepared.reset_index()
     if isinstance(prepared.columns, pd.MultiIndex):
         prepared = prepared.set_axis(["_".join(str(part) for part in column if str(part)) for column in prepared.columns], axis=1)
     names = [str(column) for column in prepared.columns]
     if not names:
-        raise ValueError("prepared has no columns")
+        raise ValueError("prepared has no columns; assign a table with at least one column, or a single value")
     if any(not name or "\x00" in name for name in names):
         raise ValueError("prepared column names must be nonempty and contain no null characters")
     if len({name.lower() for name in names}) != len(names):
@@ -103,7 +121,7 @@ def _prepared_table(prepared):
         problem = _output_type(field.type) or _interval_precision(table.column(field.name))
         if problem is not None:
             raise ValueError(f"Column '{field.name}' ({field.type}): {problem}. Convert that column explicitly in the script.")
-    return table
+    return table, shape
 
 
 def _interval_precision(column):
@@ -123,11 +141,11 @@ def _hirmos_run(code, input_paths, output_path):
             exec(compile(code, "<script>", "exec"), namespace)
         if "prepared" not in namespace:
             raise ValueError("the script did not assign prepared")
-        table = _prepared_table(namespace["prepared"])
+        table, shape = _prepared_table(namespace["prepared"])
         with pa.OSFile(output_path, "wb") as sink:
             with ipc.new_stream(sink, table.schema) as writer:
                 writer.write_table(table)
-        return ["ok", table.num_rows, table.column_names, printed.getvalue()]
+        return ["ok", table.num_rows, table.column_names, printed.getvalue(), shape]
     except SyntaxError as error:
         return ["error", f"line {error.lineno}: SyntaxError: {error.msg}", printed.getvalue()]
     except Exception as error:

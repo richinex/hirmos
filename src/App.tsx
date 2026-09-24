@@ -287,7 +287,9 @@ function App() {
   }
   // The canvas takes its files on its input cards, so opening it needs no file up front.
   const openPipelineEditor = async () => {
-    await loadPipelineWorkspace()
+    try { await loadPipelineWorkspace() }
+    catch { setEditorProblem('The pipeline editor could not be downloaded. A VPN or a firewall can block it. Check the connection, then try again.'); return }
+    setEditorProblem(null)
     dispatch({ type: 'pipeline-opened' })
   }
   const reportActivity = REPORT_ACTIVITY
@@ -302,6 +304,7 @@ function App() {
   const [storageFailure, setStorageFailure] = useState<StorageFailure | null>(() => lastStorageFailure())
   const [reopenProblem, setReopenProblem] = useState<string | null>(null)
   const [exampleNotice, setExampleNotice] = useState<string | null>(null)
+  const [editorProblem, setEditorProblem] = useState<string | null>(null)
   const [resetExample, setResetExample] = useState<ShippedExample | null>(null)
   const refreshSaved = useCallback(() => { void listProjects().then(setSaved) }, [])
   useEffect(() => { refreshSaved() }, [refreshSaved])
@@ -628,6 +631,9 @@ function App() {
               {exampleNotice !== null && activeChapter === 'data' && (
                 <p role="status" className={well('mb-4 px-3 py-2 text-body text-muted')}>{exampleNotice}</p>
               )}
+              {editorProblem !== null && (
+                <p role="alert" className={well('mb-4 px-3 py-2 text-body text-danger')} data-testid="editor-problem">{editorProblem}</p>
+              )}
               {workflow.kind === 'awaiting-project' && (
                 <section className="projects-dashboard w-full" aria-labelledby="new-analysis-title">
                   <ChapterHeading id="new-analysis-title" className="mb-6">Projects</ChapterHeading>
@@ -771,9 +777,11 @@ function App() {
               )}
 
               {workflow.kind === 'pipeline-opened' && (
+                <ChapterBoundary chapter="Pipeline editor">
                 <Suspense fallback={<ChapterSkeleton label="Loading the pipeline canvas…" />}>
                   <PipelineWorkspace resume={workflow.resume} onPrepared={(source) => dispatch({ type: 'sql-source-created', source })} />
                 </Suspense>
+                </ChapterBoundary>
               )}
 
               {workflow.kind === 'sql-inputs-chosen' && (

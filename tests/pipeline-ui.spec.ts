@@ -290,8 +290,8 @@ test.describe('pipeline canvas', () => {
 
     await set('df = inputs[0]\nprepared = df[df["populaton"] > 1]\n')
     await expect(page.getByTestId('block-status')).toContainText("line 2: KeyError: 'populaton'", { timeout: 60_000 })
-    await set('df = inputs[0]\nprepared = 42\n')
-    await expect(page.getByTestId('block-status')).toContainText('prepared must be a DataFrame, not int', { timeout: 60_000 })
+    await set('df = inputs[0]\nprepared = [1, 2, 3]\n')
+    await expect(page.getByTestId('block-status')).toContainText('prepared must be a DataFrame, a Series or a single value, not list', { timeout: 60_000 })
     await set('df = inputs[0]\nx = (\n')
     await expect(page.getByTestId('block-status')).toContainText("line 2: SyntaxError: '(' was never closed", { timeout: 60_000 })
 
@@ -305,6 +305,35 @@ test.describe('pipeline canvas', () => {
     await page.getByRole('button', { name: 'Inspect data' }).click()
     await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('region', { name: 'Physical schema' })).toContainText('population')
+  })
+
+  test('a script that evaluates to one value reads as a number and still composes downstream', async ({ page }) => {
+    test.setTimeout(240_000)
+    await startPipeline(page)
+    const script = await addBlock(page, 'Script', 'script')
+    await expect(page.getByTestId('python-runtime')).toContainText(/pandas.*numpy/, { timeout: 180_000 })
+    await wire(page, 'input-1', script)
+    await expect(block(page, script)).toContainText('4 rows, 3 columns', { timeout: 60_000 })
+
+    const editor = page.getByTestId('python-editor')
+    const set = async (code: string) => { await editor.locator('.cm-content').click(); await page.keyboard.press('ControlOrMeta+A'); await page.keyboard.press('Backspace'); await page.keyboard.type(code) }
+
+    // The naive minus adjusted comparison from Facure, chapter 1: a bare number.
+    await set('df = inputs[0]\nprepared = df["population"].mean()\n')
+    await expect(block(page, script)).toContainText('1 row, 1 column', { timeout: 60_000 })
+    await expect(page.getByTestId('pipeline-value')).toContainText('351250', { timeout: 60_000 })
+
+    // A one-cell table is a table, not a value: the shape follows what the script assigned.
+    await set('df = inputs[0]\nprepared = pd.DataFrame({"value": [df["population"].mean()]})\n')
+    await expect(block(page, script)).toContainText('1 row, 1 column', { timeout: 60_000 })
+    await expect(page.getByTestId('pipeline-value')).toBeHidden()
+    await expect(page.getByRole('region', { name: 'Script' }).getByRole('table')).toContainText('351250')
+
+    // A value keeps its output port, so it still reaches the source.
+    await set('df = inputs[0]\nprepared = df["population"].mean()\n')
+    await expect(page.getByTestId('pipeline-value')).toBeVisible({ timeout: 60_000 })
+    await wire(page, script, 'output')
+    await expect(useAsSource(page)).toBeEnabled({ timeout: 60_000 })
   })
 
   test('shows a running script with elapsed time and cancels it, then runs again on a fresh runtime', async ({ page }) => {
