@@ -46,3 +46,21 @@ test('a Python runtime that never arrives fails with an explanation instead of l
   expect(result.afterDeadline.detail).toContain('VPN')
   expect(result.afterDeadline.detail).toContain('reload the page')
 })
+
+/** The SQL workspace is lazy too. A blocked chunk there must not unmount the workbench. */
+test('a SQL workspace that will not download shows the chapter error, not a blank page', async ({ page }) => {
+  test.setTimeout(120_000)
+  let blocked = 0
+  await page.route('**/SqlPreparationWorkspace*', (route) => { blocked += 1; return route.abort('failed') })
+
+  await page.goto('/app')
+  await page.getByRole('textbox', { name: 'Project name' }).fill('SQL chunk failure')
+  await page.getByRole('button', { name: 'Create project' }).click()
+  await page.getByRole('radio', { name: 'Prepare with SQL' }).click({ force: true })
+  await page.getByRole('button', { name: 'Open empty SQL editor' }).click()
+
+  expect(blocked, 'the SQL workspace chunk was never intercepted').toBeGreaterThan(0)
+  await expect(page.getByText('could not be displayed')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible()
+  expect(await page.locator('#root').evaluate((root) => root.children.length), 'the workbench unmounted').toBeGreaterThan(0)
+})

@@ -723,7 +723,7 @@ function App() {
                         </p>
                       ) : (
                         <p className={cn(fieldHint, 'mt-0')}>
-                          {`${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : `, ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before the recorded work returns.`}
+                          {`${workflow.project.name} was built from ${workflow.restore.source?.name ?? 'a file'}${workflow.restore.source === null ? '' : `, ${formatBytes(workflow.restore.source.bytes)}`}. The file is not stored; its SHA-256 is checked before Hirmos returns to the recorded work.`}
                         </p>
                       )}
                       {workflow.problem && <p role="alert" className="mt-3 text-body text-danger">{describeSourceSelectionProblem(workflow.problem)}</p>}
@@ -786,6 +786,7 @@ function App() {
 
               {workflow.kind === 'sql-inputs-chosen' && (
                 <section className="flex min-h-0 min-w-0 w-full flex-1 flex-col" aria-label="Prepare with SQL">
+                  <ChapterBoundary chapter="SQL preparation">
                   <Suspense fallback={<ChapterSkeleton label="Loading SQL preparation…" />}>
                     <SqlShell
                       inputs={workflow.inputs}
@@ -794,6 +795,7 @@ function App() {
                       onCleared={() => dispatch({ type: 'source-cleared' })}
                     />
                   </Suspense>
+                  </ChapterBoundary>
                 </section>
               )}
 
@@ -876,9 +878,11 @@ function App() {
               )}
   
               {workflow.kind === 'profiled' && sourceEditor.kind !== 'closed' && (
+                <ChapterBoundary chapter="Source editor">
                 <Suspense fallback={null}>
                   <SourceEditor source={workflow.source} onView={showSourceEditor} onCancel={closeSourceEditor} onAccept={source => dispatch({ type: 'source-replaced', previous: workflow.source, source })} />
                 </Suspense>
+                </ChapterBoundary>
               )}
               {workflow.kind === 'profiled' && sourceEditor.kind !== 'editing' && (
                 <>
