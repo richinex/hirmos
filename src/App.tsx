@@ -875,6 +875,7 @@ function App() {
               {workflow.kind === 'profiled' && sourceEditor.kind !== 'editing' && (
                 <>
                   {activeChapter === 'data' && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
                     <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared} onEditSource={openSourceEditor}>
                       <PreprocessingPanel
                         key={workflow.profile.id}
@@ -927,8 +928,10 @@ function App() {
                       </div>
                     </details>
                     </DataStudio>
+                    </ChapterBoundary>
                   )}
                   {activeChapter === 'discovery' && workflow.prepared !== null && discoveryDraft !== null && (
+                    <ChapterBoundary key={activeChapter} chapter={activeName}>
                     <DiscoveryPanel
                       key={workflow.prepared.id}
                       source={workflow.source}
@@ -943,6 +946,7 @@ function App() {
                       onRun={(artifact) => dispatch({ type: 'discovery-run-created', artifact })}
                       onDeleteRun={(deletion) => dispatch({ type: 'discovery-run-deletion-committed', deletion })}
                     />
+                    </ChapterBoundary>
                   )}
                   {activeChapter === 'dag' && workflow.prepared !== null && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
