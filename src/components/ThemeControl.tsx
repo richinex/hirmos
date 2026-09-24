@@ -2,11 +2,7 @@ import { ThemeMark } from '@/components/ThemeMark'
 import { iconControl } from '@/components/ui/recipes'
 import { useTheme, THEME_LABELS } from '@/components/ui/useTheme'
 
-/**
- * The theme button owns the choice, so switching redraws this button and nothing else. The palette
- * itself rides on `<html data-theme>`, which the stylesheet and `useDocTheme` both read, so the rest
- * of the app re-themes without re-rendering.
- */
+/** The theme button owns the choice, so switching redraws only this button; the palette rides on `<html data-theme>`. */
 export function ThemeControl() {
   const theme = useTheme()
   return (

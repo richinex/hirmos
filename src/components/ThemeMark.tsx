@@ -1,11 +1,7 @@
 import { cn } from '@/lib/utils'
 import type { ThemeChoice } from '@/components/ui/useTheme'
 
-/**
- * The theme control's mark: one ring whose interior carries the state. The silhouette never
- * changes, so the chrome stays still while the fill sweeps from empty through half to solid.
- * Drawn here rather than taken from the Material set, which offers three unrelated glyphs.
- */
+/** One ring whose fill carries the state: empty for light, half for system, solid for dark. */
 export function ThemeMark({ choice, size = 16, className }: {
   readonly choice: ThemeChoice
   readonly size?: number

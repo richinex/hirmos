@@ -13,6 +13,8 @@ import { AppShell } from '@/components/shell/AppShell'
 import { ChapterBoundary } from '@/components/shell/ChapterBoundary'
 import { ChapterSkeleton } from '@/components/shell/ChapterSkeleton'
 import { ChapterNav, type ChapterEntry, type ChapterStatus } from '@/components/shell/ChapterNav'
+import { RunActivityChip } from '@/components/shell/RunActivityChip'
+import { REPORT_ACTIVITY } from '@/lib/runActivityStore'
 import { useShellLayout } from '@/components/shell/useShellLayout'
 import { button, chromeAction, field, fieldHint, iconControl, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
 import { formatDay, formatTimestamp } from '@/lib/format/date'
@@ -21,7 +23,6 @@ import { DataStudio } from '@/components/data/DataStudio'
 import { PreprocessingPanel } from '@/components/data/PreprocessingPanel'
 import { DiscoveryPanel } from '@/components/discovery/DiscoveryPanel'
 import { chapterPath, CHAPTER_IDS, CHAPTER_METADATA, describeRouteProblem, isCanonicalLocation, type ChapterId } from '@/domain/navigation'
-import type { ChapterActivity, RunActivity } from '@/domain/activity'
 import { describeSnapshotProblem, snapshotWorkflow, type PersistedProject, type SavedProjectHeader } from '@/domain/persistence'
 import { assessExampleCopy, isShippedExampleId, SHIPPED_EXAMPLES, stampExampleRelease, type ShippedExample } from '@/domain/example'
 import { ExampleLedger } from '@/components/projects/ExampleLedger'
@@ -289,11 +290,7 @@ function App() {
     await loadPipelineWorkspace()
     dispatch({ type: 'pipeline-opened' })
   }
-  const [activity, setActivity] = useState<ChapterActivity>({})
-  const reportActivity = useMemo(() => Object.fromEntries(CHAPTER_IDS.map((chapter) => [chapter, (run: RunActivity | null) => setActivity((current) => {
-    if (run === null) { if (!(chapter in current)) return current; const { [chapter]: _ended, ...rest } = current; return rest }
-    return { ...current, [chapter]: run }
-  })])) as Record<ChapterId, (run: RunActivity | null) => void>, [])
+  const reportActivity = REPORT_ACTIVITY
   const discoveryDraft = discoverySession.kind === 'with-prepared-dataset'
     && currentPrepared !== null
     && discoverySession.preparedDataset === currentPrepared.id
@@ -450,7 +447,6 @@ function App() {
     }
     dispatch({ type: 'source-persistence-changed', persistence: { kind } })
   }
-  const running = useMemo(() => CHAPTER_IDS.flatMap((chapter) => { const run = activity[chapter]; return run === undefined ? [] : [{ chapter, ...run }] }).at(0) ?? null, [activity])
 
   const validatedDag = workflow.kind === 'profiled'
     && workflow.dagDocuments.some((document) => document.current.validation.kind === 'structurally-valid')
@@ -505,7 +501,7 @@ function App() {
       default: return chapter
     }
   }
-  const chapters: readonly ChapterEntry[] = CHAPTERS.map((chapter) => ({ ...chapter, status: chapterStatus(chapter.id), busy: activity[chapter.id] === undefined ? null : activity[chapter.id]?.progress ?? 0 }))
+  const chapters: readonly ChapterEntry[] = CHAPTERS.map((chapter) => ({ ...chapter, status: chapterStatus(chapter.id) }))
 
   const defaultChapter: ChapterId = workflow.kind === 'awaiting-project' ? 'projects' : 'data'
   const requestedChapter = route.ok && route.value.kind === 'chapter' ? route.value.chapter : defaultChapter
@@ -595,19 +591,7 @@ function App() {
             <span>Not saved</span>
           </span>
         )}
-        {running !== null && (
-          <button
-            type="button"
-            className={chromeAction('quiet', 'relative min-w-0 gap-2 pr-3 text-muted')}
-            aria-label={`${running.label} running in ${CHAPTERS.find((chapter) => chapter.id === running.chapter)?.name ?? running.chapter}; open it`}
-            onClick={() => navigateToChapter(running.chapter)}
-          >
-            <span className="truncate">{running.label}</span>
-            <span aria-hidden className="bar-live absolute inset-x-2 bottom-[3px] h-[2px] rounded-full bg-line">
-              <span className="bar-live__fill block rounded-full bg-signal" style={{ width: `${Math.round((running.progress ?? 0) * 100)}%` }} />
-            </span>
-          </button>
-        )}
+        <RunActivityChip onOpen={navigateToChapter} />
         <ThemeControl />
       </div>
     </>

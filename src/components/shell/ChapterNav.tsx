@@ -5,6 +5,7 @@ import { CHAPTER_SECTIONS, type ChapterId } from '@/domain/navigation'
 import { assertNever } from '@/domain/dop'
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
+import { useChapterBusy } from '@/lib/runActivityStore'
 import { useIsMobile } from '@/lib/useMediaQuery'
 import { cn } from '@/lib/utils'
 
@@ -16,8 +17,6 @@ export interface ChapterEntry {
   readonly shortName: string
   readonly icon: string
   readonly status: ChapterStatus
-  /** 0 to 1 while a run is in flight for this chapter, null otherwise; drawn as the rail's progress bar. */
-  readonly busy?: number | null
 }
 
 /** What the pill at the foot of the rail says about the open project. */
@@ -39,7 +38,10 @@ const statusGlyph = (status: ChapterStatus): { readonly icon: string; readonly t
 }
 
 /** The same bar the phone tab carries, under the icon: anything alongside crowds the glyph. */
-function BusyBar({ fraction, className }: { readonly fraction: number; readonly className?: string }) {
+/** The rail's progress bar. It subscribes itself, so progress redraws only this bar. */
+function BusyBar({ chapter, className }: { readonly chapter: ChapterId; readonly className?: string }) {
+  const fraction = useChapterBusy(chapter)
+  if (fraction === null) return null
   return (
     <span aria-hidden className={cn('bar-live absolute h-[2px] rounded-full bg-rail-dim', className)}>
       <span
@@ -206,7 +208,6 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
               if (chapter === undefined) return null
               const locked = chapter.status === 'locked'
               const glyph = statusGlyph(chapter.status)
-              const busy = chapter.busy ?? null
               return <li key={id}>
                 <button type="button" className="dashboard-nav-item" aria-current={active === id ? 'page' : undefined}
                   aria-disabled={locked || undefined} aria-label={glyph === null ? chapter.name : chapter.name + ', ' + glyph.text}
@@ -216,7 +217,7 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
                   <Icon name={chapter.icon} size={20} fill={active === id} />
                   <span className="dashboard-nav-label min-w-0 flex-1 truncate">{chapter.name}</span>
                   {glyph && <Icon name={glyph.icon} size={13} className="dashboard-nav-status" />}
-                  {busy !== null && <BusyBar fraction={busy} className="inset-x-3 bottom-1" />}
+                  <BusyBar chapter={id} className="inset-x-3 bottom-1" />
                 </button>
               </li>
             })}

@@ -25,7 +25,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
 import { LagListField } from '@/components/ui/LagListField'
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import { histogramOption } from '@/charts/data/histogram'
@@ -564,7 +564,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   )
 }
 
-function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: { readonly others?: readonly EstimationRunArtifact[]; readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: () => void }) {
+/** Memoised: editing the form must not redraw the result, its diagnostics or its charts. */
+const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: { readonly others?: readonly EstimationRunArtifact[]; readonly run: EstimationRunArtifact; readonly study: StudySpecification; readonly current: boolean; readonly stepLabel: string; readonly onDelete?: (run: EstimationRunArtifact) => void }) {
   const theme = useChartTheme()
   const estimate = run.estimate
   const adjustmentVariables = useMemo(() => contemporaneousAdjustmentVariables(estimate.adjustment) ?? [], [estimate.adjustment])
@@ -698,7 +699,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
   if (!current) {
     // History rows fold to one line in the runs drawer; only the current estimate keeps the stage.
     return (
-      <RunFold title={sentence} figure={headlineFigure(estimate).text} stamp={stamp} onDelete={onDelete} deleteLabel="Delete this run">
+      <RunFold title={sentence} figure={headlineFigure(estimate).text} stamp={stamp} onDelete={onDelete === undefined ? undefined : () => onDelete(run)} deleteLabel="Delete this run">
         <RunDetails label="Estimation run details"><RunRecord run={run} /></RunDetails>
         {body}
       </RunFold>
@@ -713,7 +714,7 @@ function ResultCard({ run, study, current, stepLabel, onDelete, others = [] }: {
       {body}
     </article>
   )
-}
+})
 
 export function EstimationPanel({ source, profile, prepared, stationarity, documents, studies, identifications, runs, sensitivityRuns, onRun, onDeleteRun, onOpenStudy, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
@@ -1820,7 +1821,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         {[...runs].reverse().map((run) => {
           const bound = studies.find((candidate) => candidate.id === run.study)
           return bound === undefined ? null : (
-            <ResultCard key={run.id} run={run} study={bound} current={false} stepLabel={stepLabel} onDelete={() => setPendingDelete(run)} />
+            <ResultCard key={run.id} run={run} study={bound} current={false} stepLabel={stepLabel} onDelete={setPendingDelete} />
           )
         })}
       </ul>

@@ -14,11 +14,8 @@ export const THEME_LABELS: Record<ThemeChoice, string> = { light: 'Light', dark:
 const isTheme = (value: unknown): value is ThemeName => THEMES.includes(value as ThemeName)
 
 /**
- * Commit a theme change behind the browser's view transition, so the new palette is revealed by a
- * diagonal sweep instead of flashing. The browser holds one frame of the old page while the change
- * commits, which is why the change runs synchronously inside the callback.
- *
- * Falls back to an immediate change where the API is absent or the reader asked for less motion.
+ * Commit a theme change behind a view transition, so the palette is revealed by a diagonal sweep.
+ * The callback runs synchronously because the browser snapshots the page as soon as it returns.
  */
 const sweep = (commit: () => void): void => {
   const root = document.documentElement
@@ -66,12 +63,10 @@ export function useTheme(): {
   const osTheme = useSyncExternalStore(subscribeOsTheme, systemTheme, () => 'light' as ThemeName)
   const theme: ThemeName = choice === 'system' ? osTheme : choice
 
-  // Layout, not passive: a view transition commits its callback synchronously, and the palette has
-  // to be on the element before the browser takes the new snapshot.
+  // Layout, not passive: the palette must be set before the transition snapshots the page.
   useLayoutEffect(() => {
     const root = document.documentElement
-    // A theme change rewrites every custom property at once; anything with `transition-colors` would ease
-    // over 150ms and arrive late. Transitions are suppressed for one frame while the palette commits.
+    // Suppress colour transitions for one frame, or `transition-colors` eases the new palette in late.
     root.dataset.themeSwitching = ''
     root.dataset.theme = theme
     void root.offsetHeight

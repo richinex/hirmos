@@ -22,8 +22,32 @@ export function createJobs(stop: () => void) {
     const job = store.getState().jobs[key]
     return available && job?.kind === 'running' && job.id === id
   }
+  // Progress arrives once per resample: show the first at once, then at most one more a frame.
+  const held = new Map<string, Job>()
+  let frame: number | null = null
+  const publish = () => {
+    frame = null
+    if (held.size === 0) return
+    const reports = [...held]
+    held.clear()
+    store.setState(state => {
+      let jobs = state.jobs
+      for (const [key, job] of reports) {
+        // Dropped when the run finished, failed or was cancelled while held.
+        if (jobs[key]?.kind !== 'running') continue
+        jobs = { ...jobs, [key]: job }
+      }
+      return { jobs }
+    })
+  }
   const set = (key: string, job: Job) => {
+    held.delete(key)
     store.setState(state => ({ jobs: { ...state.jobs, [key]: job } }))
+  }
+  const hold = (key: string, job: Job) => {
+    if (frame !== null) { held.set(key, job); return }
+    frame = requestAnimationFrame(publish)
+    set(key, job)
   }
   const cancel = (key: string) => {
     const job = store.getState().jobs[key]
@@ -43,7 +67,7 @@ export function createJobs(stop: () => void) {
     progress(key: string, id: string, stage: string, progress: Progress | null = null) {
       const job = store.getState().jobs[key]
       if (!current(key, id) || job?.kind !== 'running') return
-      set(key, { ...job, stage, progress })
+      hold(key, { ...job, stage, progress })
     },
     finish(key: string, id: string) {
       if (current(key, id)) set(key, IDLE)
@@ -55,6 +79,7 @@ export function createJobs(stop: () => void) {
     },
     cancel,
     activate() {
+      held.clear()
       if (!available) store.setState({ jobs: {} })
       available = true
     },
