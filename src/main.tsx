@@ -6,6 +6,7 @@ import { useLocation } from '@/lib/router'
 import { useDocTheme } from '@/components/ui/useDocTheme'
 import { updateFavicon } from '@/lib/brand'
 import { useScrollActivity } from '@/lib/useScrollActivity'
+import { recoverFromStalePreload } from '@/lib/preloadRecovery'
 // The three faces: Roboto Slab for headings, Lato in its two weights for everything read or operated,
 // Fira Code for what is read character by character. Self-hosted; each stack in index.css names a
 // web-safe face after it.
@@ -35,6 +36,8 @@ function Root() {
 
   return landing ? <Landing /> : <App />
 }
+
+recoverFromStalePreload()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
