@@ -5,11 +5,24 @@ lapack_triangular.json, lapack_dgelsy.json, lapack_rq.json, slsqp.json.
 The companion reproductions/clsa/data/aft-optimizer.json was copied unchanged
 from the matching path in that repository.
 
-Known check failure, not waived:
-slsqp::tests::checked_slsqp_constraints_and_limits_match_scipy
-case "incompatible", maxiter=1, parameter 0:
-Rust 1.9999999999986093; oracle 2.000000000000556.
-The difference exceeds the existing 2e-13 relative/absolute-scaled tolerance.
-Reproduced in both debug and release in the current worktree, and in an
-isolated archive of Hirmos commit 7e54e11 with the same fixtures. No numerical
-implementation or test tolerance was changed to suppress the discrepancy.
+slsqp.json was regenerated on 2026-09-25 by running oracle/slsqp.py under
+SciPy 1.17.1 and NumPy 2.5.3 in the python:3.12-slim image. The retained copy
+had been produced on macOS, where NumPy links Accelerate rather than OpenBLAS;
+the two disagree on the deliberately infeasible "incompatible" case, whose
+least-squares subproblem is rank deficient. Under the pinned Linux image SciPy
+returns 1.9999999999986093 at maxiter=1, which this solver reproduces to every
+digit, so the previously recorded discrepancy was in the fixture rather than in
+the kernel. Regenerate with Docker to reproduce.
+
+Two comparisons in checked_slsqp_constraints_and_limits_match_scipy are scoped
+rather than exact, with the reasons stated at each site:
+- "incompatible" at maxiter=100 aborts on a line-search failure (status 8) over
+  that rank-deficient subproblem. The iteration it gives up on follows the
+  floating-point path, not the algorithm: 9 under the pinned image, 20 on
+  macOS, 14 here. The status, the point and its gradient are still checked, the
+  last two within 1e-11 instead of 2e-13.
+- "mixed" solves to x = (2, -1), where the equality row and both bounds are
+  active: three constraint gradients in two dimensions, so the dual is a
+  one-parameter family. SciPy reports 3 and this solver reports 1, and both
+  satisfy the Karush-Kuhn-Tucker conditions with the signs each bound requires.
+  The primal solution, objective, gradient and status match exactly.

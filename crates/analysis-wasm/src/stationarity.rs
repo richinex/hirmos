@@ -37,21 +37,38 @@ mod tests {
 
     #[test]
     fn stationarity_battery_serializes_all_evidence_lanes() {
-        let values: Vec<f64> = (0..120)
-            .map(|index| {
-                let time = index as f64;
-                0.015 * time + (time / 5.0).sin() + 0.2 * (time / 2.7).cos()
-            })
-            .collect();
+        // A trend with a random walk, drawn by a linear congruential generator so the series is
+        // reproducible in the oracle. A sum of sinusoids satisfies an exact linear recurrence, and
+        // statsmodels refuses that input with the same rank error this façade reports.
+        let values: Vec<f64> = {
+            let mut state: u64 = 12345;
+            let mut level = 0.0;
+            (0..120)
+                .map(|index| {
+                    state = (1103515245u64.wrapping_mul(state).wrapping_add(12345)) % (1u64 << 31);
+                    level += state as f64 / (1u64 << 31) as f64 - 0.5;
+                    0.015 * index as f64 + level
+                })
+                .collect()
+        };
         let json = stationarity_battery(&values)
             .and_then(|result| serde_json::to_string(&result).map_err(|error| error.to_string()))
             .expect("fixture should produce stationarity evidence");
         let value: serde_json::Value = serde_json::from_str(&json).expect("valid result JSON");
         assert_eq!(value["kind"], "stationarityBattery");
         assert_eq!(value["observations"], 120);
-        assert!(value["adf"]["constant"]["statistic"].is_number());
-        assert!(value["kpss"]["constantAndTrend"]["pValue"].is_number());
-        assert!(value["zivotAndrews"]["levelAndTrend"]["breakIndex"].is_number());
+        // statsmodels 0.14.6 on this series: adfuller(regression="c") and the three
+        // zivot_andrews regressions, which agree to the shared double precision.
+        let close = |got: f64, want: f64, name: &str| {
+            assert!((got - want).abs() < 1e-6, "{name}: {got} against statsmodels {want}");
+        };
+        close(value["adf"]["constant"]["statistic"].as_f64().unwrap(), -2.2019397715, "adf constant");
+        close(value["kpss"]["constantAndTrend"]["statistic"].as_f64().unwrap(), 0.2797843766, "kpss constant and trend");
+        close(value["zivotAndrews"]["level"]["statistic"].as_f64().unwrap(), -3.4941997939, "za level");
+        close(value["zivotAndrews"]["trend"]["statistic"].as_f64().unwrap(), -3.9675485250, "za trend");
+        close(value["zivotAndrews"]["levelAndTrend"]["statistic"].as_f64().unwrap(), -4.4364387401, "za level and trend");
+        assert_eq!(value["zivotAndrews"]["level"]["breakIndex"].as_u64().unwrap(), 20);
+        assert_eq!(value["zivotAndrews"]["levelAndTrend"]["breakIndex"].as_u64().unwrap(), 54);
     }
 
     #[test]
