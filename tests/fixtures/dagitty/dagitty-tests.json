@@ -1,0 +1,8867 @@
+[
+ {
+  "source": "parser.js",
+  "label": "parser.js input 1",
+  "dot": "dag{a->b}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "a",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 2",
+  "dot": " dag { a -> b } ",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "a",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 3",
+  "dot": "a->b",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "a",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 4",
+  "dot": "map -> pop",
+  "nodes": [
+   {
+    "name": "map",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "pop",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "map",
+    "to": "pop"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 5",
+  "dot": "x -> y",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 6",
+  "dot": "dag{{x->{a b}}}",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "a"
+   },
+   {
+    "from": "x",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 7",
+  "dot": "dag{{x->{a ; b}}}",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "a"
+   },
+   {
+    "from": "x",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 8",
+  "dot": "dag{a;b}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 9",
+  "dot": "dag{;b}",
+  "nodes": [
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 10",
+  "dot": "dag{a;}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 11",
+  "dot": "dag{}",
+  "nodes": [],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 12",
+  "dot": "dag{;}",
+  "nodes": [],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 13",
+  "dot": "dag{;;;}",
+  "nodes": [],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 14",
+  "dot": "dag{a}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 15",
+  "dot": "dag{a }",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 16",
+  "dot": "dag{ a }",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 17",
+  "dot": "pag{a @-> {b --@ {c @-@ d} }}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "d",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 18",
+  "dot": "pag{a @->b<-@c}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 19",
+  "dot": "pag{a @->b<-@c @-@d}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "d",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 20",
+  "dot": "dag{x->{a b}}",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "a"
+   },
+   {
+    "from": "x",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 21",
+  "dot": "dag{x->{a->b}}",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "a",
+    "to": "b"
+   },
+   {
+    "from": "x",
+    "to": "a"
+   },
+   {
+    "from": "x",
+    "to": "b"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 22",
+  "dot": "dag{a->{b->{c->{d->e}}}}",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "d",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "e",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "d",
+    "to": "e"
+   },
+   {
+    "from": "c",
+    "to": "d"
+   },
+   {
+    "from": "c",
+    "to": "e"
+   },
+   {
+    "from": "b",
+    "to": "c"
+   },
+   {
+    "from": "b",
+    "to": "d"
+   },
+   {
+    "from": "b",
+    "to": "e"
+   },
+   {
+    "from": "a",
+    "to": "b"
+   },
+   {
+    "from": "a",
+    "to": "c"
+   },
+   {
+    "from": "a",
+    "to": "d"
+   },
+   {
+    "from": "a",
+    "to": "e"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 23",
+  "dot": "digraph G { \"ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ\" }",
+  "nodes": [
+   {
+    "name": "ᚠᛇᚻ᛫ᛒᛦᚦ᛫ᚠᚱᚩᚠᚢᚱ᛫ᚠᛁᚱᚪ᛫ᚷᛖᚻᚹᛦᛚᚳᚢᛗ",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 24",
+  "dot": "digraph G { x [label=\"από το Άξιον Εστί\"] }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 25",
+  "dot": "digraph G { graph [bb=\"0,0,100,100\"] }",
+  "nodes": [],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 26",
+  "dot": "digraph G { x <-> y }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xy",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_xy",
+    "to": "x"
+   },
+   {
+    "from": "U_xy",
+    "to": "y"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 27",
+  "dot": "digraph G { xi1 [latent]\nxi1 -> x1\nxi1 -> x3\nxi1 -> x4\nxi1 -> x5\nx5 -> x6\nx1 -> x6\nx6 -> x3 }\n",
+  "nodes": [
+   {
+    "name": "xi1",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x1",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x3",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x4",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x5",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x6",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "xi1",
+    "to": "x1"
+   },
+   {
+    "from": "xi1",
+    "to": "x3"
+   },
+   {
+    "from": "xi1",
+    "to": "x4"
+   },
+   {
+    "from": "xi1",
+    "to": "x5"
+   },
+   {
+    "from": "x5",
+    "to": "x6"
+   },
+   {
+    "from": "x1",
+    "to": "x6"
+   },
+   {
+    "from": "x6",
+    "to": "x3"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 28",
+  "dot": "digraph  { xi1 [latent]\nxi2 [latent]\nxi1 <-> xi2\nxi1 -> x1\nxi1 -> x2\nxi1 -> x3\nxi2 -> x4\nxi2 -> x5\nxi2 -> x6 } ",
+  "nodes": [
+   {
+    "name": "xi1",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "xi2",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x1",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x2",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x3",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x4",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x5",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x6",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xi1xi2",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_xi1xi2",
+    "to": "xi1"
+   },
+   {
+    "from": "U_xi1xi2",
+    "to": "xi2"
+   },
+   {
+    "from": "xi1",
+    "to": "x1"
+   },
+   {
+    "from": "xi1",
+    "to": "x2"
+   },
+   {
+    "from": "xi1",
+    "to": "x3"
+   },
+   {
+    "from": "xi2",
+    "to": "x4"
+   },
+   {
+    "from": "xi2",
+    "to": "x5"
+   },
+   {
+    "from": "xi2",
+    "to": "x6"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 29",
+  "dot": "digraph { x -> y\ny -> z\nx <-> y } ",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xy",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "y",
+    "to": "z"
+   },
+   {
+    "from": "U_xy",
+    "to": "x"
+   },
+   {
+    "from": "U_xy",
+    "to": "y"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 30",
+  "dot": "digraph G {\ny -- x -> y <-> x }",
+  "nodes": [
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_yx",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "U_yx",
+    "to": "y"
+   },
+   {
+    "from": "U_yx",
+    "to": "x"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 31",
+  "dot": "graph G {\nx [ exposure , pos =\" 12. , .13 \"]\ny [outcome]\n}",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": 12,
+    "y": 0.13
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "x"
+  ],
+  "outcomes": [
+   "y"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 32",
+  "dot": "graph G { x [exposure] \n y [outcome] }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "x"
+  ],
+  "outcomes": [
+   "y"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 33",
+  "dot": "graph G { x \n y }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 34",
+  "dot": "graph G { x [] \n y [] }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 35",
+  "dot": "digraph G { x [] \n y [] }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 36",
+  "dot": "digraph G { x <-> m } ",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "m",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xm",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_xm",
+    "to": "x"
+   },
+   {
+    "from": "U_xm",
+    "to": "m"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 37",
+  "dot": "digraph G { x <-> m } ",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "m",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xm",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_xm",
+    "to": "x"
+   },
+   {
+    "from": "U_xm",
+    "to": "m"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 38",
+  "dot": "digraph G { x -> m } ",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "m",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "m"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 39",
+  "dot": "dag G { M [pos=\"-0.521,-0.265\"] \n X [exposure,pos=\"-1.749,-0.238\"] \n Y [outcome,pos=\"1.029,-0.228\"] \n M <-> Y [pos=\"0.645,-0.279\"] \n X -> Y \n X -> M -> Y } ",
+  "nodes": [
+   {
+    "name": "M",
+    "kind": "observed",
+    "x": -0.521,
+    "y": -0.265
+   },
+   {
+    "name": "X",
+    "kind": "observed",
+    "x": -1.749,
+    "y": -0.238
+   },
+   {
+    "name": "Y",
+    "kind": "observed",
+    "x": 1.029,
+    "y": -0.228
+   },
+   {
+    "name": "U_MY",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_MY",
+    "to": "M"
+   },
+   {
+    "from": "U_MY",
+    "to": "Y"
+   },
+   {
+    "from": "X",
+    "to": "Y"
+   },
+   {
+    "from": "X",
+    "to": "M"
+   },
+   {
+    "from": "M",
+    "to": "Y"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [
+   "X"
+  ],
+  "outcomes": [
+   "Y"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 40",
+  "dot": "dag G { M [pos=\"-0.521,-0.265\"] X [exposure,pos=\"-1.749,-0.238\"] Y [outcome,pos=\"1.029,-0.228\"] M <-> Y [pos=\"0.645,-0.279\"] X -> Y X -> M -> Y } ",
+  "nodes": [
+   {
+    "name": "M",
+    "kind": "observed",
+    "x": -0.521,
+    "y": -0.265
+   },
+   {
+    "name": "X",
+    "kind": "observed",
+    "x": -1.749,
+    "y": -0.238
+   },
+   {
+    "name": "Y",
+    "kind": "observed",
+    "x": 1.029,
+    "y": -0.228
+   },
+   {
+    "name": "U_MY",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_MY",
+    "to": "M"
+   },
+   {
+    "from": "U_MY",
+    "to": "Y"
+   },
+   {
+    "from": "X",
+    "to": "Y"
+   },
+   {
+    "from": "X",
+    "to": "M"
+   },
+   {
+    "from": "M",
+    "to": "Y"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [
+   "X"
+  ],
+  "outcomes": [
+   "Y"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 41",
+  "dot": "digraph G { x -- y \n x -> y \n x <-> y [pos=\"1.000,1.000\"] }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xy",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "U_xy",
+    "to": "x"
+   },
+   {
+    "from": "U_xy",
+    "to": "y"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 42",
+  "dot": "digraph G {\n  y --   x -> y   <-> x [pos=\"1.0,0.1\"] }",
+  "nodes": [
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_yx",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "U_yx",
+    "to": "y"
+   },
+   {
+    "from": "U_yx",
+    "to": "x"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 43",
+  "dot": "dag{x1}",
+  "nodes": [
+   {
+    "name": "x1",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "parser.js",
+  "label": "parser.js input 44",
+  "dot": "dag{ U -> {a b c d} }",
+  "nodes": [
+   {
+    "name": "U",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "d",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U",
+    "to": "a"
+   },
+   {
+    "from": "U",
+    "to": "b"
+   },
+   {
+    "from": "U",
+    "to": "c"
+   },
+   {
+    "from": "U",
+    "to": "d"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "graph-validation.js",
+  "label": "graph-validation.js input 1",
+  "dot": "dag { x -> y -> z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "y",
+    "to": "z"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "graph-validation.js",
+  "label": "graph-validation.js input 2",
+  "dot": "dag{ x -> y -> z -> x } ",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "y",
+    "to": "z"
+   },
+   {
+    "from": "z",
+    "to": "x"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "graph-validation.js",
+  "label": "graph-validation.js input 3",
+  "dot": "pdag { x -> y -> z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "y",
+    "to": "z"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "graph-validation.js",
+  "label": "graph-validation.js input 4",
+  "dot": "dag { x -- y -> z -> x }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "y",
+    "to": "z"
+   },
+   {
+    "from": "z",
+    "to": "x"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "graph-validation.js",
+  "label": "graph-validation.js input 5",
+  "dot": "pdag { x -- y -> z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "y",
+    "to": "z"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "graph-types.js",
+  "label": "graph-types.js input 1",
+  "dot": "graph { x -- y -- z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "graph-types.js",
+  "label": "graph-types.js input 2",
+  "dot": "dag { x -> y -> z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "x",
+    "to": "y"
+   },
+   {
+    "from": "y",
+    "to": "z"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "graph-types.js",
+  "label": "graph-types.js input 3",
+  "dot": "pdag { x -- y -> z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "y",
+    "to": "z"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "graph-types.js",
+  "label": "graph-types.js input 4",
+  "dot": "mag { x <-> y -> z }",
+  "nodes": [
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_xy",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "U_xy",
+    "to": "x"
+   },
+   {
+    "from": "U_xy",
+    "to": "y"
+   },
+   {
+    "from": "y",
+    "to": "z"
+   }
+  ],
+  "bidirected": 1,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "felixadjust",
+  "dot": "dag {\ns1 [pos=\"0.266,0.802\"]\ns2 [pos=\"0.457,0.811\"]\ns3 [pos=\"0.645,0.822\"]\nx [exposure,pos=\"0.170,0.716\"]\ny [outcome,pos=\"0.891,0.765\"]\nz [adjusted,pos=\"0.379,0.898\"]\nz2 [pos=\"0.585,0.898\"]\ns1 -> s2\ns1 -> z\ns2 -> s3\ns2 -> z2\ns3 -> y\nx -> s1\nx -> y\n}\n",
+  "nodes": [
+   {
+    "name": "s1",
+    "kind": "observed",
+    "x": 0.266,
+    "y": 0.802
+   },
+   {
+    "name": "s2",
+    "kind": "observed",
+    "x": 0.457,
+    "y": 0.811
+   },
+   {
+    "name": "s3",
+    "kind": "observed",
+    "x": 0.645,
+    "y": 0.822
+   },
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": 0.17,
+    "y": 0.716
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": 0.891,
+    "y": 0.765
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": 0.379,
+    "y": 0.898
+   },
+   {
+    "name": "z2",
+    "kind": "observed",
+    "x": 0.585,
+    "y": 0.898
+   }
+  ],
+  "edges": [
+   {
+    "from": "s1",
+    "to": "s2"
+   },
+   {
+    "from": "s1",
+    "to": "z"
+   },
+   {
+    "from": "s2",
+    "to": "s3"
+   },
+   {
+    "from": "s2",
+    "to": "z2"
+   },
+   {
+    "from": "s3",
+    "to": "y"
+   },
+   {
+    "from": "x",
+    "to": "s1"
+   },
+   {
+    "from": "x",
+    "to": "y"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [
+   "z"
+  ],
+  "exposures": [
+   "x"
+  ],
+  "outcomes": [
+   "y"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "amsterdam",
+  "dot": "dag {\nA [pos=\"-2.122,0.138\"]\nD [pos=\"2.122,0.096\"]\nE [pos=\"0.066,1.056\"]\nZ [pos=\"-0.004,0.336\"]\nA -> E\nA -> Z\nE -> D\nZ -> D\nZ -> E\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": -2.122,
+    "y": 0.138
+   },
+   {
+    "name": "D",
+    "kind": "observed",
+    "x": 2.122,
+    "y": 0.096
+   },
+   {
+    "name": "E",
+    "kind": "observed",
+    "x": 0.066,
+    "y": 1.056
+   },
+   {
+    "name": "Z",
+    "kind": "observed",
+    "x": -0.004,
+    "y": 0.336
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "E"
+   },
+   {
+    "from": "A",
+    "to": "Z"
+   },
+   {
+    "from": "E",
+    "to": "D"
+   },
+   {
+    "from": "Z",
+    "to": "D"
+   },
+   {
+    "from": "Z",
+    "to": "E"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "commentator1",
+  "dot": "dag {\nA [latent,pos=\"0.474,-0.094\"]\nB [latent,pos=\"0.020,0.002\"]\nC [latent,pos=\"1.012,0.002\"]\nV [pos=\"0.482,-0.034\"]\nW1 [pos=\"0.205,-0.065\"]\nW2 [pos=\"0.802,-0.060\"]\nX [pos=\"0.225,0.067\"]\nY [pos=\"0.785,0.068\"]\nZ1 [pos=\"0.213,0.006\"]\nZ2 [pos=\"0.809,0.001\"]\nA -> W1\nA -> W2\nB -> W1\nB -> X\nC -> W2\nC -> Y\nV -> Z1\nV -> Z2\nW1 -> Z1\nW2 -> Z2\nX -> Y\nZ1 -> X\nZ2 -> Y\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "latent",
+    "x": 0.474,
+    "y": -0.094
+   },
+   {
+    "name": "B",
+    "kind": "latent",
+    "x": 0.02,
+    "y": 0.002
+   },
+   {
+    "name": "C",
+    "kind": "latent",
+    "x": 1.012,
+    "y": 0.002
+   },
+   {
+    "name": "V",
+    "kind": "observed",
+    "x": 0.482,
+    "y": -0.034
+   },
+   {
+    "name": "W1",
+    "kind": "observed",
+    "x": 0.205,
+    "y": -0.065
+   },
+   {
+    "name": "W2",
+    "kind": "observed",
+    "x": 0.802,
+    "y": -0.06
+   },
+   {
+    "name": "X",
+    "kind": "observed",
+    "x": 0.225,
+    "y": 0.067
+   },
+   {
+    "name": "Y",
+    "kind": "observed",
+    "x": 0.785,
+    "y": 0.068
+   },
+   {
+    "name": "Z1",
+    "kind": "observed",
+    "x": 0.213,
+    "y": 0.006
+   },
+   {
+    "name": "Z2",
+    "kind": "observed",
+    "x": 0.809,
+    "y": 0.001
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "W1"
+   },
+   {
+    "from": "A",
+    "to": "W2"
+   },
+   {
+    "from": "B",
+    "to": "W1"
+   },
+   {
+    "from": "B",
+    "to": "X"
+   },
+   {
+    "from": "C",
+    "to": "W2"
+   },
+   {
+    "from": "C",
+    "to": "Y"
+   },
+   {
+    "from": "V",
+    "to": "Z1"
+   },
+   {
+    "from": "V",
+    "to": "Z2"
+   },
+   {
+    "from": "W1",
+    "to": "Z1"
+   },
+   {
+    "from": "W2",
+    "to": "Z2"
+   },
+   {
+    "from": "X",
+    "to": "Y"
+   },
+   {
+    "from": "Z1",
+    "to": "X"
+   },
+   {
+    "from": "Z2",
+    "to": "Y"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "commentator2",
+  "dot": "dag {\nU [latent,pos=\"0.504,-0.050\"]\nV [pos=\"0.481,-0.090\"]\nW1 [pos=\"0.283,-0.025\"]\nW2 [pos=\"0.711,-0.024\"]\nX [pos=\"0.207,0.048\"]\nY [pos=\"0.828,0.051\"]\nZ1 [pos=\"0.015,-0.047\"]\nZ2 [pos=\"0.988,-0.050\"]\nU -> W1\nU -> W2\nV -> Z1\nV -> Z2\nW1 -> X\nW1 -> Y\nW1 -> Z1\nW2 -> X\nW2 -> Y\nW2 -> Z2\nX -> Y\nZ1 -> X\nZ2 -> Y\n}\n",
+  "nodes": [
+   {
+    "name": "U",
+    "kind": "latent",
+    "x": 0.504,
+    "y": -0.05
+   },
+   {
+    "name": "V",
+    "kind": "observed",
+    "x": 0.481,
+    "y": -0.09
+   },
+   {
+    "name": "W1",
+    "kind": "observed",
+    "x": 0.283,
+    "y": -0.025
+   },
+   {
+    "name": "W2",
+    "kind": "observed",
+    "x": 0.711,
+    "y": -0.024
+   },
+   {
+    "name": "X",
+    "kind": "observed",
+    "x": 0.207,
+    "y": 0.048
+   },
+   {
+    "name": "Y",
+    "kind": "observed",
+    "x": 0.828,
+    "y": 0.051
+   },
+   {
+    "name": "Z1",
+    "kind": "observed",
+    "x": 0.015,
+    "y": -0.047
+   },
+   {
+    "name": "Z2",
+    "kind": "observed",
+    "x": 0.988,
+    "y": -0.05
+   }
+  ],
+  "edges": [
+   {
+    "from": "U",
+    "to": "W1"
+   },
+   {
+    "from": "U",
+    "to": "W2"
+   },
+   {
+    "from": "V",
+    "to": "Z1"
+   },
+   {
+    "from": "V",
+    "to": "Z2"
+   },
+   {
+    "from": "W1",
+    "to": "X"
+   },
+   {
+    "from": "W1",
+    "to": "Y"
+   },
+   {
+    "from": "W1",
+    "to": "Z1"
+   },
+   {
+    "from": "W2",
+    "to": "X"
+   },
+   {
+    "from": "W2",
+    "to": "Y"
+   },
+   {
+    "from": "W2",
+    "to": "Z2"
+   },
+   {
+    "from": "X",
+    "to": "Y"
+   },
+   {
+    "from": "Z1",
+    "to": "X"
+   },
+   {
+    "from": "Z2",
+    "to": "Y"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "big1",
+  "dot": "dag {\nS [exposure,pos=\"0.395,0.046\"]\nT [outcome,pos=\"0.715,0.039\"]\na [pos=\"0.418,-0.028\"]\nb [pos=\"0.106,-0.036\"]\nc [pos=\"0.339,-0.004\"]\nd [pos=\"0.975,-0.010\"]\ne [pos=\"0.278,-0.041\"]\nf [pos=\"0.159,-0.016\"]\ng [pos=\"0.858,-0.042\"]\nh [pos=\"0.544,0.017\"]\ni [pos=\"0.757,0.010\"]\ni4 [pos=\"0.900,0.050\"]\nj [pos=\"0.837,-0.011\"]\nm [pos=\"0.692,-0.024\"]\nn [pos=\"0.128,0.029\"]\no [pos=\"0.470,0.076\"]\np [pos=\"0.540,0.096\"]\nq [pos=\"0.605,0.076\"]\nx [pos=\"0.198,0.075\"]\ny [pos=\"0.521,0.054\"]\nz [pos=\"0.830,0.075\"]\nS -> T\na -> T\na -> c\na -> h\nb -> e\nb -> f\nd -> i\nd -> j\ne -> a\ne -> f\nf -> n\ng -> d\ng -> j\ng -> m\nh -> S\nh -> T\ni -> T\ni -> h\ni4 -> p\nm -> i\nm -> j\nn -> S\nn -> c\no -> q\no -> y\np -> o\np -> q\nq -> y\nx -> S\nx -> o\nx -> p\nz -> T\nz -> p\nz -> q\n}\n",
+  "nodes": [
+   {
+    "name": "S",
+    "kind": "observed",
+    "x": 0.395,
+    "y": 0.046
+   },
+   {
+    "name": "T",
+    "kind": "observed",
+    "x": 0.715,
+    "y": 0.039
+   },
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": 0.418,
+    "y": -0.028
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": 0.106,
+    "y": -0.036
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": 0.339,
+    "y": -0.004
+   },
+   {
+    "name": "d",
+    "kind": "observed",
+    "x": 0.975,
+    "y": -0.01
+   },
+   {
+    "name": "e",
+    "kind": "observed",
+    "x": 0.278,
+    "y": -0.041
+   },
+   {
+    "name": "f",
+    "kind": "observed",
+    "x": 0.159,
+    "y": -0.016
+   },
+   {
+    "name": "g",
+    "kind": "observed",
+    "x": 0.858,
+    "y": -0.042
+   },
+   {
+    "name": "h",
+    "kind": "observed",
+    "x": 0.544,
+    "y": 0.017
+   },
+   {
+    "name": "i",
+    "kind": "observed",
+    "x": 0.757,
+    "y": 0.01
+   },
+   {
+    "name": "i4",
+    "kind": "observed",
+    "x": 0.9,
+    "y": 0.05
+   },
+   {
+    "name": "j",
+    "kind": "observed",
+    "x": 0.837,
+    "y": -0.011
+   },
+   {
+    "name": "m",
+    "kind": "observed",
+    "x": 0.692,
+    "y": -0.024
+   },
+   {
+    "name": "n",
+    "kind": "observed",
+    "x": 0.128,
+    "y": 0.029
+   },
+   {
+    "name": "o",
+    "kind": "observed",
+    "x": 0.47,
+    "y": 0.076
+   },
+   {
+    "name": "p",
+    "kind": "observed",
+    "x": 0.54,
+    "y": 0.096
+   },
+   {
+    "name": "q",
+    "kind": "observed",
+    "x": 0.605,
+    "y": 0.076
+   },
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": 0.198,
+    "y": 0.075
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": 0.521,
+    "y": 0.054
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": 0.83,
+    "y": 0.075
+   }
+  ],
+  "edges": [
+   {
+    "from": "S",
+    "to": "T"
+   },
+   {
+    "from": "a",
+    "to": "T"
+   },
+   {
+    "from": "a",
+    "to": "c"
+   },
+   {
+    "from": "a",
+    "to": "h"
+   },
+   {
+    "from": "b",
+    "to": "e"
+   },
+   {
+    "from": "b",
+    "to": "f"
+   },
+   {
+    "from": "d",
+    "to": "i"
+   },
+   {
+    "from": "d",
+    "to": "j"
+   },
+   {
+    "from": "e",
+    "to": "a"
+   },
+   {
+    "from": "e",
+    "to": "f"
+   },
+   {
+    "from": "f",
+    "to": "n"
+   },
+   {
+    "from": "g",
+    "to": "d"
+   },
+   {
+    "from": "g",
+    "to": "j"
+   },
+   {
+    "from": "g",
+    "to": "m"
+   },
+   {
+    "from": "h",
+    "to": "S"
+   },
+   {
+    "from": "h",
+    "to": "T"
+   },
+   {
+    "from": "i",
+    "to": "T"
+   },
+   {
+    "from": "i",
+    "to": "h"
+   },
+   {
+    "from": "i4",
+    "to": "p"
+   },
+   {
+    "from": "m",
+    "to": "i"
+   },
+   {
+    "from": "m",
+    "to": "j"
+   },
+   {
+    "from": "n",
+    "to": "S"
+   },
+   {
+    "from": "n",
+    "to": "c"
+   },
+   {
+    "from": "o",
+    "to": "q"
+   },
+   {
+    "from": "o",
+    "to": "y"
+   },
+   {
+    "from": "p",
+    "to": "o"
+   },
+   {
+    "from": "p",
+    "to": "q"
+   },
+   {
+    "from": "q",
+    "to": "y"
+   },
+   {
+    "from": "x",
+    "to": "S"
+   },
+   {
+    "from": "x",
+    "to": "o"
+   },
+   {
+    "from": "x",
+    "to": "p"
+   },
+   {
+    "from": "z",
+    "to": "T"
+   },
+   {
+    "from": "z",
+    "to": "p"
+   },
+   {
+    "from": "z",
+    "to": "q"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "S"
+  ],
+  "outcomes": [
+   "T"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "small_mixed",
+  "dot": "digraph {\na\nb\nc\nd\ne\nf\na -- b\na -- c\nb -- c\nc -> d\nd -- e\nd -- f\ne -- f\n}\n",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "d",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "e",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "f",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "c",
+    "to": "d"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": true
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "small5",
+  "dot": "dag {\nA\nI [outcome]\nT [exposure]\nU\nA -> I\nT -> A\nU -> A\nU -> I\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "I",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "T",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "I"
+   },
+   {
+    "from": "T",
+    "to": "A"
+   },
+   {
+    "from": "U",
+    "to": "A"
+   },
+   {
+    "from": "U",
+    "to": "I"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "T"
+  ],
+  "outcomes": [
+   "I"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "small4",
+  "dot": "dag {\nA\nG\nI [outcome]\nK\nT [exposure]\nA -> G\nA -> T\nG -> K\nK -> I\nT -> K\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "G",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "I",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "K",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "T",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "G"
+   },
+   {
+    "from": "A",
+    "to": "T"
+   },
+   {
+    "from": "G",
+    "to": "K"
+   },
+   {
+    "from": "K",
+    "to": "I"
+   },
+   {
+    "from": "T",
+    "to": "K"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "T"
+  ],
+  "outcomes": [
+   "I"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "small3",
+  "dot": "dag {\nS [pos=\"0.420,0.025\"]\nT [pos=\"0.689,0.029\"]\np [pos=\"0.567,0.085\"]\nx [pos=\"0.287,0.069\"]\nz [pos=\"0.801,0.073\"]\nS -> T\nx -> S\nx -> p\nz -> T\nz -> p\n}\n",
+  "nodes": [
+   {
+    "name": "S",
+    "kind": "observed",
+    "x": 0.42,
+    "y": 0.025
+   },
+   {
+    "name": "T",
+    "kind": "observed",
+    "x": 0.689,
+    "y": 0.029
+   },
+   {
+    "name": "p",
+    "kind": "observed",
+    "x": 0.567,
+    "y": 0.085
+   },
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": 0.287,
+    "y": 0.069
+   },
+   {
+    "name": "z",
+    "kind": "observed",
+    "x": 0.801,
+    "y": 0.073
+   }
+  ],
+  "edges": [
+   {
+    "from": "S",
+    "to": "T"
+   },
+   {
+    "from": "x",
+    "to": "S"
+   },
+   {
+    "from": "x",
+    "to": "p"
+   },
+   {
+    "from": "z",
+    "to": "T"
+   },
+   {
+    "from": "z",
+    "to": "p"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [],
+  "outcomes": [],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "small2",
+  "dot": "digraph {\na\nb [adjusted]\nc\ng\ns [exposure]\nt [outcome]\na -> b\na -> s\nb -> s\nb -> t\nc -> b\nc -> t\ng -> c\ng -> s\n}\n",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "g",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "s",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "t",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "a",
+    "to": "b"
+   },
+   {
+    "from": "a",
+    "to": "s"
+   },
+   {
+    "from": "b",
+    "to": "s"
+   },
+   {
+    "from": "b",
+    "to": "t"
+   },
+   {
+    "from": "c",
+    "to": "b"
+   },
+   {
+    "from": "c",
+    "to": "t"
+   },
+   {
+    "from": "g",
+    "to": "c"
+   },
+   {
+    "from": "g",
+    "to": "s"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [
+   "b"
+  ],
+  "exposures": [
+   "s"
+  ],
+  "outcomes": [
+   "t"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "small1",
+  "dot": "digraph {\nA\nS [exposure]\nT [outcome]\nA -> S\nS -> T\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "S",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "T",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "S"
+   },
+   {
+    "from": "S",
+    "to": "T"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "S"
+  ],
+  "outcomes": [
+   "T"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "intermediate_adjustment_graph",
+  "dot": "dag {\nI\nX [exposure]\nY [outcome]\nZ\nI -> Y\nX -> I\nX -> Y\nZ -> I\nZ -> X\n}\n",
+  "nodes": [
+   {
+    "name": "I",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "Y",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "Z",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "I",
+    "to": "Y"
+   },
+   {
+    "from": "X",
+    "to": "I"
+   },
+   {
+    "from": "X",
+    "to": "Y"
+   },
+   {
+    "from": "Z",
+    "to": "I"
+   },
+   {
+    "from": "Z",
+    "to": "X"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "X"
+  ],
+  "outcomes": [
+   "Y"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "confounding_triangle",
+  "dot": "digraph {\nA [exposure]\nB [outcome]\nC\nA -> B\nC -> A\nC -> B\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "B",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "C",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "B"
+   },
+   {
+    "from": "C",
+    "to": "A"
+   },
+   {
+    "from": "C",
+    "to": "B"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "A"
+  ],
+  "outcomes": [
+   "B"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "extended_confounding_triangle",
+  "dot": "digraph {\nA [exposure]\nB [outcome]\nC\nD\nE\nA -> B\nC -> A\nC -> B\nD -> A\nD -> C\nE -> B\nE -> C\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "B",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "C",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "D",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "E",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "B"
+   },
+   {
+    "from": "C",
+    "to": "A"
+   },
+   {
+    "from": "C",
+    "to": "B"
+   },
+   {
+    "from": "D",
+    "to": "A"
+   },
+   {
+    "from": "D",
+    "to": "C"
+   },
+   {
+    "from": "E",
+    "to": "B"
+   },
+   {
+    "from": "E",
+    "to": "C"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "A"
+  ],
+  "outcomes": [
+   "B"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "cyclic_graph",
+  "dot": "digraph {\nA [exposure]\nB [outcome]\nC\nA -> B\nB -> C\nC -> A\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "B",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "C",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "B"
+   },
+   {
+    "from": "B",
+    "to": "C"
+   },
+   {
+    "from": "C",
+    "to": "A"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "A"
+  ],
+  "outcomes": [
+   "B"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "m_bias_graph",
+  "dot": "dag {\nA [exposure]\nB [outcome]\nM\nU1\nU2\nA -> B\nU1 -> A\nU1 -> M\nU2 -> B\nU2 -> M\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "B",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "M",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U1",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U2",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "A",
+    "to": "B"
+   },
+   {
+    "from": "U1",
+    "to": "A"
+   },
+   {
+    "from": "U1",
+    "to": "M"
+   },
+   {
+    "from": "U2",
+    "to": "B"
+   },
+   {
+    "from": "U2",
+    "to": "M"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "A"
+  ],
+  "outcomes": [
+   "B"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "confounding_triangle_with_irrelevant_nodes",
+  "dot": "dag {\nA [exposure]\nB [outcome]\nM\nU1\nU2\nM -> A\nM -> B\nU1 -> M\nU2 -> M\n}\n",
+  "nodes": [
+   {
+    "name": "A",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "B",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "M",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U1",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U2",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "M",
+    "to": "A"
+   },
+   {
+    "from": "M",
+    "to": "B"
+   },
+   {
+    "from": "U1",
+    "to": "M"
+   },
+   {
+    "from": "U2",
+    "to": "M"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "A"
+  ],
+  "outcomes": [
+   "B"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "very_large_dag",
+  "dot": "dag {\n\"DiätMutter\" [pos=\"-1.398,-1.345\"]\nAllergenexposition [pos=\"-1.286,0.327\"]\nAllergischeSensibilisierung [pos=\"0.465,-0.194\"]\nAntibiotika [pos=\"-2.082,0.906\"]\nBegleiterkrankungen [pos=\"0.741,1.374\"]\nBetreuungKind [pos=\"0.700,0.880\"]\nD [outcome,pos=\"1.392,1.693\"]\nDarmflora [pos=\"-1.258,-0.291\"]\nE [exposure,pos=\"-2.207,1.660\"]\nErregerexposition [pos=\"-0.442,0.736\"]\nEtnische [pos=\"0.998,-0.542\"]\nGeburtsmodus [pos=\"-0.019,0.438\"]\nGeburtsort [pos=\"-0.718,1.393\"]\nGenetische [pos=\"1.407,0.537\"]\nGeschwister [pos=\"-0.186,1.143\"]\nHausstaub [pos=\"-0.298,-0.735\"]\nHaustiere [pos=\"-1.971,-0.883\"]\nImpfungen [pos=\"-1.840,0.060\"]\nInfektionen [pos=\"-0.857,1.120\"]\nRauchenAnderer [pos=\"0.437,-1.094\"]\nRauchenMutter [pos=\"1.157,-1.311\"]\nSchwangerschaft [pos=\"-1.976,-1.488\"]\nStillen [pos=\"-0.882,-1.234\"]\nVitD [pos=\"-2.241,-0.014\"]\n\"DiätMutter\" -> D\n\"DiätMutter\" -> Stillen\nAllergenexposition -> AllergischeSensibilisierung\nAllergenexposition -> Darmflora\nAllergenexposition -> E\nAllergischeSensibilisierung -> D\nAntibiotika -> D\nAntibiotika -> Darmflora\nAntibiotika -> Erregerexposition\nAntibiotika -> Infektionen\nBegleiterkrankungen -> D\nBegleiterkrankungen -> E\nBetreuungKind -> AllergischeSensibilisierung\nBetreuungKind -> Erregerexposition\nBetreuungKind -> Infektionen\nDarmflora -> AllergischeSensibilisierung\nDarmflora -> D\nDarmflora -> E\nE -> AllergischeSensibilisierung\nE -> D\nErregerexposition -> D\nErregerexposition -> E\nEtnische -> D\nEtnische -> Genetische\nEtnische -> Stillen\nGeburtsmodus -> Darmflora\nGeburtsmodus -> Erregerexposition\nGeburtsort -> Erregerexposition\nGenetische -> AllergischeSensibilisierung\nGenetische -> D\nGeschwister -> AllergischeSensibilisierung\nGeschwister -> Erregerexposition\nHausstaub -> AllergischeSensibilisierung\nHausstaub -> Darmflora\nHaustiere -> AllergischeSensibilisierung\nHaustiere -> Darmflora\nHaustiere -> Erregerexposition\nHaustiere -> Hausstaub\nImpfungen -> Darmflora\nImpfungen -> E\nInfektionen -> D\nInfektionen -> Darmflora\nInfektionen -> E\nInfektionen -> Erregerexposition\nRauchenAnderer -> D\nRauchenAnderer -> E\nRauchenAnderer -> Stillen\nRauchenMutter -> D\nRauchenMutter -> E\nRauchenMutter -> Schwangerschaft\nRauchenMutter -> Stillen\nStillen -> AllergischeSensibilisierung\nStillen -> Darmflora\nVitD -> E\n}\n",
+  "nodes": [
+   {
+    "name": "DiätMutter",
+    "kind": "observed",
+    "x": -1.398,
+    "y": -1.345
+   },
+   {
+    "name": "Allergenexposition",
+    "kind": "observed",
+    "x": -1.286,
+    "y": 0.327
+   },
+   {
+    "name": "AllergischeSensibilisierung",
+    "kind": "observed",
+    "x": 0.465,
+    "y": -0.194
+   },
+   {
+    "name": "Antibiotika",
+    "kind": "observed",
+    "x": -2.082,
+    "y": 0.906
+   },
+   {
+    "name": "Begleiterkrankungen",
+    "kind": "observed",
+    "x": 0.741,
+    "y": 1.374
+   },
+   {
+    "name": "BetreuungKind",
+    "kind": "observed",
+    "x": 0.7,
+    "y": 0.88
+   },
+   {
+    "name": "D",
+    "kind": "observed",
+    "x": 1.392,
+    "y": 1.693
+   },
+   {
+    "name": "Darmflora",
+    "kind": "observed",
+    "x": -1.258,
+    "y": -0.291
+   },
+   {
+    "name": "E",
+    "kind": "observed",
+    "x": -2.207,
+    "y": 1.66
+   },
+   {
+    "name": "Erregerexposition",
+    "kind": "observed",
+    "x": -0.442,
+    "y": 0.736
+   },
+   {
+    "name": "Etnische",
+    "kind": "observed",
+    "x": 0.998,
+    "y": -0.542
+   },
+   {
+    "name": "Geburtsmodus",
+    "kind": "observed",
+    "x": -0.019,
+    "y": 0.438
+   },
+   {
+    "name": "Geburtsort",
+    "kind": "observed",
+    "x": -0.718,
+    "y": 1.393
+   },
+   {
+    "name": "Genetische",
+    "kind": "observed",
+    "x": 1.407,
+    "y": 0.537
+   },
+   {
+    "name": "Geschwister",
+    "kind": "observed",
+    "x": -0.186,
+    "y": 1.143
+   },
+   {
+    "name": "Hausstaub",
+    "kind": "observed",
+    "x": -0.298,
+    "y": -0.735
+   },
+   {
+    "name": "Haustiere",
+    "kind": "observed",
+    "x": -1.971,
+    "y": -0.883
+   },
+   {
+    "name": "Impfungen",
+    "kind": "observed",
+    "x": -1.84,
+    "y": 0.06
+   },
+   {
+    "name": "Infektionen",
+    "kind": "observed",
+    "x": -0.857,
+    "y": 1.12
+   },
+   {
+    "name": "RauchenAnderer",
+    "kind": "observed",
+    "x": 0.437,
+    "y": -1.094
+   },
+   {
+    "name": "RauchenMutter",
+    "kind": "observed",
+    "x": 1.157,
+    "y": -1.311
+   },
+   {
+    "name": "Schwangerschaft",
+    "kind": "observed",
+    "x": -1.976,
+    "y": -1.488
+   },
+   {
+    "name": "Stillen",
+    "kind": "observed",
+    "x": -0.882,
+    "y": -1.234
+   },
+   {
+    "name": "VitD",
+    "kind": "observed",
+    "x": -2.241,
+    "y": -0.014
+   }
+  ],
+  "edges": [
+   {
+    "from": "DiätMutter",
+    "to": "D"
+   },
+   {
+    "from": "DiätMutter",
+    "to": "Stillen"
+   },
+   {
+    "from": "Allergenexposition",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Allergenexposition",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Allergenexposition",
+    "to": "E"
+   },
+   {
+    "from": "AllergischeSensibilisierung",
+    "to": "D"
+   },
+   {
+    "from": "Antibiotika",
+    "to": "D"
+   },
+   {
+    "from": "Antibiotika",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Antibiotika",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "Antibiotika",
+    "to": "Infektionen"
+   },
+   {
+    "from": "Begleiterkrankungen",
+    "to": "D"
+   },
+   {
+    "from": "Begleiterkrankungen",
+    "to": "E"
+   },
+   {
+    "from": "BetreuungKind",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "BetreuungKind",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "BetreuungKind",
+    "to": "Infektionen"
+   },
+   {
+    "from": "Darmflora",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Darmflora",
+    "to": "D"
+   },
+   {
+    "from": "Darmflora",
+    "to": "E"
+   },
+   {
+    "from": "E",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "E",
+    "to": "D"
+   },
+   {
+    "from": "Erregerexposition",
+    "to": "D"
+   },
+   {
+    "from": "Erregerexposition",
+    "to": "E"
+   },
+   {
+    "from": "Etnische",
+    "to": "D"
+   },
+   {
+    "from": "Etnische",
+    "to": "Genetische"
+   },
+   {
+    "from": "Etnische",
+    "to": "Stillen"
+   },
+   {
+    "from": "Geburtsmodus",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Geburtsmodus",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "Geburtsort",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "Genetische",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Genetische",
+    "to": "D"
+   },
+   {
+    "from": "Geschwister",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Geschwister",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "Hausstaub",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Hausstaub",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Haustiere",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Haustiere",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Haustiere",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "Haustiere",
+    "to": "Hausstaub"
+   },
+   {
+    "from": "Impfungen",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Impfungen",
+    "to": "E"
+   },
+   {
+    "from": "Infektionen",
+    "to": "D"
+   },
+   {
+    "from": "Infektionen",
+    "to": "Darmflora"
+   },
+   {
+    "from": "Infektionen",
+    "to": "E"
+   },
+   {
+    "from": "Infektionen",
+    "to": "Erregerexposition"
+   },
+   {
+    "from": "RauchenAnderer",
+    "to": "D"
+   },
+   {
+    "from": "RauchenAnderer",
+    "to": "E"
+   },
+   {
+    "from": "RauchenAnderer",
+    "to": "Stillen"
+   },
+   {
+    "from": "RauchenMutter",
+    "to": "D"
+   },
+   {
+    "from": "RauchenMutter",
+    "to": "E"
+   },
+   {
+    "from": "RauchenMutter",
+    "to": "Schwangerschaft"
+   },
+   {
+    "from": "RauchenMutter",
+    "to": "Stillen"
+   },
+   {
+    "from": "Stillen",
+    "to": "AllergischeSensibilisierung"
+   },
+   {
+    "from": "Stillen",
+    "to": "Darmflora"
+   },
+   {
+    "from": "VitD",
+    "to": "E"
+   }
+  ],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "E"
+  ],
+  "outcomes": [
+   "D"
+  ],
+  "nonDag": false
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "K5",
+  "dot": "graph {\na [pos=\"0.179,0.301\"]\nb [pos=\"0.618,0.988\"]\nc [pos=\"0.305,0.981\"]\nx [exposure,pos=\"0.484,0.032\"]\ny [outcome,pos=\"0.774,0.285\"]\na -- b\na -- c\na -- x\na -- y\nb -- c\nb -- x\nb -- y\nc -- x\nc -- y\nx -- y\n}\n",
+  "nodes": [
+   {
+    "name": "a",
+    "kind": "observed",
+    "x": 0.179,
+    "y": 0.301
+   },
+   {
+    "name": "b",
+    "kind": "observed",
+    "x": 0.618,
+    "y": 0.988
+   },
+   {
+    "name": "c",
+    "kind": "observed",
+    "x": 0.305,
+    "y": 0.981
+   },
+   {
+    "name": "x",
+    "kind": "observed",
+    "x": 0.484,
+    "y": 0.032
+   },
+   {
+    "name": "y",
+    "kind": "observed",
+    "x": 0.774,
+    "y": 0.285
+   }
+  ],
+  "edges": [],
+  "bidirected": 0,
+  "adjusted": [],
+  "exposures": [
+   "x"
+  ],
+  "outcomes": [
+   "y"
+  ],
+  "nonDag": true
+ },
+ {
+  "source": "test-graphs.js",
+  "label": "spirtes",
+  "dot": "pag G{\nX10\nX100\nX101\nX102\nX106\nX108\nX110\nX111\nX113\nX115\nX116\nX117\nX118\nX119\nX120\nX122\nX123\nX124\nX125\nX127\nX128\nX129\nX13\nX132\nX134\nX135\nX136\nX138\nX139\nX141\nX142\nX144\nX146\nX147\nX148\nX149\nX15\nX151\nX152\nX153\nX154\nX157\nX158\nX159\nX16\nX161\nX162\nX165\nX166\nX167\nX168\nX169\nX17\nX170\nX171\nX172\nX174\nX175\nX176\nX177\nX178\nX179\nX18\nX181\nX183\nX185\nX186\nX188\nX189\nX190\nX193\nX194\nX195\nX196\nX197\nX198\nX199\nX2\nX200\nX201\nX203\nX204\nX206\nX207\nX209\nX21\nX210\nX211\nX212\nX215\nX216\nX217\nX218\nX219\nX22\nX220\nX221\nX222\nX223\nX224\nX225\nX226\nX227\nX228\nX23\nX230\nX231\nX232\nX233\nX234\nX235\nX236\nX237\nX238\nX239\nX24\nX240\nX241\nX242\nX243\nX245\nX247\nX249\nX25\nX250\nX251\nX253\nX254\nX255\nX256\nX259\nX260\nX261\nX263\nX264\nX265\nX266\nX267\nX268\nX270\nX271\nX272\nX273\nX274\nX275\nX276\nX277\nX279\nX28\nX280\nX282\nX283\nX286\nX287\nX288\nX289\nX29\nX290\nX292\nX293\nX294\nX295\nX296\nX297\nX298\nX299\nX3\nX30\nX300\nX301\nX302\nX306\nX307\nX308\nX309\nX31\nX310\nX312\nX313\nX314\nX316\nX317\nX318\nX319\nX32\nX320\nX321\nX322\nX323\nX324\nX325\nX327\nX328\nX33\nX331\nX332\nX333\nX334\nX335\nX336\nX339\nX340\nX342\nX343\nX344\nX345 [exposure]\nX346\nX348\nX349\nX35\nX350\nX351\nX352\nX353\nX354\nX355\nX356\nX357\nX358\nX359\nX36\nX360\nX362\nX363\nX364\nX366\nX367\nX368\nX369\nX370\nX371\nX372\nX374\nX375\nX376\nX377\nX378\nX379\nX38\nX381\nX382\nX383\nX384\nX385\nX386\nX387\nX388\nX389\nX390\nX391\nX392\nX393\nX394\nX395\nX396\nX397\nX398\nX399\nX4\nX40\nX400\nX401\nX402\nX403\nX404\nX405\nX406\nX407\nX408\nX409\nX41\nX410\nX411\nX413\nX414\nX415\nX416\nX417\nX418\nX419\nX42\nX421\nX422\nX423\nX424\nX425\nX426\nX427\nX428\nX429\nX43\nX430\nX431\nX432\nX433\nX434\nX435\nX436\nX438\nX439\nX44\nX440\nX441\nX442\nX443\nX444\nX445\nX446\nX447\nX448\nX449\nX45\nX450\nX451\nX452\nX453\nX454\nX455\nX456\nX457\nX458\nX459\nX460\nX461 [outcome]\nX462\nX463\nX464\nX465\nX466\nX467\nX468\nX469\nX47\nX470\nX471\nX472\nX473\nX474\nX475\nX476\nX477\nX478\nX479\nX48\nX480\nX481\nX482\nX483\nX484\nX485\nX486\nX487\nX488\nX489\nX49\nX490\nX491\nX492\nX493\nX494\nX495\nX496\nX497\nX498\nX499\nX5\nX50\nX500\nX51\nX54\nX55\nX56\nX58\nX6\nX62\nX64\nX66\nX68\nX75\nX76\nX77\nX78\nX79\nX80\nX81\nX82\nX83\nX84\nX85\nX87\nX88\nX89\nX9\nX90\nX91\nX93\nX94\nX97\nX98\nX99\nX10 @-> X414\nX10 @-> X426\nX10 @-> X447\nX10 @-@ X314\nX100 -> X403\nX100 <-> X183\nX100 <-> X332\nX100 <-> X497\nX101 -> X233\nX101 -> X353\nX101 -> X418\nX101 -> X461\nX102 -> X135\nX102 -> X494\nX102 <-> X227\nX106 @-> X316\nX108 @-> X174\nX108 @-> X223\nX108 @-> X238\nX108 @-> X460\nX108 @-@ X42\nX110 @-> X211\nX110 @-> X243\nX110 @-> X273\nX110 @-> X327\nX111 @-> X237\nX111 @-> X239\nX111 @-> X411\nX111 @-@ X170\nX113 @-> X310\nX113 @-> X369\nX113 @-> X390\nX113 @-@ X15\nX113 @-@ X277\nX113 @-@ X413\nX115 @-> X210\nX115 @-> X270\nX115 @-> X276\nX115 @-> X467\nX115 @-> X489\nX115 @-@ X471\nX117 @-> X300\nX118 -> X124\nX118 -> X322\nX118 -> X384\nX118 -> X393\nX118 <-> X274\nX118 <-> X432\nX119 -> X399\nX119 -> X427\nX119 <-> X323\nX120 -> X176\nX120 -> X239\nX120 -> X253\nX120 -> X368\nX120 -> X385\nX120 -> X444\nX120 <-> X175\nX120 <-> X186\nX122 -> X209\nX122 -> X292\nX122 -> X384\nX122 -> X415\nX122 -> X440\nX122 <-> X127\nX122 <-> X369\nX123 @-> X428\nX124 -> X100\nX124 -> X212\nX124 -> X342\nX124 -> X458\nX124 -> X497\nX125 -> X165\nX127 -> X282\nX128 @-> X138\nX128 @-> X322\nX128 @-> X480\nX128 @-@ X147\nX129 @-> X138\nX129 @-> X460\nX13 @-> X176\nX13 @-> X306\nX13 @-> X483\nX13 @-> X492\nX13 @-@ X343\nX13 @-@ X44\nX132 -> X335\nX132 -> X450\nX132 -> X452\nX134 @-> X251\nX135 -> X440\nX136 -> X322\nX136 <-> X207\nX136 <-> X280\nX136 <-> X433\nX138 -> X381\nX138 -> X419\nX139 -> X376\nX139 <-> X36\nX139 <-> X90\nX141 @-@ X3\nX142 -> X245\nX142 -> X439\nX142 -> X462\nX142 <-> X200\nX144 @-> X335\nX144 @-> X415\nX146 @-@ X17\nX147 @-> X209\nX147 @-> X233\nX147 @-> X264\nX147 @-> X411\nX148 @-@ X488\nX149 @-> X465\nX15 @-> X455\nX15 @-> X469\nX151 -> X300\nX151 -> X334\nX151 -> X47\nX152 @-@ X190\nX153 @-> X490\nX154 -> X219\nX158 @-> X428\nX158 @-@ X286\nX159 -> X135\nX159 -> X339\nX159 -> X342\nX159 <-> X404\nX159 <-> X411\nX159 <-> X84\nX161 -> X300\nX161 -> X366\nX161 -> X386\nX161 -> X422\nX161 -> X487\nX161 -> X490\nX162 @-> X175\nX162 @-> X319\nX162 @-> X323\nX162 @-> X370\nX166 -> X217\nX166 -> X332\nX166 -> X426\nX167 @-> X159\nX167 @-> X335\nX167 @-> X472\nX168 @-> X276\nX168 @-> X441\nX169 -> X223\nX169 -> X297\nX169 -> X316\nX169 @-> X310\nX17 @-> X241\nX171 @-> X288\nX171 @-@ X181\nX171 @-@ X402\nX172 @-> X327\nX174 -> X297\nX175 -> X186\nX175 -> X236\nX175 -> X267\nX175 -> X275\nX175 -> X392\nX176 -> X435\nX177 @-> X211\nX177 @-> X237\nX177 @-> X313\nX177 @-@ X446\nX179 @-> X207\nX179 @-@ X206\nX179 @-@ X66\nX18 @-> X458\nX181 @-> X264\nX183 -> X238\nX183 -> X270\nX183 -> X298\nX183 -> X367\nX183 -> X454\nX183 <-> X360\nX185 @-> X350\nX185 @-@ X56\nX186 -> X282\nX188 -> X436\nX189 @-> X320\nX189 @-@ X9\nX190 @-> X374\nX190 @-> X472\nX190 @-> X495\nX193 @-> X201\nX193 @-> X364\nX193 @-> X372\nX193 @-> X432\nX194 @-@ X30\nX195 -> X400\nX195 -> X417\nX195 <-> X327\nX196 @-> X408\nX196 @-@ X44\nX197 -> X151\nX197 -> X276\nX197 <-> X496\nX198 @-> X496\nX198 @-@ X43\nX2 @-> X280\nX2 @-> X433\nX2 @-> X493\nX2 @-> X80\nX200 -> X242\nX200 -> X290\nX200 -> X317\nX200 -> X357\nX200 -> X403\nX200 -> X51\nX200 <-> X245\nX200 <-> X439\nX201 -> X334\nX201 -> X466\nX203 @-> X418\nX204 @-> X274\nX204 @-> X295\nX204 @-> X344\nX204 @-> X429\nX204 @-> X444\nX206 @-> X216\nX207 -> X280\nX207 -> X468\nX209 -> X236\nX209 -> X245\nX209 -> X275\nX209 -> X309\nX209 -> X410\nX21 @-> X276\nX21 @-> X287\nX21 @-> X292\nX21 @-> X487\nX21 @-@ X82\nX210 -> X339\nX210 <-> X459\nX211 -> X268\nX212 -> X386\nX212 -> X389\nX212 -> X462\nX215 @-> X358\nX215 @-> X475\nX217 -> X295\nX217 -> X393\nX217 -> X442\nX218 @-> X102\nX218 @-> X233\nX218 @-> X334\nX218 @-> X362\nX218 @-> X445\nX218 @-> X448\nX219 -> X289\nX219 -> X392\nX219 <-> X99\nX22 @-> X242\nX220 -> X336\nX220 -> X460\nX221 @-> X344\nX221 @-> X389\nX221 @-> X434\nX221 @-@ X6\nX222 @-> X227\nX222 @-> X322\nX222 @-> X344\nX222 @-> X346\nX222 @-> X381\nX222 @-> X424\nX222 @-> X462\nX223 -> X344\nX223 <-> X460\nX224 @-@ X232\nX225 @-> X234\nX225 @-> X280\nX225 @-> X374\nX225 @-> X414\nX225 @-@ X294\nX226 @-> X282\nX226 @-> X374\nX226 @-> X403\nX226 @-> X419\nX227 -> X410\nX227 -> X434\nX227 -> X486\nX228 <-> X464\nX228 <-> X99\nX23 -> X122\nX23 -> X166\nX23 -> X264\nX23 -> X301\nX23 -> X451\nX23 <-> X274\nX23 <-> X432\nX23 @-> X118\nX230 @-> X270\nX230 @-> X84\nX231 @-> X474\nX231 @-> X497\nX232 @-> X409\nX233 -> X282\nX233 -> X301\nX233 -> X416\nX233 -> X472\nX234 -> X289\nX234 -> X353\nX234 -> X354\nX234 -> X363\nX234 -> X400\nX234 -> X466\nX234 -> X468\nX234 -> X491\nX235 @-> X139\nX235 @-> X350\nX235 @-> X368\nX235 @-> X484\nX235 @-@ X340\nX236 -> X403\nX236 -> X493\nX238 -> X265\nX238 -> X371\nX239 -> X242\nX239 -> X290\nX239 -> X367\nX24 @-> X295\nX24 @-> X456\nX24 @-@ X453\nX24 @-@ X58\nX24 @-@ X81\nX240 @-> X266\nX240 @-> X358\nX240 @-> X430\nX240 @-@ X349\nX241 -> X253\nX241 -> X333\nX241 -> X367\nX241 <-> X397\nX241 <-> X424\nX242 -> X430\nX243 -> X267\nX243 -> X426\nX243 -> X447\nX243 -> X490\nX245 -> X336\nX245 -> X476\nX247 -> X435\nX249 @-@ X28\nX25 -> X161\nX25 -> X280\nX25 -> X375\nX25 -> X384\nX250 @-> X287\nX253 -> X467\nX253 <-> X283\nX253 <-> X368\nX254 -> X383\nX255 @-> X415\nX255 @-@ X42\nX259 @-> X247\nX259 @-> X266\nX259 @-> X273\nX259 @-> X324\nX259 @-> X438\nX260 @-@ X261\nX261 @-> X469\nX263 -> X397\nX263 <-> X323\nX263 @-> X119\nX264 -> X272\nX264 -> X331\nX264 -> X447\nX264 <-> X411\nX266 -> X366\nX267 -> X292\nX267 -> X409\nX267 -> X459\nX267 <-> X320\nX268 -> X388\nX268 -> X451\nX268 -> X493\nX270 -> X332\nX271 -> X342\nX271 -> X383\nX271 -> X396\nX271 @-> X302\nX272 -> X309\nX273 -> X444\nX273 <-> X327\nX273 <-> X396\nX274 <-> X87\nX275 -> X370\nX275 -> X382\nX276 -> X309\nX276 <-> X364\nX28 @-> X264\nX28 @-> X385\nX28 @-> X409\nX28 @-> X411\nX28 @-> X459\nX28 @-> X484\nX280 -> X461\nX280 -> X490\nX282 -> X485\nX283 -> X468\nX283 -> X476\nX286 @-> X335\nX287 -> X299\nX287 -> X403\nX287 -> X497\nX288 -> X475\nX288 -> X483\nX288 <-> X495\nX29 @-> X321\nX29 @-> X360\nX29 @-> X463\nX29 @-> X489\nX290 -> X306\nX290 -> X431\nX292 -> X348\nX292 -> X481\nX293 -> X384\nX294 @-> X451\nX294 @-> X474\nX295 -> X427\nX297 -> X354\nX298 -> X376\nX298 -> X417\nX298 -> X50\nX3 @-> X201\nX3 @-> X237\nX3 @-> X441\nX300 <-> X450\nX301 -> X336\nX301 -> X359\nX301 -> X377\nX301 -> X468\nX302 -> X245\nX302 -> X500\nX306 -> X423\nX308 -> X443\nX309 -> X335\nX309 -> X358\nX309 -> X389\nX309 -> X394\nX310 -> X478\nX310 -> X483\nX312 -> X339\nX312 -> X436\nX312 <-> X88\nX313 -> X342\nX313 -> X416\nX313 -> X432\nX313 -> X469\nX313 -> X479\nX314 @-> X321\nX314 @-@ X328\nX316 -> X427\nX316 -> X435\nX317 -> X321\nX317 -> X438\nX318 @-@ X4\nX319 -> X357\nX32 @-> X266\nX32 @-> X273\nX32 @-> X390\nX320 -> X370\nX320 -> X404\nX320 <-> X88\nX321 -> X176\nX321 <-> X431\nX322 -> X461\nX322 -> X474\nX322 <-> X348\nX323 -> X331\nX323 <-> X398\nX324 -> X442\nX325 @-> X450\nX325 @-> X461\nX327 -> X469\nX327 <-> X477\nX327 <-> X491\nX33 -> X78\nX331 -> X407\nX331 -> X456\nX331 -> X472\nX331 <-> X469\nX332 -> X463\nX332 -> X497\nX333 -> X470\nX334 <-> X363\nX334 <-> X442\nX334 <-> X448\nX335 -> X499\nX340 @-> X400\nX340 @-> X414\nX340 @-> X421\nX340 @-> X460\nX342 -> X344\nX345 <-> X387\nX345 <-> X405\nX346 -> X369\nX346 -> X370\nX346 -> X397\nX346 -> X438\nX346 -> X487\nX348 -> X449\nX349 @-> X386\nX349 @-> X409\nX349 @-> X476\nX35 @-> X142\nX35 @-> X309\nX35 @-> X428\nX35 @-> X64\nX350 -> X386\nX350 -> X409\nX350 -> X444\nX350 -> X469\nX351 @-@ X79\nX353 <-> X409\nX354 -> X424\nX354 -> X435\nX354 -> X456\nX355 @-> X449\nX355 @-@ X56\nX356 @-> X452\nX357 -> X419\nX358 -> X417\nX358 -> X428\nX359 -> X408\nX359 -> X436\nX359 -> X476\nX359 -> X482\nX36 -> X247\nX36 -> X251\nX36 -> X254\nX36 -> X33\nX36 -> X346\nX36 <-> X372\nX360 -> X312\nX360 -> X320\nX360 -> X441\nX360 <-> X88\nX362 -> X429\nX364 -> X393\nX364 -> X445\nX364 <-> X369\nX366 -> X435\nX367 -> X312\nX367 -> X392\nX367 -> X451\nX368 -> X283\nX368 -> X475\nX369 -> X399\nX370 -> X234\nX370 -> X404\nX370 -> X422\nX372 <-> X90\nX374 -> X302\nX374 -> X324\nX374 -> X428\nX374 -> X465\nX376 -> X492\nX377 -> X482\nX379 @-> X480\nX379 @-@ X41\nX38 @-> X280\nX38 @-> X455\nX38 @-> X499\nX38 @-@ X4\nX382 -> X397\nX382 -> X481\nX383 -> X207\nX383 -> X409\nX383 -> X426\nX383 <-> X418\nX384 -> X452\nX384 <-> X416\nX384 <-> X469\nX387 <-> X405\nX388 -> X480\nX390 <-> X467\nX390 <-> X478\nX391 @-> X455\nX392 -> X448\nX394 -> X475\nX396 -> X439\nX398 -> X119\nX398 -> X263\nX398 -> X458\nX398 <-> X479\nX399 -> X449\nX40 @-> X101\nX40 @-> X399\nX40 @-> X415\nX40 @-> X445\nX40 @-> X455\nX40 @-@ X66\nX400 -> X452\nX400 -> X486\nX401 @-> X479\nX404 -> X457\nX404 -> X475\nX404 <-> X458\nX406 @-> X197\nX406 @-> X308\nX407 -> X422\nX409 <-> X410\nX41 @-> X125\nX41 @-> X403\nX410 -> X461\nX410 <-> X434\nX413 @-> X458\nX414 -> X445\nX414 -> X472\nX416 -> X443\nX416 <-> X474\nX417 -> X454\nX417 -> X486\nX419 -> X454\nX42 @-> X300\nX42 @-> X307\nX42 @-> X377\nX42 @-> X450\nX42 @-> X478\nX421 <-> X484\nX422 -> X466\nX424 -> X445\nX424 -> X461\nX424 -> X478\nX425 @-> X487\nX427 -> X440\nX428 <-> X492\nX429 -> X474\nX43 @-> X307\nX43 @-> X383\nX431 -> X473\nX432 <-> X87\nX433 -> X207\nX434 -> X461\nX435 -> X427\nX438 <-> X500\nX44 @-> X283\nX44 @-> X415\nX440 -> X466\nX440 -> X482\nX441 -> X481\nX442 -> X492\nX443 -> X491\nX443 <-> X90\nX446 @-> X211\nX446 @-> X362\nX447 <-> X484\nX449 -> X481\nX449 -> X498\nX45 -> X154\nX45 -> X174\nX45 -> X272\nX45 -> X345\nX45 -> X352\nX455 -> X463\nX455 -> X500\nX459 -> X386\nX460 -> X486\nX462 -> X473\nX462 -> X489\nX465 -> X234\nX47 -> X101\nX47 -> X243\nX47 -> X309\nX47 -> X400\nX47 -> X451\nX470 -> X477\nX471 @-> X270\nX473 -> X51\nX478 -> X493\nX479 -> X494\nX48 @-> X119\nX48 @-> X127\nX484 -> X308\nX487 -> X496\nX488 @-> X493\nX49 @-> X102\nX49 @-> X387\nX49 @-> X399\nX491 -> X396\nX5 -> X313\nX5 -> X403\nX5 -> X414\nX5 -> X45\nX50 -> X169\nX50 -> X227\nX50 -> X293\nX50 -> X310\nX50 -> X433\nX50 -> X487\nX51 -> X5\nX54 @-> X404\nX54 @-> X491\nX56 @-> X295\nX56 @-> X385\nX56 @-> X439\nX56 @-> X460\nX58 @-> X499\nX6 @-> X344\nX6 @-> X357\nX6 @-> X421\nX6 @-> X99\nX64 -> X135\nX64 -> X331\nX64 -> X389\nX64 -> X499\nX64 -> X99\nX66 @-> X411\nX66 @-> X441\nX66 @-> X443\nX66 @-> X460\nX68 @-> X433\nX68 @-> X84\nX75 @-> X216\nX75 @-> X319\nX76 @-> X132\nX76 @-> X233\nX76 @-> X253\nX76 @-> X368\nX77 @-> X125\nX77 @-> X327\nX77 @-> X364\nX77 @-> X390\nX77 @-> X472\nX78 -> X174\nX78 -> X234\nX78 -> X268\nX78 -> X433\nX78 -> X464\nX78 -> X467\nX79 @-> X183\nX79 @-> X195\nX79 @-> X360\nX79 @-> X386\nX79 @-> X409\nX79 @-> X448\nX80 -> X271\nX80 -> X302\nX80 -> X388\nX80 -> X405\nX80 -> X440\nX80 -> X450\nX80 -> X476\nX81 @-> X415\nX82 @-> X335\nX82 @-> X399\nX83 @-> X132\nX83 @-> X312\nX83 @-> X64\nX84 -> X161\nX84 -> X264\nX84 -> X403\nX84 -> X499\nX85 @-> X207\nX85 @-> X223\nX85 @-> X254\nX85 @-> X357\nX85 @-> X91\nX85 @-@ X98\nX87 -> X322\nX87 -> X350\nX87 -> X91\nX87 @-> X118\nX88 -> X138\nX88 -> X25\nX88 -> X493\nX88 -> X80\nX89 @-> X251\nX9 @-> X188\nX9 @-> X388\nX9 @-> X390\nX9 @-> X431\nX9 @-> X478\nX90 -> X36\nX91 -> X132\nX93 @-> X100\nX93 @-> X166\nX93 @-> X220\nX93 @-> X301\nX93 @-> X438\nX94 -> X442\nX94 @-> X306\nX94 @-> X324\nX97 @-> X188\nX97 @-> X276\nX97 @-> X431\nX98 @-> X295\nX99 -> X220\nX99 -> X316\nX99 -> X464\n}\n",
+  "nodes": [
+   {
+    "name": "X10",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X100",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X101",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X102",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X106",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X108",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X110",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X111",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X113",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X115",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X116",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X117",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X118",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X119",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X120",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X122",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X123",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X124",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X125",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X127",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X128",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X129",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X13",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X132",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X134",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X135",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X136",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X138",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X139",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X141",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X142",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X144",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X146",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X147",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X148",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X149",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X15",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X151",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X152",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X153",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X154",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X157",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X158",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X159",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X16",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X161",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X162",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X165",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X166",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X167",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X168",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X169",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X17",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X170",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X171",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X172",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X174",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X175",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X176",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X177",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X178",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X179",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X18",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X181",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X183",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X185",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X186",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X188",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X189",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X190",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X193",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X194",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X195",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X196",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X197",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X198",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X199",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X2",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X200",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X201",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X203",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X204",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X206",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X207",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X209",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X21",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X210",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X211",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X212",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X215",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X216",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X217",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X218",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X219",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X22",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X220",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X221",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X222",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X223",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X224",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X225",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X226",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X227",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X228",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X23",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X230",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X231",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X232",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X233",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X234",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X235",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X236",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X237",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X238",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X239",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X24",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X240",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X241",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X242",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X243",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X245",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X247",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X249",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X25",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X250",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X251",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X253",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X254",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X255",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X256",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X259",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X260",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X261",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X263",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X264",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X265",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X266",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X267",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X268",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X270",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X271",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X272",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X273",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X274",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X275",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X276",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X277",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X279",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X28",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X280",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X282",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X283",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X286",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X287",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X288",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X289",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X29",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X290",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X292",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X293",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X294",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X295",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X296",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X297",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X298",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X299",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X3",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X30",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X300",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X301",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X302",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X306",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X307",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X308",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X309",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X31",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X310",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X312",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X313",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X314",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X316",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X317",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X318",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X319",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X32",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X320",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X321",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X322",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X323",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X324",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X325",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X327",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X328",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X33",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X331",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X332",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X333",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X334",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X335",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X336",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X339",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X340",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X342",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X343",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X344",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X345",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X346",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X348",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X349",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X35",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X350",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X351",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X352",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X353",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X354",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X355",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X356",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X357",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X358",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X359",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X36",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X360",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X362",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X363",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X364",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X366",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X367",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X368",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X369",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X370",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X371",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X372",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X374",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X375",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X376",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X377",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X378",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X379",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X38",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X381",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X382",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X383",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X384",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X385",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X386",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X387",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X388",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X389",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X390",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X391",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X392",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X393",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X394",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X395",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X396",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X397",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X398",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X399",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X4",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X40",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X400",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X401",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X402",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X403",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X404",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X405",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X406",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X407",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X408",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X409",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X41",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X410",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X411",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X413",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X414",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X415",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X416",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X417",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X418",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X419",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X42",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X421",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X422",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X423",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X424",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X425",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X426",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X427",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X428",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X429",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X43",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X430",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X431",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X432",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X433",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X434",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X435",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X436",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X438",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X439",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X44",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X440",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X441",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X442",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X443",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X444",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X445",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X446",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X447",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X448",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X449",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X45",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X450",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X451",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X452",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X453",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X454",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X455",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X456",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X457",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X458",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X459",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X460",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X461",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X462",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X463",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X464",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X465",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X466",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X467",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X468",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X469",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X47",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X470",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X471",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X472",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X473",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X474",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X475",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X476",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X477",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X478",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X479",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X48",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X480",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X481",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X482",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X483",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X484",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X485",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X486",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X487",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X488",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X489",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X49",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X490",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X491",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X492",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X493",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X494",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X495",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X496",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X497",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X498",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X499",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X5",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X50",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X500",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X51",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X54",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X55",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X56",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X58",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X6",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X62",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X64",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X66",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X68",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X75",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X76",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X77",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X78",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X79",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X80",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X81",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X82",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X83",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X84",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X85",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X87",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X88",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X89",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X9",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X90",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X91",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X93",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X94",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X97",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X98",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "X99",
+    "kind": "observed",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X100X183",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X100X332",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X100X497",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X102X227",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X118X274",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X118X432",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X119X323",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X120X175",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X120X186",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X122X127",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X122X369",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X136X207",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X136X280",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X136X433",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X139X36",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X139X90",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X142X200",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X159X404",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X159X411",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X159X84",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X183X360",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X195X327",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X197X496",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X200X245",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X200X439",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X210X459",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X219X99",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X223X460",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X228X464",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X228X99",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X23X274",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X23X432",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X241X397",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X241X424",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X253X283",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X253X368",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X263X323",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X264X411",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X267X320",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X273X327",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X273X396",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X274X87",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X276X364",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X288X495",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X300X450",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X312X88",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X320X88",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X321X431",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X322X348",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X323X398",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X327X477",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X327X491",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X331X469",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X334X363",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X334X442",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X334X448",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X345X387",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X345X405",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X353X409",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X36X372",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X360X88",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X364X369",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X372X90",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X383X418",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X384X416",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X384X469",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X387X405",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X390X467",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X390X478",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X398X479",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X404X458",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X409X410",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X410X434",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X416X474",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X421X484",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X428X492",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X432X87",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X438X500",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X443X90",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   },
+   {
+    "name": "U_X447X484",
+    "kind": "latent",
+    "x": null,
+    "y": null
+   }
+  ],
+  "edges": [
+   {
+    "from": "X100",
+    "to": "X403"
+   },
+   {
+    "from": "U_X100X183",
+    "to": "X100"
+   },
+   {
+    "from": "U_X100X183",
+    "to": "X183"
+   },
+   {
+    "from": "U_X100X332",
+    "to": "X100"
+   },
+   {
+    "from": "U_X100X332",
+    "to": "X332"
+   },
+   {
+    "from": "U_X100X497",
+    "to": "X100"
+   },
+   {
+    "from": "U_X100X497",
+    "to": "X497"
+   },
+   {
+    "from": "X101",
+    "to": "X233"
+   },
+   {
+    "from": "X101",
+    "to": "X353"
+   },
+   {
+    "from": "X101",
+    "to": "X418"
+   },
+   {
+    "from": "X101",
+    "to": "X461"
+   },
+   {
+    "from": "X102",
+    "to": "X135"
+   },
+   {
+    "from": "X102",
+    "to": "X494"
+   },
+   {
+    "from": "U_X102X227",
+    "to": "X102"
+   },
+   {
+    "from": "U_X102X227",
+    "to": "X227"
+   },
+   {
+    "from": "X118",
+    "to": "X124"
+   },
+   {
+    "from": "X118",
+    "to": "X322"
+   },
+   {
+    "from": "X118",
+    "to": "X384"
+   },
+   {
+    "from": "X118",
+    "to": "X393"
+   },
+   {
+    "from": "U_X118X274",
+    "to": "X118"
+   },
+   {
+    "from": "U_X118X274",
+    "to": "X274"
+   },
+   {
+    "from": "U_X118X432",
+    "to": "X118"
+   },
+   {
+    "from": "U_X118X432",
+    "to": "X432"
+   },
+   {
+    "from": "X119",
+    "to": "X399"
+   },
+   {
+    "from": "X119",
+    "to": "X427"
+   },
+   {
+    "from": "U_X119X323",
+    "to": "X119"
+   },
+   {
+    "from": "U_X119X323",
+    "to": "X323"
+   },
+   {
+    "from": "X120",
+    "to": "X176"
+   },
+   {
+    "from": "X120",
+    "to": "X239"
+   },
+   {
+    "from": "X120",
+    "to": "X253"
+   },
+   {
+    "from": "X120",
+    "to": "X368"
+   },
+   {
+    "from": "X120",
+    "to": "X385"
+   },
+   {
+    "from": "X120",
+    "to": "X444"
+   },
+   {
+    "from": "U_X120X175",
+    "to": "X120"
+   },
+   {
+    "from": "U_X120X175",
+    "to": "X175"
+   },
+   {
+    "from": "U_X120X186",
+    "to": "X120"
+   },
+   {
+    "from": "U_X120X186",
+    "to": "X186"
+   },
+   {
+    "from": "X122",
+    "to": "X209"
+   },
+   {
+    "from": "X122",
+    "to": "X292"
+   },
+   {
+    "from": "X122",
+    "to": "X384"
+   },
+   {
+    "from": "X122",
+    "to": "X415"
+   },
+   {
+    "from": "X122",
+    "to": "X440"
+   },
+   {
+    "from": "U_X122X127",
+    "to": "X122"
+   },
+   {
+    "from": "U_X122X127",
+    "to": "X127"
+   },
+   {
+    "from": "U_X122X369",
+    "to": "X122"
+   },
+   {
+    "from": "U_X122X369",
+    "to": "X369"
+   },
+   {
+    "from": "X124",
+    "to": "X100"
+   },
+   {
+    "from": "X124",
+    "to": "X212"
+   },
+   {
+    "from": "X124",
+    "to": "X342"
+   },
+   {
+    "from": "X124",
+    "to": "X458"
+   },
+   {
+    "from": "X124",
+    "to": "X497"
+   },
+   {
+    "from": "X125",
+    "to": "X165"
+   },
+   {
+    "from": "X127",
+    "to": "X282"
+   },
+   {
+    "from": "X132",
+    "to": "X335"
+   },
+   {
+    "from": "X132",
+    "to": "X450"
+   },
+   {
+    "from": "X132",
+    "to": "X452"
+   },
+   {
+    "from": "X135",
+    "to": "X440"
+   },
+   {
+    "from": "X136",
+    "to": "X322"
+   },
+   {
+    "from": "U_X136X207",
+    "to": "X136"
+   },
+   {
+    "from": "U_X136X207",
+    "to": "X207"
+   },
+   {
+    "from": "U_X136X280",
+    "to": "X136"
+   },
+   {
+    "from": "U_X136X280",
+    "to": "X280"
+   },
+   {
+    "from": "U_X136X433",
+    "to": "X136"
+   },
+   {
+    "from": "U_X136X433",
+    "to": "X433"
+   },
+   {
+    "from": "X138",
+    "to": "X381"
+   },
+   {
+    "from": "X138",
+    "to": "X419"
+   },
+   {
+    "from": "X139",
+    "to": "X376"
+   },
+   {
+    "from": "U_X139X36",
+    "to": "X139"
+   },
+   {
+    "from": "U_X139X36",
+    "to": "X36"
+   },
+   {
+    "from": "U_X139X90",
+    "to": "X139"
+   },
+   {
+    "from": "U_X139X90",
+    "to": "X90"
+   },
+   {
+    "from": "X142",
+    "to": "X245"
+   },
+   {
+    "from": "X142",
+    "to": "X439"
+   },
+   {
+    "from": "X142",
+    "to": "X462"
+   },
+   {
+    "from": "U_X142X200",
+    "to": "X142"
+   },
+   {
+    "from": "U_X142X200",
+    "to": "X200"
+   },
+   {
+    "from": "X151",
+    "to": "X300"
+   },
+   {
+    "from": "X151",
+    "to": "X334"
+   },
+   {
+    "from": "X151",
+    "to": "X47"
+   },
+   {
+    "from": "X154",
+    "to": "X219"
+   },
+   {
+    "from": "X159",
+    "to": "X135"
+   },
+   {
+    "from": "X159",
+    "to": "X339"
+   },
+   {
+    "from": "X159",
+    "to": "X342"
+   },
+   {
+    "from": "U_X159X404",
+    "to": "X159"
+   },
+   {
+    "from": "U_X159X404",
+    "to": "X404"
+   },
+   {
+    "from": "U_X159X411",
+    "to": "X159"
+   },
+   {
+    "from": "U_X159X411",
+    "to": "X411"
+   },
+   {
+    "from": "U_X159X84",
+    "to": "X159"
+   },
+   {
+    "from": "U_X159X84",
+    "to": "X84"
+   },
+   {
+    "from": "X161",
+    "to": "X300"
+   },
+   {
+    "from": "X161",
+    "to": "X366"
+   },
+   {
+    "from": "X161",
+    "to": "X386"
+   },
+   {
+    "from": "X161",
+    "to": "X422"
+   },
+   {
+    "from": "X161",
+    "to": "X487"
+   },
+   {
+    "from": "X161",
+    "to": "X490"
+   },
+   {
+    "from": "X166",
+    "to": "X217"
+   },
+   {
+    "from": "X166",
+    "to": "X332"
+   },
+   {
+    "from": "X166",
+    "to": "X426"
+   },
+   {
+    "from": "X169",
+    "to": "X223"
+   },
+   {
+    "from": "X169",
+    "to": "X297"
+   },
+   {
+    "from": "X169",
+    "to": "X316"
+   },
+   {
+    "from": "X174",
+    "to": "X297"
+   },
+   {
+    "from": "X175",
+    "to": "X186"
+   },
+   {
+    "from": "X175",
+    "to": "X236"
+   },
+   {
+    "from": "X175",
+    "to": "X267"
+   },
+   {
+    "from": "X175",
+    "to": "X275"
+   },
+   {
+    "from": "X175",
+    "to": "X392"
+   },
+   {
+    "from": "X176",
+    "to": "X435"
+   },
+   {
+    "from": "X183",
+    "to": "X238"
+   },
+   {
+    "from": "X183",
+    "to": "X270"
+   },
+   {
+    "from": "X183",
+    "to": "X298"
+   },
+   {
+    "from": "X183",
+    "to": "X367"
+   },
+   {
+    "from": "X183",
+    "to": "X454"
+   },
+   {
+    "from": "U_X183X360",
+    "to": "X183"
+   },
+   {
+    "from": "U_X183X360",
+    "to": "X360"
+   },
+   {
+    "from": "X186",
+    "to": "X282"
+   },
+   {
+    "from": "X188",
+    "to": "X436"
+   },
+   {
+    "from": "X195",
+    "to": "X400"
+   },
+   {
+    "from": "X195",
+    "to": "X417"
+   },
+   {
+    "from": "U_X195X327",
+    "to": "X195"
+   },
+   {
+    "from": "U_X195X327",
+    "to": "X327"
+   },
+   {
+    "from": "X197",
+    "to": "X151"
+   },
+   {
+    "from": "X197",
+    "to": "X276"
+   },
+   {
+    "from": "U_X197X496",
+    "to": "X197"
+   },
+   {
+    "from": "U_X197X496",
+    "to": "X496"
+   },
+   {
+    "from": "X200",
+    "to": "X242"
+   },
+   {
+    "from": "X200",
+    "to": "X290"
+   },
+   {
+    "from": "X200",
+    "to": "X317"
+   },
+   {
+    "from": "X200",
+    "to": "X357"
+   },
+   {
+    "from": "X200",
+    "to": "X403"
+   },
+   {
+    "from": "X200",
+    "to": "X51"
+   },
+   {
+    "from": "U_X200X245",
+    "to": "X200"
+   },
+   {
+    "from": "U_X200X245",
+    "to": "X245"
+   },
+   {
+    "from": "U_X200X439",
+    "to": "X200"
+   },
+   {
+    "from": "U_X200X439",
+    "to": "X439"
+   },
+   {
+    "from": "X201",
+    "to": "X334"
+   },
+   {
+    "from": "X201",
+    "to": "X466"
+   },
+   {
+    "from": "X207",
+    "to": "X280"
+   },
+   {
+    "from": "X207",
+    "to": "X468"
+   },
+   {
+    "from": "X209",
+    "to": "X236"
+   },
+   {
+    "from": "X209",
+    "to": "X245"
+   },
+   {
+    "from": "X209",
+    "to": "X275"
+   },
+   {
+    "from": "X209",
+    "to": "X309"
+   },
+   {
+    "from": "X209",
+    "to": "X410"
+   },
+   {
+    "from": "X210",
+    "to": "X339"
+   },
+   {
+    "from": "U_X210X459",
+    "to": "X210"
+   },
+   {
+    "from": "U_X210X459",
+    "to": "X459"
+   },
+   {
+    "from": "X211",
+    "to": "X268"
+   },
+   {
+    "from": "X212",
+    "to": "X386"
+   },
+   {
+    "from": "X212",
+    "to": "X389"
+   },
+   {
+    "from": "X212",
+    "to": "X462"
+   },
+   {
+    "from": "X217",
+    "to": "X295"
+   },
+   {
+    "from": "X217",
+    "to": "X393"
+   },
+   {
+    "from": "X217",
+    "to": "X442"
+   },
+   {
+    "from": "X219",
+    "to": "X289"
+   },
+   {
+    "from": "X219",
+    "to": "X392"
+   },
+   {
+    "from": "U_X219X99",
+    "to": "X219"
+   },
+   {
+    "from": "U_X219X99",
+    "to": "X99"
+   },
+   {
+    "from": "X220",
+    "to": "X336"
+   },
+   {
+    "from": "X220",
+    "to": "X460"
+   },
+   {
+    "from": "X223",
+    "to": "X344"
+   },
+   {
+    "from": "U_X223X460",
+    "to": "X223"
+   },
+   {
+    "from": "U_X223X460",
+    "to": "X460"
+   },
+   {
+    "from": "X227",
+    "to": "X410"
+   },
+   {
+    "from": "X227",
+    "to": "X434"
+   },
+   {
+    "from": "X227",
+    "to": "X486"
+   },
+   {
+    "from": "U_X228X464",
+    "to": "X228"
+   },
+   {
+    "from": "U_X228X464",
+    "to": "X464"
+   },
+   {
+    "from": "U_X228X99",
+    "to": "X228"
+   },
+   {
+    "from": "U_X228X99",
+    "to": "X99"
+   },
+   {
+    "from": "X23",
+    "to": "X122"
+   },
+   {
+    "from": "X23",
+    "to": "X166"
+   },
+   {
+    "from": "X23",
+    "to": "X264"
+   },
+   {
+    "from": "X23",
+    "to": "X301"
+   },
+   {
+    "from": "X23",
+    "to": "X451"
+   },
+   {
+    "from": "U_X23X274",
+    "to": "X23"
+   },
+   {
+    "from": "U_X23X274",
+    "to": "X274"
+   },
+   {
+    "from": "U_X23X432",
+    "to": "X23"
+   },
+   {
+    "from": "U_X23X432",
+    "to": "X432"
+   },
+   {
+    "from": "X233",
+    "to": "X282"
+   },
+   {
+    "from": "X233",
+    "to": "X301"
+   },
+   {
+    "from": "X233",
+    "to": "X416"
+   },
+   {
+    "from": "X233",
+    "to": "X472"
+   },
+   {
+    "from": "X234",
+    "to": "X289"
+   },
+   {
+    "from": "X234",
+    "to": "X353"
+   },
+   {
+    "from": "X234",
+    "to": "X354"
+   },
+   {
+    "from": "X234",
+    "to": "X363"
+   },
+   {
+    "from": "X234",
+    "to": "X400"
+   },
+   {
+    "from": "X234",
+    "to": "X466"
+   },
+   {
+    "from": "X234",
+    "to": "X468"
+   },
+   {
+    "from": "X234",
+    "to": "X491"
+   },
+   {
+    "from": "X236",
+    "to": "X403"
+   },
+   {
+    "from": "X236",
+    "to": "X493"
+   },
+   {
+    "from": "X238",
+    "to": "X265"
+   },
+   {
+    "from": "X238",
+    "to": "X371"
+   },
+   {
+    "from": "X239",
+    "to": "X242"
+   },
+   {
+    "from": "X239",
+    "to": "X290"
+   },
+   {
+    "from": "X239",
+    "to": "X367"
+   },
+   {
+    "from": "X241",
+    "to": "X253"
+   },
+   {
+    "from": "X241",
+    "to": "X333"
+   },
+   {
+    "from": "X241",
+    "to": "X367"
+   },
+   {
+    "from": "U_X241X397",
+    "to": "X241"
+   },
+   {
+    "from": "U_X241X397",
+    "to": "X397"
+   },
+   {
+    "from": "U_X241X424",
+    "to": "X241"
+   },
+   {
+    "from": "U_X241X424",
+    "to": "X424"
+   },
+   {
+    "from": "X242",
+    "to": "X430"
+   },
+   {
+    "from": "X243",
+    "to": "X267"
+   },
+   {
+    "from": "X243",
+    "to": "X426"
+   },
+   {
+    "from": "X243",
+    "to": "X447"
+   },
+   {
+    "from": "X243",
+    "to": "X490"
+   },
+   {
+    "from": "X245",
+    "to": "X336"
+   },
+   {
+    "from": "X245",
+    "to": "X476"
+   },
+   {
+    "from": "X247",
+    "to": "X435"
+   },
+   {
+    "from": "X25",
+    "to": "X161"
+   },
+   {
+    "from": "X25",
+    "to": "X280"
+   },
+   {
+    "from": "X25",
+    "to": "X375"
+   },
+   {
+    "from": "X25",
+    "to": "X384"
+   },
+   {
+    "from": "X253",
+    "to": "X467"
+   },
+   {
+    "from": "U_X253X283",
+    "to": "X253"
+   },
+   {
+    "from": "U_X253X283",
+    "to": "X283"
+   },
+   {
+    "from": "U_X253X368",
+    "to": "X253"
+   },
+   {
+    "from": "U_X253X368",
+    "to": "X368"
+   },
+   {
+    "from": "X254",
+    "to": "X383"
+   },
+   {
+    "from": "X263",
+    "to": "X397"
+   },
+   {
+    "from": "U_X263X323",
+    "to": "X263"
+   },
+   {
+    "from": "U_X263X323",
+    "to": "X323"
+   },
+   {
+    "from": "X264",
+    "to": "X272"
+   },
+   {
+    "from": "X264",
+    "to": "X331"
+   },
+   {
+    "from": "X264",
+    "to": "X447"
+   },
+   {
+    "from": "U_X264X411",
+    "to": "X264"
+   },
+   {
+    "from": "U_X264X411",
+    "to": "X411"
+   },
+   {
+    "from": "X266",
+    "to": "X366"
+   },
+   {
+    "from": "X267",
+    "to": "X292"
+   },
+   {
+    "from": "X267",
+    "to": "X409"
+   },
+   {
+    "from": "X267",
+    "to": "X459"
+   },
+   {
+    "from": "U_X267X320",
+    "to": "X267"
+   },
+   {
+    "from": "U_X267X320",
+    "to": "X320"
+   },
+   {
+    "from": "X268",
+    "to": "X388"
+   },
+   {
+    "from": "X268",
+    "to": "X451"
+   },
+   {
+    "from": "X268",
+    "to": "X493"
+   },
+   {
+    "from": "X270",
+    "to": "X332"
+   },
+   {
+    "from": "X271",
+    "to": "X342"
+   },
+   {
+    "from": "X271",
+    "to": "X383"
+   },
+   {
+    "from": "X271",
+    "to": "X396"
+   },
+   {
+    "from": "X272",
+    "to": "X309"
+   },
+   {
+    "from": "X273",
+    "to": "X444"
+   },
+   {
+    "from": "U_X273X327",
+    "to": "X273"
+   },
+   {
+    "from": "U_X273X327",
+    "to": "X327"
+   },
+   {
+    "from": "U_X273X396",
+    "to": "X273"
+   },
+   {
+    "from": "U_X273X396",
+    "to": "X396"
+   },
+   {
+    "from": "U_X274X87",
+    "to": "X274"
+   },
+   {
+    "from": "U_X274X87",
+    "to": "X87"
+   },
+   {
+    "from": "X275",
+    "to": "X370"
+   },
+   {
+    "from": "X275",
+    "to": "X382"
+   },
+   {
+    "from": "X276",
+    "to": "X309"
+   },
+   {
+    "from": "U_X276X364",
+    "to": "X276"
+   },
+   {
+    "from": "U_X276X364",
+    "to": "X364"
+   },
+   {
+    "from": "X280",
+    "to": "X461"
+   },
+   {
+    "from": "X280",
+    "to": "X490"
+   },
+   {
+    "from": "X282",
+    "to": "X485"
+   },
+   {
+    "from": "X283",
+    "to": "X468"
+   },
+   {
+    "from": "X283",
+    "to": "X476"
+   },
+   {
+    "from": "X287",
+    "to": "X299"
+   },
+   {
+    "from": "X287",
+    "to": "X403"
+   },
+   {
+    "from": "X287",
+    "to": "X497"
+   },
+   {
+    "from": "X288",
+    "to": "X475"
+   },
+   {
+    "from": "X288",
+    "to": "X483"
+   },
+   {
+    "from": "U_X288X495",
+    "to": "X288"
+   },
+   {
+    "from": "U_X288X495",
+    "to": "X495"
+   },
+   {
+    "from": "X290",
+    "to": "X306"
+   },
+   {
+    "from": "X290",
+    "to": "X431"
+   },
+   {
+    "from": "X292",
+    "to": "X348"
+   },
+   {
+    "from": "X292",
+    "to": "X481"
+   },
+   {
+    "from": "X293",
+    "to": "X384"
+   },
+   {
+    "from": "X295",
+    "to": "X427"
+   },
+   {
+    "from": "X297",
+    "to": "X354"
+   },
+   {
+    "from": "X298",
+    "to": "X376"
+   },
+   {
+    "from": "X298",
+    "to": "X417"
+   },
+   {
+    "from": "X298",
+    "to": "X50"
+   },
+   {
+    "from": "U_X300X450",
+    "to": "X300"
+   },
+   {
+    "from": "U_X300X450",
+    "to": "X450"
+   },
+   {
+    "from": "X301",
+    "to": "X336"
+   },
+   {
+    "from": "X301",
+    "to": "X359"
+   },
+   {
+    "from": "X301",
+    "to": "X377"
+   },
+   {
+    "from": "X301",
+    "to": "X468"
+   },
+   {
+    "from": "X302",
+    "to": "X245"
+   },
+   {
+    "from": "X302",
+    "to": "X500"
+   },
+   {
+    "from": "X306",
+    "to": "X423"
+   },
+   {
+    "from": "X308",
+    "to": "X443"
+   },
+   {
+    "from": "X309",
+    "to": "X335"
+   },
+   {
+    "from": "X309",
+    "to": "X358"
+   },
+   {
+    "from": "X309",
+    "to": "X389"
+   },
+   {
+    "from": "X309",
+    "to": "X394"
+   },
+   {
+    "from": "X310",
+    "to": "X478"
+   },
+   {
+    "from": "X310",
+    "to": "X483"
+   },
+   {
+    "from": "X312",
+    "to": "X339"
+   },
+   {
+    "from": "X312",
+    "to": "X436"
+   },
+   {
+    "from": "U_X312X88",
+    "to": "X312"
+   },
+   {
+    "from": "U_X312X88",
+    "to": "X88"
+   },
+   {
+    "from": "X313",
+    "to": "X342"
+   },
+   {
+    "from": "X313",
+    "to": "X416"
+   },
+   {
+    "from": "X313",
+    "to": "X432"
+   },
+   {
+    "from": "X313",
+    "to": "X469"
+   },
+   {
+    "from": "X313",
+    "to": "X479"
+   },
+   {
+    "from": "X316",
+    "to": "X427"
+   },
+   {
+    "from": "X316",
+    "to": "X435"
+   },
+   {
+    "from": "X317",
+    "to": "X321"
+   },
+   {
+    "from": "X317",
+    "to": "X438"
+   },
+   {
+    "from": "X319",
+    "to": "X357"
+   },
+   {
+    "from": "X320",
+    "to": "X370"
+   },
+   {
+    "from": "X320",
+    "to": "X404"
+   },
+   {
+    "from": "U_X320X88",
+    "to": "X320"
+   },
+   {
+    "from": "U_X320X88",
+    "to": "X88"
+   },
+   {
+    "from": "X321",
+    "to": "X176"
+   },
+   {
+    "from": "U_X321X431",
+    "to": "X321"
+   },
+   {
+    "from": "U_X321X431",
+    "to": "X431"
+   },
+   {
+    "from": "X322",
+    "to": "X461"
+   },
+   {
+    "from": "X322",
+    "to": "X474"
+   },
+   {
+    "from": "U_X322X348",
+    "to": "X322"
+   },
+   {
+    "from": "U_X322X348",
+    "to": "X348"
+   },
+   {
+    "from": "X323",
+    "to": "X331"
+   },
+   {
+    "from": "U_X323X398",
+    "to": "X323"
+   },
+   {
+    "from": "U_X323X398",
+    "to": "X398"
+   },
+   {
+    "from": "X324",
+    "to": "X442"
+   },
+   {
+    "from": "X327",
+    "to": "X469"
+   },
+   {
+    "from": "U_X327X477",
+    "to": "X327"
+   },
+   {
+    "from": "U_X327X477",
+    "to": "X477"
+   },
+   {
+    "from": "U_X327X491",
+    "to": "X327"
+   },
+   {
+    "from": "U_X327X491",
+    "to": "X491"
+   },
+   {
+    "from": "X33",
+    "to": "X78"
+   },
+   {
+    "from": "X331",
+    "to": "X407"
+   },
+   {
+    "from": "X331",
+    "to": "X456"
+   },
+   {
+    "from": "X331",
+    "to": "X472"
+   },
+   {
+    "from": "U_X331X469",
+    "to": "X331"
+   },
+   {
+    "from": "U_X331X469",
+    "to": "X469"
+   },
+   {
+    "from": "X332",
+    "to": "X463"
+   },
+   {
+    "from": "X332",
+    "to": "X497"
+   },
+   {
+    "from": "X333",
+    "to": "X470"
+   },
+   {
+    "from": "U_X334X363",
+    "to": "X334"
+   },
+   {
+    "from": "U_X334X363",
+    "to": "X363"
+   },
+   {
+    "from": "U_X334X442",
+    "to": "X334"
+   },
+   {
+    "from": "U_X334X442",
+    "to": "X442"
+   },
+   {
+    "from": "U_X334X448",
+    "to": "X334"
+   },
+   {
+    "from": "U_X334X448",
+    "to": "X448"
+   },
+   {
+    "from": "X335",
+    "to": "X499"
+   },
+   {
+    "from": "X342",
+    "to": "X344"
+   },
+   {
+    "from": "U_X345X387",
+    "to": "X345"
+   },
+   {
+    "from": "U_X345X387",
+    "to": "X387"
+   },
+   {
+    "from": "U_X345X405",
+    "to": "X345"
+   },
+   {
+    "from": "U_X345X405",
+    "to": "X405"
+   },
+   {
+    "from": "X346",
+    "to": "X369"
+   },
+   {
+    "from": "X346",
+    "to": "X370"
+   },
+   {
+    "from": "X346",
+    "to": "X397"
+   },
+   {
+    "from": "X346",
+    "to": "X438"
+   },
+   {
+    "from": "X346",
+    "to": "X487"
+   },
+   {
+    "from": "X348",
+    "to": "X449"
+   },
+   {
+    "from": "X350",
+    "to": "X386"
+   },
+   {
+    "from": "X350",
+    "to": "X409"
+   },
+   {
+    "from": "X350",
+    "to": "X444"
+   },
+   {
+    "from": "X350",
+    "to": "X469"
+   },
+   {
+    "from": "U_X353X409",
+    "to": "X353"
+   },
+   {
+    "from": "U_X353X409",
+    "to": "X409"
+   },
+   {
+    "from": "X354",
+    "to": "X424"
+   },
+   {
+    "from": "X354",
+    "to": "X435"
+   },
+   {
+    "from": "X354",
+    "to": "X456"
+   },
+   {
+    "from": "X357",
+    "to": "X419"
+   },
+   {
+    "from": "X358",
+    "to": "X417"
+   },
+   {
+    "from": "X358",
+    "to": "X428"
+   },
+   {
+    "from": "X359",
+    "to": "X408"
+   },
+   {
+    "from": "X359",
+    "to": "X436"
+   },
+   {
+    "from": "X359",
+    "to": "X476"
+   },
+   {
+    "from": "X359",
+    "to": "X482"
+   },
+   {
+    "from": "X36",
+    "to": "X247"
+   },
+   {
+    "from": "X36",
+    "to": "X251"
+   },
+   {
+    "from": "X36",
+    "to": "X254"
+   },
+   {
+    "from": "X36",
+    "to": "X33"
+   },
+   {
+    "from": "X36",
+    "to": "X346"
+   },
+   {
+    "from": "U_X36X372",
+    "to": "X36"
+   },
+   {
+    "from": "U_X36X372",
+    "to": "X372"
+   },
+   {
+    "from": "X360",
+    "to": "X312"
+   },
+   {
+    "from": "X360",
+    "to": "X320"
+   },
+   {
+    "from": "X360",
+    "to": "X441"
+   },
+   {
+    "from": "U_X360X88",
+    "to": "X360"
+   },
+   {
+    "from": "U_X360X88",
+    "to": "X88"
+   },
+   {
+    "from": "X362",
+    "to": "X429"
+   },
+   {
+    "from": "X364",
+    "to": "X393"
+   },
+   {
+    "from": "X364",
+    "to": "X445"
+   },
+   {
+    "from": "U_X364X369",
+    "to": "X364"
+   },
+   {
+    "from": "U_X364X369",
+    "to": "X369"
+   },
+   {
+    "from": "X366",
+    "to": "X435"
+   },
+   {
+    "from": "X367",
+    "to": "X312"
+   },
+   {
+    "from": "X367",
+    "to": "X392"
+   },
+   {
+    "from": "X367",
+    "to": "X451"
+   },
+   {
+    "from": "X368",
+    "to": "X283"
+   },
+   {
+    "from": "X368",
+    "to": "X475"
+   },
+   {
+    "from": "X369",
+    "to": "X399"
+   },
+   {
+    "from": "X370",
+    "to": "X234"
+   },
+   {
+    "from": "X370",
+    "to": "X404"
+   },
+   {
+    "from": "X370",
+    "to": "X422"
+   },
+   {
+    "from": "U_X372X90",
+    "to": "X372"
+   },
+   {
+    "from": "U_X372X90",
+    "to": "X90"
+   },
+   {
+    "from": "X374",
+    "to": "X302"
+   },
+   {
+    "from": "X374",
+    "to": "X324"
+   },
+   {
+    "from": "X374",
+    "to": "X428"
+   },
+   {
+    "from": "X374",
+    "to": "X465"
+   },
+   {
+    "from": "X376",
+    "to": "X492"
+   },
+   {
+    "from": "X377",
+    "to": "X482"
+   },
+   {
+    "from": "X382",
+    "to": "X397"
+   },
+   {
+    "from": "X382",
+    "to": "X481"
+   },
+   {
+    "from": "X383",
+    "to": "X207"
+   },
+   {
+    "from": "X383",
+    "to": "X409"
+   },
+   {
+    "from": "X383",
+    "to": "X426"
+   },
+   {
+    "from": "U_X383X418",
+    "to": "X383"
+   },
+   {
+    "from": "U_X383X418",
+    "to": "X418"
+   },
+   {
+    "from": "X384",
+    "to": "X452"
+   },
+   {
+    "from": "U_X384X416",
+    "to": "X384"
+   },
+   {
+    "from": "U_X384X416",
+    "to": "X416"
+   },
+   {
+    "from": "U_X384X469",
+    "to": "X384"
+   },
+   {
+    "from": "U_X384X469",
+    "to": "X469"
+   },
+   {
+    "from": "U_X387X405",
+    "to": "X387"
+   },
+   {
+    "from": "U_X387X405",
+    "to": "X405"
+   },
+   {
+    "from": "X388",
+    "to": "X480"
+   },
+   {
+    "from": "U_X390X467",
+    "to": "X390"
+   },
+   {
+    "from": "U_X390X467",
+    "to": "X467"
+   },
+   {
+    "from": "U_X390X478",
+    "to": "X390"
+   },
+   {
+    "from": "U_X390X478",
+    "to": "X478"
+   },
+   {
+    "from": "X392",
+    "to": "X448"
+   },
+   {
+    "from": "X394",
+    "to": "X475"
+   },
+   {
+    "from": "X396",
+    "to": "X439"
+   },
+   {
+    "from": "X398",
+    "to": "X119"
+   },
+   {
+    "from": "X398",
+    "to": "X263"
+   },
+   {
+    "from": "X398",
+    "to": "X458"
+   },
+   {
+    "from": "U_X398X479",
+    "to": "X398"
+   },
+   {
+    "from": "U_X398X479",
+    "to": "X479"
+   },
+   {
+    "from": "X399",
+    "to": "X449"
+   },
+   {
+    "from": "X400",
+    "to": "X452"
+   },
+   {
+    "from": "X400",
+    "to": "X486"
+   },
+   {
+    "from": "X404",
+    "to": "X457"
+   },
+   {
+    "from": "X404",
+    "to": "X475"
+   },
+   {
+    "from": "U_X404X458",
+    "to": "X404"
+   },
+   {
+    "from": "U_X404X458",
+    "to": "X458"
+   },
+   {
+    "from": "X407",
+    "to": "X422"
+   },
+   {
+    "from": "U_X409X410",
+    "to": "X409"
+   },
+   {
+    "from": "U_X409X410",
+    "to": "X410"
+   },
+   {
+    "from": "X410",
+    "to": "X461"
+   },
+   {
+    "from": "U_X410X434",
+    "to": "X410"
+   },
+   {
+    "from": "U_X410X434",
+    "to": "X434"
+   },
+   {
+    "from": "X414",
+    "to": "X445"
+   },
+   {
+    "from": "X414",
+    "to": "X472"
+   },
+   {
+    "from": "X416",
+    "to": "X443"
+   },
+   {
+    "from": "U_X416X474",
+    "to": "X416"
+   },
+   {
+    "from": "U_X416X474",
+    "to": "X474"
+   },
+   {
+    "from": "X417",
+    "to": "X454"
+   },
+   {
+    "from": "X417",
+    "to": "X486"
+   },
+   {
+    "from": "X419",
+    "to": "X454"
+   },
+   {
+    "from": "U_X421X484",
+    "to": "X421"
+   },
+   {
+    "from": "U_X421X484",
+    "to": "X484"
+   },
+   {
+    "from": "X422",
+    "to": "X466"
+   },
+   {
+    "from": "X424",
+    "to": "X445"
+   },
+   {
+    "from": "X424",
+    "to": "X461"
+   },
+   {
+    "from": "X424",
+    "to": "X478"
+   },
+   {
+    "from": "X427",
+    "to": "X440"
+   },
+   {
+    "from": "U_X428X492",
+    "to": "X428"
+   },
+   {
+    "from": "U_X428X492",
+    "to": "X492"
+   },
+   {
+    "from": "X429",
+    "to": "X474"
+   },
+   {
+    "from": "X431",
+    "to": "X473"
+   },
+   {
+    "from": "U_X432X87",
+    "to": "X432"
+   },
+   {
+    "from": "U_X432X87",
+    "to": "X87"
+   },
+   {
+    "from": "X433",
+    "to": "X207"
+   },
+   {
+    "from": "X434",
+    "to": "X461"
+   },
+   {
+    "from": "X435",
+    "to": "X427"
+   },
+   {
+    "from": "U_X438X500",
+    "to": "X438"
+   },
+   {
+    "from": "U_X438X500",
+    "to": "X500"
+   },
+   {
+    "from": "X440",
+    "to": "X466"
+   },
+   {
+    "from": "X440",
+    "to": "X482"
+   },
+   {
+    "from": "X441",
+    "to": "X481"
+   },
+   {
+    "from": "X442",
+    "to": "X492"
+   },
+   {
+    "from": "X443",
+    "to": "X491"
+   },
+   {
+    "from": "U_X443X90",
+    "to": "X443"
+   },
+   {
+    "from": "U_X443X90",
+    "to": "X90"
+   },
+   {
+    "from": "U_X447X484",
+    "to": "X447"
+   },
+   {
+    "from": "U_X447X484",
+    "to": "X484"
+   },
+   {
+    "from": "X449",
+    "to": "X481"
+   },
+   {
+    "from": "X449",
+    "to": "X498"
+   },
+   {
+    "from": "X45",
+    "to": "X154"
+   },
+   {
+    "from": "X45",
+    "to": "X174"
+   },
+   {
+    "from": "X45",
+    "to": "X272"
+   },
+   {
+    "from": "X45",
+    "to": "X345"
+   },
+   {
+    "from": "X45",
+    "to": "X352"
+   },
+   {
+    "from": "X455",
+    "to": "X463"
+   },
+   {
+    "from": "X455",
+    "to": "X500"
+   },
+   {
+    "from": "X459",
+    "to": "X386"
+   },
+   {
+    "from": "X460",
+    "to": "X486"
+   },
+   {
+    "from": "X462",
+    "to": "X473"
+   },
+   {
+    "from": "X462",
+    "to": "X489"
+   },
+   {
+    "from": "X465",
+    "to": "X234"
+   },
+   {
+    "from": "X47",
+    "to": "X101"
+   },
+   {
+    "from": "X47",
+    "to": "X243"
+   },
+   {
+    "from": "X47",
+    "to": "X309"
+   },
+   {
+    "from": "X47",
+    "to": "X400"
+   },
+   {
+    "from": "X47",
+    "to": "X451"
+   },
+   {
+    "from": "X470",
+    "to": "X477"
+   },
+   {
+    "from": "X473",
+    "to": "X51"
+   },
+   {
+    "from": "X478",
+    "to": "X493"
+   },
+   {
+    "from": "X479",
+    "to": "X494"
+   },
+   {
+    "from": "X484",
+    "to": "X308"
+   },
+   {
+    "from": "X487",
+    "to": "X496"
+   },
+   {
+    "from": "X491",
+    "to": "X396"
+   },
+   {
+    "from": "X5",
+    "to": "X313"
+   },
+   {
+    "from": "X5",
+    "to": "X403"
+   },
+   {
+    "from": "X5",
+    "to": "X414"
+   },
+   {
+    "from": "X5",
+    "to": "X45"
+   },
+   {
+    "from": "X50",
+    "to": "X169"
+   },
+   {
+    "from": "X50",
+    "to": "X227"
+   },
+   {
+    "from": "X50",
+    "to": "X293"
+   },
+   {
+    "from": "X50",
+    "to": "X310"
+   },
+   {
+    "from": "X50",
+    "to": "X433"
+   },
+   {
+    "from": "X50",
+    "to": "X487"
+   },
+   {
+    "from": "X51",
+    "to": "X5"
+   },
+   {
+    "from": "X64",
+    "to": "X135"
+   },
+   {
+    "from": "X64",
+    "to": "X331"
+   },
+   {
+    "from": "X64",
+    "to": "X389"
+   },
+   {
+    "from": "X64",
+    "to": "X499"
+   },
+   {
+    "from": "X64",
+    "to": "X99"
+   },
+   {
+    "from": "X78",
+    "to": "X174"
+   },
+   {
+    "from": "X78",
+    "to": "X234"
+   },
+   {
+    "from": "X78",
+    "to": "X268"
+   },
+   {
+    "from": "X78",
+    "to": "X433"
+   },
+   {
+    "from": "X78",
+    "to": "X464"
+   },
+   {
+    "from": "X78",
+    "to": "X467"
+   },
+   {
+    "from": "X80",
+    "to": "X271"
+   },
+   {
+    "from": "X80",
+    "to": "X302"
+   },
+   {
+    "from": "X80",
+    "to": "X388"
+   },
+   {
+    "from": "X80",
+    "to": "X405"
+   },
+   {
+    "from": "X80",
+    "to": "X440"
+   },
+   {
+    "from": "X80",
+    "to": "X450"
+   },
+   {
+    "from": "X80",
+    "to": "X476"
+   },
+   {
+    "from": "X84",
+    "to": "X161"
+   },
+   {
+    "from": "X84",
+    "to": "X264"
+   },
+   {
+    "from": "X84",
+    "to": "X403"
+   },
+   {
+    "from": "X84",
+    "to": "X499"
+   },
+   {
+    "from": "X87",
+    "to": "X322"
+   },
+   {
+    "from": "X87",
+    "to": "X350"
+   },
+   {
+    "from": "X87",
+    "to": "X91"
+   },
+   {
+    "from": "X88",
+    "to": "X138"
+   },
+   {
+    "from": "X88",
+    "to": "X25"
+   },
+   {
+    "from": "X88",
+    "to": "X493"
+   },
+   {
+    "from": "X88",
+    "to": "X80"
+   },
+   {
+    "from": "X90",
+    "to": "X36"
+   },
+   {
+    "from": "X91",
+    "to": "X132"
+   },
+   {
+    "from": "X94",
+    "to": "X442"
+   },
+   {
+    "from": "X99",
+    "to": "X220"
+   },
+   {
+    "from": "X99",
+    "to": "X316"
+   },
+   {
+    "from": "X99",
+    "to": "X464"
+   }
+  ],
+  "bidirected": 80,
+  "adjusted": [],
+  "exposures": [
+   "X345"
+  ],
+  "outcomes": [
+   "X461"
+  ],
+  "nonDag": true
+ }
+]

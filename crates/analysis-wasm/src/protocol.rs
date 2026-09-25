@@ -1281,6 +1281,22 @@ pub(crate) enum AnalysisCommand {
         adjustment: Vec<usize>,
         model: PropensityModel,
     },
+    /// One slice of the boosted grid: a single learning rate and depth over every tree count, which
+    /// is the unit the prefix scoring already works in.
+    PropensityGridSlice {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        learning_rate: f64,
+        max_depth: usize,
+        n_estimators: Vec<usize>,
+        splits: usize,
+        min_samples_leaf: usize,
+        min_samples_split: usize,
+        seed: u32,
+    },
     DoublyRobust {
         rows: usize,
         columns: usize,
@@ -1740,6 +1756,8 @@ pub(crate) struct BoostedTreatmentModel {
     pub(crate) seed: u32,
     /// Score every row with a model fitted on the half that did not contain it.
     pub(crate) cross_fitted: bool,
+    /// How many candidates the caller scored before choosing this one, which a refit cannot know.
+    pub(crate) candidates_searched: Option<usize>,
 }
 
 #[derive(Clone, serde::Deserialize, Serialize)]
@@ -1761,6 +1779,15 @@ pub(crate) enum WeightingFit {
     Boosted {
         model: BoostedTreatmentModel,
     },
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct GridCandidateScore {
+    pub(crate) learning_rate: f64,
+    pub(crate) max_depth: usize,
+    pub(crate) n_estimators: usize,
+    pub(crate) mean_score: f64,
 }
 
 /// What the run can say about the treatment model, which differs by model.
@@ -2919,6 +2946,9 @@ pub(crate) enum AnalysisResult {
         weights: Vec<f64>,
         outcome: Vec<f64>,
         interval: Option<PropensityIntervalEvidence>,
+    },
+    PropensityGridSlice {
+        scores: Vec<GridCandidateScore>,
     },
     PropensityMatching {
         observations: usize,

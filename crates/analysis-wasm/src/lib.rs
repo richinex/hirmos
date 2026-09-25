@@ -673,6 +673,13 @@ pub fn run_analysis(
         AnalysisCommand::PropensityMatching {
             rows, columns, treatment, outcome, adjustment, model,
         } => propensity_matching(values, rows, columns, treatment, outcome, &adjustment, model),
+        AnalysisCommand::PropensityGridSlice {
+            rows, columns, treatment, outcome, adjustment, learning_rate, max_depth,
+            n_estimators, splits, min_samples_leaf, min_samples_split, seed,
+        } => propensity_grid_slice(
+            values, rows, columns, treatment, outcome, &adjustment, learning_rate, max_depth,
+            n_estimators, splits, min_samples_leaf, min_samples_split, seed,
+        ),
         AnalysisCommand::DoublyRobust {
             rows, columns, treatment, outcome, adjustment, model, bootstrap,
         } => doubly_robust_estimate(

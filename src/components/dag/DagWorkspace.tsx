@@ -28,12 +28,14 @@ import {
   reviseDagByReplacingEdge,
   reviseDagEdgeDetails,
   reviseDagWithLatentConfounder,
+  reviseDagWithImportedGraph,
   reviseDagWithLatentNode,
   reviseDagWithEdge,
   reviseDagWithoutLatentNode,
   reviseDagWithoutEdge,
   undoDagRevision,
   type DagCreateProblem,
+  type DagImportProblem,
   type DagDocument,
   type DagDocumentId,
   type DagEditProblem,
@@ -45,6 +47,7 @@ import {
   type EdgeSupport,
   type EdgeTiming,
 } from '@/domain/dag'
+import { describeDagImportProblem, importOf, planDagImport, type DagImportPlanProblem } from '@/domain/dagImport'
 import {
   discoveryEvidenceReference,
   discoveryEvidenceView,
@@ -98,6 +101,12 @@ type LatentVariableDraft =
   | { readonly kind: 'closed'; readonly problem: DagVariableEditProblem | null }
   | { readonly kind: 'adding'; readonly name: string; readonly problem: DagVariableEditProblem | null }
 
+type PasteProblem = DagImportPlanProblem | DagImportProblem
+
+type PasteDraft =
+  | { readonly kind: 'closed'; readonly problem: PasteProblem | null }
+  | { readonly kind: 'open'; readonly text: string; readonly problem: PasteProblem | null }
+
 /** The selected edge's editable details; the saved edge is unchanged until the draft is committed as a revision. */
 interface SelectedEdgeDraft {
   readonly edge: DagEdgeId
@@ -126,6 +135,7 @@ type DagWorkspaceState =
       readonly selectedEdge: SelectedEdgeDraft | null
       readonly attachSelectedEvidence: boolean
       readonly latentVariable: LatentVariableDraft
+      readonly paste: PasteDraft
     }
 
 type DagWorkspaceEvent =
@@ -157,6 +167,11 @@ type DagWorkspaceEvent =
   | { readonly type: 'latent-variable-edit-cancelled' }
   | { readonly type: 'latent-variable-refused'; readonly problem: DagVariableEditProblem }
   | { readonly type: 'latent-variable-saved' }
+  | { readonly type: 'paste-requested' }
+  | { readonly type: 'paste-text-changed'; readonly value: string }
+  | { readonly type: 'paste-cancelled' }
+  | { readonly type: 'paste-refused'; readonly problem: PasteProblem }
+  | { readonly type: 'paste-applied' }
 
 const editingState = (document: DagDocumentId, latestRun: DiscoveryRunId | null): DagWorkspaceState => ({
   kind: 'editing',
@@ -171,6 +186,7 @@ const editingState = (document: DagDocumentId, latestRun: DiscoveryRunId | null)
   selectedEdge: null,
   attachSelectedEvidence: false,
   latentVariable: { kind: 'closed', problem: null },
+  paste: { kind: 'closed', problem: null },
 })
 
 const latestRunId = (runs: readonly DiscoveryRunArtifact[]): DiscoveryRunId | null => runs.at(-1)?.id ?? null
@@ -265,6 +281,23 @@ function stepDagWorkspace(state: DagWorkspaceState, event: DagWorkspaceEvent): D
       : state
     case 'latent-variable-saved': return state.kind === 'editing'
       ? { ...state, latentVariable: { kind: 'closed', problem: null } }
+      : state
+    case 'paste-requested': return state.kind === 'editing'
+      ? { ...state, paste: { kind: 'open', text: '', problem: null } }
+      : state
+    case 'paste-text-changed': return state.kind === 'editing' && state.paste.kind === 'open'
+      ? { ...state, paste: { ...state.paste, text: event.value, problem: null } }
+      : state
+    case 'paste-cancelled': return state.kind === 'editing'
+      ? { ...state, paste: { kind: 'closed', problem: null } }
+      : state
+    case 'paste-refused': return state.kind === 'editing'
+      ? { ...state, paste: state.paste.kind === 'open'
+          ? { ...state.paste, problem: event.problem }
+          : { kind: 'closed', problem: event.problem } }
+      : state
+    case 'paste-applied': return state.kind === 'editing'
+      ? { ...state, paste: { kind: 'closed', problem: null } }
       : state
     default: return assertNever(event)
   }
@@ -806,6 +839,32 @@ export function DagWorkspace({
     const base = boundHere ? studyDraft : { ...EMPTY_STUDY_DRAFT, dagDocument: selectedDocument.id }
     onStudyDraftChanged({ ...base, dagDocument: selectedDocument.id, [part]: node })
   }
+
+  /** Plan against the document, then join every arrow in one revision; a declared exposure and outcome bind the study when the text names exactly one of each. */
+  const pasteGraph = (document: DagDocument) => {
+    if (state.kind !== 'editing' || state.paste.kind !== 'open') return
+    const plan = planDagImport(document, state.paste.text)
+    if (!plan.ok) {
+      dispatch({ type: 'paste-refused', problem: plan.error })
+      return
+    }
+    const revised = reviseDagWithImportedGraph(document, importOf(plan.value))
+    if (!revised.ok) {
+      dispatch({ type: 'paste-refused', problem: revised.error })
+      return
+    }
+    onDocumentRevised(revised.value)
+    const observedNamed = (name: string | null): DagNodeId | null => name === null
+      ? null
+      : revised.value.current.graph.nodes.find((node) => node.kind === 'observed' && node.name === name)?.id ?? null
+    const treatment = observedNamed(plan.value.exposure)
+    const outcome = observedNamed(plan.value.outcome)
+    if (treatment !== null || outcome !== null) {
+      const base = boundHere ? studyDraft : { ...EMPTY_STUDY_DRAFT, dagDocument: revised.value.id }
+      onStudyDraftChanged({ ...base, dagDocument: revised.value.id, treatment: treatment ?? base.treatment, outcome: outcome ?? base.outcome })
+    }
+    dispatch({ type: 'paste-applied' })
+  }
   const [inspectorTab, setInspectorTab] = useState<'selection' | 'evidence' | 'intervene'>(discoveryRuns.length > 0 ? 'evidence' : 'selection')
   const [interventionOverlay, setInterventionOverlay] = useState<InterventionOverlay | null>(null)
   useEffect(() => {
@@ -895,6 +954,7 @@ export function DagWorkspace({
             <ParameterHelp label="revision history" help={`${document.audit.length} revisions retained. Undo and redo change the active revision without deleting retained revisions.`} />
           </div>
           <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'latent-variable-add-requested' })}><Icon name="add" size={14} /> Unmeasured variable</button>
+          <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'paste-requested' })}><Icon name="content_paste" size={14} /> From text</button>
           <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'new-document-requested' })}>Create a DAG</button>
         </div>
       </div>
@@ -922,6 +982,24 @@ export function DagWorkspace({
         </form>
       )}
       {state.latentVariable.kind === 'closed' && state.latentVariable.problem !== null && <p role="alert" className="mb-3 mt-0 text-body text-danger">{describeDagVariableEditProblem(state.latentVariable.problem)}</p>}
+      {state.paste.kind === 'open' && (
+        <form className={well('mb-3 flex flex-wrap items-end gap-2 p-3')} onSubmit={(event) => { event.preventDefault(); pasteGraph(document) }}>
+          <label className="min-w-0 basis-full text-body text-ink">Graph text
+            <textarea autoFocus aria-label="Graph text" className={field('text', 'mt-1 min-h-32 w-full resize-y rounded-lg')} value={state.paste.text} onChange={(event) => dispatch({ type: 'paste-text-changed', value: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') dispatch({ type: 'paste-cancelled' }) }} placeholder="dag { X [exposure] Y [outcome] X <- A -> M <- B -> Y X -> Y A <-> B }" />
+          </label>
+          <dl className="m-0 grid basis-full grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-label text-faint">
+            <dt className={literal('text-muted')}>{'A -> B'}</dt><dd className="m-0">{'A is a cause of B. B <- A means the same.'}</dd>
+            <dt className={literal('text-muted')}>{'A <-> B'}</dt><dd className="m-0">An unmeasured common cause of A and B.</dd>
+            <dt className={literal('text-muted')}>{'X [exposure]'}</dt><dd className="m-0">{'The treatment. [outcome] marks the outcome and [latent] an unmeasured variable.'}</dd>
+            <dt className={literal('text-muted')}>{'A -> B [lag=1]'}</dt><dd className="m-0">A one step earlier is a cause of B, for a time series. Without a lag, the same period.</dd>
+          </dl>
+          <p className="m-0 basis-full text-label text-faint">The dagitty and graphviz form. An unmarked variable must be a column of the prepared data. Every arrow is added without a rationale; record one for each before analysis. Escape to cancel.</p>
+          <button type="submit" className={button('outline')}>Convert to DAG</button>
+          <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'paste-cancelled' })}>Cancel</button>
+          {state.paste.problem !== null && <Alert tone="info" className="w-full"><p className="m-0">{describeDagImportProblem(state.paste.problem)}</p></Alert>}
+        </form>
+      )}
+      {state.paste.kind === 'closed' && state.paste.problem !== null && <Alert tone="info" className="mb-3"><p className="m-0">{describeDagImportProblem(state.paste.problem)}</p></Alert>}
       {document.current.graph.nodes.some((node) => node.kind === 'latent') && (
         <div className="mb-3 flex flex-wrap gap-2" aria-label="Unmeasured DAG variables">
           {document.current.graph.nodes.filter((node) => node.kind === 'latent').map((node) => (

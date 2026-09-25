@@ -198,7 +198,7 @@ fn boosted_scores(
             n_estimators: chosen.n_estimators,
             validation_auc: if validation.is_nan() { fitted_auc } else { validation },
             fitted_auc,
-            candidates: total,
+            candidates: model.candidates_searched.unwrap_or(total),
             cross_fitted: model.cross_fitted,
         },
     ))
@@ -239,6 +239,51 @@ fn percentile_tails(request: &PropensityBootstrapRequest, label: &str) -> Result
     }
     let tail = (1.0 - request.level) / 2.0;
     Ok((tail, 1.0 - tail))
+}
+
+/// One slice of the boosted grid, so the slices run in parallel workers. The unit is a single
+/// learning rate and depth over every tree count, which is what the prefix scoring already fits
+/// once and scores at each count, so slicing changes no arithmetic.
+pub(crate) fn propensity_grid_slice(
+    values: &[f64],
+    rows: usize,
+    columns: usize,
+    treatment: usize,
+    outcome: usize,
+    adjustment: &[usize],
+    learning_rate: f64,
+    max_depth: usize,
+    n_estimators: Vec<usize>,
+    splits: usize,
+    min_samples_leaf: usize,
+    min_samples_split: usize,
+    seed: u32,
+) -> Result<AnalysisResult, String> {
+    let (design, treated, _) = propensity_inputs(
+        "propensity grid slice", values, rows, columns, treatment, outcome, adjustment,
+    )?;
+    let assignment: Vec<f64> = treated.iter().map(|&t| f64::from(t)).collect();
+    let grid = hirmos_causal_core::model_selection::Grid {
+        learning_rate: vec![learning_rate],
+        max_depth: vec![max_depth],
+        n_estimators,
+    };
+    let search = hirmos_causal_core::model_selection::grid_search(
+        &design, &assignment, &grid, splits, min_samples_leaf, min_samples_split, seed,
+    )
+    .map_err(|cause| format!("propensity grid slice could not score the candidates: {cause:?}"))?;
+    Ok(AnalysisResult::PropensityGridSlice {
+        scores: search
+            .scores
+            .into_iter()
+            .map(|entry| GridCandidateScore {
+                learning_rate: entry.candidate.learning_rate,
+                max_depth: entry.candidate.max_depth,
+                n_estimators: entry.candidate.n_estimators,
+                mean_score: entry.mean_score,
+            })
+            .collect(),
+    })
 }
 
 /// In[10]: one nearest opposite-arm neighbour for every row, averaged over the whole sample, so

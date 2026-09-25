@@ -38,3 +38,6 @@ videos/
 # Working checklist, local only
 /TODO.md
 design/
+bend/
+LAWS.bend
+PROOF.bend

@@ -106,6 +106,8 @@ import {
   doublyRobustEvidenceSchema,
   propensityMatchingEvidenceSchema,
   propensityWeightingEvidenceSchema,
+  gridSliceEvidenceSchema,
+  type GridSliceEvidence,
   frontdoorTwoStageEvidenceSchema,
   instrumentalVariableEvidenceSchema,
   causalEffectsEvidenceSchema,
@@ -240,6 +242,7 @@ const boostedTreatmentModelSchema = z.object({
   minSamplesSplit: z.number().int().min(2),
   seed: z.number().int().nonnegative(),
   crossFitted: z.boolean(),
+  candidatesSearched: z.number().int().positive().nullable(),
 }).strict()
 
 const propensityTreatmentModelSchema = z.discriminatedUnion('kind', [
@@ -262,6 +265,7 @@ export interface BoostedTreatmentModel {
   readonly minSamplesSplit: number
   readonly seed: number
   readonly crossFitted: boolean
+  readonly candidatesSearched: number | null
 }
 
 export type PropensityTreatmentModel =
@@ -633,6 +637,23 @@ export type AnalysisWorkerCommand =
       readonly adjustment: readonly number[]
       readonly scale: 'inverseProbability' | 'stabilized'
       readonly fit: PropensityWeightingFit
+    }
+  | {
+      readonly kind: 'propensity-grid-slice'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly learningRate: number
+      readonly maxDepth: number
+      readonly nEstimators: readonly number[]
+      readonly splits: number
+      readonly minSamplesLeaf: number
+      readonly minSamplesSplit: number
+      readonly seed: number
     }
   | {
       readonly kind: 'propensity-matching'
@@ -1251,6 +1272,7 @@ export type AnalysisWorkerEvent =
     }
   | { readonly kind: 'propensity-weighting-succeeded'; readonly request: WorkerRequestId; readonly result: PropensityWeightingEvidence }
   | { readonly kind: 'propensity-matching-succeeded'; readonly request: WorkerRequestId; readonly result: PropensityMatchingEvidence }
+  | { readonly kind: 'propensity-grid-slice-succeeded'; readonly request: WorkerRequestId; readonly result: GridSliceEvidence }
   | { readonly kind: 'doubly-robust-succeeded'; readonly request: WorkerRequestId; readonly result: DoublyRobustEvidence }
   | { readonly kind: 'continuous-gps-succeeded'; readonly request: WorkerRequestId; readonly result: ContinuousGpsEvidence }
   | { readonly kind: 'frontdoor-two-stage-succeeded'; readonly request: WorkerRequestId; readonly result: FrontdoorTwoStageEvidence }
@@ -1853,6 +1875,17 @@ const commandSchema = z.discriminatedUnion('kind', [
     model: propensityTreatmentModelSchema,
   }).strict(),
   z.object({
+    kind: z.literal('propensity-grid-slice'),
+    ...propensityCommandFields,
+    learningRate: z.number().positive(),
+    maxDepth: z.number().int().positive().max(16),
+    nEstimators: z.array(z.number().int().positive().max(2000)).min(1).max(12),
+    splits: z.number().int().min(2).max(20),
+    minSamplesLeaf: z.number().int().positive(),
+    minSamplesSplit: z.number().int().min(2),
+    seed: z.number().int().nonnegative(),
+  }).strict(),
+  z.object({
     kind: z.literal('doubly-robust'),
     ...propensityCommandFields,
     model: logisticTreatmentModelSchema,
@@ -2434,6 +2467,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({ kind: z.literal('propensity-weighting-succeeded'), request: requestSchema, result: propensityWeightingEvidenceSchema }).strict(),
   z.object({ kind: z.literal('propensity-matching-succeeded'), request: requestSchema, result: propensityMatchingEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('propensity-grid-slice-succeeded'), request: requestSchema, result: gridSliceEvidenceSchema }).strict(),
   z.object({ kind: z.literal('doubly-robust-succeeded'), request: requestSchema, result: doublyRobustEvidenceSchema }).strict(),
   z.object({ kind: z.literal('continuous-gps-succeeded'), request: requestSchema, result: continuousGpsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('frontdoor-two-stage-succeeded'), request: requestSchema, result: frontdoorTwoStageEvidenceSchema }).strict(),
@@ -2727,6 +2761,12 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     return result.ok
       ? ok({ kind: 'propensity-matching-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'propensity-grid-slice-succeeded') {
+    const result = gridSliceEvidenceSchema.safeParse(parsed.data.result)
+    return result.success
+      ? ok({ kind: 'propensity-grid-slice-succeeded', request: request.value, result: result.data })
+      : err({ kind: 'invalid-event', detail: 'The grid slice result did not parse.' })
   }
   if (parsed.data.kind === 'doubly-robust-succeeded') {
     const result = parseDoublyRobustEvidence(parsed.data.result)

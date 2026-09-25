@@ -1,0 +1,1177 @@
+[
+  {
+    "label": "chain and reversed arrows",
+    "dot": "graph { X [exposure] Y [outcome] X <- A -> M <- B -> Y X -> Y }",
+    "nodes": [
+      {
+        "name": "X",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "Y",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "M",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "X"
+      },
+      {
+        "from": "A",
+        "to": "M"
+      },
+      {
+        "from": "B",
+        "to": "M"
+      },
+      {
+        "from": "B",
+        "to": "Y"
+      },
+      {
+        "from": "X",
+        "to": "Y"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [
+      "X"
+    ],
+    "outcomes": [
+      "Y"
+    ],
+    "exposure": "X",
+    "outcome": "Y"
+  },
+  {
+    "label": "group on both sides",
+    "dot": "dag { {A B} -> {C D} }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "C",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "D",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "C"
+      },
+      {
+        "from": "A",
+        "to": "D"
+      },
+      {
+        "from": "B",
+        "to": "C"
+      },
+      {
+        "from": "B",
+        "to": "D"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "group chained onward",
+    "dot": "dag { {A B} -> C -> {D E} }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "C",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "D",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "E",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "C"
+      },
+      {
+        "from": "B",
+        "to": "C"
+      },
+      {
+        "from": "C",
+        "to": "D"
+      },
+      {
+        "from": "C",
+        "to": "E"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "single letter aliases",
+    "dot": "dag { X [e] Y [o] Z [u] W [a] X -> Y Z -> X W -> Y }",
+    "nodes": [
+      {
+        "name": "X",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "Y",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "Z",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "W",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "X",
+        "to": "Y"
+      },
+      {
+        "from": "Z",
+        "to": "X"
+      },
+      {
+        "from": "W",
+        "to": "Y"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [
+      "W"
+    ],
+    "exposures": [
+      "X"
+    ],
+    "outcomes": [
+      "Y"
+    ],
+    "exposure": "X",
+    "outcome": "Y"
+  },
+  {
+    "label": "long aliases",
+    "dot": "dag { X [source] Y [target] Z [unobserved] W [adjusted] X -> Y Z -> X W -> Y }",
+    "nodes": [
+      {
+        "name": "X",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "Y",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "Z",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "W",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "X",
+        "to": "Y"
+      },
+      {
+        "from": "Z",
+        "to": "X"
+      },
+      {
+        "from": "W",
+        "to": "Y"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [
+      "W"
+    ],
+    "exposures": [
+      "X"
+    ],
+    "outcomes": [
+      "Y"
+    ],
+    "exposure": "X",
+    "outcome": "Y"
+  },
+  {
+    "label": "legacy aliases",
+    "dot": "dag { X [exposure] Y [outcome] L [latent] L -> X X -> Y }",
+    "nodes": [
+      {
+        "name": "X",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "Y",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "L",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "L",
+        "to": "X"
+      },
+      {
+        "from": "X",
+        "to": "Y"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [
+      "X"
+    ],
+    "outcomes": [
+      "Y"
+    ],
+    "exposure": "X",
+    "outcome": "Y"
+  },
+  {
+    "label": "semicolons and commas",
+    "dot": "dag { A -> B; B -> C, C -> D; }",
+    "refused": "SyntaxError: Expected \"-\", \"--\", \"--@\", \"->\", \"<-\", \"<->\", \"<-@\", \"@--\", \"@->\", \"@-@\", \"[\", \"\\\"\", \"{\", \"}\", [0-9a-zA-Z_."
+  },
+  {
+    "label": "no wrapper",
+    "dot": "a.1 -> b_2 b_2 -> 3c",
+    "nodes": [
+      {
+        "name": "a.1",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "b_2",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "3c",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "a.1",
+        "to": "b_2"
+      },
+      {
+        "from": "b_2",
+        "to": "3c"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "strict with a name",
+    "dot": "strict digraph name { A -> B }",
+    "nodes": [
+      {
+        "name": "strict",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "digraph",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "name",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "quoted names",
+    "dot": "dag { \"long name\" -> b }",
+    "nodes": [
+      {
+        "name": "long name",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "b",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "long name",
+        "to": "b"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "quoted with escape",
+    "dot": "dag { \"say \\\"hi\\\"\" -> b }",
+    "nodes": [
+      {
+        "name": "say \"hi\"",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "b",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "say \"hi\"",
+        "to": "b"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "bidirected",
+    "dot": "dag { A [exposure] B [outcome] A <-> B A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_AB",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "U_AB",
+        "to": "A"
+      },
+      {
+        "from": "U_AB",
+        "to": "B"
+      },
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 1,
+    "adjusted": [],
+    "exposures": [
+      "A"
+    ],
+    "outcomes": [
+      "B"
+    ],
+    "exposure": "A",
+    "outcome": "B"
+  },
+  {
+    "label": "two bidirected",
+    "dot": "dag { A <-> B B <-> C }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "C",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_AB",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_BC",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "U_AB",
+        "to": "A"
+      },
+      {
+        "from": "U_AB",
+        "to": "B"
+      },
+      {
+        "from": "U_BC",
+        "to": "B"
+      },
+      {
+        "from": "U_BC",
+        "to": "C"
+      }
+    ],
+    "bidirected": 2,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "declared after use",
+    "dot": "dag { A -> B B [outcome] A [exposure] }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [
+      "A"
+    ],
+    "outcomes": [
+      "B"
+    ],
+    "exposure": "A",
+    "outcome": "B"
+  },
+  {
+    "label": "repeated arrow",
+    "dot": "dag { A -> B A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "repeated bidirected",
+    "dot": "dag { A <-> B A <-> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_AB",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "U_AB",
+        "to": "A"
+      },
+      {
+        "from": "U_AB",
+        "to": "B"
+      }
+    ],
+    "bidirected": 1,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "bidirected written both ways",
+    "dot": "dag { A <-> B B <-> A }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_AB",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "U_AB",
+        "to": "A"
+      },
+      {
+        "from": "U_AB",
+        "to": "B"
+      }
+    ],
+    "bidirected": 1,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "arrows in both directions",
+    "dot": "dag { A -> B B -> A }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      },
+      {
+        "from": "B",
+        "to": "A"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "repeated arrow written in reverse",
+    "dot": "dag { A -> B B <- A }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "repeated node declaration",
+    "dot": "dag { A [exposure] A [exposure] A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [
+      "A"
+    ],
+    "outcomes": [],
+    "exposure": "A",
+    "outcome": null
+  },
+  {
+    "label": "directed and bidirected between the same pair",
+    "dot": "dag { A -> B A <-> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "U_AB",
+        "kind": "latent",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      },
+      {
+        "from": "U_AB",
+        "to": "A"
+      },
+      {
+        "from": "U_AB",
+        "to": "B"
+      }
+    ],
+    "bidirected": 1,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "lag as an edge attribute",
+    "dot": "dag { A -> B [lag=1] }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "lagged self loop",
+    "dot": "dag { A -> A [lag=1] }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "A"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "two lags on one pair",
+    "dot": "dag { A -> B [lag=1] A -> B [lag=3] }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "contemporaneous self loop",
+    "dot": "dag { A -> A }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "A"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "bounding box and positions",
+    "dot": "dag { bb=\"-3,-0.5,2,1.2\" A [pos=\"1.5,-2.25\"] B [pos=\"0,0\"] A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": 1.5,
+        "y": -2.25
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": 0,
+        "y": 0
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "label attribute",
+    "dot": "dag { A [label=\"An A\"] A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "unknown attribute kept out of the way",
+    "dot": "dag { A [colour=red] A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "uppercase graph type",
+    "dot": "DAG { A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "digit and dot names",
+    "dot": "dag { 1.5 -> 2.5 }",
+    "nodes": [
+      {
+        "name": "1.5",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "2.5",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "1.5",
+        "to": "2.5"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [],
+    "outcomes": [],
+    "exposure": null,
+    "outcome": null
+  },
+  {
+    "label": "attribute without a value",
+    "dot": "dag { A [exposure] B [outcome] A -> B }",
+    "nodes": [
+      {
+        "name": "A",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      },
+      {
+        "name": "B",
+        "kind": "observed",
+        "x": null,
+        "y": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "A",
+        "to": "B"
+      }
+    ],
+    "bidirected": 0,
+    "adjusted": [],
+    "exposures": [
+      "A"
+    ],
+    "outcomes": [
+      "B"
+    ],
+    "exposure": "A",
+    "outcome": "B"
+  }
+]

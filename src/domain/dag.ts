@@ -584,6 +584,59 @@ export function reviseDagWithLatentConfounder(
   return ok(appendRevision(document, graph))
 }
 
+export interface DagImport {
+  readonly latent: readonly string[]
+  readonly arrows: readonly { readonly from: string; readonly to: string; readonly lag: number | null }[]
+}
+
+export type DagImportProblem =
+  | { readonly kind: 'unknown-variable'; readonly name: string }
+  | { readonly kind: 'variable-refused'; readonly name: string; readonly problem: DagVariableEditProblem }
+  | { readonly kind: 'arrow-refused'; readonly from: string; readonly to: string; readonly problem: DagEditProblem }
+
+/**
+ * Every arrow of a pasted graph joins in one revision, each checked the way a drawn arrow is, so a
+ * cycle or a repeat names the arrow behind it. Every arrow is added without a rationale; the
+ * incompleteness count then asks the reader for one.
+ */
+export function reviseDagWithImportedGraph(
+  document: DagDocument,
+  imported: DagImport,
+): Result<DagDocument, DagImportProblem> {
+  let graph: EditableDag = document.current.graph
+  const ids = new Map<string, DagNodeId>(graph.nodes.map((node) => [node.name, node.id]))
+  const working = (): DagDocument => ({ ...document, current: { ...document.current, graph } })
+
+  for (const name of imported.latent) {
+    const checked = latentVariableName(working(), name)
+    if (!checked.ok) return err({ kind: 'variable-refused', name, problem: checked.error })
+    const node: LatentDagNode = { kind: 'latent', id: newLatentDagNodeId(document.id), name: checked.value }
+    graph = { ...graph, nodes: [...graph.nodes, node] }
+    ids.set(checked.value, node.id)
+  }
+
+  for (const arrow of imported.arrows) {
+    const timing: EdgeTiming = arrow.lag === null ? { kind: 'contemporaneous' } : { kind: 'lagged', lag: arrow.lag }
+    const cause = ids.get(arrow.from)
+    const effect = ids.get(arrow.to)
+    if (cause === undefined) return err({ kind: 'unknown-variable', name: arrow.from })
+    if (effect === undefined) return err({ kind: 'unknown-variable', name: arrow.to })
+    const endpoints = inspectDagEdgeAddition(working(), cause, effect, timing)
+    if (!endpoints.ok) return err({ kind: 'arrow-refused', from: arrow.from, to: arrow.to, problem: endpoints.error })
+    const edge: DirectedDagEdge = {
+      kind: 'directed',
+      id: dagEdgeId(cause, effect, timing),
+      cause,
+      effect,
+      timing,
+      support: { kind: 'unstated' },
+      evidence: [],
+    }
+    graph = { ...graph, edges: [...graph.edges, edge] }
+  }
+  return ok(appendRevision(document, graph))
+}
+
 /** Move the active revision pointer backward without deleting any revision from the audit. */
 export function undoDagRevision(document: DagDocument): Result<DagDocument, Extract<DagHistoryProblem, { readonly kind: 'nothing-to-undo' }>> {
   const previous = document.history.at(-1)

@@ -289,7 +289,8 @@ export interface BoostedTreatmentModelChoice {
 }
 
 /** sklearn's own `GradientBoostingClassifier` defaults, which the chapter leaves alone. */
-export const boostedCommand = (chosen: BoostedTreatmentModelChoice) => ({
+export const boostedCommand = (chosen: BoostedTreatmentModelChoice, candidatesSearched: number | null = null) => ({
+  candidatesSearched,
   learningRate: chosen.learningRate,
   maxDepth: chosen.maxDepth,
   nEstimators: chosen.nEstimators,
@@ -633,6 +634,18 @@ export const propensityWeightingEvidenceSchema = z.object({
   outcome: z.array(z.number().finite()),
   interval: propensityIntervalSchema.nullable(),
 }).strict()
+
+export const gridSliceEvidenceSchema = z.object({
+  kind: z.literal('propensityGridSlice'),
+  scores: z.array(z.object({
+    learningRate: z.number().positive(),
+    maxDepth: z.number().int().positive(),
+    nEstimators: z.number().int().positive(),
+    meanScore: z.number().finite(),
+  }).strict()).min(1),
+}).strict()
+
+export type GridSliceEvidence = z.infer<typeof gridSliceEvidenceSchema>
 
 export const propensityMatchingEvidenceSchema = z.object({
   kind: z.literal('propensityMatching'),

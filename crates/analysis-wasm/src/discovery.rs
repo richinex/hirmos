@@ -1807,6 +1807,7 @@ mod tests {
             }
             AnalysisCommand::PropensityWeighting { .. }
             | AnalysisCommand::PropensityMatching { .. }
+            | AnalysisCommand::PropensityGridSlice { .. }
             | AnalysisCommand::DoublyRobust { .. }
             | AnalysisCommand::ContinuousGps { .. }
             | AnalysisCommand::StaggeredDid { .. }

@@ -29,6 +29,7 @@ import { memo, useEffect, useMemo, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import type { VisibleWindow } from '@/charts/window'
+import { runBoostedGridSearch } from '@/analysis/boostedSearch'
 import type { BoostedTreatmentModel, PropensityTreatmentModel } from '@/workers/analysisProtocol'
 import { histogramOption } from '@/charts/data/histogram'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
@@ -56,7 +57,7 @@ import { button, chapterIntro, field, fieldHint, fieldLabel, label, literal, num
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import { assertNever, isNonEmpty, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
+import { assertNever, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { describeDesignExpansionProblem, designLayouts, expandDesign, expandsDesign } from '@/domain/designMatrix'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
@@ -113,7 +114,7 @@ import { lowerFirst } from '@/lib/text'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { interpretEstimationResult, resultHeadline, resultSampleLine, resultScaleLine } from '@/domain/resultInterpretation'
 import type { RunActivity } from '@/domain/activity'
-import { describeAnalysisWorkerProblem, type AnalysisProgress, type DmlGroupsRequest } from '@/workers/analysisProtocol'
+import { describeAnalysisWorkerProblem, type AnalysisProgress, type AnalysisWorkerProblem, type DmlGroupsRequest } from '@/workers/analysisProtocol'
 import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 
 const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
@@ -341,7 +342,7 @@ const treatmentModelTiles = (model: TreatmentModelEvidence): readonly { readonly
       {
         label: 'Search',
         value: formatStatistic('score', model.validationAuc),
-        context: <Metadata><span>held-out ROC AUC</span><span>{formatCount(model.candidates).text} candidates</span><span>fitted {formatStatistic('score', model.fittedAuc).text}</span></Metadata>,
+        context: <Metadata><span>held-out ROC AUC</span><span>{formatCount(model.candidates).text} candidate{model.candidates === 1 ? '' : 's'}</span><span>fitted {formatStatistic('score', model.fittedAuc).text}</span></Metadata>,
       },
     ]
 
@@ -1440,19 +1441,45 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const drawn = (uncertainty: PropensityUncertainty) => uncertainty.kind === 'none'
             ? null
             : { rounds: uncertainty.rounds, seed: uncertainty.seed, level: uncertainty.level }
-          const treatmentModel = (chosen: BoostedTreatmentModelChoice): PropensityTreatmentModel =>
-            configuration.model === 'boosted'
-              ? { kind: 'boosted', model: boostedCommand(chosen) }
-              : { kind: 'logistic', model: logistic }
+          const treatmentModel = (picked: { readonly grid: BoostedTreatmentModelChoice; readonly searched: number } | null): PropensityTreatmentModel =>
+            picked === null
+              ? { kind: 'logistic', model: logistic }
+              : { kind: 'boosted', model: boostedCommand(picked.grid, picked.searched) }
           const record = (run: Parameters<typeof causalEstimateFrom>[2]) => {
             const estimate = causalEstimateFrom(study, identification, run)
             finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact,
               'The identification is no longer identified.')
           }
+          // A boosted model searches the grid across a worker pool, then fits the one candidate
+          // it chose, so the long part of the run is not on a single worker. Doubly robust has no
+          // boosted arm, so there is no grid to search and nothing to choose.
+          type ChosenGrid = { readonly grid: BoostedTreatmentModelChoice; readonly searched: number }
+          const search = async (): Promise<Result<ChosenGrid | null, AnalysisWorkerProblem>> => {
+            if (configuration.kind === 'doubly-robust' || configuration.model !== 'boosted') return ok(null)
+            const declared = configuration.boosted
+            const outcome = await runBoostedGridSearch(design.value.values.slice(), matrix.rowCount,
+              design.value.columnCount, shared, boostedCommand(declared))
+            if (!outcome.ok) return outcome
+            return ok({
+              searched: declared.learningRate.length * declared.maxDepth.length * declared.nEstimators.length,
+              grid: {
+                ...declared,
+                learningRate: [outcome.value.best.learningRate],
+                maxDepth: [outcome.value.best.maxDepth],
+                nEstimators: [outcome.value.best.nEstimators],
+              },
+            })
+          }
+          const searched = await search()
+          if (!searched.ok) {
+            dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(searched.error) })
+            return
+          }
+          const chosen = searched.value
           if (configuration.kind === 'propensity-weighting') {
-            const fit = configuration.model === 'boosted'
-              ? { kind: 'boosted', model: boostedCommand(configuration.boosted) } as const
-              : { kind: 'logistic', model: logistic, bootstrap: drawn(configuration.uncertainty) } as const
+            const fit = chosen === null
+              ? { kind: 'logistic', model: logistic, bootstrap: drawn(configuration.uncertainty) } as const
+              : { kind: 'boosted', model: boostedCommand(chosen.grid, chosen.searched) } as const
             const evidence = await analysis.runPropensityWeighting(design.value.values, matrix.rowCount, design.value.columnCount,
               { ...shared, scale: configuration.scale, fit })
             if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
@@ -1461,7 +1488,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           }
           if (configuration.kind === 'propensity-matching') {
             const evidence = await analysis.runPropensityMatching(design.value.values, matrix.rowCount, design.value.columnCount,
-              { ...shared, model: treatmentModel(configuration.boosted) })
+              { ...shared, model: treatmentModel(chosen) })
             if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
             record({ kind: 'propensity-matching-run', configuration, evidence: evidence.value })
             return

@@ -118,6 +118,7 @@ mod tests {
             min_samples_split: 2,
             seed: 7,
             cross_fitted: false,
+            candidates_searched: None,
         };
         let result = propensity_weighting(
             &values, rows, 3, 0, 1, &[2],

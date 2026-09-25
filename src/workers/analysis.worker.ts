@@ -27,7 +27,7 @@ import {
   parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
-import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseContinuousGpsEvidence, parseDoublyRobustEvidence, parsePropensityMatchingEvidence, parsePropensityWeightingEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
+import { gridSliceEvidenceSchema, parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseContinuousGpsEvidence, parseDoublyRobustEvidence, parsePropensityMatchingEvidence, parsePropensityWeightingEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
 import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseInterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
@@ -331,6 +331,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'propensityWeighting', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, fit: command.fit }
     case 'propensity-matching':
       return { kind: 'propensityMatching', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model }
+    case 'propensity-grid-slice':
+      return { kind: 'propensityGridSlice', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed }
     case 'doubly-robust':
       return { kind: 'doublyRobust', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, bootstrap: command.bootstrap }
     case 'continuous-gps':
@@ -731,6 +733,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = parsePropensityWeightingEvidence(decoded)
         if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
         emit({ kind: 'propensity-weighting-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'propensity-grid-slice': {
+        const result = gridSliceEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: 'The grid slice result did not parse.' }); return }
+        emit({ kind: 'propensity-grid-slice-succeeded', request: command.request, result: result.data })
         return
       }
       case 'propensity-matching': {

@@ -2,6 +2,7 @@
   {
     "label": "The M-bias graph",
     "slug": "the-m-bias-graph",
+    "dot": "bb=\"-3,-0.5,2,1.2\"\n\tD [outcome,pos=\"1,1\"]\n\tE [exposure,pos=\"-2,1\"]\n\tZ [pos=\"-0.5,0.5\"]\n\tD <-> Z [pos=\"1,-1\"]\n\tE -> D\n\tE <-> Z [pos=\"-2,-1\"]",
     "exposure": "E",
     "outcome": "D",
     "nodes": [
@@ -71,6 +72,7 @@
   {
     "label": "Extended confounding triangle",
     "slug": "extended-confounding-triangle",
+    "dot": "A [pos=\"-2.200,-1.520\"]\n\tB [pos=\"1.400,-1.460\"]\n\tD [outcome,pos=\"1.400,1.621\"]\n\tE [exposure,pos=\"-2.200,1.597\"]\n\tZ [pos=\"-0.300,-0.082\"]\n\tA -> { E Z }\n\tB -> { D Z }\n\tE -> D\n\tZ -> { D E }",
     "exposure": "E",
     "outcome": "D",
     "nodes": [
@@ -159,6 +161,7 @@
   {
     "label": "Small model with mediator",
     "slug": "small-model-with-mediator",
+    "dot": "dag { X [exposure,pos=\"-1.193,1.639\"] Y [outcome,pos=\"1.053,1.639\"] Z [pos=\"-0.132,-0.374\"] I [pos=\"0.423,0.755\"] Z -> X Z -> I X -> I X -> Y I -> Y }",
     "exposure": "X",
     "outcome": "Y",
     "nodes": [
@@ -226,6 +229,7 @@
   {
     "label": "Many variables but few paths",
     "slug": "many-variables-but-few-paths",
+    "dot": "dag { E [exposure,pos=\"-3.728,5.092\"] D [outcome,pos=\"-1.510,6.789\"] 1 [pos=\"-5.600,2.115\"] 2 [pos=\"-7.120,-0.603\"] 3 [pos=\"-7.138,-3.731\"] 4 [pos=\"-5.395,-6.348\"] 5 [pos=\"-2.468,-6.074\"] 6 [pos=\"-2.179,-2.682\"] 7 [pos=\"-1.049,-0.238\"] 8 [pos=\"1.043,0.916\"] 9 [pos=\"2.654,-2.614\"] 10 [pos=\"4.955,-4.447\"] 11 [pos=\"7.152,-1.901\"] 12 [pos=\"7.424,1.256\"] 13 [pos=\"5.971,3.498\"] 14 [pos=\"4.225,5.936\"] 15 [pos=\"1.634,7.468\"] 1 -> E 2 -> 1 3 -> 2 4 -> 3 5 -> 4 6 -> 5 7 -> 6 7 -> E 8 -> 7 8 -> D 9 -> 8 10 -> 9 11 -> 10 12 -> 11 13 -> 12 14 -> 13 15 -> 14 15 -> D E -> D }",
     "exposure": "E",
     "outcome": "D",
     "nodes": [
@@ -444,6 +448,7 @@
   {
     "label": "Sebastiani et al., 2005",
     "slug": "sebastiani-et-al-2005",
+    "dot": "dag { EDN1.3 [exposure,pos=\"-2.643,16.642\"] EDNI1.7 [outcome,pos=\"-1.234,18.664\"] SELP.22 [pos=\"-0.481,2.644\"] SELP.17 [pos=\"-1.367,3.939\"] ECE1.13 [pos=\"-0.280,7.260\"] ECE1.12 [pos=\"1.202,8.772\"] MET.6 [pos=\"3.562,11.155\"] CAT [pos=\"4.501,12.816\"] CSF2.3 [pos=\"2.509,-8.195\"] CSF2.4 [pos=\"-1.283,-8.195\"] TGFBR3.10 [pos=\"2.902,-3.702\"] TGFBR3.2 [pos=\"1.355,-2.058\"] TGFBR3.8 [pos=\"-0.092,-5.524\"] SELP.12 [pos=\"3.144,5.234\"] BMP6.13 [pos=\"-3.207,-4.786\"] BMP6.12 [pos=\"-2.382,-7.072\"] ANXA2.8 [pos=\"3.987,20.108\"] BMP6.11 [pos=\"-1.179,-0.789\"] ADCY9.8 [pos=\"2.198,9.855\"] BMP6.10 [pos=\"-3.086,2.250\"] BMP6 [pos=\"-1.985,4.558\"] ANXA2.11 [pos=\"0.105,12.599\"] ANXA2.13 [pos=\"1.437,15.415\"] MET.5 [pos=\"4.320,3.489\"] BMP6.9 [pos=\"-2.416,-2.349\"] ANXA2.7 [pos=\"-1.418,9.206\"] BMP6.14 [pos=\"-4.254,-6.607\"] TGFBR3.7 [pos=\"4.445,-7.336\"] ANXA2.12 [pos=\"-1.329,13.465\"] SELP.14 [pos=\"3.655,-1.126\"] Stroke [pos=\"1.418,3.285\"] ANXA2.5 [pos=\"-3.410,11.227\"] TGFBR3.9 [pos=\"1.494,-6.462\"] EDNI1.6 [pos=\"1.697,21.769\"] EDN1.9 [pos=\"-4.064,21.051\"] EDN1.10 [pos=\"-0.282,22.274\"] SELP.17 -> SELP.22 ECE1.13 -> SELP.17 ECE1.12 -> ECE1.13 MET.6 -> SELP.12 CAT -> MET.5 CSF2.3 -> CSF2.4 TGFBR3.10 -> TGFBR3.2 TGFBR3.10 -> TGFBR3.9 TGFBR3.2 -> TGFBR3.9 TGFBR3.8 -> TGFBR3.2 TGFBR3.8 -> TGFBR3.9 EDN1.3 -> ANXA2.12 EDN1.3 -> EDNI1.7 BMP6.13 -> BMP6.12 BMP6.13 -> BMP6.9 EDN1.10 -> EDNI1.7 EDNI1.6 -> EDN1.10 EDNI1.6 -> EDNI1.7 ANXA2.8 -> EDN1.3 ANXA2.8 -> CAT ANXA2.8 -> ECE1.12 ANXA2.8 -> EDNI1.6 ANXA2.8 -> ADCY9.8 ANXA2.8 -> BMP6 ANXA2.8 -> ANXA2.13 BMP6.11 -> BMP6.9 BMP6.10 -> BMP6.11 BMP6.10 -> BMP6.13 BMP6 -> BMP6.10 ANXA2.13 -> ANXA2.11 MET.5 -> MET.6 MET.5 -> TGFBR3.7 MET.5 -> SELP.14 EDN1.9 -> EDN1.10 EDN1.9 -> BMP6.14 EDN1.9 -> EDN1.3 ANXA2.7 -> ANXA2.11 ANXA2.7 -> ANXA2.5 BMP6.14 -> BMP6.12 TGFBR3.7 -> CSF2.3 TGFBR3.7 -> TGFBR3.10 ANXA2.12 -> ANXA2.13 ANXA2.12 -> ANXA2.11 ANXA2.12 -> ANXA2.7 ANXA2.12 -> ANXA2.5 Stroke -> CSF2.4 Stroke -> TGFBR3.10 Stroke -> MET.6 Stroke -> SELP.12 Stroke -> SELP.22 Stroke -> ECE1.13 Stroke -> ECE1.12 Stroke -> BMP6.12 Stroke -> BMP6.13 Stroke -> BMP6.11 Stroke -> ADCY9.8 Stroke -> BMP6.10 Stroke -> TGFBR3.8 Stroke -> MET.5 Stroke -> SELP.14 }",
     "exposure": "EDN1.3",
     "outcome": "EDNI1.7",
     "nodes": [
@@ -935,6 +940,7 @@
   {
     "label": "Polzer et al., 2012",
     "slug": "polzer-et-al-2012",
+    "dot": "dag { ToothLoss [exposure,pos=\"-1.677,2.421\"] Mortality [outcome,pos=\"1.900,2.360\"] Periodontitis [pos=\"-0.335,1.703\"] Caries [pos=\"-1.879,-1.875\"] Diabetes [pos=\"-0.888,0.322\"] Obesity [pos=\"-0.904,-1.340\"] Hypertension [pos=\"1.780,-0.157\"] Psychosocial [pos=\"-0.088,0.266\"] Age [pos=\"-0.039,-1.762\"] Sex [pos=\"-0.844,-3.340\"] Alcohol [pos=\"0.054,-3.594\"] Smoking [pos=\"0.772,0.379\"] Sport [pos=\"0.914,-3.396\"] Lipids [pos=\"2.026,-1.650\"] ToothLoss -> Mortality Periodontitis -> ToothLoss Caries -> ToothLoss Diabetes -> Mortality Diabetes -> Periodontitis Diabetes -> Hypertension Diabetes -> Lipids Obesity -> Mortality Obesity -> Periodontitis Obesity -> Diabetes Obesity -> Hypertension Obesity -> Lipids Hypertension -> Mortality Psychosocial -> ToothLoss Psychosocial -> Mortality Psychosocial -> Periodontitis Psychosocial -> Caries Psychosocial -> Diabetes Psychosocial -> Obesity Psychosocial -> Hypertension Psychosocial -> Alcohol Psychosocial -> Smoking Psychosocial -> Sport Psychosocial -> Lipids Age -> ToothLoss Age -> Mortality Age -> Periodontitis Age -> Caries Age -> Diabetes Age -> Obesity Age -> Hypertension Age -> Psychosocial Age -> Alcohol Age -> Smoking Age -> Sport Age -> Lipids Sex -> ToothLoss Sex -> Mortality Sex -> Periodontitis Sex -> Caries Sex -> Diabetes Sex -> Obesity Sex -> Hypertension Sex -> Psychosocial Sex -> Alcohol Sex -> Smoking Sex -> Sport Sex -> Lipids Alcohol -> ToothLoss Alcohol -> Mortality Alcohol -> Diabetes Alcohol -> Obesity Alcohol -> Hypertension Alcohol -> Smoking Alcohol -> Lipids Smoking -> ToothLoss Smoking -> Mortality Smoking -> Periodontitis Smoking -> Diabetes Smoking -> Obesity Smoking -> Hypertension Smoking -> Sport Sport -> Mortality Sport -> Periodontitis Sport -> Diabetes Sport -> Obesity Sport -> Hypertension Sport -> Lipids Lipids -> Mortality }",
     "exposure": "ToothLoss",
     "outcome": "Mortality",
     "nodes": [
@@ -1344,6 +1350,7 @@
   {
     "label": "Schipf et al., 2010",
     "slug": "schipf-et-al-2010",
+    "dot": "dag { TT [exposure,pos=\"-0.443,-0.942\"] T2DM [outcome,pos=\"1.666,2.693\"] A [pos=\"-1.429,-2.311\"] S [pos=\"-1.423,2.555\"] WC [pos=\"0.829,-0.735\"] U [pos=\"-0.459,1.159\"] PA [pos=\"1.661,-2.186\"] A -> S A -> PA A -> WC A -> U A -> TT S -> TT S -> T2DM WC -> TT WC -> U WC -> T2DM U -> TT U -> T2DM PA -> WC PA -> T2DM }",
     "exposure": "TT",
     "outcome": "T2DM",
     "nodes": [
@@ -1478,6 +1485,7 @@
   {
     "label": "Shrier & Platt, 2008",
     "slug": "shrier-platt-2008",
+    "dot": "dag { WarmUpExercises [exposure,pos=\"-7,8.650\"] Injury [outcome,pos=\"4.969,8.605\"] Coach [pos=\"-4.392,-7.906\"] Genetics [pos=\"2.022,-7.906\"] TeamMotivation [pos=\"-7.175,-0.950\"] PreGameProprioception [pos=\"-3.638,-1.235\"] ConnectiveTissueDisorder [pos=\"3.494,-5.099\"] PreviousInjury [pos=\"-4.293,4.175\"] ContactSport [pos=\"-1.157,2.548\"] TissueWeakness [pos=\"4.236,1.857\"] IntraGameProprioception [pos=\"-1.196,8.487\"] FitnessLevel [pos=\"-1.489,-4.530\"] NeuromuscularFatigue [pos=\"1.501,-1.235\"] Coach -> FitnessLevel Coach -> TeamMotivation Genetics -> FitnessLevel Genetics -> NeuromuscularFatigue Genetics -> ConnectiveTissueDisorder TeamMotivation -> PreviousInjury TeamMotivation -> WarmUpExercises PreGameProprioception -> WarmUpExercises ConnectiveTissueDisorder -> TissueWeakness ConnectiveTissueDisorder -> NeuromuscularFatigue ContactSport -> IntraGameProprioception ContactSport -> PreviousInjury TissueWeakness -> Injury IntraGameProprioception -> Injury FitnessLevel -> PreGameProprioception FitnessLevel -> NeuromuscularFatigue NeuromuscularFatigue -> IntraGameProprioception NeuromuscularFatigue -> Injury WarmUpExercises -> IntraGameProprioception }",
     "exposure": "WarmUpExercises",
     "outcome": "Injury",
     "nodes": [
@@ -1688,6 +1696,7 @@
   {
     "label": "Acid & de Campos, 1996",
     "slug": "acid-de-campos-1996",
+    "dot": "dag { x3 [exposure,pos=\"-7.255,2.657\"] x15 [outcome,pos=\"5.872,3.552\"] x4 [pos=\"-7.549,-5.201\"] x5 [pos=\"-4.116,-0.611\"] x6 [pos=\"-4.389,7.029\"] x7 [pos=\"-1.746,2.484\"] x8 [pos=\"2.209,6.269\"] x9 [pos=\"1.392,1.874\"] x10 [pos=\"3.925,-0.307\"] x11 [pos=\"-1.569,-4.200\"] x12 [pos=\"1.903,-4.093\"] x13 [pos=\"6.728,-4.093\"] x14 [pos=\"-0.676,9.163\"] x16 [pos=\"5.343,9.342\"] x17 [pos=\"7.417,7.412\"] x18 [pos=\"7.260,0.141\"] x1 [pos=\"-10.173,-1.479\"] x2 [pos=\"-9.832,5.930\"] x4 -> x5 x5 -> x7 x5 -> x11 x6 -> x7 x6 -> x14 x7 -> x9 x8 -> x14 x8 -> x15 x9 -> x10 x10 -> x12 x10 -> x15 x11 -> x12 x12 -> x13 x14 -> x16 x16 -> x17 x1 -> x4 x1 -> x3 x2 -> x3 x15 -> x17 x15 -> x18 x3 -> x6 x3 -> x5 }",
     "exposure": "x3",
     "outcome": "x15",
     "nodes": [
@@ -1913,6 +1922,7 @@
   {
     "label": "van Kampen, 2014",
     "slug": "van-kampen-2014",
+    "dot": "dag { AFF [pos=\"0.262,0.477\"] AIS [pos=\"0.123,0.736\"] ALN [pos=\"0.438,0.506\"] APA [pos=\"0.376,0.147\"] CDR [pos=\"0.628,0.332\"] DET [pos=\"0.920,0.561\"] EGC [outcome,pos=\"0.916,1.016\"] FTW [pos=\"0.667,0.639\"] HOS [pos=\"0.886,0.727\"] PER [pos=\"0.920,0.382\"] SAN [pos=\"0.031,0.371\"] SUS [exposure,pos=\"0.295,1.003\"] AFF -> ALN AFF -> APA AFF -> CDR AIS -> AFF AIS -> EGC AIS -> SUS ALN -> APA ALN -> DET ALN -> FTW ALN -> PER ALN -> SUS CDR -> DET EGC -> HOS FTW -> DET FTW -> EGC SAN -> ALN SAN -> AFF SAN -> AIS SAN -> APA SAN -> CDR SUS -> EGC SUS -> FTW SUS -> HOS PER -> DET }",
     "exposure": "SUS",
     "outcome": "EGC",
     "nodes": [
@@ -2108,6 +2118,7 @@
   {
     "label": "Didelez et al, 2010",
     "slug": "didelez-et-al-2010",
+    "dot": "\ndag {\nAge [adjusted,pos=\"-1.973,-0.123\"]\nHRT [exposure,pos=\"-0.536,-0.016\"]\nOcc [pos=\"-1.645,0.432\"]\nS [selected,pos=\"0.925,-0.500\"]\nSmo [adjusted,pos=\"-0.879,0.441\"]\nTCI [outcome,pos=\"0.488,0.090\"]\nThist [pos=\"-0.569,1.027\"]\nAge -> HRT\nAge -> Occ\nAge -> S [pos=\"-0.945,-0.571\"]\nAge -> TCI [pos=\"-0.264,-0.456\"]\nHRT -> TCI\nOcc -> Smo\nOcc -> Thist\nSmo -> HRT\nSmo -> TCI\nTCI -> S\nThist -> TCI\n}",
     "exposure": "HRT",
     "outcome": "TCI",
     "nodes": [
