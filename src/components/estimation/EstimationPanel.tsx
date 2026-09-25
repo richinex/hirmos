@@ -589,9 +589,17 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         ]
       }
       case 'continuous-gps-run': {
-        const { evidence } = run
+        const { evidence, configuration } = run
+        const weightContext = ((): string => {
+          switch (configuration.scale) {
+            case 'stabilized': return `stabilized weights sum to about the ${formatCount(evidence.observations).text} rows`
+            case 'inverseDensity': return 'the sum of 1 over each row’s conditional density; far above the row count means a few rows carry the result'
+            default: return assertNever(configuration.scale)
+          }
+        })()
         return [
-          { label: 'Weight sum', value: formatStatistic('raw', evidence.weightSum), context: `stabilized weights sum to about the ${formatCount(evidence.observations).text} rows` },
+          { label: 'Standard error', value: formatStatistic('raw', evidence.standardError), context: 'from the weighted regression, with the weights taken as fixed' },
+          { label: 'Weight sum', value: formatStatistic('raw', evidence.weightSum), context: weightContext },
           { label: 'Residual scale', value: formatStatistic('raw', evidence.residualScale), context: 'the spread of the treatment around its fitted value' },
           { label: 'Intercept', value: formatStatistic('raw', evidence.intercept), context: `${formatCount(evidence.treatmentParams.length).text} treatment-model parameters` },
         ]

@@ -460,12 +460,14 @@ function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTM
   return null
 }
 
-function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleExpand }: {
+function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleExpand, labelsShown, onToggleLabels }: {
   readonly onTidy: () => void
   readonly viewLocked: boolean
   readonly onToggleLock: () => void
   readonly expanded: boolean
   readonly onToggleExpand: () => void
+  readonly labelsShown: boolean
+  readonly onToggleLabels: () => void
 }) {
   const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
   const control = flowControl
@@ -479,6 +481,16 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
           onClick={() => { onTidy(); window.setTimeout(() => void fitView({ ...FIT_VIEW, duration: 220 }), 30) }}
         >
           <Icon name="auto_awesome_mosaic" size={14} />
+        </button>
+        <button
+          type="button"
+          className={control}
+          title={labelsShown ? 'Hide the label on each arrow' : 'Show the label on each arrow: its lag, and whether it still needs a rationale'}
+          aria-label={labelsShown ? 'Hide arrow labels' : 'Show arrow labels'}
+          aria-pressed={labelsShown}
+          onClick={onToggleLabels}
+        >
+          <Icon name={labelsShown ? 'label' : 'label_off'} size={14} />
         </button>
         <button
           type="button"
@@ -539,7 +551,7 @@ const EXPANDED_CANVAS_LAYER = 'dag-canvas-expanded'
 
 const IDLE_HINT = 'Drag from a card onto another card to draw an arrow; drag a card by its name to move it. Select an arrow to reverse or remove it, or drag either of its ends to another card.'
 
-const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation): {
+const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation, labelsShown: boolean): {
   readonly nodes: CanvasNode[]
   readonly edges: CanvasEdge[]
   /** The size every card is drawn at; a change relays the whole drawing, since kept positions were fitted to the old size. */
@@ -549,7 +561,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
   const placements = new Map(layoutDagForCanvas(document.current.graph, flow === null ? null : { treatment: flow.treatment, outcome: flow.outcome }, orientation, size).map((placed) => [placed.id, placed]))
   const highlighted = evidenceColumns(candidate)
   const validation = document.current.validation
-  const problemEdges = new Set(validation.kind === 'invalid' ? validation.issues.flatMap(affectedDagEdges) : [])
+  const problemEdges = new Set(validation.structure.kind === 'invalid' ? validation.structure.issues.flatMap(affectedDagEdges) : [])
   const latentNodes = new Set(document.current.graph.nodes.filter((node) => node.kind === 'latent').map((node) => node.id))
   const pairKey = (edge: DirectedDagEdge): string => [edge.cause, edge.effect].sort().join('\u0000')
   const pairSizes = new Map<string, number>()
@@ -584,7 +596,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
       source: edge.cause,
       target: edge.effect,
       data: { edge, offset, cut },
-      label: cut ? 'cut by do()' : edgeLabel,
+      label: cut ? 'cut by do()' : labelsShown ? edgeLabel : '',
       // User-space units keep the head 6px long whatever the stroke width, so selection does not swell it.
       markerEnd: { type: MarkerType.ArrowClosed, color: stroke, markerUnits: 'userSpaceOnUse', width: 24, height: 24, strokeWidth: 1 },
       style: {
@@ -665,7 +677,8 @@ export function DagCanvas({
   // The card size is measured from the names, so the model re-runs once the document's fonts have loaded.
   const metricsVersion = useTextMetricsVersion()
   // eslint-disable-next-line react-hooks/exhaustive-deps -- metricsVersion invalidates the measurements the model is built on
-  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, orientation), [document, flow, intervention, orientation, selectedEvidence, metricsVersion])
+  const [labelsShown, setLabelsShown] = useState(false)
+  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, orientation, labelsShown), [document, flow, intervention, orientation, selectedEvidence, metricsVersion, labelsShown])
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(model.nodes)
   // The gesture is read in React Flow's callbacks, which fire from listeners bound at pointer-down, so a ref carries it as well as state.
   const [gesture, setGesture] = useState<Gesture | null>(null)
@@ -933,7 +946,7 @@ export function DagCanvas({
               }}
             />
           )}
-          <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} />
+          <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} labelsShown={labelsShown} onToggleLabels={() => setLabelsShown((shown) => !shown)} />
           <RefitOnResize host={hostRef} layoutKey={bindingKey} />
         </ReactFlow>
         </div>

@@ -235,6 +235,19 @@ export function parseSnapshot(raw: string): Result<PersistedProject, SnapshotPro
 export const taggedJsonReplacer = (_key: string, value: unknown): unknown => (value instanceof Float64Array ? { [F64]: Array.from(value) } : value)
 export const taggedJsonReviver = revive
 
+/** Validation is derived from the graph, so a stored revision's copy is replaced by this build's reading of it. */
+const upgradeDagDocumentRecord = (value: Record<string, unknown>): Record<string, unknown> => {
+  const dataset = Reflect.get(value, 'dataset') as DagDocument['dataset'] | undefined
+  if (dataset === undefined) return value
+  const refresh = (revision: unknown): unknown => {
+    if (revision === null || typeof revision !== 'object') return revision
+    const graph = Reflect.get(revision, 'graph') as EditableDag | undefined
+    return graph === undefined ? revision : { ...revision, validation: inspectDagStructure(graph, dataset) }
+  }
+  const list = (key: string) => (Array.isArray(Reflect.get(value, key)) ? (Reflect.get(value, key) as unknown[]).map(refresh) : Reflect.get(value, key))
+  return { ...value, current: refresh(Reflect.get(value, 'current')), history: list('history'), future: list('future'), audit: list('audit') }
+}
+
 /** Add preparation fields introduced while the version-1 envelope remained stable. */
 const upgradePreparedTransformRecord = (value: ParsedEnvelope['prepared']): Result<ParsedEnvelope['prepared'], SnapshotProblem> => {
   if (value === null || Reflect.get(value, 'kind') !== 'prepared-time-series') return ok(value)
@@ -581,6 +594,7 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
     identifications: identifications as unknown as PersistedProject['identifications'],
     estimationRuns: estimationRuns as unknown as PersistedProject['estimationRuns'],
     survivalRuns: survivalRuns as unknown as PersistedProject['survivalRuns'],
+    dagDocuments: parsed.data.dagDocuments.map((record) => upgradeDagDocumentRecord(record as Record<string, unknown>)) as unknown as PersistedProject['dagDocuments'],
   })
 }
 
@@ -594,3 +608,4 @@ export function describeSnapshotProblem(problem: SnapshotProblem): string {
 }
 import { adjustedDidRecordMatches } from './adjustedDid'
 import { calendarEdgeSchema } from './windowEvidence'
+import { inspectDagStructure, type EditableDag } from './dag'

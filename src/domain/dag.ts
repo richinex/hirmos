@@ -73,7 +73,6 @@ export interface EditableDag {
 }
 
 export type DagStructuralIssue =
-  | { readonly kind: 'no-edges' }
   | { readonly kind: 'duplicate-node'; readonly node: DagNodeId }
   | { readonly kind: 'unknown-endpoint'; readonly edge: DagEdgeId; readonly node: DagNodeId }
   | { readonly kind: 'self-edge'; readonly edge: DagEdgeId; readonly node: DagNodeId }
@@ -82,12 +81,23 @@ export type DagStructuralIssue =
   | { readonly kind: 'temporal-edge-on-cross-section'; readonly edge: DagEdgeId }
   | { readonly kind: 'invalid-lag'; readonly edge: DagEdgeId; readonly lag: number }
   | { readonly kind: 'lag-consumes-sample'; readonly edge: DagEdgeId; readonly lag: number; readonly observations: number }
-  | { readonly kind: 'missing-rationale'; readonly edge: DagEdgeId }
 
-export type DagStructuralValidation =
-  | { readonly kind: 'incomplete'; readonly issues: NonEmptyArray<DagStructuralIssue> }
+/** Whether the graph is a DAG: sound, empty of arrows, or broken by the listed issues. */
+export type DagStructure =
+  | { readonly kind: 'sound' }
+  | { readonly kind: 'empty' }
   | { readonly kind: 'invalid'; readonly issues: NonEmptyArray<DagStructuralIssue> }
-  | { readonly kind: 'structurally-valid' }
+
+/** Whether every arrow has its rationale written. The reader's record; no analysis reads it. */
+export type DagRationales =
+  | { readonly kind: 'complete' }
+  | { readonly kind: 'outstanding'; readonly edges: NonEmptyArray<DagEdgeId> }
+
+/** Two independent facts about a revision, so a gate on structure never has to know about rationales. */
+export interface DagStructuralValidation {
+  readonly structure: DagStructure
+  readonly rationales: DagRationales
+}
 
 export interface DagDraftRevision {
   readonly kind: 'draft'
@@ -226,7 +236,6 @@ export const inspectDagStructure = (
   graph: EditableDag,
   dataset: DagDocument['dataset'],
 ): DagStructuralValidation => {
-  if (graph.edges.length === 0) return { kind: 'incomplete', issues: [{ kind: 'no-edges' }] }
   const issues: DagStructuralIssue[] = []
   const nodes = new Set<DagNodeId>()
   for (const node of graph.nodes) {
@@ -254,11 +263,12 @@ export const inspectDagStructure = (
   }
   const cycle = cycleEdges(graph)
   if (cycle !== null) issues.push({ kind: 'directed-cycle', edges: cycle })
-  if (isNonEmpty(issues)) return { kind: 'invalid', issues }
-  const unstated: DagStructuralIssue[] = graph.edges
-    .filter((edge) => edge.support.kind === 'unstated')
-    .map((edge) => ({ kind: 'missing-rationale', edge: edge.id }))
-  return isNonEmpty(unstated) ? { kind: 'incomplete', issues: unstated } : { kind: 'structurally-valid' }
+  const structure: DagStructure = isNonEmpty(issues)
+    ? { kind: 'invalid', issues }
+    : graph.edges.length === 0 ? { kind: 'empty' } : { kind: 'sound' }
+  const unstated = graph.edges.filter((edge) => edge.support.kind === 'unstated').map((edge) => edge.id)
+  const rationales: DagRationales = isNonEmpty(unstated) ? { kind: 'outstanding', edges: unstated } : { kind: 'complete' }
+  return { structure, rationales }
 }
 
 export const resolveDagOrigin = (
@@ -802,12 +812,12 @@ export function describeDagOrigin(origin: DagOrigin): string {
   }
 }
 
-export function describeDagValidation(kind: DagStructuralValidation['kind']): string {
-  switch (kind) {
-    case 'structurally-valid': return 'structurally valid'
-    case 'incomplete': return 'incomplete'
+export function describeDagValidation(validation: DagStructuralValidation): string {
+  switch (validation.structure.kind) {
     case 'invalid': return 'invalid'
-    default: return assertNever(kind)
+    case 'empty': return 'no arrows'
+    case 'sound': return validation.rationales.kind === 'complete' ? 'structurally valid' : 'structurally valid, rationale outstanding'
+    default: return assertNever(validation.structure)
   }
 }
 

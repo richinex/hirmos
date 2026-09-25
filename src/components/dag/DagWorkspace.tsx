@@ -45,8 +45,7 @@ import {
   type DagVariableEditProblem,
   type DirectedDagEdge,
   type EdgeSupport,
-  type EdgeTiming,
-} from '@/domain/dag'
+  type EdgeTiming, } from '@/domain/dag'
 import { describeDagImportProblem, importOf, planDagImport, type DagImportPlanProblem } from '@/domain/dagImport'
 import {
   discoveryEvidenceReference,
@@ -436,24 +435,22 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
   readonly onSelectEdge: (edge: DagEdgeId) => void
 }) {
   const plan = useMemo(() => planDagImplications(document), [document])
-  const validation = document.current.validation
-  const issues = validation.kind === 'structurally-valid' ? [] : validation.issues
-  const unstated = issues.flatMap((issue) => (issue.kind === 'missing-rationale' ? [issue.edge] : []))
-  const otherIssues = issues.filter((issue) => issue.kind !== 'missing-rationale')
-  const heading = validation.kind === 'structurally-valid'
-    ? 'Acyclic structure'
-    : validation.kind === 'incomplete' && document.current.graph.edges.length > 0
-      ? 'Rationale outstanding'
-      : 'Draft needs attention'
+  const { structure, rationales } = document.current.validation
+  const sound = structure.kind === 'sound'
+  const unstated = rationales.kind === 'outstanding' ? rationales.edges : []
+  const heading = sound
+    ? rationales.kind === 'complete' ? 'Acyclic structure' : 'Rationale outstanding'
+    : 'Draft needs attention'
   return (
     <aside aria-labelledby="dag-validation-title">
       <h3 id="dag-validation-title" className="mb-1 mt-0 text-body font-medium text-ink">Live validation</h3>
-      <p className={`m-0 flex items-center gap-1.5 text-body ${validation.kind === 'structurally-valid' ? 'text-ok' : 'text-warn'}`}>
-        <Icon name={validation.kind === 'structurally-valid' ? 'check_circle' : 'error'} size={16} />{heading}
+      <p className={`m-0 flex items-center gap-1.5 text-body ${sound ? 'text-ok' : 'text-warn'}`}>
+        <Icon name={sound ? 'check_circle' : 'error'} size={16} />{heading}
       </p>
-      {otherIssues.length > 0 && (
+      {structure.kind === 'empty' && <p className="mb-0 mt-3 text-body text-muted">Add at least one arrow.</p>}
+      {structure.kind === 'invalid' && (
         <ul className="mb-0 mt-3 space-y-1.5 pl-4 text-body text-muted">
-          {otherIssues.map((issue, index) => <li key={`${issue.kind}:${index}`}>{describeDagStructuralIssue(issue)}</li>)}
+          {structure.issues.map((issue, index) => <li key={`${issue.kind}:${index}`}>{describeDagStructuralIssue(issue)}</li>)}
         </ul>
       )}
       {unstated.length > 0 && (
@@ -482,7 +479,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
         </div>
       )}
       <div role="group" aria-label="Use this graph" className="mt-3 grid grid-cols-1 auto-rows-fr gap-3 empty:hidden">
-        {validation.kind === 'structurally-valid' && (
+        {sound && (
           <button type="button" className={button('outline')} onClick={onUseForStudy}>Use for study</button>
         )}
         {onUseForRootCause !== null && <button type="button" className={button('outline')} onClick={onUseForRootCause}>Use for causal model analysis</button>}

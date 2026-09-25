@@ -290,15 +290,13 @@ export function inspectDagStudyBinding(
 
 export function affectedDagEdges(issue: DagStructuralIssue): readonly DagEdgeId[] {
   switch (issue.kind) {
-    case 'no-edges':
     case 'duplicate-node': return []
     case 'unknown-endpoint':
     case 'self-edge':
     case 'duplicate-edge':
     case 'temporal-edge-on-cross-section':
     case 'invalid-lag':
-    case 'lag-consumes-sample':
-    case 'missing-rationale': return [issue.edge]
+    case 'lag-consumes-sample': return [issue.edge]
     case 'directed-cycle': return issue.edges
     default: return assertNever(issue)
   }
@@ -306,7 +304,6 @@ export function affectedDagEdges(issue: DagStructuralIssue): readonly DagEdgeId[
 
 export function describeDagStructuralIssue(issue: DagStructuralIssue): string {
   switch (issue.kind) {
-    case 'no-edges': return 'Add at least one arrow.'
     case 'duplicate-node': return 'Two variables share the same graph identity. Rename or remove one variable.'
     case 'unknown-endpoint': return 'An arrow refers to a variable outside this graph revision. Remove the arrow or restore the variable.'
     case 'self-edge': return 'A same-period variable cannot point to itself. Remove the arrow or add a lag.'
@@ -315,7 +312,6 @@ export function describeDagStructuralIssue(issue: DagStructuralIssue): string {
     case 'temporal-edge-on-cross-section': return 'Remove the lagged arrow or prepare the data as a time series.'
     case 'invalid-lag': return `Change lag ${issue.lag} to a positive integer.`
     case 'lag-consumes-sample': return `Lag ${issue.lag} leaves no usable rows from ${issue.observations} rows. Choose a smaller lag.`
-    case 'missing-rationale': return 'An arrow has no rationale. Select it and record the supporting mechanism, design, or external evidence.'
     default: return assertNever(issue)
   }
 }

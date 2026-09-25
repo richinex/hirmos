@@ -38,7 +38,7 @@ export interface ResultManifest {
     readonly revision: DagDocument['current']['id']
     readonly origin: DagDocument['origin']
     readonly graph: DagDocument['current']['graph']
-    readonly validation: DagDocument['current']['validation']['kind']
+    readonly validation: DagDocument['current']['validation']
   } | null
   readonly study: StudySpecification | null
   readonly identification: IdentificationArtifact | null
@@ -91,7 +91,7 @@ export function buildResultManifest(inputs: ResultInputs, run: EstimationRunArti
       revision: document.current.id,
       origin: document.origin,
       graph: document.current.graph,
-      validation: document.current.validation.kind,
+      validation: document.current.validation,
     },
     study,
     identification,

@@ -216,7 +216,7 @@ export function readyStudySpecification(
   const document = documents.find((candidate) => candidate.id === draft.dagDocument)
   if (document === undefined) return err({ kind: 'unknown-dag', document: draft.dagDocument })
   if (document.preparedDataset !== prepared.id) return err({ kind: 'dag-dataset-mismatch', name: document.name })
-  if (document.current.validation.kind !== 'structurally-valid') return err({ kind: 'dag-not-validated', name: document.name })
+  if (document.current.validation.structure.kind !== 'sound') return err({ kind: 'dag-not-validated', name: document.name })
   if (draft.treatment === null) return err({ kind: 'treatment-required' })
   if (draft.outcome === null) return err({ kind: 'outcome-required' })
   const treatmentNode = document.current.graph.nodes.find((node) => node.id === draft.treatment)

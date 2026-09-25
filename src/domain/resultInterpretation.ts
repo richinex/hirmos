@@ -338,7 +338,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}. ${stabilized}` },
         additiveIntervalForOutcome(estimate.interval, study.outcome.name),
-        { kind: 'qualification', text: 'The treatment is taken as normally distributed around its fitted value with constant variance, and the weighted model fits one slope. A skewed treatment or a curved dose response is not represented.' },
+        { kind: 'qualification', text: 'The treatment is taken as normally distributed around its fitted value with constant variance, and the weighted model fits one slope. The analysis does not represent a skewed treatment or a curved dose response.' },
       ] }
     }
     case 'count-glm-run': {

@@ -43,8 +43,8 @@ const revision = (
     }],
   },
   validation: evidenceRun === null
-    ? { kind: 'incomplete', issues: [{ kind: 'no-edges' }] }
-    : { kind: 'incomplete', issues: [{ kind: 'missing-rationale', edge }] },
+    ? { structure: { kind: 'empty' }, rationales: { kind: 'complete' } }
+    : { structure: { kind: 'sound' }, rationales: { kind: 'outstanding', edges: [edge] } },
 })
 
 const document = (

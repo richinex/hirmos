@@ -107,7 +107,7 @@ const estimandHint = (kind: Estimand['kind']): string => {
 /** Whether a variable may define the groups: anything measured that the treatment does not reach. */
 const modifierAllowed = (role: DagCausalRole | null): boolean => role === null || !(role.kind === 'mediator' || role.kind === 'collider' || role.kind === 'post-treatment')
 
-const isValidated = (document: DagDocument): boolean => document.current.validation.kind === 'structurally-valid'
+const isValidated = (document: DagDocument): boolean => document.current.validation.structure.kind === 'sound'
 
 
 /** One line on what each assignment mechanism means for the reader choosing it. */

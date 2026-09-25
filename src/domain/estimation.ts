@@ -2372,7 +2372,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (!timeSeries) violate('causal-effects-time-series', 'A time-series graph needs a regular time series. This prepared dataset holds independent rows.')
       else satisfy('causal-effects-time-series', `Prepared as a regular ${prepared.sampling.frequency} time series.`)
       if (context.document === null) violate('causal-effects-stationary-dag', 'No DAG document is bound to the study.')
-      else if (context.document.current.validation.kind !== 'structurally-valid') violate('causal-effects-stationary-dag', 'The bound DAG revision is not structurally valid.')
+      else if (context.document.current.validation.structure.kind !== 'sound') violate('causal-effects-stationary-dag', 'The bound DAG revision is not structurally valid.')
       else satisfy('causal-effects-stationary-dag', `Stationary DAG read from “${context.document.name}” with its lagged arrows kept.`)
       if (context.stationarity === null) leave('causal-effects-stationarity', 'Run stationarity tests for this prepared dataset version in Data studio.')
       else {
@@ -2598,7 +2598,7 @@ export function causalEstimateFrom(
         effect: { kind: 'additive', value: evidence.estimate, unit: '' },
         // A weighted estimate has no closed-form interval here; the bootstrap supplies one or none.
         interval: evidence.interval === null
-          ? { kind: 'none', reason: 'A weighted estimate has no closed-form interval; add bootstrap rounds for one.' }
+          ? { kind: 'none', reason: 'A weighted estimate has no closed-form confidence interval. Add bootstrap rounds for one.' }
           : { kind: 'confidence', level: evidence.interval.level, lower: evidence.interval.lower, upper: evidence.interval.upper },
         standardError: null,
         adjustment,
@@ -2624,7 +2624,7 @@ export function causalEstimateFrom(
         estimand: study.estimand,
         effect: { kind: 'additive', value: evidence.estimate, unit: '' },
         interval: evidence.interval === null
-          ? { kind: 'none', reason: 'The weighted regression reports a standard error that treats the weights as fixed; add bootstrap rounds for an interval that refits them.' }
+          ? { kind: 'none', reason: 'The standard error takes the weights as known. For a confidence interval that also allows for the weights being estimated, add bootstrap rounds.' }
           : { kind: 'confidence', level: evidence.interval.level, lower: evidence.interval.lower, upper: evidence.interval.upper },
         standardError: evidence.standardError,
         adjustment,

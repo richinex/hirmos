@@ -452,7 +452,7 @@ function App() {
   }
 
   const validatedDag = workflow.kind === 'profiled'
-    && workflow.dagDocuments.some((document) => document.current.validation.kind === 'structurally-valid')
+    && workflow.dagDocuments.some((document) => document.current.validation.structure.kind === 'sound')
   const identifiedStudy = workflow.kind === 'profiled'
     && workflow.identifications.some((identification) => identificationAllowsEstimation(identification.result.kind))
 
@@ -485,7 +485,7 @@ function App() {
       case 'discovery': return !prepared ? 'locked' : workflow.discoveryRuns.length > 0 ? 'done' : 'not-started'
       case 'dag': return !prepared
         ? 'locked'
-        : workflow.dagDocuments.some((document) => document.current.validation.kind === 'structurally-valid')
+        : workflow.dagDocuments.some((document) => document.current.validation.structure.kind === 'sound')
           ? 'done'
           : workflow.dagDocuments.length > 0 ? 'in-progress' : 'not-started'
       case 'study': return !validatedDag || workflow.kind !== 'profiled'

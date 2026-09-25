@@ -60,8 +60,7 @@ export function prepareRootCauseGraph(document: DagDocument, prepared: PreparedD
   if (document.preparedDataset !== prepared.id) return err({ kind: 'different-preparation' })
   const { graph } = document.current
   const validation = inspectDagStructure(graph, document.dataset)
-  if (validation.kind === 'invalid') return err({ kind: 'invalid-graph' })
-  if (validation.kind === 'incomplete' && validation.issues.some((issue) => issue.kind !== 'no-edges')) return err({ kind: 'invalid-graph' })
+  if (validation.structure.kind === 'invalid') return err({ kind: 'invalid-graph' })
 
   const nodes: ObservedDagNode[] = []
   for (const node of graph.nodes) {

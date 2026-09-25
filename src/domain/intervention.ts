@@ -103,7 +103,7 @@ export interface InterventionSpecification {
 
 /** Both nodes chosen, distinct and observed, and the revision structurally valid. */
 export function readyInterventionQuery(document: DagDocument, set: DagNodeId | null, read: DagNodeId | null): Result<InterventionSpecification, InterventionReadinessProblem> {
-  if (document.current.validation.kind === 'invalid') return err({ kind: 'graph-invalid' })
+  if (document.current.validation.structure.kind === 'invalid') return err({ kind: 'graph-invalid' })
   const nodes = document.current.graph.nodes
   if (set === null) return err({ kind: 'set-required' })
   if (read === null) return err({ kind: 'read-required' })
