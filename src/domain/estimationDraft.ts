@@ -3,7 +3,7 @@ import type { ColumnId } from './dataset'
 import { ESTIMATOR_GROUPS, ESTIMATOR_IDS, defaultConfiguration, defaultEstimatorFor, type EstimatorId, type EstimatorConfiguration, type EstimatorGroupId, type EstimationRunArtifact } from './estimation'
 import type { PanelLongMatrix, PanelInterventionLayout, PanelInterventionPreflight } from './panel'
 import type { PreparedDatasetArtifact, PreparedDatasetVersionId } from './preprocessing'
-import { estimableIdentification, type IdentificationId, type IdentificationArtifact, type StudySpecification } from './study'
+import { estimableIdentification, type CovariateEncoding, type IdentificationId, type IdentificationArtifact, type StudySpecification } from './study'
 import type { Workflow } from './workflow'
 
 export const estimatorGroupFor = (estimator: EstimatorId) =>
@@ -41,6 +41,8 @@ export interface EstimationSelection {
   readonly identification: IdentificationId | null
   readonly estimator: EstimatorId
   readonly configurations: Readonly<Record<EstimatorId, EstimatorConfiguration>>
+  /** Columns left out of this record are numeric. */
+  readonly encodings: Readonly<Record<ColumnId, CovariateEncoding>>
 }
 
 export const estimationSelection = (identification: IdentificationArtifact | null, studies: readonly StudySpecification[], prepared: PreparedDatasetArtifact): EstimationSelection => {
@@ -49,6 +51,7 @@ export const estimationSelection = (identification: IdentificationArtifact | nul
     identification: identification?.id ?? null,
     estimator: defaultEstimatorFor(identification?.result ?? null, prepared, study),
     configurations: Object.fromEntries(ESTIMATOR_IDS.map((estimator) => [estimator, defaultConfiguration(estimator, prepared, study)])) as Record<EstimatorId, EstimatorConfiguration>,
+    encodings: {},
   }
 }
 
@@ -63,6 +66,7 @@ export type EstimationEvent =
   | { readonly type: 'group-chosen'; readonly group: EstimatorGroupId }
   | { readonly type: 'estimator-chosen'; readonly estimator: EstimatorId }
   | { readonly type: 'configured'; readonly configuration: EstimatorConfiguration }
+  | { readonly type: 'encoding-declared'; readonly column: ColumnId; readonly encoding: CovariateEncoding }
   | { readonly type: 'panel-preflight-not-required' }
   | { readonly type: 'panel-preflight-started'; readonly binding: PanelBinding }
   | { readonly type: 'panel-preflight-succeeded'; readonly binding: PanelBinding; readonly matrix: PanelLongMatrix; readonly layout: PanelInterventionLayout }
@@ -78,6 +82,7 @@ export const stepEstimationDraft = (state: EstimationDraft, event: EstimationEve
     case 'group-chosen': return { ...state, group: event.group }
     case 'estimator-chosen': return { ...state, estimator: event.estimator, group: estimatorGroupFor(event.estimator).id }
     case 'configured': return { ...state, configurations: { ...state.configurations, [event.configuration.kind]: event.configuration } }
+    case 'encoding-declared': return { ...state, encodings: { ...state.encodings, [event.column]: event.encoding } }
     case 'panel-preflight-not-required': return { ...state, panelPreflight: { kind: 'not-required' } }
     case 'panel-preflight-started': return { ...state, panelPreflight: { kind: 'loading', binding: event.binding } }
     case 'panel-preflight-succeeded': return state.panelPreflight.kind === 'loading' && samePanelBinding(state.panelPreflight.binding, event.binding)
@@ -117,6 +122,7 @@ export function initialEstimationDraft(prepared: PreparedDatasetArtifact, studie
   return {
     ...selection, estimator, group: estimatorGroupFor(estimator).id,
     configurations: latest !== null && recorded !== null ? { ...selection.configurations, [latest.configuration.kind]: latest.configuration } : selection.configurations,
+    encodings: latest !== null && recorded !== null ? latest.encodings : selection.encodings,
     panelPreflight: { kind: 'not-required' }, studyDataPreflight: { kind: 'not-required' },
   }
 }

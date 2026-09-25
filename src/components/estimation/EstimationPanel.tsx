@@ -28,10 +28,14 @@ import { LagListField } from '@/components/ui/LagListField'
 import { memo, useEffect, useMemo, useState } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
+import type { VisibleWindow } from '@/charts/window'
+import type { BoostedTreatmentModel, PropensityTreatmentModel } from '@/workers/analysisProtocol'
 import { histogramOption } from '@/charts/data/histogram'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
 import { impactPathOption } from '@/charts/estimation/impactPath'
 import { posteriorDensityOption } from '@/charts/estimation/posteriorDensity'
+import { propensityDistributionOption } from '@/charts/estimation/propensityOverlap'
+import { propensityWeightOption } from '@/charts/estimation/propensityWeights'
 import { runComparisonOption, type RunComparisonRow } from '@/charts/estimation/runComparison'
 import { useChartTheme } from '@/charts/theme'
 import { EligibilityView } from '@/components/EligibilityView'
@@ -53,6 +57,8 @@ import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, isNonEmpty, mapNonEmpty, type NonEmptyArray } from '@/domain/dop'
+import { describeDesignExpansionProblem, designLayouts, expandDesign, expandsDesign } from '@/domain/designMatrix'
+import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
 import { ArmaUncertaintyAlert } from './ArmaUncertaintyAlert'
 import {
@@ -62,10 +68,14 @@ import {
   boundsReading,
   causalEstimateFrom,
   contemporaneousAdjustmentVariables,
+  type PropensityUncertainty,
   describeCovariance,
   describeDiscreteStatePreparations,
   describeEstimator,
   describeInstrumentalVariableRoute, dmlNuisanceInputs,
+  boostedCommand,
+  effectiveSampleSize,
+  type BoostedTreatmentModelChoice,
   ESTIMATOR_GROUPS,
   evaluateEstimatorEligibility,
   headlineValue,
@@ -86,6 +96,7 @@ import {
   type EstimatorGroupId,
   type EstimatorId,
   type TotalEffectEstimator,
+  type TreatmentModelEvidence,
 } from '@/domain/estimation'
 import { ESTIMATION_METHODS, methodDefinition, type MethodEligibility } from '@/domain/methods'
 import { describeSeriesTransform, frequencyUnit, seriesTransformFor, type PreparedDatasetArtifact, type StationarityEvidenceArtifact } from '@/domain/preprocessing'
@@ -111,6 +122,7 @@ const VECM_TERMS = [['n', 'None'], ['co', 'Constant outside'], ['ci', 'Constant 
 
 const ESTIMATOR_GROUP_LABELS: Readonly<Record<EstimatorGroupId, string>> = {
   'adjusted-outcome': 'Adjustment',
+  'propensity-score': 'Propensity score',
   'identified-functional': 'Identified',
   'graph-adjusted-temporal': 'Temporal graph',
   'dynamic-time-series': 'Count intervention',
@@ -316,6 +328,22 @@ function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
     </>
   )
 }
+
+const treatmentModelTiles = (model: TreatmentModelEvidence): readonly { readonly label: string; readonly value: Formatted; readonly context?: React.ReactNode }[] =>
+  model.kind === 'logistic'
+    ? [{ label: 'Treatment model', value: formatWords(model.converged ? 'Converged' : 'Stopped early'), context: `${formatCount(model.parameters).text} parameters` }]
+    : [
+      {
+        label: 'Treatment model',
+        value: formatWords(model.crossFitted ? 'Boosted, cross-fitted' : 'Boosted trees'),
+        context: <Metadata><span>learning rate {model.learningRate}</span><span>depth {model.maxDepth}</span><span>{formatCount(model.nEstimators).text} trees</span></Metadata>,
+      },
+      {
+        label: 'Search',
+        value: formatStatistic('score', model.validationAuc),
+        context: <Metadata><span>held-out ROC AUC</span><span>{formatCount(model.candidates).text} candidates</span><span>fitted {formatStatistic('score', model.fittedAuc).text}</span></Metadata>,
+      },
+    ]
 
 function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   const tiles = ((): readonly { readonly label: string; readonly value: Formatted; readonly context?: React.ReactNode }[] => {
@@ -532,6 +560,41 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
             : [{ label: 'Log likelihood', value: formatStatistic('raw', evidence.logLikelihood), context: `${formatCount(evidence.controls.length).text} controls` }]),
         ]
       }
+      case 'propensity-weighting-run': {
+        const { evidence } = run
+        const sampleSize = effectiveSampleSize(evidence.weights, evidence.treated)
+        return [
+          { label: 'Treated mean', value: formatStatistic('raw', evidence.treatedMean), context: `${formatCount(evidence.treatedRows).text} treated rows` },
+          { label: 'Control mean', value: formatStatistic('raw', evidence.controlMean), context: `${formatCount(evidence.controlRows).text} control rows` },
+          { label: 'Weight sums', value: formatWords(`${evidence.treatedWeightSum.toFixed(0)} treated, ${evidence.controlWeightSum.toFixed(0)} control`), context: 'the total weight each arm carries' },
+          { label: 'Effective sample size', value: formatWords(`${sampleSize.treated.toFixed(0)} treated, ${sampleSize.control.toFixed(0)} control`), context: 'well below the rows in each arm means a few rows carry the result' },
+          ...treatmentModelTiles(evidence.treatmentModel),
+        ]
+      }
+      case 'propensity-matching-run': {
+        const { evidence } = run
+        return [
+          { label: 'Paired rows', value: formatCount(evidence.matches.length), context: 'one nearest neighbour from the other arm for every row' },
+          { label: 'Arms', value: formatWords(`${evidence.treatedRows} treated, ${evidence.controlRows} control`), context: 'pairs are averaged over every row' },
+          ...treatmentModelTiles(evidence.treatmentModel),
+        ]
+      }
+      case 'doubly-robust-run': {
+        const { evidence } = run
+        return [
+          { label: 'Treated term', value: formatStatistic('raw', evidence.treatedTerm), context: 'weighted residual plus the fitted outcome under treatment' },
+          { label: 'Control term', value: formatStatistic('raw', evidence.controlTerm), context: 'the same under no treatment' },
+          { label: 'Treatment model', value: formatWords(evidence.converged ? 'Converged' : 'Stopped early'), context: `${formatCount(evidence.parameters).text} parameters` },
+        ]
+      }
+      case 'continuous-gps-run': {
+        const { evidence } = run
+        return [
+          { label: 'Weight sum', value: formatStatistic('raw', evidence.weightSum), context: `stabilized weights sum to about the ${formatCount(evidence.observations).text} rows` },
+          { label: 'Residual scale', value: formatStatistic('raw', evidence.residualScale), context: 'the spread of the treatment around its fitted value' },
+          { label: 'Intercept', value: formatStatistic('raw', evidence.intercept), context: `${formatCount(evidence.treatmentParams.length).text} treatment-model parameters` },
+        ]
+      }
       default: return assertNever(run)
     }
   })()
@@ -549,6 +612,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   // whenever it accepted them, so the two tiles would print one value twice and leave the grid's last
   // row part-filled. Keep the one tile and let it carry how the set was chosen.
   const restated = tiles.find((tile) => tile.label === 'Adjustment set' && tile.value.text === adjustmentValue.text)
+  const declaredCategorical = run.columns
+    .filter((column) => run.encodings[column.column]?.kind === 'categorical')
+    .map((column) => column.name)
 
   return (
     <MetricGrid className="mt-4" label="Diagnostics">
@@ -557,7 +623,11 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         size="compact"
         frame="cell"
         value={adjustmentValue}
-        context={run.kind === 'panel-intervention-run' ? 'This design does not use a DAG adjustment set.' : restated?.context}
+        context={run.kind === 'panel-intervention-run'
+          ? 'This design does not use a DAG adjustment set.'
+          : declaredCategorical.length > 0
+            ? `Categorical: ${declaredCategorical.join(', ')}. One column per level.`
+            : restated?.context}
       />
       {tiles.filter((tile) => tile !== restated).map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </MetricGrid>
@@ -598,6 +668,28 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
       hdiUpper: run.evidence.hdiUpper,
     }, theme)
     : null), [run, study.outcome.name, study.treatment.name, theme])
+  const overlap = useMemo(() => {
+    const scored = run.kind === 'propensity-weighting-run' || run.kind === 'propensity-matching-run' || run.kind === 'doubly-robust-run'
+    if (!scored) return null
+    return propensityDistributionOption({
+      treatment: study.treatment.name,
+      propensity: run.evidence.propensity,
+      treated: run.evidence.treated,
+      weights: run.kind === 'propensity-weighting-run' ? run.evidence.weights : undefined,
+    }, theme)
+  }, [run, study.treatment.name, theme])
+  const overlapPanels = run.kind === 'propensity-weighting-run' ? 2 : 1
+  const weightScatter = useMemo(() => run.kind !== 'propensity-weighting-run'
+    ? null
+    : propensityWeightOption({
+      treatment: study.treatment.name,
+      outcomeName: study.outcome.name,
+      propensity: run.evidence.propensity,
+      treated: run.evidence.treated,
+      weights: run.evidence.weights,
+      outcome: run.evidence.outcome,
+    }, theme), [run, study.outcome.name, study.treatment.name, theme])
+  const [scoreWindow, setScoreWindow] = useState<VisibleWindow | null>(null)
   const [chosenCurve, setChosenCurve] = useState(0)
   const curves = run.kind === 'bayesian-gaussian-run' ? run.evidence.curves ?? [] : []
   const curveIndex = Math.min(chosenCurve, Math.max(0, curves.length - 1))
@@ -634,6 +726,16 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
       {groupChart !== null && estimate.effect.kind === 'byGroup' && (
         <div className="mt-3">
           <ExpandableChart option={groupChart} label={`Effect of ${study.treatment.name} on ${study.outcome.name} by group of ${estimate.effect.modifier}`} className="h-[220px]" testId="group-effects" />
+        </div>
+      )}
+      {overlap !== null && (
+        <div className="mt-3">
+          <ExpandableChart option={overlap} window={scoreWindow} onWindow={setScoreWindow} label={`Fitted propensity score for ${study.treatment.name} by arm`} className={overlapPanels === 1 ? 'h-[240px]' : 'h-[480px]'} testId="propensity-overlap" />
+        </div>
+      )}
+      {weightScatter !== null && (
+        <div className="mt-3">
+          <ExpandableChart option={weightScatter} window={scoreWindow} onWindow={setScoreWindow} label={`${study.outcome.name} against the fitted propensity score, each row at its weight`} className="h-[300px]" testId="propensity-weights" />
         </div>
       )}
       {rowChart !== null && (
@@ -911,7 +1013,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return matrix.value
       }
       const columnAt = (values: Float64Array, rows: number, index: number): number[] => Array.from(values.subarray(index * rows, (index + 1) * rows))
-      const identity = { id: newEstimationRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), eligibility } as const
+      const identity = { id: newEstimationRunId(), study: study.id, identification: identification.id, preparedDataset: prepared.id, createdAt: new Date().toISOString(), eligibility, encodings: state.encodings } as const
       const finish = (run: EstimationRunArtifact | null, detail: string) => {
         if (!session.current(current)) return
         if (run === null) { dispatch({ type: 'run-failed', detail }); return }
@@ -1020,8 +1122,10 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         case 'backdoor-linear-regression': {
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
           const matrix = await materialise(columns)
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
           const errorModel: LinearErrorModel = configuration.errors.kind === 'arma' ? { kind: 'arma', p: configuration.errors.p, q: configuration.errors.q, maxIter: configuration.errors.maxIter } : { kind: 'neweyWest' }
-          const evidence = await analysis.runBackdoorLinear(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), hacMaxLags: null, level: configuration.level, errorModel })
+          const evidence = await analysis.runBackdoorLinear(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), hacMaxLags: null, level: configuration.level, errorModel })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'backdoor-linear-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1040,7 +1144,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             : study.estimand.grouping.kind === 'levels'
               ? { kind: 'levels', column: columns.findIndex((variable) => variable.column === modifier?.column) }
               : { kind: 'quantiles', column: columns.findIndex((variable) => variable.column === modifier?.column), bins: study.estimand.grouping.bins }
-          const evidence = await analysis.runDoubleMl(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: nuisance.map((_, index) => index + 2), model: configuration.kind === 'dml-plr' ? 'plr' : 'irm', att: configuration.kind === 'dml-irm' && configuration.att, seed: configuration.seed, groups })
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
+          const evidence = await analysis.runDoubleMl(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), model: configuration.kind === 'dml-plr' ? 'plr' : 'irm', att: configuration.kind === 'dml-irm' && configuration.att, seed: configuration.seed, groups })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'double-ml-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1052,7 +1158,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...inputs]
           const matrix = await materialise(columns)
           if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the T-learner fits one outcome model per arm and needs a 0/1 treatment.` }); return }
-          const evidence = await analysis.runTLearner(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: inputs.map((_, index) => index + 2), seed: configuration.seed, uncertainty: configuration.uncertainty })
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
+          const evidence = await analysis.runTLearner(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), seed: configuration.seed, uncertainty: configuration.uncertainty })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 't-learner-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1171,7 +1279,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
           const matrix = await materialise(columns)
           if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the Gaussian model needs a 0/1 treatment.` }); return }
-          const evidence = await analysis.runBayesianGaussian(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
+          const evidence = await analysis.runBayesianGaussian(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'bayesian-gaussian-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1205,7 +1315,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const matrix = await materialise(columns)
           const outcome = columnAt(matrix.values, matrix.rowCount, 1)
           if (outcome.some((value) => value < 0 || !Number.isInteger(value))) { dispatch({ type: 'run-failed', detail: `${study.outcome.name} is not a count: it holds negative or fractional values.` }); return }
-          const evidence = await analysis.runCountGlm(matrix.values, matrix.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment: identification.result.adjustment.variables.map((_, index) => index + 2), family: configuration.kind === 'poisson-glm' ? 'poisson' : 'negativeBinomial' })
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
+          const evidence = await analysis.runCountGlm(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), family: configuration.kind === 'poisson-glm' ? 'poisson' : 'negativeBinomial' })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'count-glm-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1314,6 +1426,70 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The impact run produced no post-intervention rows.')
           return
         }
+        case 'propensity-weighting':
+        case 'propensity-matching':
+        case 'doubly-robust': {
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
+          const matrix = await materialise(columns)
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
+          const shared = { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat() }
+          const logistic = configuration.model === 'lbfgsb'
+            ? { kind: 'lbfgsb', maxIter: configuration.maxIter } as const
+            : { kind: 'newton' } as const
+          const drawn = (uncertainty: PropensityUncertainty) => uncertainty.kind === 'none'
+            ? null
+            : { rounds: uncertainty.rounds, seed: uncertainty.seed, level: uncertainty.level }
+          const treatmentModel = (chosen: BoostedTreatmentModelChoice): PropensityTreatmentModel =>
+            configuration.model === 'boosted'
+              ? { kind: 'boosted', model: boostedCommand(chosen) }
+              : { kind: 'logistic', model: logistic }
+          const record = (run: Parameters<typeof causalEstimateFrom>[2]) => {
+            const estimate = causalEstimateFrom(study, identification, run)
+            finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact,
+              'The identification is no longer identified.')
+          }
+          if (configuration.kind === 'propensity-weighting') {
+            const fit = configuration.model === 'boosted'
+              ? { kind: 'boosted', model: boostedCommand(configuration.boosted) } as const
+              : { kind: 'logistic', model: logistic, bootstrap: drawn(configuration.uncertainty) } as const
+            const evidence = await analysis.runPropensityWeighting(design.value.values, matrix.rowCount, design.value.columnCount,
+              { ...shared, scale: configuration.scale, fit })
+            if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+            record({ kind: 'propensity-weighting-run', configuration, evidence: evidence.value })
+            return
+          }
+          if (configuration.kind === 'propensity-matching') {
+            const evidence = await analysis.runPropensityMatching(design.value.values, matrix.rowCount, design.value.columnCount,
+              { ...shared, model: treatmentModel(configuration.boosted) })
+            if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+            record({ kind: 'propensity-matching-run', configuration, evidence: evidence.value })
+            return
+          }
+          const evidence = await analysis.runDoublyRobust(design.value.values, matrix.rowCount, design.value.columnCount,
+            { ...shared, model: logistic, bootstrap: drawn(configuration.uncertainty) })
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+          record({ kind: 'doubly-robust-run', configuration, evidence: evidence.value })
+          return
+        }
+        case 'continuous-gps': {
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
+          const matrix = await materialise(columns)
+          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
+          const evidence = await analysis.runContinuousGps(design.value.values, matrix.rowCount, design.value.columnCount, {
+            treatment: 0, outcome: 1,
+            adjustment: design.value.expanded.slice(2).flat(),
+            scale: configuration.scale,
+            bootstrap: configuration.uncertainty.kind === 'none' ? null
+              : { rounds: configuration.uncertainty.rounds, seed: configuration.uncertainty.seed, level: configuration.uncertainty.level },
+          })
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+          const run = { kind: 'continuous-gps-run', configuration, evidence: evidence.value } as const
+          const estimate = causalEstimateFrom(study, identification, run)
+          finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
+          return
+        }
         default:
           return assertNever(configuration)
       }
@@ -1387,6 +1563,102 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity chapter repeats this fit at the same seed before its refuters.</p>
           </div>
         )
+      case 'propensity-weighting':
+      case 'propensity-matching':
+      case 'doubly-robust': {
+        return (
+          <div className="grid gap-4">
+            <fieldset className="m-0 border-0 p-0">
+              <legend className={fieldLabel}>1. Fit the propensity score</legend>
+              <div className="mt-1 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+                <div>
+                  <ParameterLabel className={fieldHint} label="Treatment model" help={ESTIMATION_PARAMETER_HELP.propensity.treatmentModel} />
+                  <SegmentedControl className="mt-1" fill ariaLabel="Treatment model" value={configuration.model}
+                    options={configuration.kind === 'doubly-robust'
+                      ? [{ value: 'newton', label: 'Newton' }, { value: 'lbfgsb', label: 'L-BFGS-B' }]
+                      : [{ value: 'newton', label: 'Newton' }, { value: 'lbfgsb', label: 'L-BFGS-B' }, { value: 'boosted', label: 'Boosted' }]}
+                    onChange={(model) => configure(configuration.kind === 'doubly-robust'
+                      ? { ...configuration, model: model === 'newton' ? 'newton' : 'lbfgsb' }
+                      : { ...configuration, model: model === 'newton' || model === 'lbfgsb' || model === 'boosted' ? model : 'newton' })} />
+                </div>
+                {configuration.model === 'lbfgsb' && (
+                  <label className="block"><ParameterLabel className={fieldHint} label="Iteration limit" help={ESTIMATION_PARAMETER_HELP.propensity.maxIter} /><input type="number" min={1} max={100000} aria-label="Iteration limit" className={field('text', 'mt-1 w-full')} value={configuration.maxIter} onChange={(event) => configure({ ...configuration, maxIter: Math.max(1, Math.min(100000, Math.floor(Number(event.target.value) || 1))) })} /></label>
+                )}
+                {configuration.kind !== 'doubly-robust' && configuration.model === 'boosted' && <>
+                  <div>
+                    <ParameterLabel className={fieldHint} label="Scoring" help={ESTIMATION_PARAMETER_HELP.propensity.crossFitted} />
+                    <SegmentedControl className="mt-1" fill ariaLabel="Scoring" value={configuration.boosted.crossFitted ? 'crossFitted' : 'inSample'}
+                      options={[{ value: 'inSample', label: 'One model' }, { value: 'crossFitted', label: 'Cross-fitted' }]}
+                      onChange={(scoring) => configure({ ...configuration, boosted: { ...configuration.boosted, crossFitted: scoring === 'crossFitted' } })} />
+                  </div>
+                  <label className="block"><ParameterLabel className={fieldHint} label="Search folds" help={ESTIMATION_PARAMETER_HELP.propensity.splits} /><input type="number" min={2} max={20} aria-label="Search folds" className={field('text', 'mt-1 w-full')} value={configuration.boosted.splits} onChange={(event) => configure({ ...configuration, boosted: { ...configuration.boosted, splits: Math.max(2, Math.min(20, Math.floor(Number(event.target.value) || 2))) } })} /></label>
+                  <label className="block"><ParameterLabel className={fieldHint} label="Tree seed" help={ESTIMATION_PARAMETER_HELP.propensity.treeSeed} /><input type="number" min={0} max={4294967295} aria-label="Tree seed" className={field('text', 'mt-1 w-full')} value={configuration.boosted.seed} onChange={(event) => configure({ ...configuration, boosted: { ...configuration.boosted, seed: Math.max(0, Math.min(4294967295, Math.floor(Number(event.target.value) || 0))) } })} /></label>
+                </>}
+              </div>
+            </fieldset>
+            {configuration.kind === 'propensity-weighting' && (
+              <fieldset className="m-0 border-0 p-0">
+                <legend className={fieldLabel}>2. Weight the sample</legend>
+                <div className="mt-1 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+                  <div>
+                    <ParameterLabel className={fieldHint} label="Weights" help={ESTIMATION_PARAMETER_HELP.propensity.scale} />
+                    <SegmentedControl className="mt-1" fill ariaLabel="Weights" value={configuration.scale}
+                      options={[{ value: 'inverseProbability', label: 'Inverse probability' }, { value: 'stabilized', label: 'Stabilized' }]}
+                      onChange={(scale) => configure({ ...configuration, scale: scale === 'stabilized' ? 'stabilized' : 'inverseProbability' })} />
+                  </div>
+                </div>
+              </fieldset>
+            )}
+            {configuration.kind !== 'propensity-matching' && configuration.model !== 'boosted' && (
+              <fieldset className="m-0 border-0 p-0">
+                <legend className={fieldLabel}>{configuration.kind === 'propensity-weighting' ? '3. Report uncertainty' : '2. Report uncertainty'}</legend>
+                <div className="mt-1 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+                  <div>
+                    <ParameterLabel className={fieldHint} label="Uncertainty" help={ESTIMATION_PARAMETER_HELP.propensity.uncertainty} />
+                    <SegmentedControl className="mt-1" fill ariaLabel="Interval" value={configuration.uncertainty.kind}
+                      options={[{ value: 'none', label: 'Point estimate' }, { value: 'bootstrap', label: 'Bootstrap interval' }]}
+                      onChange={(kind) => configure({ ...configuration, uncertainty: kind === 'none' ? { kind: 'none' } : { kind: 'bootstrap', rounds: 200, seed: 123, level: 0.95 } })} />
+                  </div>
+                  {configuration.uncertainty.kind === 'bootstrap' && <>
+                    <label className="block"><span className={fieldHint}>Bootstrap rounds</span><input className={field('text', 'mt-1 w-full')} aria-label="Bootstrap rounds" type="number" min={2} max={2000} value={configuration.uncertainty.rounds} onChange={(event) => configure({ ...configuration, uncertainty: { kind: 'bootstrap', rounds: Math.min(2000, Math.max(2, Math.floor(Number(event.target.value) || 2))), seed: configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.seed : 123, level: configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.level : 0.95 } })} /></label>
+                    <label className="block"><span className={fieldHint}>Bootstrap seed</span><input className={field('text', 'mt-1 w-full')} aria-label="Bootstrap seed" type="number" min={0} max={4294967295} value={configuration.uncertainty.seed} onChange={(event) => configure({ ...configuration, uncertainty: { kind: 'bootstrap', rounds: configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.rounds : 200, seed: Math.min(4294967295, Math.max(0, Math.floor(Number(event.target.value) || 0))), level: configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.level : 0.95 } })} /></label>
+                    <div><span className={fieldHint}>Confidence level</span><SegmentedControl className="mt-1" fill ariaLabel="Confidence level" value={String(configuration.uncertainty.level)} options={[{ value: '0.9', label: '90%' }, { value: '0.95', label: '95%' }, { value: '0.99', label: '99%' }]} onChange={(level) => configure({ ...configuration, uncertainty: { kind: 'bootstrap', rounds: configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.rounds : 200, seed: configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.seed : 123, level: Number(level) } })} /></div>
+                  </>}
+                </div>
+              </fieldset>
+            )}
+            <p className={prose('m-0 text-faint')}>
+              {`The score is fitted on the identified adjustment set as supplied. Declare categorical covariates before the run, and read the fitted scores with the result: a score at zero or one leaves a row with no counterpart in the other arm.${configuration.model === 'boosted' ? ` The search scores ${configuration.boosted.learningRate.length * configuration.boosted.maxDepth.length * configuration.boosted.nEstimators.length} candidates by held-out ROC AUC across ${configuration.boosted.splits} folds, then refits the one it chose, and reports no bootstrap interval.` : ''}`}
+            </p>
+          </div>
+        )
+      }
+      case 'continuous-gps': {
+        const drawnRounds = configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.rounds : 200
+        const drawnSeed = configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.seed : 123
+        const drawnLevel = configuration.uncertainty.kind === 'bootstrap' ? configuration.uncertainty.level : 0.95
+        return (
+          <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            <div>
+              <ParameterLabel className={fieldLabel} label="Weights" help={ESTIMATION_PARAMETER_HELP.propensity.gpsScale} />
+              <SegmentedControl className="mt-1" fill ariaLabel="Weights" value={configuration.scale}
+                options={[{ value: 'inverseDensity', label: 'Inverse density' }, { value: 'stabilized', label: 'Stabilized' }]}
+                onChange={(scale) => configure({ ...configuration, scale: scale === 'stabilized' ? 'stabilized' : 'inverseDensity' })} />
+            </div>
+            <div>
+              <span className={fieldLabel}>Uncertainty</span>
+              <SegmentedControl className="mt-1" fill ariaLabel="Interval" value={configuration.uncertainty.kind}
+                options={[{ value: 'none', label: 'Point estimate' }, { value: 'bootstrap', label: 'Bootstrap interval' }]}
+                onChange={(kind) => configure({ ...configuration, uncertainty: kind === 'none' ? { kind: 'none' } : { kind: 'bootstrap', rounds: 200, seed: 123, level: 0.95 } })} />
+            </div>
+            {configuration.uncertainty.kind === 'bootstrap' && <>
+              <label className="block"><span className={fieldLabel}>Bootstrap rounds</span><input className={field('text', 'mt-1')} aria-label="Bootstrap rounds" type="number" min={2} max={2000} value={configuration.uncertainty.rounds} onChange={(event) => configure({ ...configuration, uncertainty: { kind: 'bootstrap', rounds: Math.min(2000, Math.max(2, Math.floor(Number(event.target.value) || 2))), seed: drawnSeed, level: drawnLevel } })} /></label>
+              <label className="block"><span className={fieldLabel}>Bootstrap seed</span><input className={field('text', 'mt-1')} aria-label="Bootstrap seed" type="number" min={0} max={4294967295} value={configuration.uncertainty.seed} onChange={(event) => configure({ ...configuration, uncertainty: { kind: 'bootstrap', rounds: drawnRounds, seed: Math.min(4294967295, Math.max(0, Math.floor(Number(event.target.value) || 0))), level: drawnLevel } })} /></label>
+            </>}
+            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>The treatment is regressed on the adjustment set and taken as normal around its fitted value with constant variance. The weighted model fits one slope, so the result is a single treatment response rather than a curve.</p>
+          </div>
+        )
+      }
       case 't-learner':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
@@ -1739,6 +2011,25 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 {selectedEstimatorIsVisible && method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>
               {selectedEstimatorIsVisible && <div>{controls}</div>}
+              {selectedEstimatorIsVisible && expandsDesign(state.estimator) && identification !== null
+                && identification.result.kind === 'identified'
+                && identification.result.adjustment.variables.length > 0 && (
+                <ColumnChecklist
+                  title="Categorical covariates"
+                  help="Tick the covariates whose values are categories rather than quantities. A ticked covariate becomes one column per level instead of one numeric column."
+                  columns={identification.result.adjustment.variables.map((variable) => ({ id: variable.column, name: variable.name }))}
+                  selected={identification.result.adjustment.variables
+                    .filter((variable) => state.encodings[variable.column]?.kind === 'categorical')
+                    .map((variable) => variable.column)}
+                  onChange={(selected) => {
+                    for (const variable of identification.result.kind === 'identified' ? identification.result.adjustment.variables : []) {
+                      const encoding = selected.includes(variable.column) ? 'categorical' as const : 'numeric' as const
+                      if ((state.encodings[variable.column]?.kind ?? 'numeric') !== encoding) {
+                        dispatch({ type: 'encoding-declared', column: variable.column, encoding: { kind: encoding } })
+                      }
+                    }
+                  }} />
+              )}
             </div>
             {selectedEstimatorIsVisible && eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {studyDataError !== null && <Alert tone="danger" className="mt-3"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}

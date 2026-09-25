@@ -40,7 +40,7 @@ fn arange(start: f64, stop: f64, step: f64) -> Vec<f64> {
 /// _infer_default_kappa_t with binary_flip: logistic flip fractions per zeroed column.
 pub fn infer_kappa_t(occ: &[Vec<f64>], t: &[f64]) -> Vec<f64> {
     let scaled = standardize(occ);
-    let model = fit_logistic(&scaled, t);
+    let model = fit_logistic(&scaled, t, crate::logistic::SKLEARN_DEFAULT_MAX_ITER);
     let base = model.predict(&scaled);
     let n = t.len();
     let p = occ[0].len();

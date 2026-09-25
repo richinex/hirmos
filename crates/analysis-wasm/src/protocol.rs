@@ -1264,6 +1264,41 @@ pub(crate) enum AnalysisCommand {
         /// The error process beside the Newey-West interval: none, or an ARMA fitted by maximum likelihood.
         error_model: LinearErrorModel,
     },
+    PropensityWeighting {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        scale: PropensityWeightScale,
+        fit: WeightingFit,
+    },
+    PropensityMatching {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        model: PropensityModel,
+    },
+    DoublyRobust {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        model: LogisticModel,
+        bootstrap: Option<PropensityBootstrapRequest>,
+    },
+    ContinuousGps {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        scale: GpsWeightScale,
+        bootstrap: Option<PropensityBootstrapRequest>,
+    },
     FrontdoorTwoStage {
         rows: usize,
         columns: usize,
@@ -1657,6 +1692,113 @@ pub(crate) enum IngarchInterventionSchedule {
     Point,
     Persistent,
     Decaying { delta: f64 },
+}
+
+/// A percentile interval over refitted rounds, with the rounds that stopped early named rather
+/// than hidden.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PropensityIntervalEvidence {
+    pub(crate) lower: f64,
+    pub(crate) upper: f64,
+    pub(crate) rounds: usize,
+    pub(crate) level: f64,
+    pub(crate) unconverged: Vec<usize>,
+}
+
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PropensityBootstrapRequest {
+    pub(crate) rounds: usize,
+    pub(crate) seed: u32,
+    pub(crate) level: f64,
+}
+
+/// Which treatment model fits the propensity score. statsmodels and sklearn do not agree to
+/// better than their own convergence, so the choice is the reader's rather than an implementation
+/// detail.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum LogisticModel {
+    /// statsmodels `Logit`, Newton-Raphson over a LAPACK solve.
+    Newton,
+    /// sklearn `LogisticRegression(penalty=None)`.
+    Lbfgsb { max_iter: usize },
+}
+
+/// A boosted treatment model: a `GridSearchCV` over the tree grid scored by ROC AUC, then the
+/// chosen candidate refitted on the whole sample.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BoostedTreatmentModel {
+    pub(crate) learning_rate: Vec<f64>,
+    pub(crate) max_depth: Vec<usize>,
+    pub(crate) n_estimators: Vec<usize>,
+    pub(crate) splits: usize,
+    pub(crate) min_samples_leaf: usize,
+    pub(crate) min_samples_split: usize,
+    pub(crate) seed: u32,
+    /// Score every row with a model fitted on the half that did not contain it.
+    pub(crate) cross_fitted: bool,
+}
+
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum PropensityModel {
+    Logistic { model: LogisticModel },
+    Boosted { model: BoostedTreatmentModel },
+}
+
+/// A bootstrap refits the treatment model on every replicate, which the kernels support for a
+/// logistic fit alone. The request sits inside that variant, so the other case cannot carry one.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum WeightingFit {
+    Logistic {
+        model: LogisticModel,
+        bootstrap: Option<PropensityBootstrapRequest>,
+    },
+    Boosted {
+        model: BoostedTreatmentModel,
+    },
+}
+
+/// What the run can say about the treatment model, which differs by model.
+#[derive(Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum TreatmentModelEvidence {
+    Logistic {
+        parameters: usize,
+        converged: bool,
+    },
+    Boosted {
+        learning_rate: f64,
+        max_depth: usize,
+        n_estimators: usize,
+        /// The selected candidate's mean cross-validated ROC AUC.
+        validation_auc: f64,
+        /// ROC AUC of the scores this run went on to use.
+        fitted_auc: f64,
+        candidates: usize,
+        cross_fitted: bool,
+    },
+}
+
+/// Weights as the inverse conditional density, or stabilized by the marginal density of the
+/// treatment. With a continuous treatment the chapter treats stabilizing as necessary.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum GpsWeightScale {
+    InverseDensity,
+    Stabilized,
+}
+
+/// Weights as the inverse propensity, or stabilized by the marginal treatment prevalence.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum PropensityWeightScale {
+    InverseProbability,
+    Stabilized,
 }
 
 /// The error process of a linear fit: independent errors with a Newey-West interval, or an
@@ -2757,6 +2899,63 @@ pub(crate) enum AnalysisResult {
         hac_p_value: f64,
         durbin_watson: f64,
         error_model: LinearErrorEvidence,
+    },
+    PropensityWeighting {
+        observations: usize,
+        treatment_model: TreatmentModelEvidence,
+        treated_rows: usize,
+        control_rows: usize,
+        estimate: f64,
+        treated_mean: f64,
+        control_mean: f64,
+        /// The weights each arm carries in total, which is how overlap shows itself.
+        treated_weight_sum: f64,
+        control_weight_sum: f64,
+        /// P(treated | design), in row order, so the panel can draw the score by arm.
+        propensity: Vec<f64>,
+        /// Which arm each row is in, paired with the scores above.
+        treated: Vec<bool>,
+        /// The weight each row carries, in row order, for the weighted distribution.
+        weights: Vec<f64>,
+        outcome: Vec<f64>,
+        interval: Option<PropensityIntervalEvidence>,
+    },
+    PropensityMatching {
+        observations: usize,
+        treatment_model: TreatmentModelEvidence,
+        treated_rows: usize,
+        control_rows: usize,
+        estimate: f64,
+        propensity: Vec<f64>,
+        treated: Vec<bool>,
+        /// The opposite-arm outcome matched to each row, which the chapter prints.
+        matches: Vec<f64>,
+    },
+    DoublyRobust {
+        observations: usize,
+        /// The treatment model's parameter count: the constant plus one per design column.
+        parameters: usize,
+        estimate: f64,
+        /// The two halves of the estimator, so a reader can see which arm moves it.
+        treated_term: f64,
+        control_term: f64,
+        propensity: Vec<f64>,
+        treated: Vec<bool>,
+        converged: bool,
+        interval: Option<PropensityIntervalEvidence>,
+    },
+    ContinuousGps {
+        observations: usize,
+        estimate: f64,
+        intercept: f64,
+        standard_error: f64,
+        /// Stabilized weights sum to about the sample size; inverse-density weights need not.
+        weight_sum: f64,
+        /// The conditional density at each observed treatment, in row order.
+        density: Vec<f64>,
+        residual_scale: f64,
+        treatment_params: Vec<f64>,
+        interval: Option<PropensityIntervalEvidence>,
     },
     FrontdoorTwoStage {
         observations: usize,

@@ -102,12 +102,20 @@ import {
 } from '@/domain/discovery'
 import {
   backdoorLinearEvidenceSchema,
+  continuousGpsEvidenceSchema,
+  doublyRobustEvidenceSchema,
+  propensityMatchingEvidenceSchema,
+  propensityWeightingEvidenceSchema,
   frontdoorTwoStageEvidenceSchema,
   instrumentalVariableEvidenceSchema,
   causalEffectsEvidenceSchema,
   causalImpactEvidenceSchema,
   countGlmEvidenceSchema,
   parseBackdoorLinearEvidence,
+  parseContinuousGpsEvidence,
+  parseDoublyRobustEvidence,
+  parsePropensityMatchingEvidence,
+  parsePropensityWeightingEvidence,
   parseFrontdoorTwoStageEvidence,
   parseInstrumentalVariableEvidence,
   parseCausalEffectsEvidence,
@@ -115,6 +123,10 @@ import {
   parseCountGlmEvidence,
   parseNegativeBinomialIngarchEvidence,
   type BackdoorLinearEvidence,
+  type ContinuousGpsEvidence,
+  type DoublyRobustEvidence,
+  type PropensityMatchingEvidence,
+  type PropensityWeightingEvidence,
   type FrontdoorTwoStageEvidence,
   type InstrumentalVariableEvidence,
   type CausalEffectsEvidence,
@@ -212,6 +224,61 @@ export type CoxRegressionWorkerDesign = {
     | { readonly kind: 'unpenalized' }
     | { readonly kind: 'elasticNet'; readonly penalizer: number; readonly l1Ratio: number }
   readonly confidenceLevel: number
+}
+
+const logisticTreatmentModelSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('newton') }).strict(),
+  z.object({ kind: z.literal('lbfgsb'), maxIter: z.number().int().positive() }).strict(),
+])
+
+const boostedTreatmentModelSchema = z.object({
+  learningRate: z.array(z.number().positive()).min(1).max(12),
+  maxDepth: z.array(z.number().int().positive().max(16)).min(1).max(12),
+  nEstimators: z.array(z.number().int().positive().max(2000)).min(1).max(12),
+  splits: z.number().int().min(2).max(20),
+  minSamplesLeaf: z.number().int().positive(),
+  minSamplesSplit: z.number().int().min(2),
+  seed: z.number().int().nonnegative(),
+  crossFitted: z.boolean(),
+}).strict()
+
+const propensityTreatmentModelSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('logistic'), model: logisticTreatmentModelSchema }).strict(),
+  z.object({ kind: z.literal('boosted'), model: boostedTreatmentModelSchema }).strict(),
+])
+
+/** Which treatment model fits the propensity: statsmodels' Newton, or sklearn's L-BFGS-B. */
+export type LogisticTreatmentModel =
+  | { readonly kind: 'newton' }
+  | { readonly kind: 'lbfgsb'; readonly maxIter: number }
+
+/** A boosted treatment model: a grid searched on cross-validated ROC AUC. */
+export interface BoostedTreatmentModel {
+  readonly learningRate: readonly number[]
+  readonly maxDepth: readonly number[]
+  readonly nEstimators: readonly number[]
+  readonly splits: number
+  readonly minSamplesLeaf: number
+  readonly minSamplesSplit: number
+  readonly seed: number
+  readonly crossFitted: boolean
+}
+
+export type PropensityTreatmentModel =
+  | { readonly kind: 'logistic'; readonly model: LogisticTreatmentModel }
+  | { readonly kind: 'boosted'; readonly model: BoostedTreatmentModel }
+
+/** A bootstrap refits the treatment model per replicate, which the kernels do for a logistic fit
+ * alone, so the request sits inside that variant. */
+export type PropensityWeightingFit =
+  | { readonly kind: 'logistic'; readonly model: LogisticTreatmentModel; readonly bootstrap: PropensityBootstrapRequest | null }
+  | { readonly kind: 'boosted'; readonly model: BoostedTreatmentModel }
+
+/** Rounds and seed for a percentile interval; absent when only the point estimate is wanted. */
+export interface PropensityBootstrapRequest {
+  readonly rounds: number
+  readonly seed: number
+  readonly level: number
 }
 
 export type AnalysisWorkerCommand =
@@ -554,6 +621,53 @@ export type AnalysisWorkerCommand =
       readonly hacMaxLags: number | null
       readonly level: number
       readonly errorModel: LinearErrorModel
+    }
+  | {
+      readonly kind: 'propensity-weighting'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly scale: 'inverseProbability' | 'stabilized'
+      readonly fit: PropensityWeightingFit
+    }
+  | {
+      readonly kind: 'propensity-matching'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly model: PropensityTreatmentModel
+    }
+  | {
+      readonly kind: 'doubly-robust'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly model: LogisticTreatmentModel
+      readonly bootstrap: PropensityBootstrapRequest | null
+    }
+  | {
+      readonly kind: 'continuous-gps'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly scale: 'inverseDensity' | 'stabilized'
+      readonly bootstrap: PropensityBootstrapRequest | null
     }
   | {
       readonly kind: 'frontdoor-two-stage'
@@ -1135,6 +1249,10 @@ export type AnalysisWorkerEvent =
       readonly request: WorkerRequestId
       readonly result: BackdoorLinearEvidence
     }
+  | { readonly kind: 'propensity-weighting-succeeded'; readonly request: WorkerRequestId; readonly result: PropensityWeightingEvidence }
+  | { readonly kind: 'propensity-matching-succeeded'; readonly request: WorkerRequestId; readonly result: PropensityMatchingEvidence }
+  | { readonly kind: 'doubly-robust-succeeded'; readonly request: WorkerRequestId; readonly result: DoublyRobustEvidence }
+  | { readonly kind: 'continuous-gps-succeeded'; readonly request: WorkerRequestId; readonly result: ContinuousGpsEvidence }
   | { readonly kind: 'frontdoor-two-stage-succeeded'; readonly request: WorkerRequestId; readonly result: FrontdoorTwoStageEvidence }
   | { readonly kind: 'instrumental-variable-succeeded'; readonly request: WorkerRequestId; readonly result: InstrumentalVariableEvidence }
   | { readonly kind: 'count-glm-succeeded'; readonly request: WorkerRequestId; readonly result: CountGlmEvidence }
@@ -1182,6 +1300,24 @@ export type AnalysisProtocolProblem =
   | { readonly kind: 'invalid-event'; readonly detail: string }
 
 const requestSchema = z.string().uuid()
+
+/** What every propensity command carries; an expanded design widens with every level. */
+const propensityCommandFields = {
+  request: requestSchema,
+  values: z.instanceof(Float64Array),
+  rows: z.number().int().positive(),
+  columns: z.number().int().min(3).max(256),
+  treatment: z.number().int().nonnegative(),
+  outcome: z.number().int().nonnegative(),
+  adjustment: z.array(z.number().int().nonnegative()).nonempty(),
+} as const
+
+const propensityBootstrapSchema = z.object({
+  rounds: z.number().int().min(2).max(2000),
+  seed: z.number().int().nonnegative(),
+  level: z.number().gt(0.5).lt(1),
+}).strict()
+
 
 export interface AalenWorkerDesign {
   readonly duration: number
@@ -1697,6 +1833,36 @@ const commandSchema = z.discriminatedUnion('kind', [
     hacMaxLags: z.number().int().nonnegative().nullable(),
     level: z.number().gt(0.5).lt(1),
     errorModel: linearErrorModelSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('propensity-weighting'),
+    ...propensityCommandFields,
+    scale: z.enum(['inverseProbability', 'stabilized']),
+    fit: z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('logistic'),
+        model: logisticTreatmentModelSchema,
+        bootstrap: propensityBootstrapSchema.nullable(),
+      }).strict(),
+      z.object({ kind: z.literal('boosted'), model: boostedTreatmentModelSchema }).strict(),
+    ]),
+  }).strict(),
+  z.object({
+    kind: z.literal('propensity-matching'),
+    ...propensityCommandFields,
+    model: propensityTreatmentModelSchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('doubly-robust'),
+    ...propensityCommandFields,
+    model: logisticTreatmentModelSchema,
+    bootstrap: propensityBootstrapSchema.nullable(),
+  }).strict(),
+  z.object({
+    kind: z.literal('continuous-gps'),
+    ...propensityCommandFields,
+    scale: z.enum(['inverseDensity', 'stabilized']),
+    bootstrap: propensityBootstrapSchema.nullable(),
   }).strict(),
   z.object({
     kind: z.literal('frontdoor-two-stage'),
@@ -2266,6 +2432,10 @@ const eventSchema = z.discriminatedUnion('kind', [
     request: requestSchema,
     result: backdoorLinearEvidenceSchema,
   }).strict(),
+  z.object({ kind: z.literal('propensity-weighting-succeeded'), request: requestSchema, result: propensityWeightingEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('propensity-matching-succeeded'), request: requestSchema, result: propensityMatchingEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('doubly-robust-succeeded'), request: requestSchema, result: doublyRobustEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('continuous-gps-succeeded'), request: requestSchema, result: continuousGpsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('frontdoor-two-stage-succeeded'), request: requestSchema, result: frontdoorTwoStageEvidenceSchema }).strict(),
   z.object({ kind: z.literal('instrumental-variable-succeeded'), request: requestSchema, result: instrumentalVariableEvidenceSchema }).strict(),
   z.object({ kind: z.literal('count-glm-succeeded'), request: requestSchema, result: countGlmEvidenceSchema }).strict(),
@@ -2544,6 +2714,30 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = parseBackdoorLinearEvidence(parsed.data.result)
     return result.ok
       ? ok({ kind: 'backdoor-linear-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'propensity-weighting-succeeded') {
+    const result = parsePropensityWeightingEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'propensity-weighting-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'propensity-matching-succeeded') {
+    const result = parsePropensityMatchingEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'propensity-matching-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'doubly-robust-succeeded') {
+    const result = parseDoublyRobustEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'doubly-robust-succeeded', request: request.value, result: result.value })
+      : err({ kind: 'invalid-event', detail: result.error.detail })
+  }
+  if (parsed.data.kind === 'continuous-gps-succeeded') {
+    const result = parseContinuousGpsEvidence(parsed.data.result)
+    return result.ok
+      ? ok({ kind: 'continuous-gps-succeeded', request: request.value, result: result.value })
       : err({ kind: 'invalid-event', detail: result.error.detail })
   }
   if (parsed.data.kind === 'frontdoor-two-stage-succeeded') {

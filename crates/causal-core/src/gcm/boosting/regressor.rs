@@ -139,12 +139,12 @@ impl Regressor {
         for _ in 0..options.iterations.get() {
             let derivatives = Derivatives::squared_error(&observed, &predicted)
                 .map_err(|_| BoostError::NonFinite)?;
-            let unit = UnitDerivatives::try_from(&derivatives).map_err(|_| BoostError::Tree)?;
+            UnitDerivatives::try_from(&derivatives).map_err(|_| BoostError::Tree)?;
             let tree = Tree::fit(
                 &columns,
                 &counts,
                 options.bins + 1,
-                &unit,
+                &derivatives,
                 options.min_leaf,
                 options.leaves,
                 options.l2,

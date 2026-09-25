@@ -146,6 +146,8 @@ export const runEstimator = async (page: Page, options: {
   readonly family?: RegExp
   readonly estimator?: RegExp | { readonly value: string }
   readonly choices?: readonly string[]
+  /** Covariates that enter as indicators for their levels rather than as a single number. */
+  readonly categorical?: readonly string[]
   readonly run: RegExp
   readonly done?: RegExp | string
 }): Promise<void> => {
@@ -154,6 +156,10 @@ export const runEstimator = async (page: Page, options: {
   if (options.estimator instanceof RegExp) await page.getByRole('radio', { name: options.estimator }).click()
   else if (options.estimator !== undefined) await page.locator(`input[type="radio"][value="${options.estimator.value}"]`).check()
   for (const choice of options.choices ?? []) await page.getByRole('radio', { name: choice, exact: true }).click()
+  for (const covariate of options.categorical ?? []) {
+    await page.getByRole('group', { name: 'Categorical covariates' })
+      .getByRole('checkbox', { name: covariate, exact: true }).check()
+  }
   await page.getByRole('button', { name: options.run }).first().click()
   await expect(page.getByText(options.done ?? 'Current estimate').first()).toBeVisible({ timeout: 600_000 })
 }
@@ -180,6 +186,40 @@ export const runDiscovery = async (page: Page, options: {
   await expect(page.getByRole('list', { name: 'Discovery runs' })).toBeVisible({ timeout: 60_000 })
 }
 
+interface RecordedRun {
+  readonly kind: string
+  readonly estimate?: { readonly effect?: { readonly value?: number } }
+}
+
+/** The effect each recorded run carries, in ledger order, for comparing a rebuild with the shipped copy. */
+const recordedEffects = (bundle: unknown): readonly { readonly kind: string; readonly value: number }[] => {
+  const runs = (bundle as { project?: { estimationRuns?: readonly RecordedRun[] } })?.project?.estimationRuns ?? []
+  return runs.flatMap((run) => {
+    const value = run.estimate?.effect?.value
+    return typeof value === 'number' ? [{ kind: run.kind, value }] : []
+  })
+}
+
+/**
+ * A rebuilt example must reproduce the estimates the shipped bundle already carries. Without this
+ * a build writes whatever the estimators now produce, so drift ships silently.
+ */
+const REBUILD_TOLERANCE = 1e-9
+
+const expectNoEstimateDrift = (before: unknown, after: unknown, example: ShippedExample): void => {
+  const previous = recordedEffects(before)
+  const rebuilt = recordedEffects(after)
+  if (previous.length === 0) return
+  expect(rebuilt.length, `${example.name}: the rebuild recorded a different number of estimates`).toBe(previous.length)
+  for (const [index, recorded] of previous.entries()) {
+    const fresh = rebuilt[index]
+    expect(fresh?.kind, `${example.name}: run ${index} changed estimator`).toBe(recorded.kind)
+    const drift = Math.abs((fresh?.value ?? Number.NaN) - recorded.value)
+    expect(drift, `${example.name}: ${recorded.kind} moved from ${recorded.value} to ${fresh?.value}`)
+      .toBeLessThan(REBUILD_TOLERANCE * Math.max(1, Math.abs(recorded.value)))
+  }
+}
+
 /** Export with the source file inside, then write the bundle under the catalog's fixed id. */
 export const exportBundle = async (page: Page, example: ShippedExample): Promise<void> => {
   await chapter(page, /Data studio/i)
@@ -191,9 +231,18 @@ export const exportBundle = async (page: Page, example: ShippedExample): Promise
   // The rail's pill offers the same export; the builder uses the one in the stage.
   await page.locator('main').getByRole('button', { name: /Export project/ }).click()
   const target = bundleTarget(example)
+  const shipped = await readFile(target, 'utf8').then((text) => text, () => null)
   await (await download).saveAs(target)
   // The app recognises its saved copy of an example by this id, whichever build produced the bundle.
   const bundle = JSON.parse(await readFile(target, 'utf8')) as { project: { project: { id: string } } }
   bundle.project.project.id = example.id
   await writeFile(target, JSON.stringify(bundle, null, 2))
+  if (shipped === null) return
+  try {
+    expectNoEstimateDrift(JSON.parse(shipped), bundle, example)
+  } catch (cause: unknown) {
+    // A rebuild that moved an estimate must not leave its bundle behind as the shipped copy.
+    await writeFile(target, shipped)
+    throw cause
+  }
 }

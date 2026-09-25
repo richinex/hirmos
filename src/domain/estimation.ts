@@ -12,6 +12,10 @@ import { assertNever, brand, err, flattenNonEmpty, mapNonEmpty, ok, type Brand, 
 import type { CaveatEvaluation, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
 import {
   BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
+  CONTINUOUS_GPS_METHOD_ID,
+  DOUBLY_ROBUST_METHOD_ID,
+  PROPENSITY_MATCHING_METHOD_ID,
+  PROPENSITY_WEIGHTING_METHOD_ID,
   FRONTDOOR_TWO_STAGE_METHOD_ID,
   INSTRUMENTAL_VARIABLE_METHOD_ID,
   CAUSAL_EFFECTS_TOTAL_METHOD_ID,
@@ -34,7 +38,7 @@ import {
 import { describeSeriesTransform, seriesTransformFor, type PreparedDatasetArtifact, type PreparedDatasetVersionId, type StationarityEvidenceArtifact } from './preprocessing'
 import { describePanelInterventionPreflight, type PanelInterventionPreflight } from './panel'
 import { describeStationarityConflict, levelModelVerdict, type LevelModelVerdict, type StationarityAssessment } from './stationarityAssessment'
-import { describeGrouping, identifiedInstruments, treatmentDescendants, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type ModifierGrouping, type StudyId, type StudySpecification, type StudyVariable } from './study'
+import { describeGrouping, identifiedInstruments, treatmentDescendants, type CovariateEncoding, type DesignLayout, type Estimand, type Identification, type IdentificationArtifact, type IdentificationId, type ModifierGrouping, type StudyId, type StudySpecification, type StudyVariable } from './study'
 import { formatStatistic } from '@/lib/format/number'
 
 /**
@@ -271,8 +275,85 @@ export interface BinaryEttConfiguration {
   readonly kind: 'binary-ett-idc-star'
 }
 
+/** Which treatment model fits the score. The chapter fits it with statsmodels and with sklearn. */
+export type PropensityTreatmentModelChoice = 'newton' | 'lbfgsb' | 'boosted'
+
+/** The grid a run searches unless the reader narrows it. */
+export interface BoostedTreatmentModelChoice {
+  readonly learningRate: readonly number[]
+  readonly maxDepth: readonly number[]
+  readonly nEstimators: readonly number[]
+  readonly splits: number
+  readonly seed: number
+  readonly crossFitted: boolean
+}
+
+/** sklearn's own `GradientBoostingClassifier` defaults, which the chapter leaves alone. */
+export const boostedCommand = (chosen: BoostedTreatmentModelChoice) => ({
+  learningRate: chosen.learningRate,
+  maxDepth: chosen.maxDepth,
+  nEstimators: chosen.nEstimators,
+  splits: chosen.splits,
+  minSamplesLeaf: 1,
+  minSamplesSplit: 2,
+  seed: chosen.seed,
+  crossFitted: chosen.crossFitted,
+})
+
+export const DEFAULT_BOOSTED_GRID: BoostedTreatmentModelChoice = {
+  learningRate: [0.01, 0.05, 0.1, 0.15],
+  maxDepth: [1, 2, 3, 4, 5],
+  nEstimators: [50, 100, 200, 300],
+  splits: 5,
+  seed: 7,
+  crossFitted: false,
+}
+
+/** Rounds and seed for a percentile interval, or none when the point estimate is enough. */
+export type PropensityUncertainty =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'bootstrap'; readonly rounds: number; readonly seed: number; readonly level: number }
+
+export interface PropensityWeightingConfiguration {
+  readonly kind: 'propensity-weighting'
+  readonly model: PropensityTreatmentModelChoice
+  /** sklearn's iteration limit; the chapter raises it to 1000. */
+  readonly maxIter: number
+  readonly boosted: BoostedTreatmentModelChoice
+  readonly scale: 'inverseProbability' | 'stabilized'
+  readonly uncertainty: PropensityUncertainty
+}
+
+export interface PropensityMatchingConfiguration {
+  readonly kind: 'propensity-matching'
+  readonly model: PropensityTreatmentModelChoice
+  readonly maxIter: number
+  readonly boosted: BoostedTreatmentModelChoice
+}
+
+/** The doubly robust estimator refits the treatment model per arm, which the kernels do for a
+ * logistic fit alone, so the boosted model is not among its choices. */
+export type LogisticTreatmentModelChoice = Exclude<PropensityTreatmentModelChoice, 'boosted'>
+
+export interface DoublyRobustConfiguration {
+  readonly kind: 'doubly-robust'
+  readonly model: LogisticTreatmentModelChoice
+  readonly maxIter: number
+  readonly uncertainty: PropensityUncertainty
+}
+
+export interface ContinuousGpsConfiguration {
+  readonly kind: 'continuous-gps'
+  readonly scale: 'inverseDensity' | 'stabilized'
+  readonly uncertainty: PropensityUncertainty
+}
+
 export type EstimatorConfiguration =
   | SharpRdConfiguration
+  | PropensityWeightingConfiguration
+  | PropensityMatchingConfiguration
+  | DoublyRobustConfiguration
+  | ContinuousGpsConfiguration
   | BackdoorLinearConfiguration
   | FrontdoorTwoStageConfiguration
   | InstrumentalVariableConfiguration
@@ -293,7 +374,7 @@ export type EstimatorConfiguration =
 
 export type EstimatorId = EstimatorConfiguration['kind']
 
-export type EstimatorGroupId = 'adjusted-outcome' | 'identified-functional' | 'graph-adjusted-temporal' | 'dynamic-time-series' | 'intervention-comparison'
+export type EstimatorGroupId = 'adjusted-outcome' | 'propensity-score' | 'identified-functional' | 'graph-adjusted-temporal' | 'dynamic-time-series' | 'intervention-comparison'
 
 export interface EstimatorGroup {
   readonly id: EstimatorGroupId
@@ -308,6 +389,12 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
     name: 'Covariate-adjusted outcome models',
     description: 'Regression, count-model and orthogonal-score estimators using an identified adjustment set.',
     estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 't-learner'],
+  },
+  {
+    id: 'propensity-score',
+    name: 'Propensity-score estimators',
+    description: 'Weighting, matching and doubly robust estimation from a fitted propensity score, and the generalised score when the treatment is continuous.',
+    estimators: ['propensity-weighting', 'propensity-matching', 'doubly-robust', 'continuous-gps'],
   },
   {
     id: 'identified-functional',
@@ -337,6 +424,43 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
 
 export const ESTIMATOR_IDS: NonEmptyArray<EstimatorId> = flattenNonEmpty(mapNonEmpty(ESTIMATOR_GROUPS, (group) => group.estimators))
 
+/** The layout an estimator expands a categorical covariate into. A design with an intercept needs
+ *  the baseline dropped; a forest takes every level. */
+export const designLayoutOf = (estimator: EstimatorId, encoding: CovariateEncoding): DesignLayout => {
+  if (encoding.kind === 'numeric') return { kind: 'numeric' }
+  switch (estimator) {
+    case 'dml-plr':
+    case 'dml-irm':
+    case 't-learner':
+      return { kind: 'indicators' }
+    case 'propensity-weighting':
+    case 'propensity-matching':
+    case 'doubly-robust':
+    case 'continuous-gps':
+      return { kind: 'treatment-contrast' }
+    case 'backdoor-linear-regression':
+    case 'frontdoor-two-stage':
+    case 'instrumental-variable':
+    case 'poisson-glm':
+    case 'negative-binomial-p':
+    case 'negative-binomial-ingarch':
+    case 'ardl-pss':
+    case 'vecm':
+    case 'synthetic-control':
+    case 'sharp-rd':
+    case 'panel-intervention':
+    case 'negbin-nuts':
+    case 'bayesian-gaussian':
+    case 'causal-effects-total':
+    case 'causal-impact':
+    case 'discrete-bn-query':
+    case 'binary-ett-idc-star':
+      return { kind: 'treatment-contrast' }
+    default:
+      return assertNever(estimator)
+  }
+}
+
 export const methodIdOf = (estimator: EstimatorId): MethodId => {
   switch (estimator) {
     case 'backdoor-linear-regression': return BACKDOOR_LINEAR_REGRESSION_METHOD_ID
@@ -358,6 +482,10 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
     case 'discrete-bn-query': return DISCRETE_BN_METHOD_ID
     case 'binary-ett-idc-star': return BINARY_ETT_METHOD_ID
     case 'causal-effects-total': return CAUSAL_EFFECTS_TOTAL_METHOD_ID
+    case 'propensity-weighting': return PROPENSITY_WEIGHTING_METHOD_ID
+    case 'propensity-matching': return PROPENSITY_MATCHING_METHOD_ID
+    case 'doubly-robust': return DOUBLY_ROBUST_METHOD_ID
+    case 'continuous-gps': return CONTINUOUS_GPS_METHOD_ID
     case 'causal-impact': return CAUSAL_IMPACT_METHOD_ID
     default: return assertNever(estimator)
   }
@@ -371,6 +499,10 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'poisson-glm':
     case 'negative-binomial-p': return { kind: estimator }
     case 'negative-binomial-ingarch': return { kind: estimator, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], horizon: 12, controlValue: 0, treatmentValue: 1, schedule: { kind: 'persistent' } }
+    case 'propensity-weighting': return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID, scale: 'inverseProbability', uncertainty: { kind: 'none' } }
+    case 'propensity-matching': return { kind: estimator, model: 'newton', maxIter: 1000, boosted: DEFAULT_BOOSTED_GRID }
+    case 'doubly-robust': return { kind: estimator, model: 'lbfgsb', maxIter: 1000, uncertainty: { kind: 'none' } }
+    case 'continuous-gps': return { kind: estimator, scale: 'stabilized', uncertainty: { kind: 'none' } }
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
     case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
     case 't-learner': return { kind: estimator, seed: 7, uncertainty: { kind: 'none' } }
@@ -443,7 +575,132 @@ export const backdoorLinearEvidenceSchema = z.object({
 }).strict()
 
 export type BackdoorLinearEvidence = z.infer<typeof backdoorLinearEvidenceSchema>
+
+/** A percentile interval over refitted rounds, naming the rounds whose treatment model stopped early. */
+const propensityIntervalSchema = z.object({
+  lower: z.number().finite(),
+  upper: z.number().finite(),
+  rounds: z.number().int().positive(),
+  level: z.number().gt(0.5).lt(1),
+  unconverged: z.array(z.number().int().nonnegative()),
+}).strict()
+
+export const treatmentModelEvidenceSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('logistic'),
+    parameters: z.number().int().positive(),
+    converged: z.boolean(),
+  }).strict(),
+  z.object({
+    kind: z.literal('boosted'),
+    learningRate: z.number().positive(),
+    maxDepth: z.number().int().positive(),
+    nEstimators: z.number().int().positive(),
+    validationAuc: z.number().min(0).max(1),
+    fittedAuc: z.number().min(0).max(1),
+    candidates: z.number().int().positive(),
+    crossFitted: z.boolean(),
+  }).strict(),
+])
+
+export type TreatmentModelEvidence = z.infer<typeof treatmentModelEvidenceSchema>
+
+/** A boosted fit has no coefficient count, so the sample reports none. */
+export const treatmentModelParameters = (model: TreatmentModelEvidence): number | null =>
+  model.kind === 'logistic' ? model.parameters : null
+
+/** Only an iterative fit can stop before its own rule; a search either completes or fails. */
+export const treatmentModelStoppedEarly = (model: TreatmentModelEvidence): boolean =>
+  model.kind === 'logistic' && !model.converged
+
+export const propensityWeightingEvidenceSchema = z.object({
+  kind: z.literal('propensityWeighting'),
+  observations: z.number().int().positive(),
+  treatmentModel: treatmentModelEvidenceSchema,
+  treatedRows: z.number().int().positive(),
+  controlRows: z.number().int().positive(),
+  estimate: z.number().finite(),
+  treatedMean: z.number().finite(),
+  controlMean: z.number().finite(),
+  treatedWeightSum: z.number().finite().positive(),
+  controlWeightSum: z.number().finite().positive(),
+  /** P(treated | design) in row order, which is what the distribution panels draw. */
+  propensity: z.array(z.number().finite()),
+  /** Which arm each row is in, paired with the scores. */
+  treated: z.array(z.boolean()),
+  /** The weight each row carries, for the weighted panel. */
+  weights: z.array(z.number().finite()),
+  outcome: z.array(z.number().finite()),
+  interval: propensityIntervalSchema.nullable(),
+}).strict()
+
+export const propensityMatchingEvidenceSchema = z.object({
+  kind: z.literal('propensityMatching'),
+  observations: z.number().int().positive(),
+  treatmentModel: treatmentModelEvidenceSchema,
+  treatedRows: z.number().int().positive(),
+  controlRows: z.number().int().positive(),
+  estimate: z.number().finite(),
+  propensity: z.array(z.number().finite()),
+  treated: z.array(z.boolean()),
+  /** The opposite-arm outcome paired with each row. */
+  matches: z.array(z.number().finite()),
+}).strict()
+
+export const doublyRobustEvidenceSchema = z.object({
+  kind: z.literal('doublyRobust'),
+  observations: z.number().int().positive(),
+  /** The treatment model's parameter count: the constant plus one per design column. */
+  parameters: z.number().int().positive(),
+  estimate: z.number().finite(),
+  treatedTerm: z.number().finite(),
+  controlTerm: z.number().finite(),
+  propensity: z.array(z.number().finite()),
+  treated: z.array(z.boolean()),
+  converged: z.boolean(),
+  interval: propensityIntervalSchema.nullable(),
+}).strict()
+
+export const continuousGpsEvidenceSchema = z.object({
+  kind: z.literal('continuousGps'),
+  observations: z.number().int().positive(),
+  estimate: z.number().finite(),
+  intercept: z.number().finite(),
+  standardError: z.number().finite().nonnegative(),
+  weightSum: z.number().finite().positive(),
+  /** The conditional density at each observed treatment, in row order. */
+  density: z.array(z.number().finite()),
+  residualScale: z.number().finite().positive(),
+  treatmentParams: z.array(z.number().finite()),
+  interval: propensityIntervalSchema.nullable(),
+}).strict()
+
+export type PropensityWeightingEvidence = z.infer<typeof propensityWeightingEvidenceSchema>
+export type PropensityMatchingEvidence = z.infer<typeof propensityMatchingEvidenceSchema>
+export type DoublyRobustEvidence = z.infer<typeof doublyRobustEvidenceSchema>
+export type ContinuousGpsEvidence = z.infer<typeof continuousGpsEvidenceSchema>
+export type PropensityInterval = z.infer<typeof propensityIntervalSchema>
 export type ArmaReading = Extract<BackdoorLinearEvidence['errorModel'], { kind: 'arma' }>
+
+export interface EffectiveSampleSize { readonly treated: number; readonly control: number }
+
+export const effectiveSampleSize = (
+  weights: readonly number[],
+  treated: readonly boolean[],
+): EffectiveSampleSize => {
+  let treatedSum = 0
+  let treatedSquares = 0
+  let controlSum = 0
+  let controlSquares = 0
+  for (const [row, weight] of weights.entries()) {
+    if (treated[row] === true) { treatedSum += weight; treatedSquares += weight * weight }
+    else { controlSum += weight; controlSquares += weight * weight }
+  }
+  return {
+    treated: treatedSquares === 0 ? 0 : (treatedSum * treatedSum) / treatedSquares,
+    control: controlSquares === 0 ? 0 : (controlSum * controlSum) / controlSquares,
+  }
+}
 
 /** The ARMA reading a run was configured for, and only then. */
 export const armaReading = (run: { readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }): ArmaReading | null =>
@@ -1168,6 +1425,56 @@ const parseWith = <Schema extends z.ZodTypeAny>(schema: Schema, value: unknown):
   return parsed.success ? ok(parsed.data) : err({ kind: 'invalid-estimation-evidence', detail: z.prettifyError(parsed.error) })
 }
 
+/** A bootstrap interval with its bounds the wrong way round is a defect, not a wide interval. */
+const orderedInterval = (interval: PropensityInterval | null): boolean =>
+  interval === null || interval.lower <= interval.upper
+
+export function parsePropensityWeightingEvidence(value: unknown): Result<PropensityWeightingEvidence, EstimationEvidenceProblem> {
+  const parsed = parseWith(propensityWeightingEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (parsed.value.propensity.length !== parsed.value.observations) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted scores do not cover every row.' })
+  }
+  if (!orderedInterval(parsed.value.interval)) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+  }
+  return parsed
+}
+
+export function parsePropensityMatchingEvidence(value: unknown): Result<PropensityMatchingEvidence, EstimationEvidenceProblem> {
+  const parsed = parseWith(propensityMatchingEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (parsed.value.propensity.length !== parsed.value.observations
+    || parsed.value.matches.length !== parsed.value.observations) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The matched rows do not cover every row.' })
+  }
+  return parsed
+}
+
+export function parseDoublyRobustEvidence(value: unknown): Result<DoublyRobustEvidence, EstimationEvidenceProblem> {
+  const parsed = parseWith(doublyRobustEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (parsed.value.propensity.length !== parsed.value.observations) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted scores do not cover every row.' })
+  }
+  if (!orderedInterval(parsed.value.interval)) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+  }
+  return parsed
+}
+
+export function parseContinuousGpsEvidence(value: unknown): Result<ContinuousGpsEvidence, EstimationEvidenceProblem> {
+  const parsed = parseWith(continuousGpsEvidenceSchema, value)
+  if (!parsed.ok) return parsed
+  if (parsed.value.density.length !== parsed.value.observations) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted densities do not cover every row.' })
+  }
+  if (!orderedInterval(parsed.value.interval)) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
+  }
+  return parsed
+}
+
 export function parseBackdoorLinearEvidence(value: unknown): Result<BackdoorLinearEvidence, EstimationEvidenceProblem> {
   const parsed = parseWith(backdoorLinearEvidenceSchema, value)
   if (!parsed.ok) return parsed
@@ -1399,7 +1706,7 @@ export interface CausalEstimate {
   readonly interval: EstimateInterval
   readonly standardError: number | null
   readonly adjustment: AppliedAdjustment
-  readonly sample: { readonly observations: number; readonly parameters: number; readonly degreesOfFreedom: number | null }
+  readonly sample: { readonly observations: number; readonly parameters: number | null; readonly degreesOfFreedom: number | null }
 }
 
 export interface TimeIndexedStudyVariable {
@@ -1463,12 +1770,18 @@ interface RunIdentity {
   readonly eligibility: AcceptedEstimatorEligibility
   /** Columns in the order the numeric matrix was materialised. */
   readonly columns: NonEmptyArray<StudyVariable>
+  /** The encoding used for each column. A column left out was numeric. */
+  readonly encodings: Readonly<Record<ColumnId, CovariateEncoding>>
   readonly estimate: CausalEstimate
 }
 
 export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'sharp-rd-run'; readonly method: typeof SHARP_RD_METHOD_ID; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
   | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
+  | RunIdentity & { readonly kind: 'propensity-weighting-run'; readonly method: typeof PROPENSITY_WEIGHTING_METHOD_ID; readonly configuration: PropensityWeightingConfiguration; readonly evidence: PropensityWeightingEvidence }
+  | RunIdentity & { readonly kind: 'propensity-matching-run'; readonly method: typeof PROPENSITY_MATCHING_METHOD_ID; readonly configuration: PropensityMatchingConfiguration; readonly evidence: PropensityMatchingEvidence }
+  | RunIdentity & { readonly kind: 'doubly-robust-run'; readonly method: typeof DOUBLY_ROBUST_METHOD_ID; readonly configuration: DoublyRobustConfiguration; readonly evidence: DoublyRobustEvidence }
+  | RunIdentity & { readonly kind: 'continuous-gps-run'; readonly method: typeof CONTINUOUS_GPS_METHOD_ID; readonly configuration: ContinuousGpsConfiguration; readonly evidence: ContinuousGpsEvidence }
   | RunIdentity & { readonly kind: 'frontdoor-two-stage-run'; readonly method: typeof FRONTDOOR_TWO_STAGE_METHOD_ID; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
   | RunIdentity & { readonly kind: 'instrumental-variable-run'; readonly method: typeof INSTRUMENTAL_VARIABLE_METHOD_ID; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
   | RunIdentity & { readonly kind: 'count-glm-run'; readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
@@ -1968,6 +2281,40 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else satisfy('nuts-independence', 'The prepared dataset holds independent rows.')
       break
     }
+    case 'propensity-weighting':
+    case 'propensity-matching':
+    case 'doubly-robust': {
+      const prefix = configuration.kind === 'propensity-weighting' ? 'ipw'
+        : configuration.kind === 'propensity-matching' ? 'matching' : 'aipw'
+      if (adjustment === null) violate(`${prefix}-unconfoundedness`, 'No measured back-door adjustment set was found, so the score has nothing to condition on.')
+      else satisfy(`${prefix}-unconfoundedness`, `Identified by back-door adjustment for ${adjustment}.`)
+      if (context.treatmentIsBinary === null) leave(`${prefix}-positivity`, 'The treatment column has not been read yet; it is checked before the estimator runs.')
+      else if (!context.treatmentIsBinary) violate(`${prefix}-positivity`, 'The treatment holds values other than 0 and 1, so there are no two arms to weight between.')
+      else leave(`${prefix}-positivity`, 'Read the fitted scores with the run: a score at zero or one leaves a row with no counterpart in the other arm.')
+      if (configuration.kind === 'propensity-weighting') {
+        leave('ipw-extreme-weights', 'The weight sums for each arm are reported with the estimate. Far from the number of rows in that arm means a few rows carry the result.')
+        leave('ipw-treatment-model', `The score is fitted by ${configuration.model === 'newton' ? 'Newton-Raphson, as statsmodels does' : `L-BFGS-B at ${configuration.maxIter} iterations, as scikit-learn does`}. Declare categorical covariates before the run.`)
+      }
+      if (configuration.kind === 'propensity-matching') {
+        leave('matching-single-neighbour', 'Every row is paired with one nearest neighbour on the score.')
+        leave('matching-average-not-treated', 'Pairs are averaged over every row, so this is the average effect rather than the effect on the treated.')
+      }
+      if (configuration.kind === 'doubly-robust') {
+        leave('aipw-one-model-right', 'Only one of the treatment model and the outcome model has to be correct. Both wrong leaves the estimate biased.')
+        leave('aipw-arm-regressions', 'The outcome model is a linear regression fitted within each arm on the same design.')
+      }
+      break
+    }
+    case 'continuous-gps': {
+      if (adjustment === null) violate('gps-unconfoundedness', 'No measured back-door adjustment set was found, so the treatment model has nothing to condition on.')
+      else satisfy('gps-unconfoundedness', `Identified by back-door adjustment for ${adjustment}.`)
+      if (context.treatmentIsBinary === true) violate('gps-normal-treatment', 'The treatment holds only 0 and 1. A binary treatment has a propensity rather than a density, so use inverse propensity weighting.')
+      else leave('gps-normal-treatment', 'The treatment is taken as normal around its fitted value with constant variance.')
+      if (configuration.scale === 'stabilized') satisfy('gps-stabilize', 'Weights are stabilized by the marginal density of the treatment.')
+      else leave('gps-stabilize', 'Weights are the inverse density alone. With a continuous treatment, stabilizing is necessary rather than optional.')
+      leave('gps-linear-response', 'The weighted model fits one slope, so the reported effect is a single treatment response rather than a curve.')
+      break
+    }
     case 'bayesian-gaussian': {
       if (adjustment === null) violate('bayes-gaussian-identified-adjustment', 'No measured back-door adjustment set was found, so the regression has no identified set to condition on.')
       else satisfy('bayes-gaussian-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
@@ -2121,6 +2468,10 @@ export function causalEstimateFrom(
   run:
     | { readonly kind: 'sharp-rd-run'; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
     | { readonly kind: 'backdoor-linear-run'; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
+    | { readonly kind: 'propensity-weighting-run'; readonly configuration: PropensityWeightingConfiguration; readonly evidence: PropensityWeightingEvidence }
+    | { readonly kind: 'propensity-matching-run'; readonly configuration: PropensityMatchingConfiguration; readonly evidence: PropensityMatchingEvidence }
+    | { readonly kind: 'doubly-robust-run'; readonly configuration: DoublyRobustConfiguration; readonly evidence: DoublyRobustEvidence }
+    | { readonly kind: 'continuous-gps-run'; readonly configuration: ContinuousGpsConfiguration; readonly evidence: ContinuousGpsEvidence }
     | { readonly kind: 'frontdoor-two-stage-run'; readonly configuration: FrontdoorTwoStageConfiguration; readonly evidence: FrontdoorTwoStageEvidence }
     | { readonly kind: 'instrumental-variable-run'; readonly configuration: InstrumentalVariableConfiguration; readonly evidence: InstrumentalVariableEvidence }
     | { readonly kind: 'count-glm-run'; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
@@ -2220,6 +2571,51 @@ export function causalEstimateFrom(
         standardError: reading.standardError,
         adjustment,
         sample: { observations: evidence.observations, parameters: evidence.parameters, degreesOfFreedom: evidence.degreesOfFreedom },
+      }
+    }
+    case 'propensity-weighting-run':
+    case 'doubly-robust-run': {
+      const { evidence } = run
+      const parameters = evidence.kind === 'doublyRobust'
+        ? evidence.parameters
+        : treatmentModelParameters(evidence.treatmentModel)
+      return {
+        kind: 'causal-estimate',
+        estimand: study.estimand,
+        effect: { kind: 'additive', value: evidence.estimate, unit: '' },
+        // A weighted estimate has no closed-form interval here; the bootstrap supplies one or none.
+        interval: evidence.interval === null
+          ? { kind: 'none', reason: 'A weighted estimate has no closed-form interval; add bootstrap rounds for one.' }
+          : { kind: 'confidence', level: evidence.interval.level, lower: evidence.interval.lower, upper: evidence.interval.upper },
+        standardError: null,
+        adjustment,
+        sample: { observations: evidence.observations, parameters, degreesOfFreedom: null },
+      }
+    }
+    case 'propensity-matching-run': {
+      const { evidence } = run
+      return {
+        kind: 'causal-estimate',
+        estimand: study.estimand,
+        effect: { kind: 'additive', value: evidence.estimate, unit: '' },
+        interval: { kind: 'none', reason: 'Matched pairs have no closed-form interval here.' },
+        standardError: null,
+        adjustment,
+        sample: { observations: evidence.observations, parameters: treatmentModelParameters(evidence.treatmentModel), degreesOfFreedom: null },
+      }
+    }
+    case 'continuous-gps-run': {
+      const { evidence } = run
+      return {
+        kind: 'causal-estimate',
+        estimand: study.estimand,
+        effect: { kind: 'additive', value: evidence.estimate, unit: '' },
+        interval: evidence.interval === null
+          ? { kind: 'none', reason: 'The weighted regression reports a standard error that treats the weights as fixed; add bootstrap rounds for an interval that refits them.' }
+          : { kind: 'confidence', level: evidence.interval.level, lower: evidence.interval.lower, upper: evidence.interval.upper },
+        standardError: evidence.standardError,
+        adjustment,
+        sample: { observations: evidence.observations, parameters: 2, degreesOfFreedom: evidence.observations - 2 },
       }
     }
     case 'count-glm-run': {
@@ -2621,6 +3017,10 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'discrete-bn-query': return 'Discrete BN do-query'
     case 'binary-ett-idc-star': return 'Binary ETT by IDC*'
     case 'causal-effects-total': return 'CausalEffects total effect'
+    case 'propensity-weighting': return 'Inverse propensity weighting'
+    case 'propensity-matching': return 'Propensity-score matching'
+    case 'doubly-robust': return 'Doubly robust estimation'
+    case 'continuous-gps': return 'Generalised propensity score'
     case 'causal-impact': return 'Causal impact'
     default: return assertNever(estimator)
   }

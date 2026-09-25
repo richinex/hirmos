@@ -66,6 +66,7 @@ pub fn ols_hac(y: &[f64], x: &DMatrix<f64>, maxlags: usize) -> HacOls {
 
 pub struct WlsFit {
     pub params: Vec<f64>,
+    pub bse: Vec<f64>,
     pub pvalues: Vec<f64>,
 }
 
@@ -88,14 +89,13 @@ pub fn wls(y: &[f64], x: &DMatrix<f64>, weights: &[f64]) -> WlsFit {
     let ssr = fit.ssr;
     let df = (n - fit.rank) as f64;
     let sigma2 = ssr / df;
+    let bse: Vec<f64> = (0..k).map(|j| (sigma2 * xtx_inv[(j, j)]).sqrt()).collect();
     let pvalues: Vec<f64> = (0..k)
-        .map(|j| {
-            let t = beta[j] / (sigma2 * xtx_inv[(j, j)]).sqrt();
-            crate::parcorr::analytic_pvalue_t(t.abs(), df)
-        })
+        .map(|j| crate::parcorr::analytic_pvalue_t((beta[j] / bse[j]).abs(), df))
         .collect();
     WlsFit {
         params: beta.iter().copied().collect(),
+        bse,
         pvalues,
     }
 }

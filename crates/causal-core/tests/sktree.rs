@@ -53,6 +53,7 @@ fn sktree_matches_sklearn() {
         max_features: n_features,
         min_samples_leaf: 5,
         min_samples_split: 2,
+        max_depth: None,
     };
     let tree = build_tree(&x32, n_features, &y, None, None, &params, 3);
     let want: Vec<f64> = serde_json::from_value(root["tree_reg"]["pred"].clone()).unwrap();
@@ -71,6 +72,7 @@ fn sktree_matches_sklearn() {
         max_features: ((n_features as f64).sqrt() as usize).max(1),
         min_samples_leaf: 5,
         min_samples_split: 2,
+        max_depth: None,
     };
     let treec = build_tree(&x32, n_features, &yc, None, Some(2), &params_c, 3);
     let want: Vec<f64> = serde_json::from_value(root["tree_clf"]["proba"].clone()).unwrap();

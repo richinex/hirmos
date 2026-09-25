@@ -26,6 +26,19 @@ export type ModifierGrouping =
   | { readonly kind: 'levels' }
   | { readonly kind: 'quantiles'; readonly bins: number }
 
+/** What a reader declares about a covariate before a run. */
+export type CovariateEncoding =
+  | { readonly kind: 'numeric' }
+  | { readonly kind: 'categorical' }
+
+/** The columns a declared encoding expands into. */
+export type DesignLayout =
+  | { readonly kind: 'numeric' }
+  /** One column per level, as `pd.get_dummies` gives a classifier. */
+  | { readonly kind: 'indicators' }
+  /** The first level is the baseline and is dropped, as patsy's `C(x)` gives a regression. */
+  | { readonly kind: 'treatment-contrast' }
+
 export type Estimand =
   | { readonly kind: 'local-cutoff-effect'; readonly scale: 'additive'; readonly running: StudyVariable; readonly cutoff: number; readonly assignment: 'at-or-above' }
   | { readonly kind: 'average-treatment-effect'; readonly scale: 'additive' }

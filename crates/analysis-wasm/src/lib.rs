@@ -652,6 +652,37 @@ pub fn run_analysis(
             level,
             error_model,
         ),
+        AnalysisCommand::PropensityWeighting {
+            rows,
+            columns,
+            treatment,
+            outcome,
+            adjustment,
+            scale,
+            fit,
+        } => propensity_weighting(
+            values,
+            rows,
+            columns,
+            treatment,
+            outcome,
+            &adjustment,
+            scale,
+            fit,
+        ),
+        AnalysisCommand::PropensityMatching {
+            rows, columns, treatment, outcome, adjustment, model,
+        } => propensity_matching(values, rows, columns, treatment, outcome, &adjustment, model),
+        AnalysisCommand::DoublyRobust {
+            rows, columns, treatment, outcome, adjustment, model, bootstrap,
+        } => doubly_robust_estimate(
+            values, rows, columns, treatment, outcome, &adjustment, model, bootstrap,
+        ),
+        AnalysisCommand::ContinuousGps {
+            rows, columns, treatment, outcome, adjustment, scale, bootstrap,
+        } => continuous_gps(
+            values, rows, columns, treatment, outcome, &adjustment, scale, bootstrap,
+        ),
         AnalysisCommand::FrontdoorTwoStage {
             rows,
             columns,

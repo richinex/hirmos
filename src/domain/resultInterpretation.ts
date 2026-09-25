@@ -6,6 +6,7 @@ import {
   boundsReading,
   headlineValue,
   summariseRowEffects,
+  treatmentModelStoppedEarly,
   type EstimateInterval,
   type EstimationRunArtifact,
 } from './estimation'
@@ -224,6 +225,10 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'panel-intervention-run': return run.evidence.kind==='staggeredDid'?'Average of supported post-adoption event-time ATT estimates.':`Average difference over treated units and post-adoption periods.`
     case 'discrete-bn-run': return `Difference in expected ${outcome} in the high rather than low ${treatment} state.`
     case 'binary-ett-run': return `Expected ${outcome} under treatment minus no treatment among treated rows.`
+    case 'propensity-weighting-run': return `Difference in ${outcome} between the arms, with the sample reweighted by the inverse probability of treatment.`
+    case 'propensity-matching-run': return `Average difference in ${outcome} between each row and its nearest neighbour on the propensity score from the other arm.`
+    case 'doubly-robust-run': return `Difference in ${outcome} between the arms, combining the propensity score with an outcome regression fitted in each arm.`
+    case 'continuous-gps-run': return `Difference in ${outcome} per 1-unit increase in ${treatment}, each row weighted by the conditional density of the treatment it received.`
     case 'causal-effects-run': {
       const treatmentTime = run.configuration.treatmentLag === 0 ? 't' : `t−${run.configuration.treatmentLag}`
       return `Difference in expected ${outcome} at t after setting ${treatment} at ${treatmentTime} from ${run.evidence.interventions[0]} to ${run.evidence.interventions[1]}.`
@@ -298,6 +303,43 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'qualification', text: 'This should be interpreted as a total effect only if the recorded adjustment variables account for the important common causes of treatment and outcome, while leaving out variables through which treatment works or variables that would create bias when controlled. Comparable treatment levels must exist among otherwise similar observations, and the straight-line model must suit the data.' },
       ]
       return { kind: 'result-interpretation', statements }
+    }
+    case 'propensity-weighting-run':
+    case 'propensity-matching-run':
+    case 'doubly-robust-run': {
+      const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
+      const adjustment = adjustmentLabels(run.estimate.adjustment).map(plainName)
+      const opening = adjustment.length === 0
+        ? 'Without additional measured adjustment variables'
+        : `After accounting for ${adjustment.join(', ')}`
+      const method = run.kind === 'propensity-weighting-run'
+        ? 'The sample is reweighted by the inverse probability of treatment.'
+        : run.kind === 'propensity-matching-run'
+          ? 'Each row is paired with its nearest neighbour on the propensity score from the other arm, and the pairs are averaged over every row.'
+          : 'The propensity score is combined with an outcome regression fitted in each arm, so only one of the two models has to be correct.'
+      const stopped = run.kind === 'doubly-robust-run'
+        ? (run.evidence.converged ? '' : ' The treatment model stopped before its own convergence rule was met, so read the estimate with that in mind.')
+        : (treatmentModelStoppedEarly(run.evidence.treatmentModel) ? ' The treatment model stopped before its own convergence rule was met, so read the estimate with that in mind.' : '')
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `${opening}, setting ${plainName(study.treatment.name)} to 1 rather than 0 is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}. ${method}${stopped}` },
+        additiveIntervalForOutcome(estimate.interval, study.outcome.name),
+        { kind: 'qualification', text: 'This counts as a total effect only when the recorded adjustment variables include all important shared causes of treatment and outcome, and every row could have ended up in either group. If a fitted score is close to zero or one, that row has no match in the other group, so the estimate depends on a few rows with large weights.' },
+      ] }
+    }
+    case 'continuous-gps-run': {
+      const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
+      const adjustment = adjustmentLabels(run.estimate.adjustment).map(plainName)
+      const opening = adjustment.length === 0
+        ? 'Without additional measured adjustment variables'
+        : `After accounting for ${adjustment.join(', ')}`
+      const stabilized = run.configuration.scale === 'stabilized'
+        ? `Weights are stabilized by the marginal density of the treatment and sum to ${Math.round(run.evidence.weightSum)} across ${run.evidence.observations} rows.`
+        : `Weights are the inverse density alone and sum to ${Math.round(run.evidence.weightSum)} across ${run.evidence.observations} rows. With a continuous treatment, stabilizing is necessary rather than optional.`
+      return { kind: 'result-interpretation', statements: [
+        { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}. ${stabilized}` },
+        additiveIntervalForOutcome(estimate.interval, study.outcome.name),
+        { kind: 'qualification', text: 'The treatment is taken as normally distributed around its fitted value with constant variance, and the weighted model fits one slope. A skewed treatment or a curved dose response is not represented.' },
+      ] }
     }
     case 'count-glm-run': {
       const ratio = estimate.effect.kind === 'expectedCountRatio' ? estimate.effect.value : Number.NaN

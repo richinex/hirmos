@@ -4,7 +4,7 @@
 
 use crate::nprandom::Mt19937;
 
-const RAND_R_MAX: u32 = 2147483647;
+pub const RAND_R_MAX: u32 = 2147483647;
 const FEATURE_THRESHOLD: f32 = 1e-7;
 const EPSILON: f64 = f64::EPSILON;
 
@@ -393,7 +393,7 @@ impl<'a> Criterion<'a> {
 
 // ---------------------------------------------------------------- tree
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TreeNode {
     pub feature: usize,
     pub threshold: f64,
@@ -402,6 +402,7 @@ pub struct TreeNode {
     pub value: Vec<f64>,
 }
 
+#[derive(Clone, Debug)]
 pub struct DecisionTree {
     pub nodes: Vec<TreeNode>,
 }
@@ -410,6 +411,7 @@ pub struct TreeParams {
     pub max_features: usize,
     pub min_samples_leaf: usize,
     pub min_samples_split: usize,
+    pub max_depth: Option<usize>,
 }
 
 struct SplitRecord {
@@ -612,6 +614,23 @@ pub fn build_tree(
     params: &TreeParams,
     tree_seed: u32,
 ) -> DecisionTree {
+    // Splitter init: rand_r seed from a fresh MT19937 on the tree seed.
+    let mut mt = Mt19937::seeded(tree_seed);
+    let rand_r_state = mt.randint(RAND_R_MAX as u64) as u32;
+    build_tree_with_rand_r(x, n_features, y, sample_weight, kind_is_gini, params, rand_r_state)
+}
+
+/// Gradient boosting shares one RandomState across its trees, so each draws its own rand_r seed
+/// from that stream rather than from a per-tree seed.
+pub fn build_tree_with_rand_r(
+    x: &[f32],
+    n_features: usize,
+    y: &[f64],
+    sample_weight: Option<&[f64]>,
+    kind_is_gini: Option<usize>,
+    params: &TreeParams,
+    rand_r_state: u32,
+) -> DecisionTree {
     let n_samples_total = if n_features == 0 {
         0
     } else {
@@ -621,10 +640,6 @@ pub fn build_tree(
         Some(n_classes) => Kind::Gini { n_classes },
         None => Kind::Mse,
     };
-    // Splitter init: rand_r seed from a fresh MT19937 on the tree seed.
-    let mut mt = Mt19937::seeded(tree_seed);
-    let rand_r_state = mt.randint(RAND_R_MAX as u64) as u32;
-
     let mut samples = Vec::with_capacity(n_samples_total);
     let mut weighted_n_samples = 0.0;
     for i in 0..n_samples_total {
@@ -696,7 +711,8 @@ pub fn build_tree(
             impurity = criterion.node_impurity();
             first = false;
         }
-        let mut is_leaf = n_node_samples < params.min_samples_split
+        let mut is_leaf = params.max_depth.is_some_and(|limit| rec.depth >= limit)
+            || n_node_samples < params.min_samples_split
             || n_node_samples < 2 * params.min_samples_leaf
             || impurity <= EPSILON;
         let value = criterion.node_value();
@@ -762,6 +778,22 @@ pub fn build_tree(
 }
 
 impl DecisionTree {
+    /// The leaf a row lands in, which gradient boosting overwrites after fitting on the residual.
+    pub fn apply_row(&self, row: &[f32]) -> usize {
+        let mut node = 0usize;
+        loop {
+            let n = &self.nodes[node];
+            if n.left < 0 {
+                return node;
+            }
+            node = if (row[n.feature] as f64) <= n.threshold {
+                n.left as usize
+            } else {
+                n.right as usize
+            };
+        }
+    }
+
     pub fn predict_row(&self, row: &[f32]) -> &[f64] {
         let mut node = 0usize;
         loop {
@@ -818,6 +850,7 @@ pub fn fit_forest_with_rng(
         max_features,
         min_samples_leaf,
         min_samples_split: 2,
+        max_depth: None,
     };
 
     let tree_seeds: Vec<u32> = (0..n_estimators)

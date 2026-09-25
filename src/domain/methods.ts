@@ -167,6 +167,10 @@ export const SYNTHETIC_CONTROL_METHOD_ID = methodId('synthetic-control')
 export const PANEL_INTERVENTION_METHOD_ID = methodId('panel-intervention')
 export const SHARP_RD_METHOD_ID = methodId('sharp-rd')
 export const RD_DESIGN_METHOD_ID = methodId('sharp-rd-design')
+export const PROPENSITY_WEIGHTING_METHOD_ID = methodId('propensity-weighting')
+export const PROPENSITY_MATCHING_METHOD_ID = methodId('propensity-matching')
+export const DOUBLY_ROBUST_METHOD_ID = methodId('doubly-robust')
+export const CONTINUOUS_GPS_METHOD_ID = methodId('continuous-gps')
 
 const SHARP_RD: MethodDefinition = {
   id: SHARP_RD_METHOD_ID, name: 'Sharp regression discontinuity', family: 'estimation',
@@ -223,6 +227,9 @@ const MAEDA_SHIMIZU_2021 = paper('Causal additive models with unobserved variabl
 // Primary literature checked against the publication record and, where available, the vendored package documentation.
 const PEARL_2009 = (locator: string): MethodSource => paper('Causality: Models, Reasoning, and Inference, 2nd ed. (Pearl, 2009)', locator)
 const HERNAN_ROBINS = paper('Causal Inference: What If (Hernán and Robins, 2020)', '§3.3, positivity')
+const FACURE_CH5 = (locator: string): MethodSource => paper('Causal Inference in Python (Facure, O\u2019Reilly, 2023), chapter 5', locator)
+const ROSENBAUM_RUBIN_1983 = paper('The central role of the propensity score in observational studies for causal effects (Rosenbaum and Rubin, 1983)', 'Biometrika 70(1), 41\u201355')
+const HIRANO_IMBENS_2004 = paper('The propensity score with continuous treatments (Hirano and Imbens, 2004)', 'Applied Bayesian Modeling and Causal Inference, 73\u201384')
 const NEWEY_WEST_1987 = paper('A Simple, Positive Semi-definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix (Newey and West, 1987)', 'Econometrica 55(3), 703–708')
 const GRANGER_NEWBOLD_1974 = paper('Spurious regressions in econometrics (Granger and Newbold, 1974)', 'Journal of Econometrics 2(2), 111–120')
 const DICKEY_FULLER_1979 = paper('Distribution of the Estimators for Autoregressive Time Series with a Unit Root (Dickey and Fuller, 1979)', 'Journal of the American Statistical Association 74(366), 427–431')
@@ -1230,6 +1237,170 @@ const COUNTERFACTUAL_IDENTIFICATION: MethodDefinition = {
       requirement: 'The identified expressions and their numerical evaluation remain separate records.',
       consequenceIfUnmet: 'A symbolic identification result is reported as an estimate before the observed distribution has been evaluated.',
       sources: [NESS_CH10('query → model → identify → estimate')],
+    },
+  ],
+}
+
+const PROPENSITY_WEIGHTING: MethodDefinition = {
+  id: PROPENSITY_WEIGHTING_METHOD_ID,
+  name: 'Inverse propensity weighting',
+  family: 'estimation',
+  summary: 'Fit the propensity score on the adjustment set, then reweight the sample by the inverse probability of treatment. Weights may be stabilized by the marginal treatment prevalence.',
+  summaryTex: {
+    tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i\left(\frac{T_i Y_i}{e(X_i)} - \frac{(1-T_i) Y_i}{1 - e(X_i)}\right),\quad e(X) = P(T{=}1 \mid X)`,
+    plain: 'ATE = (1/N) Σ [ T·Y / e(X) − (1−T)·Y / (1 − e(X)) ], where e(X) = P(T=1 | X)',
+  },
+  caveats: [
+    {
+      id: caveatId('ipw-unconfoundedness'),
+      category: 'identification',
+      requirement: 'The covariates are an identified adjustment set, so that given the same propensity score treatment is as good as random.',
+      consequenceIfUnmet: 'The estimate is an association.',
+      sources: [FACURE_CH5('conditional independence and the propensity score'), ROSENBAUM_RUBIN_1983],
+    },
+    {
+      id: caveatId('ipw-positivity'),
+      category: 'identification',
+      requirement: 'Every unit has some chance of either arm given the covariates, so no fitted score sits at zero or one.',
+      consequenceIfUnmet: 'A weight divides by a near-zero probability and the estimate is carried by a handful of rows.',
+      sources: [FACURE_CH5('positivity and the bias-variance trade-off'), HERNAN_ROBINS],
+    },
+    {
+      id: caveatId('ipw-extreme-weights'),
+      category: 'finite-sample',
+      requirement: 'Read the weight sums beside the estimate; very small or large propensity scores give high variance even when positivity holds.',
+      consequenceIfUnmet: 'A stable-looking point estimate rests on a few heavily weighted rows.',
+      sources: [FACURE_CH5('small or large propensity scores and the variance of IPW')],
+    },
+    {
+      id: caveatId('ipw-treatment-model'),
+      category: 'functional-form',
+      requirement: 'The treatment model is a logistic regression on the adjustment set as supplied, with categorical covariates declared before the run.',
+      consequenceIfUnmet: 'A misspecified score misweights the sample.',
+      sources: [FACURE_CH5('estimating the propensity score'), statsmodels('statsmodels/discrete/discrete_model.py#Logit')],
+    },
+  ],
+}
+
+const PROPENSITY_MATCHING: MethodDefinition = {
+  id: PROPENSITY_MATCHING_METHOD_ID,
+  name: 'Propensity-score matching',
+  family: 'estimation',
+  summary: 'Pair every row with its nearest neighbour on the fitted propensity score from the opposite arm, then average the paired differences over the whole sample.',
+  summaryTex: {
+    tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i (2T_i - 1)\bigl(Y_i - Y_{j_m(i)}\bigr)`,
+    plain: 'ATE = (1/N) Σ (2T − 1)(Y − Y_jm), where jm is the nearest neighbour on the score from the other arm',
+  },
+  caveats: [
+    {
+      id: caveatId('matching-unconfoundedness'),
+      category: 'identification',
+      requirement: 'The covariates are an identified adjustment set, so that given the same propensity score treatment is as good as random.',
+      consequenceIfUnmet: 'The estimate is an association.',
+      sources: [FACURE_CH5('conditional independence and the propensity score'), ROSENBAUM_RUBIN_1983],
+    },
+    {
+      id: caveatId('matching-positivity'),
+      category: 'identification',
+      requirement: 'Every unit has some chance of either arm given the covariates, so no fitted score sits at zero or one.',
+      consequenceIfUnmet: 'A weight divides by a near-zero probability and the estimate is carried by a handful of rows.',
+      sources: [FACURE_CH5('positivity and the bias-variance trade-off'), HERNAN_ROBINS],
+    },
+    {
+      id: caveatId('matching-single-neighbour'),
+      category: 'finite-sample',
+      requirement: 'Each row is paired with one nearest neighbour, which is a K-nearest-neighbours fit with K of one.',
+      consequenceIfUnmet: 'A single neighbour carries the whole comparison for that row.',
+      sources: [FACURE_CH5('matching as a K-nearest-neighbours estimator with K = 1')],
+    },
+    {
+      id: caveatId('matching-average-not-treated'),
+      category: 'interpretation',
+      requirement: 'Pairs are averaged over every row, so the estimand is the average effect rather than the effect on the treated.',
+      consequenceIfUnmet: 'An average effect is read as an effect on the treated.',
+      sources: [FACURE_CH5('the matching estimator')],
+    },
+  ],
+}
+
+const DOUBLY_ROBUST: MethodDefinition = {
+  id: DOUBLY_ROBUST_METHOD_ID,
+  name: 'Doubly robust estimation',
+  family: 'estimation',
+  summary: 'Combine the propensity score with an outcome regression fitted separately in each arm, so that only one of the two models has to be correct.',
+  summaryTex: {
+    tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i\left(\frac{T_i\bigl(Y_i - \hat\mu_1(X_i)\bigr)}{e(X_i)} + \hat\mu_1(X_i)\right) - \frac{1}{N}\sum_i\left(\frac{(1-T_i)\bigl(Y_i - \hat\mu_0(X_i)\bigr)}{1 - e(X_i)} + \hat\mu_0(X_i)\right)`,
+    plain: 'ATE = (1/N) Σ [ T(Y − μ1(X)) / e(X) + μ1(X) ] − (1/N) Σ [ (1−T)(Y − μ0(X)) / (1 − e(X)) + μ0(X) ]',
+  },
+  caveats: [
+    {
+      id: caveatId('aipw-unconfoundedness'),
+      category: 'identification',
+      requirement: 'The covariates are an identified adjustment set, so that given the same propensity score treatment is as good as random.',
+      consequenceIfUnmet: 'The estimate is an association.',
+      sources: [FACURE_CH5('conditional independence and the propensity score'), ROSENBAUM_RUBIN_1983],
+    },
+    {
+      id: caveatId('aipw-positivity'),
+      category: 'identification',
+      requirement: 'Every unit has some chance of either arm given the covariates, so no fitted score sits at zero or one.',
+      consequenceIfUnmet: 'A weight divides by a near-zero probability and the estimate is carried by a handful of rows.',
+      sources: [FACURE_CH5('positivity and the bias-variance trade-off'), HERNAN_ROBINS],
+    },
+    {
+      id: caveatId('aipw-one-model-right'),
+      category: 'functional-form',
+      requirement: 'One of the treatment model and the outcome model must be correctly specified. Two chances at a correct model is not the same as a guarantee.',
+      consequenceIfUnmet: 'With both models wrong the estimate is biased like either one alone.',
+      sources: [FACURE_CH5('why it is called doubly robust'), ROBINS_1994, KENNEDY_DR],
+    },
+    {
+      id: caveatId('aipw-arm-regressions'),
+      category: 'functional-form',
+      requirement: 'The outcome model is a linear regression fitted within each arm on the same design.',
+      consequenceIfUnmet: 'A non-linear response is averaged away.',
+      sources: [FACURE_CH5('the doubly robust estimator in code')],
+    },
+  ],
+}
+
+const CONTINUOUS_GPS: MethodDefinition = {
+  id: CONTINUOUS_GPS_METHOD_ID,
+  name: 'Generalised propensity score',
+  family: 'estimation',
+  summary: 'A continuous treatment has no propensity, so the treatment is regressed on the covariates and the conditional Gaussian density at each observed value supplies the weight.',
+  summaryTex: {
+    tex: String.raw`w_i = \frac{1}{\hat f(T_i \mid X_i)},\qquad \hat\tau = \arg\min_{\alpha,\tau}\sum_i w_i\bigl(Y_i - \alpha - \tau T_i\bigr)^2`,
+    plain: 'w = 1 / f(T | X); τ minimises Σ w (Y − α − τT)²',
+  },
+  caveats: [
+    {
+      id: caveatId('gps-unconfoundedness'),
+      category: 'identification',
+      requirement: 'The covariates are an identified adjustment set, so that given the same propensity score treatment is as good as random.',
+      consequenceIfUnmet: 'The estimate is an association.',
+      sources: [FACURE_CH5('conditional independence and the propensity score'), ROSENBAUM_RUBIN_1983],
+    },
+    {
+      id: caveatId('gps-normal-treatment'),
+      category: 'functional-form',
+      requirement: 'The treatment is taken as normally distributed around its fitted value with constant variance.',
+      consequenceIfUnmet: 'A skewed or heteroskedastic treatment gives the wrong density and the wrong weights.',
+      sources: [FACURE_CH5('assuming a conditional Gaussian for the treatment'), HIRANO_IMBENS_2004],
+    },
+    {
+      id: caveatId('gps-stabilize'),
+      category: 'finite-sample',
+      requirement: 'Stabilize the weights by the marginal density of the treatment; with a continuous treatment this is necessary rather than optional.',
+      consequenceIfUnmet: 'Unstabilized weights can exceed a thousand and the estimate rests on a few points.',
+      sources: [FACURE_CH5('stabilizing the weights by the marginal density')],
+    },
+    {
+      id: caveatId('gps-linear-response'),
+      category: 'interpretation',
+      requirement: 'The weighted model fits one slope, so the reported effect is a single treatment response rather than a curve.',
+      consequenceIfUnmet: 'A curved dose response is read as one slope.',
+      sources: [FACURE_CH5('the weighted final model')],
     },
   ],
 }
@@ -2421,6 +2592,10 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   GRAPHICAL_IDENTIFICATION,
   COUNTERFACTUAL_IDENTIFICATION,
   BACKDOOR_LINEAR_REGRESSION,
+  PROPENSITY_WEIGHTING,
+  PROPENSITY_MATCHING,
+  DOUBLY_ROBUST,
+  CONTINUOUS_GPS,
   FRONTDOOR_TWO_STAGE,
   INSTRUMENTAL_VARIABLE,
   POISSON_GLM,

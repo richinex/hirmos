@@ -249,7 +249,7 @@ pub fn fit(plan: &Plan<'_>) -> Result<Fit, Error> {
         .map_err(|_| Error::Regression)?;
         let train_x: Vec<_> = train.iter().map(|i| x[*i].clone()).collect();
         let train_d: Vec<_> = train.iter().map(|i| group[*i]).collect();
-        let classifier = logistic::fit_unpenalized(&train_x, &train_d);
+        let classifier = logistic::fit_unpenalized(&train_x, &train_d, logistic::SKLEARN_DEFAULT_MAX_ITER);
         termination.push(classifier.termination);
         let test_x: Vec<_> = test.iter().map(|i| x[*i].clone()).collect();
         let probabilities = classifier.predict_probability(&test_x);

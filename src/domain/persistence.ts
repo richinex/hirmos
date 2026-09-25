@@ -267,7 +267,9 @@ const upgradeStationarityTransformRecord = (value: ParsedEnvelope['stationarity'
  * tagged evidence. The numerical result is retained; inference that was never computed is recorded
  * explicitly rather than fabricated during project loading.
  */
-const upgradeEstimationRunRecord = (value: Record<string, unknown>): Record<string, unknown> => {
+const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<string, unknown> => {
+  // A run saved before covariate encodings were declarable entered every column as a number.
+  const value = Reflect.get(record, 'encodings') === undefined ? { ...record, encodings: {} } : record
   const estimate = Reflect.get(value, 'estimate')
   let upgradedEstimate = estimate
 

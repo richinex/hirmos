@@ -4,3 +4,4 @@ pub mod histogram;
 pub mod split;
 pub mod tree;
 pub mod regressor;
+pub mod classifier;

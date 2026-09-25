@@ -2,7 +2,7 @@
 //! Derived from scikit-learn 1.9.0 (BSD-3-Clause); see the preserved COPYING.
 
 use super::{
-    histogram::{subtract, Bin, Feature, UnitDerivatives},
+    histogram::{subtract, Bin, Derivatives, Feature},
     split::{Child, Curvature, Search, Split},
 };
 use std::num::NonZeroUsize;
@@ -86,6 +86,7 @@ fn candidate(
     bins: &[usize],
     search: &Search,
     min_leaf: usize,
+    curvature: Curvature,
 ) -> Result<Option<Candidate>, TreeError> {
     if rows.len() < min_leaf.saturating_mul(2) {
         return Ok(None);
@@ -93,7 +94,7 @@ fn candidate(
     let mut best: Option<(usize, Split)> = None;
     for (feature, values) in histogram.iter().enumerate() {
         let split = search
-            .find(&values[..bins[feature]], totals, Curvature::Unit)
+            .find(&values[..bins[feature]], totals, curvature)
             .map_err(|_| TreeError::Split)?;
         if let Some(split) = split {
             if best.as_ref().map_or(true, |(_, b)| split.gain > b.gain) {
@@ -116,7 +117,7 @@ impl Tree {
         columns: &[Vec<u8>],
         bins: &[usize],
         width: usize,
-        derivatives: &UnitDerivatives<'_>,
+        derivatives: &Derivatives,
         min_leaf: NonZeroUsize,
         max_leaves: NonZeroUsize,
         l2: f64,
@@ -141,7 +142,7 @@ impl Tree {
         let features: Vec<_> = columns
             .iter()
             .map(|c| {
-                Feature::new(c, derivatives.derivatives(), width).map_err(|_| TreeError::Shape)
+                Feature::new(c, derivatives, width).map_err(|_| TreeError::Shape)
             })
             .collect::<Result<_, _>>()?;
         let histogram: Vec<_> = features.iter().map(Feature::root).collect();
@@ -149,9 +150,16 @@ impl Tree {
         let gradient = crate::numpy_reduce::numpy_sum(
             &histogram[0].iter().map(|b| b.gradient).collect::<Vec<_>>(),
         );
+        let curvature = derivatives.curvature();
+        let hessian = match curvature {
+            Curvature::Unit => count as f64,
+            Curvature::Variable => crate::numpy_reduce::numpy_sum(
+                &histogram[0].iter().map(|b| b.hessian).collect::<Vec<_>>(),
+            ),
+        };
         let totals = Child {
             gradient,
-            hessian: count as f64,
+            hessian,
             count: count as u32,
             value: 0.,
         };
@@ -166,6 +174,7 @@ impl Tree {
             bins,
             &search,
             min_leaf.get(),
+            curvature,
         )? {
             push(&mut queue, root);
         }
@@ -214,6 +223,7 @@ impl Tree {
                 bins,
                 &search,
                 min_leaf.get(),
+                curvature,
             )? {
                 push(&mut queue, c);
             }
@@ -225,6 +235,7 @@ impl Tree {
                 bins,
                 &search,
                 min_leaf.get(),
+                curvature,
             )? {
                 push(&mut queue, c);
             }

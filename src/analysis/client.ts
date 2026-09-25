@@ -34,7 +34,7 @@ import type {
   PcmciPlusEvidence,
   VarLingamEvidence,
 } from '@/domain/discovery'
-import type { BackdoorLinearEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, InstrumentalVariableEvidence, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
+import type { BackdoorLinearEvidence, ContinuousGpsEvidence, DoublyRobustEvidence, PropensityMatchingEvidence, PropensityWeightingEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, InstrumentalVariableEvidence, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, TLearnerEvidence, VecmEvidence } from '@/domain/estimation'
@@ -55,6 +55,10 @@ import {
   type AnalysisWorkerEvent,
   type AnalysisWorkerProblem,
   type DmlGroupsRequest,
+  type PropensityBootstrapRequest,
+  type PropensityTreatmentModel,
+  type PropensityWeightingFit,
+  type LogisticTreatmentModel,
   type CoxRegressionWorkerDesign,
   type MultiStateWorkerInput,
   type TemporalSamples,
@@ -724,6 +728,105 @@ export function runBackdoorLinear(
   return new Promise((resolve) => {
     pending.set(request, pendingRun('backdoor-linear-succeeded', resolve))
     const command: AnalysisWorkerCommand = { kind: 'backdoor-linear', request, values, rows, columns, ...design }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runPropensityWeighting(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly treatment: number
+    readonly outcome: number
+    readonly adjustment: readonly number[]
+    readonly scale: 'inverseProbability' | 'stabilized'
+    readonly fit: PropensityWeightingFit
+  },
+): Promise<Result<PropensityWeightingEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('propensity-weighting-succeeded', resolve))
+    const command: AnalysisWorkerCommand = { kind: 'propensity-weighting', request, values, rows, columns, ...design }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runPropensityMatching(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly treatment: number
+    readonly outcome: number
+    readonly adjustment: readonly number[]
+    readonly model: PropensityTreatmentModel
+  },
+): Promise<Result<PropensityMatchingEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('propensity-matching-succeeded', resolve))
+    const command: AnalysisWorkerCommand = { kind: 'propensity-matching', request, values, rows, columns, ...design }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runDoublyRobust(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly treatment: number
+    readonly outcome: number
+    readonly adjustment: readonly number[]
+    readonly model: LogisticTreatmentModel
+    readonly bootstrap: PropensityBootstrapRequest | null
+  },
+): Promise<Result<DoublyRobustEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('doubly-robust-succeeded', resolve))
+    const command: AnalysisWorkerCommand = { kind: 'doubly-robust', request, values, rows, columns, ...design }
+    try {
+      analysisWorker().postMessage(command, [values.buffer])
+    } catch (cause: unknown) {
+      pending.delete(request)
+      resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
+    }
+  })
+}
+
+export function runContinuousGps(
+  values: Float64Array,
+  rows: number,
+  columns: number,
+  design: {
+    readonly treatment: number
+    readonly outcome: number
+    readonly adjustment: readonly number[]
+    readonly scale: 'inverseDensity' | 'stabilized'
+    readonly bootstrap: PropensityBootstrapRequest | null
+  },
+): Promise<Result<ContinuousGpsEvidence, AnalysisWorkerProblem>> {
+  const request = newWorkerRequestId()
+  return new Promise((resolve) => {
+    pending.set(request, pendingRun('continuous-gps-succeeded', resolve))
+    const command: AnalysisWorkerCommand = { kind: 'continuous-gps', request, values, rows, columns, ...design }
     try {
       analysisWorker().postMessage(command, [values.buffer])
     } catch (cause: unknown) {

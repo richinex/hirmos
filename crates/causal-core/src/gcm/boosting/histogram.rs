@@ -82,8 +82,40 @@ impl Derivatives {
             Hessians::Constant,
         )
     }
+    /// CyHalfBinomialLoss gradient and Hessian, with the Taylor branch at -37.
+    pub fn half_binomial(observed: &[f64], raw: &[f64]) -> Result<Self, HistogramError> {
+        if observed.len() != raw.len() {
+            return Err(HistogramError::Shape);
+        }
+        if observed.iter().chain(raw).any(|v| !v.is_finite()) {
+            return Err(HistogramError::NonFinite);
+        }
+        let mut gradients = Vec::with_capacity(observed.len());
+        let mut hessians = Vec::with_capacity(observed.len());
+        for (&y, &value) in observed.iter().zip(raw) {
+            let (gradient, hessian) = if value > -37.0 {
+                let exponential = (-value).exp();
+                (
+                    ((1.0 - y) - y * exponential) / (1.0 + exponential),
+                    exponential / (1.0 + exponential).powi(2),
+                )
+            } else {
+                let exponential = value.exp();
+                (exponential - y, exponential)
+            };
+            gradients.push(gradient as f32);
+            hessians.push(hessian as f32);
+        }
+        Self::new(gradients, Hessians::Variable(hessians))
+    }
     pub fn gradients(&self) -> &[f32] {
         &self.gradients
+    }
+    pub fn curvature(&self) -> crate::gcm::boosting::split::Curvature {
+        match self.hessians {
+            Hessians::Constant => crate::gcm::boosting::split::Curvature::Unit,
+            Hessians::Variable(_) => crate::gcm::boosting::split::Curvature::Variable,
+        }
     }
 }
 

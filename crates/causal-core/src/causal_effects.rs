@@ -1196,6 +1196,25 @@ fn linear_fit(predictors: &[Vec<f64>], targets: &[f64]) -> Fitted {
     }
 }
 
+/// Uniform weights, so the prediction is the mean of the k nearest targets. Ties keep the lower
+/// row, which is what `KNeighborsRegressor` does.
+pub fn k_neighbors_predict(predictors: &[Vec<f64>], targets: &[f64], k: usize, row: &[f64]) -> f64 {
+    let mut d: Vec<(f64, usize)> = predictors
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let sq: f64 = p.iter().zip(row).map(|(a, b)| (a - b) * (a - b)).sum();
+            (sq, i)
+        })
+        .collect();
+    d.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .expect("no NaN distances")
+            .then(a.1.cmp(&b.1))
+    });
+    d[..k].iter().map(|&(_, i)| targets[i]).sum::<f64>() / k as f64
+}
+
 fn predict_one(fitted: &Fitted, row: &[f64]) -> f64 {
     match fitted {
         Fitted::Linear { intercept, coef } => {
@@ -1205,23 +1224,7 @@ fn predict_one(fitted: &Fitted, row: &[f64]) -> f64 {
             k,
             predictors,
             targets,
-        } => {
-            // Uniform weights, so the prediction is the mean of the k nearest targets.
-            let mut d: Vec<(f64, usize)> = predictors
-                .iter()
-                .enumerate()
-                .map(|(i, p)| {
-                    let sq: f64 = p.iter().zip(row).map(|(a, b)| (a - b) * (a - b)).sum();
-                    (sq, i)
-                })
-                .collect();
-            d.sort_by(|a, b| {
-                a.0.partial_cmp(&b.0)
-                    .expect("no NaN distances")
-                    .then(a.1.cmp(&b.1))
-            });
-            d[..*k].iter().map(|&(_, i)| targets[i]).sum::<f64>() / *k as f64
-        }
+        } => k_neighbors_predict(predictors, targets, *k, row),
     }
 }
 

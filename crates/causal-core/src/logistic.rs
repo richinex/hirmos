@@ -29,16 +29,20 @@ fn closs_grad(y: f64, raw: f64) -> (f64, f64) {
     }
 }
 
-pub fn fit_logistic(x: &[Vec<f64>], y: &[f64]) -> Logistic {
-    fit_with_penalty(x, y, true)
+/// `LogisticRegression`'s own default.
+pub const SKLEARN_DEFAULT_MAX_ITER: usize = 100;
+
+pub fn fit_logistic(x: &[Vec<f64>], y: &[f64], max_iter: usize) -> Logistic {
+    fit_with_penalty(x, y, true, max_iter)
 }
 
-/// The chapter's sklearn LogisticRegression(penalty=None), retaining optimizer status.
-pub fn fit_unpenalized(x: &[Vec<f64>], y: &[f64]) -> Logistic {
-    fit_with_penalty(x, y, false)
+/// sklearn's LogisticRegression(penalty=None), retaining optimizer status. `max_iter` is the
+/// caller's because sklearn's own default of 100 is not what every caller asks for.
+pub fn fit_unpenalized(x: &[Vec<f64>], y: &[f64], max_iter: usize) -> Logistic {
+    fit_with_penalty(x, y, false, max_iter)
 }
 
-fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool) -> Logistic {
+fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool, max_iter: usize) -> Logistic {
     let n = x.len();
     let p = x[0].len();
     let l2 = if penalized { 1.0 / n as f64 } else { 0.0 };
@@ -52,7 +56,7 @@ fn fit_with_penalty(x: &[Vec<f64>], y: &[f64], penalized: bool) -> Logistic {
         64.0,
         1e-4,
         50,
-        100,
+        max_iter,
         |w| {
             let sw_sum = n as f64;
             let mut loss_sum = 0.0;

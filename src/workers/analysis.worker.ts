@@ -27,7 +27,7 @@ import {
   parseVarLingamEvidence,
 } from '@/domain/discovery'
 import { assertNever } from '@/domain/dop'
-import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
+import { parseBackdoorLinearEvidence, parseCausalEffectsEvidence, parseContinuousGpsEvidence, parseDoublyRobustEvidence, parsePropensityMatchingEvidence, parsePropensityWeightingEvidence, parseCausalImpactEvidence, parseCountGlmEvidence, parseFrontdoorTwoStageEvidence, parseInstrumentalVariableEvidence, parseNegativeBinomialIngarchEvidence } from '@/domain/estimation'
 import { parseCountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { parseInterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
@@ -327,6 +327,14 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         level: command.level,
         errorModel: command.errorModel,
       }
+    case 'propensity-weighting':
+      return { kind: 'propensityWeighting', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, fit: command.fit }
+    case 'propensity-matching':
+      return { kind: 'propensityMatching', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model }
+    case 'doubly-robust':
+      return { kind: 'doublyRobust', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, bootstrap: command.bootstrap }
+    case 'continuous-gps':
+      return { kind: 'continuousGps', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, bootstrap: command.bootstrap }
     case 'frontdoor-two-stage':
       return {
         kind: 'frontdoorTwoStage',
@@ -717,6 +725,30 @@ self.onmessage = (message: MessageEvent<unknown>) => {
           return
         }
         emit({ kind: 'backdoor-linear-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'propensity-weighting': {
+        const result = parsePropensityWeightingEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'propensity-weighting-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'propensity-matching': {
+        const result = parsePropensityMatchingEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'propensity-matching-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'doubly-robust': {
+        const result = parseDoublyRobustEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'doubly-robust-succeeded', request: command.request, result: result.value })
+        return
+      }
+      case 'continuous-gps': {
+        const result = parseContinuousGpsEvidence(decoded)
+        if (!result.ok) { fail(command.request, { kind: 'worker-protocol-failed', detail: result.error.detail }); return }
+        emit({ kind: 'continuous-gps-succeeded', request: command.request, result: result.value })
         return
       }
       case 'frontdoor-two-stage': {

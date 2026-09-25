@@ -1805,7 +1805,11 @@ mod tests {
                 assert_eq!(pc_alpha, 0.05);
                 assert!(matches!(samples, TemporalSamples::Dense));
             }
-            AnalysisCommand::StaggeredDid { .. }
+            AnalysisCommand::PropensityWeighting { .. }
+            | AnalysisCommand::PropensityMatching { .. }
+            | AnalysisCommand::DoublyRobust { .. }
+            | AnalysisCommand::ContinuousGps { .. }
+            | AnalysisCommand::StaggeredDid { .. }
             | AnalysisCommand::InterruptedSeries { .. }
             | AnalysisCommand::SharpRd { .. }
             | AnalysisCommand::StructuralCausalImpact { .. }
