@@ -12,10 +12,19 @@ export const timeInterpretationSchema = z.discriminatedUnion('kind', [
 
 export type TimeInterpretation = z.infer<typeof timeInterpretationSchema>
 
+/** The most common gap between consecutive distinct times; the source frequency is read from it. */
+export const timeSpacingSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('ordinal') }).strict(),
+  z.object({ kind: z.literal('single-period') }).strict(),
+  z.object({ kind: z.literal('days'), modal: z.number().positive() }).strict(),
+])
+export type TimeSpacing = z.infer<typeof timeSpacingSchema>
+
 export const timePreviewSchema = z.object({
   calendar: calendarReportSchema.optional(),
   kind: z.enum(['ordinal', 'calendar']),
   rows: z.array(z.object({ original: z.string().nullable(), parsed: z.number().finite().nullable() }).strict()).max(12),
+  spacing: timeSpacingSchema,
 }).strict()
 export type TimePreview = z.infer<typeof timePreviewSchema>
 

@@ -1,6 +1,6 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { inspectCalendar } from './calendar'
-import { timestampSql, type TimeInterpretation, type TimePreview } from '@/domain/timeInterpretation'
+import { timestampSql, type TimeInterpretation, type TimePreview, type TimeSpacing } from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
 import duckdbEhWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url'
 import duckdbMvpWorker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url'
@@ -33,6 +33,8 @@ import {
 } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
 import type { PanelDataProblem, PanelKeyMatrix, PanelLongMatrix, PanelPeriod, PanelStructureEvidence } from '@/domain/panel'
+
+const MILLISECONDS_PER_DAY = 86_400_000
 
 const PREVIEW_ROWS = 12
 
@@ -440,7 +442,18 @@ export async function previewTimeColumn(source: SelectedSource, profile: Dataset
         const number = value == null ? NaN : Number(value)
         return { original: original == null ? null : String(original), parsed: Number.isFinite(number) ? number : null }
       })
-      if (calendar === undefined || parsed.kind === 'ordinal') return ok({ kind: parsed.kind, rows })
+      const spacing = await ((): Promise<TimeSpacing> => {
+        if (parsed.kind === 'ordinal') return Promise.resolve({ kind: 'ordinal' })
+        return connection.query(`
+          WITH distinct_times AS (SELECT DISTINCT ${parsed.sql} AS time FROM ${relation} WHERE ${parsed.sql} IS NOT NULL),
+               gaps AS (SELECT time - lag(time) OVER (ORDER BY time) AS gap FROM distinct_times)
+          SELECT gap FROM gaps WHERE gap IS NOT NULL GROUP BY gap ORDER BY count(*) DESC, gap ASC LIMIT 1
+        `).then((gaps) => {
+          const gap = gaps.numRows === 0 ? null : gaps.getChild('gap')?.get(0)
+          return gap == null ? { kind: 'single-period' } : { kind: 'days', modal: Number(gap) / MILLISECONDS_PER_DAY }
+        })
+      })()
+      if (calendar === undefined || parsed.kind === 'ordinal') return ok({ kind: parsed.kind, rows, spacing })
       const unit = calendar.unitColumn === undefined ? undefined : profile.columns.find((candidate) => candidate.id === calendar.unitColumn)
       if (calendar.unitColumn !== undefined && unit === undefined) return err({ kind: 'materialization-failed', detail: 'The unit column is outside the supplied profile.' })
       const unitSql = unit === undefined ? "'Series'" : `CAST(${sqlIdentifier(unit.name)} AS VARCHAR)`
@@ -456,7 +469,7 @@ export async function previewTimeColumn(source: SelectedSource, profile: Dataset
         else times.push(Number(value))
       }
       const report = await inspectCalendar(calendar.schedule, Array.from(groups, ([name, times]) => ({ name, times })))
-      return ok({ kind: parsed.kind, rows, calendar: report })
+      return ok({ kind: parsed.kind, rows, spacing, calendar: report })
     },
     interpretation.kind === 'source-type' ? undefined : column.name,
   )

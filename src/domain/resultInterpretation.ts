@@ -12,6 +12,7 @@ import {
 } from './estimation'
 import type { StudySpecification } from './study'
 import type { SensitivityRunArtifact } from './sensitivity'
+import type { AdjustedDidSpecification } from './adjustedDid'
 import {
   formatCount,
   formatEstimate,
@@ -166,6 +167,21 @@ const intervalStatement = (
 }
 
 const noInterval = (reason: string): InterpretationStatement => ({ kind: 'uncertainty', text: reason })
+
+const staggeredBaseline = (anticipation: number): string => {
+  if (anticipation === 0) return 'the period immediately before adoption'
+  return `the period immediately before the ${anticipation}-period anticipation window`
+}
+
+/** The two-period regression counts rows, not units, when computing standard errors; the interval says so. */
+const adjustedDidUncertainty = (specification: AdjustedDidSpecification, interval: EstimateInterval): InterpretationStatement => {
+  const base = interval.kind === 'none' ? noInterval(interval.reason) : intervalStatement(interval, { kind: 'additive' })
+  switch (specification.kind) {
+    case 'doublyRobust': return base
+    case 'regression': return { kind: 'uncertainty', text: `${base.text} The same unit appears in both periods, so the rows are not independent and identically distributed. The treatment is assigned to the unit, not to the period, so the sample size is closer to the number of units than to the number of rows, which is what this regression uses when computing standard errors. Standard errors clustered by unit give wider confidence intervals than no clustering at all; the staggered adoption estimator clusters by unit.` }
+    default: return assertNever(specification)
+  }
+}
 
 const additiveIntervalForOutcome = (interval: EstimateInterval, outcome: string): InterpretationStatement => {
   switch (interval.kind) {
@@ -452,14 +468,14 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
     }
     case 'panel-intervention-run': {
       if(run.evidence.kind==='staggeredDid') return {kind:'result-interpretation',statements:[
-        {kind:'magnitude',text:'The headline is the equal-weight average of supported post-adoption event-time effects. Group-time ATT, cohort averages and calendar averages are reported separately.'},
+        {kind:'magnitude',text:`The headline is the equal-weight average of supported post-adoption event-time effects. Each post-adoption effect compares the outcome in that period with ${staggeredBaseline(run.evidence.specification.anticipation)}, for the treated cohort against the comparison group. Group-time ATT, cohort averages and calendar averages are reported separately.`},
         estimate.interval.kind==='none'?noInterval(estimate.interval.reason):intervalStatement(estimate.interval,{kind:'additive'}),
         {kind:'qualification',text:'Interpretation requires parallel untreated trends for the selected comparison group, treatment overlap, no effects before the specified anticipation window, and no interference between units. Adjustment covariates must not be affected by treatment.'},
       ]}
       if (run.evidence.kind === 'panelAdjusted') return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `For the treated group, the estimated average effect on ${plainName(study.outcome.name)} is ${directionalDifference(run.evidence.estimate)} after adoption.` },
-        estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
-        { kind: 'qualification', text: run.evidence.specification.kind === 'regression' ? 'Interpretation requires parallel untreated trends, no anticipation or spillovers, and an appropriate regression specification. The Student-t interval assumes independent, homoskedastic errors; it is not clustered by unit.' : 'Interpretation requires conditional parallel trends, no anticipation or spillovers, treatment overlap and an adequate nuisance model. Cross-fitting does not establish these causal conditions. Covariates are measured before treatment.' },
+        adjustedDidUncertainty(run.evidence.specification, estimate.interval),
+        { kind: 'qualification', text: run.evidence.specification.kind === 'regression' ? 'Interpretation requires parallel untreated trends, no anticipation or spillovers, and an appropriate regression specification.' : 'Interpretation requires conditional parallel trends, no anticipation or spillovers, treatment overlap and an adequate nuisance model. Cross-fitting does not establish these causal conditions. Covariates are measured before treatment.' },
       ] }
       const primary = run.evidence.kind === 'panelDid' ? run.evidence.did.estimate : run.evidence.syntheticDid.estimate
       return { kind: 'result-interpretation', statements: [

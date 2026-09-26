@@ -10,7 +10,8 @@ import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { previewTimeColumnInWorker } from '@/data/client'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
@@ -52,6 +53,7 @@ import {
   type SeriesTransform,
   type StationarityEvidenceArtifact,
   type VariableStationarityEvidence,
+  suggestFrequency,
 } from '@/domain/preprocessing'
 import { assessStationarity, decisiveEvidence, describeStationarityAssessment, describeStationarityConflict, type StationarityAssessment, type StationarityTestRef } from '@/domain/stationarityAssessment'
 import { seasonalPeriodOf } from '@/domain/seasonal'
@@ -381,6 +383,22 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
   const currentFrequency = timeSeriesSelected || panelSelected ? draft.sampling.frequency : 'monthly'
   const currentTime = draft.sampling.kind === 'regular-series' || draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.timeColumn ?? '' : ''
   const currentUnit = draft.sampling.kind === 'regular-panel' || draft.sampling.kind === 'regular-panel-awaiting-keys' ? draft.sampling.unitColumn ?? '' : ''
+  const timeColumnProfile = profile.columns.find((column) => column.id === currentTime) ?? null
+  const timeColumnId = timeColumnProfile === null ? null : timeColumnProfile.id
+  const panelClockOrdinal = panelSelected && timeColumnProfile !== null && isNumericDuckDbType(timeColumnProfile.duckdbType)
+  const interpretationValue = draft.sampling.kind === 'regular-series'
+    ? draft.sampling.interpretation?.kind === 'date-format' ? draft.sampling.interpretation.format : draft.sampling.interpretation?.kind ?? 'source-type'
+    : 'source-type'
+  useEffect(() => {
+    const interpretation = TIME_INTERPRETATIONS.find((choice) => choice.value === interpretationValue)
+    if (timeColumnId === null || interpretation === undefined) return
+    let current = true
+    void previewTimeColumnInWorker(source.file, profile, timeColumnId, interpretation.interpretation).then((result) => {
+      if (!current || !result.ok) return
+      changePreprocessing(profile.id, { type: 'time-spacing-observed', timeColumn: timeColumnId, suggestion: suggestFrequency(result.value.spacing) })
+    })
+    return () => { current = false }
+  }, [source.file, profile, timeColumnId, interpretationValue, changePreprocessing])
   const outputFrequency = timeSeriesSelected ? effectiveFrequency(draft.sampling.frequency, draft.resampling) : null
   const seasonalPeriod = outputFrequency === null ? null : seasonalPeriodOf(outputFrequency)
   const lagExclusion = draft.missingness.kind === 'lag-aware-exclusion' ? draft.missingness : null
@@ -640,7 +658,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   ? <ParameterLabel className={fieldLabel} htmlFor="time-interpretation" label="Time interpretation" help="Weeks start on Monday. The ISO week-year can differ from the calendar year." />
                   : <label className={fieldLabel} htmlFor="time-interpretation">Time interpretation</label>}
                 <Select id="time-interpretation" className={field('text', 'mt-1')}
-                  value={draft.sampling.interpretation?.kind === 'date-format' ? draft.sampling.interpretation.format : draft.sampling.interpretation?.kind ?? 'source-type'}
+                  value={interpretationValue}
                   onChange={(event) => {
                     const choice = TIME_INTERPRETATIONS.find((candidate) => candidate.value === event.target.value)
                     if (choice) dispatch({ type: 'time-interpretation-selected', interpretation: choice.interpretation })
@@ -648,7 +666,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   {TIME_INTERPRETATIONS.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
                 </Select>
               </div> : null}
-              <label className="block text-body text-ink">
+              {!panelClockOrdinal && <label className="block text-body text-ink">
                 <span className={fieldLabel}>Source frequency</span>
                 <Select
                   className={field('text', 'mt-1')}
@@ -660,7 +678,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                 >
                   {FREQUENCIES.map((frequency) => <option key={frequency.value} value={frequency.value}>{frequency.label}</option>)}
                 </Select>
-              </label>
+              </label>}
             </div>
           )}
           {draft.sampling.kind === 'regular-series' ? <details className="mt-3">
@@ -668,7 +686,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             <TimePreview file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} />
           </details> : null}
           {draft.sampling.kind === 'regular-series' && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} frequency={draft.sampling.frequency} />}
-          {draft.sampling.kind === 'regular-panel' && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} unitColumn={draft.sampling.unitColumn} frequency={draft.sampling.frequency} />}
+          {draft.sampling.kind === 'regular-panel' && !panelClockOrdinal && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} unitColumn={draft.sampling.unitColumn} frequency={draft.sampling.frequency} />}
           {crossSectionSelected && (
             <p className="m-0 text-body text-muted">Rows are independent units. Their order does not represent time.</p>
           )}

@@ -1,5 +1,5 @@
 import type { MissingnessResolutionRecord } from './missingness'
-import type { TimeInterpretation } from './timeInterpretation'
+import type { TimeInterpretation, TimeSpacing } from './timeInterpretation'
 import { assertNever, brand, err, isNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { ColumnId, DatasetProfile } from './dataset'
 import { seasonalPeriodOf, type SeasonalAdjustmentRecord } from './seasonal'
@@ -20,6 +20,36 @@ export type TransformRecipeId = Brand<string, 'TransformRecipeId'>
 export type StationarityEvidenceId = Brand<string, 'StationarityEvidenceId'>
 
 export type Frequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+
+/** Where the draft's frequency came from: the placeholder, the data, or the reader; a reading never replaces a choice. */
+export type FrequencyOrigin = 'assumed' | 'observed' | 'chosen'
+
+export type FrequencySuggestion =
+  | { readonly kind: 'suggested'; readonly frequency: Frequency }
+  | { readonly kind: 'ordinal' }
+  | { readonly kind: 'single-period' }
+  | { readonly kind: 'unrecognised'; readonly days: number }
+
+const FREQUENCY_BANDS: readonly { readonly frequency: Frequency; readonly days: readonly [number, number] }[] = [
+  { frequency: 'daily', days: [1, 1] },
+  { frequency: 'weekly', days: [7, 7] },
+  { frequency: 'monthly', days: [28, 31] },
+  { frequency: 'quarterly', days: [89, 92] },
+  { frequency: 'yearly', days: [365, 366] },
+]
+
+/** The source frequency read from the modal gap between distinct times; half a day either side allows for clock changes. */
+export function suggestFrequency(spacing: TimeSpacing): FrequencySuggestion {
+  switch (spacing.kind) {
+    case 'ordinal': return { kind: 'ordinal' }
+    case 'single-period': return { kind: 'single-period' }
+    case 'days': {
+      const band = FREQUENCY_BANDS.find(({ days: [low, high] }) => spacing.modal >= low - 0.5 && spacing.modal <= high + 0.5)
+      return band === undefined ? { kind: 'unrecognised', days: spacing.modal } : { kind: 'suggested', frequency: band.frequency }
+    }
+    default: return assertNever(spacing)
+  }
+}
 
 /** The singular calendar unit represented by one row of a regular series. */
 export function frequencyUnit(frequency: Frequency): 'day' | 'week' | 'month' | 'quarter' | 'year' {
@@ -93,6 +123,7 @@ export type SeasonalAdjustmentDraft =
 
 export interface PreprocessingDraft {
   readonly sampling: SamplingDraft
+  readonly frequencyOrigin: FrequencyOrigin
   readonly variables: VariableDraft
   readonly missingness: MissingnessDraft
   /** A saved calendar aggregation for regular daily series; never a chart-only grouping. */
@@ -193,6 +224,7 @@ export type PreprocessingEvent =
   | { readonly type: 'unit-column-selected'; readonly unitColumn: ColumnId }
   | { readonly type: 'time-column-selected'; readonly timeColumn: ColumnId }
   | { readonly type: 'frequency-selected'; readonly frequency: Frequency }
+  | { readonly type: 'time-spacing-observed'; readonly timeColumn: ColumnId; readonly suggestion: FrequencySuggestion }
   | { readonly type: 'variable-toggled'; readonly column: ColumnId }
   | { readonly type: 'column-selection-replaced'; readonly columns: NonEmptyArray<ColumnId> }
   | { readonly type: 'missingness-selected'; readonly resolution: MissingnessDraft }
@@ -220,6 +252,7 @@ export type PreprocessingReadinessProblem =
 export const initialPreprocessingDraft = (profile: DatasetProfile): PreprocessingDraft => {
   return {
     sampling: { kind: 'unconfigured' },
+    frequencyOrigin: 'assumed',
     variables: { kind: 'empty' },
     missingness: { kind: 'not-present' },
     resampling: { kind: 'none' },
@@ -284,6 +317,22 @@ const setSeriesTransform = (
   { column, transform },
 ]
 
+const withFrequency = (state: PreprocessingDraft, frequency: Frequency, frequencyOrigin: FrequencyOrigin): PreprocessingDraft => {
+  switch (state.sampling.kind) {
+    case 'regular-series':
+      return { ...state, frequencyOrigin, sampling: { ...state.sampling, frequency }, resampling: frequency === 'daily' ? state.resampling : { kind: 'none' } }
+    case 'regular-series-awaiting-time':
+      return { ...state, frequencyOrigin, sampling: { kind: 'regular-series-awaiting-time', frequency }, resampling: frequency === 'daily' ? state.resampling : { kind: 'none' } }
+    case 'regular-panel':
+    case 'regular-panel-awaiting-keys':
+      return { ...state, frequencyOrigin, sampling: { ...state.sampling, frequency } }
+    case 'cross-sectional':
+    case 'unconfigured':
+      return state
+    default: return assertNever(state.sampling)
+  }
+}
+
 export function stepPreprocessing(state: PreprocessingDraft, event: PreprocessingEvent): PreprocessingDraft {
   switch (event.type) {
     case 'time-interpretation-selected':
@@ -330,28 +379,40 @@ export function stepPreprocessing(state: PreprocessingDraft, event: Preprocessin
           ? { kind: 'regular-panel-awaiting-keys', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
           : { kind: 'regular-panel', unitColumn, timeColumn: event.timeColumn, frequency: state.sampling.frequency }
         const variables = state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn) ? toggleColumn(state.variables, event.timeColumn) : state.variables
-        return { ...state, sampling, variables }
+        return { ...state, sampling, variables, frequencyOrigin: 'assumed' }
       }
       if (state.sampling.kind !== 'regular-series' && state.sampling.kind !== 'regular-series-awaiting-time') return state
       const frequency = state.sampling.frequency
       return {
         ...state,
         sampling: { kind: 'regular-series', timeColumn: event.timeColumn, frequency },
+        frequencyOrigin: 'assumed',
         variables: state.variables.kind === 'selected' && state.variables.columns.includes(event.timeColumn)
           ? toggleColumn(state.variables, event.timeColumn)
           : state.variables,
       }
     }
+    case 'time-spacing-observed': {
+      switch (event.suggestion.kind) {
+        case 'suggested': {
+          if (state.sampling.kind !== 'regular-series' && state.sampling.kind !== 'regular-panel' && state.sampling.kind !== 'regular-panel-awaiting-keys') return state
+          if (state.sampling.timeColumn !== event.timeColumn) return state
+          switch (state.frequencyOrigin) {
+            case 'chosen': return state
+            case 'assumed':
+            case 'observed': return withFrequency(state, event.suggestion.frequency, 'observed')
+            default: return assertNever(state.frequencyOrigin)
+          }
+        }
+        case 'ordinal':
+        case 'single-period':
+        case 'unrecognised':
+          return state
+        default: return assertNever(event.suggestion)
+      }
+    }
     case 'frequency-selected':
-      if (state.sampling.kind === 'regular-series') {
-        return { ...state, sampling: { ...state.sampling, frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' } }
-      }
-      if (state.sampling.kind === 'regular-series-awaiting-time') {
-        return { ...state, sampling: { kind: 'regular-series-awaiting-time', frequency: event.frequency }, resampling: event.frequency === 'daily' ? state.resampling : { kind: 'none' } }
-      }
-      if (state.sampling.kind === 'regular-panel') return { ...state, sampling: { ...state.sampling, frequency: event.frequency } }
-      if (state.sampling.kind === 'regular-panel-awaiting-keys') return { ...state, sampling: { ...state.sampling, frequency: event.frequency } }
-      return state
+      return withFrequency(state, event.frequency, 'chosen')
     case 'variable-toggled': {
       const variables = toggleColumn(state.variables, event.column)
       const kept: readonly ColumnId[] = variables.kind === 'selected' ? variables.columns : []

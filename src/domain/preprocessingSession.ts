@@ -12,6 +12,7 @@ export interface PreprocessingSession {
 /** Restore choices from the saved preparation, not from its realised row counts. */
 export function preparedDraft(prepared: PreparedDatasetArtifact): PreprocessingDraft {
   const base = {
+    frequencyOrigin: 'chosen' as const,
     variables: { kind: 'selected' as const, columns: prepared.columns },
     missingness: prepared.missingness,
     diagnosticTransform: { kind: 'levels' as const },
