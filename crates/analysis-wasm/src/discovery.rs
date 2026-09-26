@@ -179,22 +179,22 @@ fn cdnots_matrices(
     let mut p_matrix = vec![vec![vec![1.0; max_lag + 1]; variables]; variables];
     let mut val_matrix = vec![vec![vec![0.0; max_lag + 1]; variables]; variables];
 
-    for source in 0..variables {
-        for target in 0..variables {
+    for (source, row) in graph.iter_mut().enumerate() {
+        for (target, cell) in row.iter_mut().enumerate() {
             if source != target {
                 if let Some(mark) =
                     endpoint_mark(result.graph[source][target], result.graph[target][source])
                 {
-                    graph[source][target][0] = mark;
+                    cell[0] = mark;
                 }
             }
-            for lag in 1..=max_lag {
+            for (lag, slot) in cell.iter_mut().enumerate().skip(1) {
                 let lagged_source = lag * variables + source;
                 if let Some(mark) = endpoint_mark(
                     result.graph[lagged_source][target],
                     result.graph[target][lagged_source],
                 ) {
-                    graph[source][target][lag] = mark;
+                    *slot = mark;
                 }
             }
         }
@@ -666,14 +666,15 @@ pub(crate) fn jpcmciplus_evidence(
         .enumerate()
         .flat_map(|(source, targets)| {
             targets.iter().enumerate().flat_map(move |(target, lags)| {
-                lags.iter().enumerate().filter_map(move |(lag, variables)| {
-                    (!variables.is_empty()).then(|| JpcmciSeparatingSetEvidence {
+                lags.iter()
+                    .enumerate()
+                    .filter(|(_, variables)| !variables.is_empty())
+                    .map(move |(lag, variables)| JpcmciSeparatingSetEvidence {
                         source,
                         target,
                         lag,
                         variables: variables.iter().copied().map(node).collect(),
                     })
-                })
             })
         })
         .collect();

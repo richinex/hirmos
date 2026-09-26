@@ -59,6 +59,8 @@ pub(crate) fn validate_stationarity_values(values: &[f64]) -> Result<(), String>
     Ok(())
 }
 
+pub(crate) type DesignColumns = (DMatrix<f64>, DMatrix<f64>, Vec<f64>);
+
 pub(crate) fn design_columns(
     label: &str,
     values: &[f64],
@@ -67,7 +69,7 @@ pub(crate) fn design_columns(
     treatment: usize,
     outcome: usize,
     adjustment: &[usize],
-) -> Result<(DMatrix<f64>, DMatrix<f64>, Vec<f64>), String> {
+) -> Result<DesignColumns, String> {
     validate_dense_matrix(label, values, rows, columns)?;
     let mut used = vec![treatment, outcome];
     used.extend_from_slice(adjustment);

@@ -418,7 +418,7 @@ pub(crate) fn discrete_bn_query(
     if !(2..=10).contains(&bins) {
         return Err("discrete BN query state budget must be between 2 and 10".to_owned());
     }
-    if !(equivalent_sample_size > 0.0) || !equivalent_sample_size.is_finite() {
+    if !(equivalent_sample_size.is_finite() && equivalent_sample_size > 0.0) {
         return Err("discrete BN query equivalent sample size must be positive".to_owned());
     }
     let state_budget = StateBudget::try_from(bins)

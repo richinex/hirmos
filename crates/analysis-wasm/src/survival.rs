@@ -1116,12 +1116,12 @@ pub(crate) fn flexsurv_evidence(
             let durations = column(values, rows, columns, duration)?;
             let events = column(values, rows, columns, event)?;
             let mut observations = Vec::with_capacity(rows);
-            for row in 0..rows {
+            for (row, &duration) in durations.iter().enumerate() {
                 let observed = event_indicator(&events, row)?;
                 let value = if observed {
-                    SurvivalObservation::exact(durations[row])
+                    SurvivalObservation::exact(duration)
                 } else {
-                    SurvivalObservation::right_censored(durations[row])
+                    SurvivalObservation::right_censored(duration)
                 }
                 .map_err(|problem| {
                     format!("invalid survival time at row {}: {problem:?}", row + 1)
@@ -1654,9 +1654,9 @@ pub(crate) fn multi_state_survival_evidence(
         );
     }
     let mut states = origins.clone();
-    for row in 0..rows {
+    for (row, &destination) in destinations.iter().enumerate() {
         if event_indicator(&events, row)? {
-            states.push(destinations[row]);
+            states.push(destination);
         }
     }
     states.sort_by(f64::total_cmp);

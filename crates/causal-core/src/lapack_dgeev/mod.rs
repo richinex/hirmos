@@ -6,7 +6,7 @@
 
 use core::fmt;
 
-#[allow(unused_parens, unused_variables)]
+#[allow(unused_parens, unused_variables, clippy::eq_op, clippy::approx_constant)]
 mod generated {
     pub mod d_lg10;
     pub mod d_sign;

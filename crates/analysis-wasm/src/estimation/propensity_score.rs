@@ -75,6 +75,8 @@ pub(crate) fn continuous_gps(
 }
 
 /// Validation shared by the propensity commands: a dense matrix, distinct columns that index it,
+type PropensityInputs = (Vec<Vec<f64>>, Vec<bool>, Vec<f64>);
+
 /// a non-empty adjustment set and a 0/1 treatment. Returns the design and the arms.
 fn propensity_inputs(
     label: &str,
@@ -84,7 +86,7 @@ fn propensity_inputs(
     treatment: usize,
     outcome: usize,
     adjustment: &[usize],
-) -> Result<(Vec<Vec<f64>>, Vec<bool>, Vec<f64>), String> {
+) -> Result<PropensityInputs, String> {
     validate_dense_matrix(label, values, rows, columns)?;
     let mut used = vec![treatment, outcome];
     used.extend_from_slice(adjustment);

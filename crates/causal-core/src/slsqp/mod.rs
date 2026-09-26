@@ -8,7 +8,8 @@
     non_upper_case_globals,
     unused_assignments,
     unused_mut,
-    unused_parens
+    unused_parens,
+    clippy::eq_op
 )]
 mod generated {
     pub mod __nnls;

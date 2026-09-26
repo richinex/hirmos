@@ -38,7 +38,7 @@ pub(crate) fn linear_scm_counterfactual(
         return Err("linear SCM counterfactual interventions must be finite".to_owned());
     }
     if let Some(scale) = observation_noise {
-        if !(scale > 0.0) || !scale.is_finite() {
+        if !(scale.is_finite() && scale > 0.0) {
             return Err("linear SCM counterfactual observation noise must be positive".to_owned());
         }
     }

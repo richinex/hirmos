@@ -46,6 +46,7 @@ impl RRng {
 
     /// R 4.4.1's `exp_rand` (Ahrens-Dieter), used by `rexp`.
     pub(crate) fn exponential(&mut self) -> f64 {
+        #[allow(clippy::approx_constant)]
         const Q: [f64; 16] = [
             0.693_147_180_559_945_3,
             0.933_373_687_519_045_9,

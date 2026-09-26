@@ -1,3 +1,4 @@
+#![allow(clippy::too_many_arguments)]
 //! Thin browser command façade over the parity-tested causal kernels.
 //!
 //! The façade owns browser-facing validation and serialization. It does not reinterpret test
@@ -849,7 +850,7 @@ pub fn run_analysis(
             uncertainty,
             progress,
         ),
-        AnalysisCommand::SharpRd { rows, cutoff } => estimation::sharp_rd(&values, rows, cutoff),
+        AnalysisCommand::SharpRd { rows, cutoff } => estimation::sharp_rd(values, rows, cutoff),
         AnalysisCommand::CausalImpact {
             rows,
             columns,

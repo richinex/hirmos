@@ -42,7 +42,7 @@ pub(crate) fn interrupted_series(
     let harmonics = match seasonal {
         InterruptedSeasonal::None => None,
         InterruptedSeasonal::Harmonic { pairs, period } => {
-            if pairs == 0 || !(period > 0.0) {
+            if pairs == 0 || period.is_nan() || period <= 0.0 {
                 return Err("harmonic terms need at least one pair and a positive period".to_owned());
             }
             Some(Harmonics { pairs, period, phase: (1..=rows).map(|t| t as f64).collect() })
@@ -136,7 +136,7 @@ pub(crate) fn interrupted_series(
                 return Err("a count model is undefined when every outcome is zero".to_owned());
             }
             let exposure_values: Option<Vec<f64>> = exposure.map(|column| (0..rows).map(|row| values[column * rows + row]).collect());
-            if exposure_values.as_ref().is_some_and(|e| e.iter().any(|v| !(*v > 0.0))) {
+            if exposure_values.as_ref().is_some_and(|e| e.iter().any(|v| v.is_nan() || *v <= 0.0)) {
                 return Err("the exposure must be positive on every row".to_owned());
             }
             let fit = fit_count(&y, exposure_values.as_deref(), &spec, ljung_box_lags);

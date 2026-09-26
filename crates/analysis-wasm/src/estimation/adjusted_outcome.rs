@@ -534,6 +534,8 @@ pub(crate) fn negbin_nuts(
     })
 }
 
+pub(crate) type DmlFrame = (Vec<Vec<f64>>, Vec<f64>, Vec<f64>, bool);
+
 /// The DoubleML study frame: covariate rows, outcome, treatment, and the model flags.
 pub(crate) fn dml_frame(
     label: &str,
@@ -544,7 +546,7 @@ pub(crate) fn dml_frame(
     outcome: usize,
     adjustment: &[usize],
     model: DmlModel,
-) -> Result<(Vec<Vec<f64>>, Vec<f64>, Vec<f64>, bool), String> {
+) -> Result<DmlFrame, String> {
     let (data, _, y) =
         design_columns(label, values, rows, columns, treatment, outcome, adjustment)?;
     if adjustment.is_empty() {

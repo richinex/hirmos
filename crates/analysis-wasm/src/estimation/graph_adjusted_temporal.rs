@@ -302,7 +302,7 @@ pub(crate) fn causal_effects_total(
                                 .iter()
                                 .map(|draw| vec![draw[0][0], draw[1][0]])
                                 .collect();
-                            let interval = vec![
+                            let interval = [
                                 vec![prediction.confidence_interval[0][0][0]],
                                 vec![prediction.confidence_interval[0][1][0]],
                                 vec![prediction.confidence_interval[1][0][0]],
