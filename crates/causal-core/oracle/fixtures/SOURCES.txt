@@ -26,3 +26,10 @@ rather than exact, with the reasons stated at each site:
   one-parameter family. SciPy reports 3 and this solver reports 1, and both
   satisfy the Karush-Kuhn-Tucker conditions with the signs each bound requires.
   The primal solution, objective, gradient and status match exactly.
+
+sklearn_tlearner_global_selection.json was generated on 2026-09-26 by
+oracle/tlearner_global_selection.py under scikit-learn 1.9.0 and NumPy 2.2.6.
+It uses the generated rows of sklearn_crossfit_kernel.json.
+sklearn_tlearner_global_selection_leaf1.json is the same script with a minimum
+leaf of 1, scikit-learn's default and the value the Estimation panel sends:
+python oracle/tlearner_global_selection.py 1

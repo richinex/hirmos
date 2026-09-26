@@ -12,8 +12,7 @@ import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import { brand, err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
-import { tLearnerEvidenceSchema, parseCausalImpactEvidence, bayesianImpactSettingsSchema, impactInferenceMatches } from './estimation'
-import { matchesTLearnerUncertainty, tLearnerUncertaintySchema } from './tLearner'
+import { tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, tLearnerConfigurationSchema, tLearnerRunMatches, parseCausalImpactEvidence, bayesianImpactSettingsSchema, impactInferenceMatches } from './estimation'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
 import { EMPTY_STUDY_DRAFT, type IdentificationArtifact, type StudyDesignDraft, type StudySpecification } from './study'
@@ -325,12 +324,36 @@ const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<str
       evidence: { errorModel: { kind: 'neweyWest' }, ...evidence },
     }
   }
+  // A propensity run saved while boosted scoring was a flag: a cross-fitted run's recorded
+  // validation AUC was the AUC of its cross-fitted scores, so that is the one figure it keeps.
+  if ((Reflect.get(value, 'kind') === 'propensity-weighting-run' || Reflect.get(value, 'kind') === 'propensity-matching-run')
+    && typeof configuration === 'object' && configuration !== null
+    && typeof evidence === 'object' && evidence !== null) {
+    const boosted = Reflect.get(configuration, 'boosted')
+    const model = Reflect.get(evidence, 'treatmentModel')
+    const flagged = (holder: unknown) => typeof holder === 'object' && holder !== null && typeof Reflect.get(holder, 'crossFitted') === 'boolean'
+    if (flagged(boosted) || flagged(model)) {
+      const scoringOf = (holder: object) => Reflect.get(holder, 'crossFitted') === true ? 'cross-fitted' : 'one-model'
+      const withoutFlag = (holder: object) => Object.fromEntries(Object.entries(holder).filter(([key]) => key !== 'crossFitted'))
+      const upgradedBoosted = flagged(boosted) ? { ...withoutFlag(boosted as object), scoring: scoringOf(boosted as object) } : boosted
+      const upgradedModel = flagged(model)
+        ? (() => {
+            const { validationAuc, fittedAuc, ...rest } = withoutFlag(model as object)
+            return { ...rest, scoring: Reflect.get(model as object, 'crossFitted') === true ? { kind: 'crossFitted', auc: fittedAuc } : { kind: 'oneModel', validationAuc, fittedAuc } }
+          })()
+        : model
+      return { ...value, estimate: upgradedEstimate, configuration: { ...configuration, boosted: upgradedBoosted }, evidence: { ...evidence, treatmentModel: upgradedModel } }
+    }
+  }
+  // A T-learner saved before the outcome model was a choice fitted random forests, and one saved
+  // before intervals existed requested none.
   if (Reflect.get(value, 'kind') === 't-learner-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null) {
+    const model = Reflect.get(configuration, 'model') ?? { kind: 'forest', uncertainty: { kind: 'none' }, seed: Reflect.get(configuration, 'seed'), ...(Reflect.get(configuration, 'uncertainty') === undefined ? {} : { uncertainty: Reflect.get(configuration, 'uncertainty') }) }
     return { ...value, estimate: upgradedEstimate,
-      configuration: { uncertainty: { kind: 'none' }, ...configuration },
-      evidence: { uncertainty: { kind: 'none' }, ...evidence } }
+      configuration: { kind: 't-learner', model },
+      evidence: Reflect.get(evidence, 'kind') === 'tLearner' ? { uncertainty: { kind: 'none' }, ...evidence } : evidence }
   }
   // An impact run saved before the evaluated window was a choice covered every row after the
   // intervention, so its window runs through the last row and its window ends at the last row.
@@ -567,10 +590,10 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
       }
     }
     if (run.kind !== 't-learner-run') continue
-    const evidence = tLearnerEvidenceSchema.safeParse(run.evidence)
-    const settings = z.object({ kind: z.literal('t-learner'), seed: z.number().int().min(0).max(0xffffffff), uncertainty: tLearnerUncertaintySchema }).strict().safeParse(run.configuration)
-    if (!evidence.success || !settings.success || !matchesTLearnerUncertainty(settings.data.uncertainty, evidence.data.uncertainty)) {
-      return err({ kind: 'invalid-snapshot', detail: 'The saved T-learner result does not match its uncertainty settings.' })
+    const evidence = z.discriminatedUnion('kind', [tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema]).safeParse(run.evidence)
+    const settings = tLearnerConfigurationSchema.safeParse(run.configuration)
+    if (!evidence.success || !settings.success || !tLearnerRunMatches(settings.data, evidence.data)) {
+      return err({ kind: 'invalid-snapshot', detail: 'The saved T-learner result does not match its outcome model settings.' })
     }
   }
   const survivalRuns = parsed.data.survivalRuns.map((run) => upgradeSurvivalRunRecord(run))

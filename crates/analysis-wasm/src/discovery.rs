@@ -1863,6 +1863,7 @@ mod tests {
             | AnalysisCommand::SeasonalAdjust { .. }
             | AnalysisCommand::DoubleMl { .. }
             | AnalysisCommand::TLearner { .. }
+            | AnalysisCommand::CrossFittedTLearner { .. }
             | AnalysisCommand::GcmEffects { .. }
             | AnalysisCommand::GcmInfluence { .. }
             | AnalysisCommand::DmlRefutationBatch { .. }

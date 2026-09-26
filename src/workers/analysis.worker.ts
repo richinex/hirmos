@@ -33,7 +33,7 @@ import { parseInterruptedSeriesEvidence } from '@/domain/interruptedSeries'
 import { parseMissingnessResolvedEvidence } from '@/domain/missingness'
 import { parseSeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { parsePandasResamplingEvidence } from '@/domain/resampling'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
+import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, negbinNutsEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, vecmEvidenceSchema } from '@/domain/estimation'
 import { parseDmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintyMatches, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema } from '@/domain/counterfactual'
 import { parseLinearRefutationEvidence, parseSeriesStructureEvidence, parseUnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -390,6 +390,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'doubleMl', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed, groups: command.groups }
     case 't-learner':
       return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, uncertainty: command.uncertainty }
+    case 'cross-fitted-t-learner':
+      return { kind: 'crossFittedTLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed }
     case 'ardl-pss':
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
     case 'ardl-model':
@@ -855,6 +857,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = tLearnerEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 't-learner-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'cross-fitted-t-learner': {
+        const result = crossFittedTLearnerEvidenceSchema.safeParse(decoded)
+        if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
+        emit({ kind: 'cross-fitted-t-learner-succeeded', request: command.request, result: result.data })
         return
       }
       case 'ardl-pss': {

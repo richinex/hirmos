@@ -48,6 +48,8 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'count-scan-stable-recursion',
   ])
   expect(parsed.data.map((method) => method.id)).toEqual([
+    'sharp-rd',
+    'sharp-rd-design',
     'adf',
     'kpss',
     'zivot-andrews',
@@ -72,6 +74,10 @@ test('requires sourced caveats for every registered method', async ({ page }, te
     'graphical-identification-id',
     'counterfactual-identification-id-star',
     'backdoor-linear-regression',
+    'propensity-weighting',
+    'propensity-matching',
+    'doubly-robust',
+    'continuous-gps',
     'frontdoor-two-stage',
     'instrumental-variable',
     'poisson-glm',

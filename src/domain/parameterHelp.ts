@@ -109,6 +109,8 @@ export const ESTIMATION_PARAMETER_HELP = {
   },
   tLearner: {
     learnerSeed: 'One seed for both outcome forests.',
+    outcomeModel: 'Random forest is EconML’s TLearner with a forest per arm, fitted on all rows. Boosted, cross-fitted chooses one gradient-boosted classifier per arm by grid search on that arm’s rows, then splits the data set into 2 equally sized data sets; each set’s predictions come from the models trained on the other.',
+    boostedSeed: 'scikit-learn’s random_state for the trees, and the seed of the split into two sets.',
   },
   propensity: {
     treatmentModel: 'Newton-Raphson fits the score the way statsmodels does, over a LAPACK solve. L-BFGS-B fits it the way scikit-learn does, and stops on its own criteria. Boosted trees search a grid of gradient-boosted classifiers and keep the one with the best held-out ROC AUC, which fits a score no linear form can.',
@@ -117,6 +119,9 @@ export const ESTIMATION_PARAMETER_HELP = {
     uncertainty: 'A point estimate alone, or a percentile interval from refitting the treatment model on bootstrap resamples of the rows.',
     crossFitted: 'One model fits the whole sample and scores it. Cross-fitted splits the rows in half, fits a model on each half, and scores every row with the model that did not see it, so a flexible model cannot score its own training rows.',
     splits: 'Folds the grid search scores each candidate on. Five is the usual choice.',
+    learningRates: 'Values of learning_rate to search, separated by commas. scikit-learn: “Learning rate shrinks the contribution of each tree by learning_rate. There is a trade-off between learning_rate and n_estimators.”',
+    maxDepths: 'Values of max_depth to search, separated by commas. scikit-learn: “Maximum depth of the individual regression estimators. The maximum depth limits the number of nodes in the tree.”',
+    nEstimators: 'Values of n_estimators to search, separated by commas. scikit-learn: “The number of boosting stages to perform.”',
     treeSeed: 'Seed for the boosted trees and for the split that cross-fitting uses, so a run repeats exactly.',
     gpsScale: 'Inverse density weights each row by 1 over the conditional density of the treatment it received. Stabilized weights multiply that by the marginal density. With a continuous treatment, stabilizing is necessary rather than optional.',
   },

@@ -117,7 +117,7 @@ mod tests {
             min_samples_leaf: 1,
             min_samples_split: 2,
             seed: 7,
-            cross_fitted: false,
+            scoring: BoostedScoring::OneModel,
             candidates_searched: None,
         };
         let result = propensity_weighting(
@@ -129,8 +129,8 @@ mod tests {
         let json = serde_json::to_value(&result).expect("the evidence serialises");
         assert_eq!(json["treatmentModel"]["kind"], "boosted");
         assert_eq!(json["treatmentModel"]["candidates"], 8);
-        assert_eq!(json["treatmentModel"]["crossFitted"], false);
-        let auc = json["treatmentModel"]["validationAuc"].as_f64().expect("an auc");
+        assert_eq!(json["treatmentModel"]["scoring"]["kind"], "oneModel");
+        let auc = json["treatmentModel"]["scoring"]["validationAuc"].as_f64().expect("an auc");
         assert!(auc > 0.5, "the search should beat chance on a confounded design, got {auc}");
         let estimate = json["estimate"].as_f64().expect("an estimate");
         assert!((estimate - 1.5).abs() < 0.2, "boosted weighting should recover 1.5, got {estimate}");
@@ -141,11 +141,12 @@ mod tests {
         let split = propensity_weighting(
             &values, rows, 3, 0, 1, &[2],
             PropensityWeightScale::InverseProbability,
-            WeightingFit::Boosted { model: BoostedTreatmentModel { cross_fitted: true, ..boosted } },
+            WeightingFit::Boosted { model: BoostedTreatmentModel { scoring: BoostedScoring::CrossFitted, ..boosted } },
         )
         .expect("the cross-fitted design weights");
         let crossed = serde_json::to_value(&split).expect("the evidence serialises");
-        assert_eq!(crossed["treatmentModel"]["crossFitted"], true);
+        assert_eq!(crossed["treatmentModel"]["scoring"]["kind"], "crossFitted");
+        assert!(crossed["treatmentModel"]["scoring"]["validationAuc"].is_null(), "cross-fitting reports no search AUC it did not compute");
         assert_eq!(crossed["propensity"].as_array().expect("scores").len(), rows);
         let apart = (estimate - crossed["estimate"].as_f64().expect("an estimate")).abs();
         assert!(apart < 0.4, "cross-fitting should not move the estimand far, {apart:.3e} apart");
@@ -249,6 +250,52 @@ mod tests {
             PropensityWeightScale::Stabilized, newton()).is_err(), "treatment repeated as outcome");
         assert!(propensity_weighting(&values, 4, 3, 1, 0, &[2],
             PropensityWeightScale::Stabilized, newton()).is_err(), "treatment column is not 0/1");
+    }
+
+    /// The browser command against scikit-learn: each arm's candidate chosen once on all of its rows,
+    /// refitted per half, every row's effect and the ATE, through the matrix layout and the
+    /// reordering back to row order.
+    #[test]
+    fn cross_fitted_t_learner_command_reproduces_scikit_learn() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../causal-core/oracle/fixtures/sklearn_tlearner_global_selection.json"
+        ))
+        .unwrap();
+        let rows = fixture["rows"].as_u64().unwrap() as usize;
+        let width = fixture["columns"].as_u64().unwrap() as usize;
+        let confounder = |row: usize, column: usize| ((row * (column + 3) + column * column) % 29) as f64;
+        let treatment: Vec<f64> = (0..rows).map(|r| f64::from((confounder(r, 0) + confounder(r, 2)).rem_euclid(7.0) > 3.0)).collect();
+        let death: Vec<f64> = (0..rows).map(|r| f64::from((confounder(r, 1) * 2.0 + treatment[r] * 5.0).rem_euclid(11.0) > 4.0)).collect();
+        let mut values = treatment.clone();
+        values.extend(&death);
+        for column in 0..width { values.extend((0..rows).map(|row| confounder(row, column))); }
+        let axis = |name: &str| fixture["grid"][name].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect::<Vec<_>>();
+        let grid = || hirmos_causal_core::model_selection::Grid {
+            learning_rate: axis("learning_rate"),
+            max_depth: axis("max_depth").into_iter().map(|v| v as usize).collect(),
+            n_estimators: axis("n_estimators").into_iter().map(|v| v as usize).collect(),
+        };
+        let adjustment: Vec<usize> = (2..2 + width).collect();
+        let leaf = fixture["min_samples_leaf"].as_u64().unwrap() as usize;
+        let seed = fixture["seed"].as_u64().unwrap() as u32;
+        let result = cross_fitted_t_learner(&values, rows, 2 + width, 0, 1, &adjustment, grid(), 5, leaf, 2, seed).unwrap();
+        let AnalysisResult::CrossFittedTLearner { effects, average, selected, candidates, .. } = result else { panic!("wrong result") };
+        assert_eq!(candidates, 8);
+        assert!((average - fixture["ate"].as_f64().unwrap()).abs() < 1e-12, "ATE {average}");
+        let order: Vec<usize> = fixture["order"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap() as usize).collect();
+        let expected: Vec<f64> = fixture["effects"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        for (at, &row) in order.iter().enumerate() {
+            assert!((effects[row] - expected[at]).abs() < 1e-12, "row {row}");
+        }
+        for (mine, arm) in [(&selected.treated, "treated"), (&selected.control, "control")] {
+            let want = &fixture["selected"][arm];
+            assert_eq!(mine.learning_rate, want["learning_rate"].as_f64().unwrap(), "{arm}");
+            assert_eq!(mine.max_depth, want["max_depth"].as_u64().unwrap() as usize, "{arm}");
+            assert_eq!(mine.n_estimators, want["n_estimators"].as_u64().unwrap() as usize, "{arm}");
+            assert!((mine.validation_auc - fixture["validation_auc"][arm].as_f64().unwrap()).abs() < 1e-12, "{arm} AUC");
+        }
+        assert!(cross_fitted_t_learner(&values, rows, 2 + width, 2, 1, &adjustment[1..], grid(), 5, leaf, 2, seed).is_err(),
+            "a non-binary treatment is refused");
     }
 
     #[test]

@@ -37,7 +37,7 @@ import type {
 import type { BackdoorLinearEvidence, ContinuousGpsEvidence, DoublyRobustEvidence, PropensityMatchingEvidence, PropensityWeightingEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, InstrumentalVariableEvidence, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, TLearnerEvidence, VecmEvidence } from '@/domain/estimation'
+import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, TLearnerEvidence, CrossFittedTLearnerEvidence, VecmEvidence } from '@/domain/estimation'
 import type { DmlRefutationEvidence } from '@/domain/sensitivity'
 import type { DynamicCounterfactualUncertainty, DynamicInterventionTiming, DynamicLinearScmEvidence, LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -102,6 +102,7 @@ type MissingnessOutcome = Result<MissingnessResolvedEvidence, AnalysisWorkerProb
 type SeasonalOutcome = Result<SeasonalAdjustedEvidence, AnalysisWorkerProblem>
 type DoubleMlOutcome = Result<DoubleMlEvidence, AnalysisWorkerProblem>
 type TLearnerOutcome = Result<TLearnerEvidence, AnalysisWorkerProblem>
+type CrossFittedTLearnerOutcome = Result<CrossFittedTLearnerEvidence, AnalysisWorkerProblem>
 type DmlRefutationOutcome = Result<DmlRefutationEvidence, AnalysisWorkerProblem>
 type ArdlOutcome = Result<ArdlEvidence, AnalysisWorkerProblem>
 type VecmOutcome = Result<VecmEvidence, AnalysisWorkerProblem>
@@ -1132,6 +1133,24 @@ export interface TLearnerDesign {
 export function runTLearner(values: Float64Array, rows: number, columns: number, design: TLearnerDesign): Promise<TLearnerOutcome> {
   const request = newWorkerRequestId()
   return post('t-learner-succeeded', { kind: 't-learner', request, values, rows, columns, ...design }, values)
+}
+
+export interface CrossFittedTLearnerDesign {
+  readonly treatment: number
+  readonly outcome: number
+  readonly adjustment: readonly number[]
+  readonly learningRate: readonly number[]
+  readonly maxDepth: readonly number[]
+  readonly nEstimators: readonly number[]
+  readonly splits: number
+  readonly minSamplesLeaf: number
+  readonly minSamplesSplit: number
+  readonly seed: number
+}
+
+export function runCrossFittedTLearner(values: Float64Array, rows: number, columns: number, design: CrossFittedTLearnerDesign): Promise<CrossFittedTLearnerOutcome> {
+  const request = newWorkerRequestId()
+  return post('cross-fitted-t-learner-succeeded', { kind: 'cross-fitted-t-learner', request, values, rows, columns, ...design }, values)
 }
 
 export function runDmlRefutationBatch(values: Float64Array, rows: number, columns: number, design: DmlDesign): Promise<DmlRefutationOutcome> {

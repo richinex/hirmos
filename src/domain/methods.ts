@@ -200,6 +200,7 @@ export const STL_METHOD_ID = methodId('stl-decomposition')
 const paper = (title: string, locator: string): MethodSource => ({ kind: 'paper', title, locator })
 
 // Sources the ontology notes establish.
+const RUIZ_DE_VILLA_CH5 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 5', locator)
 const RUIZ_DE_VILLA_CH7 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 7', locator)
 const RUIZ_DE_VILLA_CH8 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 8', locator)
 const NESS_CH4 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 4', locator)
@@ -1921,12 +1922,12 @@ const T_LEARNER: MethodDefinition = {
   id: T_LEARNER_METHOD_ID,
   name: 'T-learner',
   family: 'estimation',
-  summary: 'One random forest per treatment arm on the adjustment variables; each row’s effect is the treated prediction minus the control prediction at that row.',
+  summary: 'One outcome model per treatment arm on the adjustment variables: a random forest, or a gradient-boosted classifier chosen by grid search and cross-fitted over two halves. Each row’s effect is the treated prediction minus the control prediction at that row.',
   caveats: [
     {
       id: caveatId('t-learner-identified-adjustment'),
       category: 'identification',
-      requirement: 'The two outcome forests see the identified adjustment set, which is also what each row’s effect is conditioned on; the learner removes no confounding of its own.',
+      requirement: 'The two outcome models see the identified adjustment set, which is also what each row’s effect is conditioned on; the learner removes no confounding of its own.',
       consequenceIfUnmet: 'Every row’s effect is an adjusted association under a wrong set, so the whole distribution of effects is off, not one number.',
       sources: [MOLAK_CH9('§ T-Learner: Together We Can Do More; DoWhy’s backdoor.econml.metalearners.TLearner'), KUNZEL_2019],
     },
@@ -1940,14 +1941,14 @@ const T_LEARNER: MethodDefinition = {
     {
       id: caveatId('t-learner-independent-rows'),
       category: 'sampling-structure',
-      requirement: 'Rows are independent draws: each forest bootstraps rows as exchangeable.',
-      consequenceIfUnmet: 'On a series or a panel the forests treat dependent rows as separate evidence and the effects are read with more confidence than the data carry.',
+      requirement: 'Rows are independent draws: forests bootstrap the rows, and the search folds and the two halves split them, as exchangeable.',
+      consequenceIfUnmet: 'On a series or a panel the arm models treat dependent rows as separate evidence and the effects are read with more confidence than the data carry.',
       sources: [KUNZEL_2019, hirmos('docs/DESIGN.md#10 time dependence is not cosmetic')],
     },
     {
       id: caveatId('t-learner-overlap'),
       category: 'identification',
-      requirement: 'Positivity holds at each row’s covariate values: both arms have rows nearby, so neither forest extrapolates.',
+      requirement: 'Positivity holds at each row’s covariate values: both arms have rows nearby, so neither arm model extrapolates.',
       consequenceIfUnmet: 'Where one arm has no rows nearby, that arm’s prediction is an extrapolation and the row’s effect is unsupported.',
       sources: [RUIZ_DE_VILLA_CH7('§7.4.3 positivity'), HERNAN_ROBINS],
     },
@@ -1961,15 +1962,15 @@ const T_LEARNER: MethodDefinition = {
     {
       id: caveatId('t-learner-learner-settings'),
       category: 'computation',
-      requirement: '200 random-forest trees, minimum leaf 5, and one recorded seed shared by both arms’ forests.',
-      consequenceIfUnmet: 'Changing the forest settings changes the estimator specification and every row’s effect.',
-      sources: [ECONML_TLEARNER, hirmos('crates/causal-core/src/tlearner.rs')],
+      requirement: 'The run records its outcome model: 200 random-forest trees with minimum leaf 5 and one seed for both forests, or the boosted grid, the search folds and the seed for the halves and the trees.',
+      consequenceIfUnmet: 'Changing the model settings changes the estimator specification and every row’s effect.',
+      sources: [ECONML_TLEARNER, RUIZ_DE_VILLA_CH5('exercise solution, section 5: ATEs with T-learners and cross-fitting'), hirmos('crates/causal-core/src/tlearner.rs'), hirmos('crates/causal-core/src/crossfit.rs')],
     },
     {
       id: caveatId('t-learner-no-interval'),
       category: 'finite-sample',
-      requirement: 'Optional bootstrap intervals refit both forests on resampled independent rows. Row intervals are pointwise, not simultaneous; the average-effect interval uses a conservative standard-error bound.',
-      consequenceIfUnmet: 'The spread between rows is read as heterogeneity when part of it is sampling noise in two forests.',
+      requirement: 'With random forests, optional bootstrap intervals refit both forests on resampled independent rows; row intervals are pointwise, not simultaneous, and the average-effect interval uses a conservative standard-error bound. The boosted, cross-fitted model reports no interval.',
+      consequenceIfUnmet: 'The spread between rows is read as heterogeneity when part of it is sampling noise in the two arm models.',
       sources: [ECONML_TLEARNER, KUNZEL_2019],
     },
   ],

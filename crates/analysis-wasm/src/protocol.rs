@@ -1495,6 +1495,23 @@ pub(crate) enum AnalysisCommand {
         #[serde(default)]
         uncertainty: TLearnerUncertainty,
     },
+    /// A T-learner whose outcome model per arm is a gradient-boosted classifier chosen by one grid
+    /// search on all of that arm's rows, then refitted in each of two halves stratified on the
+    /// outcome to predict the other half.
+    CrossFittedTLearner {
+        rows: usize,
+        columns: usize,
+        treatment: usize,
+        outcome: usize,
+        adjustment: Vec<usize>,
+        learning_rate: Vec<f64>,
+        max_depth: Vec<usize>,
+        n_estimators: Vec<usize>,
+        splits: usize,
+        min_samples_leaf: usize,
+        min_samples_split: usize,
+        seed: u32,
+    },
     DmlRefutationBatch {
         rows: usize,
         columns: usize,
@@ -1744,6 +1761,28 @@ pub(crate) enum LogisticModel {
 
 /// A boosted treatment model: a `GridSearchCV` over the tree grid scored by ROC AUC, then the
 /// chosen candidate refitted on the whole sample.
+/// Whether the chosen model scores the rows it was fitted on, or each half is scored by the model
+/// fitted on the other half.
+#[derive(Clone, Copy, PartialEq, Eq, serde::Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum BoostedScoring { OneModel, CrossFitted }
+
+/// The areas under the ROC curve each scoring can report.
+#[derive(Clone, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum BoostedScoringEvidence {
+    OneModel {
+        /// The chosen candidate's mean cross-validated ROC AUC.
+        validation_auc: f64,
+        /// ROC AUC of the scores the fitted model gives the rows it was fitted on.
+        fitted_auc: f64,
+    },
+    CrossFitted {
+        /// ROC AUC of the scores each half received from the model fitted on the other half.
+        auc: f64,
+    },
+}
+
 #[derive(Clone, serde::Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct BoostedTreatmentModel {
@@ -1754,8 +1793,7 @@ pub(crate) struct BoostedTreatmentModel {
     pub(crate) min_samples_leaf: usize,
     pub(crate) min_samples_split: usize,
     pub(crate) seed: u32,
-    /// Score every row with a model fitted on the half that did not contain it.
-    pub(crate) cross_fitted: bool,
+    pub(crate) scoring: BoostedScoring,
     /// How many candidates the caller scored before choosing this one, which a refit cannot know.
     pub(crate) candidates_searched: Option<usize>,
 }
@@ -1783,6 +1821,23 @@ pub(crate) enum WeightingFit {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct ArmChoices {
+    pub(crate) treated: ArmChoice,
+    pub(crate) control: ArmChoice,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ArmChoice {
+    pub(crate) learning_rate: f64,
+    pub(crate) max_depth: usize,
+    pub(crate) n_estimators: usize,
+    /// Mean held-out ROC AUC of the chosen candidate over the search folds.
+    pub(crate) validation_auc: f64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct GridCandidateScore {
     pub(crate) learning_rate: f64,
     pub(crate) max_depth: usize,
@@ -1802,12 +1857,8 @@ pub(crate) enum TreatmentModelEvidence {
         learning_rate: f64,
         max_depth: usize,
         n_estimators: usize,
-        /// The selected candidate's mean cross-validated ROC AUC.
-        validation_auc: f64,
-        /// ROC AUC of the scores this run went on to use.
-        fitted_auc: f64,
         candidates: usize,
-        cross_fitted: bool,
+        scoring: BoostedScoringEvidence,
     },
 }
 
@@ -3220,6 +3271,21 @@ pub(crate) enum AnalysisResult {
         /// The mean of the row effects, EconML's `ate`.
         average: f64,
         uncertainty: TLearnerUncertaintyEvidence,
+    },
+    CrossFittedTLearner {
+        observations: usize,
+        control_rows: usize,
+        treated_rows: usize,
+        seed: u32,
+        splits: usize,
+        /// Candidates in the grid; every one of the four searches scored all of them.
+        candidates: usize,
+        /// Each arm's candidate, chosen on all of that arm's rows.
+        selected: ArmChoices,
+        /// One effect per row, in row order.
+        effects: Vec<f64>,
+        /// The mean of the effects in the order the halves are concatenated, as numpy takes it.
+        average: f64,
     },
     ArdlPss {
         observations: usize,

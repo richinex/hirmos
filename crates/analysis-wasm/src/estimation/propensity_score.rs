@@ -151,57 +151,59 @@ fn boosted_scores(
     let labels: Vec<u8> = treated.iter().map(|&t| u8::from(t)).collect();
     let total = candidates(&grid).len();
 
-    let (propensity, chosen, validation) = if model.cross_fitted {
-        let fitted = hirmos_causal_core::crossfit::cross_fitted_propensity(
-            design, &assignment, &grid, model.splits,
-            model.min_samples_leaf, model.min_samples_split, model.seed,
-        )
-        .map_err(|cause| format!("{label} could not cross-fit the treatment model: {cause:?}"))?;
-        let mut ordered = vec![f64::NAN; design.len()];
-        for (at, &row) in fitted.rows.iter().enumerate() {
-            ordered[row] = fitted.scores[at];
+    let fitted_auc = |scores: &[f64]| hirmos_causal_core::metrics::roc_auc(&labels, scores);
+    let (propensity, chosen, scoring) = match model.scoring {
+        BoostedScoring::CrossFitted => {
+            let fitted = hirmos_causal_core::crossfit::cross_fitted_propensity(
+                design, &assignment, &grid, model.splits,
+                model.min_samples_leaf, model.min_samples_split, model.seed,
+            )
+            .map_err(|cause| format!("{label} could not cross-fit the treatment model: {cause:?}"))?;
+            let mut ordered = vec![f64::NAN; design.len()];
+            for (at, &row) in fitted.rows.iter().enumerate() {
+                ordered[row] = fitted.scores[at];
+            }
+            if ordered.iter().any(|score| score.is_nan()) {
+                return Err(format!("{label} cross-fitting left a row unscored"));
+            }
+            let auc = fitted_auc(&ordered);
+            (ordered, fitted.selected[0], BoostedScoringEvidence::CrossFitted { auc })
         }
-        if ordered.iter().any(|score| score.is_nan()) {
-            return Err(format!("{label} cross-fitting left a row unscored"));
+        BoostedScoring::OneModel => {
+            let search = hirmos_causal_core::model_selection::grid_search(
+                design, &assignment, &grid, model.splits,
+                model.min_samples_leaf, model.min_samples_split, model.seed,
+            )
+            .map_err(|cause| format!("{label} could not search the tree grid: {cause:?}"))?;
+            let fitted = hirmos_causal_core::gradient_boosting::GradientBoostingClassifier::fit(
+                design,
+                &assignment,
+                &hirmos_causal_core::gradient_boosting::Options {
+                    n_estimators: search.best.n_estimators,
+                    learning_rate: search.best.learning_rate,
+                    max_depth: search.best.max_depth,
+                    min_samples_leaf: model.min_samples_leaf,
+                    min_samples_split: model.min_samples_split,
+                    random_state: model.seed,
+                },
+            )
+            .map_err(|cause| format!("{label} could not fit the chosen candidate: {cause:?}"))?;
+            let scores = fitted
+                .predict_probability(design)
+                .map_err(|cause| format!("{label} could not score the rows: {cause:?}"))?;
+            let evidence = BoostedScoringEvidence::OneModel { validation_auc: search.best_score, fitted_auc: fitted_auc(&scores) };
+            (scores, search.best, evidence)
         }
-        let best = fitted.selected[0];
-        (ordered, best, f64::NAN)
-    } else {
-        let search = hirmos_causal_core::model_selection::grid_search(
-            design, &assignment, &grid, model.splits,
-            model.min_samples_leaf, model.min_samples_split, model.seed,
-        )
-        .map_err(|cause| format!("{label} could not search the tree grid: {cause:?}"))?;
-        let fitted = hirmos_causal_core::gradient_boosting::GradientBoostingClassifier::fit(
-            design,
-            &assignment,
-            &hirmos_causal_core::gradient_boosting::Options {
-                n_estimators: search.best.n_estimators,
-                learning_rate: search.best.learning_rate,
-                max_depth: search.best.max_depth,
-                min_samples_leaf: model.min_samples_leaf,
-                min_samples_split: model.min_samples_split,
-                random_state: model.seed,
-            },
-        )
-        .map_err(|cause| format!("{label} could not fit the chosen candidate: {cause:?}"))?;
-        let scores = fitted
-            .predict_probability(design)
-            .map_err(|cause| format!("{label} could not score the rows: {cause:?}"))?;
-        (scores, search.best, search.best_score)
     };
 
-    let fitted_auc = hirmos_causal_core::metrics::roc_auc(&labels, &propensity);
     Ok((
         propensity,
         TreatmentModelEvidence::Boosted {
             learning_rate: chosen.learning_rate,
             max_depth: chosen.max_depth,
             n_estimators: chosen.n_estimators,
-            validation_auc: if validation.is_nan() { fitted_auc } else { validation },
-            fitted_auc,
             candidates: model.candidates_searched.unwrap_or(total),
-            cross_fitted: model.cross_fitted,
+            scoring,
         },
     ))
 }

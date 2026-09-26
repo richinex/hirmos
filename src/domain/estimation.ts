@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { sameStructuralModel, structuralModelSchema, structuralImpactSettingsSchema, structuralContributionSchema } from './structuralImpact'
 import type { SharpRdConfiguration, SharpRdEvidence } from './sharpRd'
 import { SHARP_RD_METHOD_ID } from './methods'
-import { matchesTLearnerUncertainty, tLearnerUncertaintyEvidenceSchema } from './tLearner'
+import { matchesTLearnerUncertainty, tLearnerUncertaintyEvidenceSchema, tLearnerUncertaintySchema } from './tLearner'
 import { vecmForecastSchema } from './vecmForecast'
 import { ardlLongRunSchema, vecmLongRunSchema } from './longRun'
 import type { ColumnId } from './dataset'
@@ -201,11 +201,23 @@ export interface DoubleMlConfiguration {
   readonly seed: number
 }
 
+/** The outcome model fitted in each arm, and what each kind of model can report. */
+export type TLearnerOutcomeModel =
+  | {
+      readonly kind: 'forest'
+      /** One seed for both outcome forests. */
+      readonly seed: number
+      readonly uncertainty: import('./tLearner').TLearnerUncertainty
+    }
+  | {
+      readonly kind: 'boosted-cross-fitted'
+      /** Searched separately in each arm of each half. */
+      readonly grid: BoostedGridChoice
+    }
+
 export interface TLearnerConfiguration {
   readonly kind: 't-learner'
-  /** One seed for both outcome forests. */
-  readonly seed: number
-  readonly uncertainty: import('./tLearner').TLearnerUncertainty
+  readonly model: TLearnerOutcomeModel
 }
 
 export interface ArdlConfiguration {
@@ -278,37 +290,128 @@ export interface BinaryEttConfiguration {
 /** Which treatment model fits the score. The chapter fits it with statsmodels and with sklearn. */
 export type PropensityTreatmentModelChoice = 'newton' | 'lbfgsb' | 'boosted'
 
-/** The grid a run searches unless the reader narrows it. */
-export interface BoostedTreatmentModelChoice {
-  readonly learningRate: readonly number[]
-  readonly maxDepth: readonly number[]
-  readonly nEstimators: readonly number[]
+/** A grid of gradient-boosted classifiers, the folds that score it, and the seed for trees and splits. */
+export interface BoostedGridChoice {
+  readonly learningRate: NonEmptyArray<number>
+  readonly maxDepth: NonEmptyArray<number>
+  readonly nEstimators: NonEmptyArray<number>
   readonly splits: number
   readonly seed: number
-  readonly crossFitted: boolean
+}
+
+export const boostedCandidateCount = (grid: BoostedGridChoice): number =>
+  grid.learningRate.length * grid.maxDepth.length * grid.nEstimators.length
+
+/** Whether the chosen model scores the rows it was fitted on, or each half is scored by the model fitted on the other half. */
+export type BoostedScoring = 'one-model' | 'cross-fitted'
+
+/** The propensity score's grid and how the chosen model scores the rows. */
+export interface BoostedTreatmentModelChoice extends BoostedGridChoice {
+  readonly scoring: BoostedScoring
 }
 
 /** sklearn's own `GradientBoostingClassifier` defaults, which the chapter leaves alone. */
-export const boostedCommand = (chosen: BoostedTreatmentModelChoice, candidatesSearched: number | null = null) => ({
-  candidatesSearched,
-  learningRate: chosen.learningRate,
-  maxDepth: chosen.maxDepth,
-  nEstimators: chosen.nEstimators,
-  splits: chosen.splits,
+export const boostedGridCommand = (grid: BoostedGridChoice) => ({
+  learningRate: grid.learningRate,
+  maxDepth: grid.maxDepth,
+  nEstimators: grid.nEstimators,
+  splits: grid.splits,
   minSamplesLeaf: 1,
   minSamplesSplit: 2,
-  seed: chosen.seed,
-  crossFitted: chosen.crossFitted,
+  seed: grid.seed,
 })
 
-export const DEFAULT_BOOSTED_GRID: BoostedTreatmentModelChoice = {
-  learningRate: [0.01, 0.05, 0.1, 0.15],
+export const boostedCommand = (chosen: BoostedTreatmentModelChoice, candidatesSearched: number | null = null) => ({
+  ...boostedGridCommand(chosen),
+  scoring: chosen.scoring,
+  candidatesSearched,
+})
+
+/** The grid a new boosted model starts from; every value can be edited before the run. */
+export const DEFAULT_BOOSTED_SEARCH: BoostedGridChoice = {
+  learningRate: [0.005, 0.01, 0.15, 0.2],
   maxDepth: [1, 2, 3, 4, 5],
-  nEstimators: [50, 100, 200, 300],
+  nEstimators: [100, 150, 200, 300],
   splits: 5,
   seed: 7,
-  crossFitted: false,
 }
+
+export const DEFAULT_BOOSTED_GRID: BoostedTreatmentModelChoice = { ...DEFAULT_BOOSTED_SEARCH, scoring: 'one-model' }
+
+/** What a grid axis accepts: scikit-learn's own bounds for that `GradientBoostingClassifier` parameter. */
+export type BoostedGridAxis = 'learningRate' | 'maxDepth' | 'nEstimators'
+
+/** The largest search the workers accept: values per axis, tree depth and tree count. */
+export const BOOSTED_GRID_LIMITS = { values: 12, maxDepth: 16, nEstimators: 2000 } as const
+
+const gridAxis = (value: z.ZodNumber) => z.tuple([value], value).readonly()
+  .refine((values) => values.length <= BOOSTED_GRID_LIMITS.values, `A grid axis holds at most ${BOOSTED_GRID_LIMITS.values} values.`)
+
+export const boostedGridAxisSchemas = {
+  learningRate: gridAxis(z.number().finite().nonnegative()),
+  maxDepth: gridAxis(z.number().int().positive().max(BOOSTED_GRID_LIMITS.maxDepth)),
+  nEstimators: gridAxis(z.number().int().positive().max(BOOSTED_GRID_LIMITS.nEstimators)),
+}
+
+export type BoostedGridProblem =
+  | { readonly kind: 'empty' }
+  | { readonly kind: 'not-a-number'; readonly token: string }
+  | { readonly kind: 'negative'; readonly value: number }
+  | { readonly kind: 'below-one'; readonly value: number }
+  | { readonly kind: 'not-whole'; readonly value: number }
+  | { readonly kind: 'above-limit'; readonly value: number; readonly limit: number }
+  | { readonly kind: 'repeated'; readonly value: number }
+  | { readonly kind: 'too-many'; readonly limit: number }
+
+/** Values separated by commas or spaces, in the order written; each axis accepts scikit-learn's range for that parameter. */
+export function parseBoostedGridAxis(axis: BoostedGridAxis, text: string): Result<NonEmptyArray<number>, BoostedGridProblem> {
+  const tokens = text.split(/[\s,]+/).filter((token) => token.length > 0)
+  const values: number[] = []
+  for (const token of tokens) {
+    const value = Number(token)
+    if (!Number.isFinite(value)) return err({ kind: 'not-a-number', token })
+    switch (axis) {
+      case 'learningRate':
+        if (value < 0) return err({ kind: 'negative', value })
+        break
+      case 'maxDepth':
+      case 'nEstimators':
+        if (!Number.isInteger(value)) return err({ kind: 'not-whole', value })
+        if (value < 1) return err({ kind: 'below-one', value })
+        if (value > BOOSTED_GRID_LIMITS[axis]) return err({ kind: 'above-limit', value, limit: BOOSTED_GRID_LIMITS[axis] })
+        break
+      default: return assertNever(axis)
+    }
+    if (values.includes(value)) return err({ kind: 'repeated', value })
+    values.push(value)
+  }
+  if (values.length > BOOSTED_GRID_LIMITS.values) return err({ kind: 'too-many', limit: BOOSTED_GRID_LIMITS.values })
+  return isNonEmpty(values) ? ok(values) : err({ kind: 'empty' })
+}
+
+export function describeBoostedGridProblem(axis: BoostedGridAxis, problem: BoostedGridProblem): string {
+  const noun = ((): string => {
+    switch (axis) {
+      case 'learningRate': return 'learning rate'
+      case 'maxDepth': return 'tree depth'
+      case 'nEstimators': return 'tree count'
+      default: return assertNever(axis)
+    }
+  })()
+  switch (problem.kind) {
+    case 'empty': return `Enter at least one ${noun}.`
+    case 'not-a-number': return `${problem.token} is not a number.`
+    case 'negative': return `Each ${noun} must be 0 or more; ${problem.value} is not.`
+    case 'below-one': return `Each ${noun} must be 1 or more; ${problem.value} is not.`
+    case 'not-whole': return `Each ${noun} must be a whole number; ${problem.value} is not.`
+    case 'above-limit': return `Each ${noun} must be ${problem.limit} or less; ${problem.value} is not.`
+    case 'repeated': return `${problem.value} appears twice.`
+    case 'too-many': return `Enter at most ${problem.limit} values.`
+    default: return assertNever(problem)
+  }
+}
+
+export const formatBoostedGridAxis = (values: readonly number[]): string => values.join(', ')
 
 /** Rounds and seed for a percentile interval, or none when the point estimate is enough. */
 export type PropensityUncertainty =
@@ -506,7 +609,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'continuous-gps': return { kind: estimator, scale: 'stabilized', uncertainty: { kind: 'none' } }
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
     case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
-    case 't-learner': return { kind: estimator, seed: 7, uncertainty: { kind: 'none' } }
+    case 't-learner': return { kind: estimator, model: { kind: 'forest', seed: 7, uncertainty: { kind: 'none' } } }
     case 'ardl-pss': return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
     case 'vecm': return { kind: estimator, maxLags: 4, deterministic: 'co', significance: 95, breakIndex: null }
     case 'synthetic-control': {
@@ -594,13 +697,16 @@ export const treatmentModelEvidenceSchema = z.discriminatedUnion('kind', [
   }).strict(),
   z.object({
     kind: z.literal('boosted'),
-    learningRate: z.number().positive(),
+    learningRate: z.number().finite().nonnegative(),
     maxDepth: z.number().int().positive(),
     nEstimators: z.number().int().positive(),
-    validationAuc: z.number().min(0).max(1),
-    fittedAuc: z.number().min(0).max(1),
     candidates: z.number().int().positive(),
-    crossFitted: z.boolean(),
+    scoring: z.discriminatedUnion('kind', [
+      /** The chosen candidate's mean cross-validated ROC AUC, and the ROC AUC on the rows it was fitted on. */
+      z.object({ kind: z.literal('oneModel'), validationAuc: z.number().min(0).max(1), fittedAuc: z.number().min(0).max(1) }).strict(),
+      /** ROC AUC of the scores each half received from the model fitted on the other half. */
+      z.object({ kind: z.literal('crossFitted'), auc: z.number().min(0).max(1) }).strict(),
+    ]),
   }).strict(),
 ])
 
@@ -638,7 +744,7 @@ export const propensityWeightingEvidenceSchema = z.object({
 export const gridSliceEvidenceSchema = z.object({
   kind: z.literal('propensityGridSlice'),
   scores: z.array(z.object({
-    learningRate: z.number().positive(),
+    learningRate: z.number().finite().nonnegative(),
     maxDepth: z.number().int().positive(),
     nEstimators: z.number().int().positive(),
     meanScore: z.number().finite(),
@@ -914,6 +1020,65 @@ export const tLearnerEvidenceSchema = z.object({
 })
 
 export type TLearnerEvidence = z.infer<typeof tLearnerEvidenceSchema>
+
+const armChoiceSchema = z.object({
+  learningRate: z.number().finite().nonnegative(),
+  maxDepth: z.number().int().positive(),
+  nEstimators: z.number().int().positive(),
+  /** Mean held-out ROC AUC of the chosen candidate over the search folds. */
+  validationAuc: z.number().finite().min(0).max(1),
+}).strict()
+
+export const crossFittedTLearnerEvidenceSchema = z.object({
+  kind: z.literal('crossFittedTLearner'),
+  observations: z.number().int().positive(),
+  controlRows: z.number().int().positive(),
+  treatedRows: z.number().int().positive(),
+  seed: z.number().int().nonnegative(),
+  splits: z.number().int().min(2),
+  candidates: z.number().int().positive(),
+  /** Each arm's candidate, chosen on all of that arm's rows. */
+  selected: z.object({ treated: armChoiceSchema, control: armChoiceSchema }).strict(),
+  /** One effect per prepared row, in row order. */
+  effects: z.array(z.number().finite()).min(1),
+  /** The mean of the effects in the order the halves are concatenated, as numpy takes it. */
+  average: z.number().finite(),
+}).strict().superRefine((value, context) => {
+  if (value.controlRows + value.treatedRows !== value.observations || value.effects.length !== value.observations) {
+    context.addIssue({ code: 'custom', message: 'Treatment groups and row effects must match the observation count.' })
+  }
+})
+
+export type CrossFittedTLearnerEvidence = z.infer<typeof crossFittedTLearnerEvidenceSchema>
+
+const boostedGridChoiceSchema = z.object({
+  ...boostedGridAxisSchemas,
+  splits: z.number().int().min(2).max(20),
+  seed: z.number().int().min(0).max(0xffffffff),
+}).strict()
+
+export const tLearnerConfigurationSchema = z.object({
+  kind: z.literal('t-learner'),
+  model: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('forest'), seed: z.number().int().min(0).max(0xffffffff), uncertainty: tLearnerUncertaintySchema }).strict(),
+    z.object({ kind: z.literal('boosted-cross-fitted'), grid: boostedGridChoiceSchema }).strict(),
+  ]),
+}).strict()
+
+/** Whether a saved T-learner's evidence is what its configuration would produce. */
+export function tLearnerRunMatches(configuration: TLearnerConfiguration, evidence: TLearnerEvidence | CrossFittedTLearnerEvidence): boolean {
+  const model = configuration.model
+  switch (model.kind) {
+    case 'forest':
+      return evidence.kind === 'tLearner' && evidence.seed === model.seed && matchesTLearnerUncertainty(model.uncertainty, evidence.uncertainty)
+    case 'boosted-cross-fitted':
+      return evidence.kind === 'crossFittedTLearner' && evidence.seed === model.grid.seed && evidence.splits === model.grid.splits
+        && evidence.candidates === boostedCandidateCount(model.grid)
+        && [evidence.selected.treated, evidence.selected.control].every((choice) => model.grid.learningRate.includes(choice.learningRate)
+          && model.grid.maxDepth.includes(choice.maxDepth) && model.grid.nEstimators.includes(choice.nEstimators))
+    default: return assertNever(model)
+  }
+}
 
 export const ardlEvidenceSchema = z.object({
   kind: z.literal('ardlPss'),
@@ -1800,7 +1965,7 @@ export type EstimationRunArtifact =
   | RunIdentity & { readonly kind: 'count-glm-run'; readonly method: typeof POISSON_GLM_METHOD_ID | typeof NEGATIVE_BINOMIAL_METHOD_ID; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
   | RunIdentity & { readonly kind: 'negative-binomial-ingarch-run'; readonly method: typeof NEGATIVE_BINOMIAL_INGARCH_METHOD_ID; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
   | RunIdentity & { readonly kind: 'double-ml-run'; readonly method: typeof DML_PLR_METHOD_ID | typeof DML_IRM_METHOD_ID; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
-  | RunIdentity & { readonly kind: 't-learner-run'; readonly method: typeof T_LEARNER_METHOD_ID; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence }
+  | RunIdentity & { readonly kind: 't-learner-run'; readonly method: typeof T_LEARNER_METHOD_ID; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
   | RunIdentity & { readonly kind: 'ardl-run'; readonly method: typeof ARDL_PSS_METHOD_ID; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
   | RunIdentity & { readonly kind: 'vecm-run'; readonly method: typeof VECM_METHOD_ID; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
   | RunIdentity & { readonly kind: 'synthetic-control-run'; readonly method: typeof SYNTHETIC_CONTROL_METHOD_ID; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
@@ -2212,21 +2377,31 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     }
     case 't-learner': {
       const inputs = identification.kind === 'identified' ? tLearnerInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
-      if (identification.kind !== 'identified') violate('t-learner-identified-adjustment', 'No measured back-door adjustment set was found, so there is no identified set for the outcome forests.')
+      if (identification.kind !== 'identified') violate('t-learner-identified-adjustment', 'No measured back-door adjustment set was found, so there is no identified set for the arm models.')
       else if (inputs.length === 0) violate('t-learner-identified-adjustment', 'The identified adjustment set is empty and the study names no effect modifier, so each row’s effect has nothing to be conditioned on. Name the modifiers in Study design.')
-      else satisfy('t-learner-identified-adjustment', `Both forests see ${inputs.map((variable) => variable.name).join(', ')}, and each row’s effect is conditioned on those values.`)
+      else satisfy('t-learner-identified-adjustment', `Both arm models see ${inputs.map((variable) => variable.name).join(', ')}, and each row’s effect is conditioned on those values.`)
       if (context.treatmentIsBinary === null) leave('t-learner-binary-treatment', 'The treatment column has not been read yet; it is checked when the run starts.')
       else if (context.treatmentIsBinary) satisfy('t-learner-binary-treatment', 'Every treatment value is 0 or 1.')
       else violate('t-learner-binary-treatment', 'The treatment holds values other than 0 and 1; one outcome model per arm needs a binary treatment.')
-      if (panel) leave('t-learner-independent-rows', 'Rows repeat within units; the forests treat them as independent draws.')
-      else if (timeSeries) leave('t-learner-independent-rows', 'The rows are a time series; the forests treat them as independent draws.')
+      if (panel) leave('t-learner-independent-rows', 'Rows repeat within units; the arm models treat them as independent draws.')
+      else if (timeSeries) leave('t-learner-independent-rows', 'The rows are a time series; the arm models treat them as independent draws.')
       else satisfy('t-learner-independent-rows', 'The prepared dataset holds independent rows.')
       leave('t-learner-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio; a row with no nearby rows in one arm carries an extrapolated effect.')
       leave('t-learner-row-effect-reading', 'Each row’s effect is the average for rows with its covariate values; it is not that row’s own observed counterfactual.')
-      satisfy('t-learner-learner-settings', `The run records 200 trees, minimum leaf 5, and learner seed ${configuration.seed} for both arms.`)
-      satisfy('t-learner-no-interval', configuration.uncertainty.kind === 'none'
-        ? 'Uncertainty was not requested. The run reports point estimates.'
-        : `Both forests are refitted on ${configuration.uncertainty.samples} resampled datasets. Row intervals are pointwise; the average uses a conservative standard-error bound. Resampling assumes independent observations.`)
+      const model = configuration.model
+      switch (model.kind) {
+        case 'forest':
+          satisfy('t-learner-learner-settings', `The run records 200 trees, minimum leaf 5, and learner seed ${model.seed} for both arms.`)
+          satisfy('t-learner-no-interval', model.uncertainty.kind === 'none'
+            ? 'Uncertainty was not requested. The run reports point estimates.'
+            : `Both forests are refitted on ${model.uncertainty.samples} resampled datasets. Row intervals are pointwise; the average uses a conservative standard-error bound. Resampling assumes independent observations.`)
+          break
+        case 'boosted-cross-fitted':
+          satisfy('t-learner-learner-settings', `The run records a grid of ${boostedCandidateCount(model.grid)} boosted classifiers, searched with ${model.grid.splits}-fold ROC AUC on each arm’s rows, and seed ${model.grid.seed} for the split and the trees.`)
+          leave('t-learner-no-interval', 'The cross-fitted boosted learner reports point estimates only; no interval is calculated.')
+          break
+        default: assertNever(model)
+      }
       break
     }
     case 'ardl-pss': {
@@ -2490,7 +2665,7 @@ export function causalEstimateFrom(
     | { readonly kind: 'count-glm-run'; readonly configuration: CountGlmConfiguration; readonly evidence: CountGlmEvidence }
     | { readonly kind: 'negative-binomial-ingarch-run'; readonly configuration: NegativeBinomialIngarchConfiguration; readonly evidence: NegativeBinomialIngarchEvidence }
     | { readonly kind: 'double-ml-run'; readonly configuration: DoubleMlConfiguration; readonly evidence: DoubleMlEvidence }
-    | { readonly kind: 't-learner-run'; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence }
+    | { readonly kind: 't-learner-run'; readonly configuration: TLearnerConfiguration; readonly evidence: TLearnerEvidence | CrossFittedTLearnerEvidence }
     | { readonly kind: 'ardl-run'; readonly configuration: ArdlConfiguration; readonly evidence: ArdlEvidence }
     | { readonly kind: 'vecm-run'; readonly configuration: VecmConfiguration; readonly evidence: VecmEvidence }
     | { readonly kind: 'synthetic-control-run'; readonly configuration: SyntheticControlConfiguration; readonly evidence: SyntheticControlEvidence }
@@ -2685,17 +2860,31 @@ export function causalEstimateFrom(
       if (study.estimand.kind !== 'conditional-average-treatment-effect-per-row') return null
       const { evidence } = run
       if (!isNonEmpty(evidence.effects) || evidence.effects.length !== evidence.observations) return null
-      if (!matchesTLearnerUncertainty(run.configuration.uncertainty, evidence.uncertainty)) return null
-      return {
-        kind: 'causal-estimate',
-        estimand: study.estimand,
-        effect: { kind: 'perRow', overall: evidence.average, effects: evidence.effects },
-        interval: evidence.uncertainty.kind === 'none'
-          ? { kind: 'none', reason: 'Uncertainty was not requested. Choose bootstrap intervals to estimate it.' }
-          : { kind: 'confidence', level: evidence.uncertainty.level, lower: evidence.uncertainty.average.interval[0], upper: evidence.uncertainty.average.interval[1] },
-        standardError: evidence.uncertainty.kind === 'none' ? null : evidence.uncertainty.average.standardErrorBound,
-        adjustment,
-        sample: { observations: evidence.observations, parameters: 0, degreesOfFreedom: null },
+      if (!tLearnerRunMatches(run.configuration, evidence)) return null
+      const sample = { observations: evidence.observations, parameters: 0, degreesOfFreedom: null }
+      const effect = { kind: 'perRow', overall: evidence.average, effects: evidence.effects } as const
+      switch (evidence.kind) {
+        case 'tLearner': return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect,
+          interval: evidence.uncertainty.kind === 'none'
+            ? { kind: 'none', reason: 'Uncertainty was not requested. Choose bootstrap intervals to estimate it.' }
+            : { kind: 'confidence', level: evidence.uncertainty.level, lower: evidence.uncertainty.average.interval[0], upper: evidence.uncertainty.average.interval[1] },
+          standardError: evidence.uncertainty.kind === 'none' ? null : evidence.uncertainty.average.standardErrorBound,
+          adjustment,
+          sample,
+        }
+        case 'crossFittedTLearner': return {
+          kind: 'causal-estimate',
+          estimand: study.estimand,
+          effect,
+          interval: { kind: 'none', reason: 'The cross-fitted boosted learner reports point estimates only.' },
+          standardError: null,
+          adjustment,
+          sample,
+        }
+        default: return assertNever(evidence)
       }
     }
     case 'ardl-run': {

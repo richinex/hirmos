@@ -15,7 +15,7 @@ import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/gran
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
 import { pandasResamplingEvidenceSchema, parsePandasResamplingEvidence, type PandasResamplingEvidence, type ResamplingAggregation } from '@/domain/resampling'
-import { ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TLearnerEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
+import { boostedGridAxisSchemas, ardlEvidenceSchema, bayesianGaussianEvidenceSchema, binaryEttEvidenceSchema, causalEffectsUncertaintySchema, discreteBnEvidenceSchema, doubleMlEvidenceSchema, ingarchInterventionScheduleSchema, negbinNutsEvidenceSchema, negativeBinomialIngarchEvidenceSchema, panelInterventionEvidenceSchema, syntheticControlEvidenceSchema, tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, totalEffectEstimatorSchema, vecmEvidenceSchema, type ArdlEvidence, type BayesianGaussianEvidence, type BinaryEttEvidence, type CausalEffectsUncertainty, type DiscreteBnEvidence, type DoubleMlEvidence, type IngarchInterventionSchedule, type NegbinNutsEvidence, type NegativeBinomialIngarchEvidence, type PanelInterventionEvidence, type SyntheticControlEvidence, type TLearnerEvidence, type CrossFittedTLearnerEvidence, type TotalEffectEstimator, type VecmEvidence } from '@/domain/estimation'
 import { dmlRefutationEvidenceSchema, parseDmlRefutationEvidence, type DmlRefutationEvidence } from '@/domain/sensitivity'
 import { dynamicCounterfactualUncertaintySchema, dynamicLinearScmEvidenceSchema, linearScmEvidenceSchema, type DynamicCounterfactualUncertainty, type DynamicInterventionTiming, type DynamicLinearScmEvidence, type LinearScmEvidence } from '@/domain/counterfactual'
 import {
@@ -50,7 +50,7 @@ export const dmlGroupsRequestSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('quantiles'), column: z.number().int().nonnegative(), bins: z.number().int().min(2).max(10) }).strict(),
 ])
 export type DmlGroupsRequest = z.infer<typeof dmlGroupsRequestSchema>
-import { assertNever, brand, err, ok, type Brand, type Result } from '@/domain/dop'
+import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from '@/domain/dop'
 import {
   dynotearsEvidenceSchema,
   directLingamEvidenceSchema,
@@ -234,14 +234,12 @@ const logisticTreatmentModelSchema = z.discriminatedUnion('kind', [
 ])
 
 const boostedTreatmentModelSchema = z.object({
-  learningRate: z.array(z.number().positive()).min(1).max(12),
-  maxDepth: z.array(z.number().int().positive().max(16)).min(1).max(12),
-  nEstimators: z.array(z.number().int().positive().max(2000)).min(1).max(12),
+  ...boostedGridAxisSchemas,
   splits: z.number().int().min(2).max(20),
   minSamplesLeaf: z.number().int().positive(),
   minSamplesSplit: z.number().int().min(2),
   seed: z.number().int().nonnegative(),
-  crossFitted: z.boolean(),
+  scoring: z.enum(['one-model', 'cross-fitted']),
   candidatesSearched: z.number().int().positive().nullable(),
 }).strict()
 
@@ -257,14 +255,14 @@ export type LogisticTreatmentModel =
 
 /** A boosted treatment model: a grid searched on cross-validated ROC AUC. */
 export interface BoostedTreatmentModel {
-  readonly learningRate: readonly number[]
-  readonly maxDepth: readonly number[]
-  readonly nEstimators: readonly number[]
+  readonly learningRate: NonEmptyArray<number>
+  readonly maxDepth: NonEmptyArray<number>
+  readonly nEstimators: NonEmptyArray<number>
   readonly splits: number
   readonly minSamplesLeaf: number
   readonly minSamplesSplit: number
   readonly seed: number
-  readonly crossFitted: boolean
+  readonly scoring: import('@/domain/estimation').BoostedScoring
   readonly candidatesSearched: number | null
 }
 
@@ -916,6 +914,23 @@ export type AnalysisWorkerCommand =
       readonly uncertainty: TLearnerUncertainty
     }
   | {
+      readonly kind: 'cross-fitted-t-learner'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly learningRate: readonly number[]
+      readonly maxDepth: readonly number[]
+      readonly nEstimators: readonly number[]
+      readonly splits: number
+      readonly minSamplesLeaf: number
+      readonly minSamplesSplit: number
+      readonly seed: number
+    }
+  | {
       readonly kind: 'dml-refutation-batch'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1290,6 +1305,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'seasonal-adjusted'; readonly request: WorkerRequestId; readonly result: SeasonalAdjustedEvidence }
   | { readonly kind: 'double-ml-succeeded'; readonly request: WorkerRequestId; readonly result: DoubleMlEvidence }
   | { readonly kind: 't-learner-succeeded'; readonly request: WorkerRequestId; readonly result: TLearnerEvidence }
+  | { readonly kind: 'cross-fitted-t-learner-succeeded'; readonly request: WorkerRequestId; readonly result: CrossFittedTLearnerEvidence }
   | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
   | { readonly kind: 'root-cause-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseEvidence }
   | { readonly kind: 'root-cause-checks-succeeded'; readonly request: WorkerRequestId; readonly result: RootCauseChecks }
@@ -1877,7 +1893,7 @@ const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('propensity-grid-slice'),
     ...propensityCommandFields,
-    learningRate: z.number().positive(),
+    learningRate: z.number().finite().nonnegative(),
     maxDepth: z.number().int().positive().max(16),
     nEstimators: z.array(z.number().int().positive().max(2000)).min(1).max(12),
     splits: z.number().int().min(2).max(20),
@@ -2123,6 +2139,21 @@ const commandSchema = z.discriminatedUnion('kind', [
     adjustment: z.array(z.number().int().nonnegative()).min(1),
     seed: z.number().int().nonnegative(),
     uncertainty: tLearnerUncertaintySchema,
+  }).strict(),
+  z.object({
+    kind: z.literal('cross-fitted-t-learner'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().positive(),
+    columns: z.number().int().min(3).max(256),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    adjustment: z.array(z.number().int().nonnegative()).min(1),
+    ...boostedGridAxisSchemas,
+    splits: z.number().int().min(2).max(20),
+    minSamplesLeaf: z.number().int().positive(),
+    minSamplesSplit: z.number().int().min(2),
+    seed: z.number().int().min(0).max(0xffffffff),
   }).strict(),
   z.object({
     kind: z.literal('dml-refutation-batch'),
@@ -2485,6 +2516,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('seasonal-adjusted'), request: requestSchema, result: seasonalAdjustedEvidenceSchema }).strict(),
   z.object({ kind: z.literal('double-ml-succeeded'), request: requestSchema, result: doubleMlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('t-learner-succeeded'), request: requestSchema, result: tLearnerEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('cross-fitted-t-learner-succeeded'), request: requestSchema, result: crossFittedTLearnerEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
   z.object({ kind: z.literal('root-cause-succeeded'), request: requestSchema, result: rootCauseEvidenceSchema }).strict(),
   z.object({ kind: z.literal('root-cause-checks-succeeded'), request: requestSchema, result: rootCauseChecksSchema }).strict(),
@@ -2835,6 +2867,10 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 't-learner-succeeded') {
     const result = tLearnerEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 't-learner-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'cross-fitted-t-learner-succeeded') {
+    const result = crossFittedTLearnerEvidenceSchema.safeParse(parsed.data.result)
+    return result.success ? ok({ kind: 'cross-fitted-t-learner-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'ardl-succeeded') {
     const result = ardlEvidenceSchema.safeParse(parsed.data.result)

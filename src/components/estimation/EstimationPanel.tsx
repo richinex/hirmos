@@ -30,6 +30,7 @@ import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import type { VisibleWindow } from '@/charts/window'
 import { runBoostedGridSearch } from '@/analysis/boostedSearch'
+import { BoostedSearchFields } from './BoostedSearchFields'
 import type { BoostedTreatmentModel, PropensityTreatmentModel } from '@/workers/analysisProtocol'
 import { histogramOption } from '@/charts/data/histogram'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
@@ -75,6 +76,9 @@ import {
   describeEstimator,
   describeInstrumentalVariableRoute, dmlNuisanceInputs,
   boostedCommand,
+  boostedGridCommand,
+  boostedCandidateCount,
+  DEFAULT_BOOSTED_SEARCH,
   effectiveSampleSize,
   type BoostedTreatmentModelChoice,
   ESTIMATOR_GROUPS,
@@ -336,15 +340,24 @@ const treatmentModelTiles = (model: TreatmentModelEvidence): readonly { readonly
     : [
       {
         label: 'Treatment model',
-        value: formatWords(model.crossFitted ? 'Boosted, cross-fitted' : 'Boosted trees'),
-        context: <Metadata><span>learning rate {model.learningRate}</span><span>depth {model.maxDepth}</span><span>{formatCount(model.nEstimators).text} trees</span></Metadata>,
+        value: formatWords(model.scoring.kind === 'crossFitted' ? 'Boosted, cross-fitted' : 'Boosted trees'),
+        context: <Metadata><span>learning rate {model.learningRate}</span><span>depth {model.maxDepth}</span><span>{formatCount(model.nEstimators).text} trees</span><span>{formatCount(model.candidates).text} candidate{model.candidates === 1 ? '' : 's'}</span></Metadata>,
       },
-      {
-        label: 'Search',
-        value: formatStatistic('score', model.validationAuc),
-        context: <Metadata><span>held-out ROC AUC</span><span>{formatCount(model.candidates).text} candidate{model.candidates === 1 ? '' : 's'}</span><span>fitted {formatStatistic('score', model.fittedAuc).text}</span></Metadata>,
-      },
+      ...boostedScoringTiles(model.scoring),
     ]
+
+const boostedScoringTiles = (scoring: Extract<TreatmentModelEvidence, { kind: 'boosted' }>['scoring']): readonly { readonly label: string; readonly value: Formatted; readonly context?: React.ReactNode }[] => {
+  switch (scoring.kind) {
+    case 'oneModel': return [
+      { label: 'Cross-validated AUC', value: formatStatistic('score', scoring.validationAuc), context: 'the chosen candidate, averaged over the search folds' },
+      { label: 'AUC on the fitted rows', value: formatStatistic('score', scoring.fittedAuc), context: 'the model scoring the rows it was fitted on' },
+    ]
+    case 'crossFitted': return [
+      { label: 'Cross-fitted AUC', value: formatStatistic('score', scoring.auc), context: 'each half scored by the model fitted on the other half' },
+    ]
+    default: return assertNever(scoring)
+  }
+}
 
 function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
   const tiles = ((): readonly { readonly label: string; readonly value: Formatted; readonly context?: React.ReactNode }[] => {
@@ -474,11 +487,24 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         const { evidence } = run
         // The bound estimate carries the effects as a non-empty list; the raw evidence only promises a list.
         const summary = run.estimate.effect.kind === 'perRow' ? summariseRowEffects(run.estimate.effect.effects) : null
-        return [
-          { label: 'Arms', value: formatWords(`${formatCount(evidence.controlRows).text} control, ${formatCount(evidence.treatedRows).text} treated`), context: 'one outcome forest each' },
-          { label: 'Row effects', value: formatWords(summary === null ? 'none' : `${formatStatistic('raw', summary.minimum).text} to ${formatStatistic('raw', summary.maximum).text}`), context: summary === null ? '' : <Metadata><span>median {formatStatistic('raw', summary.median).text}</span><span>{formatPercent(summary.positiveShare, { precision: 0 }).text} above zero</span></Metadata> },
-          { label: 'Forests', value: formatWords(`${formatCount(evidence.trees).text} trees`), context: <Metadata><span>minimum leaf {evidence.minLeaf}</span><span>learner seed {evidence.seed}</span></Metadata> },
-        ]
+        const rowEffects = { label: 'Row effects', value: formatWords(summary === null ? 'none' : `${formatStatistic('raw', summary.minimum).text} to ${formatStatistic('raw', summary.maximum).text}`), context: summary === null ? '' : <Metadata><span>median {formatStatistic('raw', summary.median).text}</span><span>{formatPercent(summary.positiveShare, { precision: 0 }).text} above zero</span></Metadata> }
+        switch (evidence.kind) {
+          case 'tLearner': return [
+            { label: 'Arms', value: formatWords(`${formatCount(evidence.controlRows).text} control, ${formatCount(evidence.treatedRows).text} treated`), context: 'one outcome forest each' },
+            rowEffects,
+            { label: 'Forests', value: formatWords(`${formatCount(evidence.trees).text} trees`), context: <Metadata><span>minimum leaf {evidence.minLeaf}</span><span>learner seed {evidence.seed}</span></Metadata> },
+          ]
+          case 'crossFittedTLearner': return [
+            { label: 'Arms', value: formatWords(`${formatCount(evidence.controlRows).text} control, ${formatCount(evidence.treatedRows).text} treated`), context: 'two halves of equal size, stratified on the outcome' },
+            rowEffects,
+            ...([['Treated model', evidence.selected.treated], ['Control model', evidence.selected.control]] as const).map(([label, choice]) => ({
+              label,
+              value: formatWords(`learning rate ${choice.learningRate}, depth ${choice.maxDepth}, ${formatCount(choice.nEstimators).text} trees`),
+              context: <Metadata><span>best AUC {formatStatistic('score', choice.validationAuc).text}</span><span>{formatCount(evidence.candidates).text} candidates, {evidence.splits}-fold</span></Metadata>,
+            })),
+          ]
+          default: return assertNever(evidence)
+        }
       }
       case 'negbin-nuts-run': {
         const { evidence } = run
@@ -752,7 +778,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
           <ExpandableChart option={rowChart} label={`Distribution of the per-row effect of ${study.treatment.name} on ${study.outcome.name}`} className="h-[220px]" testId="row-effects" />
         </div>
       )}
-      {run.kind === 't-learner-run' && <TLearnerIntervals evidence={run.evidence} />}
+      {run.kind === 't-learner-run' && run.evidence.kind === 'tLearner' && <TLearnerIntervals evidence={run.evidence} />}
       {chart !== null && (
         <div className="mt-3">
           {ghosts.length > 0 && (
@@ -1169,7 +1195,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the T-learner fits one outcome model per arm and needs a 0/1 treatment.` }); return }
           const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
           if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
-          const evidence = await analysis.runTLearner(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), seed: configuration.seed, uncertainty: configuration.uncertainty })
+          const shared = { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat() }
+          const model = configuration.model
+          if (model.kind === 'boosted-cross-fitted' && columnAt(matrix.values, matrix.rowCount, 1).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.outcome.name} is not 0 or 1; the boosted learner fits a classifier per arm.` }); return }
+          const evidence = await (async () => {
+            switch (model.kind) {
+              case 'forest': return analysis.runTLearner(design.value.values, matrix.rowCount, design.value.columnCount, { ...shared, seed: model.seed, uncertainty: model.uncertainty })
+              case 'boosted-cross-fitted': {
+                return analysis.runCrossFittedTLearner(design.value.values, matrix.rowCount, design.value.columnCount, { ...shared, ...boostedGridCommand(model.grid) })
+              }
+              default: return assertNever(model)
+            }
+          })()
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 't-learner-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1619,16 +1656,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 {configuration.model === 'lbfgsb' && (
                   <label className="block"><ParameterLabel className={fieldHint} label="Iteration limit" help={ESTIMATION_PARAMETER_HELP.propensity.maxIter} /><input type="number" min={1} max={100000} aria-label="Iteration limit" className={field('text', 'mt-1 w-full')} value={configuration.maxIter} onChange={(event) => configure({ ...configuration, maxIter: Math.max(1, Math.min(100000, Math.floor(Number(event.target.value) || 1))) })} /></label>
                 )}
-                {configuration.kind !== 'doubly-robust' && configuration.model === 'boosted' && <>
-                  <div>
-                    <ParameterLabel className={fieldHint} label="Scoring" help={ESTIMATION_PARAMETER_HELP.propensity.crossFitted} />
-                    <SegmentedControl className="mt-1" fill ariaLabel="Scoring" value={configuration.boosted.crossFitted ? 'crossFitted' : 'inSample'}
-                      options={[{ value: 'inSample', label: 'One model' }, { value: 'crossFitted', label: 'Cross-fitted' }]}
-                      onChange={(scoring) => configure({ ...configuration, boosted: { ...configuration.boosted, crossFitted: scoring === 'crossFitted' } })} />
+                {configuration.kind !== 'doubly-robust' && configuration.model === 'boosted' && (
+                  <div className="@md/panel:col-span-2 @4xl/panel:col-span-4">
+                    <BoostedSearchFields grid={configuration.boosted} seedHelp={ESTIMATION_PARAMETER_HELP.propensity.treeSeed}
+                      onChange={(grid) => configure({ ...configuration, boosted: { ...configuration.boosted, ...grid } })}
+                      scoring={<div>
+                        <ParameterLabel className={fieldHint} label="Scoring" help={ESTIMATION_PARAMETER_HELP.propensity.crossFitted} />
+                        <SegmentedControl className="mt-1" fill ariaLabel="Scoring" value={configuration.boosted.scoring}
+                          options={[{ value: 'one-model', label: 'One model' }, { value: 'cross-fitted', label: 'Cross-fitted' }]}
+                          onChange={(scoring) => configure({ ...configuration, boosted: { ...configuration.boosted, scoring } })} />
+                      </div>} />
                   </div>
-                  <label className="block"><ParameterLabel className={fieldHint} label="Search folds" help={ESTIMATION_PARAMETER_HELP.propensity.splits} /><input type="number" min={2} max={20} aria-label="Search folds" className={field('text', 'mt-1 w-full')} value={configuration.boosted.splits} onChange={(event) => configure({ ...configuration, boosted: { ...configuration.boosted, splits: Math.max(2, Math.min(20, Math.floor(Number(event.target.value) || 2))) } })} /></label>
-                  <label className="block"><ParameterLabel className={fieldHint} label="Tree seed" help={ESTIMATION_PARAMETER_HELP.propensity.treeSeed} /><input type="number" min={0} max={4294967295} aria-label="Tree seed" className={field('text', 'mt-1 w-full')} value={configuration.boosted.seed} onChange={(event) => configure({ ...configuration, boosted: { ...configuration.boosted, seed: Math.max(0, Math.min(4294967295, Math.floor(Number(event.target.value) || 0))) } })} /></label>
-                </>}
+                )}
               </div>
             </fieldset>
             {configuration.kind === 'propensity-weighting' && (
@@ -1697,9 +1736,31 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 't-learner':
         return (
           <div className="grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-            <label className="block"><ParameterLabel className={fieldLabel} label="Learner seed" help={ESTIMATION_PARAMETER_HELP.tLearner.learnerSeed} /><input type="number" min={0} aria-label="Learner seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <TLearnerUncertainty value={configuration.uncertainty} onChange={(uncertainty) => configure({ ...configuration, uncertainty })} />
-            <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>One random forest per treatment arm, with 200 trees and a minimum leaf size of 5. Bootstrap intervals refit both forests on resampled rows and take longer to calculate.</p>
+            <div className="@md/panel:col-span-2">
+              <ParameterLabel className={fieldLabel} label="Outcome model" help={ESTIMATION_PARAMETER_HELP.tLearner.outcomeModel} />
+              <SegmentedControl className="mt-1" fill ariaLabel="Outcome model" value={configuration.model.kind}
+                options={[{ value: 'forest', label: 'Random forest' }, { value: 'boosted-cross-fitted', label: 'Boosted, cross-fitted' }]}
+                onChange={(kind) => configure({ ...configuration, model: kind === 'boosted-cross-fitted'
+                  ? { kind, grid: DEFAULT_BOOSTED_SEARCH }
+                  : { kind: 'forest', seed: 7, uncertainty: { kind: 'none' } } })} />
+            </div>
+            {(() => {
+              const model = configuration.model
+              switch (model.kind) {
+                case 'forest': return <>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Learner seed" help={ESTIMATION_PARAMETER_HELP.tLearner.learnerSeed} /><input type="number" min={0} aria-label="Learner seed" className={field('text', 'mt-1')} value={model.seed} onChange={(event) => configure({ ...configuration, model: { ...model, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) } })} /></label>
+                  <TLearnerUncertainty value={model.uncertainty} onChange={(uncertainty) => configure({ ...configuration, model: { ...model, uncertainty } })} />
+                  <p className={prose('m-0 self-end text-faint @md/panel:col-span-2')}>One random forest per treatment arm, with 200 trees and a minimum leaf size of 5. Bootstrap intervals refit both forests on resampled rows and take longer to calculate.</p>
+                </>
+                case 'boosted-cross-fitted': return <>
+                  <div className="@md/panel:col-span-2 @4xl/panel:col-span-4">
+                    <BoostedSearchFields grid={model.grid} seedHelp={ESTIMATION_PARAMETER_HELP.tLearner.boostedSeed} onChange={(grid) => configure({ ...configuration, model: { ...model, grid } })} />
+                  </div>
+                  <p className={prose('m-0 text-faint @md/panel:col-span-2 @4xl/panel:col-span-4')}>{`The search scores ${boostedCandidateCount(model.grid)} candidates on the treated rows and again on the control rows. The data set is then split into 2 equally sized data sets, stratified on the outcome; each set’s effects come from the two chosen models trained on the other set. The outcome must be 0 or 1, and no interval is calculated.`}</p>
+                </>
+                default: return assertNever(model)
+              }
+            })()}
           </div>
         )
       case 'ardl-pss':

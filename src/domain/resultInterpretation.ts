@@ -168,6 +168,14 @@ const intervalStatement = (
 
 const noInterval = (reason: string): InterpretationStatement => ({ kind: 'uncertainty', text: reason })
 
+const armModel = (evidence: { readonly kind: 'tLearner' | 'crossFittedTLearner' }): string => {
+  switch (evidence.kind) {
+    case 'tLearner': return 'forest’s'
+    case 'crossFittedTLearner': return 'boosted classifier’s'
+    default: return assertNever(evidence.kind)
+  }
+}
+
 const staggeredBaseline = (anticipation: number): string => {
   if (anticipation === 0) return 'the period immediately before adoption'
   return `the period immediately before the ${anticipation}-period anticipation window`
@@ -411,7 +419,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
           ? `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(headlineValue(estimate.effect))} on average across rows, ${adjustment}.`
           : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(perRow.overall)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}. ${formatPercent(rows.positiveShare, { precision: 0 }).text} are above zero.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : { kind: 'uncertainty', text: `The ${formatPercent(estimate.interval.level, { precision: 0 }).text} confidence interval for the average effect is ${number(estimate.interval.lower)} to ${number(estimate.interval.upper)}. It uses a conservative uncertainty calculation based on refitting both forests on resampled rows. Individual row intervals appear in the table below.` },
-        { kind: 'qualification', text: `Each row’s effect is the treated forest’s prediction minus the control forest’s at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual. The spread across rows shows variation in fitted predictions and can also contain fitting noise; it is not an uncertainty interval.` },
+        { kind: 'qualification', text: `Each row’s effect is the treated ${armModel(run.evidence)} prediction minus the control ${armModel(run.evidence)} prediction at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual. ${run.evidence.kind === 'crossFittedTLearner' ? 'Each row is predicted by the models fitted on the other half of the rows. ' : ''}The spread across rows shows variation in fitted predictions and can also contain fitting noise; it is not an uncertainty interval.` },
       ] }
     }
     case 'ardl-run': {

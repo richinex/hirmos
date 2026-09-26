@@ -775,6 +775,89 @@ pub(crate) fn t_learner_with_uncertainty(
     })
 }
 
+/// The arm models are chosen once, on all of each arm's rows, and refitted in each half to predict
+/// the other half, so a row's effect never comes from a model fitted on that row.
+pub(crate) fn cross_fitted_t_learner(
+    values: &[f64], rows: usize, columns: usize, treatment: usize, outcome: usize,
+    adjustment: &[usize], grid: hirmos_causal_core::model_selection::Grid,
+    splits: usize, min_samples_leaf: usize, min_samples_split: usize, seed: u32,
+) -> Result<AnalysisResult, String> {
+    use hirmos_causal_core::gradient_boosting::{GradientBoostingClassifier, Options};
+    use hirmos_causal_core::model_selection::{grid_search, stratified_shuffle_split, Candidate};
+    let label = "Cross-fitted T-learner";
+    let (data, _, y) = design_columns(label, values, rows, columns, treatment, outcome, adjustment)?;
+    if adjustment.is_empty() {
+        return Err(format!("{label} needs at least one adjustment column as the classifiers' inputs"));
+    }
+    let d: Vec<f64> = (0..rows).map(|row| data[(row, treatment)]).collect();
+    if d.iter().any(|&value| value != 0.0 && value != 1.0) {
+        return Err(format!("{label} needs a 0/1 treatment"));
+    }
+    if y.iter().any(|&value| value != 0.0 && value != 1.0) {
+        return Err(format!("{label} fits a classifier per arm, so the outcome must be 0 or 1"));
+    }
+    let design: Vec<Vec<f64>> = (0..rows).map(|row| adjustment.iter().map(|&column| data[(row, column)]).collect()).collect();
+    let take = |selected: &[usize]| -> (Vec<Vec<f64>>, Vec<f64>) {
+        (selected.iter().map(|&row| design[row].clone()).collect(), selected.iter().map(|&row| y[row]).collect())
+    };
+    let arm_rows = |within: &[usize], arm: f64| -> Vec<usize> { within.iter().copied().filter(|&row| d[row] == arm).collect() };
+    let everyone: Vec<usize> = (0..rows).collect();
+    let choose = |arm: f64| -> Result<(Candidate, f64), String> {
+        let (x, target) = take(&arm_rows(&everyone, arm));
+        let search = grid_search(&x, &target, &grid, splits, min_samples_leaf, min_samples_split, seed)
+            .map_err(|cause| format!("{label} could not search the {} arm's grid: {cause:?}", if arm == 1.0 { "treated" } else { "control" }))?;
+        Ok((search.best, search.best_score))
+    };
+    let (treated_choice, treated_auc) = choose(1.0)?;
+    let (control_choice, control_auc) = choose(0.0)?;
+    let fit = |within: &[usize], arm: f64, chosen: Candidate| -> Result<GradientBoostingClassifier, String> {
+        let (x, target) = take(&arm_rows(within, arm));
+        GradientBoostingClassifier::fit(&x, &target, &Options {
+            n_estimators: chosen.n_estimators,
+            learning_rate: chosen.learning_rate,
+            max_depth: chosen.max_depth,
+            min_samples_leaf,
+            min_samples_split,
+            random_state: seed,
+        })
+        .map_err(|cause| format!("{label} could not fit an arm model: {cause:?}"))
+    };
+    let (first, second) = stratified_shuffle_split(&y, 0.5, seed)
+        .map_err(|cause| format!("{label} could not split the rows: {cause:?}"))?;
+    let mut effects = vec![f64::NAN; rows];
+    let mut ordered = Vec::with_capacity(rows);
+    for (fitted_on, predicted) in [(&second, &first), (&first, &second)] {
+        let treated_model = fit(fitted_on, 1.0, treated_choice)?;
+        let control_model = fit(fitted_on, 0.0, control_choice)?;
+        let (held, _) = take(predicted);
+        let with = treated_model.predict_probability(&held).map_err(|cause| format!("{label} could not predict: {cause:?}"))?;
+        let without = control_model.predict_probability(&held).map_err(|cause| format!("{label} could not predict: {cause:?}"))?;
+        for (at, &row) in predicted.iter().enumerate() {
+            effects[row] = with[at] - without[at];
+            ordered.push(effects[row]);
+        }
+    }
+    if effects.iter().any(|effect| effect.is_nan()) {
+        return Err(format!("{label} left a row without an effect"));
+    }
+    let candidates = grid.learning_rate.len() * grid.max_depth.len() * grid.n_estimators.len();
+    let arm = |chosen: Candidate, validation_auc: f64| ArmChoice {
+        learning_rate: chosen.learning_rate, max_depth: chosen.max_depth, n_estimators: chosen.n_estimators, validation_auc,
+    };
+    let treated_rows = d.iter().filter(|&&value| value == 1.0).count();
+    Ok(AnalysisResult::CrossFittedTLearner {
+        observations: rows,
+        control_rows: rows - treated_rows,
+        treated_rows,
+        seed,
+        splits,
+        candidates,
+        selected: ArmChoices { treated: arm(treated_choice, treated_auc), control: arm(control_choice, control_auc) },
+        effects,
+        average: hirmos_causal_core::numpy_mean(&ordered),
+    })
+}
+
 struct ModifierCut {
     column: usize,
     grouping: DmlGroupingEvidence,
