@@ -215,6 +215,7 @@ test('round-trips a SQL source recipe through project persistence', async ({ pag
     return roundTrip.ok ? roundTrip.value.source?.recipe : roundTrip
   })
 
+  // An input recorded before column declarations existed reads back declaring none.
   expect(recipes).toEqual({
     kind: 'sql-derived',
     outputView: 'hirmos_prepared',
@@ -224,6 +225,7 @@ test('round-trips a SQL source recipe through project persistence', async ({ pag
       fileName: 'measurements.csv',
       bytes: 24,
       format: 'csv',
+      declared: {},
       fingerprint: 'a'.repeat(64),
     }],
   })

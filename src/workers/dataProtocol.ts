@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { columnDeclarationsSchema, type ColumnDeclarations } from '@/domain/fileReading'
 import { timeInterpretationSchema, timePreviewSchema, type TimeInterpretation, type TimePreview } from '@/domain/timeInterpretation'
 import { calendarRequestSchema, type CalendarRequest } from '@/domain/calendar'
 import {
@@ -32,6 +33,7 @@ export type DataWorkerCommand =
       readonly kind: 'profile-source'
       readonly request: ImportRequestId
       readonly file: File
+      readonly declared: ColumnDeclarations
     }
   | {
       readonly kind: 'materialize-numeric'
@@ -104,6 +106,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     kind: z.literal('profile-source'),
     request: requestSchema,
     file: z.instanceof(File),
+    declared: columnDeclarationsSchema,
   }).strict(),
   z.object({
     kind: z.literal('materialize-numeric'),
@@ -247,7 +250,7 @@ export function parseDataWorkerCommand(value: unknown): Result<DataWorkerCommand
   const request = importRequestId(data.request)
   if (!request.ok) return err({ kind: 'invalid-command', detail: 'The import request identity is invalid.' })
   if (data.kind === 'profile-source') {
-    return ok({ kind: 'profile-source', request: request.value, file: data.file })
+    return ok({ kind: 'profile-source', request: request.value, file: data.file, declared: data.declared })
   }
 
   const profile = parseDatasetProfile(data.profile)

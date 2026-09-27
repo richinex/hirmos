@@ -781,6 +781,7 @@ pub(crate) fn cross_fitted_t_learner(
     values: &[f64], rows: usize, columns: usize, treatment: usize, outcome: usize,
     adjustment: &[usize], grid: hirmos_causal_core::model_selection::Grid,
     splits: usize, min_samples_leaf: usize, min_samples_split: usize, seed: u32,
+    selection: ArmSelection,
 ) -> Result<AnalysisResult, String> {
     use hirmos_causal_core::gradient_boosting::{GradientBoostingClassifier, Options};
     use hirmos_causal_core::model_selection::{grid_search, stratified_shuffle_split, Candidate};
@@ -808,8 +809,19 @@ pub(crate) fn cross_fitted_t_learner(
             .map_err(|cause| format!("{label} could not search the {} arm's grid: {cause:?}", if arm == 1.0 { "treated" } else { "control" }))?;
         Ok((search.best, search.best_score))
     };
-    let (treated_choice, treated_auc) = choose(1.0)?;
-    let (control_choice, control_auc) = choose(0.0)?;
+    let in_grid = |arm: &ChosenArm| grid.learning_rate.contains(&arm.learning_rate)
+        && grid.max_depth.contains(&arm.max_depth)
+        && grid.n_estimators.contains(&arm.n_estimators);
+    let given = |arm: ChosenArm| (Candidate { learning_rate: arm.learning_rate, max_depth: arm.max_depth, n_estimators: arm.n_estimators }, arm.validation_auc);
+    let ((treated_choice, treated_auc), (control_choice, control_auc)) = match selection {
+        ArmSelection::Search => (choose(1.0)?, choose(0.0)?),
+        ArmSelection::Chosen { treated, control } => {
+            if !in_grid(&treated) || !in_grid(&control) {
+                return Err(format!("{label} was given a chosen candidate outside its grid"));
+            }
+            (given(treated), given(control))
+        }
+    };
     let fit = |within: &[usize], arm: f64, chosen: Candidate| -> Result<GradientBoostingClassifier, String> {
         let (x, target) = take(&arm_rows(within, arm));
         GradientBoostingClassifier::fit(&x, &target, &Options {

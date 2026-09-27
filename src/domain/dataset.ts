@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import { isNonEmpty } from './dop'
+import { columnDeclarationsSchema, declarationsKey, fileReadingOf, type FileReading } from './fileReading'
 
 export type SourceFingerprint = Brand<string, 'SourceFingerprint'>
 export type DatasetProfileId = Brand<string, 'DatasetProfileId'>
@@ -65,13 +66,13 @@ export interface PhysicalColumnProfile {
 /** Whether the browser keeps a copy of the file: never by default; in the origin-private file system when the user asks. */
 export type SourcePersistence = { readonly kind: 'ephemeral' } | { readonly kind: 'cached-locally' }
 
-export interface SourceArtifact {
+/** The file a profile was read from, and how its columns were read. */
+export type SourceArtifact = {
   readonly fingerprint: SourceFingerprint
   readonly fileName: string
   readonly bytes: number
-  readonly format: 'csv' | 'tsv' | 'parquet'
   readonly persistence: SourcePersistence
-}
+} & FileReading
 
 export interface DatasetProfile {
   readonly id: DatasetProfileId
@@ -170,8 +171,11 @@ export const sourceFingerprint = (value: string): Result<SourceFingerprint, { re
     ? ok(brand<string, 'SourceFingerprint'>(value))
     : err({ kind: 'invalid-fingerprint' })
 
-export const datasetProfileId = (fingerprint: SourceFingerprint, version: DataParserVersion = DUCKDB_PACKAGE_VERSION): DatasetProfileId =>
-  brand<string, 'DatasetProfileId'>(`duckdb-wasm:${version}:${fingerprint}`)
+/** One file read two ways gives two profiles, so the declarations are part of the id. */
+export const datasetProfileId = (fingerprint: SourceFingerprint, reading: FileReading, version: DataParserVersion = DUCKDB_PACKAGE_VERSION): DatasetProfileId => {
+  const declared = reading.format === 'parquet' ? '' : declarationsKey(reading.declared)
+  return brand<string, 'DatasetProfileId'>(`duckdb-wasm:${version}:${fingerprint}${declared === '' ? '' : `:${declared}`}`)
+}
 
 export const columnId = (index: number, name: string): ColumnId =>
   brand<string, 'ColumnId'>(`${index}:${name}`)
@@ -208,6 +212,7 @@ const datasetProfileSchema = z.object({
     fileName: z.string().min(1),
     bytes: z.number().int().nonnegative(),
     format: z.enum(['csv', 'tsv', 'parquet']),
+    declared: columnDeclarationsSchema.optional(),
     persistence: z.object({ kind: z.enum(['ephemeral', 'cached-locally']) }).strict(),
   }).strict(),
   parser: z.object({
@@ -323,7 +328,11 @@ export function parseDatasetProfile(value: unknown): Result<DatasetProfile, Data
   if (!fingerprint.ok) {
     return err({ kind: 'inconsistent-profile', detail: 'The source fingerprint is not a SHA-256 digest.' })
   }
-  const expectedProfileId = datasetProfileId(fingerprint.value, parsed.data.parser.packageVersion)
+  const reading = fileReadingOf(parsed.data.source.format, parsed.data.source.declared)
+  if (!reading.ok) {
+    return err({ kind: 'inconsistent-profile', detail: 'A Parquet file stores its column types, so a profile of one declares none.' })
+  }
+  const expectedProfileId = datasetProfileId(fingerprint.value, reading.value, parsed.data.parser.packageVersion)
   if (parsed.data.id !== expectedProfileId) {
     return err({ kind: 'inconsistent-profile', detail: 'The dataset profile identity does not match its source fingerprint.' })
   }
@@ -359,7 +368,7 @@ export function parseDatasetProfile(value: unknown): Result<DatasetProfile, Data
 
   return ok({
     id: expectedProfileId,
-    source: { ...parsed.data.source, fingerprint: fingerprint.value },
+    source: { fileName: parsed.data.source.fileName, bytes: parsed.data.source.bytes, persistence: parsed.data.source.persistence, fingerprint: fingerprint.value, ...reading.value },
     parser: parsed.data.parser,
     rowCount: parsed.data.rowCount,
     columns,

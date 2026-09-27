@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { choose as pick, fixture, prepare as prepareDataset } from './examples/support'
+import { expectVerdict } from './dagitty-verdict'
 
 const fixtureDir = fileURLToPath(new URL('fixtures/dagitty/', import.meta.url))
 
@@ -81,19 +82,7 @@ for (const fixture of selected) {
     // The same verdict the click-built graph receives in dagitty-parity.spec.ts.
     const adjustment = page.getByLabel('Adjustment')
     await expect(adjustment).toBeVisible()
-    if (!fixture.expected.backdoorOpen) {
-      await expect(adjustment.getByText('No back-door path is open.', { exact: false })).toBeVisible()
-      return
-    }
-    if (fixture.expected.msas.length === 0) {
-      await expect(adjustment.getByText('No observed adjustment set blocks every back-door path', { exact: false })).toBeVisible()
-      return
-    }
-    await expect(adjustment.getByText('blocks all represented back-door paths', { exact: false })).toBeVisible()
-    const sentence = await adjustment.innerText()
-    const named = /Adjusting for (.+?) blocks all represented back-door paths/.exec(sentence.replace(/\n/g, ' '))
-    expect(named, sentence).not.toBeNull()
-    expect((named?.[1] ?? '').split(', ').sort()).toEqual([...fixture.expected.canonical].sort())
+    await expectVerdict(adjustment, fixture.expected)
   })
 }
 

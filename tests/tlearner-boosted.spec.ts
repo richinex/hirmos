@@ -28,7 +28,7 @@ test('the browser build reproduces scikit-learn', async ({ page }) => {
     return runCrossFittedTLearner(new Float64Array(values), 400, 7, {
       treatment: 0, outcome: 1, adjustment: [2, 3, 4, 5, 6],
       learningRate: grid.learning_rate, maxDepth: grid.max_depth, nEstimators: grid.n_estimators,
-      splits: 5, minSamplesLeaf: leaf, minSamplesSplit: 2, seed,
+      splits: 5, minSamplesLeaf: leaf, minSamplesSplit: 2, seed, selection: { kind: 'search' },
     })
   }, { values, grid: oracle.grid, leaf: oracle.min_samples_leaf, seed: oracle.seed })
   expect(result.ok, JSON.stringify(result)).toBe(true)

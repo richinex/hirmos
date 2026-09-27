@@ -1,4 +1,5 @@
 import { Metadata } from '@/components/ui/Metadata'
+import { declareColumn, declarationsOf, type DeclaredType } from '@/domain/fileReading'
 import { causalModelRunCount } from '@/domain/rootCauseAnalysis'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { DatabaseFolder } from '@/components/data/DatabaseFolder'
@@ -240,12 +241,21 @@ function App() {
 
   const inspectSource = async () => {
     if (workflow.kind !== 'source-selected' && workflow.kind !== 'import-failed') return
-    const source = workflow.source
+    await profileSelected(workflow.source)
+  }
+  /** Reads the same file with one column declared, which profiles it again from the start. */
+  const declareColumnType = (column: string, type: DeclaredType | null) => {
+    if (workflow.kind !== 'profiled' || workflow.source.format === 'parquet') return
+    const source = { ...workflow.source, declared: declareColumn(workflow.source.declared, column, type) }
+    dispatch({ type: 'source-replaced', previous: workflow.source, source })
+    void profileSelected(source)
+  }
+  const profileSelected = async (source: SelectedSource) => {
     const request = newImportRequestId()
     dispatch({ type: 'profile-requested', request })
     try {
       const { profileSourceInWorker } = await import('@/data/client')
-      const result = await profileSourceInWorker(request, source.file)
+      const result = await profileSourceInWorker(request, source.file, declarationsOf(source))
       dispatch(result.ok
         ? { type: 'profile-succeeded', request, profile: result.value }
         : { type: 'profile-failed', request, problem: result.error })
@@ -888,7 +898,7 @@ function App() {
                 <>
                   {activeChapter === 'data' && (
                     <ChapterBoundary key={activeChapter} chapter={activeName}>
-                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared} onEditSource={openSourceEditor}>
+                    <DataStudio source={workflow.source} profile={workflow.profile} prepared={workflow.prepared} onEditSource={openSourceEditor} onDeclare={declareColumnType}>
                       <PreprocessingPanel
                         key={workflow.profile.id}
                         source={workflow.source}

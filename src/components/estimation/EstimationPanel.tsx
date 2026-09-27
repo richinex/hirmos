@@ -83,6 +83,7 @@ import {
   DEFAULT_BOOSTED_SEARCH,
   effectiveSampleSize,
   weightSpread,
+  type ArmChoice,
   type BoostedTreatmentModelChoice,
   ESTIMATOR_GROUPS,
   evaluateEstimatorEligibility,
@@ -1207,7 +1208,28 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             switch (model.kind) {
               case 'forest': return analysis.runTLearner(design.value.values, matrix.rowCount, design.value.columnCount, { ...shared, seed: model.seed, uncertainty: model.uncertainty })
               case 'boosted-cross-fitted': {
-                return analysis.runCrossFittedTLearner(design.value.values, matrix.rowCount, design.value.columnCount, { ...shared, ...boostedGridCommand(model.grid) })
+                // Each arm's grid is searched across a worker pool on that arm's rows, which is
+                // the search the kernel would run itself; the kernel then fits the two choices.
+                const command = boostedGridCommand(model.grid)
+                const chooseArm = async (arm: 0 | 1): Promise<Result<ArmChoice, AnalysisWorkerProblem>> => {
+                  const rows = columnAt(design.value.values, matrix.rowCount, 0).flatMap((value, row) => (value === arm ? [row] : []))
+                  const armValues = new Float64Array(rows.length * design.value.columnCount)
+                  for (let column = 0; column < design.value.columnCount; column += 1) {
+                    rows.forEach((row, at) => { armValues[column * rows.length + at] = design.value.values[column * matrix.rowCount + row]! })
+                  }
+                  // The pooled search predicts its `treatment` column, so the outcome takes that place.
+                  const searched = await runBoostedGridSearch(armValues, rows.length, design.value.columnCount,
+                    { treatment: 1, outcome: 0, adjustment: shared.adjustment }, command)
+                  if (!searched.ok) return searched
+                  const { learningRate, maxDepth, nEstimators, meanScore } = searched.value.best
+                  return ok({ learningRate, maxDepth, nEstimators, validationAuc: meanScore })
+                }
+                const treated = await chooseArm(1)
+                if (!treated.ok) return treated
+                const control = await chooseArm(0)
+                if (!control.ok) return control
+                return analysis.runCrossFittedTLearner(design.value.values, matrix.rowCount, design.value.columnCount,
+                  { ...shared, ...command, selection: { kind: 'chosen', treated: treated.value, control: control.value } })
               }
               default: return assertNever(model)
             }

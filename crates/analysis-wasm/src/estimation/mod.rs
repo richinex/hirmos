@@ -279,23 +279,39 @@ mod tests {
         let adjustment: Vec<usize> = (2..2 + width).collect();
         let leaf = fixture["min_samples_leaf"].as_u64().unwrap() as usize;
         let seed = fixture["seed"].as_u64().unwrap() as u32;
-        let result = cross_fitted_t_learner(&values, rows, 2 + width, 0, 1, &adjustment, grid(), 5, leaf, 2, seed).unwrap();
-        let AnalysisResult::CrossFittedTLearner { effects, average, selected, candidates, .. } = result else { panic!("wrong result") };
-        assert_eq!(candidates, 8);
-        assert!((average - fixture["ate"].as_f64().unwrap()).abs() < 1e-12, "ATE {average}");
-        let order: Vec<usize> = fixture["order"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap() as usize).collect();
-        let expected: Vec<f64> = fixture["effects"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
-        for (at, &row) in order.iter().enumerate() {
-            assert!((effects[row] - expected[at]).abs() < 1e-12, "row {row}");
-        }
-        for (mine, arm) in [(&selected.treated, "treated"), (&selected.control, "control")] {
+        let chosen = |arm: &str| {
             let want = &fixture["selected"][arm];
-            assert_eq!(mine.learning_rate, want["learning_rate"].as_f64().unwrap(), "{arm}");
-            assert_eq!(mine.max_depth, want["max_depth"].as_u64().unwrap() as usize, "{arm}");
-            assert_eq!(mine.n_estimators, want["n_estimators"].as_u64().unwrap() as usize, "{arm}");
-            assert!((mine.validation_auc - fixture["validation_auc"][arm].as_f64().unwrap()).abs() < 1e-12, "{arm} AUC");
+            ChosenArm {
+                learning_rate: want["learning_rate"].as_f64().unwrap(),
+                max_depth: want["max_depth"].as_u64().unwrap() as usize,
+                n_estimators: want["n_estimators"].as_u64().unwrap() as usize,
+                validation_auc: fixture["validation_auc"][arm].as_f64().unwrap(),
+            }
+        };
+        // The kernel's own search, and the same choice handed in from a search run elsewhere.
+        let selections = [ArmSelection::Search, ArmSelection::Chosen { treated: chosen("treated"), control: chosen("control") }];
+        for selection in selections {
+            let result = cross_fitted_t_learner(&values, rows, 2 + width, 0, 1, &adjustment, grid(), 5, leaf, 2, seed, selection).unwrap();
+            let AnalysisResult::CrossFittedTLearner { effects, average, selected, candidates, .. } = result else { panic!("wrong result") };
+            assert_eq!(candidates, 8);
+            assert!((average - fixture["ate"].as_f64().unwrap()).abs() < 1e-12, "ATE {average}");
+            let order: Vec<usize> = fixture["order"].as_array().unwrap().iter().map(|v| v.as_u64().unwrap() as usize).collect();
+            let expected: Vec<f64> = fixture["effects"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+            for (at, &row) in order.iter().enumerate() {
+                assert!((effects[row] - expected[at]).abs() < 1e-12, "row {row}");
+            }
+            for (mine, arm) in [(&selected.treated, "treated"), (&selected.control, "control")] {
+                let want = &fixture["selected"][arm];
+                assert_eq!(mine.learning_rate, want["learning_rate"].as_f64().unwrap(), "{arm}");
+                assert_eq!(mine.max_depth, want["max_depth"].as_u64().unwrap() as usize, "{arm}");
+                assert_eq!(mine.n_estimators, want["n_estimators"].as_u64().unwrap() as usize, "{arm}");
+                assert!((mine.validation_auc - fixture["validation_auc"][arm].as_f64().unwrap()).abs() < 1e-12, "{arm} AUC");
+            }
         }
-        assert!(cross_fitted_t_learner(&values, rows, 2 + width, 2, 1, &adjustment[1..], grid(), 5, leaf, 2, seed).is_err(),
+        let outside = ChosenArm { learning_rate: 0.5, ..chosen("treated") };
+        assert!(cross_fitted_t_learner(&values, rows, 2 + width, 0, 1, &adjustment, grid(), 5, leaf, 2, seed,
+            ArmSelection::Chosen { treated: outside, control: chosen("control") }).is_err(), "a candidate outside the grid is refused");
+        assert!(cross_fitted_t_learner(&values, rows, 2 + width, 2, 1, &adjustment[1..], grid(), 5, leaf, 2, seed, ArmSelection::Search).is_err(),
             "a non-binary treatment is refused");
     }
 

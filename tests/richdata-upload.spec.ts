@@ -60,7 +60,7 @@ test('reproduce weekly-key parsing and missing-data alignment through direct upl
   await page.getByRole('button', { name: 'Select all columns', exact: true }).click()
   await page.getByRole('radio', { name: 'Lag-aware sample exclusion', exact: true }).check()
   const cutoff = page.getByRole('combobox', { name: 'Sample cutoff', exact: true })
-  const following = page.getByRole('checkbox', { name: 'Exclude following samples through the cutoff window.', exact: true })
+  const following = page.getByRole('checkbox', { name: 'Exclude subsequent samples within the cutoff window.', exact: true })
   await cutoff.scrollIntoViewIfNeeded()
   console.log('Cutoff bounds:', await cutoff.boundingBox(), 'Following bounds:', await following.boundingBox())
   await page.screenshot({ path: info.outputPath('lag-exclusion-layout.png') })

@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { isNumericDuckDbType } from '@/domain/dataset'
 import type { SelectedSource } from '@/domain/workflow'
+import type { DeclaredType } from '@/domain/fileReading'
 import { FigureParts } from '@/components/ui/figures'
 import { Metadata } from '@/components/ui/Metadata'
 import { Icon } from '@/components/Icon'
@@ -16,12 +17,13 @@ import { useDatasetSummary } from './useDatasetSummary'
  * onto the whole file, and the preparation cards passed as children. Selecting a column in either
  * table drives the column profile in the inspector.
  */
-export function DataProfileView({ source, profile, selectedColumn, onSelectColumn, onEditSource, children }: {
+export function DataProfileView({ source, profile, selectedColumn, onSelectColumn, onEditSource, onDeclare, children }: {
   readonly source: SelectedSource
   readonly profile: DatasetProfile
   readonly selectedColumn: ColumnId | null
   readonly onSelectColumn: (column: ColumnId) => void
   readonly onEditSource: (() => void) | null
+  readonly onDeclare?: (column: string, type: DeclaredType | null) => void
   readonly children?: ReactNode
 }) {
   const numericColumns = profile.columns.filter((column) => isNumericDuckDbType(column.duckdbType)).length
@@ -54,7 +56,7 @@ export function DataProfileView({ source, profile, selectedColumn, onSelectColum
       </header>
 
       <div className="grid gap-3 @5xl/studio:grid-cols-[minmax(420px,0.9fr)_minmax(0,1.4fr)]">
-        <SchemaTable profile={profile} summary={summary} selectedColumn={selectedColumn} onSelectColumn={onSelectColumn} />
+        <SchemaTable profile={profile} summary={summary} selectedColumn={selectedColumn} onSelectColumn={onSelectColumn} onDeclare={onDeclare} />
         <PreviewTable source={source} profile={profile} summary={summary} selectedColumn={selectedColumn} onSelectColumn={onSelectColumn} />
       </div>
 

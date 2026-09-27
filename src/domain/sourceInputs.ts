@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { sourceFingerprint, type SourceFingerprint } from './dataset'
 import { brand, err, ok, type Brand, type Result } from './dop'
+import { columnDeclarationsSchema, fileReadingOf, type FileReading } from './fileReading'
 
 /**
  * The files a derived source is built from, as every derivation records them: an alias the recipe
@@ -19,25 +20,11 @@ interface InputFileDescriptor {
 }
 
 export type SqlInputDescriptor = InputFileDescriptor & (
-  | { readonly format: 'csv' | 'tsv' | 'parquet' }
+  | FileReading
   | { readonly format: 'duckdb-export-file'; readonly path: string }
 )
 
 export type SqlPreparationInput = SqlInputDescriptor & { readonly file: File }
-
-/** Recovered files keep the aliases recorded in the recipe, not their current filenames. */
-export function matchInputFiles(descriptors: readonly SqlInputDescriptor[], offered: readonly SqlPreparationInput[]): Result<readonly SqlPreparationInput[], string> {
-  const inputs: SqlPreparationInput[] = []
-  const missing: string[] = []
-  for (const descriptor of descriptors) {
-    const input = offered.find(candidate => candidate.fingerprint === descriptor.fingerprint)
-    if (input === undefined) missing.push(descriptor.fileName)
-    else inputs.push({ ...descriptor, file: input.file })
-  }
-  return missing.length === 0
-    ? ok(inputs)
-    : err(`The files chosen do not include ${missing.join(', ')}, unchanged.`)
-}
 
 export type SqlAliasProblem =
   | { readonly kind: 'empty-alias' }
@@ -84,7 +71,7 @@ const fileFields = {
   fingerprint: z.string(),
 }
 export const inputDescriptorSchema = z.union([
-  z.object({ ...fileFields, format: z.enum(['csv', 'tsv', 'parquet']) }).strict(),
+  z.object({ ...fileFields, format: z.enum(['csv', 'tsv', 'parquet']), declared: columnDeclarationsSchema.optional() }).strict(),
   z.object({ ...fileFields, bytes: z.number().int().nonnegative(), format: z.literal('duckdb-export-file'), path: z.string().min(1) }).strict(),
 ])
 
@@ -116,7 +103,14 @@ export function parseInputDescriptors(
     const fingerprint = sourceFingerprint(input.fingerprint)
     if (!fingerprint.ok) return err({ detail: `Invalid fingerprint for input ${input.alias}.` })
     occupied.add(alias.value)
-    descriptors.push({ ...input, alias: alias.value, fingerprint: fingerprint.value })
+    const identity = { alias: alias.value, fileName: input.fileName, bytes: input.bytes, fingerprint: fingerprint.value }
+    if (input.format === 'duckdb-export-file') {
+      descriptors.push({ ...identity, format: input.format, path: input.path })
+      continue
+    }
+    const reading = fileReadingOf(input.format, input.declared)
+    if (!reading.ok) return err({ detail: `Input ${input.alias} is a Parquet file, which stores its column types, but declares some.` })
+    descriptors.push({ ...identity, ...reading.value })
   }
   const exports = descriptors.filter(input => input.format === 'duckdb-export-file')
   if (exports.length > 0) {

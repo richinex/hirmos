@@ -1,5 +1,6 @@
 import { assertNever, brand, err, ok, type Brand, type NonEmptyArray, type Result } from './dop'
 import type { DatasetProfile, DatasetProfileProblem, SourcePersistence } from './dataset'
+import { fileReading, NO_DECLARATIONS, type FileReading } from './fileReading'
 import type { DagDocument } from './dag'
 import { EMPTY_ROOT_CAUSE, type RootCauseRun, type RootCauseWorkspace, type RootCauseCheckRecord } from './rootCauseAnalysis'
 import type { GcmEffectsRun } from './gcmEffects'
@@ -47,15 +48,14 @@ export type SourceSelectionProblem =
   /** The SQL step of a reopened project could not be run again on the files chosen. */
   | { readonly kind: 'replay-failed'; readonly detail: string }
 
-export interface SelectedSource {
+export type SelectedSource = {
   readonly file: File
   readonly name: string
   readonly bytes: number
   readonly mediaType: string
   readonly lastModified: number
-  readonly format: 'csv' | 'tsv' | 'parquet'
   readonly recipe: SourceRecipe
-}
+} & FileReading
 
 export type Workflow =
   | {
@@ -243,15 +243,8 @@ export function selectSource(file: File): Result<SelectedSource, SourceSelection
         ? 'parquet'
         : null
   if (format === null) return err({ kind: 'unsupported-format', extension })
-  return ok({
-    file,
-    name: file.name,
-    bytes: file.size,
-    mediaType: file.type,
-    lastModified: file.lastModified,
-    format,
-    recipe: { kind: 'uploaded-file' },
-  })
+  const common = { file, name: file.name, bytes: file.size, mediaType: file.type, lastModified: file.lastModified, recipe: { kind: 'uploaded-file' } } as const
+  return ok(format === 'parquet' ? { ...common, format } : { ...common, format, declared: NO_DECLARATIONS })
 }
 
 export function selectDerivedSource(
@@ -261,6 +254,17 @@ export function selectDerivedSource(
   const selected = selectSource(file)
   return selected.ok ? ok({ ...selected.value, recipe }) : selected
 }
+
+/** The same file read another way; a restored source takes the reading its profile records. */
+export const readAs = (source: SelectedSource, reading: FileReading): SelectedSource => ({
+  file: source.file,
+  name: source.name,
+  bytes: source.bytes,
+  mediaType: source.mediaType,
+  lastModified: source.lastModified,
+  recipe: source.recipe,
+  ...fileReading(reading),
+})
 
 /** The SQL workspace's name for the same step. */
 export const selectSqlDerivedSource = selectDerivedSource
@@ -299,9 +303,8 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         const parsed = selectSource(event.file)
         if (!parsed.ok) return { ...state, problem: parsed.error }
         const snapshot = state.restore
-        const source = snapshot.source === null
-          ? parsed.value
-          : { ...parsed.value, recipe: snapshot.source.recipe }
+        const recorded = snapshot.profile ?? (() => { throw new Error('unreachable') })()
+        const source = readAs(snapshot.source === null ? parsed.value : { ...parsed.value, recipe: snapshot.source.recipe }, recorded.source)
         return {
           kind: 'profiled',
           project: snapshot.project,

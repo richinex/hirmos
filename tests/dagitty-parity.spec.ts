@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { expectVerdict } from './dagitty-verdict'
 
 const fixtureDir = fileURLToPath(new URL('fixtures/dagitty/', import.meta.url))
 
@@ -93,20 +94,8 @@ for (const fixture of selected) {
     await page.waitForTimeout(400)
     await page.getByLabel('Causal DAG editor').screenshot({ path: `${out}/${fixture.slug}.png` })
     writeFileSync(`${out}/${fixture.slug}.json`, JSON.stringify({ verdict: (await adjustment.innerText()).replace(/\n+/g, ' ').trim() }))
-    if (!fixture.expected.backdoorOpen) {
-      await expect(adjustment.getByText('No back-door path is open.', { exact: false })).toBeVisible()
-      return
-    }
-    if (fixture.expected.msas.length === 0) {
-      await expect(adjustment.getByText('No observed adjustment set blocks every back-door path', { exact: false })).toBeVisible()
-      return
-    }
+    if (!await expectVerdict(adjustment, fixture.expected)) return
     expect(fixture.expected.canonicalValid, 'dagitty must accept the canonical set Hirmos names').toBe(true)
-    await expect(adjustment.getByText('blocks all represented back-door paths', { exact: false })).toBeVisible()
-    const sentence = await adjustment.innerText()
-    const named = /Adjusting for (.+?) blocks all represented back-door paths/.exec(sentence.replace(/\n/g, ' '))
-    expect(named, sentence).not.toBeNull()
-    expect((named?.[1] ?? '').split(', ').sort()).toEqual([...fixture.expected.canonical].sort())
 
     if (fixture.slug === 'extended-confounding-triangle') {
       await page.getByRole('button', { name: 'Use for study' }).click()

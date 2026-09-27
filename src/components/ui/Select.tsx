@@ -47,13 +47,17 @@ const collect = (children: ReactNode, into: Option[]): void => {
   })
 }
 
-export function Select({ value, onChange, children, className, disabled, id, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy }: {
+export function Select({ value, onChange, children, className, disabled, id, trigger, heading, 'aria-label': ariaLabel, 'aria-labelledby': ariaLabelledBy }: {
   readonly value: string | number
   readonly onChange: (event: { readonly target: { readonly value: string } }) => void
   readonly children?: ReactNode
   readonly className?: string
   readonly disabled?: boolean
   readonly id?: string
+  /** Shown in the trigger instead of the chosen label and the chevron, for a compact control such as a type glyph. */
+  readonly trigger?: ReactNode
+  /** A line above the options that names what is being chosen, for a trigger that shows no label. */
+  readonly heading?: string
   readonly 'aria-label'?: string
   readonly 'aria-labelledby'?: string
 }) {
@@ -71,17 +75,22 @@ export function Select({ value, onChange, children, className, disabled, id, 'ar
         aria-labelledby={ariaLabelledBy}
         className={cn('inline-flex items-center justify-between gap-2 text-left data-[placeholder]:text-faint', className)}
       >
-        <span className="min-w-0 flex-1 truncate">
-          <RadixSelect.Value placeholder={placeholder?.label ?? ''}>{selected !== undefined && selected.value !== '' ? selected.label : undefined}</RadixSelect.Value>
-        </span>
-        <RadixSelect.Icon aria-hidden className="flex shrink-0 text-faint">
-          <Icon name="expand_more" size={14} />
-        </RadixSelect.Icon>
+        {trigger ?? (
+          <>
+            <span className="min-w-0 flex-1 truncate">
+              <RadixSelect.Value placeholder={placeholder?.label ?? ''}>{selected !== undefined && selected.value !== '' ? selected.label : undefined}</RadixSelect.Value>
+            </span>
+            <RadixSelect.Icon aria-hidden className="flex shrink-0 text-faint">
+              <Icon name="expand_more" size={14} />
+            </RadixSelect.Icon>
+          </>
+        )}
       </RadixSelect.Trigger>
       <RadixSelect.Portal>
-        <RadixSelect.Content position="popper" sideOffset={4} className="float z-(--z-popover) max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-edge bg-panel text-body text-ink">
+        <RadixSelect.Content position="popper" align="start" sideOffset={4} className={cn('float z-(--z-popover) max-h-[min(20rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-lg border border-edge bg-panel text-body text-ink', trigger !== undefined && 'min-w-52')}>
           <RadixSelect.ScrollUpButton aria-hidden className="flex justify-center py-0.5 text-faint"><Icon name="expand_less" size={14} /></RadixSelect.ScrollUpButton>
           <RadixSelect.Viewport className="p-1">
+            {heading !== undefined && <RadixSelect.Group><RadixSelect.Label className="mb-1 border-b border-line px-2 pb-1.5 pt-1 text-label text-muted">{heading}</RadixSelect.Label></RadixSelect.Group>}
             {items.map((option) => (
               <RadixSelect.Item
                 key={option.value === '' ? EMPTY : option.value}

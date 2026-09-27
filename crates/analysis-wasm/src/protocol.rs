@@ -128,6 +128,26 @@ pub(crate) struct BootstrapAverage {
     pub standard_error_bound: f64,
 }
 
+/// How the cross-fitted T-learner picks each arm's candidate: by its own grid search, or as chosen
+/// by a search that already ran on that arm's rows, such as one spread across a worker pool.
+#[derive(Clone, Copy, Default, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase", deny_unknown_fields)]
+pub(crate) enum ArmSelection {
+    #[default]
+    Search,
+    Chosen { treated: ChosenArm, control: ChosenArm },
+}
+
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) struct ChosenArm {
+    pub(crate) learning_rate: f64,
+    pub(crate) max_depth: usize,
+    pub(crate) n_estimators: usize,
+    /// Mean held-out ROC AUC of the candidate over the search folds.
+    pub(crate) validation_auc: f64,
+}
+
 #[derive(Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum TLearnerUncertaintyEvidence {
@@ -1511,6 +1531,8 @@ pub(crate) enum AnalysisCommand {
         min_samples_leaf: usize,
         min_samples_split: usize,
         seed: u32,
+        #[serde(default)]
+        selection: ArmSelection,
     },
     DmlRefutationBatch {
         rows: usize,

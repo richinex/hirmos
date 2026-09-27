@@ -5,7 +5,7 @@ import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { useRunActivity } from '@/lib/useRunActivity'
 import type { RunActivity } from '@/domain/activity'
-import type { DiscoveryRunEvent } from '@/domain/discovery'
+import { STANDARDISED_INPUTS_NOTE, type DiscoveryRunEvent } from '@/domain/discovery'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Select } from '@/components/ui/Select'
@@ -1349,7 +1349,7 @@ function CmlpResult({ run, current }: { readonly current: boolean; readonly run:
   return (
     <ResultCard run={run} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.lag}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and scaled by its recorded population standard deviation before training.</p>
+      <p className="mb-0 mt-3 text-body text-muted">{STANDARDISED_INPUTS_NOTE}</p>
       <StructurePlot run={run} label="cMLP lag-resolved relations" />
       <NeuralSummaryPlot run={run} />
       <CmlpLagPlot run={run} />
@@ -1382,7 +1382,7 @@ function ClstmResult({ run, current }: { readonly current: boolean; readonly run
   return (
     <ResultCard run={run} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>context {run.result.context}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and scaled by its recorded population standard deviation before training.</p>
+      <p className="mb-0 mt-3 text-body text-muted">{STANDARDISED_INPUTS_NOTE}</p>
       <NeuralSummaryPlot run={run} />
       <p className="mb-3 mt-3 text-body text-muted">cLSTM selects source histories that help predict a target under the fitted model and sparsity penalty. It does not select individual lags, so Hirmos does not display this result as a lag graph.</p>
       <EvidenceTable<typeof rows[number]>

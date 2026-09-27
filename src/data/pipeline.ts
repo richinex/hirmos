@@ -1,11 +1,12 @@
 import type * as duckdb from '@duckdb/duckdb-wasm'
 import { isolatedDuckDbEngine, previewCell, type DuckDbEngine } from './duckdb'
-import { describeSqlPreparationProblem, materializeView, prepareSqlInputs, registerInputs, type SqlPreparationProblem } from './sqlPreparation'
+import { describeSqlPreparationProblem, materializeView, prepareSqlInputs, recoverSqlInputs, redeclareInput, registerInputs, type SqlPreparationProblem } from './sqlPreparation'
 import type { PreviewCell } from '@/domain/dataset'
 import { err, isNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { compileDraft, compilePipeline, describePipelineProblem, type CompiledPipeline, type PipelineBlockId, type PipelineGraph, type PipelineProblem, type PipelineRecipe, type PipelineStep } from '@/domain/pipeline'
 import type { ScriptShape } from '@/workers/pythonProtocol'
 import { inputDescriptor, type SqlInputAlias, type SqlPreparationInput } from '@/domain/sourceInputs'
+import type { DeclaredType } from '@/domain/fileReading'
 
 export type PipelineRunProblem =
   | { readonly kind: 'engine-unavailable'; readonly detail: string }
@@ -15,6 +16,7 @@ export type PipelineRunProblem =
   | { readonly kind: 'preview-failed'; readonly id: PipelineBlockId; readonly detail: string }
   | { readonly kind: 'materialization'; readonly problem: SqlPreparationProblem }
   | { readonly kind: 'session-closed' }
+  | { readonly kind: 'unknown-input'; readonly alias: SqlInputAlias }
 
 export interface PreviewColumn {
   readonly name: string
@@ -99,6 +101,17 @@ export async function addPipelineInput(session: PipelineSession, file: File): Pr
   if (!registered.ok) return err({ kind: 'input', problem: registered.error })
   session.inputs.push(input)
   return ok(input)
+}
+
+/** Reads a registered file again with one column's declaration changed, under the same alias. */
+export async function redeclarePipelineInput(session: PipelineSession, alias: SqlInputAlias, column: string, type: DeclaredType | null): Promise<Result<SqlPreparationInput, PipelineRunProblem>> {
+  if (session.lifecycle.current === 'closed') return err({ kind: 'session-closed' })
+  const index = session.inputs.findIndex((input) => input.alias === alias)
+  if (index === -1) return err({ kind: 'unknown-input', alias })
+  const updated = await redeclareInput(session.engine, session.namespace, session.inputs[index]!, column, type)
+  if (!updated.ok) return err({ kind: 'input', problem: updated.error })
+  session.inputs[index] = updated.value
+  return ok(updated.value)
 }
 
 /** Drops a registered file's view and forgets it; the block that held it is the caller's to update. */
@@ -258,17 +271,9 @@ export async function replayPipelineRecipe(
   files: readonly File[],
   scripts: ScriptRuntime,
 ): Promise<Result<File, PipelineRunProblem>> {
-  const offered = files.length === 0 ? ok([]) : await prepareSqlInputs(files)
-  if (!offered.ok) return err({ kind: 'input', problem: offered.error })
-  const matched: SqlPreparationInput[] = []
-  const missing: string[] = []
-  for (const descriptor of recipe.inputs) {
-    const input = offered.value.find((candidate) => candidate.fingerprint === descriptor.fingerprint)
-    if (input === undefined) missing.push(descriptor.fileName)
-    else matched.push({ ...input, alias: descriptor.alias })
-  }
-  if (missing.length > 0) return err({ kind: 'input', problem: { kind: 'replay-inputs-missing', fileNames: missing } })
-  const session = await openPipeline(matched, scripts)
+  const matched = await recoverSqlInputs(recipe.inputs, files)
+  if (!matched.ok) return err({ kind: 'input', problem: matched.error })
+  const session = await openPipeline(matched.value, scripts)
   if (!session.ok) return session
   try {
     const output = await materializePipeline(session.value, recipe.graph)
@@ -287,6 +292,7 @@ export function describePipelineRunProblem(problem: PipelineRunProblem, name: (i
     case 'preview-failed': return `${name(problem.id)} could not be previewed: ${problem.detail}`
     case 'materialization': return `The output could not be written: ${describeSqlPreparationProblem(problem.problem)}`
     case 'session-closed': return 'The pipeline session has been closed. Choose the input files again.'
+    case 'unknown-input': return `No input file is named ${problem.alias}.`
     default: { const exhaustive: never = problem; return exhaustive }
   }
 }

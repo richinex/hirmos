@@ -1,6 +1,8 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
 import { RecordBatchFileWriter } from 'apache-arrow'
 import { fingerprintFile } from './fingerprint'
+import { fileRelation } from './fileRelation'
+import { declareColumn, fileReading, type DeclaredType } from '@/domain/fileReading'
 import { isolatedDuckDbEngine, type DuckDbEngine } from './duckdb'
 import { rememberInputFiles } from './inputFiles'
 import { exportDirectory, type SqlInputDescriptor } from '@/domain/sourceInputs'
@@ -56,9 +58,7 @@ const scalarCount = (value: unknown): Result<number, SqlPreparationProblem> => {
   return err({ kind: 'prepared-view-invalid', detail: `DuckDB returned an invalid row count: ${String(value)}` })
 }
 
-const relationFor = (input: SqlPreparationInput, path: string): string => input.format === 'parquet'
-  ? `read_parquet(${sqlString(path)})`
-  : `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480)`
+const relationFor = (input: Exclude<SqlPreparationInput, { readonly format: 'duckdb-export-file' }>, path: string): string => fileRelation(input, path)
 
 export async function registerInputs(
   engine: DuckDbEngine,
@@ -87,6 +87,22 @@ export async function registerInputs(
   } finally {
     await connection.close()
   }
+}
+
+/** The input read again with one column's declaration changed: its view is created again under the same alias. */
+export async function redeclareInput(
+  engine: DuckDbEngine,
+  namespace: string,
+  input: SqlPreparationInput,
+  column: string,
+  type: DeclaredType | null,
+): Promise<Result<SqlPreparationInput, SqlPreparationProblem>> {
+  if (input.format === 'duckdb-export-file' || input.format === 'parquet') {
+    return err({ kind: 'input-registration-failed', fileName: input.fileName, detail: 'This file stores its column types, so none can be declared.' })
+  }
+  const updated: SqlPreparationInput = { ...input, declared: declareColumn(input.declared, column, type) }
+  const registered = await registerInputs(engine, [updated], namespace)
+  return registered.ok ? ok(updated) : registered
 }
 
 export async function prepareDatabaseExport(files: readonly File[]): Promise<Result<readonly SqlPreparationInput[], SqlPreparationProblem>> {
@@ -145,8 +161,8 @@ export async function prepareSqlInputs(files: readonly File[], taken: ReadonlySe
       file,
       fileName: source.value.name,
       bytes: source.value.bytes,
-      format: source.value.format,
       fingerprint: fingerprint.value,
+      ...fileReading(source.value),
     })
   }
   if (!isNonEmpty(prepared)) return err({ kind: 'no-input-files' })

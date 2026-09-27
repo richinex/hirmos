@@ -9,7 +9,9 @@ import { button, caption, chromeAction, label, literal, num } from '@/components
 import { isNumericDuckDbType, type PreviewCell } from '@/domain/dataset'
 import { assertNever } from '@/domain/dop'
 import { blockLabel, describeCalendarWindow, describePipelineProblem, type PipelineBlock, type PipelineBlockId, type PipelineEdge, type PipelineNode, type RowTest } from '@/domain/pipeline'
-import type { SqlPreparationInput } from '@/domain/sourceInputs'
+import type { SqlInputAlias, SqlPreparationInput } from '@/domain/sourceInputs'
+import { columnReading, type DeclaredType } from '@/domain/fileReading'
+import { ColumnTypeText, ReadAsButton, TypeGlyph } from '../ReadAs'
 import { type PipelineResume, type SelectedSource } from '@/domain/workflow'
 import {
   previewBlock,
@@ -232,7 +234,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   const inspector = selectedNode === null
     ? (
       <div className="space-y-3">
-        <Alert tone="info" live={false}>Connect input files to “Use as source” through transformation blocks. Select a block to edit its settings and preview its rows.</Alert>
+        <Alert tone="info" live={false} testId="pipeline-instructions">Connect input files to “Use as source” through transformation blocks. Select a block to edit its settings and preview its rows.</Alert>
         {outputNotice}
         <div className={caption('m-0 flex items-center gap-3')} aria-label="Pipeline size">
           {[
@@ -258,7 +260,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
         )}
       </div>
     )
-    : <Inspector node={selectedNode} index={index} outcomes={outcomes} viewOf={viewOf} files={files} choosing={choosing} onChooseFile={(file) => void chooseFile(selectedNode.id, file)} onChange={(block) => setGraph((current) => configureBlock(current, selectedNode.id, block))} onRemove={() => dropBlock(selectedNode.id)} />
+    : <Inspector node={selectedNode} index={index} outcomes={outcomes} viewOf={viewOf} files={files} choosing={choosing} onChooseFile={(file) => void chooseFile(selectedNode.id, file)} onDeclare={(alias, column, type) => void controller.declare(alias, column, type)} onChange={(block) => setGraph((current) => configureBlock(current, selectedNode.id, block))} onRemove={() => dropBlock(selectedNode.id)} />
 
   const decimals = useMemo(() => preview === null ? [] : preview.columns.map((_, index) => columnDecimals(preview.rows, index)), [preview])
   const previewColumns = useMemo<EvidenceColumn<PreviewRow>[]>(() => preview === null ? [] : [
@@ -338,7 +340,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   )
 }
 
-function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFile, onChange, onRemove }: {
+function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFile, onDeclare, onChange, onRemove }: {
   readonly node: PipelineNode
   readonly index: GraphIndex
   readonly outcomes: ReadonlyMap<PipelineBlockId, BlockOutcome>
@@ -346,6 +348,7 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
   readonly files: readonly SqlPreparationInput[]
   readonly choosing: { readonly kind: 'idle' } | { readonly kind: 'busy' } | { readonly kind: 'refused'; readonly detail: string }
   readonly onChooseFile: (file: File) => void
+  readonly onDeclare: (alias: SqlInputAlias, column: string, type: DeclaredType | null) => void
   readonly onChange: (block: PipelineBlock) => void
   readonly onRemove: () => void
 }) {
@@ -367,7 +370,15 @@ function Inspector({ node, index, outcomes, viewOf, files, choosing, onChooseFil
         <details className="group/schema">
           <summary className={label('flex cursor-pointer list-none items-center gap-1 text-muted hover:text-ink')}><Metadata><span><Icon name="chevron_right" size={14} className="transition-transform group-open/schema:rotate-90" /> Columns</span><span>{outcome.columns.length}</span></Metadata></summary>
           <ul className="m-0 mt-1.5 list-none space-y-0.5 p-0" data-testid="block-schema">
-            {outcome.columns.map((column) => <li key={column.name} className="flex items-baseline gap-2 text-body"><span className={literal('truncate text-ink')}>{column.name}</span><span className="ml-auto shrink-0 text-micro text-faint">{column.type}</span></li>)}
+            {outcome.columns.map((column) => (
+              <li key={column.name} className="flex items-center gap-1.5 text-body">
+                {held === null || held.format === 'parquet' || held.format === 'duckdb-export-file'
+                  ? <TypeGlyph type={column.type} />
+                  : <ReadAsButton column={column.name} reading={columnReading(held, column.name)} type={column.type} disabled={choosing.kind === 'busy'} onDeclare={(type) => onDeclare(held.alias, column.name, type)} />}
+                <span className={literal('min-w-0 truncate text-ink')}>{column.name}</span>
+                <span className="ml-auto shrink-0 text-micro"><ColumnTypeText reading={held === null || held.format === 'duckdb-export-file' ? { kind: 'detected' } : columnReading(held, column.name)} type={column.type} /></span>
+              </li>
+            ))}
           </ul>
         </details>
       )}

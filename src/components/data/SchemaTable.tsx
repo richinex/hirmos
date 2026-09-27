@@ -7,9 +7,10 @@ import { isNumericDuckDbType, type ColumnId, type ColumnSummary, type DatasetPro
 import { assertNever } from '@/domain/dop'
 import { formatCount, formatPercent, formatStatistic } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
+import { columnReading, type DeclaredType } from '@/domain/fileReading'
+import { ColumnTypeText, ReadAsButton, TypeGlyph } from './ReadAs'
+import { KINDS, kindOf, kindText, type ColumnKind } from './columnKind'
 import type { DatasetSummaryState } from './useDatasetSummary'
-
-type ColumnKind = 'numeric' | 'text' | 'temporal' | 'boolean'
 
 interface SchemaRow {
   readonly id: ColumnId
@@ -21,34 +22,6 @@ interface SchemaRow {
   readonly summary: ColumnSummary | null
 }
 
-const kindOf = (duckdbType: string): ColumnKind => {
-  if (isNumericDuckDbType(duckdbType)) return 'numeric'
-  if (duckdbType === 'BOOLEAN') return 'boolean'
-  if (/^(DATE|TIME|TIMESTAMP|INTERVAL)/.test(duckdbType)) return 'temporal'
-  return 'text'
-}
-
-const kindGlyph = (kind: ColumnKind): string => {
-  switch (kind) {
-    case 'numeric': return '#'
-    case 'text': return 'Aa'
-    case 'temporal': return '⏱'
-    case 'boolean': return '◐'
-    default: return assertNever(kind)
-  }
-}
-
-const kindText = (kind: ColumnKind): string => {
-  switch (kind) {
-    case 'numeric': return 'Numeric'
-    case 'text': return 'Text'
-    case 'temporal': return 'Temporal'
-    case 'boolean': return 'Boolean'
-    default: return assertNever(kind)
-  }
-}
-
-const KINDS: readonly ColumnKind[] = ['numeric', 'text', 'temporal', 'boolean']
 
 /** The name with the search match marked, so a reader sees why the row survived the filter. */
 function Highlighted({ text, query }: { readonly text: string; readonly query: string }): ReactNode {
@@ -66,11 +39,13 @@ const trimNumber = (raw: string): string => {
 
 const helper = createColumnHelper<SchemaRow>()
 
-export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }: {
+export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn, onDeclare }: {
   readonly profile: DatasetProfile
   readonly summary: DatasetSummaryState
   readonly selectedColumn: ColumnId | null
   readonly onSelectColumn: (column: ColumnId) => void
+  /** Declares how a column of a delimited file is read; absent where the reading cannot change. */
+  readonly onDeclare?: (column: string, type: DeclaredType | null) => void
 }) {
   const titleId = useId()
   const [density, setDensity] = useTableDensity()
@@ -108,7 +83,9 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
         const selected = row.id === selectedColumn
         return (
           <span className="flex items-center gap-2">
-            <span aria-hidden className={literal('w-4 shrink-0 text-center text-micro text-faint')} title={kindText(row.kind)}>{kindGlyph(row.kind)}</span>
+            {onDeclare === undefined || profile.source.format === 'parquet'
+              ? <TypeGlyph type={row.duckdbType} />
+              : <span onClick={(event) => event.stopPropagation()}><ReadAsButton column={row.name} reading={columnReading(profile.source, row.name)} type={row.duckdbType} onDeclare={(type) => onDeclare(row.name, type)} /></span>}
             <button
               type="button"
               aria-pressed={selected}
@@ -124,7 +101,7 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
     }),
     helper.accessor('duckdbType', {
       header: 'Type',
-      cell: (context) => <span className={literal('text-faint')}>{context.getValue()}</span>,
+      cell: (context) => <ColumnTypeText reading={columnReading(profile.source, context.row.original.name)} type={context.getValue()} />,
     }),
     helper.accessor('nullCount', {
       header: 'Missing',
@@ -179,7 +156,7 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
         return <span className="text-faint">—</span>
       },
     }),
-  ], [onSelectColumn, profile.rowCount, query, selectedColumn])
+  ], [onDeclare, onSelectColumn, profile.rowCount, profile.source, query, selectedColumn])
 
   const table = useReactTable({
     data: visible,

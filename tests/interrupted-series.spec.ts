@@ -57,9 +57,10 @@ test('fits the paper\'s smoking-ban model through the UI and reads it as the pap
   await expect(result).toContainText('Change in per-row rate multiplier')
   await expect(result.getByRole('table', { name: 'Fitted terms' }).locator('tbody tr').nth(3)).toContainText('0.00148')
   await expect(result).toContainText('so this slope change is uncertain under the fitted model.')
-  await expect(result).toContainText('At the first affected row, add the level and slope coefficients')
+  // With both a level and a slope term, the reader is told how the two combine.
+  await expect(result.getByRole('region', { name: 'What must be true' }).getByRole('paragraph')).toHaveCount(1)
   await expect(result).not.toContainText('no effect at all')
-  await expect(result).toContainText('Bars outside the dashed bands suggest residual correlation.')
+  await expect(result.getByRole('img', { name: 'Residual autocorrelation' })).toBeVisible()
   await expect(result).not.toContainText('wider Newey–West bandwidth')
   // The same design on the standardised count as a continuous series with AR(1) errors: the
   // statsmodels SARIMAX fixture (crates/causal-core/oracle/fixtures/arma_regression.json) fits

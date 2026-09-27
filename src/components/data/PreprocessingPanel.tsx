@@ -1,5 +1,6 @@
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
-import { TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
+import { ISO_WEEK_NOTE, TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
+import { STATIONARITY_TESTS_NOTE } from '@/domain/stationarity'
 import { TimePreview } from './TimePreview'
 import { CalendarReport } from './CalendarReport'
 import { ParameterLabel, ParameterHelp } from '@/components/ui/ParameterLabel'
@@ -654,7 +655,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               </label>
               {draft.sampling.kind === 'regular-series' ? <div className="block text-body text-ink">
                 {draft.sampling.interpretation?.kind === 'iso-week'
-                  ? <ParameterLabel className={fieldLabel} htmlFor="time-interpretation" label="Time interpretation" help="Weeks start on Monday. The ISO week-year can differ from the calendar year." />
+                  ? <ParameterLabel className={fieldLabel} htmlFor="time-interpretation" label="Time interpretation" help={ISO_WEEK_NOTE} />
                   : <label className={fieldLabel} htmlFor="time-interpretation">Time interpretation</label>}
                 <Select id="time-interpretation" className={field('text', 'mt-1')}
                   value={interpretationValue}
@@ -1027,7 +1028,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
             <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
-              <p className={prose('m-0 text-faint')}>A stationary process maintains stable probabilistic behaviour over time after accounting for the deterministic terms in the test. The ADF test uses a unit root as its null hypothesis, while the KPSS test uses stationarity as its null. Hirmos considers both tests together, as either alone may be inconclusive. The Zivot–Andrews test allows for one structural break.</p>
+              <p className={prose('m-0 text-faint')}>{STATIONARITY_TESTS_NOTE}</p>
               <p className={prose('m-0 text-faint')}>These tests evaluate the saved values. To assess a different transformation, modify it above and create a new version of the prepared dataset.</p>
             </div>
           </div>

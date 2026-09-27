@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { ISO_WEEK_NOTE } from '../src/domain/timeInterpretation'
 import { choose } from './examples/support'
 import { parseDataWorkerEvent } from '../src/workers/dataProtocol'
 
@@ -62,7 +63,7 @@ test('direct upload previews and prepares ISO weeks through existing controls', 
   const help = page.getByRole('button', { name: 'About Time interpretation', exact: true })
   if (info.project.name === 'mobile-chromium') await help.click()
   else await help.focus()
-  await expect(page.getByText('Weeks start on Monday. The ISO week-year can differ from the calendar year.', { exact: true }).first()).toBeVisible()
+  await expect(page.getByText(ISO_WEEK_NOTE, { exact: true }).first()).toBeVisible()
   await page.keyboard.press('Escape')
   await choose(page, 'Source frequency', 'Weekly')
   await page.locator('summary').filter({ hasText: 'Time preview' }).click()

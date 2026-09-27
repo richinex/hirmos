@@ -92,7 +92,7 @@ test('direct upload can enter either editor without losing preparation on cancel
       expect(Math.abs(cancel.width - accept.width)).toBeLessThan(1)
       expect(Math.abs(cancel.height - accept.height)).toBeLessThan(1)
       const notice = (await page.getByTestId('pipeline-incomplete').boundingBox())!
-      const instructions = (await page.getByText('Connect input files through transformation blocks', { exact: false }).boundingBox())!
+      const instructions = (await page.getByTestId('pipeline-instructions').boundingBox())!
       expect(notice.y).toBeGreaterThan(instructions.y + instructions.height)
       await expect(page.getByRole('banner').getByRole('button', { name: 'Cancel editing' })).toHaveCount(0)
     }

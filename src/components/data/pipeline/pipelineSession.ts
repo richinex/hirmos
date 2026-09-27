@@ -1,8 +1,9 @@
 import { createStore } from 'zustand/vanilla'
 import { blockLabel, type PipelineBlockId, type PipelineGraph } from '@/domain/pipeline'
 import { selectDerivedSource, type PipelineResume, type SelectedSource } from '@/domain/workflow'
-import type { SqlPreparationInput } from '@/domain/sourceInputs'
-import { addPipelineInput, closePipeline, describePipelineRunProblem, materializePipeline, openPipeline, removePipelineInput, runPipeline, type PipelineRun, type PipelineSession } from '@/data/pipeline'
+import type { SqlInputAlias, SqlPreparationInput } from '@/domain/sourceInputs'
+import type { DeclaredType } from '@/domain/fileReading'
+import { addPipelineInput, closePipeline, describePipelineRunProblem, materializePipeline, openPipeline, redeclarePipelineInput, removePipelineInput, runPipeline, type PipelineRun, type PipelineSession } from '@/data/pipeline'
 import { createPythonRuntime } from '@/data/pythonRuntime'
 import { configureBlock, initialGraph, removeBlock } from './pipelineWorkspaceModel'
 
@@ -113,6 +114,23 @@ export function createPipelineSession(resume: PipelineResume | null) {
       if (valid(generation)) store.setState({ choosing: store.getState().session.kind === 'failed' ? { kind: 'refused', detail: 'The data engine could not start. The file cannot be read.' } : { kind: 'idle' } })
     } catch (cause) { if (valid(generation)) store.setState({ choosing: { kind: 'refused', detail: String(cause) } }) }
   }
+  /** One column of an input file declared as a type, or with `null` detected again; the blocks then run on the new reading. */
+  const declare = async (alias: SqlInputAlias, column: string, type: DeclaredType | null) => {
+    if (closed || store.getState().choosing.kind === 'busy') return
+    const generation = epoch
+    store.setState({ choosing: { kind: 'busy' } })
+    try {
+      await enqueue(async live => {
+        const updated = await redeclarePipelineInput(live, alias, column, type)
+        if (!valid(generation)) return
+        if (!updated.ok) throw new Error(describePipelineRunProblem(updated.error, nameOf))
+        store.setState({ files: [...live.inputs] })
+      })
+      if (!valid(generation)) return
+      store.setState({ choosing: { kind: 'idle' } })
+      schedule()
+    } catch (cause) { if (valid(generation)) store.setState({ choosing: { kind: 'refused', detail: String(cause) } }) }
+  }
   const dropBlock = (id: PipelineBlockId) => {
     if (closed) return
     const generation = epoch
@@ -149,6 +167,6 @@ export function createPipelineSession(resume: PipelineResume | null) {
       return null
     }
   }
-  return { store, python, open, dispose, setGraph, chooseFile, dropBlock, adopt, active: () => !closed }
+  return { store, python, open, dispose, setGraph, chooseFile, declare, dropBlock, adopt, active: () => !closed }
 }
 export type PipelineController = ReturnType<typeof createPipelineSession>

@@ -391,7 +391,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 't-learner':
       return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, uncertainty: command.uncertainty }
     case 'cross-fitted-t-learner':
-      return { kind: 'crossFittedTLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed }
+      return { kind: 'crossFittedTLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, learningRate: command.learningRate, maxDepth: command.maxDepth, nEstimators: command.nEstimators, splits: command.splits, minSamplesLeaf: command.minSamplesLeaf, minSamplesSplit: command.minSamplesSplit, seed: command.seed, selection: command.selection }
     case 'ardl-pss':
       return { kind: 'ardlPss', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, maxLag: command.maxLag, trend: command.trend, case: command.case }
     case 'ardl-model':

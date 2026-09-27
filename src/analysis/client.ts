@@ -37,7 +37,7 @@ import type {
 import type { BackdoorLinearEvidence, ContinuousGpsEvidence, DoublyRobustEvidence, PropensityMatchingEvidence, PropensityWeightingEvidence, CausalEffectsEvidence, CausalEffectsUncertainty, CausalImpactEvidence, CountGlmEvidence, FrontdoorTwoStageEvidence, IngarchInterventionSchedule, InstrumentalVariableEvidence, NegativeBinomialIngarchEvidence, TotalEffectEstimator } from '@/domain/estimation'
 import type { MissingnessResolutionCommand, MissingnessResolvedEvidence } from '@/domain/missingness'
 import type { SeasonalAdjustedEvidence } from '@/domain/seasonal'
-import type { ArdlEvidence, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, TLearnerEvidence, CrossFittedTLearnerEvidence, VecmEvidence } from '@/domain/estimation'
+import type { ArdlEvidence, ArmSelection, BayesianGaussianEvidence, BinaryEttEvidence, DiscreteBnEvidence, DoubleMlEvidence, NegbinNutsEvidence, PanelInterventionEvidence, SyntheticControlEvidence, TLearnerEvidence, CrossFittedTLearnerEvidence, VecmEvidence } from '@/domain/estimation'
 import type { DmlRefutationEvidence } from '@/domain/sensitivity'
 import type { DynamicCounterfactualUncertainty, DynamicInterventionTiming, DynamicLinearScmEvidence, LinearScmEvidence } from '@/domain/counterfactual'
 import type { LinearRefutationEvidence, SeriesStructureEvidence, UnobservedConfoundingEvidence } from '@/domain/sensitivity'
@@ -1146,6 +1146,7 @@ export interface CrossFittedTLearnerDesign {
   readonly minSamplesLeaf: number
   readonly minSamplesSplit: number
   readonly seed: number
+  readonly selection: ArmSelection
 }
 
 export function runCrossFittedTLearner(values: Float64Array, rows: number, columns: number, design: CrossFittedTLearnerDesign): Promise<CrossFittedTLearnerOutcome> {

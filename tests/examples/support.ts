@@ -25,7 +25,8 @@ export const chapter = async (page: Page, name: RegExp) => {
   const toggle = page.getByRole('button', { name: 'Expand chapter list' })
   if (await toggle.isVisible()) await toggle.click()
   const destination = page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name })
-  await expect(destination).not.toHaveAttribute('aria-disabled', 'true')
+  // A reopened project unlocks its chapters once the file is restored, which can take a while under load.
+  await expect(destination).not.toHaveAttribute('aria-disabled', 'true', { timeout: 60_000 })
   await destination.click()
 }
 

@@ -55,3 +55,6 @@ export function parseStationarityBattery(value: unknown): Result<StationarityBat
     ? ok(parsed.data)
     : err({ kind: 'invalid-stationarity-result', detail: z.prettifyError(parsed.error) })
 }
+
+/** What the two unit-root tests assume, as the Data studio states it beside them. */
+export const STATIONARITY_TESTS_NOTE = 'A stationary process maintains stable probabilistic behaviour over time after accounting for the deterministic terms in the test. The ADF test uses a unit root as its null hypothesis, while the KPSS test uses stationarity as its null. Hirmos considers both tests together, as either alone may be inconclusive. The Zivot–Andrews test allows for one structural break.'

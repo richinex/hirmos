@@ -977,10 +977,11 @@ pub fn run_analysis(
             min_samples_leaf,
             min_samples_split,
             seed,
+            selection,
         } => cross_fitted_t_learner(
             values, rows, columns, treatment, outcome, &adjustment,
             hirmos_causal_core::model_selection::Grid { learning_rate, max_depth, n_estimators },
-            splits, min_samples_leaf, min_samples_split, seed,
+            splits, min_samples_leaf, min_samples_split, seed, selection,
         ),
         AnalysisCommand::DmlRefutationBatch {
             rows,

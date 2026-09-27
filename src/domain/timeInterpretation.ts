@@ -60,3 +60,6 @@ export const TIME_INTERPRETATIONS: readonly { readonly label: string; readonly v
 /** The same list where only a calendar reading makes sense. */
 export const CALENDAR_TIME_INTERPRETATIONS: readonly { readonly label: string; readonly value: string; readonly interpretation: CalendarTimeInterpretation }[] =
   TIME_INTERPRETATIONS.flatMap((entry) => entry.interpretation.kind === 'source-type' || entry.interpretation.kind === 'ordinal' ? [] : [{ ...entry, interpretation: entry.interpretation }])
+
+/** What an ISO week is, as the time-interpretation help states it. */
+export const ISO_WEEK_NOTE = 'Weeks start on Monday. The ISO week-year can differ from the calendar year.'

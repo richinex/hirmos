@@ -1663,3 +1663,6 @@ export const changedSettings = (configuration: DiscoveryConfiguration): readonly
     .filter((key) => key !== 'kind' && key !== 'background')
     .filter((key) => JSON.stringify(Reflect.get(configuration, key)) !== JSON.stringify(defaults[key]))
 }
+
+/** How a neural Granger run standardises its inputs, as both result cards state it. */
+export const STANDARDISED_INPUTS_NOTE = 'Each selected column was centered and scaled by its recorded population standard deviation before training.'

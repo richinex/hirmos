@@ -70,7 +70,7 @@ test('series retains its chart through loading, stale replies and cached switche
   await expect(page.getByText('Category is not numeric', { exact: false })).toBeVisible()
   await expect(chart).toHaveCount(0)
   await render(1, 'failed')
-  await expect(page.getByText('The column profile was refused', { exact: false })).toBeVisible()
+  await expect(page.getByText('The column could not be profiled', { exact: false })).toBeVisible()
   await render(1, 'loading', 1, 'new-source')
   await expect(chart).toHaveCount(0)
   await render(1, 'ready', 1, 'new-source')

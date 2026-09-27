@@ -1052,6 +1052,15 @@ const armChoiceSchema = z.object({
   validationAuc: z.number().finite().min(0).max(1),
 }).strict()
 
+/** How the kernel picks each arm's candidate: its own search, or one already run on a worker pool. */
+export const armSelectionSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('search') }).strict(),
+  z.object({ kind: z.literal('chosen'), treated: armChoiceSchema, control: armChoiceSchema }).strict(),
+])
+
+export type ArmSelection = z.infer<typeof armSelectionSchema>
+export type ArmChoice = z.infer<typeof armChoiceSchema>
+
 export const crossFittedTLearnerEvidenceSchema = z.object({
   kind: z.literal('crossFittedTLearner'),
   observations: z.number().int().positive(),

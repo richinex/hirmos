@@ -1,4 +1,5 @@
 import { assertNever, err, type Result } from '@/domain/dop'
+import { NO_DECLARATIONS, type ColumnDeclarations } from '@/domain/fileReading'
 import type { TimeInterpretation, TimePreview } from '@/domain/timeInterpretation'
 import type { NonEmptyArray } from '@/domain/dop'
 import {
@@ -230,9 +231,11 @@ const dataWorker = (): Worker => {
   return created
 }
 
+/** Profiles the file with the declared column types applied; a Parquet file declares none. */
 export function profileSourceInWorker(
   request: ImportRequestId,
   file: File,
+  declared: ColumnDeclarations = NO_DECLARATIONS,
 ): Promise<ProfileOutcome> {
   if (pending.has(request)) {
     return Promise.resolve(err({
@@ -243,7 +246,7 @@ export function profileSourceInWorker(
 
   return new Promise((resolve) => {
     pending.set(request, { kind: 'profile', resolve })
-    const command: DataWorkerCommand = { kind: 'profile-source', request, file }
+    const command: DataWorkerCommand = { kind: 'profile-source', request, file, declared }
     try {
       dataWorker().postMessage(command)
     } catch (cause: unknown) {

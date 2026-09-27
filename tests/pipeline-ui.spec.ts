@@ -121,7 +121,7 @@ test.describe('pipeline canvas', () => {
     await expect(block(page, filter)).toContainText('4 rows')
 
     await wire(page, regions, filter)
-    await expect(page.getByRole('alert')).toContainText('That input already has an arrow. Remove it first.')
+    await expect(page.getByRole('alert')).toContainText('This input already has an arrow. Remove it first.')
 
     await wire(page, filter, filter)
     await expect(page.getByRole('alert')).toContainText('A block cannot feed itself.')
@@ -129,7 +129,7 @@ test.describe('pipeline canvas', () => {
     const sort = await addBlock(page, 'Sort and limit', 'sort-limit')
     await wire(page, filter, sort)
     await wire(page, sort, filter)
-    await expect(page.getByRole('alert')).toContainText('That input already has an arrow. Remove it first.')
+    await expect(page.getByRole('alert')).toContainText('This input already has an arrow. Remove it first.')
   })
 
   test('shows a failed block, skips what follows it, and recovers when the block is fixed', async ({ page }) => {

@@ -3,7 +3,8 @@
 import { inspectPanelStructure, materializeNumericColumns, materializePanelKeys, materializePanelLong, materializeTimeSeriesColumns, previewWindow, profileColumn, profileSource, summarizeColumns } from '@/data/duckdb'
 import { assertNever } from '@/domain/dop'
 import { previewTimeColumn } from '@/data/duckdb'
-import { describeSourceSelectionProblem, selectSource } from '@/domain/workflow'
+import { describeSourceSelectionProblem, readAs, selectSource } from '@/domain/workflow'
+import { fileReadingOf } from '@/domain/fileReading'
 import { parseDataWorkerCommand, type DataWorkerEvent } from './dataProtocol'
 
 const emit = (event: DataWorkerEvent, transfer: Transferable[] = []) => self.postMessage(event, { transfer })
@@ -45,7 +46,12 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         return
       }
       case 'profile-source': {
-        const result = await profileSource(source.value)
+        const reading = fileReadingOf(source.value.format, command.declared)
+        if (!reading.ok) {
+          emit({ kind: 'profile-failed', request: command.request, problem: { kind: 'worker-protocol-failed', detail: 'A Parquet file stores its column types, so none can be declared.' } })
+          return
+        }
+        const result = await profileSource(readAs(source.value, reading.value))
         emit(result.ok
           ? { kind: 'profile-succeeded', request: command.request, profile: result.value }
           : { kind: 'profile-failed', request: command.request, problem: result.error })

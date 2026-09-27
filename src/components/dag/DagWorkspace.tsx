@@ -412,17 +412,17 @@ function PathList({ document, flow }: { readonly document: DagDocument; readonly
 function AdjustmentSentence({ document, flow }: { readonly document: DagDocument; readonly flow: DagCausalFlow }) {
   const name = (node: DagNodeId) => nameOfDagNode(document, node)
   switch (flow.adjustment.kind) {
-    case 'unnecessary': return <p className="m-0 text-body text-faint">No back-door path is open in the same-period graph, so no adjustment variable is needed for that graph.</p>
+    case 'unnecessary': return <p data-adjustment="unnecessary" className="m-0 text-body text-faint">No back-door path is open in the same-period graph, so no adjustment variable is needed for that graph.</p>
     case 'sufficient': {
       const predictors = flow.adjustment.variables.filter((node) => flow.roles.get(node)?.kind === 'outcome-predictor')
       return (
-        <p className="m-0 text-body text-muted">
-          Adjusting for <span className="text-ink">{flow.adjustment.variables.map(name).join(', ')}</span> blocks all represented back-door paths.
+        <p data-adjustment="sufficient" className="m-0 text-body text-muted">
+          Adjusting for <span data-adjustment-variables className="text-ink">{flow.adjustment.variables.map(name).join(', ')}</span> blocks all represented back-door paths.
           {predictors.length > 0 && <> {predictors.map(name).join(', ')} {predictors.length === 1 ? 'is' : 'are'} not required for identification but may improve precision as {predictors.length === 1 ? 'an outcome predictor' : 'outcome predictors'}.</>}
         </p>
       )
     }
-    case 'none': return <p className="m-0 text-body text-muted">No measured adjustment set blocks every back-door path in the same-period graph. This check does not assess front-door, instrumental variable, or other identification strategies. Sensitivity analysis alone does not establish identification.</p>
+    case 'none': return <p data-adjustment="none" className="m-0 text-body text-muted">No measured adjustment set blocks every back-door path in the same-period graph. This check does not assess front-door, instrumental variable, or other identification strategies. Sensitivity analysis alone does not establish identification.</p>
     default: return assertNever(flow.adjustment)
   }
 }

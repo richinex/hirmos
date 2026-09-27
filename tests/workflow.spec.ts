@@ -1,4 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { STANDARDISED_INPUTS_NOTE } from '../src/domain/discovery'
+import { STATIONARITY_TESTS_NOTE } from '../src/domain/stationarity'
 import { fileURLToPath } from 'node:url'
 import { CHAPTER_IDS } from '../src/domain/navigation'
 
@@ -164,7 +166,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   const mobileGrangerTable = mobileGranger.getByRole('region', { name: 'Granger raw evidence' })
   await expect(mobileGrangerTable.getByRole('row')).toHaveCount(3)
   await expect(mobileGrangerTable.getByRole('columnheader', { name: 'Sum-of-squared-residuals F statistic' })).toBeVisible()
-  await expect(mobileGranger.getByText('not a causal estimate', { exact: false }).first()).toBeVisible()
+  await expect(mobileGranger.getByText('not an intervention effect', { exact: false }).first()).toBeVisible()
 
   const mobileNav = page.locator('nav[aria-label="Workspace chapters"]')
   await page.getByRole('button', { name: 'Expand chapter list' }).click()
@@ -220,7 +222,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await expect(page.getByText('Lag-resolved neural Granger evidence')).toBeVisible({ timeout: 30_000 })
   // On a phone the run ledger is a bottom pane opened from a bar under the stage; its button carries the count.
   await expect(page.getByRole('group', { name: 'Panes' }).getByRole('button', { name: 'Runs (1)' })).toBeVisible()
-  await expect(page.getByText('divided by its recorded population standard deviation')).toBeVisible()
+  await expect(page.getByText(STANDARDISED_INPUTS_NOTE).first()).toBeVisible()
   await discoveryFamilies.getByRole('radio', { name: 'PCMCI' }).click()
   await discoveryMethods.getByRole('radio', { name: /^PCMCI\+/ }).click()
 
@@ -412,8 +414,7 @@ test('explains the opposing stationarity null hypotheses and labels every critic
 
   // Diagnostics open on redundancy, so the stationarity pane has to be selected before it is read.
   await page.getByRole('radio', { name: /Stationarity/ }).click()
-  await expect(page.getByText(/ADF tests a unit root as its null; KPSS tests stationarity as its null/)).toBeVisible()
-  await expect(page.getByText(/These tests assess the saved values/)).toBeVisible()
+  await expect(page.getByText(STATIONARITY_TESTS_NOTE)).toBeVisible()
   await page.getByRole('group', { name: 'Stationarity variables' }).getByRole('checkbox', { name: 'x' }).check()
   await page.getByRole('button', { name: 'Run stationarity tests' }).click()
   const results = page.getByRole('region', { name: 'Stationarity results' })

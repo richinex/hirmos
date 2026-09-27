@@ -59,7 +59,7 @@ export function ResultInterpretation({ interpretation, className = '', context =
       <h4 className="m-0 text-faint text-label font-medium">{interpretationTitle(context)}</h4>
       <div className="mt-4 space-y-5">
         {sections.map((section) => (
-          <section key={section.kind}>
+          <section key={section.kind} aria-label={sectionLabel(section.kind)}>
             <h5 className="m-0 text-label font-medium text-bone">{sectionLabel(section.kind)}</h5>
             <div className="mt-1 space-y-1.5">
               {section.statements.map((statement, statementIndex) => (

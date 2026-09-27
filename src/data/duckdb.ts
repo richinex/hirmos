@@ -1,4 +1,6 @@
 import * as duckdb from '@duckdb/duckdb-wasm'
+import { fileRelation } from './fileRelation'
+import { fileReading } from '@/domain/fileReading'
 import { inspectCalendar } from './calendar'
 import { timestampSql, type TimeInterpretation, type TimePreview, type TimeSpacing } from '@/domain/timeInterpretation'
 import { DUCKDB_PACKAGE_VERSION, DUCKDB_ENGINE_VERSION } from '@/domain/dataEngine'
@@ -254,13 +256,13 @@ async function readProfile(
   }
 
   return ok({
-    id: datasetProfileId(fingerprint),
+    id: datasetProfileId(fingerprint, source),
     source: {
       fingerprint,
       fileName: source.name,
       bytes: source.bytes,
-      format: source.format,
       persistence: { kind: 'ephemeral' },
+      ...fileReading(source),
     },
     parser: {
       kind: 'duckdb-wasm',
@@ -298,9 +300,7 @@ export async function profileSource(source: SelectedSource): Promise<Result<Data
     return err({ kind: 'registration-failed', detail: detailOf(cause) })
   }
 
-  const relation = source.format === 'parquet'
-    ? `read_parquet(${sqlString(registeredPath)})`
-    : `read_csv_auto(${sqlString(registeredPath)}, header = true, sample_size = 20480)`
+  const relation = fileRelation(source, registeredPath)
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<DatasetProfile, DatasetProfileProblem>
   try {
@@ -555,9 +555,6 @@ async function verifiedPanelSource(
   try { return ok(await engine()) } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
 }
 
-const sourceRelation = (source: SelectedSource, path: string, textColumn?: string): string => source.format === 'parquet'
-  ? `read_parquet(${sqlString(path)})`
-  : `read_csv_auto(${sqlString(path)}, header = true, sample_size = 20480${textColumn === undefined ? '' : `, types = {${sqlString(textColumn)}: 'VARCHAR'}`})`
 
 /** Validate the observational panel keys without reading the scientific values. */
 export async function inspectPanelStructure(
@@ -580,7 +577,7 @@ export async function inspectPanelStructure(
   try {
     await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
   } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
-  const relation = sourceRelation(source, registeredPath)
+  const relation = fileRelation(profile.source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -642,7 +639,7 @@ export async function materializePanelKeys(
   try {
     await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
   } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
-  const relation = sourceRelation(source, registeredPath)
+  const relation = fileRelation(profile.source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -732,7 +729,7 @@ export async function materializePanelLong(
   try {
     await running.value.db.registerFileHandle(registeredPath, source.file, duckdb.DuckDBDataProtocol.BROWSER_FILEREADER, true)
   } catch (cause) { return err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
-  const relation = sourceRelation(source, registeredPath)
+  const relation = fileRelation(profile.source, registeredPath)
   const unit = sqlIdentifier(unitColumn.name)
   const time = sqlIdentifier(timeColumn.name)
   const numericProjection = numericColumns.map((column, index) => `CAST(${sqlIdentifier(column.name)} AS DOUBLE) AS value_${index}`).join(', ')
@@ -830,9 +827,7 @@ export async function profileColumn(
   } catch (cause) {
     return err({ kind: 'column-profile-failed', detail: detailOf(cause) })
   }
-  const relation = source.format === 'parquet'
-    ? `read_parquet(${sqlString(registeredPath)})`
-    : `read_csv_auto(${sqlString(registeredPath)}, header = true, sample_size = 20480)`
+  const relation = fileRelation(profile.source, registeredPath)
   const name = sqlIdentifier(column.name)
 
   let connection: duckdb.AsyncDuckDBConnection | null = null
@@ -979,7 +974,7 @@ async function withSource<Value, Problem>(
   } catch (cause) {
     return err(failure(detailOf(cause)))
   }
-  const relation = sourceRelation(source, registeredPath, textColumn)
+  const relation = fileRelation(profile.source, registeredPath, textColumn)
   let connection: duckdb.AsyncDuckDBConnection | null = null
   let outcome: Result<Value, Problem>
   try {
