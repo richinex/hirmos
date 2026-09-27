@@ -67,6 +67,7 @@ pub(crate) fn continuous_gps(
         intercept: estimate.intercept,
         standard_error: estimate.standard_error,
         weight_sum: estimate.weight_sum,
+        weights: estimate.weights,
         density: scores.density,
         residual_scale: scores.residual_scale,
         treatment_params: scores.treatment_params,

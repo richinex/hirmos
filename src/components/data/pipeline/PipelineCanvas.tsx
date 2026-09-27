@@ -303,7 +303,7 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
             <button
               type="button"
               className={flowControl}
-              title="Tidy: lay the blocks out again top to bottom in the order the arrows run, and fit the view. Dragged positions are replaced; nothing is rewired."
+              title="Tidy: Arrange the blocks from top to bottom following the direction of the arrows, and fit the view. Dragged positions are replaced, but connections remain unchanged."
               aria-label="Tidy pipeline"
               onClick={tidy}
             >
@@ -313,7 +313,7 @@ function Flow({ graph, outcomes, selected, summaries, onSelect, onMove, onConnec
               <button
                 type="button"
                 className={flowControl}
-                title={viewLocked ? 'Scrolling and pinching stay with the page. Tap to let them zoom the canvas.' : 'Scrolling and pinching zoom the canvas. Tap to give them back to the page.'}
+                title={viewLocked ? 'Scrolling and pinching control the page. Tap to enable zooming on the canvas.' : 'Scrolling and pinching zoom the canvas. Tap to return these controls to the page.'}
                 aria-label="Lock the view"
                 aria-pressed={viewLocked}
                 onClick={() => setLockOverride(!viewLocked)}

@@ -70,7 +70,7 @@ test('estimator chips use the prepared treatment and outcome before a run', asyn
   await expect(page.getByRole('radio', { name: /Bayesian negative binomial.*review/i })).toBeVisible()
   await expect(page.getByRole('radio', { name: /Bayesian Gaussian regression.*unavailable/i })).toBeVisible()
   // The do-query belongs to the identified-function family, and a family shows only its own methods.
-  await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio').nth(1).click()
+  await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio', { name: /^Identified/ }).click()
   await expect(page.getByRole('radio', { name: /Discrete Bayesian network do-query.*unavailable/i })).toBeVisible()
 })
 
@@ -217,7 +217,7 @@ test('CausalEffects reports nonstationary prepared values for review without blo
     const document = {
       name: 'Seat-belt temporal DAG',
       current: {
-        validation: { kind: 'structurally-valid' },
+        validation: { structure: { kind: 'sound' }, rationales: { kind: 'complete' } },
         graph: { nodes: [
           { id: 'kms', kind: 'observed', column: 'kms', name: 'kms' },
           { id: 'deaths', kind: 'observed', column: 'deaths', name: 'DriversKilled' },

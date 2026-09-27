@@ -60,11 +60,11 @@ function SeriesRow({ facts, period }: { readonly facts: SeriesFacts; readonly pe
         <MetricTile label="Seasonal strength" size="compact" frame="cell" value={strength(facts.evidence.seasonalStrength)} context={period === null ? 'no period' : `period ${period}`} />
         <MetricTile label="Change points" size="compact" frame="cell" value={formatCount(facts.evidence.changePoints.length)} context="pruned exact linear time (PELT), L2 cost" />
       </div>
-      <p className="mb-0 mt-2 text-label text-muted">Strengths near 1 mean that the fitted trend or seasonal component accounts for most of the variation remaining after the other component is removed; values near 0 indicate little such structure. PELT locations are the optimum for this penalty and minimum-segment choice, not hypothesis-test rejections.</p>
+      <p className="mb-0 mt-2 text-label text-muted">Strength values near 1 indicate that the fitted trend or seasonal component accounts for most of the remaining variation after removing the other component. Values near 0 indicate little such structure. PELT locations represent the optimal segmentation for the chosen penalty and minimum segment length, not hypothesis-test rejections.</p>
       <ExpandableChart option={option} label={`${facts.name} with PELT change points`} className="mt-2 h-[180px]" testId="change-points" />
       <div className="mt-3 border-t border-hair pt-3">
         <span className="text-body font-medium text-ink">Lag correlation</span>
-        <p className="mb-0 mt-1 text-label text-muted">ACF compares the series with its earlier values. PACF measures the remaining relation at each lag after shorter lags are accounted for. The shaded regions show approximate 95% reference bands. These plots describe temporal dependence; they do not establish causal arrows.</p>
+        <p className="mb-0 mt-1 text-label text-muted">ACF measures correlation between the series and its previous values. PACF measures the remaining linear relationship at each lag after accounting for shorter lags. Shaded regions indicate approximate 95% reference bands. These plots describe temporal dependence but do not establish causality.</p>
         <ExpandableChart option={correlation} label={`${facts.name} ACF and PACF`} className="mt-2 h-[430px]" testId="acf-pacf" />
       </div>
     </li>
@@ -126,7 +126,7 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 id="structure-title" className={embedded ? 'm-0 text-body font-medium text-ink' : cn(sectionTitle, 'm-0')}>Temporal structure</h3>
-          <p className="mb-0 mt-1 text-body text-faint">PELT estimates changes in the series mean. STL reports trend and seasonal strength{period === null ? ' (no seasonal period for yearly rows)' : ` at period ${period}`}. ACF and PACF show dependence across lags. This analysis does not change the prepared dataset.</p>
+          <p className="mb-0 mt-1 text-body text-faint">PELT estimates changes in the series mean. STL reports trend and seasonal strength{period === null ? ' (no seasonal period for yearly rows)' : ` at period ${period}`}. ACF and PACF display dependence across lags. This analysis does not alter the prepared dataset.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-body text-ink"><span className={label('block text-faint')}>Min segment</span><input type="number" min={1} max={200} className={field('text', 'mt-1 w-20')} value={minSize} onChange={(event) => setMinSize(Math.max(1, Math.min(200, Number(event.target.value) || 1)))} /></label>

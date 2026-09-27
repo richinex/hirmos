@@ -49,7 +49,7 @@ export function ColumnSeriesPane({ column, description, stepLabel }: {
   )
   const summary = useMemo(() => (series === null ? null : summariseWindow(series.values, window)), [series, window])
   if (column === null) return <p className="m-0 px-3 py-2 text-body text-faint">Select a numeric column to draw it in row order.</p>
-  if (current && description.kind === 'failed') return <p className="m-0 px-3 py-2 text-body text-faint">The column profile was refused, so there is no series to draw.</p>
+  if (current && description.kind === 'failed') return <p className="m-0 px-3 py-2 text-body text-faint">The column could not be profiled, so its series cannot be displayed.</p>
   if (!isNumericDuckDbType(column.duckdbType)) {
     return <p className="m-0 px-3 py-2 text-body text-faint">{column.name} is not numeric, so it has no series view. Its most frequent values are in the column profile.</p>
   }

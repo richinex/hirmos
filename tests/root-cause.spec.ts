@@ -390,7 +390,7 @@ test('root-cause graph preparation validates structure and preserves column orde
     const graph = { kind: 'editable-dag', nodes, edges: [edge] }
     const document = {
       id: 'document', preparedDataset: 'prepared', dataset: { kind: 'cross-section', observations: 100 },
-      current: { id: 'revision', graph, validation: { kind: 'structurally-valid' } },
+      current: { id: 'revision', graph, validation: { structure: { kind: 'sound' }, rationales: { kind: 'complete' } } },
     }
     const prepared = { id: 'prepared', columns: ['0:A', '1:B'] }
     const check = (changes: Record<string, unknown>) => prepareRootCauseGraph({
@@ -419,10 +419,11 @@ test('root-cause graph preparation validates structure and preserves column orde
     nodes: [{ name: 'B' }, { name: 'A' }],
   } })
   expect(result.roots).toMatchObject({ ok: true, value: { edges: [] } })
+  expect(result.unstated).toMatchObject({ ok: true, value: { edges: [[1, 0]] } })
   for (const [name, kind] of Object.entries({
     stale: 'different-preparation', missing: 'missing-column', latent: 'unmeasured-variable',
     repeatedColumn: 'duplicate-column', repeatedName: 'duplicate-name', repeatedRoot: 'invalid-graph',
-    empty: 'invalid-graph', unstated: 'invalid-graph', cycle: 'invalid-graph', unknown: 'invalid-graph',
+    empty: 'invalid-graph', cycle: 'invalid-graph', unknown: 'invalid-graph',
     lagged: 'lagged-relationship',
   })) {
     expect(result[name as keyof typeof result], name).toMatchObject({ ok: false, error: { kind } })

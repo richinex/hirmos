@@ -1,7 +1,9 @@
-import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState, type ReactNode } from 'react'
 import { useStore } from 'zustand'
 import { cancelAnalysisRuns } from './client'
 import { createJobs, IDLE, type Progress } from './jobs'
+import { chapterOfJob } from './jobChapter'
+import { REPORT_ACTIVITY } from '@/lib/runActivityStore'
 import type { PreparedDatasetVersionId } from '@/domain/preprocessing'
 import type { DatasetProfileId } from '@/domain/dataset'
 
@@ -13,6 +15,14 @@ export function JobsProvider({ children, prepared, profile = null }: { readonly 
     jobs.activate()
     return () => jobs.dispose()
   }, [jobs, prepared, profile])
+  // A chapter's chip outlives its panel while the run goes on, and clears when the run stops wherever the reader is.
+  useEffect(() => jobs.store.subscribe((state, previous) => {
+    for (const [key, job] of Object.entries(previous.jobs)) {
+      if (job.kind !== 'running' || state.jobs[key]?.kind === 'running') continue
+      const chapter = chapterOfJob(key)
+      if (chapter !== null) REPORT_ACTIVITY[chapter](null)
+    }
+  }), [jobs])
   return <Context.Provider value={jobs}>{children}</Context.Provider>
 }
 

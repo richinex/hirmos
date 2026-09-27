@@ -134,7 +134,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
       if (!matrix.ok) { fail(describePreparedMaterialisationProblem(matrix.error)); return }
       const targetColumn = matrix.value.columns.find((column) => column.id === readiness.value.target)
       const causeColumn = matrix.value.columns.find((column) => column.id === readiness.value.candidateCause)
-      if (targetColumn === undefined || causeColumn === undefined) { fail('The returned matrix omitted the selected pair.'); return }
+      if (targetColumn === undefined || causeColumn === undefined) { fail('The result does not include the selected pair of variables.'); return }
       const result = await analysis.runGrangerSsrF(matrix.value.values, matrix.value.rowCount, readiness.value.maxLag)
       if (!session.current(current)) return
       if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
@@ -160,7 +160,7 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
   return (
     <section className={embedded ? undefined : panel('mt-4 p-(--panel-space)')} aria-labelledby="granger-title">
       <h3 id="granger-title" className={embedded ? 'm-0 text-body font-medium text-ink' : cn(sectionTitle, 'm-0')}>Granger predictive test</h3>
-      <p className={prose('mb-0 mt-1 text-faint')}>Whether past values of one series add predictive information about another beyond its own past, at each lag order up to the maximum. A diagnostic of precedence in prediction, not a causal estimate; it is not offered to the DAG as evidence.</p>
+      <p className={prose('mb-0 mt-1 text-faint')}>The test assesses whether past values of one series improve prediction of another beyond that series’ own past, at each lag order up to the maximum. It assesses predictive precedence, not an intervention effect. Its result is not added to the DAG as causal evidence.</p>
       <div className="mt-3 flex flex-wrap items-end gap-2">
         <label className="text-body text-ink"><span className={label('block text-faint')}>Candidate cause</span>
           <Select aria-label="Candidate cause" className={field('text', 'mt-1 w-44')} value={columnOf(candidateCause) ?? ''} onChange={(event) => setCandidateCause(event.target.value === '' ? null : (event.target.value as ColumnId))}>

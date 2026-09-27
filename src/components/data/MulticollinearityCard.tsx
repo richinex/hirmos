@@ -95,7 +95,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection }
     if (result === null) return
     const selection = multicollinearitySelection(result.evidence, result.matrix.columns, method)
     if (!selection.ok) {
-      setSelectionProblem('The diagnostic result no longer matches the prepared columns. Run it again.')
+      setSelectionProblem('The diagnostic result does not match the columns currently prepared. Rerun the diagnostic.')
       return
     }
     onSelection(selection.value)
@@ -137,7 +137,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection }
             <h4 id="multicollinearity-title" className="m-0 text-body font-medium text-ink">Predictor redundancy</h4>
             <ParameterHelp label="predictor redundancy" help="These diagnostics describe numerical redundancy, not confounding or a causal adjustment set; do not remove a required causal variable solely because it is correlated with another predictor." />
           </div>
-          <p className="mb-0 mt-1 max-w-[78ch] text-body text-faint">Pairwise correlation groups variables with similar linear variation. Variance inflation factor (VIF) measures how well each variable is explained by all the others, then removes the largest value until the threshold is met.</p>
+          <p className="mb-0 mt-1 max-w-[78ch] text-body text-faint">Pairwise correlation groups variables with similar or opposite linear variation. The variance inflation factor (VIF) measures how much linear dependence on the other predictors inflates a coefficient’s variance. The selection procedure repeatedly removes the variable with the highest VIF until the threshold is met.</p>
         </div>
         {/* The thresholds are ordinary fields; on a narrow panel they fill the width and the button takes the row beneath. */}
         <div className="flex w-full flex-col gap-3 @xl/panel:w-auto @xl/panel:flex-row @xl/panel:items-end">
@@ -159,7 +159,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection }
           <div className="grid gap-4 @3xl/panel:grid-cols-2">
             <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">Correlation groups</h5>
-              <p className="mb-2 mt-1 text-label text-muted">Complete linkage over 1 − |r|. The deterministic recommendation retains the first selected variable in each group; review that representative before applying it.</p>
+              <p className="mb-2 mt-1 text-label text-muted">Variables are grouped using complete linkage with distance 1 − |r|. The recommendation retains the first selected variable in each group. Review that representative before applying the selection.</p>
               <ul className="m-0 space-y-1 pl-5 text-body text-muted">
                 {result.evidence.correlationClusters.filter((cluster) => cluster.length > 1).map((cluster) => <li key={cluster.join('-')}>{cluster.map((index) => nameAt(result.matrix, index)).join(', ')}</li>)}
                 {result.evidence.correlationDrop.length === 0 && <li>No group crossed |r| ≥ {result.evidence.correlationThreshold}.</li>}
@@ -168,7 +168,7 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection }
             </div>
             <div className={well('p-(--panel-space)')}>
               <h5 className="m-0 text-body font-medium text-ink">VIF elimination path</h5>
-              <p className="mb-2 mt-1 text-label text-muted">At each step the variable with the largest VIF is removed; ties are resolved by the later selected column.</p>
+              <p className="mb-2 mt-1 text-label text-muted">At each step, the variable with the highest VIF is removed. If there is a tie, the later-selected column is removed.</p>
               {result.evidence.vifHistory.length === 0
                 ? <p className="m-0 text-body text-muted">Every VIF is below {result.evidence.vifThreshold}.</p>
                 : <div className="overflow-x-auto"><table className={table}><thead><tr><th className={th()}>Step</th><th className={th()}>Removed</th><th className={th('text-right')}>VIF</th></tr></thead><tbody>{result.evidence.vifHistory.map((entry, index) => <tr key={`${entry.column}-${index}`} className={tr()}><td className={td()}>{index + 1}</td><td className={td()}>{nameAt(result.matrix, entry.column)}</td><td className={td(num('text-right'))}>{entry.vif === null ? '∞' : formatStatistic('raw', entry.vif).text}</td></tr>)}</tbody></table></div>}

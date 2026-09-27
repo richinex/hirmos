@@ -15,7 +15,7 @@ import { useJob } from '@/analysis/JobsProvider'
 import { JobNotice } from '@/components/ui/JobNotice'
 import { cn } from '@/lib/utils'
 import { Icon } from '@/components/Icon'
-import { button, chapterIntro, field, iconControl, literal, panel, pill, sectionTitle, well } from '@/components/ui/recipes'
+import { button, chapterIntro, field, fieldLabel, iconControl, literal, panel, pill, sectionTitle, well } from '@/components/ui/recipes'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import {
   createDagDocument,
@@ -412,7 +412,7 @@ function PathList({ document, flow }: { readonly document: DagDocument; readonly
 function AdjustmentSentence({ document, flow }: { readonly document: DagDocument; readonly flow: DagCausalFlow }) {
   const name = (node: DagNodeId) => nameOfDagNode(document, node)
   switch (flow.adjustment.kind) {
-    case 'unnecessary': return <p className="m-0 text-body text-faint">No back-door path is open. No adjustment variable is needed.</p>
+    case 'unnecessary': return <p className="m-0 text-body text-faint">No back-door path is open in the same-period graph, so no adjustment variable is needed for that graph.</p>
     case 'sufficient': {
       const predictors = flow.adjustment.variables.filter((node) => flow.roles.get(node)?.kind === 'outcome-predictor')
       return (
@@ -422,7 +422,7 @@ function AdjustmentSentence({ document, flow }: { readonly document: DagDocument
         </p>
       )
     }
-    case 'none': return <p className="m-0 text-body text-muted">No measured adjustment set blocks every back-door path under this graph. Front-door, instrumental-variable and other identification strategies are not assessed here; sensitivity analysis does not establish identification.</p>
+    case 'none': return <p className="m-0 text-body text-muted">No measured adjustment set blocks every back-door path in the same-period graph. This check does not assess front-door, instrumental variable, or other identification strategies. Sensitivity analysis alone does not establish identification.</p>
     default: return assertNever(flow.adjustment)
   }
 }
@@ -455,7 +455,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
       )}
       {unstated.length > 0 && (
         <div className="mt-3 text-body text-muted">
-          <p className="m-0">{unstated.length === 1 ? 'This arrow has' : 'These arrows have'} no substantive rationale. Select an arrow to record the mechanism, design evidence, or external evidence supporting it.</p>
+          <p className="m-0">{unstated.length === 1 ? 'This arrow has' : 'These arrows have'} no recorded substantive rationale. Select an arrow to document the supporting mechanism, design evidence, or external sources.</p>
           <ul className="mb-0 mt-1.5 flex list-none flex-wrap gap-1 p-0" aria-label="Arrows without a rationale">
             {unstated.map((edgeId) => {
               const edge = document.current.graph.edges.find((candidate) => candidate.id === edgeId)
@@ -474,7 +474,7 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
         <div className="mt-6" aria-label="Adjustment">
           <span className="block text-label text-faint">Back-door paths</span>
           <div className="mt-1"><AdjustmentSentence document={document} flow={flow} /></div>
-          {flow.laggedArrows > 0 && <p className="mb-0 mt-1 text-label text-faint">{flow.laggedArrows} lagged arrow{flow.laggedArrows === 1 ? '' : 's'} left to CausalEffects; this reads the same-period graph.</p>}
+          {flow.laggedArrows > 0 && <p className="mb-0 mt-1 text-label text-faint">This back-door check considers only same-period arrows. It excludes {flow.laggedArrows} lagged arrow{flow.laggedArrows === 1 ? '' : 's'}.</p>}
           <PathList document={document} flow={flow} />
         </div>
       )}
@@ -496,14 +496,14 @@ function ValidationPanel({ document, flow, onUseForStudy, onUseForRootCause, onS
                 </li>
               ))}
             </ul>
-            <p className="mb-0 mt-2 text-label text-faint">Kernel conditional-independence tests use α = 0.05 with Holm correction. Rejection provides evidence against the corresponding local-Markov implication; non-rejection does not validate the complete graph.</p>
+            <p className="mb-0 mt-2 text-label text-faint">Kernel conditional-independence tests use α = 0.05 with Holm correction. Rejection provides evidence against the corresponding local-Markov implication. Failure to reject does not validate the entire graph.</p>
           </details>
         )}
         {plan.kind === 'not-testable' && (
           <p className="m-0 text-faint">This draft has no testable observed local-Markov implication. The absence of a test does not provide evidence for the graph.</p>
         )}
         {plan.kind === 'requires-lag-aware-validation' && (
-          <p className="m-0 text-faint">Lagged implications require the time-series CausalEffects validation route; the cross-sectional Markov checker does not evaluate them.</p>
+          <p className="m-0 text-faint">This checker does not test lagged implications. They require time-series tests that account for the recorded lags.</p>
         )}
       </div>
     </aside>
@@ -566,7 +566,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
         : [{ x, y, given }]
     })
     if (implications.length !== plan.implications.length) {
-      fail('The graph implication plan refers to a variable outside the observed data projection.')
+      fail('A conditional-independence test requires a variable that is not included in the observed data selected for this check.')
       return
     }
     const result = await runDagCheck(
@@ -625,7 +625,7 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
       )}
       <JobNotice job={job} />
       {plan.kind === 'not-testable' && <p className="mb-0 mt-2 text-body text-faint">No observed local-Markov implication is available to test for this revision.</p>}
-      {plan.kind === 'requires-lag-aware-validation' && <p className="mb-0 mt-2 text-body text-faint">Use the lag-aware CausalEffects validation route for this time-series graph.</p>}
+      {plan.kind === 'requires-lag-aware-validation' && <p className="mb-0 mt-2 text-body text-faint">This checker cannot test the graph’s lagged implications. Time-series tests must account for the recorded lags.</p>}
       {evidence !== undefined && (
         <div className="mt-3">
           <p className={`m-0 text-body font-medium ${contradictions > 0 || systematicTension || (evidence.falsification.kind === 'completed' && evidence.falsification.falsified) ? 'text-danger' : 'text-ink'}`}>
@@ -660,14 +660,14 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
             <div className={well('p-(--panel-space)')}>
               <span className="block text-label text-faint">Raw p-value distribution</span>
               <strong className="mt-1 block text-title font-medium tabular-nums text-ink">KS p = {evidence.uniformity.pValue.toPrecision(3)}</strong>
-              <p className="mb-0 mt-1 text-label text-muted">{evidence.uniformity.pValue < evidence.significanceLevel ? 'The raw p-values are inconsistent with a uniform distribution under the graph.' : 'The test did not find evidence that the raw p-values differ from a uniform distribution under the graph.'} Treat this as a supplementary check because the implication tests can be dependent.</p>
+              <p className="mb-0 mt-1 text-label text-muted">{evidence.uniformity.pValue < evidence.significanceLevel ? 'The test found evidence that the unadjusted p-values differ from a uniform distribution.' : 'The test did not find evidence that the unadjusted p-values differ from a uniform distribution.'} Treat this as a supplementary check because the implication tests may depend on each other.</p>
             </div>
             <div className={well('p-(--panel-space)')}>
               {evidence.falsification.kind === 'completed' ? (
                 <>
                   <span className="block text-label text-faint">Relabeled-graph comparison</span>
                   <strong className="mt-1 block text-title font-medium tabular-nums text-ink"><Metadata><span>p<sub>LMC</sub> = {evidence.falsification.pValueLmc.toPrecision(3)}</span><span>p<sub>TPA</sub> = {evidence.falsification.pValueTpa.toPrecision(3)}</span></Metadata></strong>
-                  <p className="mb-0 mt-1 text-label text-muted">p<sub>LMC</sub> is the share of relabeled graphs with no more local-Markov violations than this graph. p<sub>TPA</sub> is the share in the same Markov-equivalence class. {evidence.falsification.falsified ? 'This graph has more violations than enough distinguishable relabelings to be rejected at the recorded threshold.' : !evidence.falsification.falsifiable ? 'Too many relabelings are observationally equivalent for this comparison to evaluate the graph.' : 'This graph is distinguishable from most relabelings and is not worse than enough of them to be rejected.'}</p>
+                  <p className="mb-0 mt-1 text-label text-muted">p<sub>LMC</sub> is the share of relabeled graphs whose proportion of violated local-Markov implications is no greater than this graph’s. p<sub>TPA</sub> is the share of relabeled graphs in the same Markov-equivalence class as this graph. {evidence.falsification.falsified ? 'The relabeling comparison rejects this graph at the recorded threshold.' : !evidence.falsification.falsifiable ? 'This comparison cannot evaluate the graph at the recorded threshold. It requires testable implications and enough relabelings outside the graph’s Markov-equivalence class.' : 'The relabeling comparison can evaluate this graph and does not reject it at the recorded threshold. This does not establish that the graph is correct.'}</p>
                 </>
               ) : (
                 <><span className="block text-label text-faint">Relabeled-graph comparison</span><p className="mb-0 mt-1 text-label text-muted">Not run. {evidence.falsification.reason}</p></>
@@ -872,7 +872,7 @@ export function DagWorkspace({
     <div className="mb-3">
       <div>
         <ChapterHeading id="dag-workspace-title" className="mb-2">DAG workspace</ChapterHeading>
-        <p className={chapterIntro}>A directed acyclic graph (DAG) represents a data-generating process: nodes are variables, and each arrow states a direct causal relationship. In this chapter, construct the graph for the causal question and record the basis for each arrow. Discovery results can contribute empirical evidence, but they do not determine the graph.</p>
+        <p className={chapterIntro}>A directed acyclic graph (DAG) represents assumptions about how data is generated. Nodes represent variables, and each arrow states an assumed direct causal relationship. In this chapter, build the graph for your causal question and record the reason for each arrow. Discovery results can contribute evidence, but they do not determine the graph.</p>
       </div>
     </div>
   )
@@ -987,10 +987,10 @@ export function DagWorkspace({
           <dl className="m-0 grid basis-full grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-label text-faint">
             <dt className={literal('text-muted')}>{'A -> B'}</dt><dd className="m-0">{'A is a cause of B. B <- A means the same.'}</dd>
             <dt className={literal('text-muted')}>{'A <-> B'}</dt><dd className="m-0">An unmeasured common cause of A and B.</dd>
-            <dt className={literal('text-muted')}>{'X [exposure]'}</dt><dd className="m-0">{'The treatment. [outcome] marks the outcome and [latent] an unmeasured variable.'}</dd>
-            <dt className={literal('text-muted')}>{'A -> B [lag=1]'}</dt><dd className="m-0">A one step earlier is a cause of B, for a time series. Without a lag, the same period.</dd>
+            <dt className={literal('text-muted')}>{'X [exposure]'}</dt><dd className="m-0">{'[exposure] marks the treatment, [outcome] marks the outcome, and [latent] marks an unmeasured variable.'}</dd>
+            <dt className={literal('text-muted')}>{'A -> B [lag=1]'}</dt><dd className="m-0">For a time series, this states that A one time step earlier is a cause of B now. Without a lag, the arrow relates variables in the same period.</dd>
           </dl>
-          <p className="m-0 basis-full text-label text-faint">The dagitty and graphviz form. An unmarked variable must be a column of the prepared data. Every arrow is added without a rationale; record one for each before analysis. Escape to cancel.</p>
+          <p className="m-0 basis-full text-label text-faint">Use the graph-text syntax shown above. Each unmarked variable must be a column in your prepared data. Imported arrows have no recorded rationale; add one for each arrow before analysis. Press Escape to cancel.</p>
           <button type="submit" className={button('outline')}>Convert to DAG</button>
           <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'paste-cancelled' })}>Cancel</button>
           {state.paste.problem !== null && <Alert tone="info" className="w-full"><p className="m-0">{describeDagImportProblem(state.paste.problem)}</p></Alert>}
@@ -1029,21 +1029,21 @@ export function DagWorkspace({
         <h3 id="add-edge-title" className="m-0 text-body font-medium text-ink">Add an arrow or use the editor</h3>
         {(state.cause !== null || state.effect !== null || state.rationale.length > 0) && <button type="button" className="text-label text-muted hover:text-ink" onClick={() => dispatch({ type: 'edge-draft-cancelled' })}>Clear the draft</button>}
       </div>
-      <div className="mt-2 grid gap-2">
-        <label className="min-w-0 text-body text-ink"><span className="sr-only">Proposed cause</span><Select aria-label="Proposed cause" className={field('text')} value={state.cause ?? ''} onChange={(event) => dispatch({ type: 'cause-selected', node: nodeFromValue(document, event.target.value) })}><option value="">Cause</option>{document.current.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</Select></label>
-        <label className="min-w-0 text-body text-ink"><span className="sr-only">Proposed effect</span><Select aria-label="Proposed effect" className={field('text')} value={state.effect ?? ''} onChange={(event) => dispatch({ type: 'effect-selected', node: nodeFromValue(document, event.target.value) })}><option value="">Effect</option>{document.current.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</Select></label>
+      <div className="mt-3 grid gap-4">
+        <label className="block min-w-0"><span className={fieldLabel}>Cause</span><Select aria-label="Proposed cause" className={field('text', 'mt-1')} value={state.cause ?? ''} onChange={(event) => dispatch({ type: 'cause-selected', node: nodeFromValue(document, event.target.value) })}><option value="">Choose a variable</option>{document.current.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</Select></label>
+        <label className="block min-w-0"><span className={fieldLabel}>Effect</span><Select aria-label="Proposed effect" className={field('text', 'mt-1')} value={state.effect ?? ''} onChange={(event) => dispatch({ type: 'effect-selected', node: nodeFromValue(document, event.target.value) })}><option value="">Choose a variable</option>{document.current.graph.nodes.map((node) => <option key={node.id} value={node.id}>{node.name}</option>)}</Select></label>
         {document.dataset.kind === 'time-series' ? (
-          <Select aria-label="Timing" className={field('text')} value={state.timing.kind} onChange={(event) => dispatch({ type: 'timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous (t)</option><option value="lagged">Past cause (t−lag)</option></Select>
+          <label className="block min-w-0"><span className={fieldLabel}>Timing</span><Select aria-label="Timing" className={field('text', 'mt-1')} value={state.timing.kind} onChange={(event) => dispatch({ type: 'timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous (t)</option><option value="lagged">Past cause (t−lag)</option></Select></label>
         ) : null}
         {document.dataset.kind === 'time-series' && state.timing.kind === 'lagged'
-          ? <input aria-label="Lag" className={field('text')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={state.timing.lag} onChange={(event) => dispatch({ type: 'lag-changed', value: event.target.value })} />
+          ? <label className="block min-w-0"><span className={fieldLabel}>Lag</span><input aria-label="Lag" className={field('text', 'mt-1')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={state.timing.lag} onChange={(event) => dispatch({ type: 'lag-changed', value: event.target.value })} /></label>
           : null}
       </div>
-      <div className="mt-2 grid gap-2">
-        <input aria-label="Rationale for proposed arrow" className={field('text')} value={state.rationale} onChange={(event) => dispatch({ type: 'rationale-changed', value: event.target.value })} placeholder="Record the mechanism, assignment rule, protocol, prior study, or expert evidence." />
+      <div className="mt-4 grid gap-4">
+        <label className="block min-w-0"><span className={fieldLabel}>Rationale</span><input aria-label="Rationale for proposed arrow" className={field('text', 'mt-1')} value={state.rationale} onChange={(event) => dispatch({ type: 'rationale-changed', value: event.target.value })} placeholder="Record the mechanism, assignment rule, protocol, prior study, or expert evidence." /></label>
         <button type="button" className={button('signal', 'inline-flex items-center justify-center gap-1.5')} onClick={addEdge}><Icon name="add" size={16} /> Add the arrow</button>
       </div>
-      {canAttach && <label className="mt-2 flex items-start gap-2 text-body text-muted"><input type="checkbox" checked={state.attachSelectedEvidence} onChange={(event) => dispatch({ type: 'evidence-attachment-changed', attached: event.target.checked })} /><span>Attach the selected discovery result to this user-authored edge.</span></label>}
+      {canAttach && <label className="mt-2 flex items-start gap-2 text-body text-muted"><input type="checkbox" checked={state.attachSelectedEvidence} onChange={(event) => dispatch({ type: 'evidence-attachment-changed', attached: event.target.checked })} /><span>Attach the selected discovery result to this arrow.</span></label>}
       {state.problem !== null && <p role="alert" className="mb-0 mt-2 text-body text-danger">{describeDagEditProblem(state.problem)}</p>}
     </section>
   )
@@ -1066,11 +1066,11 @@ export function DagWorkspace({
             <form className="mt-3" onSubmit={(event) => { event.preventDefault(); saveSelectedEdgeDetails(document) }}>
               {document.dataset.kind === 'time-series' && (
                 <div className="grid gap-3 @sm/inspector:grid-cols-2">
-                  <label className="text-body text-ink">Arrow timing<Select className={field('text', 'mt-1')} value={selectedEdgeDraft.timing.kind} onChange={(event) => dispatch({ type: 'selected-edge-timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous (t)</option><option value="lagged">Past cause (t−lag)</option></Select></label>
-                  {selectedEdgeDraft.timing.kind === 'lagged' && <label className="text-body text-ink">Arrow lag<input className={field('text', 'mt-1')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={selectedEdgeDraft.timing.lag} onChange={(event) => dispatch({ type: 'selected-edge-lag-changed', value: event.target.value })} /></label>}
+                  <label className="block"><span className={fieldLabel}>Arrow timing</span><Select className={field('text', 'mt-1')} value={selectedEdgeDraft.timing.kind} onChange={(event) => dispatch({ type: 'selected-edge-timing-selected', timing: event.target.value === 'lagged' ? { kind: 'lagged', lag: '1' } : { kind: 'contemporaneous' } })}><option value="contemporaneous">Contemporaneous (t)</option><option value="lagged">Past cause (t−lag)</option></Select></label>
+                  {selectedEdgeDraft.timing.kind === 'lagged' && <label className="block"><span className={fieldLabel}>Arrow lag</span><input className={field('text', 'mt-1')} type="number" min={1} max={Math.max(1, document.dataset.observations - 1)} value={selectedEdgeDraft.timing.lag} onChange={(event) => dispatch({ type: 'selected-edge-lag-changed', value: event.target.value })} /></label>}
                 </div>
               )}
-              <label className="mt-3 block text-body text-ink">Rationale<textarea className={field('text', 'mt-1 min-h-20 resize-y rounded-lg')} value={selectedEdgeDraft.rationale} onChange={(event) => dispatch({ type: 'selected-edge-rationale-changed', value: event.target.value })} placeholder="Record the mechanism, assignment rule, protocol, prior study, or expert evidence supporting this arrow." /></label>
+              <label className="mt-3 block"><span className={fieldLabel}>Rationale</span><textarea className={field('text', 'mt-1 min-h-20 resize-y rounded-lg')} value={selectedEdgeDraft.rationale} onChange={(event) => dispatch({ type: 'selected-edge-rationale-changed', value: event.target.value })} placeholder="Record the mechanism, assignment rule, protocol, prior study, or expert evidence supporting this arrow." /></label>
               <p className={literal('mb-0 mt-2 text-micro text-faint')}>{selectedEdge.evidence.length} attached discovery item{selectedEdge.evidence.length === 1 ? '' : 's'}</p>
               {selectedEdgeDraft.problem !== null && <p role="alert" className="mb-0 mt-3 text-body text-danger">{describeDagEditProblem(selectedEdgeDraft.problem)}</p>}
               <div className="mt-3 flex flex-wrap gap-2">

@@ -15,7 +15,7 @@ import type { ColumnDescription } from './useColumnProfile'
 const describeProblem = (problem: ColumnProfileProblem): string => {
   switch (problem.kind) {
     case 'column-not-found': return 'Choose another column. The selected column is no longer part of this dataset.'
-    case 'source-changed': return 'The file changed after it was profiled. Choose it again to refresh the profile.'
+    case 'source-changed': return 'The file changed after profiling. Choose it again to refresh the profile.'
     case 'column-profile-failed':
     case 'worker-protocol-failed':
     case 'worker-unavailable': return problem.detail

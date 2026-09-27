@@ -265,8 +265,8 @@ export function evaluateCounterfactualEligibility(method: MethodDefinition, cont
       if (latent.length > 0) violate('dynamic-scm-graph-complete', `${latent.map((node) => node.name).join(', ')} ${latent.length === 1 ? 'is' : 'are'} unmeasured; the dynamic fitter requires every parent series.`)
       else satisfy('dynamic-scm-graph-complete', `All ${study.graph.nodes.length} graph nodes are measured; contemporaneous and lagged arrows are passed at their recorded time indices.`)
       const startRow = configuration.schedule.kind === 'point' ? configuration.schedule.row : configuration.schedule.startRow
-      if (startRow < 2) violate('dynamic-scm-history', 'The intervention starts before one complete lag of factual history is available; the exact maximum lag is checked by the kernel.')
-      else satisfy('dynamic-scm-history', `The intervention begins at row ${startRow}; the kernel verifies that the preceding rows cover the graph’s maximum lag.`)
+      if (startRow < 2) violate('dynamic-scm-history', 'The intervention starts before one complete lag of observed history is available. The required history depends on the graph’s maximum lag.')
+      else satisfy('dynamic-scm-history', `The intervention begins at row ${startRow}. Before fitting, the preceding history is checked against the graph’s maximum lag.`)
       leave('dynamic-scm-modularity', 'The replay holds every non-treatment equation and each time point’s recovered innovation fixed across worlds; this cross-world invariance is a structural assumption.')
       if (configuration.interventions[0] === configuration.interventions[1]) violate('dynamic-scm-intervention-schedule', 'The two intervention values are equal, so the contrast is zero by construction.')
       else satisfy('dynamic-scm-intervention-schedule', configuration.schedule.kind === 'point' ? `One-time intervention at row ${configuration.schedule.row}.` : `Persistent intervention from row ${configuration.schedule.startRow} through the ${configuration.steps}-point horizon.`)
@@ -276,7 +276,7 @@ export function evaluateCounterfactualEligibility(method: MethodDefinition, cont
           break
         case 'blockBootstrap':
           if (configuration.uncertainty.samples < 20) violate('dynamic-scm-no-interval', 'At least 20 block-bootstrap refits are required.')
-          else satisfy('dynamic-scm-no-interval', `${configuration.uncertainty.samples} block-bootstrap refits at ${Math.round(configuration.uncertainty.confidenceLevel * 100)}% confidence; the kernel verifies the selected block length leaves at least 2 blocks.`)
+          else satisfy('dynamic-scm-no-interval', `${configuration.uncertainty.samples} block-bootstrap refits at ${Math.round(configuration.uncertainty.confidenceLevel * 100)}% confidence. Before fitting, the selected block length is checked to ensure at least 2 blocks remain.`)
           break
         default: assertNever(configuration.uncertainty)
       }

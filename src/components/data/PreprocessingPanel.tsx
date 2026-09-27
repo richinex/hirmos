@@ -4,7 +4,7 @@ import { TimePreview } from './TimePreview'
 import { CalendarReport } from './CalendarReport'
 import { ParameterLabel, ParameterHelp } from '@/components/ui/ParameterLabel'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
-import { resultSurface } from '@/components/ui/recipes'
+import { fieldHint, resultSurface, stepTitle } from '@/components/ui/recipes'
 import { Metadata } from '@/components/ui/Metadata'
 import { Select } from '@/components/ui/Select'
 import { describePanelDataProblem } from '@/domain/panel'
@@ -141,10 +141,10 @@ const MISSINGNESS_LABELS: Record<MissingnessChoiceKind, string> = {
   imputation: 'Explicit imputation',
 }
 const MISSINGNESS_HELP: Record<MissingnessChoiceKind, string> = {
-  unresolved: 'Leave missing cells unchanged; choose a resolution before creating the prepared dataset.',
-  'lag-aware-exclusion': 'Keep the time grid and missing cells; compatible methods exclude constructed lagged samples affected by missing values.',
-  'complete-interval': 'Keep the longest consecutive run where every selected column is observed, dropping rows before and after it.',
-  imputation: 'Replace missing cells using the chosen method; this does not create rows for absent time points.',
+  unresolved: 'Leave missing cells unchanged and select a resolution method before creating the prepared dataset.',
+  'lag-aware-exclusion': 'Retain the time grid and missing cells. Compatible methods exclude constructed lagged samples affected by missing values.',
+  'complete-interval': 'Retain the longest consecutive sequence where all selected columns are observed, and remove rows before and after this sequence.',
+  imputation: 'Replace missing cells using the selected method. This process does not generate rows for missing time points.',
 }
 
 const ANALYSIS_MASK_ROLES: readonly { readonly value: AnalysisMaskRole; readonly label: string }[] = [
@@ -459,7 +459,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       let resolvedMatrix: PreparedMatrix | null = null
       if (recipe.value.missingness.kind === 'lag-aware-exclusion') {
         if (matrix.value.missingCells !== recipe.value.missingness.cells) {
-          dispatch({ type: 'preparation-failed', detail: 'The source missing-value count changed. Profile the source again before saving this version.' })
+          dispatch({ type: 'preparation-failed', detail: 'The number of missing values in the source has changed. Profile the source again before saving this version.' })
           return
         }
         observations = matrix.value.rowCount
@@ -480,11 +480,11 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       if (recipe.value.kind === 'regular-series') {
         if (recipe.value.resampling.kind === 'daily-downsample') {
           if (resolvedMatrix === null) {
-            dispatch({ type: 'preparation-failed', detail: 'Calendar resampling requires a dense prepared matrix.' })
+            dispatch({ type: 'preparation-failed', detail: 'Calendar resampling requires prepared values with no missing cells.' })
             return
           }
           const timeAxis = resolvedMatrix.timeAxis
-          if (timeAxis?.kind !== 'calendar') { dispatch({ type: 'preparation-failed', detail: 'Weekly and monthly resampling require a date or timestamp column. An ordinal time key can order rows but cannot define calendar bins.' }); return }
+          if (timeAxis?.kind !== 'calendar') { dispatch({ type: 'preparation-failed', detail: 'Weekly and monthly resampling require a date or timestamp column. An ordinal time key can order rows but cannot define calendar intervals.' }); return }
           const input = { ...resolvedMatrix, timestamps: timeAxis.timestamps }
           const aggregations = aggregationsForColumns(input.columns, recipe.value.resampling)
           if (!aggregations.ok) { dispatch({ type: 'preparation-failed', detail: describeResamplingProblem(aggregations.error) }); return }
@@ -502,7 +502,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         }
         const leadingRows = transformWarmup(recipe.value.seriesTransforms)
         if (observations <= leadingRows) {
-          dispatch({ type: 'preparation-failed', detail: 'First differencing needs at least two retained observations. Choose a longer interval or keep the series in levels.' })
+          dispatch({ type: 'preparation-failed', detail: 'First differencing requires at least two retained observations. Choose a longer interval or keep the series in levels.' })
           return
         }
         observations -= leadingRows
@@ -560,7 +560,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         session.progress(current, 'Stationarity tests', { completed: evidence.length, total: testColumns.length })
       }
       if (!isNonEmpty(evidence)) {
-        fail('The stationarity tests returned no results. Check the selected numeric columns and run the tests again.')
+        fail('The stationarity tests returned no results. Check the selected numeric columns and rerun the tests.')
         return
       }
       const [firstEvidence] = evidence
@@ -609,13 +609,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <span className={label('text-faint')}>Prepare data</span>
           <h2 id="preprocessing-title" className="mb-0 mt-2 text-heading text-ink">Set the analysis dataset</h2>
         </div>
-        <span className="max-w-[52ch] text-body text-faint">Set how rows are organised, handle missing values, and choose any time-series transformations.</span>
+        <span className="max-w-[52ch] text-body text-faint">Specify how rows are organised, address missing values, and select any required time-series transformations.</span>
       </div>
 
       <div className="grid gap-4 @3xl/panel:grid-cols-2">
         <section className={panel('@container/card p-(--panel-space)')} aria-labelledby="sampling-title">
-          <span className={label('text-faint')}>How rows are organised</span>
-          <h3 id="sampling-title" className={cn(sectionTitle, 'mb-3 mt-1')}>Choose the observation structure</h3>
+          <h3 id="sampling-title" className={cn(stepTitle, 'mb-4 mt-0')}><span className="mr-1.5 text-faint">1</span><span>Choose the observation structure</span></h3>
           <RadioList frame="none"
             className="mb-3"
             legend="Observation structure"
@@ -682,7 +681,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             </div>
           )}
           {draft.sampling.kind === 'regular-series' ? <details className="mt-3">
-            <DisclosureSummary>Time preview</DisclosureSummary>
+            <DisclosureSummary className="cursor-pointer text-body font-medium text-ink">Time preview</DisclosureSummary>
             <TimePreview file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} />
           </details> : null}
           {draft.sampling.kind === 'regular-series' && <CalendarReport file={source.file} profile={profile} column={draft.sampling.timeColumn} interpretation={draft.sampling.interpretation} frequency={draft.sampling.frequency} />}
@@ -698,8 +697,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         <section className={panel('@container/card flex min-h-0 flex-col p-(--panel-space)')} aria-labelledby="variables-title">
           <div className="mb-3 flex shrink-0 flex-wrap items-end justify-between gap-3">
             <div>
-              <span className={label('text-faint')}>Variables</span>
-              <h3 id="variables-title" className={cn(sectionTitle, 'mb-0 mt-1')}>Select analysis columns</h3>
+              <h3 id="variables-title" className={cn(stepTitle, 'm-0')}><span className="mr-1.5 text-faint">2</span><span>Select analysis columns</span></h3>
             </div>
             <SelectionActions
               selectLabel="Select all columns"
@@ -728,8 +726,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         </section>
 
         <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="missingness-title">
-          <span className={label('text-faint')}>Missing values</span>
-          <h3 id="missingness-title" className={cn(sectionTitle, 'mb-3 mt-1')}>{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</h3>
+          <h3 id="missingness-title" className={cn(stepTitle, 'mb-4 mt-0')}><span className="mr-1.5 text-faint">3</span><span>{draft.missingness.kind === 'not-present' ? 'Missing-data status' : 'Choose how to handle missing data'}</span></h3>
           {draft.missingness.kind === 'not-present' ? (
             <p className="m-0 flex items-center gap-2 text-body text-muted">
               <Icon name="check_circle" size={16} className="text-ok" /> No missing values detected.
@@ -737,7 +734,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           ) : panelSelected ? (
             <Alert tone="danger" live={false}>
               <p className="m-0">Fill the missing values separately within each unit before preparing this panel.</p>
-              <p className="mb-0 mt-1 text-muted">This form does not yet support missing-value handling within panel units. Prepare those values in the pipeline or SQL editor.</p>
+              <p className="mb-0 mt-1 text-muted">This form does not currently support missing-value handling within panel units. Address missing values in the pipeline or SQL editor.</p>
             </Alert>
           ) : (
             <div className="space-y-2">
@@ -780,7 +777,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                         resolution: { ...lagExclusion, propagateThroughMaxLag: event.target.checked },
                       })}
                     />
-                    <span>Exclude following samples through the cutoff window.</span>
+                    <span>Exclude subsequent samples within the cutoff window.</span>
                   </label>
                   <fieldset className="@md/card:col-span-2">
                     <legend className={fieldLabel}>Apply the analysis mask when a cell is used as</legend>
@@ -817,9 +814,9 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       value={draft.missingness.kind === 'imputation' ? draft.missingness.method : null}
                       onChange={(method) => dispatch({ type: 'missingness-selected', resolution: { ...(draft.missingness as Extract<MissingnessDraft, { kind: 'imputation' }>), method } })}
                       options={[
-                        { value: 'linearInterior', label: 'Linear inside the series', help: 'Interpolate between the observed values on both sides of a gap; edge gaps and gaps exceeding the limit remain missing.' },
-                        { value: 'forwardFill', label: 'Carry forward', help: 'Repeat the preceding observed value through a gap; leading gaps and gaps exceeding the limit remain missing.' },
-                        { value: 'structuralZero', label: 'Structural zero', help: 'Replace every missing cell with zero only when you confirm it represents a true zero, not an unknown value.' },
+                        { value: 'linearInterior', label: 'Linear inside the series', help: 'Interpolate between observed values on both sides of a gap. Edge gaps and those exceeding the limit remain missing.' },
+                        { value: 'forwardFill', label: 'Carry forward', help: 'Repeat the preceding observed value through a gap. Leading gaps and those exceeding the limit remain missing.' },
+                        { value: 'structuralZero', label: 'Structural zero', help: 'Replace each missing cell with zero only if you have confirmed it represents a true zero, not an unknown value.' },
                       ]}
                     />
                   </div>
@@ -836,16 +833,15 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
 
         {(timeSeriesSelected || panelSelected) && (
         <section className={panel('@container/card p-(--panel-space) @3xl/panel:col-span-2')} aria-labelledby="transform-title">
-          <span className={label('text-faint')}>Time-series values</span>
-          <h3 id="transform-title" className={cn(sectionTitle, 'mb-1 mt-1')}>Prepare the analysis scale</h3>
+          <h3 id="transform-title" className={cn(stepTitle, 'mb-1 mt-0')}><span className="mr-1.5 text-faint">4</span><span>Prepare the analysis scale</span></h3>
           {timeSeriesSelected ? (
             <>
-              <p className={prose('mb-0 mt-1 text-faint')}>A transformation changes the values used by later analyses. Save a separate prepared version so results on levels and transformed values remain comparable. Missingness is resolved before calendar resampling, seasonal adjustment, and per-column transformations.</p>
+              <p className={cn(fieldHint, 'mb-0 mt-1 max-w-[65ch]')}>A transformation changes the values used in subsequent analyses. Save a separate prepared version so you can compare results from levels and transformed values. The selected missing-value policy is applied before calendar resampling, seasonal adjustment, and per-column transformations.</p>
               <div className="mt-4 rounded-md border border-line p-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <span className={fieldLabel}>Calendar resampling</span>
-                    <span className="block text-label text-faint">Create UTC calendar weeks or months from a daily source before diagnostics and analysis.</span>
+                    <span className="block text-label text-faint">Convert daily data to UTC calendar weeks or months before running diagnostics or analysis.</span>
                   </div>
                   <SegmentedControl
                     size="sm"
@@ -862,7 +858,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                     ]}
                   />
                 </div>
-                {draft.sampling.frequency !== 'daily' && <p className="mb-0 mt-2 text-body text-faint">This increment resamples daily sources. Other source frequencies remain unchanged.</p>}
+                {draft.sampling.frequency !== 'daily' && <p className="mb-0 mt-2 text-body text-faint">This step resamples only daily sources; it does not affect other frequencies.</p>}
                 {draft.resampling.kind === 'daily-downsample' && (
                   <div className="mt-3 border-t border-hair pt-3">
                     <label className="block text-body text-ink">
@@ -879,7 +875,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                       </Select>
                     </label>
                     <div className="mt-3 rounded-md border border-hair" role="group" aria-label="Aggregation by column">
-                      <div className="border-b border-hair px-3 py-1.5 text-label text-faint">Choose sum for interval totals; use mean for rates or measurements.</div>
+                      <div className="border-b border-hair px-3 py-1.5 text-label text-faint">Use sum for interval totals and mean for rates or measurements when an arithmetic average is appropriate.</div>
                       <div className="space-y-2">
                         {selectedIds.map((column) => (
                           <label key={column} className="flex items-center justify-between gap-3 px-3 py-2 text-body text-ink">
@@ -918,7 +914,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   />
                   <span>
                     Remove the seasonal component with seasonal-trend decomposition using loess (STL){seasonalPeriod === null ? ' (no period for yearly rows)' : ` at period ${seasonalPeriod}`}
-                    <span className="block text-faint">STL separates a fitted trend, a repeating seasonal component, and a remainder. Adjustment subtracts the seasonal component while retaining the trend; the decomposition does not assign causal meaning.</span>
+                    <span className="block text-faint">STL decomposes the series into a fitted trend, a seasonal component that can change over time, and a remainder. Seasonal adjustment removes the seasonal component but retains the trend. This decomposition does not imply causality.</span>
                   </span>
                 </label>
                 {draft.seasonal.kind === 'stl' && (
@@ -994,12 +990,12 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
                   </div>
                 </div>
                 {draft.seriesTransforms.some((record) => record.transform.kind === 'difference') && (
-                  <p className="mb-0 mt-3 text-body text-faint">First difference replaces xₜ with xₜ − xₜ₋₁. The first retained row is removed from every column so timestamps remain aligned. An effect on a differenced outcome is an effect on its period-to-period change, not directly on its level.</p>
+                  <p className="mb-0 mt-3 text-body text-faint">First differencing replaces xₜ with xₜ − xₜ₋₁. The first retained row is removed from every column to maintain timestamp alignment. Effects on differenced outcomes reflect changes between periods, not the absolute level.</p>
                 )}
               </div>
             </>
           ) : (
-            <p className="m-0 text-body text-faint">This prepared panel keeps outcomes in levels. Any later lag, difference, or interpolation must operate separately within each unit.</p>
+            <p className="m-0 text-body text-faint">This prepared panel retains outcomes in levels. Apply any subsequent lag, differencing, or interpolation separately to each unit.</p>
           )}
         </section>
         )}
@@ -1020,7 +1016,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             )}
           </div>
           {preparedCurrent === null && (
-            <p role="status" className="mb-0 mt-3 text-body text-faint">Create a prepared dataset version to run these diagnostics.</p>
+            <p role="status" className="mb-0 mt-3 text-body text-faint">Create a version of the prepared dataset to run these diagnostics.</p>
           )}
           <div hidden={diagnostic !== 'multicollinearity'} className="mt-4">
             {preparedCurrent !== null
@@ -1031,8 +1027,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Stationarity tests</h4>
             <div className="mt-2 grid gap-3 @3xl/panel:grid-cols-2 @3xl/panel:gap-6">
-              <p className={prose('m-0 text-faint')}>A stationary process has stable probabilistic behavior over time after accounting for the deterministic terms in the test. ADF tests a unit root as its null; KPSS tests stationarity as its null. Hirmos reads them together because either test alone can be inconclusive. Zivot–Andrews allows one structural break.</p>
-              <p className={prose('m-0 text-faint')}>These tests assess the saved values. To test a different transformation, change it above and create a new prepared dataset version.</p>
+              <p className={prose('m-0 text-faint')}>A stationary process maintains stable probabilistic behaviour over time after accounting for the deterministic terms in the test. The ADF test uses a unit root as its null hypothesis, while the KPSS test uses stationarity as its null. Hirmos considers both tests together, as either alone may be inconclusive. The Zivot–Andrews test allows for one structural break.</p>
+              <p className={prose('m-0 text-faint')}>These tests evaluate the saved values. To assess a different transformation, modify it above and create a new version of the prepared dataset.</p>
             </div>
           </div>
           <MethodCaveats methods={STATIONARITY_METHODS} />

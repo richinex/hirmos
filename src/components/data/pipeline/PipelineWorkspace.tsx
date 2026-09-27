@@ -232,7 +232,7 @@ function PipelineEditor({ onPrepared, onCancelEditing, controller }: Props & { r
   const inspector = selectedNode === null
     ? (
       <div className="space-y-3">
-        <Alert tone="info" live={false}>Connect input files through transformation blocks to “Use as source”. Select a block to edit its settings and preview its rows.</Alert>
+        <Alert tone="info" live={false}>Connect input files to “Use as source” through transformation blocks. Select a block to edit its settings and preview its rows.</Alert>
         {outputNotice}
         <div className={caption('m-0 flex items-center gap-3')} aria-label="Pipeline size">
           {[
@@ -412,7 +412,7 @@ function InputFileField({ held, choosing }: {
   return (
     <div className="space-y-2">
       {held === null
-        ? <p className={caption('m-0')}>Choose a CSV, TSV or Parquet file, then connect to the next block to continue processing.</p>
+        ? <p className={caption('m-0')}>Select a CSV, TSV, or Parquet file, then connect it to the next block to continue processing.</p>
         : (
           <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-body">
             <dt className="text-muted">File</dt><dd className={literal('m-0 truncate text-ink')} title={held.fileName}>{held.fileName}</dd>

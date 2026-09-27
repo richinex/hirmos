@@ -200,9 +200,9 @@ export const STL_METHOD_ID = methodId('stl-decomposition')
 const paper = (title: string, locator: string): MethodSource => ({ kind: 'paper', title, locator })
 
 // Sources the ontology notes establish.
-const RUIZ_DE_VILLA_CH5 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 5', locator)
-const RUIZ_DE_VILLA_CH7 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 7', locator)
-const RUIZ_DE_VILLA_CH8 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Ruiz de Villa, Manning), chapter 8', locator)
+const RUIZ_DE_VILLA_CH5 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Aleix Ruiz de Villa, Manning), chapter 5', locator)
+const RUIZ_DE_VILLA_CH7 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Aleix Ruiz de Villa, Manning), chapter 7', locator)
+const RUIZ_DE_VILLA_CH8 = (locator: string): MethodSource => paper('Causal Inference for Data Science (Aleix Ruiz de Villa, Manning), chapter 8', locator)
 const NESS_CH4 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 4', locator)
 const NESS_CH11 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 11', locator)
 const NESS_CH10 = (locator: string): MethodSource => paper('Causal AI (Ness, Manning), chapter 10', locator)
@@ -228,7 +228,7 @@ const MAEDA_SHIMIZU_2021 = paper('Causal additive models with unobserved variabl
 // Primary literature checked against the publication record and, where available, the vendored package documentation.
 const PEARL_2009 = (locator: string): MethodSource => paper('Causality: Models, Reasoning, and Inference, 2nd ed. (Pearl, 2009)', locator)
 const HERNAN_ROBINS = paper('Causal Inference: What If (Hernán and Robins, 2020)', '§3.3, positivity')
-const FACURE_CH5 = (locator: string): MethodSource => paper('Causal Inference in Python (Facure, O\u2019Reilly, 2023), chapter 5', locator)
+const FACURE_CH5 = (locator: string): MethodSource => paper('Causal Inference in Python (Matheus Facure, O\u2019Reilly, 2023), chapter 5', locator)
 const ROSENBAUM_RUBIN_1983 = paper('The central role of the propensity score in observational studies for causal effects (Rosenbaum and Rubin, 1983)', 'Biometrika 70(1), 41\u201355')
 const HIRANO_IMBENS_2004 = paper('The propensity score with continuous treatments (Hirano and Imbens, 2004)', 'Applied Bayesian Modeling and Causal Inference, 73\u201384')
 const NEWEY_WEST_1987 = paper('A Simple, Positive Semi-definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix (Newey and West, 1987)', 'Econometrica 55(3), 703–708')
@@ -309,7 +309,7 @@ const KPSS: MethodDefinition = {
     {
       id: caveatId('kpss-null'),
       category: 'interpretation',
-      requirement: 'The null is stationarity (level or trend as chosen); rejection points to a unit root.',
+      requirement: 'The null is stationarity around a constant or trend, as selected. Rejection is evidence against that form of stationarity, not proof of a unit root.',
       consequenceIfUnmet: 'The conclusion is reversed.',
       sources: [KPSS_1992, statsmodels('statsmodels/tsa/stattools/_stattools.py:3051-3175')],
     },
@@ -376,7 +376,7 @@ const GRANGER_SSR_F: MethodDefinition = {
     {
       id: caveatId('granger-predictive-reading'),
       category: 'interpretation',
-      requirement: 'A rejection establishes incremental temporal prediction at the tested lag order, not an identified intervention effect.',
+      requirement: 'Rejection provides evidence of incremental predictive information at the tested lag order, not an identified intervention effect.',
       consequenceIfUnmet: 'Predictive precedence is presented as a causal effect.',
       sources: [GRANGER_1969],
     },
@@ -718,8 +718,8 @@ const VAR_LINGAM: MethodDefinition = {
     {
       id: caveatId('var-lingam-non-gaussian-errors'),
       category: 'functional-form',
-      requirement: 'Independent non-Gaussian errors drive the residuals; Shapiro–Wilk checks this.',
-      consequenceIfUnmet: 'With Gaussian errors the same-period order is not identified and the returned order is a tie-break.',
+      requirement: 'The structural errors are mutually independent and non-Gaussian. Shapiro–Wilk assesses normality, not independence.',
+      consequenceIfUnmet: 'Gaussian errors do not provide the non-Gaussian information used to identify the contemporaneous causal order.',
       sources: [HYVARINEN_2010, lingam('lingam/var_lingam.py')],
     },
     {
@@ -754,7 +754,7 @@ const VAR_LINGAM: MethodDefinition = {
       id: caveatId('var-lingam-browser-boundary'),
       category: 'missingness',
       requirement: 'At least 2 complete, varying columns and lags 1 to 6.',
-      consequenceIfUnmet: 'A constant column or a gap refuses the run.',
+      consequenceIfUnmet: 'The analysis cannot run with a constant column or missing time periods.',
       sources: [hirmos('crates/analysis-wasm/src/lib.rs#var_lingam_evidence')],
     },
   ],
@@ -812,7 +812,7 @@ const PC_STABLE: MethodDefinition = {
       id: caveatId('pc-stable-complete-data'),
       category: 'missingness',
       requirement: 'The selected numeric columns form a complete matrix.',
-      consequenceIfUnmet: 'The browser refuses the run before conditional-independence testing.',
+      consequenceIfUnmet: 'The analysis cannot run until these input requirements are met.',
       sources: [COLOMBO_MAATHUIS_2014],
     },
   ],
@@ -870,7 +870,7 @@ const FCI: MethodDefinition = {
       id: caveatId('fci-complete-data'),
       category: 'missingness',
       requirement: 'The selected numeric columns form a complete matrix.',
-      consequenceIfUnmet: 'The browser refuses the run before conditional-independence testing.',
+      consequenceIfUnmet: 'The analysis cannot run until these input requirements are met.',
       sources: [SPIRTES_2000],
     },
   ],
@@ -921,7 +921,7 @@ const DIRECT_LINGAM: MethodDefinition = {
       id: caveatId('direct-lingam-browser-boundary'),
       category: 'missingness',
       requirement: 'At least 2 complete, varying numeric columns are selected.',
-      consequenceIfUnmet: 'The browser refuses the run before the numerical kernel is called.',
+      consequenceIfUnmet: 'The analysis cannot run until these input requirements are met.',
       sources: [hirmos('crates/analysis-wasm/src/discovery.rs#direct_lingam_evidence')],
     },
     {
@@ -979,7 +979,7 @@ const DYNOTEARS: MethodDefinition = {
       id: caveatId('dynotears-browser-boundary'),
       category: 'missingness',
       requirement: 'At least 2 complete columns and lags 1 to 6.',
-      consequenceIfUnmet: 'A gap refuses the run.',
+      consequenceIfUnmet: 'The analysis cannot run with missing time periods.',
       sources: [hirmos('crates/analysis-wasm/src/lib.rs#dynotears_evidence')],
     },
   ],
@@ -1269,16 +1269,16 @@ const PROPENSITY_WEIGHTING: MethodDefinition = {
     {
       id: caveatId('ipw-extreme-weights'),
       category: 'finite-sample',
-      requirement: 'Read the weight sums beside the estimate; very small or large propensity scores give high variance even when positivity holds.',
+      requirement: 'Inspect the weight distribution and effective sample size within each arm. Extreme propensity scores can produce large relative weights even when positivity holds.',
       consequenceIfUnmet: 'A stable-looking point estimate rests on a few heavily weighted rows.',
       sources: [FACURE_CH5('small or large propensity scores and the variance of IPW')],
     },
     {
       id: caveatId('ipw-treatment-model'),
       category: 'functional-form',
-      requirement: 'The treatment model is a logistic regression on the adjustment set as supplied, with categorical covariates declared before the run.',
+      requirement: 'The selected treatment model estimates treatment probabilities from the adjustment variables using logistic regression or gradient-boosted trees. Declare categorical covariates before fitting.',
       consequenceIfUnmet: 'A misspecified score misweights the sample.',
-      sources: [FACURE_CH5('estimating the propensity score'), statsmodels('statsmodels/discrete/discrete_model.py#Logit')],
+      sources: [FACURE_CH5('estimating the propensity score; propensity score and ML'), statsmodels('statsmodels/discrete/discrete_model.py#Logit'), hirmos('crates/analysis-wasm/src/estimation/propensity_score.rs#boosted_scores')],
     },
   ],
 }
@@ -1303,8 +1303,8 @@ const PROPENSITY_MATCHING: MethodDefinition = {
     {
       id: caveatId('matching-positivity'),
       category: 'identification',
-      requirement: 'Every unit has some chance of either arm given the covariates, so no fitted score sits at zero or one.',
-      consequenceIfUnmet: 'A weight divides by a near-zero probability and the estimate is carried by a handful of rows.',
+      requirement: 'Both treatment arms must have support at the covariate values being compared. Inspect overlap in their fitted propensity scores.',
+      consequenceIfUnmet: 'Nearest neighbours may have very different propensity scores, so the matched outcomes may not provide comparable counterfactuals.',
       sources: [FACURE_CH5('positivity and the bias-variance trade-off'), HERNAN_ROBINS],
     },
     {
@@ -1328,7 +1328,7 @@ const DOUBLY_ROBUST: MethodDefinition = {
   id: DOUBLY_ROBUST_METHOD_ID,
   name: 'Doubly robust estimation',
   family: 'estimation',
-  summary: 'Combine the propensity score with an outcome regression fitted separately in each arm, so that only one of the two models has to be correct.',
+  summary: 'Combine propensity weighting with outcome regression fitted separately in each arm. Under the identification and regularity assumptions, the estimator is consistent if either the propensity model or the outcome regressions are correctly specified.',
   summaryTex: {
     tex: String.raw`\mathrm{ATE} = \frac{1}{N}\sum_i\left(\frac{T_i\bigl(Y_i - \hat\mu_1(X_i)\bigr)}{e(X_i)} + \hat\mu_1(X_i)\right) - \frac{1}{N}\sum_i\left(\frac{(1-T_i)\bigl(Y_i - \hat\mu_0(X_i)\bigr)}{1 - e(X_i)} + \hat\mu_0(X_i)\right)`,
     plain: 'ATE = (1/N) Σ [ T(Y − μ1(X)) / e(X) + μ1(X) ] − (1/N) Σ [ (1−T)(Y − μ0(X)) / (1 − e(X)) + μ0(X) ]',
@@ -1351,15 +1351,15 @@ const DOUBLY_ROBUST: MethodDefinition = {
     {
       id: caveatId('aipw-one-model-right'),
       category: 'functional-form',
-      requirement: 'One of the treatment model and the outcome model must be correctly specified. Two chances at a correct model is not the same as a guarantee.',
-      consequenceIfUnmet: 'With both models wrong the estimate is biased like either one alone.',
+      requirement: 'Either the propensity model or both arm-specific outcome regressions must be correctly specified. Double robustness does not remove the need for unconfoundedness and positivity.',
+      consequenceIfUnmet: 'If both model specifications are incorrect, the estimator may be biased.',
       sources: [FACURE_CH5('why it is called doubly robust'), ROBINS_1994, KENNEDY_DR],
     },
     {
       id: caveatId('aipw-arm-regressions'),
       category: 'functional-form',
       requirement: 'The outcome model is a linear regression fitted within each arm on the same design.',
-      consequenceIfUnmet: 'A non-linear response is averaged away.',
+      consequenceIfUnmet: 'The linear regressions may miss nonlinear outcome relationships; consistency then depends on a correctly specified propensity model.',
       sources: [FACURE_CH5('the doubly robust estimator in code')],
     },
   ],
@@ -1369,7 +1369,7 @@ const CONTINUOUS_GPS: MethodDefinition = {
   id: CONTINUOUS_GPS_METHOD_ID,
   name: 'Generalised propensity score',
   family: 'estimation',
-  summary: 'A continuous treatment has no propensity, so the treatment is regressed on the covariates and the conditional Gaussian density at each observed value supplies the weight.',
+  summary: 'For a continuous treatment, the generalised propensity score is a conditional treatment density rather than a binary treatment probability. This estimator fits a Gaussian treatment model and uses density-based weights in a linear outcome regression.',
   summaryTex: {
     tex: String.raw`w_i = \frac{1}{\hat f(T_i \mid X_i)},\qquad \hat\tau = \arg\min_{\alpha,\tau}\sum_i w_i\bigl(Y_i - \alpha - \tau T_i\bigr)^2`,
     plain: 'w = 1 / f(T | X); τ minimises Σ w (Y − α − τT)²',
@@ -1378,9 +1378,9 @@ const CONTINUOUS_GPS: MethodDefinition = {
     {
       id: caveatId('gps-unconfoundedness'),
       category: 'identification',
-      requirement: 'The covariates are an identified adjustment set, so that given the same propensity score treatment is as good as random.',
+      requirement: 'Potential outcomes must be independent of treatment assignment conditional on the adjustment variables, with treatment support at the values being compared.',
       consequenceIfUnmet: 'The estimate is an association.',
-      sources: [FACURE_CH5('conditional independence and the propensity score'), ROSENBAUM_RUBIN_1983],
+      sources: [FACURE_CH5('generalized propensity score'), HIRANO_IMBENS_2004],
     },
     {
       id: caveatId('gps-normal-treatment'),
@@ -1392,14 +1392,14 @@ const CONTINUOUS_GPS: MethodDefinition = {
     {
       id: caveatId('gps-stabilize'),
       category: 'finite-sample',
-      requirement: 'Stabilize the weights by the marginal density of the treatment; with a continuous treatment this is necessary rather than optional.',
-      consequenceIfUnmet: 'Unstabilized weights can exceed a thousand and the estimate rests on a few points.',
+      requirement: 'Stabilized weights use the marginal treatment density divided by the conditional treatment density. Inspect weight concentration; stabilization does not guarantee adequate overlap.',
+      consequenceIfUnmet: 'Large relative weights can make the estimate sensitive to a small number of observations.',
       sources: [FACURE_CH5('stabilizing the weights by the marginal density')],
     },
     {
       id: caveatId('gps-linear-response'),
       category: 'interpretation',
-      requirement: 'The weighted model fits one slope, so the reported effect is a single treatment response rather than a curve.',
+      requirement: 'The weighted outcome model assumes a linear dose-response relationship. Its slope is the estimated change in outcome per one-unit increase in treatment.',
       consequenceIfUnmet: 'A curved dose response is read as one slope.',
       sources: [FACURE_CH5('the weighted final model')],
     },
@@ -1566,15 +1566,15 @@ const countCaveats = (prefix: 'poisson' | 'negbin', model: string): NonEmptyArra
     ? {
       id: caveatId('poisson-dispersion'),
       category: 'noise-and-dependence',
-      requirement: 'Variance equals the mean; compare with the negative binomial alpha before trusting the standard errors.',
-      consequenceIfUnmet: 'Overdispersed counts give standard errors that are too small.',
+      requirement: 'The Poisson model assumes the outcome variance equals its mean conditional on the predictors. Assess dispersion after accounting for those predictors.',
+      consequenceIfUnmet: 'Overdispersion can make model-based standard errors too small.',
       sources: [CAMERON_TRIVEDI, statsmodels('statsmodels/genmod/families/family.py#Poisson')],
     }
     : {
       id: caveatId('negbin-convergence'),
       category: 'computation',
-      requirement: 'BFGS reaches the maximum; a stop at the alpha boundary is reported as not converged.',
-      consequenceIfUnmet: 'Estimates from an unconverged fit are not maximum likelihood.',
+      requirement: 'Check the reported convergence status. Reaching the dispersion boundary is not treated as convergence.',
+      consequenceIfUnmet: 'Without convergence, the reported estimates and standard errors may be unreliable.',
       sources: [statsmodels('statsmodels/discrete/discrete_model.py#NegativeBinomialP.fit'), hirmos('crates/causal-core/src/bfgs.rs')],
     },
   {
@@ -1583,7 +1583,7 @@ const countCaveats = (prefix: 'poisson' | 'negbin', model: string): NonEmptyArra
     requirement: prefix === 'poisson'
       ? 'Counts are independent across rows; no serial-correlation correction exists in this fit.'
       : 'Rows are independent; the dispersion term absorbs extra variance, not serial dependence.',
-    consequenceIfUnmet: 'Autocorrelated counts make the interval too narrow.',
+    consequenceIfUnmet: 'Serial dependence can invalidate intervals calculated under independence.',
     sources: [statsmodels(model)],
   },
   {
@@ -1799,9 +1799,9 @@ const RANDOM_COMMON_CAUSE_REFUTER: MethodDefinition = {
   id: RANDOM_COMMON_CAUSE_REFUTER_METHOD_ID,
   name: 'Random common cause',
   family: 'refuter',
-  summary: 'Adds an independent random covariate and refits; the estimate should not move.',
+  summary: 'Adds a randomly generated covariate and refits to assess the sensitivity of the estimate to an irrelevant variable.',
   caveats: [
-    refuterCaveat('random-cause-reads-against-original', 'Read the estimate with the random covariate against the original.', 'Movement means the estimator is sensitive to irrelevant conditioning.', [NESS_CH11('§11.5.2 random common cause refuter'), dowhy('dowhy/causal_refuters/random_common_cause.py')]),
+    refuterCaveat('random-cause-reads-against-original', 'Compare the refitted estimates with the original, allowing for variation across simulations.', 'Small changes can occur by chance; substantial changes warrant further investigation.', [NESS_CH11('§11.5.2 random common cause refuter'), dowhy('dowhy/causal_refuters/random_common_cause.py')]),
     { id: caveatId('random-cause-not-a-confounder-test'), category: 'identification', requirement: 'The added covariate is independent by construction; passing says nothing about a real unmeasured confounder.', consequenceIfUnmet: 'The probe is read as evidence against confounding.', sources: [NESS_CH11('§11.5.2 random common cause refuter')] },
   ],
 }
@@ -1955,16 +1955,16 @@ const T_LEARNER: MethodDefinition = {
     {
       id: caveatId('t-learner-row-effect-reading'),
       category: 'interpretation',
-      requirement: 'A row’s effect is the average contrast for rows with its covariate values, not that row’s own counterfactual, which is never observed.',
-      consequenceIfUnmet: 'A per-row figure is read as what would have happened to that individual, a quantity no estimator can report.',
+      requirement: 'A row’s estimate is a conditional average treatment effect at its covariate values, not an identified individual treatment effect.',
+      consequenceIfUnmet: 'An average contrast may be mistaken for that individual’s treatment effect, which is not identified by these outcome regressions.',
       sources: [NESS_CH11('§11.4 conditional average treatment effect estimation; meta-learners such as the T-learner'), RUIZ_DE_VILLA_CH8('§8.1.4 heterogeneous treatment effects, the conditional average treatment effect')],
     },
     {
       id: caveatId('t-learner-learner-settings'),
       category: 'computation',
-      requirement: 'The run records its outcome model: 200 random-forest trees with minimum leaf 5 and one seed for both forests, or the boosted grid, the search folds and the seed for the halves and the trees.',
+      requirement: 'The run records the learner settings. For boosted models, grid search selects hyperparameters on all rows within each treatment arm before the two-half split. Each half is predicted by models fitted on the other half; hyperparameter selection is not repeated within the training halves.',
       consequenceIfUnmet: 'Changing the model settings changes the estimator specification and every row’s effect.',
-      sources: [ECONML_TLEARNER, RUIZ_DE_VILLA_CH5('exercise solution, section 5: ATEs with T-learners and cross-fitting'), hirmos('crates/causal-core/src/tlearner.rs'), hirmos('crates/causal-core/src/crossfit.rs')],
+      sources: [ECONML_TLEARNER, RUIZ_DE_VILLA_CH5('§5.4.1: cross-fitting with hyperparameter selection within training halves; differs from selection before splitting'), hirmos('crates/causal-core/src/tlearner.rs'), hirmos('crates/analysis-wasm/src/estimation/adjusted_outcome.rs#cross_fitted_t_learner')],
     },
     {
       id: caveatId('t-learner-no-interval'),
@@ -2171,7 +2171,7 @@ const PANEL_INTERVENTION: MethodDefinition = {
   caveats: [
     {
       id: caveatId('panel-balanced-layout'), category: 'sampling-structure',
-      requirement: 'One observation per unit and period on a complete balanced panel; treated units adopt at the same period and remain treated.',
+      requirement: 'The prepared panel has one observation per unit and period on a complete grid. Shared-adoption methods require a common adoption period; staggered DiD permits different adoption cohorts. Treatment is absorbing: units remain treated after adoption.',
       consequenceIfUnmet: 'The implemented weighting system does not define the requested comparison.',
       sources: [ARKHANGELSKY_2021, CALLAWAY_SANTANNA_2021, synthdid('R/utils.R#panel.matrices')],
     },
@@ -2183,7 +2183,7 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-no-anticipation'), category: 'identification',
-      requirement: 'Treatment does not affect outcomes before the recorded adoption period.',
+      requirement: 'Treatment does not affect outcomes before adoption, or before the specified anticipation window when staggered DiD allows anticipation.',
       consequenceIfUnmet: 'Pre-treatment periods used to fit the counterfactual are already treated.',
       sources: [ARKHANGELSKY_2021],
     },
@@ -2239,7 +2239,7 @@ const NEGBIN_NUTS: MethodDefinition = {
       id: caveatId('nuts-independence'),
       category: 'noise-and-dependence',
       requirement: 'Rows are independent; the model has no serial-correlation term.',
-      consequenceIfUnmet: 'The posterior interval is too narrow.',
+      consequenceIfUnmet: 'Dependence between rows is not represented in the posterior uncertainty.',
       sources: [hirmos('crates/causal-core/src/negbin_nuts.rs')],
     },
     {
@@ -2294,7 +2294,7 @@ const BAYESIAN_GAUSSIAN: MethodDefinition = {
       id: caveatId('bayes-gaussian-independence'),
       category: 'noise-and-dependence',
       requirement: 'Rows are independent; the model has no serial-correlation term.',
-      consequenceIfUnmet: 'The posterior interval is too narrow.',
+      consequenceIfUnmet: 'Dependence between rows is not represented in the posterior uncertainty.',
       sources: [hirmos('crates/causal-core/src/bayesian_gaussian.rs')],
     },
     {

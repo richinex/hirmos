@@ -15,7 +15,7 @@ import { Orb } from '@/components/ui/Orb'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { button, chapterIntro, field, fieldHint, fieldLabel, num, panel, sectionTitle } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, num, panel, sectionTitle } from '@/components/ui/recipes'
 import { cn } from '@/lib/utils'
 import type { RunActivity } from '@/domain/activity'
 import { isNumericDuckDbType, type ColumnId, type ColumnSelection, type DatasetProfile, type NumericColumnSelection } from '@/domain/dataset'
@@ -715,9 +715,9 @@ function RowFrequencyControls({ value, columns, onChange }: {
     }
   }
   return (
-    <div className="sm:col-span-2">
-      <ParameterLabel label="Rows represent" help="Choose grouped counts when one row summarizes several observations. The frequency must be a positive whole-number count." />
-      <SegmentedControl size="sm" ariaLabel="Survival row representation" value={value.kind} onChange={selectKind} options={[
+    <div className="@md/panel:col-span-2">
+      <ParameterLabel className={fieldLabel} label="Rows represent" help="Choose grouped counts when one row summarizes several observations. The frequency must be a positive whole-number count." />
+      <SegmentedControl ariaLabel="Survival row representation" value={value.kind} onChange={selectKind} options={[
         { value: 'one-observation-per-row', label: 'One observation' },
         { value: 'frequency-column', label: 'Grouped count' },
       ]} />
@@ -744,9 +744,9 @@ function TransitionControls({ stateCount, transitions, onStateCount, onTransitio
     onTransitions([...transitions, candidate])
   }
   return (
-    <fieldset className="m-0 border-0 p-0 sm:col-span-2">
+    <fieldset className="m-0 border-0 p-0 @md/panel:col-span-2">
       <legend className={fieldLabel}>Allowed state changes</legend>
-      <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(8rem,12rem)_1fr]">
+      <div className="mt-1 grid gap-3 @md/panel:grid-cols-[minmax(8rem,12rem)_1fr]">
         <label className="block">
           <span className={fieldHint}>Number of states</span>
           <input className={field('text', 'mt-1 w-full')} type="number" min={2} max={32} step={1} value={stateCount} aria-label="Number of states" onChange={(event) => onStateCount(Math.min(32, Math.max(2, Number(event.target.value) || 2)))} />
@@ -1089,7 +1089,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
     families: readonly ParametricSurvivalFamily[],
   ) => (
     <label className="block">
-      <ParameterLabel label="Distribution" help="The shape the hazard takes over follow-up. Weibull and Gompertz let risk rise or fall with age; the exponential holds it constant. PH families multiply the hazard by a covariate's effect, AFT families stretch time." />
+      <ParameterLabel className={fieldLabel} label="Distribution" help="The shape the hazard takes over follow-up. Weibull and Gompertz let risk rise or fall with age; the exponential holds it constant. PH families multiply the hazard by a covariate's effect, AFT families stretch time." />
       <Select className={field('text', 'mt-1')} value={value} onChange={(event) => changeFamily(event.target.value)}>
         {families.map((family) => <option key={family} value={family}>{survivalFamilyLabel(family)}</option>)}
       </Select>
@@ -1097,7 +1097,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
   )
   const horizonControl = (value: number, onChange: (value: number) => void) => (
     <label className="block">
-      <ParameterLabel label="Prediction horizon" help="The last follow-up time the fitted curve is drawn to, in the duration column's units." />
+      <ParameterLabel className={fieldLabel} label="Prediction horizon" help="The last follow-up time the fitted curve is drawn to, in the duration column's units." />
       <input className={field('text', 'mt-1 w-full')} type="number" min={0.001} step="any" value={value} aria-label="Prediction horizon" onChange={(event) => onChange(Math.max(0.001, Number(event.target.value) || 10))} />
     </label>
   )
@@ -1109,9 +1109,9 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
         <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
         {draft.kind === 'survival-forest' ? <>
-          <label className="block"><ParameterLabel label="Split rule" help="Log-rank selects the best eligible split. Extra trees tests one randomly chosen threshold per candidate covariate." /><Select className={field('text', 'mt-1')} value={draft.settings.splitRule} onChange={(event) => { const splitRule = event.target.value; if (splitRule === 'logRank' || splitRule === 'extraTrees') configure({ ...draft, settings: { ...draft.settings, splitRule } }) }}><option value="logRank">Log-rank</option><option value="extraTrees">Extra trees</option></Select></label>
-          {FOREST_PARAMETERS.map(({ key, title, help }) => <label className="block" key={key}><ParameterLabel label={title} help={help} /><input aria-label={title} className={field('text', 'mt-1 w-full')} type="number" min={1} step={1} value={draft.settings[key]} onChange={(event) => configure({ ...draft, settings: { ...draft.settings, [key]: Number(event.target.value) } })} /></label>)}
-          <label className="block"><ParameterLabel label="Prediction row" help="Draw the fitted survival curve for the covariate values in this prepared row. Row numbering begins at 1. This is a fitted prediction, not an out-of-bag prediction." /><input aria-label="Prediction row" className={field('text', 'mt-1 w-full')} type="number" min={1} max={prepared.observations} step={1} value={draft.predictionRow + 1} onChange={(event) => configure({ ...draft, predictionRow: Number(event.target.value) - 1 })} /></label>
+          <label className="block"><ParameterLabel className={fieldLabel} label="Split rule" help="Log-rank selects the best eligible split. Extra trees tests one randomly chosen threshold per candidate covariate." /><Select className={field('text', 'mt-1')} value={draft.settings.splitRule} onChange={(event) => { const splitRule = event.target.value; if (splitRule === 'logRank' || splitRule === 'extraTrees') configure({ ...draft, settings: { ...draft.settings, splitRule } }) }}><option value="logRank">Log-rank</option><option value="extraTrees">Extra trees</option></Select></label>
+          {FOREST_PARAMETERS.map(({ key, title, help }) => <label className="block" key={key}><ParameterLabel className={fieldLabel} label={title} help={help} /><input aria-label={title} className={field('text', 'mt-1 w-full')} type="number" min={1} step={1} value={draft.settings[key]} onChange={(event) => configure({ ...draft, settings: { ...draft.settings, [key]: Number(event.target.value) } })} /></label>)}
+          <label className="block"><ParameterLabel className={fieldLabel} label="Prediction row" help="Draw the fitted survival curve for the covariate values in this prepared row. Row numbering begins at 1. This is a fitted prediction, not an out-of-bag prediction." /><input aria-label="Prediction row" className={field('text', 'mt-1 w-full')} type="number" min={1} max={prepared.observations} step={1} value={draft.predictionRow + 1} onChange={(event) => configure({ ...draft, predictionRow: Number(event.target.value) - 1 })} /></label>
         </> : null}
       </>
       case 'right-censored': return <>
@@ -1126,8 +1126,8 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
         <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
         <RowFrequencyControls value={draft.rowFrequency} columns={columns} onChange={(rowFrequency) => configure({ ...draft, rowFrequency })} />
         <div>
-          <ParameterLabel label="Tied events" help="Use discrete handling when event times are recorded in discrete units such as years or minutes. Smoothed handling accounts for tied events one at a time, reducing the number at risk after each event." />
-          <SegmentedControl size="sm" ariaLabel="Nelson-Aalen tied events" value={draft.ties} onChange={(ties) => configure({ ...draft, ties })} options={[{ value: 'discrete', label: 'Discrete' }, { value: 'smoothed', label: 'Smoothed' }]} />
+          <ParameterLabel className={fieldLabel} label="Tied events" help="Use discrete handling when event times are recorded in discrete units such as years or minutes. Smoothed handling accounts for tied events one at a time, reducing the number at risk after each event." />
+          <SegmentedControl ariaLabel="Nelson-Aalen tied events" value={draft.ties} onChange={(ties) => configure({ ...draft, ties })} options={[{ value: 'discrete', label: 'Discrete' }, { value: 'smoothed', label: 'Smoothed' }]} />
         </div>
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
       </>
@@ -1143,18 +1143,18 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
         <ColumnSelect title="Duration" value={draft.duration} columns={columns} onChange={(duration) => configure({ ...draft, duration, covariates: withoutCovariate(draft.covariates, duration) })} />
         <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event, covariates: withoutCovariate(draft.covariates, event) })} />
         <label className="block">
-          <ParameterLabel label="Distribution" help="Weibull AFT: the log duration has a Gumbel-type error with a shape parameter; log-logistic AFT: a logistic error. Both report a time ratio per covariate, the multiplier on the duration for a one-unit increase." />
+          <ParameterLabel className={fieldLabel} label="Distribution" help="Weibull AFT: the log duration has a Gumbel-type error with a shape parameter; log-logistic AFT: a logistic error. Both report a time ratio per covariate, the multiplier on the duration for a one-unit increase." />
           <Select className={field('text', 'mt-1')} value={draft.family} onChange={(event) => changeFamily(event.target.value)}>
             <option value="weibull">Weibull AFT</option>
             <option value="logLogistic">Log-logistic AFT</option>
           </Select>
         </label>
         <label className="block">
-          <ParameterLabel label="Penalty" help="An L2 penalty shrinks coefficients toward zero after covariates are scaled by their sample standard deviations. Use zero to fit without a penalty." />
+          <ParameterLabel className={fieldLabel} label="Penalty" help="An L2 penalty shrinks coefficients toward zero after covariates are scaled by their sample standard deviations. Use zero to fit without a penalty." />
           <input className={field('text', 'mt-1 w-full')} type="number" min={0} step="any" value={draft.penalizer} aria-label="AFT penalizer" onChange={(event) => configure({ ...draft, penalizer: Number(event.target.value) })} />
         </label>
         <label className="block">
-          <ParameterLabel label="Confidence level" help="The percentage used for coefficient and time-ratio intervals." />
+          <ParameterLabel className={fieldLabel} label="Confidence level" help="The percentage used for coefficient and time-ratio intervals." />
           <input className={field('text', 'mt-1 w-full')} type="number" min={1} max={99.9} step="any" value={draft.confidenceLevel * 100} onChange={(event) => configure({ ...draft, confidenceLevel: Number(event.target.value) / 100 })} />
         </label>
         {horizonControl(draft.horizon, (horizon) => configure({ ...draft, horizon }))}
@@ -1224,33 +1224,33 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                 <ColumnSelect title="Duration" value={observation.duration} columns={columns} onChange={(duration) => setObservation({ ...observation, duration })} />
                 <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
                 <div>
-                  <ParameterLabel label="Shared frailty" help="A gamma frailty gives every observation in a group the same unobserved multiplier on its hazard, fitted as survival's frailty(group, distribution = 'gamma') with its penalised likelihood. Use it when observations are grouped, for example lines within a repository, and the group's own risk is not a covariate." />
-                  <SegmentedControl size="sm" ariaLabel="Cox shared frailty" value={observation.frailty.kind} onChange={chooseFrailty} options={[{ value: 'none', label: 'None' }, { value: 'gamma', label: 'Gamma by group' }]} />
+                  <ParameterLabel className={fieldLabel} label="Shared frailty" help="A gamma frailty gives every observation in a group the same unobserved multiplier on its hazard, fitted as survival's frailty(group, distribution = 'gamma') with its penalised likelihood. Use it when observations are grouped, for example lines within a repository, and the group's own risk is not a covariate." />
+                  <SegmentedControl ariaLabel="Cox shared frailty" value={observation.frailty.kind} onChange={chooseFrailty} options={[{ value: 'none', label: 'None' }, { value: 'gamma', label: 'Gamma by group' }]} />
                 </div>
                 {observation.frailty.kind === 'gamma' && <ColumnSelect title="Frailty group" value={observation.frailty.column} columns={columns} onChange={(column) => setObservation({ ...observation, frailty: { kind: 'gamma', column, ties: observation.frailty.kind === 'gamma' ? observation.frailty.ties : 'efron' } })} />}
                 {observation.frailty.kind === 'gamma' && <div>
-                  <ParameterLabel label="Tied event times" help="Efron's approximation is coxph's default. Breslow's treats every tied event as if it came after the others at that time; choose it to match a study that fitted with ties = 'breslow'." />
-                  <SegmentedControl size="sm" ariaLabel="Cox tied event times" value={observation.frailty.ties} onChange={(ties) => setObservation({ ...observation, frailty: { kind: 'gamma', column: observation.frailty.kind === 'gamma' ? observation.frailty.column : null, ties } })} options={[{ value: 'efron', label: 'Efron' }, { value: 'breslow', label: 'Breslow' }]} />
+                  <ParameterLabel className={fieldLabel} label="Tied event times" help="Efron's approximation is coxph's default. Breslow's treats every tied event as if it came after the others at that time; choose it to match a study that fitted with ties = 'breslow'." />
+                  <SegmentedControl ariaLabel="Cox tied event times" value={observation.frailty.ties} onChange={(ties) => setObservation({ ...observation, frailty: { kind: 'gamma', column: observation.frailty.kind === 'gamma' ? observation.frailty.column : null, ties } })} options={[{ value: 'efron', label: 'Efron' }, { value: 'breslow', label: 'Breslow' }]} />
                 </div>}
                 {observation.frailty.kind === 'none' && <>
                   <div>
-                    <ParameterLabel label="Delayed entry" help="Select an entry-time column when an observation joined the risk set after time zero." />
-                    <SegmentedControl size="sm" ariaLabel="Cox delayed entry" value={observation.entry.kind} onChange={chooseEntry} options={[{ value: 'not-used', label: 'Not used' }, { value: 'column', label: 'Entry column', disabled: clusteredBreslow, title: breslowConstraint }]} />
+                    <ParameterLabel className={fieldLabel} label="Delayed entry" help="Select an entry-time column when an observation joined the risk set after time zero." />
+                    <SegmentedControl ariaLabel="Cox delayed entry" value={observation.entry.kind} onChange={chooseEntry} options={[{ value: 'not-used', label: 'Not used' }, { value: 'column', label: 'Entry column', disabled: clusteredBreslow, title: breslowConstraint }]} />
                   </div>
                   {observation.entry.kind === 'column' && <ColumnSelect title="Entry time" value={observation.entry.column} columns={columns} onChange={(column) => setObservation({ ...observation, entry: { kind: 'column', column } })} />}
-                  <div className="sm:col-span-2">
-                    <ParameterLabel label="Standard errors" help="Use robust errors for weighted or misspecified models. Use clustered errors when rows within the same cluster may be related." />
-                    <SegmentedControl size="sm" ariaLabel="Cox standard errors" value={observation.standardErrors.kind === 'clustered-breslow' ? 'clustered' : observation.standardErrors.kind} onChange={chooseStandardErrors} options={[{ value: 'model-based', label: 'Model-based' }, { value: 'robust', label: 'Robust' }, { value: 'clustered', label: 'Clustered' }]} />
+                  <div className="@md/panel:col-span-2">
+                    <ParameterLabel className={fieldLabel} label="Standard errors" help="Use robust errors for weighted or misspecified models. Use clustered errors when rows within the same cluster may be related." />
+                    <SegmentedControl ariaLabel="Cox standard errors" value={observation.standardErrors.kind === 'clustered-breslow' ? 'clustered' : observation.standardErrors.kind} onChange={chooseStandardErrors} options={[{ value: 'model-based', label: 'Model-based' }, { value: 'robust', label: 'Robust' }, { value: 'clustered', label: 'Clustered' }]} />
                   </div>
                   {'column' in observation.standardErrors && <>
                     <ColumnSelect title="Cluster" value={observation.standardErrors.column} columns={columns} onChange={(column) => setObservation({ ...observation, standardErrors: { kind: observation.standardErrors.kind === 'clustered-breslow' ? 'clustered-breslow' : 'clustered', column } })} />
                     <div>
-                      <ParameterLabel label="Tied event times" help="Efron adjusts the risk set within tied event groups. Breslow uses the same risk set for every event at that time. Clustered Breslow supports equal weights, no delayed entry, no strata and no penalty." />
-                      <SegmentedControl size="sm" ariaLabel="Cox clustered tied event times" value={observation.standardErrors.kind === 'clustered-breslow' ? 'breslow' : 'efron'} onChange={(ties: 'efron' | 'breslow') => setObservation({ ...observation, standardErrors: { kind: ties === 'breslow' ? 'clustered-breslow' : 'clustered', column: 'column' in observation.standardErrors ? observation.standardErrors.column : null } })} options={[{ value: 'efron', label: 'Efron' }, { value: 'breslow', label: 'Breslow', disabled: !canUseBreslow, title: breslowConstraint }]} />
+                      <ParameterLabel className={fieldLabel} label="Tied event times" help="Efron adjusts the risk set within tied event groups. Breslow uses the same risk set for every event at that time. Clustered Breslow supports equal weights, no delayed entry, no strata and no penalty." />
+                      <SegmentedControl ariaLabel="Cox clustered tied event times" value={observation.standardErrors.kind === 'clustered-breslow' ? 'breslow' : 'efron'} onChange={(ties: 'efron' | 'breslow') => setObservation({ ...observation, standardErrors: { kind: ties === 'breslow' ? 'clustered-breslow' : 'clustered', column: 'column' in observation.standardErrors ? observation.standardErrors.column : null } })} options={[{ value: 'efron', label: 'Efron' }, { value: 'breslow', label: 'Breslow', disabled: !canUseBreslow, title: breslowConstraint }]} />
                     </div>
                   </>}
                 </>}
-                {observation.frailty.kind === 'gamma' && <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>A shared frailty model uses model-based standard errors, no delayed entry and no penalty.</p>}
+                {observation.frailty.kind === 'gamma' && <p className={cn(fieldHint, 'm-0 @md/panel:col-span-2')}>A shared frailty model uses model-based standard errors, no delayed entry and no penalty.</p>}
               </>
             }
             case 'start-stop': {
@@ -1260,38 +1260,38 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                 <ColumnSelect title="Start time" value={observation.start} columns={columns} onChange={(start) => setObservation({ ...observation, start })} />
                 <ColumnSelect title="Stop time" value={observation.stop} columns={columns} onChange={(stop) => setObservation({ ...observation, stop })} />
                 <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={observation.event} columns={columns} onChange={(event) => setObservation({ ...observation, event })} />
-                <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>Model-based standard errors are used for start–stop Cox regression.</p>
+                <p className={cn(fieldHint, 'm-0 @md/panel:col-span-2')}>Model-based standard errors are used for start–stop Cox regression.</p>
               </>
             }
             default: return assertNever(draft.observation)
           }
         })()
         return <>
-          <div className="sm:col-span-2">
-            <ParameterLabel label="Observation structure" help="Use right-censored rows when each observation has one duration. Use start–stop rows when a subject contributes intervals with covariates that can change." />
-            <SegmentedControl size="sm" ariaLabel="Cox observation structure" value={draft.observation.kind} onChange={chooseObservation} options={[{ value: 'right-censored', label: 'Right-censored' }, { value: 'start-stop', label: 'Start–stop' }]} />
+          <div className="@md/panel:col-span-2">
+            <ParameterLabel className={fieldLabel} label="Observation structure" help="Use right-censored rows when each observation has one duration. Use start–stop rows when a subject contributes intervals with covariates that can change." />
+            <SegmentedControl ariaLabel="Cox observation structure" value={draft.observation.kind} onChange={chooseObservation} options={[{ value: 'right-censored', label: 'Right-censored' }, { value: 'start-stop', label: 'Start–stop' }]} />
           </div>
           {observationControls}
           <div>
-            <ParameterLabel label="Observation weights" help="Select a positive weight column when rows contribute different weights to the partial likelihood." />
-            <SegmentedControl size="sm" ariaLabel="Cox observation weights" value={draft.weights.kind} onChange={(kind) => setWeights(kind === 'equal' ? { kind } : { kind, column: columnLike(columns, /^(weight|weights)$/i) })} options={[{ value: 'equal', label: 'Equal' }, { value: 'column', label: 'Weight column', disabled: clusteredBreslow, title: breslowConstraint }]} />
+            <ParameterLabel className={fieldLabel} label="Observation weights" help="Select a positive weight column when rows contribute different weights to the partial likelihood." />
+            <SegmentedControl ariaLabel="Cox observation weights" value={draft.weights.kind} onChange={(kind) => setWeights(kind === 'equal' ? { kind } : { kind, column: columnLike(columns, /^(weight|weights)$/i) })} options={[{ value: 'equal', label: 'Equal' }, { value: 'column', label: 'Weight column', disabled: clusteredBreslow, title: breslowConstraint }]} />
           </div>
           {draft.weights.kind === 'column' && <ColumnSelect title="Weight" value={draft.weights.column} columns={columns} onChange={(column) => setWeights({ kind: 'column', column })} />}
           <div>
-            <ParameterLabel label="Strata" help="Select a stratum column when groups may have different baseline hazards but share the same covariate coefficients." />
-            <SegmentedControl size="sm" ariaLabel="Cox strata" value={draft.strata.kind} onChange={(kind) => setStrata(kind === 'unstratified' ? { kind } : { kind, column: columnLike(columns, /^(strata|stratum|group)$/i) })} options={[{ value: 'unstratified', label: 'Unstratified' }, { value: 'column', label: 'Stratum column', disabled: clusteredBreslow, title: breslowConstraint }]} />
+            <ParameterLabel className={fieldLabel} label="Strata" help="Select a stratum column when groups may have different baseline hazards but share the same covariate coefficients." />
+            <SegmentedControl ariaLabel="Cox strata" value={draft.strata.kind} onChange={(kind) => setStrata(kind === 'unstratified' ? { kind } : { kind, column: columnLike(columns, /^(strata|stratum|group)$/i) })} options={[{ value: 'unstratified', label: 'Unstratified' }, { value: 'column', label: 'Stratum column', disabled: clusteredBreslow, title: breslowConstraint }]} />
           </div>
           {draft.strata.kind === 'column' && <ColumnSelect title="Stratum" value={draft.strata.column} columns={columns} onChange={(column) => setStrata({ kind: 'column', column })} />}
-          {!(draft.observation.kind === 'right-censored' && draft.observation.frailty.kind === 'gamma') && <div className="sm:col-span-2">
-            <ParameterLabel label="Penalty" help="An elastic-net penalty can stabilize a model with many or strongly related covariates. Leave the model unpenalized unless the study specifies a penalty." />
-            <SegmentedControl size="sm" ariaLabel="Cox penalty" value={penalty.kind} onChange={(kind) => configure({ ...draft, penalty: kind === 'unpenalized' ? { kind } : { kind, strength: 0.1, l1Ratio: 0 } })} options={[{ value: 'unpenalized', label: 'Unpenalized' }, { value: 'elastic-net', label: 'Elastic net', disabled: clusteredBreslow, title: breslowConstraint }]} />
+          {!(draft.observation.kind === 'right-censored' && draft.observation.frailty.kind === 'gamma') && <div className="@md/panel:col-span-2">
+            <ParameterLabel className={fieldLabel} label="Penalty" help="An elastic-net penalty can stabilize a model with many or strongly related covariates. Leave the model unpenalized unless the study specifies a penalty." />
+            <SegmentedControl ariaLabel="Cox penalty" value={penalty.kind} onChange={(kind) => configure({ ...draft, penalty: kind === 'unpenalized' ? { kind } : { kind, strength: 0.1, l1Ratio: 0 } })} options={[{ value: 'unpenalized', label: 'Unpenalized' }, { value: 'elastic-net', label: 'Elastic net', disabled: clusteredBreslow, title: breslowConstraint }]} />
           </div>}
           {penalty.kind === 'elastic-net' && <>
             <label className="block"><span className={fieldLabel}>Penalty strength</span><input className={field('text', 'mt-1 w-full')} type="number" min={Number.EPSILON} step="any" value={penalty.strength} onChange={(event) => configure({ ...draft, penalty: { ...penalty, strength: Number(event.target.value) } })} /></label>
             <label className="block"><span className={fieldLabel}>L1 ratio</span><input className={field('text', 'mt-1 w-full')} type="number" min={0} max={1} step="any" value={penalty.l1Ratio} onChange={(event) => configure({ ...draft, penalty: { ...penalty, l1Ratio: Number(event.target.value) } })} /></label>
           </>}
           <label className="block">
-            <ParameterLabel label="Confidence level" help="The percentage used for coefficient and hazard-ratio intervals." />
+            <ParameterLabel className={fieldLabel} label="Confidence level" help="The percentage used for coefficient and hazard-ratio intervals." />
             <input className={field('text', 'mt-1 w-full')} type="number" min={1} max={99.9} step="any" value={draft.confidenceLevel * 100} onChange={(event) => configure({ ...draft, confidenceLevel: Number(event.target.value) / 100 })} />
           </label>
         </>
@@ -1301,7 +1301,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
         <ColumnSelect title={<Metadata><span>Event</span><span className="font-normal text-faint">1 observed, 0 censored</span></Metadata>} value={draft.event} columns={columns} onChange={(event) => configure({ ...draft, event })} />
         <ColumnSelect title={<Metadata><span>Group</span><span className="font-normal text-faint">0 or 1</span></Metadata>} value={draft.group} columns={columns} onChange={(group) => configure({ ...draft, group })} />
         <label className="block">
-          <ParameterLabel label="Compare through time" help="The follow-up time the restricted mean is taken to. Event-free time is averaged up to here, so the difference is in the duration column's units." />
+          <ParameterLabel className={fieldLabel} label="Compare through time" help="The follow-up time the restricted mean is taken to. Event-free time is averaged up to here, so the difference is in the duration column's units." />
           <input className={field('text', 'mt-1 w-full')} type="number" min={0.001} step="any" value={draft.truncationTime} aria-label="Compare through time" onChange={(event) => configure({ ...draft, truncationTime: Math.max(0.001, Number(event.target.value) || 10) })} />
         </label>
       </>
@@ -1332,7 +1332,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
               <ColumnSelect title="Destination state" value={input.to} columns={columns} onChange={(to) => configure({ ...draft, input: { ...input, to } })} />
             </>
             case 'longitudinal-states': return <>
-              <p className={cn(fieldHint, 'm-0 sm:col-span-2')}>Use one row per exact state observation. Time keeps the numeric units in the source data; irregular observation times are allowed.</p>
+              <p className={cn(fieldHint, 'm-0 @md/panel:col-span-2')}>Use one row per exact state observation. Time keeps the numeric units in the source data; irregular observation times are allowed.</p>
               <ColumnSelect title="Subject" value={input.subject} columns={sourceColumns} onChange={(subject) => configure({ ...draft, input: { ...input, subject } })} />
               <ColumnSelect title="Observation time" value={input.time} columns={columns} onChange={(time) => configure({ ...draft, input: { ...input, time } })} />
               <ColumnSelect title="Observed state" value={input.state} columns={columns} onChange={(state) => configure({ ...draft, input: { ...input, state } })} />
@@ -1343,11 +1343,11 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                 const states = Array.from({ length: stateCount }, (_, index) => input.states[index] ?? { kind: 'recorded' as const, time: null, status: null })
                 configure({ ...draft, input: { ...input, states, transitions: input.transitions.filter(({ from, to }) => from <= stateCount && to <= stateCount) } })
               }} onTransitions={(transitions) => configure({ ...draft, input: { ...input, transitions } })} />
-              <div className="grid gap-3 sm:col-span-2">
+              <div className="grid gap-3 @md/panel:col-span-2">
                 {input.states.map((state, index) => (
-                  <fieldset key={index} className="m-0 grid gap-3 rounded-md border border-hair p-3 sm:grid-cols-2">
+                  <fieldset key={index} className="m-0 grid gap-3 rounded-md border border-hair p-3 @md/panel:grid-cols-2">
                     <legend className="px-1 text-body font-medium text-ink">State {index + 1}</legend>
-                    <label className="flex items-center gap-2 text-body sm:col-span-2"><input type="checkbox" checked={state.kind === 'not-applicable'} onChange={(event) => {
+                    <label className="flex items-center gap-2 text-body @md/panel:col-span-2"><input type="checkbox" checked={state.kind === 'not-applicable'} onChange={(event) => {
                       const states = input.states.map((candidate, candidateIndex) => candidateIndex === index ? event.target.checked ? { kind: 'not-applicable' as const } : { kind: 'recorded' as const, time: null, status: null } : candidate)
                       configure({ ...draft, input: { ...input, states } })
                     }} />No time/status fields for this state</label>
@@ -1358,9 +1358,9 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                   </fieldset>
                 ))}
               </div>
-              <div className="sm:col-span-2">
+              <div className="@md/panel:col-span-2">
                 <span className={fieldLabel}>Entry for each subject</span>
-                <SegmentedControl size="sm" ariaLabel="Wide event entry mode" value={input.entry.kind} onChange={(kind) => configure({ ...draft, input: { ...input, entry: kind === 'shared' ? { kind, state: 1, time: 0 } : { kind, state: null, time: null } } })} options={[{ value: 'shared', label: 'Same entry' }, { value: 'columns', label: 'Entry columns' }]} />
+                <SegmentedControl ariaLabel="Wide event entry mode" value={input.entry.kind} onChange={(kind) => configure({ ...draft, input: { ...input, entry: kind === 'shared' ? { kind, state: 1, time: 0 } : { kind, state: null, time: null } } })} options={[{ value: 'shared', label: 'Same entry' }, { value: 'columns', label: 'Entry columns' }]} />
               </div>
               {input.entry.kind === 'shared' ? <>
                 <label className="block"><span className={fieldLabel}>Entry state</span><input className={field('text', 'mt-1 w-full')} type="number" min={1} max={input.states.length} step={1} value={input.entry.state} onChange={(event) => { if (input.entry.kind === 'shared') configure({ ...draft, input: { ...input, entry: { kind: 'shared', state: Number(event.target.value) || 1, time: input.entry.time } } }) }} /></label>
@@ -1374,9 +1374,9 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
           }
         })()
         return <>
-          <div className="sm:col-span-2">
-            <ParameterLabel label="Input rows" help="Use existing transition-risk rows, exact state observations recorded over time, or one wide event-history row per subject. Hirmos validates and expands the last two forms before fitting." />
-            <SegmentedControl size="sm" ariaLabel="Multi-state input rows" value={input.kind} onChange={chooseInput} options={[{ value: 'prepared-rows', label: 'Prepared rows' }, { value: 'longitudinal-states', label: 'State observations' }, { value: 'wide-events', label: 'Wide event history' }]} />
+          <div className="@md/panel:col-span-2">
+            <ParameterLabel className={fieldLabel} label="Input rows" help="Use existing transition-risk rows, exact state observations recorded over time, or one wide event-history row per subject. Hirmos validates and expands the last two forms before fitting." />
+            <SegmentedControl ariaLabel="Multi-state input rows" value={input.kind} onChange={chooseInput} options={[{ value: 'prepared-rows', label: 'Prepared rows' }, { value: 'longitudinal-states', label: 'State observations' }, { value: 'wide-events', label: 'Wide event history' }]} />
           </div>
           {inputControls}
           {familyOptions(draft.family, ['exponential', 'weibullPh', 'gompertz'])}
@@ -1403,11 +1403,14 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
             ? 'Choose at least one covariate. Covariates affect the time to an event; the shape parameter is shared across observations.'
             : 'Each enters the model on the log hazard or log time scale. The columns already chosen as times or the event cannot be covariates.'
         return (
-          <div>
-            <span className={fieldLabel}>Covariates</span>
-            <p className={cn(fieldHint, 'mb-2 max-w-[65ch]')}>{help}</p>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5" role="group" aria-label="Covariates">
+          <div className="max-w-3xl">
+            <div role="group" aria-label="Covariates">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className={fieldLabel}>Covariates</span>
               <SelectionActions selectLabel="Select all covariates" clearLabel="Clear selected covariates" onSelectAll={() => configure({ ...draft, covariates: columns.filter((column) => !roles.includes(column.id)).map((column) => column.id) })} onClear={() => configure({ ...draft, covariates: [] })} />
+            </div>
+            <p className={cn(fieldHint, 'mb-2 max-w-[65ch]')}>{help}</p>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
               {columns.map((column) => {
               const reserved = roles.includes(column.id)
               return <label key={column.id} className={cn('flex items-center gap-2 text-body', reserved ? 'text-faint' : 'text-ink')}><input type="checkbox" disabled={reserved} checked={draft.covariates.includes(column.id)} onChange={() => {
@@ -1415,6 +1418,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
                 configure({ ...draft, covariates: draft.covariates.includes(column.id) ? draft.covariates.filter((id) => id !== column.id) : [...draft.covariates, column.id] })
               }} />{column.name}</label>
             })}</div>
+            </div>
             {draft.kind === 'survival-forest' ? <fieldset className="mt-3 border-0 p-0"><legend className={fieldLabel}>Categorical covariates</legend><p className={fieldHint}>Mark categorical columns coded with whole numbers from 1 to 53. Unmarked columns use numeric thresholds.</p><div className="flex flex-wrap gap-3">{columns.filter((column) => draft.covariates.includes(column.id)).map((column) => <label key={column.id} className="flex items-center gap-2 text-body"><input type="checkbox" checked={draft.categorical.includes(column.id)} onChange={() => configure({ ...draft, categorical: draft.categorical.includes(column.id) ? draft.categorical.filter((id) => id !== column.id) : [...draft.categorical, column.id] })} />{column.name}</label>)}</div></fieldset> : null}
           </div>
         )
@@ -1435,19 +1439,21 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="survival-setup-title">
-        <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{type.name}</h3>
-        <div className="grid grid-cols-1 gap-4">
+        <h3 id="survival-setup-title" className={cn(sectionTitle, 'mb-4 mt-0')}>{type.name}</h3>
+        <div className="grid grid-cols-1 gap-8">
           <div>
             <SegmentedControl variant="line" size="sm" ariaLabel="Survival analysis type" value={draft.kind} onChange={selectDraft} options={[{ value: 'right-censored', label: 'Parametric' }, { value: 'nonparametric', label: 'Kaplan–Meier' }, { value: 'start-stop', label: 'Start–stop' }, { value: 'cox-regression', label: 'Cox regression' }, { value: 'aalen', label: 'Aalen regression' }, { value: 'survival-forest', label: 'Survival forest' }, { value: 'penalized-aft', label: 'Penalised AFT' }, { value: 'two-group', label: 'Compare groups' }, { value: 'multi-state', label: 'Multi-state' }]} />
             <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{type.summary}</p>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">{draftControls}</div>
+          <div className="grid max-w-4xl items-start gap-6 @md/panel:grid-cols-2">{draftControls}</div>
           {covariateControls}
         </div>
+        <div className={cn(actionGap, 'grid gap-3')}>
         <JobNotice job={job} />
-        <div className="mt-4 flex items-center gap-3">
+        <div className="flex items-center gap-3">
           <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked} onClick={() => void execute()}>{job.kind === 'running' ? 'Running…' : 'Run survival analysis'}</button>
           {job.kind === 'running' && <><Orb state="solving" aria-label="Survival analysis running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
+        </div>
         </div>
       </section>
 

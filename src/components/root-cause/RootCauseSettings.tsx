@@ -1,4 +1,4 @@
-import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
+import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useRef, useState } from 'react'
 import { rootCauseRequestSchema, rootCauseRunSchema, type RootCauseRequest } from '@/domain/rootCauseAnalysis'
 import { matchesRootCauseGraph, type RootCauseGraph } from '@/domain/rootCause'
@@ -18,10 +18,10 @@ export function RootCauseSettings({ graph, value, onChange }: { readonly graph: 
       setProblem(error instanceof Error ? error.message : String(error))
     }
   }
-  return <details className="pt-2 text-body"><DisclosureSummary className="cursor-pointer font-medium text-ink">Reuse saved settings{value !== null && <span className="ml-2 font-normal text-muted">Loaded</span>}</DisclosureSummary><div className="mt-3 space-y-3">
+  return <SettingsDisclosure title="Reuse saved settings" items={[{ icon: 'upload_file', text: value === null ? 'none loaded' : 'loaded' }]}><div className="space-y-3">
     <input ref={input} type="file" accept=".json" aria-label="Saved analysis settings" className="hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file !== undefined) void load(file) }} />
     <div><button type="button" className={button('outline')} onClick={() => input.current?.click()}>Load saved settings</button><p className={`${fieldHint} max-w-[65ch]`}>Choose a settings file or exported analysis record. To repeat the analysis, select the same input data separately; it is not included in the record.</p></div>
     {value !== null && <><p className={`${fieldHint} max-w-[65ch]`} role="status">Loaded {value.query.kind === 'anomaly' ? 'unusual-observation' : value.query.kind === 'change' ? 'distribution-change' : 'shift-intervention'} settings for {value.names[value.target]}, with {value.repetitions} refitted estimates.</p><button type="button" className={button('quiet')} onClick={() => onChange(null)}>Use editable settings</button></>}
     {problem !== null && <p role="alert" className="text-warn">{problem}</p>}
-  </div></details>
+  </div></SettingsDisclosure>
 }

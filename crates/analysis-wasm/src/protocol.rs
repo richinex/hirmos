@@ -3032,6 +3032,8 @@ pub(crate) enum AnalysisResult {
         standard_error: f64,
         /// Stabilized weights sum to about the sample size; inverse-density weights need not.
         weight_sum: f64,
+        /// The weight each row carries in the outcome regression, in row order.
+        weights: Vec<f64>,
         /// The conditional density at each observed treatment, in row order.
         density: Vec<f64>,
         residual_scale: f64,

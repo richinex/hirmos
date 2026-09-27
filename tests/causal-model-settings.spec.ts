@@ -64,7 +64,7 @@ test('causal-model drafts isolate recorded graph revisions and discard invalid b
       nodes: [{ kind: 'observed', id: 'a', column: 'A', name: 'A' }, { kind: 'observed', id: 'b', column: 'B', name: 'B' }],
       edges: [{ kind: 'directed', id: 'a-b', cause: 'a', effect: 'b', timing: { kind: 'contemporaneous' }, support: { kind: 'user-assumption', rationale: 'A affects B.' }, evidence: [] }],
     }
-    const first = { id: 'first', graph, validation: { kind: 'structurally-valid' } }
+    const first = { id: 'first', graph, validation: { structure: { kind: 'sound' }, rationales: { kind: 'complete' } } }
     const second = { ...first, id: 'second' }
     const document = { id: 'document', preparedDataset: 'prepared', dataset: { kind: 'cross-section', observations: 100 }, current: second, audit: [first, second] }
     const selection = { dagDocument: 'document', dagRevision: 'first', preparedDataset: 'prepared' }

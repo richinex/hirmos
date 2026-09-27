@@ -23,7 +23,8 @@ import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { button, chapterIntro, field, fieldLabel, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, label, literal, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
+import { SettingsStep } from '@/components/ui/SettingsStep'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { adjustmentLabels, contemporaneousAdjustmentVariables, describeEstimator, type EstimationRunArtifact, type EstimationRunId } from '@/domain/estimation'
@@ -354,12 +355,14 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="sensitivity-setup-title">
-        <h3 id="sensitivity-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{describeProbe(state.probe)}</h3>
+        <h3 id="sensitivity-setup-title" className={cn(sectionTitle, 'mb-6 mt-0')}>{describeProbe(state.probe)}</h3>
         {estimationRuns.length === 0 ? (
           <Alert tone="info" live={false}><p className="m-0">Run an estimate before choosing a sensitivity probe.</p></Alert>
         ) : (
           <>
-            <label className="block">
+            <div className={stepsStack}>
+            <SettingsStep number={1} title="Choose the estimate">
+            <label className="block max-w-2xl">
               <span className={fieldLabel}>Estimation run</span>
               <Select className={field('text', 'mt-1')} value={state.estimationRun ?? ''} onChange={(event) => dispatch({ type: 'run-chosen', run: event.target.value === '' ? null : (event.target.value as EstimationRunId) })}>
                 {[...estimationRuns].reverse().map((run) => {
@@ -368,10 +371,12 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
                 })}
               </Select>
             </label>
-            <div className="mt-4">
-              <RadioList frame="none" legend="Probe" value={state.probe} onChange={(probe) => dispatch({ type: 'probe-chosen', probe })} options={PROBES.map((probe) => ({ value: probe, label: describeProbe(probe), hint: probeHint(probe) }))} />
-            </div>
-            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            </SettingsStep>
+            <SettingsStep number={2} title="Choose the probe">
+              <RadioList frame="none" legend="Probe" legendHidden className="max-w-3xl" value={state.probe} onChange={(probe) => dispatch({ type: 'probe-chosen', probe })} options={PROBES.map((probe) => ({ value: probe, label: describeProbe(probe), hint: probeHint(probe) }))} />
+            </SettingsStep>
+            <SettingsStep number={3} title="Set the probe">
+            <div className="grid max-w-4xl items-start gap-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               {configuration.kind === 'linear-refutation' && (
                 <>
                   <label className="block"><ParameterLabel className={fieldLabel} label="Simulations" help={SENSITIVITY_PARAMETER_HELP.linearRefutation.simulations} /><input aria-label="Simulations" type="number" min={1} max={2000} className={field('text', 'mt-1')} value={configuration.simulations} onChange={(event) => configure({ ...configuration, simulations: Math.max(1, Math.min(2000, Number(event.target.value) || 1)) })} /></label>
@@ -383,17 +388,17 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               {configuration.kind === 'dml-refutation' && (
                 <>
                   <label className="block"><ParameterLabel className={fieldLabel} label="Fold seed" help={SENSITIVITY_PARAMETER_HELP.dmlRefutation.foldSeed} /><input type="number" min={0} aria-label="Batch fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-                  <p className="m-0 self-end text-body text-faint @md/panel:col-span-2 @4xl/panel:col-span-3">Main fit, placebo, random common cause, then confounding bounds, all from this seed. Use the estimation run’s seed{estimation?.kind === 'double-ml-run' ? ` (${estimation.configuration.seed})` : ''} so the main fit repeats it.</p>
+                  <p className={cn(fieldHint, 'm-0 self-end @md/panel:col-span-2 @4xl/panel:col-span-3')}>Main fit, placebo, random common cause, then confounding bounds, all from this seed. Use the estimation run’s seed{estimation?.kind === 'double-ml-run' ? ` (${estimation.configuration.seed})` : ''} so the main fit repeats it.</p>
                 </>
               )}
               {configuration.kind === 'unobserved-confounding' && (
                 <>
-                  <label className="block"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.unobservedConfounding.seed} /><input aria-label="Seed" type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
+                  <label className="block max-w-xs @md/panel:col-span-2 @4xl/panel:col-span-4"><ParameterLabel className={fieldLabel} label="Seed" help={SENSITIVITY_PARAMETER_HELP.unobservedConfounding.seed} /><input aria-label="Seed" type="number" min={0} className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
                   {(['kappaT', 'kappaY'] as const).map((axis) => {
                     const range = configuration[axis]
                     const title = axis === 'kappaT' ? 'Treatment flip strength' : 'Outcome shift strength'
                     return (
-                      <div key={axis} className="@md/panel:col-span-2 @4xl/panel:col-span-1">
+                      <div key={axis} className="col-span-full">
                         <ParameterLabel className={fieldLabel} label={title} help={axis === 'kappaT' ? SENSITIVITY_PARAMETER_HELP.unobservedConfounding.treatmentFlipStrength : SENSITIVITY_PARAMETER_HELP.unobservedConfounding.outcomeShiftStrength} />
                         <div className="mt-1 flex flex-wrap items-center gap-2">
                           <SegmentedControl ariaLabel={title} value={range.kind} onChange={(kind) => configure({ ...configuration, [axis]: kind === 'inferred' ? { kind: 'inferred' } : axis === 'kappaT' ? { kind: 'range', from: 0.05, to: 0.5, steps: 10 } : { kind: 'range', from: 0, to: Math.abs(estimation?.estimate.effect.kind === 'additive' ? estimation.estimate.effect.value : 1), steps: 10 } })} options={[{ value: 'inferred', label: 'Inferred' }, { value: 'range', label: 'Range' }]} />
@@ -414,13 +419,17 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
                 </>
               )}
             </div>
-            {eligibility.kind === 'refused' && <Alert tone="warn" live={false} className="mt-4"><p className="m-0">{eligibility.reason}</p></Alert>}
+            </SettingsStep>
+            </div>
+            <div className={cn(actionGap, 'grid gap-3')}>
+            {eligibility.kind === 'refused' && <Alert tone="warn" live={false}><p className="m-0">{eligibility.reason}</p></Alert>}
             <JobNotice job={job} />
-            <div className="mt-4 flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <button type="button" className={button('signal')} disabled={eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 Run {lowerFirst(describeProbe(state.probe))}
               </button>
               {job.kind === 'running' && <><Orb state="working" aria-label="Probe running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
+            </div>
             </div>
           </>
         )}

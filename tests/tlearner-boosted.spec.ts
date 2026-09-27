@@ -78,6 +78,7 @@ test('the Estimation panel runs it and records both chosen models', async ({ pag
   await identifyEffect(page)
   await chapter(page, /Estimation/)
   await page.getByRole('radio', { name: 'Boosted, cross-fitted', exact: true }).click()
+  await page.getByText('Search grid', { exact: true }).click()
   await page.getByRole('textbox', { name: 'Learning rates', exact: true }).fill('0.05, 0.15')
   await page.getByRole('textbox', { name: 'Tree depths', exact: true }).fill('1, 2')
   await page.getByRole('textbox', { name: 'Tree counts', exact: true }).fill('5, 10')

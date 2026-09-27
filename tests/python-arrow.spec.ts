@@ -49,7 +49,7 @@ test('Script Arrow transport preserves typed values and refuses lossy results', 
       const failures: Record<string, string> = {
         mixed: 'prepared=pd.DataFrame({"mixed":[1,"hello"]})',
         duplicateNames: 'prepared=pd.DataFrame([[1,2]],columns=["x","X"])',
-        invalidOutput: 'prepared=42',
+        invalidOutput: 'prepared=[1, 2, 3]',
         missingOutput: 'value=42',
         tooPrecise: 'import pyarrow as pa\nfrom decimal import Decimal\nprepared=pd.DataFrame({"amount":pd.Series([Decimal("1")],dtype=pd.ArrowDtype(pa.decimal256(50,0)))})',
         zonedNanoseconds: 'import pyarrow as pa\nprepared=pd.DataFrame({"time":pd.Series([1],dtype=pd.ArrowDtype(pa.timestamp("ns",tz="UTC")))})',

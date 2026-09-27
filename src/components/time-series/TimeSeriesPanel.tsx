@@ -18,7 +18,9 @@ import { Orb } from '@/components/ui/Orb'
 import { Select } from '@/components/ui/Select'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, chapterIntro, field, fieldLabel, fieldHint, panel, sectionTitle } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, fieldRow, panel, sectionTitle, stepsStack } from '@/components/ui/recipes'
+import { SettingsStep } from '@/components/ui/SettingsStep'
+import { cn } from '@/lib/utils'
 import { isNumericDuckDbType, type ColumnId, type DatasetProfile } from '@/domain/dataset'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { ARDL_TERMS, newTimeSeriesRunId, parseTimeSeriesRun, type ArdlTerms, type TimeSeriesRun, type TimeSeriesRunId } from '@/domain/timeSeries'
@@ -106,22 +108,31 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
     } catch (cause: unknown) { fail(cause instanceof Error ? cause.message : String(cause)) }
   }
 
-  const controls = <><fieldset disabled={job.kind === 'running'} className="m-0 grid min-w-0 grid-cols-1 items-start gap-4 border-0 p-0 @lg/panel:grid-cols-2">
+  const controls = <><fieldset disabled={job.kind === 'running'} className="m-0 mt-8 min-w-0 border-0 p-0">
     <legend className="sr-only">Model specification</legend>
-    {model === 'ardl' ? <>
-      <label className="block"><span className={fieldLabel}>Outcome series</span><Select className={field('text', 'mt-1')} value={selected[0] ?? ''} onChange={(e) => { const id = columns.find((c) => c.id === e.target.value)?.id; setSelected(id === undefined ? [] : [id, ...selected.slice(1).filter((other) => other !== id)]) }}><option value="">Choose outcome</option>{columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>
-      <label className="block"><span className={fieldLabel}>Predictor series</span><Select disabled={selected[0] === undefined} className={field('text', 'mt-1')} value={selected[1] ?? ''} onChange={(e) => { const id = columns.find((c) => c.id === e.target.value)?.id; if (selected[0] !== undefined) setSelected(id === undefined ? [selected[0]] : [selected[0], id]) }}><option value="">Choose predictor</option>{columns.filter((c) => c.id !== selected[0]).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>
-      <label className="block"><span className={fieldLabel}>Deterministic terms</span><Select className={field('text', 'mt-1')} value={terms} onChange={(e) => { const entry = Object.keys(ARDL_TERMS).find((key) => key === e.target.value); if (entry !== undefined) setTerms(entry as ArdlTerms) }}>{Object.entries(ARDL_TERMS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</Select></label>
-    </> : <>
-      <div className="min-w-0 @lg/panel:col-span-2"><ColumnChecklist title="Series in the system" help="Choose at least two series. The model estimates their relationships jointly." columns={columns} selected={selected} onChange={setSelected} /></div>
-      <label className="block"><span className={fieldLabel}>Deterministic terms</span><Select className={field('text', 'mt-1')} value={deterministic} onChange={(e) => { const value = e.target.value; if (value === 'n' || value === 'co' || value === 'ci' || value === 'coli') setDeterministic(value) }}><option value="n">None</option><option value="ci">Constant within equilibrium</option><option value="co">Constant outside equilibrium</option><option value="coli">Constant outside, trend within equilibrium</option></Select></label>
-      <label className="block"><span className={fieldLabel}>Rank-test confidence level</span><Select className={field('text', 'mt-1')} value={significance} onChange={(e) => { const value = Number(e.target.value); if (value === 90 || value === 95 || value === 99) setSignificance(value) }}><option value={90}>90%</option><option value={95}>95%</option><option value={99}>99%</option></Select></label>
-    </>}
-    <label className="block"><span className={fieldLabel}>Maximum lag</span><input type="number" min={1} max={24} className={field('text', 'mt-1')} value={maxLag} onChange={(e) => setMaxLag(Math.max(1, Math.min(24, Math.floor(Number(e.target.value) || 1))))} /></label>
-    {model==='vecm'&&<label className="block"><span className={fieldLabel}>Forecast periods</span><input type="number" min={1} max={200} className={field('text','mt-1')} placeholder="No forecast" value={forecastSteps} onChange={e=>setForecastSteps(e.target.value)} /><span className={fieldHint}>Leave blank to fit without forecasting.</span></label>}
-    {selected.length >= 2 && props.prepared.observations < minimumRows && <p role="status" className="text-body text-muted">This specification needs at least {minimumRows} prepared observations.</p>}
+    <div className={stepsStack}>
+      <SettingsStep number={1} title="Choose the series">
+        {model === 'ardl' ? <div className={fieldRow.two}>
+          <label className="block"><span className={fieldLabel}>Outcome series</span><Select className={field('text', 'mt-1')} value={selected[0] ?? ''} onChange={(e) => { const id = columns.find((c) => c.id === e.target.value)?.id; setSelected(id === undefined ? [] : [id, ...selected.slice(1).filter((other) => other !== id)]) }}><option value="">Choose outcome</option>{columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>
+          <label className="block"><span className={fieldLabel}>Predictor series</span><Select disabled={selected[0] === undefined} className={field('text', 'mt-1')} value={selected[1] ?? ''} onChange={(e) => { const id = columns.find((c) => c.id === e.target.value)?.id; if (selected[0] !== undefined) setSelected(id === undefined ? [selected[0]] : [selected[0], id]) }}><option value="">Choose predictor</option>{columns.filter((c) => c.id !== selected[0]).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select></label>
+        </div> : <div className="min-w-0"><ColumnChecklist title="Series in the system" help="Choose at least two series. The model estimates their relationships jointly." columns={columns} selected={selected} onChange={setSelected} /></div>}
+      </SettingsStep>
+      <SettingsStep number={2} title="Fit the model">
+        <div className={fieldRow.three}>
+          {model === 'ardl' ? <label className="block"><span className={fieldLabel}>Deterministic terms</span><Select className={field('text', 'mt-1')} value={terms} onChange={(e) => { const entry = Object.keys(ARDL_TERMS).find((key) => key === e.target.value); if (entry !== undefined) setTerms(entry as ArdlTerms) }}>{Object.entries(ARDL_TERMS).map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}</Select></label> : <>
+            <label className="block"><span className={fieldLabel}>Deterministic terms</span><Select className={field('text', 'mt-1')} value={deterministic} onChange={(e) => { const value = e.target.value; if (value === 'n' || value === 'co' || value === 'ci' || value === 'coli') setDeterministic(value) }}><option value="n">None</option><option value="ci">Constant within equilibrium</option><option value="co">Constant outside equilibrium</option><option value="coli">Constant outside, trend within equilibrium</option></Select></label>
+            <label className="block"><span className={fieldLabel}>Rank-test confidence level</span><Select className={field('text', 'mt-1')} value={significance} onChange={(e) => { const value = Number(e.target.value); if (value === 90 || value === 95 || value === 99) setSignificance(value) }}><option value={90}>90%</option><option value={95}>95%</option><option value={99}>99%</option></Select></label>
+          </>}
+          <label className="block"><span className={fieldLabel}>Maximum lag</span><input type="number" min={1} max={24} className={field('text', 'mt-1')} value={maxLag} onChange={(e) => setMaxLag(Math.max(1, Math.min(24, Math.floor(Number(e.target.value) || 1))))} /></label>
+        </div>
+        {selected.length >= 2 && props.prepared.observations < minimumRows && <p role="status" className="m-0 text-body text-muted">This specification needs at least {minimumRows} prepared observations.</p>}
+      </SettingsStep>
+      {model === 'vecm' && <SettingsStep number={3} title="Forecast">
+        <label className="block max-w-xs"><span className={fieldLabel}>Forecast periods</span><input type="number" min={1} max={200} className={field('text','mt-1')} placeholder="No forecast" value={forecastSteps} onChange={e=>setForecastSteps(e.target.value)} /><span className={fieldHint}>Leave blank to fit without forecasting.</span></label>
+      </SettingsStep>}
+    </div>
   </fieldset>
-  <div className="mt-4 flex flex-wrap items-center gap-3"><button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button><span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label={`${model.toUpperCase()} running`} />}</span>{job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div></>
+  <div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}><button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button><span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label={`${model.toUpperCase()} running`} />}</span>{job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div></>
 
   return <WorkbenchLayout id={`time-series-${model}`}
     bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} /> }}
@@ -131,7 +142,7 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
         {selector}
         <h3 className="mb-0 mt-3 text-body font-medium text-ink">{model === 'ardl' ? 'ARDL long-run relationship' : 'Vector error-correction model'}</h3>
-        <p className={`${fieldHint} mb-4 mt-1 max-w-[65ch]`}>{model === 'ardl' ? 'Estimate how an outcome relates to its own earlier values and to current and earlier values of another series.' : 'Estimate long-run equilibrium relationships and how changes in the series respond to departures from them.'}</p>
+        <p className={`${fieldHint} m-0 mt-1 max-w-[65ch]`}>{model === 'ardl' ? 'Estimate how an outcome relates to its own earlier values and to current and earlier values of another series.' : 'Estimate long-run equilibrium relationships and how changes in the series respond to departures from them.'}</p>
         {controls}
         <span role="status" className="sr-only">{job.kind === 'running' ? `Fitting ${model.toUpperCase()}…` : ''}</span>
         <JobNotice job={job} />

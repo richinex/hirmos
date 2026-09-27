@@ -33,7 +33,8 @@ import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { RunFold } from '@/components/ui/RunFold'
 import { CmlpLagPlot, NeuralSummaryPlot, OcsePlot, RpcmciMembershipPlot, RpcmciTimeGraphPlot, StructurePlot, TimeGraphPlot, WeightPlot } from './DiscoveryPlots'
 import { RadioList } from '@/components/ui/RadioList'
-import { button, chapterIntro, field, figureGrid, iconControl, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, figureGrid, iconControl, label, literal, num, panel, sectionTitle, well } from '@/components/ui/recipes'
+import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import type { DatasetProfile } from '@/domain/dataset'
 import type { DagDocument } from '@/domain/dag'
 import {
@@ -306,10 +307,10 @@ function JpcmciControls({ configuration, columns, onChange }: {
       : [...configuration.assignments.filter((assignment) => assignment.column !== column), { column, role }],
   })
   return (
-    <div className="mt-4 grid gap-4">
-      <div className="grid gap-3 @md/panel:grid-cols-2">
+    <div className="mt-8 grid gap-6">
+      <div className="grid gap-4 @md/panel:grid-cols-2">
         <div className="text-body text-ink">
-          <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.jpcmci.maximumLag} htmlFor="jpcmci-maximum-lag" />
+          <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.jpcmci.maximumLag} htmlFor="jpcmci-maximum-lag" />
           <Select id="jpcmci-maximum-lag" className={field('text', 'mt-1')} value={configuration.tauMax} onChange={(event) => {
             const value = lagFromValue(event.target.value)
             if (value !== null) onChange({ ...configuration, tauMax: value })
@@ -318,7 +319,7 @@ function JpcmciControls({ configuration, columns, onChange }: {
           </Select>
         </div>
         <div className="text-body text-ink">
-          <ParameterLabel label="PC alpha" help={DISCOVERY_PARAMETER_HELP.jpcmci.pcAlpha} htmlFor="jpcmci-pc-alpha" />
+          <ParameterLabel className={fieldLabel} label="PC alpha" help={DISCOVERY_PARAMETER_HELP.jpcmci.pcAlpha} htmlFor="jpcmci-pc-alpha" />
           <Select id="jpcmci-pc-alpha" className={field('text', 'mt-1')} value={configuration.pcAlpha} onChange={(event) => {
             const value = alphaFromValue(event.target.value)
             if (value !== null) onChange({ ...configuration, pcAlpha: value })
@@ -329,10 +330,10 @@ function JpcmciControls({ configuration, columns, onChange }: {
       </div>
       <div className={well('p-(--panel-space)')}>
         <h4 className="m-0 text-body font-medium text-ink">Variable roles</h4>
-        <p className="mb-3 mt-1 text-label text-faint">System variables may change across units and periods. A time context is shared by all units at a period; a unit context stays fixed within one unit.</p>
-        <div className="grid gap-2 @2xl/panel:grid-cols-2">
+        <p className={cn(fieldHint, 'mb-4 mt-1')}>System variables may change across units and periods. All units share a time context within a period, while each unit has a fixed unit context.</p>
+        <div className="grid gap-4 @2xl/panel:grid-cols-2">
           {columns.map((column) => (
-            <label key={column.id} className="text-label text-ink">{column.name}
+            <label key={column.id} className="block"><span className={fieldLabel}>{column.name}</span>
               {/* The trigger is a button, which a wrapping label does not name, so the role control names itself. */}
               <Select className={field('text', 'mt-1')} aria-label={`${column.name} role`} value={roleFor(column.id)} onChange={(event) => {
                 const role = jpcmciRoleFromValue(event.target.value)
@@ -345,9 +346,9 @@ function JpcmciControls({ configuration, columns, onChange }: {
             </label>
           ))}
         </div>
-        <div className="mt-3 grid gap-2 @md/panel:grid-cols-2">
-          <label className="flex items-center gap-2 text-label text-ink"><input type="checkbox" checked={configuration.timeDummy} onChange={(event) => onChange({ ...configuration, timeDummy: event.target.checked })} />Generate period context</label>
-          <label className="flex items-center gap-2 text-label text-ink"><input type="checkbox" checked={configuration.spaceDummy} onChange={(event) => onChange({ ...configuration, spaceDummy: event.target.checked })} />Generate unit context</label>
+        <div className="mt-4 grid gap-2 @md/panel:grid-cols-2">
+          <label className="flex items-center gap-2 text-body text-ink"><input type="checkbox" checked={configuration.timeDummy} onChange={(event) => onChange({ ...configuration, timeDummy: event.target.checked })} />Generate period context</label>
+          <label className="flex items-center gap-2 text-body text-ink"><input type="checkbox" checked={configuration.spaceDummy} onChange={(event) => onChange({ ...configuration, spaceDummy: event.target.checked })} />Generate unit context</label>
         </div>
       </div>
     </div>
@@ -381,10 +382,10 @@ function ConstraintDiscoveryControls({
     && assignedTiers.every((tier) => configuration.background.forbiddenWithinTiers.includes(tier))
 
   return (
-    <div className="mt-4 grid gap-4">
-      <div className="grid gap-3 @2xl/panel:grid-cols-4">
+    <div className="mt-8 grid gap-6">
+      <div className="grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-4">
         <div className="text-body text-ink">
-          <ParameterLabel label="Significance level" help="Edges are removed when the selected conditional-independence test does not reject independence at this level." htmlFor="constraint-alpha" />
+          <ParameterLabel className={fieldLabel} label="Significance level" help="Edges are removed if the selected conditional-independence test does not reject independence at the specified level." htmlFor="constraint-alpha" />
           <Select id="constraint-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
             const alpha = alphaFromValue(event.target.value)
             if (alpha !== null) onChange({ ...configuration, alpha })
@@ -393,14 +394,14 @@ function ConstraintDiscoveryControls({
           </Select>
         </div>
         <div className="text-body text-ink">
-          <ParameterLabel label="CI test" help="Fisher Z tests zero partial correlation under a linear Gaussian model. KCI is a kernel conditional-independence test and costs substantially more." htmlFor="constraint-ci-test" />
+          <ParameterLabel className={fieldLabel} label="CI test" help="The Fisher Z test assesses zero partial correlation under a linear Gaussian model. KCI is a kernel conditional-independence test and is more computationally intensive." htmlFor="constraint-ci-test" />
           <Select id="constraint-ci-test" className={field('text', 'mt-1')} value={configuration.ciTest} onChange={(event) => onChange({ ...configuration, ciTest: event.target.value === 'kci' ? 'kci' : 'fisherZ' })}>
             <option value="fisherZ">Fisher Z</option>
             <option value="kci">KCI</option>
           </Select>
         </div>
         <div className="text-body text-ink">
-          <ParameterLabel label="Maximum depth" help="Limits the largest conditioning set tested during skeleton discovery. Automatic continues until no larger conditioning set is available." htmlFor="constraint-depth" />
+          <ParameterLabel className={fieldLabel} label="Maximum depth" help="Sets the maximum conditioning set size tested during skeleton discovery. Automatic mode continues until no larger set is available." htmlFor="constraint-depth" />
           <Select id="constraint-depth" className={field('text', 'mt-1')} value={configuration.maxDepth ?? 'automatic'} onChange={(event) => onChange({ ...configuration, maxDepth: event.target.value === 'automatic' ? null : Number(event.target.value) })}>
             <option value="automatic">Automatic</option>
             {[0, 1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>{value}</option>)}
@@ -408,7 +409,7 @@ function ConstraintDiscoveryControls({
         </div>
         {configuration.kind === 'fci' && (
           <div className="text-body text-ink">
-            <ParameterLabel label="Maximum path length" help="Limits the discriminating and uncovered paths used by FCI orientation rules. Automatic sets no limit." htmlFor="fci-path-length" />
+            <ParameterLabel className={fieldLabel} label="Maximum path length" help="Sets a limit on the discriminating and uncovered paths used by FCI orientation rules. Automatic mode applies no limit." htmlFor="fci-path-length" />
             <Select id="fci-path-length" className={field('text', 'mt-1')} value={configuration.maxPathLength ?? 'automatic'} onChange={(event) => onChange({ ...configuration, maxPathLength: event.target.value === 'automatic' ? null : Number(event.target.value) })}>
               <option value="automatic">Automatic</option>
               {[1, 2, 3, 4, 5, 6, 8, 10].map((value) => <option key={value} value={value}>{value}</option>)}
@@ -421,7 +422,7 @@ function ConstraintDiscoveryControls({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h4 className="m-0 text-body font-medium text-ink">Background knowledge</h4>
-            <p className="mb-0 mt-1 text-label text-faint">Required and forbidden directions constrain orientation. Tiers forbid arrows from a later tier to an earlier tier.</p>
+            <p className={cn(fieldHint, 'mb-0 mt-1')}>Required and forbidden directions constrain orientation. Tiers prevent arrows from a later tier to an earlier tier.</p>
           </div>
           <div className="flex gap-2">
             <button type="button" className={button('outline', 'sm')} onClick={() => addPair('required')}>Add required</button>
@@ -429,8 +430,8 @@ function ConstraintDiscoveryControls({
           </div>
         </div>
         {(['required', 'forbidden'] as const).map((kind) => pairs(kind).length === 0 ? null : (
-          <div key={kind} className="mt-3 grid gap-2">
-            <span className={label('text-faint')}>{kind === 'required' ? 'Required directions' : 'Forbidden directions'}</span>
+          <div key={kind} className="mt-4 grid gap-2">
+            <span className={fieldLabel}>{kind === 'required' ? 'Required directions' : 'Forbidden directions'}</span>
             {pairs(kind).map(([from, to], index) => (
               <div key={`${kind}:${index}`} className="grid grid-cols-[1fr_auto_1fr_auto] items-center gap-2">
                 <Select className={field('text')} aria-label={`${kind} direction source ${index + 1}`} value={from} onChange={(event) => {
@@ -449,9 +450,13 @@ function ConstraintDiscoveryControls({
             ))}
           </div>
         ))}
-        <div className="mt-3 grid gap-2 @2xl/panel:grid-cols-3">
+        <SettingsDisclosure className="mt-4 bg-panel" title="Tiers" items={[
+          { icon: 'layers', text: assignedTiers.length === 0 ? 'no tiers assigned' : `${tiers.filter((tier) => tier !== null).length} of ${variableNames.length} variables in tiers` },
+          ...(forbidWithinTiers ? [{ icon: 'block', text: 'directions within tiers forbidden' }] : []),
+        ]}>
+        <div className="grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
           {variableNames.map((name, index) => (
-            <label key={name} className="text-label text-ink">{name}
+            <label key={name} className="block"><span className={fieldLabel}>{name}</span>
               <Select className={field('text', 'mt-1')} value={tiers[index] ?? 'none'} onChange={(event) => {
                 const next = [...tiers]
                 next[index] = event.target.value === 'none' ? null : Number(event.target.value)
@@ -464,7 +469,7 @@ function ConstraintDiscoveryControls({
           ))}
         </div>
         {assignedTiers.length > 0 && (
-          <label className="mt-3 flex items-center gap-2 text-label text-ink">
+          <label className="flex items-center gap-2 text-body text-ink">
             <input type="checkbox" checked={forbidWithinTiers} onChange={(event) => onChange({
               ...configuration,
               background: { ...configuration.background, forbiddenWithinTiers: event.target.checked ? assignedTiers : [] },
@@ -472,6 +477,7 @@ function ConstraintDiscoveryControls({
             Forbid directions within assigned tiers
           </label>
         )}
+        </SettingsDisclosure>
       </div>
     </div>
   )
@@ -496,62 +502,66 @@ function RpcmciControls({ configuration, onChange }: {
     if (Number.isFinite(value)) onChange({ ...configuration, [fieldName]: value })
   }
   return (
-    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+    <div className="mt-8 grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
       <div className="text-body text-ink">
-        <ParameterLabel label="Regimes" help={DISCOVERY_PARAMETER_HELP.rpcmci.regimes} htmlFor="rpcmci-regimes" />
+        <ParameterLabel className={fieldLabel} label="Regimes" help={DISCOVERY_PARAMETER_HELP.rpcmci.regimes} htmlFor="rpcmci-regimes" />
         <Select id="rpcmci-regimes" className={field('text', 'mt-1')} value={configuration.numRegimes} onChange={(event) => changeNumber('numRegimes', Number(event.target.value))}>
           {[2, 3, 4, 5, 6].map((value) => <option key={value} value={value}>{value}</option>)}
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Maximum transitions" help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumTransitions} htmlFor="rpcmci-maximum-transitions" />
+        <ParameterLabel className={fieldLabel} label="Maximum transitions" help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumTransitions} htmlFor="rpcmci-maximum-transitions" />
         <input id="rpcmci-maximum-transitions" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.maxTransitions} onChange={(event) => changeNumber('maxTransitions', event.currentTarget.valueAsNumber)} />
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumLag} htmlFor="rpcmci-maximum-lag" />
+        <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.maximumLag} htmlFor="rpcmci-maximum-lag" />
         <Select id="rpcmci-maximum-lag" className={field('text', 'mt-1')} value={configuration.tauMax} onChange={(event) => changeNumber('tauMax', Number(event.target.value))}>
           {DISCOVERY_LAG_OPTIONS.filter((value) => value <= 6).map((value) => <option key={value} value={value}>{value}</option>)}
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Graph alpha" help={DISCOVERY_PARAMETER_HELP.rpcmci.graphAlpha} htmlFor="rpcmci-graph-alpha" />
+        <ParameterLabel className={fieldLabel} label="Graph alpha" help={DISCOVERY_PARAMETER_HELP.rpcmci.graphAlpha} htmlFor="rpcmci-graph-alpha" />
         <Select id="rpcmci-graph-alpha" className={field('text', 'mt-1')} value={configuration.alphaLevel} onChange={(event) => changeNumber('alphaLevel', Number(event.target.value))}>
           {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
         </Select>
       </div>
-      <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
-        <DisclosureSummary className="cursor-pointer text-body text-ink">Annealing and conditional-independence settings</DisclosureSummary>
-        <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+      <SettingsDisclosure className="@md/panel:col-span-2 @2xl/panel:col-span-3" title="Annealing and conditional-independence settings" items={[
+        { icon: 'history', text: `minimum lag ${configuration.tauMin}` },
+        { icon: 'tune', text: `PC alpha ${configuration.pcAlpha}` },
+        { icon: 'repeat', text: `${configuration.maxAnneal} annealing runs` },
+        { icon: 'tag', text: `seed ${configuration.seed}` },
+      ]}>
+        <div className="grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
           <div className="text-body text-ink">
-            <ParameterLabel label="Minimum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.minimumLag} htmlFor="rpcmci-minimum-lag" />
+            <ParameterLabel className={fieldLabel} label="Minimum lag" help={DISCOVERY_PARAMETER_HELP.rpcmci.minimumLag} htmlFor="rpcmci-minimum-lag" />
             <Select id="rpcmci-minimum-lag" className={field('text', 'mt-1')} value={configuration.tauMin} onChange={(event) => changeNumber('tauMin', Number(event.target.value))}>
               {Array.from({ length: configuration.tauMax + 1 }, (_, value) => value).map((value) => <option key={value} value={value}>{value}</option>)}
             </Select>
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="PC alpha" help={DISCOVERY_PARAMETER_HELP.rpcmci.pcAlpha} htmlFor="rpcmci-pc-alpha" />
+            <ParameterLabel className={fieldLabel} label="PC alpha" help={DISCOVERY_PARAMETER_HELP.rpcmci.pcAlpha} htmlFor="rpcmci-pc-alpha" />
             <Select id="rpcmci-pc-alpha" className={field('text', 'mt-1')} value={configuration.pcAlpha} onChange={(event) => changeNumber('pcAlpha', Number(event.target.value))}>
               {PCMCI_ALPHA_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
             </Select>
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Switching threshold" help={DISCOVERY_PARAMETER_HELP.rpcmci.switchingThreshold} htmlFor="rpcmci-switching-threshold" />
+            <ParameterLabel className={fieldLabel} label="Switching threshold" help={DISCOVERY_PARAMETER_HELP.rpcmci.switchingThreshold} htmlFor="rpcmci-switching-threshold" />
             <input id="rpcmci-switching-threshold" className={field('text', 'mt-1')} type="number" min={0} max={1} step={0.01} value={configuration.switchThres} onChange={(event) => changeNumber('switchThres', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Iterations per annealing" help={DISCOVERY_PARAMETER_HELP.rpcmci.iterationsPerAnnealing} htmlFor="rpcmci-iterations" />
+            <ParameterLabel className={fieldLabel} label="Iterations per annealing" help={DISCOVERY_PARAMETER_HELP.rpcmci.iterationsPerAnnealing} htmlFor="rpcmci-iterations" />
             <input id="rpcmci-iterations" className={field('text', 'mt-1')} type="number" min={1} max={100} step={1} value={configuration.numIterations} onChange={(event) => changeNumber('numIterations', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Annealing runs" help={DISCOVERY_PARAMETER_HELP.rpcmci.annealingRuns} htmlFor="rpcmci-annealing-runs" />
+            <ParameterLabel className={fieldLabel} label="Annealing runs" help={DISCOVERY_PARAMETER_HELP.rpcmci.annealingRuns} htmlFor="rpcmci-annealing-runs" />
             <input id="rpcmci-annealing-runs" className={field('text', 'mt-1')} type="number" min={1} max={50} step={1} value={configuration.maxAnneal} onChange={(event) => changeNumber('maxAnneal', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.rpcmci.seed} htmlFor="rpcmci-seed" />
+            <ParameterLabel className={fieldLabel} label="Seed" help={DISCOVERY_PARAMETER_HELP.rpcmci.seed} htmlFor="rpcmci-seed" />
             <input id="rpcmci-seed" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
           </div>
         </div>
-      </details>
+      </SettingsDisclosure>
     </div>
   )
 }
@@ -573,9 +583,9 @@ function CdnotsControls({ configuration, onChange }: {
   readonly onChange: (configuration: CdnotsConfiguration) => void
 }) {
   return (
-    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
+    <div className="mt-8 grid gap-4 @md/panel:grid-cols-2">
       <div className="text-body text-ink">
-        <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.cdnots.maximumLag} htmlFor="cdnots-maximum-lag" />
+        <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.cdnots.maximumLag} htmlFor="cdnots-maximum-lag" />
         <Select id="cdnots-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
           const maxLag = lagFromValue(event.target.value)
           if (maxLag !== null) onChange({ ...configuration, maxLag })
@@ -584,7 +594,7 @@ function CdnotsControls({ configuration, onChange }: {
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Alpha" help={DISCOVERY_PARAMETER_HELP.cdnots.alpha} htmlFor="cdnots-alpha" />
+        <ParameterLabel className={fieldLabel} label="Alpha" help={DISCOVERY_PARAMETER_HELP.cdnots.alpha} htmlFor="cdnots-alpha" />
         <Select id="cdnots-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
           const alpha = alphaFromValue(event.target.value)
           if (alpha !== null) onChange({ ...configuration, alpha })
@@ -593,7 +603,7 @@ function CdnotsControls({ configuration, onChange }: {
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Missing observations" help={DISCOVERY_PARAMETER_HELP.cdnots.missing} htmlFor="cdnots-missing" />
+        <ParameterLabel className={fieldLabel} label="Missing observations" help={DISCOVERY_PARAMETER_HELP.cdnots.missing} htmlFor="cdnots-missing" />
         <Select id="cdnots-missing" className={field('text', 'mt-1')} value={configuration.missing} onChange={(event) => {
           const missing = event.target.value
           if (missing === 'pairwiseComplete' || missing === 'varEm') onChange({ ...configuration, missing })
@@ -603,7 +613,7 @@ function CdnotsControls({ configuration, onChange }: {
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Time context" help={DISCOVERY_PARAMETER_HELP.cdnots.context} htmlFor="cdnots-context" />
+        <ParameterLabel className={fieldLabel} label="Time context" help={DISCOVERY_PARAMETER_HELP.cdnots.context} htmlFor="cdnots-context" />
         <Select id="cdnots-context" className={field('text', 'mt-1')} value={configuration.context} onChange={(event) => {
           const option = CDN_CONTEXT_OPTIONS.find(({ value }) => value === event.target.value)
           if (option !== undefined) onChange({ ...configuration, context: option.value })
@@ -625,9 +635,9 @@ function GraceControls({ configuration, onChange }: {
     if (Number.isFinite(value)) onChange({ ...configuration, [fieldName]: value })
   }
   return (
-    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+    <div className="mt-8 grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
       <div className="text-body text-ink">
-        <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.grace.maximumLag} htmlFor="grace-maximum-lag" />
+        <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.grace.maximumLag} htmlFor="grace-maximum-lag" />
         <Select id="grace-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
           const maxLag = lagFromValue(event.target.value)
           if (maxLag !== null) onChange({ ...configuration, maxLag })
@@ -636,7 +646,7 @@ function GraceControls({ configuration, onChange }: {
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Skeleton alpha" help={DISCOVERY_PARAMETER_HELP.grace.alpha} htmlFor="grace-alpha" />
+        <ParameterLabel className={fieldLabel} label="Skeleton alpha" help={DISCOVERY_PARAMETER_HELP.grace.alpha} htmlFor="grace-alpha" />
         <Select id="grace-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
           const alpha = alphaFromValue(event.target.value)
           if (alpha !== null) onChange({ ...configuration, alpha })
@@ -645,7 +655,7 @@ function GraceControls({ configuration, onChange }: {
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Time context" help={DISCOVERY_PARAMETER_HELP.grace.context} htmlFor="grace-context" />
+        <ParameterLabel className={fieldLabel} label="Time context" help={DISCOVERY_PARAMETER_HELP.grace.context} htmlFor="grace-context" />
         <Select id="grace-context" className={field('text', 'mt-1')} value={configuration.context} onChange={(event) => {
           const option = CDN_CONTEXT_OPTIONS.find(({ value }) => value === event.target.value)
           if (option !== undefined) onChange({ ...configuration, context: option.value })
@@ -654,26 +664,29 @@ function GraceControls({ configuration, onChange }: {
         </Select>
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Gate threshold" help={DISCOVERY_PARAMETER_HELP.grace.gateThreshold} htmlFor="grace-gate-threshold" />
+        <ParameterLabel className={fieldLabel} label="Gate threshold" help={DISCOVERY_PARAMETER_HELP.grace.gateThreshold} htmlFor="grace-gate-threshold" />
         <input id="grace-gate-threshold" className={field('text', 'mt-1')} type="number" min={0} max={1} step={0.05} value={configuration.gateThreshold} onChange={(event) => changeNumber('gateThreshold', event.currentTarget.valueAsNumber)} />
       </div>
-      <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
-        <DisclosureSummary className="cursor-pointer text-body text-ink">Training settings</DisclosureSummary>
-        <div className="mt-3 grid gap-3 @md/panel:grid-cols-3">
+      <SettingsDisclosure className="@md/panel:col-span-2 @2xl/panel:col-span-3" title="Training settings" items={[
+        { icon: 'repeat', text: `${configuration.epochs} epochs` },
+        { icon: 'hourglass_empty', text: `patience ${configuration.patience}` },
+        { icon: 'tag', text: `seed ${configuration.seed}` },
+      ]}>
+        <div className="grid gap-4 @md/panel:grid-cols-3">
           <div className="text-body text-ink">
-            <ParameterLabel label="Epochs" help={DISCOVERY_PARAMETER_HELP.grace.epochs} htmlFor="grace-epochs" />
+            <ParameterLabel className={fieldLabel} label="Epochs" help={DISCOVERY_PARAMETER_HELP.grace.epochs} htmlFor="grace-epochs" />
             <input id="grace-epochs" className={field('text', 'mt-1')} type="number" min={1} max={5000} step={1} value={configuration.epochs} onChange={(event) => changeNumber('epochs', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Patience" help={DISCOVERY_PARAMETER_HELP.grace.patience} htmlFor="grace-patience" />
+            <ParameterLabel className={fieldLabel} label="Patience" help={DISCOVERY_PARAMETER_HELP.grace.patience} htmlFor="grace-patience" />
             <input id="grace-patience" className={field('text', 'mt-1')} type="number" min={1} max={configuration.epochs} step={1} value={configuration.patience} onChange={(event) => changeNumber('patience', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.grace.seed} htmlFor="grace-seed" />
+            <ParameterLabel className={fieldLabel} label="Seed" help={DISCOVERY_PARAMETER_HELP.grace.seed} htmlFor="grace-seed" />
             <input id="grace-seed" className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
           </div>
         </div>
-      </details>
+      </SettingsDisclosure>
     </div>
   )
 }
@@ -692,10 +705,10 @@ function NeuralControls({ configuration, onChange }: {
   }
   const prefix = configuration.kind
   return (
-    <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+    <div className="mt-8 grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
       {configuration.kind === 'cmlp' ? (
         <div className="text-body text-ink">
-          <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.neural.maximumLag} htmlFor="cmlp-lag" />
+          <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.neural.maximumLag} htmlFor="cmlp-lag" />
           <Select id="cmlp-lag" className={field('text', 'mt-1')} value={configuration.lag} onChange={(event) => {
             const value = lagFromValue(event.target.value)
             if (value !== null) onChange({ ...configuration, lag: value })
@@ -705,7 +718,7 @@ function NeuralControls({ configuration, onChange }: {
         </div>
       ) : (
         <div className="text-body text-ink">
-          <ParameterLabel label="Context length" help={DISCOVERY_PARAMETER_HELP.neural.context} htmlFor="clstm-context" />
+          <ParameterLabel className={fieldLabel} label="Context length" help={DISCOVERY_PARAMETER_HELP.neural.context} htmlFor="clstm-context" />
           <input id="clstm-context" className={field('text', 'mt-1')} type="number" min={1} max={100} step={1} value={configuration.context} onChange={(event) => {
             const context = event.currentTarget.valueAsNumber
             if (Number.isFinite(context)) onChange({ ...configuration, context })
@@ -713,7 +726,7 @@ function NeuralControls({ configuration, onChange }: {
         </div>
       )}
       <div className="text-body text-ink">
-        <ParameterLabel label="Hidden width" help={DISCOVERY_PARAMETER_HELP.neural.hiddenWidth} htmlFor={`${prefix}-hidden`} />
+        <ParameterLabel className={fieldLabel} label="Hidden width" help={DISCOVERY_PARAMETER_HELP.neural.hiddenWidth} htmlFor={`${prefix}-hidden`} />
         <input id={`${prefix}-hidden`} className={field('text', 'mt-1')} type="number" min={1} max={256} step={1} value={configuration.kind === 'cmlp' ? configuration.hidden[0] : configuration.hidden} onChange={(event) => {
           const value = event.currentTarget.valueAsNumber
           if (!Number.isFinite(value)) return
@@ -721,13 +734,13 @@ function NeuralControls({ configuration, onChange }: {
         }} />
       </div>
       <div className="text-body text-ink">
-        <ParameterLabel label="Sparsity λ" help={DISCOVERY_PARAMETER_HELP.neural.sparsity} htmlFor={`${prefix}-lambda`} />
+        <ParameterLabel className={fieldLabel} label="Sparsity λ" help={DISCOVERY_PARAMETER_HELP.neural.sparsity} htmlFor={`${prefix}-lambda`} />
         <input id={`${prefix}-lambda`} className={field('text', 'mt-1')} type="number" min={0} step={0.001} value={configuration.lambda} onChange={(event) => changeNumber('lambda', event.currentTarget.valueAsNumber)} />
       </div>
       {configuration.kind === 'cmlp' && (
         <>
           <div className="text-body text-ink">
-            <ParameterLabel label="Activation" help={DISCOVERY_PARAMETER_HELP.neural.activation} htmlFor="cmlp-activation" />
+            <ParameterLabel className={fieldLabel} label="Activation" help={DISCOVERY_PARAMETER_HELP.neural.activation} htmlFor="cmlp-activation" />
             <Select id="cmlp-activation" className={field('text', 'mt-1')} value={configuration.activation} onChange={(event) => {
               const activation = event.target.value
               if (activation === 'sigmoid' || activation === 'tanh' || activation === 'relu' || activation === 'leakyRelu' || activation === 'identity') onChange({ ...configuration, activation })
@@ -740,7 +753,7 @@ function NeuralControls({ configuration, onChange }: {
             </Select>
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Structured penalty" help={DISCOVERY_PARAMETER_HELP.neural.penalty} htmlFor="cmlp-penalty" />
+            <ParameterLabel className={fieldLabel} label="Structured penalty" help={DISCOVERY_PARAMETER_HELP.neural.penalty} htmlFor="cmlp-penalty" />
             <Select id="cmlp-penalty" className={field('text', 'mt-1')} value={configuration.penalty} onChange={(event) => {
               const penalty = event.target.value
               if (penalty === 'groupLasso' || penalty === 'groupSparseGroupLasso' || penalty === 'hierarchical') onChange({ ...configuration, penalty })
@@ -752,35 +765,38 @@ function NeuralControls({ configuration, onChange }: {
           </div>
         </>
       )}
-      <details className={well('@md/panel:col-span-2 @2xl/panel:col-span-3 px-3 py-2')}>
-        <DisclosureSummary className="cursor-pointer text-body text-ink">Training settings</DisclosureSummary>
-        <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
+      <SettingsDisclosure className="@md/panel:col-span-2 @2xl/panel:col-span-3" title="Training settings" items={[
+        { icon: 'speed', text: `learning rate ${configuration.learningRate}` },
+        { icon: 'repeat', text: `${configuration.maxIter} iterations` },
+        { icon: 'tag', text: `seed ${configuration.seed}` },
+      ]}>
+        <div className="grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
           <div className="text-body text-ink">
-            <ParameterLabel label="Ridge λ" help={DISCOVERY_PARAMETER_HELP.neural.ridge} htmlFor={`${prefix}-ridge`} />
+            <ParameterLabel className={fieldLabel} label="Ridge λ" help={DISCOVERY_PARAMETER_HELP.neural.ridge} htmlFor={`${prefix}-ridge`} />
             <input id={`${prefix}-ridge`} className={field('text', 'mt-1')} type="number" min={0} step={0.001} value={configuration.ridgeLambda} onChange={(event) => changeNumber('ridgeLambda', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Learning rate" help={DISCOVERY_PARAMETER_HELP.neural.learningRate} htmlFor={`${prefix}-learning-rate`} />
+            <ParameterLabel className={fieldLabel} label="Learning rate" help={DISCOVERY_PARAMETER_HELP.neural.learningRate} htmlFor={`${prefix}-learning-rate`} />
             <input id={`${prefix}-learning-rate`} className={field('text', 'mt-1')} type="number" min={0.000001} step={0.001} value={configuration.learningRate} onChange={(event) => changeNumber('learningRate', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Maximum iterations" help={DISCOVERY_PARAMETER_HELP.neural.iterations} htmlFor={`${prefix}-iterations`} />
+            <ParameterLabel className={fieldLabel} label="Maximum iterations" help={DISCOVERY_PARAMETER_HELP.neural.iterations} htmlFor={`${prefix}-iterations`} />
             <input id={`${prefix}-iterations`} className={field('text', 'mt-1')} type="number" min={1} max={configuration.kind === 'cmlp' ? 50_000 : 20_000} step={1} value={configuration.maxIter} onChange={(event) => changeNumber('maxIter', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Check every" help={DISCOVERY_PARAMETER_HELP.neural.checkEvery} htmlFor={`${prefix}-check-every`} />
+            <ParameterLabel className={fieldLabel} label="Check every" help={DISCOVERY_PARAMETER_HELP.neural.checkEvery} htmlFor={`${prefix}-check-every`} />
             <input id={`${prefix}-check-every`} className={field('text', 'mt-1')} type="number" min={1} max={configuration.maxIter} step={1} value={configuration.checkEvery} onChange={(event) => changeNumber('checkEvery', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Early-stop lookback" help={DISCOVERY_PARAMETER_HELP.neural.lookback} htmlFor={`${prefix}-lookback`} />
+            <ParameterLabel className={fieldLabel} label="Early-stop lookback" help={DISCOVERY_PARAMETER_HELP.neural.lookback} htmlFor={`${prefix}-lookback`} />
             <input id={`${prefix}-lookback`} className={field('text', 'mt-1')} type="number" min={1} step={1} value={configuration.lookback} onChange={(event) => changeNumber('lookback', event.currentTarget.valueAsNumber)} />
           </div>
           <div className="text-body text-ink">
-            <ParameterLabel label="Seed" help={DISCOVERY_PARAMETER_HELP.neural.seed} htmlFor={`${prefix}-seed`} />
+            <ParameterLabel className={fieldLabel} label="Seed" help={DISCOVERY_PARAMETER_HELP.neural.seed} htmlFor={`${prefix}-seed`} />
             <input id={`${prefix}-seed`} className={field('text', 'mt-1')} type="number" min={0} step={1} value={configuration.seed} onChange={(event) => changeNumber('seed', event.currentTarget.valueAsNumber)} />
           </div>
         </div>
-      </details>
+      </SettingsDisclosure>
     </div>
   )
 }
@@ -925,7 +941,7 @@ function TimeGraphResult({ run, current }: { readonly current: boolean; readonly
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <StructurePlot run={run} label={`${methodLabel} structure`} />
       <TimeGraphPlot run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">Empty marks appear as “—”. {isLpcmci ? 'The legend under the structure view defines each mark.' : 'Unoriented same-period links keep the o-o mark.'}</p>
+      <p className="mb-3 mt-3 text-body text-muted">Empty marks appear as “—”. {isLpcmci ? 'The legend below the structure view defines each mark.' : 'Unoriented same-period links retain the o-o mark.'}</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title={tableLabel}
@@ -977,7 +993,7 @@ function JpcmciResult({ run, current }: { readonly current: boolean; readonly ru
     <ResultCard run={run} current={current} method="J-PCMCI+ with ParCorrMult" title={<>Joint panel time-series CPDAG evidence</>} meta={<><Metadata><span>{run.result.datasets} units × {run.result.periods} periods</span><span>{run.result.observedVariables} observed variables</span><span>maximum lag {run.result.tauMax}</span><span>alpha {run.result.pcAlpha}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <StructurePlot run={run} label="J-PCMCI+ joint structure" />
-      <p className="mb-3 mt-3 text-body text-muted">Generated period and unit contexts remain visible as auxiliary nodes. Only relations between observed columns can be taken into the editable DAG workspace.</p>
+      <p className="mb-3 mt-3 text-body text-muted">Generated period and unit contexts remain visible as auxiliary nodes. You can add only relations between observed columns to the editable DAG workspace.</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title="J-PCMCI+ raw evidence"
@@ -1045,7 +1061,7 @@ function RpcmciResult({ run, current }: { readonly current: boolean; readonly ru
       </div>
       <StructurePlot run={run} regime={regime} label={`RPCMCI regime ${regime + 1} structure`} />
       <RpcmciTimeGraphPlot run={run} regime={regime} />
-      <p className="mb-3 mt-3 text-body text-muted">The selected regime changes both the graph and its partial-correlation matrix. Regime numbers are labels and may be exchanged without changing the fitted model.</p>
+      <p className="mb-3 mt-3 text-body text-muted">Selecting a regime changes the displayed graph and partial-correlation matrix. Regime numbers serve as labels and can be exchanged without affecting the fitted model.</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title={`RPCMCI regime ${regime + 1} raw evidence`}
@@ -1087,7 +1103,7 @@ function CdnotsResult({ run, current }: { readonly current: boolean; readonly ru
     <ResultCard run={run} current={current} method={`${method} with ParCorr`} title={<>Nonstationary time-graph evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.observedVariables} observed variables</span><span>maximum lag {run.result.maxLag}</span><span>{context}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <StructurePlot run={run} label={`${method} structure`} />
-      <p className="mb-3 mt-3 text-body text-muted">Generated context nodes appear in this evidence graph but are not dataset columns and cannot be copied into the editable DAG.</p>
+      <p className="mb-3 mt-3 text-body text-muted">Generated context nodes appear in this evidence graph, but they are not dataset columns and cannot be copied into the editable DAG.</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title={`${method} raw evidence`}
@@ -1129,7 +1145,7 @@ function GraceResult({ run, current }: { readonly current: boolean; readonly run
         <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Final loss</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{finalLoss === undefined ? '—' : statistic(finalLoss)}</dd></div>
         <div className="bg-panel px-3 py-2"><dt className={label('text-faint')}>Final RMSE</dt><dd className={num('m-0 mt-1 text-title text-ink')}>{finalRmse === undefined ? '—' : statistic(finalRmse)}</dd></div>
       </dl>
-      <p className="mb-3 mt-3 text-body text-muted">The skeleton limits which links can be trained. A link is retained when its fitted hard-concrete gate meets the recorded threshold. {run.result.imputedCells === 0 ? 'The neural input contained no missing cells.' : `VAR-EM filled ${formatCount(run.result.imputedCells).text} missing cells before the dense neural windows were constructed.`}</p>
+      <p className="mb-3 mt-3 text-body text-muted">The skeleton restricts which links can be trained. A link is retained if its fitted hard-concrete gate meets the recorded threshold. {run.result.imputedCells === 0 ? 'The neural input contained no missing cells.' : `VAR-EM filled ${formatCount(run.result.imputedCells).text} missing cells before the dense neural windows were constructed.`}</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title="GRACE gate values"
@@ -1159,7 +1175,7 @@ function DynotearsResult({ run, current }: { readonly current: boolean; readonly
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
       <StructurePlot run={run} label="DYNOTEARS structure" />
       <WeightPlot run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">All fitted weights are retained without a display threshold. Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
+      <p className="mb-3 mt-3 text-body text-muted">All fitted weights are retained without a display threshold. Lag 0 is contemporaneous; each row denotes source(t−lag) → target(t).</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title="DYNOTEARS raw weights"
@@ -1186,7 +1202,7 @@ function VarLingamResult({ run, current }: { readonly current: boolean; readonly
       <p className={num('mb-3 mt-0 text-body text-ink')} aria-label="VAR-LiNGAM causal order">{order.join(' → ')}</p>
       <StructurePlot run={run} label="VAR-LiNGAM structure" />
       <WeightPlot run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">Lag 0 is contemporaneous; a row denotes source(t−lag) → target(t).</p>
+      <p className="mb-3 mt-3 text-body text-muted">Lag 0 is contemporaneous; each row denotes source(t−lag) → target(t).</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title="VAR-LiNGAM raw weights"
@@ -1247,7 +1263,7 @@ function OcseResult({ run, current }: { readonly current: boolean; readonly run:
         rows={rows}
         rowKey={(row) => row.key}
         noun="edge"
-        empty="No edge survived forward and backward selection."
+        empty="No edges remained after forward and backward selection."
         columns={[...linkColumns<typeof rows[number]>(), figureColumn<typeof rows[number]>('cmi', 'CMI', (row) => row.cmi), figureColumn<typeof rows[number]>('p', 'p-value', (row) => row.pValue, pValue)]}
       />
     </ResultCard>
@@ -1333,11 +1349,11 @@ function CmlpResult({ run, current }: { readonly current: boolean; readonly run:
   return (
     <ResultCard run={run} current={current} method="cMLP" title={<>Lag-resolved neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>maximum lag {run.result.lag}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
+      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and scaled by its recorded population standard deviation before training.</p>
       <StructurePlot run={run} label="cMLP lag-resolved relations" />
       <NeuralSummaryPlot run={run} />
       <CmlpLagPlot run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">A selected row means the source’s past at that lag contributes to predicting the target under the fitted component-wise network and sparsity penalty.</p>
+      <p className="mb-3 mt-3 text-body text-muted">A selected row indicates that the source’s past at that lag contributes to predicting the target under the fitted component-wise network and sparsity penalty.</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title="cMLP lag-group scores"
@@ -1366,9 +1382,9 @@ function ClstmResult({ run, current }: { readonly current: boolean; readonly run
   return (
     <ResultCard run={run} current={current} method="cLSTM" title={<>Window-level neural Granger evidence</>} meta={<><Metadata><span>{formatCount(run.result.observations).text} rows</span><span>{run.result.variables} variables</span><span>context {run.result.context}</span><span>{run.result.iterations} ISTA iterations</span><span>seed {run.result.seed}</span></Metadata></>}>
       <p className="mb-0 mt-3 text-body"><ResultEligibility eligibility={run.eligibility} /></p>
-      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and divided by its recorded population standard deviation before training.</p>
+      <p className="mb-0 mt-3 text-body text-muted">Each selected column was centered and scaled by its recorded population standard deviation before training.</p>
       <NeuralSummaryPlot run={run} />
-      <p className="mb-3 mt-3 text-body text-muted">cLSTM selects whether a source history helps predict a target. It does not select an individual lag, so Hirmos does not render this result as a lag graph.</p>
+      <p className="mb-3 mt-3 text-body text-muted">cLSTM selects source histories that help predict a target under the fitted model and sparsity penalty. It does not select individual lags, so Hirmos does not display this result as a lag graph.</p>
       <EvidenceTable<typeof rows[number]>
         frame="none"
         title="cLSTM input-group scores"
@@ -1854,7 +1870,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
       </section>
       {selectedMethodIsVisible
         ? <MethodCaveats methods={[method]} eligibility={eligibility} />
-        : <p className="m-0 text-body text-faint">Choose a method from this family to review its requirements.</p>}
+        : <p className="m-0 text-body text-faint">Select a method from this family to review its requirements.</p>}
     </div>
   )
 
@@ -1862,7 +1878,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     <section aria-labelledby="discovery-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="discovery-title" className="mb-2">Causal discovery</ChapterHeading>
-        <p className={chapterIntro}>Causal discovery uses patterns in data to propose relations between variables, including same-period and lagged relations when time is part of the study. In this chapter, choose a method suited to the observation structure and compare the candidate relations it produces. The result depends on the method's assumptions and does not establish a causal graph on its own.</p>
+        <p className={chapterIntro}>Causal discovery uses data patterns to propose relationships between variables, including same-period and lagged relations when time is considered. In this chapter, select a method suited to the observation structure and compare the candidate relationships it produces. The results depend on the method’s assumptions and do not independently establish a causal graph.</p>
       </div>
 
       <div className="grid gap-4">
@@ -1889,7 +1905,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             onChange={(method) => dispatch({ type: 'method-selected', method })}
             options={methodOptions}
           />
-          {!selectedMethodIsVisible && <p className="mb-0 mt-3 text-body text-faint">Choose a method from this family to configure it.</p>}
+          {!selectedMethodIsVisible && <p className="mb-0 mt-3 text-body text-faint">Select a method from this family to configure it.</p>}
 
           {selectedMethodIsVisible && (
             <>
@@ -1902,9 +1918,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             />
           )}
           {(configuration.kind === 'pcmci-plus' || configuration.kind === 'lpcmci') && (
-            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
+            <div className="mt-8 grid gap-4 @md/panel:grid-cols-2">
               <div className="text-body text-ink">
-                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.pcmci.maximumLag} htmlFor="pcmci-maximum-lag" />
+                <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.pcmci.maximumLag} htmlFor="pcmci-maximum-lag" />
                 <Select
                   id="pcmci-maximum-lag"
                   className={field('text', 'mt-1')}
@@ -1918,7 +1934,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
               <div className="text-body text-ink">
-                <ParameterLabel label="PC alpha" help={DISCOVERY_PARAMETER_HELP.pcmci.pcAlpha} htmlFor="pcmci-pc-alpha" />
+                <ParameterLabel className={fieldLabel} label="PC alpha" help={DISCOVERY_PARAMETER_HELP.pcmci.pcAlpha} htmlFor="pcmci-pc-alpha" />
                 <Select
                   id="pcmci-pc-alpha"
                   className={field('text', 'mt-1')}
@@ -1960,9 +1976,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           )}
 
           {configuration.kind === 'dynotears' && (
-            <div className="mt-4 grid gap-3 @2xl/panel:grid-cols-3">
+            <div className="mt-8 grid gap-4 @md/panel:grid-cols-2 @2xl/panel:grid-cols-3">
               <div className="text-body text-ink">
-                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.dynotears.maximumLag} htmlFor="dynotears-maximum-lag" />
+                <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.dynotears.maximumLag} htmlFor="dynotears-maximum-lag" />
                 <Select id="dynotears-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
@@ -1971,7 +1987,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
               <div className="text-body text-ink">
-                <ParameterLabel label="Contemporaneous λ" help={DISCOVERY_PARAMETER_HELP.dynotears.contemporaneousPenalty} htmlFor="dynotears-contemporaneous-penalty" />
+                <ParameterLabel className={fieldLabel} label="Contemporaneous λ" help={DISCOVERY_PARAMETER_HELP.dynotears.contemporaneousPenalty} htmlFor="dynotears-contemporaneous-penalty" />
                 <Select id="dynotears-contemporaneous-penalty" className={field('text', 'mt-1')} value={configuration.lambdaW} onChange={(event) => {
                   const value = penaltyFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'dynotears-lambda-w-selected', value })
@@ -1980,7 +1996,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
               <div className="text-body text-ink">
-                <ParameterLabel label="Lagged λ" help={DISCOVERY_PARAMETER_HELP.dynotears.laggedPenalty} htmlFor="dynotears-lagged-penalty" />
+                <ParameterLabel className={fieldLabel} label="Lagged λ" help={DISCOVERY_PARAMETER_HELP.dynotears.laggedPenalty} htmlFor="dynotears-lagged-penalty" />
                 <Select id="dynotears-lagged-penalty" className={field('text', 'mt-1')} value={configuration.lambdaA} onChange={(event) => {
                   const value = penaltyFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'dynotears-lambda-a-selected', value })
@@ -1992,9 +2008,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           )}
 
           {configuration.kind === 'var-lingam' && (
-            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
+            <div className="mt-8 grid gap-4 @md/panel:grid-cols-2">
               <div className="text-body text-ink">
-                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.varLingam.maximumLag} htmlFor="var-lingam-maximum-lag" />
+                <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.varLingam.maximumLag} htmlFor="var-lingam-maximum-lag" />
                 <Select id="var-lingam-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
@@ -2016,9 +2032,9 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           )}
 
           {configuration.kind === 'ocse' && (
-            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2">
+            <div className="mt-8 grid gap-4 @md/panel:grid-cols-2">
               <div className="text-body text-ink">
-                <ParameterLabel label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.ocse.maximumLag} htmlFor="ocse-maximum-lag" />
+                <ParameterLabel className={fieldLabel} label="Maximum lag" help={DISCOVERY_PARAMETER_HELP.ocse.maximumLag} htmlFor="ocse-maximum-lag" />
                 <Select id="ocse-maximum-lag" className={field('text', 'mt-1')} value={configuration.maxLag} onChange={(event) => {
                   const value = lagFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'max-lag-selected', value })
@@ -2027,7 +2043,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
               <div className="text-body text-ink">
-                <ParameterLabel label="Information estimator" help={DISCOVERY_PARAMETER_HELP.ocse.informationEstimator} htmlFor="ocse-information-estimator" />
+                <ParameterLabel className={fieldLabel} label="Information estimator" help={DISCOVERY_PARAMETER_HELP.ocse.informationEstimator} htmlFor="ocse-information-estimator" />
                 <Select id="ocse-information-estimator" className={field('text', 'mt-1')} value={configuration.method} onChange={(event) => {
                   if (event.target.value === 'gaussian' || event.target.value === 'knn') dispatch({ type: 'ocse-method-selected', value: event.target.value })
                 }}>
@@ -2036,7 +2052,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
               <div className="text-body text-ink">
-                <ParameterLabel label="Test alpha" help={DISCOVERY_PARAMETER_HELP.ocse.testAlpha} htmlFor="ocse-test-alpha" />
+                <ParameterLabel className={fieldLabel} label="Test alpha" help={DISCOVERY_PARAMETER_HELP.ocse.testAlpha} htmlFor="ocse-test-alpha" />
                 <Select id="ocse-test-alpha" className={field('text', 'mt-1')} value={configuration.alpha} onChange={(event) => {
                   const value = alphaFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'ocse-alpha-selected', value })
@@ -2045,7 +2061,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
                 </Select>
               </div>
               <div className="text-body text-ink">
-                <ParameterLabel label="Permutation shuffles" help={DISCOVERY_PARAMETER_HELP.ocse.permutationShuffles} htmlFor="ocse-permutation-shuffles" />
+                <ParameterLabel className={fieldLabel} label="Permutation shuffles" help={DISCOVERY_PARAMETER_HELP.ocse.permutationShuffles} htmlFor="ocse-permutation-shuffles" />
                 <Select id="ocse-permutation-shuffles" className={field('text', 'mt-1')} value={configuration.nShuffles} onChange={(event) => {
                   const value = shufflesFromValue(event.target.value)
                   if (value !== null) dispatch({ type: 'ocse-shuffles-selected', value })
@@ -2064,13 +2080,14 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
           )}
 
 
+          <div className={cn(actionGap, 'grid gap-3')}>
           {sampleReview.kind !== 'blocked' && job.kind !== 'failed' ? <EligibilityView eligibility={eligibility} /> : null}
-          {sampleReview.kind !== 'ready' ? <Alert tone={sampleReview.kind === 'blocked' ? 'danger' : 'warn'} className="mt-3">{sampleReview.detail}</Alert> : null}
+          {sampleReview.kind !== 'ready' ? <Alert tone={sampleReview.kind === 'blocked' ? 'danger' : 'warn'}>{sampleReview.detail}</Alert> : null}
           {/* A refusal disables the run, so it is an alert in the danger tone: louder than the review note above it, which leaves the run available. */}
-          {!readiness.ok && <Alert tone="danger" className="mt-3">{describeDiscoveryReadiness(readiness.error)}</Alert>}
+          {!readiness.ok && <Alert tone="danger">{describeDiscoveryReadiness(readiness.error)}</Alert>}
           <JobNotice job={job} />
           {job.kind === 'running' && job.progress !== null && (
-            <div className="mt-3" role="status" aria-live="polite">
+            <div role="status" aria-live="polite">
               <div className="mb-1 flex items-center justify-between gap-3 text-micro text-faint">
                 <span>{job.stage}</span>
                 <span className={num()}>{job.progress.completed} / {job.progress.total}</span>
@@ -2080,7 +2097,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
               </div>
             </div>
           )}
-          <div className="mt-4 flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               className={button('signal')}
@@ -2091,6 +2108,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
               Run {method.name}
             </button>
             {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={cancelRun}>Cancel run</button>}
+          </div>
           </div>
             </>
           )}

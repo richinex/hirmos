@@ -19,7 +19,8 @@ import { Alert } from '@/components/ui/Alert'
 import { RefusalTile } from '@/components/ui/figures'
 import { RadioList } from '@/components/ui/RadioList'
 import { Formula } from '@/components/ui/Formula'
-import { button, chapterIntro, chip, field, fieldHint, fieldLabel, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
+import { button, chapterIntro, chip, field, fieldHint, fieldLabel, fieldRow, label, literal, num, panel, prose, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
+import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import { RecordList, RecordRow } from '@/components/ui/RecordList'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
@@ -429,121 +430,126 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
       <CausalHierarchy />
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="study-form-title">
-        <h3 id="study-form-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Define the estimand and select a graph</h3>
+        <h3 id="study-form-title" className={cn(sectionTitle, 'mb-6 mt-0')}>Define the estimand and select a graph</h3>
         {documents.length === 0 && (
           <Alert tone="info" live={false}>
             <p className="m-0">Draw and validate a causal graph in the DAG workspace first.</p>
           </Alert>
         )}
-        <div className="grid gap-3 @lg/panel:grid-cols-3">
-          <label className="block">
-            <span className={fieldLabel}>Causal graph</span>
-            <Select
-              className={field('text', 'mt-1')}
-              value={state.draft.dagDocument ?? ''}
-              onChange={(event) => chooseDag(event.target.value === '' ? null : (event.target.value as DagDocumentId))}
-            >
-              <option value="">Choose a graph</option>
-              {documents.map((candidate) => (
-                <option key={candidate.id} value={candidate.id} disabled={!isValidated(candidate)}>
-                  {candidate.name}{isValidated(candidate) ? '' : ' (needs validation)'}
-                </option>
-              ))}
-            </Select>
-          </label>
-          <label className="block">
-            <span className={fieldLabel}>Treatment</span>
-            <Select
-              className={field('text', 'mt-1')}
-              value={state.draft.treatment ?? ''}
-              disabled={document === null}
-              onChange={(event) => chooseTreatment(event.target.value === '' ? null : (event.target.value as DagNodeId))}
-            >
-              <option value="">Choose a variable</option>
-              {observedNodes.map((node) => <option key={node.id} value={node.id} disabled={node.id === state.draft.outcome}>{node.name}</option>)}
-            </Select>
-          </label>
-          <label className="block">
-            <span className={fieldLabel}>Outcome</span>
-            <Select
-              className={field('text', 'mt-1')}
-              value={state.draft.outcome ?? ''}
-              disabled={document === null}
-              onChange={(event) => chooseOutcome(event.target.value === '' ? null : (event.target.value as DagNodeId))}
-            >
-              <option value="">Choose a variable</option>
-              {observedNodes.map((node) => <option key={node.id} value={node.id} disabled={node.id === state.draft.treatment}>{node.name}</option>)}
-            </Select>
-          </label>
-        </div>
-        <fieldset className="mt-4 min-w-0 border-t border-hair pt-4" aria-label="Design">
-          <legend className="float-left m-0 w-full p-0 text-body font-medium text-ink">Design</legend>
-          <div className="clear-both grid gap-x-4 gap-y-3 pt-3 @lg/panel:grid-cols-2">
-            <div className="grid gap-3">
-              <RadioList
-                legend="Target population"
-                value={state.draft.estimand}
-                onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
-                options={ESTIMAND_KINDS.map((kind) => ({ value: kind, label: estimandLabel(kind), hint: estimandHint(kind) }))}
-              />
-              {state.draft.estimand === 'local-cutoff-effect' && <div className="grid gap-3 @lg/panel:grid-cols-2">
-                <label className="block"><span className={fieldLabel}>Running variable</span><Select aria-label="Running variable" className={field('text', 'mt-1')} value={state.draft.cutoff?.variable ?? ''} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: event.target.value === '' ? null : event.target.value as DagNodeId, value: draft.cutoff?.value ?? '0' } })}>
-                  <option value="">Choose a variable</option>{modifierCandidates.map(({ node, allowed }) => <option key={node.id} value={node.id} disabled={!allowed}>{node.name}</option>)}
-                </Select></label>
-                <label className="block"><span className={fieldLabel}>Assignment cutoff</span><input aria-label="Assignment cutoff" type="number" step="any" className={field('text', 'mt-1')} value={state.draft.cutoff?.value ?? '0'} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: draft.cutoff?.variable ?? null, value: event.target.value } })} /></label>
-              </div>}
-              {state.draft.estimand === 'conditional-average-treatment-effect' && (
-                <div className="grid gap-3 @lg/panel:grid-cols-2">
-                  <label className="block">
-                    <span className={fieldLabel}>Effect modifier</span>
-                    <Select
-                      className={field('text', 'mt-1')}
-                      value={state.draft.modifier ?? ''}
-                      disabled={document === null}
-                      onChange={(event) => onDraftChanged({ ...draft, modifier: event.target.value === '' ? null : (event.target.value as DagNodeId) })}
-                    >
-                      <option value="">Choose a variable</option>
-                      {modifierCandidates.map(({ node, role, allowed }) => (
-                        <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : ` — ${roleWord(role)}`}</option>
-                      ))}
-                    </Select>
-                  </label>
-                  <label className="block">
-                    <span className={fieldLabel}>Groups</span>
-                    <Select
-                      className={field('text', 'mt-1')}
-                      value={state.draft.grouping.kind === 'levels' ? 'levels' : String(state.draft.grouping.bins)}
-                      onChange={(event) => onDraftChanged({ ...draft, grouping: event.target.value === 'levels' ? { kind: 'levels' } : { kind: 'quantiles', bins: Number(event.target.value) } })}
-                    >
-                      <option value="levels">Each value of the modifier</option>
-                      {QUANTILE_GROUP_CHOICES.map((bins) => <option key={bins} value={String(bins)}>{bins} quantile groups</option>)}
-                    </Select>
-                  </label>
-                </div>
-              )}
-              {state.draft.estimand === 'conditional-average-treatment-effect-per-row' && (
-                <fieldset className="m-0 min-w-0 border-0 p-0" aria-label="Effect modifiers">
-                  <legend className={fieldLabel}>Effect modifiers</legend>
-                  <p className={cn(fieldHint, 'mt-1')}>Variables the effect may vary with, joined to the adjustment set as what each row’s effect is conditioned on.</p>
-                  <div className="mt-2 grid gap-1.5 @lg/panel:grid-cols-2">
-                    {modifierCandidates.map(({ node, role, allowed }) => (
-                      <label key={node.id} className={cn('flex items-center gap-2 text-body', allowed ? 'text-ink' : 'text-faint')}>
-                        <input
-                          type="checkbox"
-                          disabled={!allowed || document === null}
-                          checked={state.draft.modifiers.includes(node.id)}
-                          onChange={(event) => onDraftChanged({ ...draft, modifiers: event.target.checked ? [...draft.modifiers, node.id] : draft.modifiers.filter((id) => id !== node.id) })}
-                        />
-                        <span>{node.name}{role === null ? '' : <span className="text-faint"><Metadata className="ml-3"><span>{roleWord(role)}</span></Metadata></span>}</span>
-                      </label>
-                    ))}
-                    {modifierCandidates.length === 0 && <p className={cn(fieldHint, 'm-0')}>Choose a graph, treatment and outcome first.</p>}
-                  </div>
-                </fieldset>
-              )}
+        <div className={stepsStack}>
+          <SettingsStep number={1} title="Choose the graph and variables">
+            <div className={fieldRow.three}>
+              <label className="block">
+                <span className={fieldLabel}>Causal graph</span>
+                <Select
+                  className={field('text', 'mt-1')}
+                  value={state.draft.dagDocument ?? ''}
+                  onChange={(event) => chooseDag(event.target.value === '' ? null : (event.target.value as DagDocumentId))}
+                >
+                  <option value="">Choose a graph</option>
+                  {documents.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id} disabled={!isValidated(candidate)}>
+                      {candidate.name}{isValidated(candidate) ? '' : ' (needs validation)'}
+                    </option>
+                  ))}
+                </Select>
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>Treatment</span>
+                <Select
+                  className={field('text', 'mt-1')}
+                  value={state.draft.treatment ?? ''}
+                  disabled={document === null}
+                  onChange={(event) => chooseTreatment(event.target.value === '' ? null : (event.target.value as DagNodeId))}
+                >
+                  <option value="">Choose a variable</option>
+                  {observedNodes.map((node) => <option key={node.id} value={node.id} disabled={node.id === state.draft.outcome}>{node.name}</option>)}
+                </Select>
+              </label>
+              <label className="block">
+                <span className={fieldLabel}>Outcome</span>
+                <Select
+                  className={field('text', 'mt-1')}
+                  value={state.draft.outcome ?? ''}
+                  disabled={document === null}
+                  onChange={(event) => chooseOutcome(event.target.value === '' ? null : (event.target.value as DagNodeId))}
+                >
+                  <option value="">Choose a variable</option>
+                  {observedNodes.map((node) => <option key={node.id} value={node.id} disabled={node.id === state.draft.treatment}>{node.name}</option>)}
+                </Select>
+              </label>
             </div>
+          </SettingsStep>
+          <SettingsStep number={2} title="Target population">
+            <RadioList
+              legend="Target population"
+              legendHidden
+              className="max-w-3xl"
+              value={state.draft.estimand}
+              onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
+              options={ESTIMAND_KINDS.map((kind) => ({ value: kind, label: estimandLabel(kind), hint: estimandHint(kind) }))}
+            />
+            {state.draft.estimand === 'local-cutoff-effect' && <div className={fieldRow.two}>
+              <label className="block"><span className={fieldLabel}>Running variable</span><Select aria-label="Running variable" className={field('text', 'mt-1')} value={state.draft.cutoff?.variable ?? ''} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: event.target.value === '' ? null : event.target.value as DagNodeId, value: draft.cutoff?.value ?? '0' } })}>
+                <option value="">Choose a variable</option>{modifierCandidates.map(({ node, allowed }) => <option key={node.id} value={node.id} disabled={!allowed}>{node.name}</option>)}
+              </Select></label>
+              <label className="block"><span className={fieldLabel}>Assignment cutoff</span><input aria-label="Assignment cutoff" type="number" step="any" className={field('text', 'mt-1')} value={state.draft.cutoff?.value ?? '0'} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: draft.cutoff?.variable ?? null, value: event.target.value } })} /></label>
+            </div>}
+            {state.draft.estimand === 'conditional-average-treatment-effect' && (
+              <div className={fieldRow.two}>
+                <label className="block">
+                  <span className={fieldLabel}>Effect modifier</span>
+                  <Select
+                    className={field('text', 'mt-1')}
+                    value={state.draft.modifier ?? ''}
+                    disabled={document === null}
+                    onChange={(event) => onDraftChanged({ ...draft, modifier: event.target.value === '' ? null : (event.target.value as DagNodeId) })}
+                  >
+                    <option value="">Choose a variable</option>
+                    {modifierCandidates.map(({ node, role, allowed }) => (
+                      <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : ` — ${roleWord(role)}`}</option>
+                    ))}
+                  </Select>
+                </label>
+                <label className="block">
+                  <span className={fieldLabel}>Groups</span>
+                  <Select
+                    className={field('text', 'mt-1')}
+                    value={state.draft.grouping.kind === 'levels' ? 'levels' : String(state.draft.grouping.bins)}
+                    onChange={(event) => onDraftChanged({ ...draft, grouping: event.target.value === 'levels' ? { kind: 'levels' } : { kind: 'quantiles', bins: Number(event.target.value) } })}
+                  >
+                    <option value="levels">Each value of the modifier</option>
+                    {QUANTILE_GROUP_CHOICES.map((bins) => <option key={bins} value={String(bins)}>{bins} quantile groups</option>)}
+                  </Select>
+                </label>
+              </div>
+            )}
+            {state.draft.estimand === 'conditional-average-treatment-effect-per-row' && (
+              <fieldset className="m-0 min-w-0 border-0 p-0" aria-label="Effect modifiers">
+                <legend className={fieldLabel}>Effect modifiers</legend>
+                <p className={cn(fieldHint, 'mt-1')}>Variables the effect may vary with, joined to the adjustment set as what each row’s effect is conditioned on.</p>
+                <div className="mt-2 grid gap-1.5 @lg/panel:grid-cols-2">
+                  {modifierCandidates.map(({ node, role, allowed }) => (
+                    <label key={node.id} className={cn('flex items-center gap-2 text-body', allowed ? 'text-ink' : 'text-faint')}>
+                      <input
+                        type="checkbox"
+                        disabled={!allowed || document === null}
+                        checked={state.draft.modifiers.includes(node.id)}
+                        onChange={(event) => onDraftChanged({ ...draft, modifiers: event.target.checked ? [...draft.modifiers, node.id] : draft.modifiers.filter((id) => id !== node.id) })}
+                      />
+                      <span>{node.name}{role === null ? '' : <span className="text-faint"><Metadata className="ml-3"><span>{roleWord(role)}</span></Metadata></span>}</span>
+                    </label>
+                  ))}
+                  {modifierCandidates.length === 0 && <p className={cn(fieldHint, 'm-0')}>Choose a graph, treatment and outcome first.</p>}
+                </div>
+              </fieldset>
+            )}
+          </SettingsStep>
+          <SettingsStep number={3} title="Why the treatment varied">
             <RadioList
               legend="Why the treatment varied"
+              legendHidden
+              className="max-w-3xl"
               value={state.draft.assignment.kind}
               onChange={(kind) => onDraftChanged({ ...draft, assignment: { ...draft.assignment, kind } })}
               options={ASSIGNMENT_KINDS.map((kind) => {
@@ -551,7 +557,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                 return { value: kind, label: describeAssignmentKind(kind), disabled: withheld, hint: withheld ? 'Only for a graph built from an experimental design.' : assignmentHint(kind) }
               })}
             />
-            <label className="flex min-w-0 flex-col">
+            <label className="flex min-w-0 max-w-3xl flex-col">
               <span className={fieldLabel}>Assignment sentence</span>
               <textarea
                 className={field('text', 'mt-1 min-h-24 flex-1 resize-y rounded-lg')}
@@ -560,20 +566,19 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                 onChange={(event) => onDraftChanged({ ...draft, assignment: { ...draft.assignment, description: event.target.value } })}
               />
             </label>
-          </div>
-          {/* The statements and their literature sit in the side panel under Design assumptions; here the reader records the rationale. */}
-          <div className="mt-3 grid gap-3 @lg/panel:grid-cols-2">
-            <div className="grid gap-y-1">
-              <ParameterLabel className={fieldLabel} htmlFor={`${rationaleId}-consistency`} label="Consistency rationale" help={CONSISTENCY_STATEMENT} />
-              <input id={`${rationaleId}-consistency`} type="text" className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.consistencyRationale} onChange={(event) => onDraftChanged({ ...draft, consistencyRationale: event.target.value })} />
+            <div className={fieldRow.two}>
+              <div className="grid gap-y-1">
+                <ParameterLabel className={fieldLabel} htmlFor={`${rationaleId}-consistency`} label="Consistency rationale" help={CONSISTENCY_STATEMENT} />
+                <input id={`${rationaleId}-consistency`} type="text" className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.consistencyRationale} onChange={(event) => onDraftChanged({ ...draft, consistencyRationale: event.target.value })} />
+              </div>
+              <div className="grid gap-y-1">
+                <ParameterLabel className={fieldLabel} htmlFor={`${rationaleId}-interference`} label="No-interference rationale" help={NO_INTERFERENCE_STATEMENT} />
+                <input id={`${rationaleId}-interference`} type="text" className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.noInterferenceRationale} onChange={(event) => onDraftChanged({ ...draft, noInterferenceRationale: event.target.value })} />
+              </div>
             </div>
-            <div className="grid gap-y-1">
-              <ParameterLabel className={fieldLabel} htmlFor={`${rationaleId}-interference`} label="No-interference rationale" help={NO_INTERFERENCE_STATEMENT} />
-              <input id={`${rationaleId}-interference`} type="text" className={field('text', 'self-start')} placeholder="Why this holds here (optional)" value={state.draft.noInterferenceRationale} onChange={(event) => onDraftChanged({ ...draft, noInterferenceRationale: event.target.value })} />
-            </div>
-          </div>
-        </fieldset>
-        <dl className="mb-0 mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body" aria-label="Estimand and population">
+          </SettingsStep>
+        </div>
+        <dl className="mb-0 mt-10 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-body" aria-label="Estimand and population">
           <dt className="text-faint">Estimand</dt>
           <dd className="m-0 text-ink">{preview === null ? <Metadata><span>Average treatment effect</span><span>additive scale</span><span>total effect, mediators included</span></Metadata> : describeEstimand(preview)}</dd>
           <dt className="text-faint">Population</dt>

@@ -110,7 +110,7 @@ export function createPipelineSession(resume: PipelineResume | null) {
         if (previous.file.kind === 'chosen') await removePipelineInput(live, previous.file.alias)
         if (valid(generation)) store.setState({ files: [...live.inputs] })
       })
-      if (valid(generation)) store.setState({ choosing: store.getState().session.kind === 'failed' ? { kind: 'refused', detail: 'DuckDB could not start, so the file cannot be read.' } : { kind: 'idle' } })
+      if (valid(generation)) store.setState({ choosing: store.getState().session.kind === 'failed' ? { kind: 'refused', detail: 'The data engine could not start. The file cannot be read.' } : { kind: 'idle' } })
     } catch (cause) { if (valid(generation)) store.setState({ choosing: { kind: 'refused', detail: String(cause) } }) }
   }
   const dropBlock = (id: PipelineBlockId) => {
@@ -135,7 +135,7 @@ export function createPipelineSession(resume: PipelineResume | null) {
       const source = await enqueue(async live => {
         const output = await materializePipeline(live, graph)
         if (!valid(generation)) return null
-        if (version !== revision) throw new Error('The pipeline changed. Use the updated result as the source.')
+        if (version !== revision) throw new Error('The pipeline has changed. Use the updated result as the source.')
         if (!output.ok) throw new Error(describePipelineRunProblem(output.error, nameOf))
         const source = selectDerivedSource(output.value.file, output.value.recipe)
         if (!source.ok) throw new Error(`The output could not be used as a source: ${source.error.kind}`)

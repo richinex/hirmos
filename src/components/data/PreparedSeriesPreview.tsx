@@ -71,7 +71,7 @@ function DecompositionPlot({ series }: { readonly series: PreparedSeries & { rea
         <span className="text-body font-medium text-ink">STL decomposition</span>
         <span className={caption()}><Metadata><span>trend strength {series.decomposition.trendStrength.toFixed(3)}</span><span>seasonal strength {series.decomposition.seasonalStrengthBefore.toFixed(3)}</span></Metadata></span>
       </div>
-      <p className="mb-0 mt-1 text-label text-muted">Observed = trend + seasonal + remainder at every retained time point. The components describe temporal structure; the decomposition does not assign causal meaning.</p>
+      <p className="mb-0 mt-1 text-label text-muted">Observed = trend + seasonal + remainder at every retained time point. The components describe temporal structure; the decomposition does not imply causality.</p>
       <ExpandableChart option={option} label={`${series.name} STL decomposition`} className="mt-2 h-[520px]" testId="stl-decomposition" />
     </div>
   )
@@ -174,8 +174,8 @@ export function PreparedSeriesPreview({ source, profile, prepared }: {
         <div>
           <h3 id="prepared-preview-title" className={cn(sectionTitle, 'm-0')}>Prepared values</h3>
           <p className="mb-0 mt-1 text-body text-faint">{prepared.missingness.kind === 'lag-aware-exclusion'
-            ? 'Missing values remain as gaps. Supported analyses exclude samples according to their lag and variable roles.'
-            : 'Inspect the exact values passed to diagnostics, discovery methods, and estimators. An adjusted column shows each station of its recipe.'}</p>
+            ? 'Missing values remain as gaps. Supported analyses exclude samples based on lags and variable roles.'
+            : 'Review the exact values provided to diagnostics, discovery methods, and estimators. An adjusted column shows each stage of processing.'}</p>
         </div>
         <button type="button" className={button('quiet')} aria-busy={busy} onClick={busy ? undefined : () => void load()}>
           {busy ? 'Loading preview' : job.kind === 'failed' ? 'Retry preview' : 'Refresh preview'}

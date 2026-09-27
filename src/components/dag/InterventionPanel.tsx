@@ -8,7 +8,8 @@ import { Icon } from '@/components/Icon'
 import { Formula } from '@/components/ui/Formula'
 import { MetricTile } from '@/components/ui/figures'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, figureGrid, num, prose, well } from '@/components/ui/recipes'
+import { button, field, fieldHint, fieldLabel, figureGrid, num, well } from '@/components/ui/recipes'
+import { cn } from '@/lib/utils'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import type { DagDocument, DagNodeId } from '@/domain/dag'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
@@ -82,7 +83,7 @@ function DistributionRecord({ query, result, context, methodNote, formula }: { r
 function BayesianNetworkRecord({ query, result, open, equivalentSampleSize }: { readonly query: InterventionQueryArtifact; readonly result: DiscreteBnEvidence; readonly open: boolean; readonly equivalentSampleSize: number }) {
   return (
     <QueryFrame query={query} open={open} summary={<span className={num('text-body text-ink')}>{formatStatistic('raw', result.effect).text}</span>}>
-      <DistributionRecord query={query} result={result} context={<Metadata><span>{result.bins} bins</span><span>equivalent sample size {equivalentSampleSize}</span></Metadata>} methodNote="The contrast comes from BDeu conditional probability tables fitted to the fully observed DAG. No uncertainty interval is reported." />
+      <DistributionRecord query={query} result={result} context={<Metadata><span>{result.bins} bins</span><span>equivalent sample size {equivalentSampleSize}</span></Metadata>} methodNote="The contrast is based on BDeu conditional probability tables fitted to the fully observed DAG. No uncertainty interval is reported." />
     </QueryFrame>
   )
 }
@@ -214,8 +215,8 @@ export function InterventionPanel({ document, source, profile, prepared, queries
   return (
     <section className="border-t border-hair pt-4" aria-labelledby="intervene-title">
       <h3 id="intervene-title" className="mb-1 mt-0 text-body font-medium text-ink">Intervene</h3>
-      <p className={prose('mb-3 mt-0 text-faint')}>Set one measured variable and read another. With unmeasured variables, Hirmos first determines whether the interventional distribution is identifiable from the observed data.</p>
-      <div className="grid gap-2 @sm/inspector:grid-cols-2">
+      <p className={cn(fieldHint, 'm-0')}>Set one measured variable and read another. If there are unmeasured variables, Hirmos first checks whether the interventional distribution can be identified from the observed data.</p>
+      <div className="mt-4 grid gap-4 @sm/inspector:grid-cols-2">
         <label className="min-w-0 text-body text-ink"><span className={fieldLabel}>Set</span>
           <Select aria-label="Variable to set" className={field('text', 'mt-1')} value={set ?? ''} onChange={(event) => choose('set', event.target.value)}>
             <option value="">Choose variable</option>{observed.map((node) => <option key={node.id} value={node.id} disabled={node.id === read}>{node.name}</option>)}
@@ -245,10 +246,10 @@ export function InterventionPanel({ document, source, profile, prepared, queries
           <input type="number" min={1} max={100} step={1} aria-label="Equivalent sample size" className={field('text', 'mt-1')} value={equivalentSampleSize} onChange={(event) => { const value = Number(event.target.value); if (Number.isInteger(value) && value >= 1) setEquivalentSampleSize(value) }} />
         </label>}
       </div>
-      <p className="mb-0 mt-2 text-label text-faint">Method: {identifiedRoute ? (condition.kind === 'selected' ? 'IDC expression' : 'ID expression') : 'fully observed Bayesian network'}</p>
-      {!readiness.ok && <Alert tone="danger" className="mt-2">{describeInterventionReadiness(readiness.error)}</Alert>}
+      <p className={cn(fieldHint, 'mb-0 mt-4')}>Method: {identifiedRoute ? (condition.kind === 'selected' ? 'IDC expression' : 'ID expression') : 'fully observed Bayesian network'}</p>
+      {!readiness.ok && <Alert tone="danger" className="mt-4">{describeInterventionReadiness(readiness.error)}</Alert>}
       <JobNotice job={job} />
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-6 flex items-center gap-3">
         <button type="button" className={button('signal')} disabled={!readiness.ok || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>Evaluate intervention</button>
         {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
       </div>

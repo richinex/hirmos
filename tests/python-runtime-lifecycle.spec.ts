@@ -76,7 +76,7 @@ test('Python cancellation during result staging leaves the previous output untou
     const pending = session.scripts.run({ kind: 'script', id: 'a', inputs: [], code: '', view: 'out' }, connection)
     await Promise.resolve()
     const request = session.store.getState().active.request
-    worker.onmessage({ data: { kind: 'ran', request, rows: 1, columns: ['x'], stdout: '', prepared: { format: 'arrow-stream', bytes: new Uint8Array() } } })
+    worker.onmessage({ data: { kind: 'ran', request, rows: 1, columns: ['x'], stdout: '', shape: { kind: 'table' }, prepared: { format: 'arrow-stream', bytes: new Uint8Array() } } })
     await Promise.resolve()
     session.cancel()
     staged()

@@ -118,7 +118,7 @@ function SqlEditor({ inputs, onPrepared, onCleared, clearLabel = 'Choose other f
           {script.kind === 'reading' && <p role="status">Reading SQL file…</p>}
           {script.kind === 'failed' && <p role="alert" className="text-danger">{script.detail}</p>}
           {script.kind === 'editing' && <>
-            {scriptResult.kind === 'none' && state.kind !== 'running-script' && <p className={fieldHint}>Review the SQL before running it. Opening this file has not executed it.</p>}
+            {scriptResult.kind === 'none' && state.kind !== 'running-script' && <p className={fieldHint}>Review the SQL before execution. Opening this file does not run it.</p>}
             <textarea aria-label="SQL file contents" disabled={busy} spellCheck={false} className={field('text', 'min-h-64 w-full font-mono text-label')} value={script.text} onChange={event => controller.editScript(event.target.value)} />
             <button type="button" className={button('signal', 'mt-3 w-full')} disabled={busy || !script.text.trim()} onClick={() => void controller.runScript()}>Run SQL</button>
             {state.kind === 'running-script' && <button type="button" className={button('quiet', 'mt-2 w-full')} onClick={() => void controller.cancel()}>Cancel query</button>}

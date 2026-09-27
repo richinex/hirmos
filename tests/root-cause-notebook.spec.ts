@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 
 test('full microservices model checks match the preserved v0.14 notebook through the Hirmos worker', async ({ page }, info) => {
-  test.skip(process.env.HIRMOS_GCM_NOTEBOOK !== '1', 'Opt-in full-size numerical replay.')
+  test.skip(process.env.HIRMOS_FULL_ORACLE !== '1' && process.env.HIRMOS_GCM_NOTEBOOK !== '1', 'Opt-in full-size numerical replay.')
   test.setTimeout(1_800_000)
   const reference = '../octopus/rust-causal-transpile/oracle/gcm/fixtures/'
   const model = JSON.parse(readFileSync(reference + 'model.json', 'utf8'))

@@ -143,6 +143,7 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await page.reload()
   await page.getByRole('button',{name:'Open Staggered DiD source verification',exact:true}).click()
   await page.locator('input[type=file]').setInputFiles({name:'mpdta.csv',mimeType:'text/csv',buffer:Buffer.from(csv)})
+  await expect(page.getByRole('navigation',{name:'Workspace chapters'}).getByRole('button',{name:/Estimation/})).not.toHaveAttribute('aria-disabled','true',{timeout:60_000})
   await chapter(page,/Estimation/)
   await expect(page.getByTestId('staggered-did-result').first()).toBeVisible()
   await page.getByRole('radio',{name:'Staggered adoption',exact:true}).click()

@@ -162,7 +162,7 @@ export const resampledMatrixFromEvidence = (
     || evidence.values.length !== cells
     || evidence.timestampsMs.length !== evidence.outputRows
     || evidence.imputedCells.some(([row, column]) => row >= evidence.outputRows || column >= matrix.columns.length)) {
-    return err({ kind: 'kernel-refused', detail: 'The Rust resampling result does not match the source matrix shape.' })
+    return err({ kind: 'kernel-refused', detail: 'The resampled data has unexpected dimensions. It cannot be used to prepare the dataset.' })
   }
   return ok({
     values: Float64Array.from(evidence.values),

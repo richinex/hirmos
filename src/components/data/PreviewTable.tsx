@@ -329,7 +329,7 @@ export function PreviewTable({ source, profile, summary, selectedColumn, onSelec
             <tr role="presentation" aria-hidden><td role="presentation" colSpan={visibleColumns.length + 1} style={{ height: virtualizer.getTotalSize() - (items.at(-1)?.end ?? 0), padding: 0, border: 0 }} /></tr>
           )}
           {windows.total === 0 && (
-            <tr><td colSpan={visibleColumns.length + 1} className="px-3.5 py-6 text-center text-body text-faint">No row matches. Loosen a filter or the search.</td></tr>
+            <tr><td colSpan={visibleColumns.length + 1} className="px-3.5 py-6 text-center text-body text-faint">No rows match the criteria. Loosen a filter or broaden the search.</td></tr>
           )}
         </tbody>
       </table>

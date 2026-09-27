@@ -158,7 +158,7 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
           <label className="block"><span className={fieldLabel}>Column name</span>
             <input aria-label="Calendar column name" className={field('mono', 'mt-1')} value={block.name} placeholder={calendarShareName(block.window)} onChange={(event) => onChange({ ...block, name: event.target.value })} />
           </label>
-          <p className={caption('m-0')}>Adds a column that marks the rows falling in a declared calendar window, such as the year-end shutdown. The value is the share of the row's days inside the window, so a week that straddles the window's edge carries a fraction. Declare it before fitting: a calendar event is a common cause of activity and outcomes that a trend term cannot represent.</p>
+          <p className={caption('m-0')}>Adds a column to mark rows that fall within a specified calendar window, such as a year-end shutdown. The value is the proportion of days covered by the row that fall within the window, so a week partly overlapping the window is assigned a fraction. Declare the window before fitting, as calendar events can influence activity and outcomes in ways a trend term may not capture.</p>
         </div>
       )
     }
@@ -183,7 +183,7 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
               ))}
             </Rows>
           )}
-          <p className={caption('m-0')}>Input 1 is the top-left port, input 2 the top-right.</p>
+          <p className={caption('m-0')}>Input 1 corresponds to the top-left port; input 2 to the top-right.</p>
         </div>
       )
     }
@@ -191,7 +191,7 @@ export function BlockSettings({ node, inputColumns, inputNames, onChange }: {
       <div className="space-y-3">
         <SegmentedControl size="sm" ariaLabel="Union matches columns" value={block.by} onChange={(by) => onChange({ ...block, by })} options={[{ value: 'name', label: 'By column name' }, { value: 'position', label: 'By position' }]} />
         <label className="flex items-center gap-2 text-body text-ink"><input type="checkbox" checked={block.distinct} onChange={(event) => onChange({ ...block, distinct: event.target.checked })} />Drop duplicate rows</label>
-        <p className={caption('m-0')}>Wire as many inputs as needed; a new port appears under each arrow.</p>
+        <p className={caption('m-0')}>Connect as many inputs as needed. A new port appears below each arrow.</p>
       </div>
     )
     case 'aggregate': return (

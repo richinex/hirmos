@@ -12,6 +12,7 @@
     "postinstall": "patch-package",
     "test:e2e": "playwright test",
     "test:e2e:update": "playwright test --update-snapshots",
+    "test:e2e:oracle": "HIRMOS_FULL_ORACLE=1 playwright test --project=chromium tests/gcm-401k.spec.ts tests/gcm-supply-chain.spec.ts tests/gcm-influence.spec.ts tests/root-cause-notebook.spec.ts",
     "preview": "vite preview"
   },
   "dependencies": {

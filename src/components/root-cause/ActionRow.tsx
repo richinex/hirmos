@@ -6,7 +6,7 @@ export type { Job } from '@/analysis/jobs'
 
 export function ActionRow({ job, action, progress = 'visible', disabled = false, onRun, onCancel }: { readonly job: Job; readonly action: Action; readonly progress?: 'visible' | 'accessible'; readonly disabled?: boolean; readonly onRun: () => void; readonly onCancel: () => void }) {
   const active = job.kind !== 'idle' && job.action === action ? job : null
-  return <div className="mt-4" data-testid={`${action}-actions`}>
+  return <div className="mt-8" data-testid={`${action}-actions`}>
     <div className="flex flex-wrap items-center gap-3">
       <button type="button" className={button('signal')} disabled={disabled || job.kind === 'running'} aria-busy={active?.kind === 'running'} onClick={onRun}>{action === 'checks' ? 'Check fitted model' : 'Run analysis'}</button>
       {active?.kind === 'running' && <>

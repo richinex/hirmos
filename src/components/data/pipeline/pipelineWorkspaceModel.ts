@@ -123,9 +123,9 @@ export function describeConnectionRefusal(refusal: ConnectionRefusal): string {
     case 'unknown-block': return 'That block is no longer on the canvas.'
     case 'into-input': return 'An input file has no inputs of its own.'
     case 'out-of-output': return 'The output block is the end of the pipeline.'
-    case 'port-taken': return 'That input already has an arrow. Remove it first.'
+    case 'port-taken': return 'This input already has an arrow. Remove it first.'
     case 'no-more-inputs': return 'This block takes no more inputs.'
-    case 'would-loop': return 'That arrow would make a loop; a pipeline flows one way.'
+    case 'would-loop': return 'This arrow would create a loop. Pipelines must flow in one direction.'
     default: { const exhaustive: never = refusal; return exhaustive }
   }
 }

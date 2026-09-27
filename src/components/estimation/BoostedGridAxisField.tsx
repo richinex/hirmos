@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { field, fieldHint } from '@/components/ui/recipes'
+import { field, fieldHint, fieldLabel } from '@/components/ui/recipes'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import type { NonEmptyArray } from '@/domain/dop'
 import { describeBoostedGridProblem, formatBoostedGridAxis, parseBoostedGridAxis, type BoostedGridAxis, type BoostedGridProblem } from '@/domain/estimation'
@@ -26,7 +26,7 @@ export function BoostedGridAxisField({ axis, label, help, values, onChange }: Bo
 
   return (
     <label className="block">
-      <ParameterLabel className={fieldHint} label={label} help={help} />
+      <ParameterLabel className={fieldLabel} label={label} help={help} />
       <input
         type="text"
         inputMode="decimal"

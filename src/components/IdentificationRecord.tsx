@@ -125,7 +125,7 @@ export function IdentificationRecord({ identification }: { readonly identificati
       <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
         <span className="block text-body font-medium text-ink">Identification record</span>
         <p className="mb-1 mt-1 flex items-center gap-2 text-body text-ink"><Icon name="block" size={16} className="text-muted" /> No measured back-door adjustment set</p>
-        <p className="mb-1 mt-1 text-body text-muted">The general ID result and its hedge, when present, are listed below.</p>
+        <p className="mb-1 mt-1 text-body text-muted">Below, you can find the general ID result and its hedge if one is available.</p>
         <ul className="m-0 list-disc pl-4 text-body text-muted">
           {identification.reasons.map((reason) => <li key={reason.kind + describeIdentificationFailure(reason)}>{describeIdentificationFailure(reason)}</li>)}
         </ul>
@@ -141,10 +141,10 @@ export function IdentificationRecord({ identification }: { readonly identificati
         ? 'IDC* returned the two expressions required for binary ETT'
         : `Instrumental variable estimand through ${identification.instruments.map((variable) => variable.name).join(', ')}`
     const enabled = identification.kind === 'graphically-identified'
-      ? 'No back-door adjustment estimator is enabled for this expression.'
+      ? 'A back-door adjustment estimator is not enabled for this expression.'
       : identification.kind === 'counterfactually-identified'
-        ? 'The binary ETT evaluator is enabled when every observed graph variable contains only 0 and 1.'
-        : 'The instrumental variable estimator is enabled. The level 2 graphical assumptions are not sufficient for instrumental variable identification; additional parametric assumptions are needed.'
+        ? 'The binary ETT evaluator is enabled when all observed graph variables have values of only 0 or 1.'
+        : 'The instrumental variable estimator is enabled. However, level 2 graphical assumptions alone do not identify the effect estimated here. Additional parametric assumptions are required.'
     return (
       <section aria-label="Identification record" className="@container/record mb-3 border-t border-hair pt-3 first:border-t-0 first:pt-0">
         <span className="block text-body font-medium text-ink">Identification record</span>

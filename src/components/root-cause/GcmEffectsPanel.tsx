@@ -1,4 +1,4 @@
-import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
+import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
 import { useMemo, useState, type ReactNode } from 'react'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -141,24 +141,32 @@ export function GcmEffectsPanel(props: Props) {
       <section className={panel('p-(--panel-space)')} aria-label="Intervention effects setup">
         <div className="mb-6"><GraphDetails name={props.name} graph={props.graph} disabled={busy} onOpen={props.onGraph} /></div>
         <div className="mb-4">{props.navigation}</div>
-        <fieldset disabled={busy} className="m-0 min-w-0 space-y-4 border-0 p-0"><legend className="sr-only">Intervention effect settings</legend>
+        <fieldset disabled={busy} className="m-0 grid min-w-0 gap-6 border-0 p-0"><legend className="sr-only">Intervention effect settings</legend>
           <div><h3 className={`${sectionTitle} m-0`}>Estimate the effect of an intervention</h3><p className={fieldHint}>Compare simulated outcomes when the treatment is set to 1 rather than 0.</p></div>
           <div className="grid min-w-0 gap-4 @lg/panel:grid-cols-2">
             {(['treatment', 'outcome'] as const).map(role => <label key={role}><span className={fieldLabel}>{role === 'treatment' ? 'Treatment' : 'Outcome'}</span><Select aria-label={role === 'treatment' ? 'GCM treatment' : 'GCM outcome'} className={field('text', 'mt-1')} value={String(model[role])} onChange={event => setModel({ ...model, [role]: Number(event.target.value) })}>{model.names.map((name, i) => <option key={name} value={i}>{name}</option>)}</Select></label>)}
             <label><span className={fieldLabel}>Group effects by</span><Select aria-label="Group effects by" className={field('text', 'mt-1')} value={model.grouping.kind === 'none' ? '' : String(model.grouping.column)} onChange={event => setModel({ ...model, grouping: event.target.value === '' ? { kind: 'none' } : { kind: 'quantiles', column: Number(event.target.value), groups: 5, scope: { kind: 'all' } } })}><option value="">All rows</option>{model.names.map((name, i) => !model.edges.some(([, child]) => child === i) && i !== model.treatment && i !== model.outcome ? <option key={name} value={i}>{name}</option> : null)}</Select></label>
             {model.grouping.kind === 'quantiles' && <QuantileGroups value={model.grouping} onChange={grouping => setModel({ ...model, grouping })} />}
           </div>
-          <details><DisclosureSummary className="cursor-pointer text-body font-medium">Variable models</DisclosureSummary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">{model.mechanisms.map((mechanism, i) => <div key={model.names[i]}>
+          <SettingsDisclosure title="Variable models" items={[
+            { icon: 'show_chart', text: `${model.mechanisms.filter(m => m.kind === 'regression').length} continuous` },
+            { icon: 'category', text: `${model.mechanisms.filter(m => m.kind === 'classifier').length} categorical` },
+            { icon: 'bar_chart', text: `${model.mechanisms.filter(m => m.kind === 'empirical').length} observed distributions` },
+          ]}><div className="grid gap-4 @lg/panel:grid-cols-2">{model.mechanisms.map((mechanism, i) => <div key={model.names[i]}>
             <span className={fieldLabel}>{model.names[i]}</span>
             {mechanism.kind === 'empirical' ? <p className={fieldHint}>Observed distribution</p> : <>
               <SegmentedControl className="mt-1" fill ariaLabel={`Model for ${model.names[i]}`} value={mechanism.kind} options={[{ value: 'regression', label: 'Continuous' }, { value: 'classifier', label: 'Categorical' }]} onChange={kind => setModel({ ...model, mechanisms: model.mechanisms.map((entry, j) => j !== i ? entry : kind === 'regression' ? { kind } : { kind, classes: 2 }) })} />
               {mechanism.kind === 'classifier' && <label className="mt-2 block"><span className={fieldLabel}>Categories, coded from 0</span><input aria-label={`Categories for ${model.names[i]}`} type="number" min={2} max={7} value={mechanism.classes} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, mechanisms: model.mechanisms.map((entry, j) => j !== i ? entry : { kind: 'classifier', classes: Number(event.target.value) }) })} /></label>}
             </>}
-          </div>)}</div></details>
-          <details><DisclosureSummary className="cursor-pointer text-body font-medium">Sampling settings</DisclosureSummary><div className="mt-3 grid gap-4 @lg/panel:grid-cols-2">
+          </div>)}</div></SettingsDisclosure>
+          <SettingsDisclosure title="Sampling settings" items={[
+            { icon: 'forest', text: `${model.trees} trees per model` },
+            { icon: 'repeat', text: `${model.repetitions} simulations` },
+            { icon: 'tag', text: `seeds ${model.fitSeed} and ${model.simulationSeed}` },
+          ]}><div className="grid gap-4 @lg/panel:grid-cols-2">
             {([{ key: 'trees', label: 'Trees per model', min: 1 }, { key: 'minLeaf', label: 'Minimum leaf size', min: 1 }, { key: 'fitSeed', label: 'Fitting seed', min: 0 }, { key: 'simulationSeed', label: 'Simulation seed', min: 0 }, { key: 'repetitions', label: 'Simulations', min: 1 }] as const).map(item => <label key={item.key}><span className={fieldLabel}>{item.label}</span><input aria-label={item.label} type="number" min={item.min} value={model[item.key]} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, [item.key]: Number(event.target.value) })} /></label>)}
             <label><span className={fieldLabel}>Upper percentile</span><input aria-label="Upper percentile" type="number" min={51} max={99.9} step={0.1} value={model.upperQuantile * 100} className={field('text', 'mt-1')} onChange={event => setModel({ ...model, upperQuantile: Number(event.target.value) / 100 })} /></label>
-          </div></details>
+          </div></SettingsDisclosure>
         </fieldset><ActionRow job={job} action="analysis" disabled={session.blocked} onRun={() => void run()} onCancel={cancel} />
       </section>
       {latest && <GcmEffectResult run={latest} />}

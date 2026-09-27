@@ -57,7 +57,7 @@ function Status({ evaluation }: { readonly evaluation: CaveatEvaluation | undefi
     case 'satisfied': return <span className="whitespace-nowrap text-label text-ok">Checked</span>
     case 'unresolved':
       return (
-        <Tooltip text="No evidence has been recorded for this requirement.">
+        <Tooltip text="There is no recorded evidence for this requirement.">
           <span tabIndex={0} className="cursor-help whitespace-nowrap text-label text-warn underline decoration-dotted underline-offset-2">Not checked</span>
         </Tooltip>
       )

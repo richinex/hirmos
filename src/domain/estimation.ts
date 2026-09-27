@@ -787,6 +787,8 @@ export const continuousGpsEvidenceSchema = z.object({
   intercept: z.number().finite(),
   standardError: z.number().finite().nonnegative(),
   weightSum: z.number().finite().positive(),
+  /** The weight each row carries, in row order; null for a run saved before weights were recorded. */
+  weights: z.array(z.number().finite().positive()).nullable(),
   /** The conditional density at each observed treatment, in row order. */
   density: z.array(z.number().finite()),
   residualScale: z.number().finite().positive(),
@@ -818,6 +820,27 @@ export const effectiveSampleSize = (
   return {
     treated: treatedSquares === 0 ? 0 : (treatedSum * treatedSum) / treatedSquares,
     control: controlSquares === 0 ? 0 : (controlSum * controlSum) / controlSquares,
+  }
+}
+
+export interface WeightSpread {
+  /** (Σw)² / Σw², the row count an unweighted sample with the same precision would need. */
+  readonly effectiveSampleSize: number
+  readonly largestWeight: number
+  /** The share of the total weight carried by the largest `count` weights. */
+  readonly largestShare: { readonly count: number; readonly share: number }
+}
+
+export const weightSpread = (weights: readonly number[], count: number): WeightSpread => {
+  let sum = 0
+  let squares = 0
+  for (const weight of weights) { sum += weight; squares += weight * weight }
+  const descending = [...weights].sort((left, right) => right - left)
+  const largest = descending.slice(0, count)
+  return {
+    effectiveSampleSize: squares === 0 ? 0 : (sum * sum) / squares,
+    largestWeight: descending[0] ?? 0,
+    largestShare: { count: largest.length, share: sum === 0 ? 0 : largest.reduce((total, weight) => total + weight, 0) / sum },
   }
 }
 
@@ -1647,6 +1670,9 @@ export function parseContinuousGpsEvidence(value: unknown): Result<ContinuousGps
   if (parsed.value.density.length !== parsed.value.observations) {
     return err({ kind: 'invalid-estimation-evidence', detail: 'The fitted densities do not cover every row.' })
   }
+  if (parsed.value.weights?.length !== parsed.value.observations) {
+    return err({ kind: 'invalid-estimation-evidence', detail: 'The weights do not cover every row.' })
+  }
   if (!orderedInterval(parsed.value.interval)) {
     return err({ kind: 'invalid-estimation-evidence', detail: 'An interval has its bounds reversed.' })
   }
@@ -2397,7 +2423,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
             : `Both forests are refitted on ${model.uncertainty.samples} resampled datasets. Row intervals are pointwise; the average uses a conservative standard-error bound. Resampling assumes independent observations.`)
           break
         case 'boosted-cross-fitted':
-          satisfy('t-learner-learner-settings', `The run records a grid of ${boostedCandidateCount(model.grid)} boosted classifiers, searched with ${model.grid.splits}-fold ROC AUC on each arm’s rows, and seed ${model.grid.seed} for the split and the trees.`)
+          satisfy('t-learner-learner-settings', `Grid search compares ${boostedCandidateCount(model.grid)} boosted classifiers using ${model.grid.splits}-fold ROC AUC on all rows within each arm before the two-half split. Each half is predicted by models fitted on the other half, without repeating hyperparameter selection. The split and trees use seed ${model.grid.seed}.`)
           leave('t-learner-no-interval', 'The cross-fitted boosted learner reports point estimates only; no interval is calculated.')
           break
         default: assertNever(model)
@@ -2477,18 +2503,23 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (adjustment === null) violate(`${prefix}-unconfoundedness`, 'No measured back-door adjustment set was found, so the score has nothing to condition on.')
       else satisfy(`${prefix}-unconfoundedness`, `Identified by back-door adjustment for ${adjustment}.`)
       if (context.treatmentIsBinary === null) leave(`${prefix}-positivity`, 'The treatment column has not been read yet; it is checked before the estimator runs.')
-      else if (!context.treatmentIsBinary) violate(`${prefix}-positivity`, 'The treatment holds values other than 0 and 1, so there are no two arms to weight between.')
-      else leave(`${prefix}-positivity`, 'Read the fitted scores with the run: a score at zero or one leaves a row with no counterpart in the other arm.')
+      else if (!context.treatmentIsBinary) violate(`${prefix}-positivity`, 'This estimator requires treatment values of 0 or 1.')
+      else leave(`${prefix}-positivity`, 'Inspect overlap in the fitted propensity scores. Scores strictly between zero and one do not by themselves establish adequate support in both arms.')
       if (configuration.kind === 'propensity-weighting') {
-        leave('ipw-extreme-weights', 'The weight sums for each arm are reported with the estimate. Far from the number of rows in that arm means a few rows carry the result.')
-        leave('ipw-treatment-model', `The score is fitted by ${configuration.model === 'newton' ? 'Newton-Raphson, as statsmodels does' : `L-BFGS-B at ${configuration.maxIter} iterations, as scikit-learn does`}. Declare categorical covariates before the run.`)
+        leave('ipw-extreme-weights', 'Inspect the weight distribution and effective sample size within each arm. Weight sums alone do not measure concentration.')
+        const modelDescription = {
+          newton: 'Logistic regression fitted with Newton-Raphson.',
+          lbfgsb: `Logistic regression fitted with L-BFGS-B, with a maximum of ${configuration.maxIter} iterations.`,
+          boosted: 'Gradient-boosted trees with hyperparameters selected by cross-validation ROC AUC on the full sample before any two-half split.',
+        } satisfies Record<PropensityWeightingConfiguration['model'], string>
+        leave('ipw-treatment-model', `${modelDescription[configuration.model]} Declare categorical covariates before fitting.`)
       }
       if (configuration.kind === 'propensity-matching') {
         leave('matching-single-neighbour', 'Every row is paired with one nearest neighbour on the score.')
         leave('matching-average-not-treated', 'Pairs are averaged over every row, so this is the average effect rather than the effect on the treated.')
       }
       if (configuration.kind === 'doubly-robust') {
-        leave('aipw-one-model-right', 'Only one of the treatment model and the outcome model has to be correct. Both wrong leaves the estimate biased.')
+        leave('aipw-one-model-right', 'Consistency requires a correctly specified propensity model or correctly specified outcome regressions in both arms, together with the identification and regularity assumptions.')
         leave('aipw-arm-regressions', 'The outcome model is a linear regression fitted within each arm on the same design.')
       }
       break
@@ -2496,11 +2527,11 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     case 'continuous-gps': {
       if (adjustment === null) violate('gps-unconfoundedness', 'No measured back-door adjustment set was found, so the treatment model has nothing to condition on.')
       else satisfy('gps-unconfoundedness', `Identified by back-door adjustment for ${adjustment}.`)
-      if (context.treatmentIsBinary === true) violate('gps-normal-treatment', 'The treatment holds only 0 and 1. A binary treatment has a propensity rather than a density, so use inverse propensity weighting.')
+      if (context.treatmentIsBinary === true) violate('gps-normal-treatment', 'The treatment contains only 0 and 1. This Gaussian density model is for continuous treatments; use a binary-treatment estimator.')
       else leave('gps-normal-treatment', 'The treatment is taken as normal around its fitted value with constant variance.')
       if (configuration.scale === 'stabilized') satisfy('gps-stabilize', 'Weights are stabilized by the marginal density of the treatment.')
-      else leave('gps-stabilize', 'Weights are the inverse density alone. With a continuous treatment, stabilizing is necessary rather than optional.')
-      leave('gps-linear-response', 'The weighted model fits one slope, so the reported effect is a single treatment response rather than a curve.')
+      else leave('gps-stabilize', 'Weights are inverse conditional treatment densities. Inspect their concentration; small densities can produce large weights.')
+      leave('gps-linear-response', 'The weighted regression assumes a linear dose-response relationship and estimates the outcome change per one-unit increase in treatment.')
       break
     }
     case 'bayesian-gaussian': {

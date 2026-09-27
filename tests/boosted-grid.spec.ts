@@ -33,6 +33,7 @@ test('the grid fields show the grid the run searches, and refuse bad text with i
   await page.getByRole('radio', { name: /^Propensity score/ }).click()
   await page.getByRole('radio', { name: /^Inverse propensity weighting/ }).click()
   await page.getByRole('radio', { name: 'Boosted', exact: true }).click()
+  await page.getByText('Search grid', { exact: true }).click()
 
   const rates = page.getByRole('textbox', { name: 'Learning rates', exact: true })
   await expect(rates).toHaveValue('0.005, 0.01, 0.15, 0.2')

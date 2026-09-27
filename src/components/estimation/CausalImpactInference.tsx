@@ -1,6 +1,6 @@
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
-import { field, fieldLabel } from '@/components/ui/recipes'
+import { field, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
 import type { CausalImpactConfiguration } from '@/domain/estimation'
 import { StructuralImpactControls } from './StructuralImpactControls'
 
@@ -9,10 +9,10 @@ export function CausalImpactInference({ configuration, onChange }: {
   readonly onChange: (configuration: CausalImpactConfiguration) => void
 }) {
   const settings = configuration.inference
-  return <div className="grid gap-3">
+  return <div className={settingsStack}>
     <div>
       <ParameterLabel className={fieldLabel} label="Inference" help="Maximum likelihood reports pointwise forecast bands. Bayesian inference samples the selected model and reports posterior effect intervals." />
-      <SegmentedControl className="mt-1" fill ariaLabel="Causal impact inference"
+      <SegmentedControl className="mt-1 max-w-2xl" fill ariaLabel="Causal impact inference"
         value={settings === undefined ? 'maximum-likelihood' : 'bayesian'}
         options={[{ value:'maximum-likelihood', label:'Maximum likelihood' }, { value:'bayesian', label:'Bayesian' }]}
         onChange={(kind) => {
@@ -24,14 +24,14 @@ export function CausalImpactInference({ configuration, onChange }: {
     </div>
     {settings !== undefined && <div>
       <ParameterLabel className={fieldLabel} label="Bayesian model" help="CausalImpact uses a local level model. BSTS components supports local level, local linear trend and semilocal linear trend models. The specifications have different variance priors and prior inclusion probabilities." />
-      <SegmentedControl className="mt-1" fill ariaLabel="Bayesian model" value={settings.kind}
+      <SegmentedControl className="mt-1 max-w-2xl" fill ariaLabel="Bayesian model" value={settings.kind}
         options={[{ value:'bayesian',label:'CausalImpact specification' },{ value:'structural',label:'BSTS components' }]}
         onChange={kind => onChange({ ...configuration, inference:kind === 'bayesian'
           ? { kind:'bayesian',draws:settings.draws,warmup:settings.warmup,seed:settings.seed,priorLevelSd:0.01 }
           : { kind:'structural',draws:4000,warmup:2000,seed:settings.seed,model:{ version:'gaussian-components-v1',trend:'level',seasonality:{ kind:'none' } } } })} />
     </div>}
     {settings?.kind === 'structural' && <StructuralImpactControls model={settings.model} onChange={model => onChange({ ...configuration,inference:{ ...settings,model } })} />}
-    {settings !== undefined && <div className="grid grid-cols-2 items-end gap-3">
+    {settings !== undefined && <div className={fieldRow.three}>
       <label className="block"><ParameterLabel className={fieldLabel} label="Posterior draws" help="Draws retained after warmup. More draws can reduce Monte Carlo error; they do not correct an unsuitable model." />
         <input className={field('text','mt-1 w-full')} aria-label="Posterior draws" type="number" min={2} step={1} value={settings.draws}
           onChange={(event) => onChange({ ...configuration, inference:{ ...settings, draws:Math.max(2,Math.trunc(Number(event.target.value)||2)) } })} />

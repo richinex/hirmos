@@ -45,8 +45,8 @@ for (const timezoneId of ['UTC', 'Europe/Amsterdam', 'America/New_York']) {
 test('time preview protocol rejects unknown variants and malformed results', () => {
   const request = '8c2b1a19-9b68-45b3-8f47-e31450850436'
   expect(parseDataWorkerEvent({ kind: 'unknown', request }).ok).toBe(false)
-  expect(parseDataWorkerEvent({ kind: 'time-preview-succeeded', request, preview: { kind: 'calendar', rows: [{ original: 'bad', parsed: NaN }] } }).ok).toBe(false)
-  expect(parseDataWorkerEvent({ kind: 'time-preview-succeeded', request, preview: { kind: 'calendar', rows: [{ original: 'bad', parsed: null }] } }).ok).toBe(true)
+  expect(parseDataWorkerEvent({ kind: 'time-preview-succeeded', request, preview: { kind: 'calendar', rows: [{ original: 'bad', parsed: NaN }], spacing: { kind: 'single-period' } } }).ok).toBe(false)
+  expect(parseDataWorkerEvent({ kind: 'time-preview-succeeded', request, preview: { kind: 'calendar', rows: [{ original: 'bad', parsed: null }], spacing: { kind: 'single-period' } } }).ok).toBe(true)
 })
 
 test('direct upload previews and prepares ISO weeks through existing controls', async ({ page }, info) => {

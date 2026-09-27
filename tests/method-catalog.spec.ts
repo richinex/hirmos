@@ -128,7 +128,7 @@ test('requires sourced caveats for every registered method', async ({ page }, te
   const dynotears = parsed.data.find((method) => method.id === 'dynotears')
   expect(dynotears?.caveats.some((caveat) => caveat.requirement.includes('sparse linear dynamic'))).toBe(true)
   const varLingam = parsed.data.find((method) => method.id === 'var-lingam')
-  expect(varLingam?.caveats.some((caveat) => caveat.requirement.includes('non-Gaussian errors'))).toBe(true)
+  expect(varLingam?.caveats.some((caveat) => caveat.requirement.includes('mutually independent and non-Gaussian'))).toBe(true)
   const directLingam = parsed.data.find((method) => method.id === 'direct-lingam')
   expect(directLingam?.caveats.some((caveat) => caveat.requirement.includes('independent and non-Gaussian'))).toBe(true)
   const ocse = parsed.data.find((method) => method.id === 'ocse')

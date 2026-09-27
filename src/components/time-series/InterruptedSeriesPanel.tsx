@@ -17,7 +17,9 @@ import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 import { Select } from '@/components/ui/Select'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Orb } from '@/components/ui/Orb'
-import { button, field, fieldLabel, fieldHint, panel } from '@/components/ui/recipes'
+import { actionGap, button, field, fieldHint, fieldLabel, fieldRow, panel, stepsStack } from '@/components/ui/recipes'
+import { SettingsStep } from '@/components/ui/SettingsStep'
+import { cn } from '@/lib/utils'
 import { useRunActivity } from '@/lib/useRunActivity'
 import { describeAnalysisWorkerProblem } from '@/workers/analysisProtocol'
 import { TimeSeriesHeading, type TimeSeriesPanelProps } from './TimeSeriesPanel'
@@ -135,61 +137,69 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">
         {props.selector}
         <h3 className="mb-1 mt-3 text-body font-medium text-ink">Interrupted series</h3>
-        <p className={`${fieldHint} mb-4 max-w-[65ch]`}>{TIME_SERIES_METHODS.interrupted.summary}</p>
-        <fieldset disabled={job.kind === 'running'} className="m-0 min-w-0 space-y-4 border-0 p-0">
+        <p className={`${fieldHint} m-0 max-w-[65ch]`}>{TIME_SERIES_METHODS.interrupted.summary}</p>
+        <fieldset disabled={job.kind === 'running'} className="m-0 mt-8 grid min-w-0 gap-6 border-0 p-0">
           <legend className="sr-only">Interrupted series specification</legend>
-          <div className="grid gap-4 @lg/panel:grid-cols-2">
-            <label className="block"><span className={fieldLabel}>Series</span>
-              <Select className={field('text', 'mt-1')} value={draft.outcome ?? ''} onChange={(e) => set('outcome', columns.find((c) => c.id === e.target.value)?.id ?? null)}><option value="">Choose the series</option>{columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
-            </label>
-            <div className="space-y-1">
-              <ParameterLabel className={fieldLabel} label="Outcome type" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.outcomeType} />
-              <SegmentedControl size="sm" ariaLabel="Outcome type" value={model.kind} onChange={(kind) => set('model', kind === 'count' ? { kind, exposure: null } : { kind, errors: { kind: 'neweyWest', maxLags: '' } })} options={[{ value: 'continuous', label: 'Continuous' }, { value: 'count', label: 'Count' }]} />
-            </div>
-            {model.kind === 'count' && <label className="block"><ParameterLabel className={fieldLabel} label="Exposure" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.exposure} />
-              <Select aria-label="Exposure" className={field('text', 'mt-1')} value={model.exposure ?? ''} onChange={(e) => set('model', { kind: 'count', exposure: columns.find((c) => c.id === e.target.value)?.id ?? null })}><option value="">None</option>{columns.filter((c) => c.id !== draft.outcome).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
-            </label>}
-          </div>
-          <div className="grid gap-4 @lg/panel:grid-cols-2">
-            <label className="block"><ParameterLabel className={fieldLabel} label="Intervention row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.interventionRow} />
-              <input aria-label="Intervention row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.interventionRow} onChange={(e) => set('interventionRow', e.target.value)} />
-            </label>
-            <label className="block"><ParameterLabel className={fieldLabel} label="Lag" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.lag} />
-              <input aria-label="Lag" type="number" min={0} className={field('text', 'mt-1')} value={draft.lag} onChange={(e) => set('lag', e.target.value)} />
-            </label>
-          </div>
-          <div className="space-y-1">
-            <ParameterLabel className={fieldLabel} label="Impact model" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.impactModel[draft.impact.kind]} />
-            <SegmentedControl size="sm" wrap ariaLabel="Impact model" value={draft.impact.kind} onChange={(kind) => set('impact', kind === 'temporaryLevel' ? { kind, until: '' } : { kind })} options={[{ value: 'level', label: 'Level change' }, { value: 'levelAndSlope', label: 'Level and slope change' }, { value: 'slope', label: 'Slope change' }, { value: 'temporaryLevel', label: 'Temporary level change' }]} />
-            {draft.impact.kind === 'temporaryLevel' && <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Until row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.untilRow} />
-              <input aria-label="Until row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.impact.until} onChange={(e) => set('impact', { kind: 'temporaryLevel', until: e.target.value })} />
-            </label>}
-          </div>
-          <div className="grid gap-4 @lg/panel:grid-cols-2">
-            <label className="block"><ParameterLabel className={fieldLabel} label="Seasonal terms" help={period === null ? ESTIMATION_PARAMETER_HELP.interruptedSeries.noSeasonalPeriod : ESTIMATION_PARAMETER_HELP.interruptedSeries.seasonalTerms} />
-              <input aria-label="Seasonal terms" type="number" min={0} max={12} className={field('text', 'mt-1')} value={period === null ? '0' : draft.harmonicPairs} disabled={period === null} onChange={(e) => set('harmonicPairs', e.target.value)} />
-            </label>
-          </div>
-          {model.kind === 'continuous' && <div className="space-y-2">
-            <ParameterLabel className={fieldLabel} label="Error model" help={model.errors.kind === 'neweyWest' ? ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWest : ESTIMATION_PARAMETER_HELP.interruptedSeries.armaErrors} />
-            <SegmentedControl size="sm" ariaLabel="Error model" value={model.errors.kind} onChange={(kind) => set('model', { kind: 'continuous', errors: kind === 'arma' ? { kind, p: '1', q: '0', maxIter: String(DEFAULT_ARMA_ITERATIONS) } : { kind, maxLags: '' } })} options={[{ value: 'neweyWest', label: 'Newey–West' }, { value: 'arma', label: 'ARMA errors' }]} />
-            {armaDraft === null ? <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Newey–West bandwidth" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWestBandwidth} />
-              <input aria-label="Newey–West bandwidth" type="number" min={0} className={field('text', 'mt-1')} placeholder="Automatic" value={model.errors.kind === 'neweyWest' ? model.errors.maxLags : ''} onChange={(e) => set('model', { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: e.target.value } })} />
-            </label> : <div className="grid gap-4 @lg/panel:grid-cols-3">
-              <label className="block"><ParameterLabel className={fieldLabel} label="Autoregressive order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder} />
-                <input aria-label="Autoregressive order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={armaDraft.p} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, p: e.target.value } })} />
+          <div className={stepsStack}>
+            <SettingsStep number={1} title="Choose the series">
+              <label className="block max-w-md"><span className={fieldLabel}>Series</span>
+                <Select className={field('text', 'mt-1')} value={draft.outcome ?? ''} onChange={(e) => set('outcome', columns.find((c) => c.id === e.target.value)?.id ?? null)}><option value="">Choose the series</option>{columns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
               </label>
-              <label className="block"><ParameterLabel className={fieldLabel} label="Moving-average order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.movingAverageOrder} />
-                <input aria-label="Moving-average order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={armaDraft.q} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, q: e.target.value } })} />
+              <div>
+                  <ParameterLabel className={fieldLabel} label="Outcome type" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.outcomeType} />
+                  <SegmentedControl className="mt-1" ariaLabel="Outcome type" value={model.kind} onChange={(kind) => set('model', kind === 'count' ? { kind, exposure: null } : { kind, errors: { kind: 'neweyWest', maxLags: '' } })} options={[{ value: 'continuous', label: 'Continuous' }, { value: 'count', label: 'Count' }]} />
+              </div>
+              {model.kind === 'count' && <label className="block max-w-md"><ParameterLabel className={fieldLabel} label="Exposure" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.exposure} />
+                <Select aria-label="Exposure" className={field('text', 'mt-1')} value={model.exposure ?? ''} onChange={(e) => set('model', { kind: 'count', exposure: columns.find((c) => c.id === e.target.value)?.id ?? null })}><option value="">None</option>{columns.filter((c) => c.id !== draft.outcome).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
+              </label>}
+            </SettingsStep>
+            <SettingsStep number={2} title="Mark the intervention">
+              <div className={fieldRow.two}>
+                <label className="block"><ParameterLabel className={fieldLabel} label="Intervention row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.interventionRow} />
+                  <input aria-label="Intervention row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.interventionRow} onChange={(e) => set('interventionRow', e.target.value)} />
+                </label>
+                <label className="block"><ParameterLabel className={fieldLabel} label="Lag" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.lag} />
+                  <input aria-label="Lag" type="number" min={0} className={field('text', 'mt-1')} value={draft.lag} onChange={(e) => set('lag', e.target.value)} />
+                </label>
+              </div>
+              <div className="grid gap-4">
+                <div>
+                  <ParameterLabel className={fieldLabel} label="Impact model" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.impactModel[draft.impact.kind]} />
+                  <SegmentedControl className="mt-1" wrap ariaLabel="Impact model" value={draft.impact.kind} onChange={(kind) => set('impact', kind === 'temporaryLevel' ? { kind, until: '' } : { kind })} options={[{ value: 'level', label: 'Level change' }, { value: 'levelAndSlope', label: 'Level and slope change' }, { value: 'slope', label: 'Slope change' }, { value: 'temporaryLevel', label: 'Temporary level change' }]} />
+                </div>
+                {draft.impact.kind === 'temporaryLevel' && <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Until row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.untilRow} />
+                  <input aria-label="Until row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.impact.until} onChange={(e) => set('impact', { kind: 'temporaryLevel', until: e.target.value })} />
+                </label>}
+              </div>
+            </SettingsStep>
+            <SettingsStep number={3} title="Model the rest of the series">
+              <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Seasonal terms" help={period === null ? ESTIMATION_PARAMETER_HELP.interruptedSeries.noSeasonalPeriod : ESTIMATION_PARAMETER_HELP.interruptedSeries.seasonalTerms} />
+                <input aria-label="Seasonal terms" type="number" min={0} max={12} className={field('text', 'mt-1')} value={period === null ? '0' : draft.harmonicPairs} disabled={period === null} onChange={(e) => set('harmonicPairs', e.target.value)} />
               </label>
-              <label className="block"><ParameterLabel className={fieldLabel} label="Optimiser iterations" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.armaIterations} />
-                <input aria-label="Optimiser iterations" type="number" min={1} className={field('text', 'mt-1')} value={armaDraft.maxIter} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, maxIter: e.target.value } })} />
-              </label>
-            </div>}
-          </div>}
+              {model.kind === 'continuous' && <div className="grid gap-4">
+                <div>
+                  <ParameterLabel className={fieldLabel} label="Error model" help={model.errors.kind === 'neweyWest' ? ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWest : ESTIMATION_PARAMETER_HELP.interruptedSeries.armaErrors} />
+                  <SegmentedControl className="mt-1" ariaLabel="Error model" value={model.errors.kind} onChange={(kind) => set('model', { kind: 'continuous', errors: kind === 'arma' ? { kind, p: '1', q: '0', maxIter: String(DEFAULT_ARMA_ITERATIONS) } : { kind, maxLags: '' } })} options={[{ value: 'neweyWest', label: 'Newey–West' }, { value: 'arma', label: 'ARMA errors' }]} />
+                </div>
+                {armaDraft === null ? <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Newey–West bandwidth" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.neweyWestBandwidth} />
+                  <input aria-label="Newey–West bandwidth" type="number" min={0} className={field('text', 'mt-1')} placeholder="Automatic" value={model.errors.kind === 'neweyWest' ? model.errors.maxLags : ''} onChange={(e) => set('model', { kind: 'continuous', errors: { kind: 'neweyWest', maxLags: e.target.value } })} />
+                </label> : <div className={fieldRow.three}>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Autoregressive order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder} />
+                    <input aria-label="Autoregressive order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={armaDraft.p} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, p: e.target.value } })} />
+                  </label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Moving-average order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.movingAverageOrder} />
+                    <input aria-label="Moving-average order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={armaDraft.q} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, q: e.target.value } })} />
+                  </label>
+                  <label className="block"><ParameterLabel className={fieldLabel} label="Optimiser iterations" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.armaIterations} />
+                    <input aria-label="Optimiser iterations" type="number" min={1} className={field('text', 'mt-1')} value={armaDraft.maxIter} onChange={(e) => set('model', { kind: 'continuous', errors: { ...armaDraft, maxIter: e.target.value } })} />
+                  </label>
+                </div>}
+              </div>}
+            </SettingsStep>
+          </div>
           {problem !== null && draft.outcome !== null && <p role="status" className="m-0 text-body text-muted">{problem}</p>}
         </fieldset>
-        <div className="mt-4 flex flex-wrap items-center gap-3">
+        <div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}>
           <button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void fit()}>Fit interrupted series</button>
           <span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label="Interrupted series running" />}</span>
           {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}

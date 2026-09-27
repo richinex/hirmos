@@ -186,7 +186,7 @@ const adjustedDidUncertainty = (specification: AdjustedDidSpecification, interva
   const base = interval.kind === 'none' ? noInterval(interval.reason) : intervalStatement(interval, { kind: 'additive' })
   switch (specification.kind) {
     case 'doublyRobust': return base
-    case 'regression': return { kind: 'uncertainty', text: `${base.text} The same unit appears in both periods, so the rows are not independent and identically distributed. The treatment is assigned to the unit, not to the period, so the sample size is closer to the number of units than to the number of rows, which is what this regression uses when computing standard errors. Standard errors clustered by unit give wider confidence intervals than no clustering at all; the staggered adoption estimator clusters by unit.` }
+    case 'regression': return { kind: 'uncertainty', text: `${base.text} This interval assumes independent errors. Because each unit appears in both periods, errors may be correlated within units. These standard errors are not clustered by unit and do not account for that dependence. Clustering can change the interval in either direction.` }
     default: return assertNever(specification)
   }
 }

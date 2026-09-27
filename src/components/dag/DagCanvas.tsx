@@ -476,7 +476,7 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
         <button
           type="button"
           className={control}
-          title="Tidy: lay the variables out again left to right in causal order and fit the view. Dragged positions are replaced; nothing is rewired."
+          title="Tidy: Lay out the variables again from left to right in causal order and fit the view. Any positions you dragged will be replaced, but the connections remain unchanged."
           aria-label="Tidy graph"
           onClick={() => { onTidy(); window.setTimeout(() => void fitView({ ...FIT_VIEW, duration: 220 }), 30) }}
         >
@@ -496,8 +496,8 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
           type="button"
           className={control}
           title={viewLocked
-            ? 'Scroll wheel scrolls the page. Click to let it zoom the graph instead, or hold ⌘ or Ctrl.'
-            : 'Scroll wheel zooms the graph. Click to give it back to the page.'}
+            ? 'The scroll wheel scrolls the page. Click to enable graph zooming, or hold ⌘ or Ctrl while scrolling.'
+            : 'The scroll wheel zooms the graph. Click to restore page scrolling.'}
           aria-label={viewLocked ? 'Let the wheel zoom' : 'Lock the view'}
           aria-pressed={viewLocked}
           onClick={onToggleLock}
@@ -538,9 +538,9 @@ type Gesture =
 
 const describeConnectionNotice = (notice: ConnectionNotice): string => {
   switch (notice.kind) {
-    case 'edge-added': return 'Arrow added as a new revision. Record its rationale in the selected-edge panel.'
-    case 'edge-reversed': return 'Arrow reversed as a new revision. The reversed relation needs its own rationale.'
-    case 'edge-reconnected': return 'Endpoint moved as a new revision. The reconnected relation needs its own rationale.'
+    case 'edge-added': return 'An arrow has been added in a new graph revision. Record its rationale in the selected-edge panel.'
+    case 'edge-reversed': return 'An arrow has been reversed in a new graph revision. Provide a rationale for the reversed relation.'
+    case 'edge-reconnected': return 'An endpoint has been moved in a new graph revision. Provide a rationale for the reconnected relation.'
     case 'edge-refused': return describeDagEditProblem(notice.problem)
     default: return assertNever(notice)
   }
@@ -549,7 +549,7 @@ const describeConnectionNotice = (notice: ConnectionNotice): string => {
 /** One canvas at a time, so the layer stack needs no per-instance id. */
 const EXPANDED_CANVAS_LAYER = 'dag-canvas-expanded'
 
-const IDLE_HINT = 'Drag from a card onto another card to draw an arrow; drag a card by its name to move it. Select an arrow to reverse or remove it, or drag either of its ends to another card.'
+const IDLE_HINT = 'Draw an arrow by dragging from one card to another. Move a card by dragging its name. Select an arrow to reverse or remove it. To reconnect an arrow, drag either endpoint to another card.'
 
 const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation, labelsShown: boolean): {
   readonly nodes: CanvasNode[]

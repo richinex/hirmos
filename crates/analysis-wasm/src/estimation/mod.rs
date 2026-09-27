@@ -233,6 +233,7 @@ mod tests {
         let json = serde_json::to_value(&result).expect("the evidence serialises");
         assert_eq!(json["kind"], "continuousGps");
         assert_eq!(json["density"].as_array().expect("densities").len(), rows);
+        assert_eq!(json["weights"].as_array().expect("weights").len(), rows);
         let estimate = json["estimate"].as_f64().expect("an estimate");
         assert!((estimate + 0.8).abs() < 0.1, "GPS should recover -0.8, got {estimate}");
         // Stabilized weights sum to about the sample size, which is how the chapter reads them.

@@ -31,7 +31,7 @@ export function CalendarReport(props: {
 }) {
   const [open, setOpen] = useState(false)
   return <details className="mt-3" onToggle={(event) => setOpen(event.currentTarget.open)} data-testid="calendar-report">
-    <DisclosureSummary>Calendar coverage</DisclosureSummary>
+    <DisclosureSummary className="cursor-pointer text-body font-medium text-ink">Calendar coverage</DisclosureSummary>
     {open && <Coverage key={props.frequency} {...props} />}
   </details>
 }

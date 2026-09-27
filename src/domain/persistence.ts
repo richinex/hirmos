@@ -366,6 +366,12 @@ const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<str
       evidence: { preInterventionPath: { kind: 'notReported' },
         ...(typeof observations === 'number' ? { postEnd: observations } : {}), ...evidence } }
   }
+  // A generalised propensity score run saved before its weights were recorded keeps its estimate
+  // and records the weights as missing.
+  if (Reflect.get(value, 'kind') === 'continuous-gps-run'
+    && typeof evidence === 'object' && evidence !== null) {
+    return { ...value, estimate: upgradedEstimate, evidence: { weights: null, ...evidence } }
+  }
   if (Reflect.get(value, 'kind') === 'synthetic-control-run'
     && typeof configuration === 'object' && configuration !== null
     && typeof evidence === 'object' && evidence !== null) {

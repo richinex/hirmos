@@ -20,7 +20,8 @@ import { Formula } from '@/components/ui/Formula'
 import { ResultInterpretation } from '@/components/ui/ResultInterpretation'
 import { RadioList } from '@/components/ui/RadioList'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
-import { button, chapterIntro, field, fieldLabel, label, literal, num, panel, prose, sectionTitle, well } from '@/components/ui/recipes'
+import { actionGap, button, chapterIntro, field, fieldHint, fieldLabel, label, literal, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
+import { SettingsStep } from '@/components/ui/SettingsStep'
 import { DEFAULT_DYNAMIC_LINEAR_SCM, DEFAULT_LINEAR_SCM, evaluateCounterfactualEligibility, newCounterfactualRunId, type CounterfactualConfiguration, type CounterfactualRunArtifact, type DynamicCounterfactualUncertainty } from '@/domain/counterfactual'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
@@ -162,7 +163,7 @@ function RunCard({ run, study, current, stepLabel, onDelete }: { readonly run: C
   const record = (
     <>
       <h3 className="mb-1 mt-2 text-heading font-medium text-ink text-balance">What {study.outcome.name} would have been with {study.treatment.name} set to {view.interventions[1]} instead of {view.interventions[0]}</h3>
-      <p className="m-0 text-body text-muted">{run.kind === 'linear-scm-run' ? `For each ${stepLabel}, the model infers disturbance terms from the observed values and predicts both treatment worlds.` : `The model recovers the observed innovation at each time point, preserves the factual history through row ${view.firstStep - 1}, and replays both treatment worlds through the recorded lagged graph.`} The difference is conditional on the fitted structural equations.</p>
+      <p className="m-0 text-body text-muted">{run.kind === 'linear-scm-run' ? `For each ${stepLabel}, the model infers disturbance terms from the observed values and predicts both treatment worlds.` : `The model recovers the observed innovation at each time point, preserves the factual history through row ${view.firstStep - 1}, and replays both treatment worlds through the recorded lagged graph.`} The difference depends on the fitted structural equations.</p>
       <MetricGrid className="mt-3" label="Counterfactual summary">
         <MetricTile label={constant ? 'Effect for every row' : run.kind === 'dynamic-linear-scm-run' ? 'Average horizon effect' : 'Average individual effect'} size="compact" frame="cell" value={formatStatistic('raw', view.averageEffect)} context={constant ? 'the same for all rows: a linear model with exact abduction gives coefficient × change' : uncertainty === null ? `SD across ${stepLabel}s ${formatStatistic('sd', sd).text}` : `${Math.round(uncertainty.confidenceLevel * 100)}% block-bootstrap CI [${formatStatistic('raw', uncertainty.averageInterval[0]).text}, ${formatStatistic('raw', uncertainty.averageInterval[1]).text}]`} />
         {constant
@@ -314,7 +315,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       if (!session.current(current)) return
       const measured = study.graph.nodes.flatMap((node) => (node.column === null ? [] : [{ node: node.node, column: node.column, name: node.name }]))
-      if (measured.length !== study.graph.nodes.length) { fail('Counterfactual estimation requires measured values for every node. Replace or remove unmeasured nodes in the DAG workspace.'); return }
+      if (measured.length !== study.graph.nodes.length) { fail('This counterfactual model requires measured values for every node. Review the unmeasured nodes in the DAG workspace. Removing a node changes the causal assumptions; it does not resolve unmeasured confounding.'); return }
       const nodes = measured as unknown as NonEmptyArray<StudyVariable>
       const matrix = await materialisePrepared(source, profile, prepared, nodes.map((variable) => variable.column) as unknown as NonEmptyArray<ColumnId>)
       if (!session.current(current)) return
@@ -339,7 +340,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
         case 'dynamic-linear-scm': {
           const document = documents.find((candidate) => candidate.id === study.dagDocument)
           const revision = document?.audit.find((candidate) => candidate.id === study.dagRevision)
-          if (revision === undefined) { fail('The DAG revision recorded by this study is not available.'); return }
+          if (revision === undefined) { fail('This study’s recorded DAG revision is not available.'); return }
           const stationary = stationaryMarksFromGraph(revision.graph)
           const timing = state.configuration.schedule.kind === 'point'
             ? { kind: 'point' as const, time: state.configuration.schedule.row - 1 }
@@ -375,15 +376,17 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="counterfactual-title" className="mb-2">Counterfactuals</ChapterHeading>
-        <p className={chapterIntro}>A counterfactual compares outcomes for the same unit or evolving system under alternative interventions. The row-wise model treats observations independently. The dynamic model preserves the recorded lags, infers the innovation at each time point, and propagates an intervention through the later series.</p>
+        <p className={chapterIntro}>A counterfactual compares outcomes for the same unit or system under different interventions. The row-wise model treats each observation independently. The dynamic model keeps the recorded lags, infers the innovation at each time point, and carries the intervention through the later series.</p>
       </div>
       <section className={panel('p-(--panel-space)')} aria-labelledby="counterfactual-setup-title">
-        <h3 id="counterfactual-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Structural counterfactual</h3>
+        <h3 id="counterfactual-setup-title" className={cn(sectionTitle, 'mb-6 mt-0')}>Structural counterfactual</h3>
         {identified.length === 0 ? (
           <p className="m-0 text-body text-faint">Identify a study first.</p>
         ) : (
           <>
-            <label className="block">
+            <div className={stepsStack}>
+            <SettingsStep number={1} title="Choose the study and model">
+            <label className="block max-w-2xl">
               <span className={fieldLabel}>Identified study</span>
               <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => dispatch({ type: 'identification-chosen', identification: event.target.value === '' ? null : (event.target.value as IdentificationId) })}>
                 {identified.map((candidate) => {
@@ -392,7 +395,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
                 })}
               </Select>
             </label>
-            <div className="mt-4">
+            <div>
               <span className={fieldLabel}>Structural model</span>
               <SegmentedControl
                 className="mt-1"
@@ -415,7 +418,9 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
                 ]}
               />
             </div>
-            <div className="mt-4 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
+            </SettingsStep>
+            <SettingsStep number={2} title="Set the intervention">
+            <div className="grid max-w-4xl items-start gap-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
               <label className="block"><span className={fieldLabel}>Set {study?.treatment.name ?? 'treatment'} to</span><input type="number" step="any" aria-label="First intervention value" className={field('text', 'mt-1')} value={state.configuration.interventions[0]} onChange={(event) => configure({ ...state.configuration, interventions: [Number(event.target.value) || 0, state.configuration.interventions[1]] })} /></label>
               <label className="block"><span className={fieldLabel}>and to</span><input type="number" step="any" aria-label="Second intervention value" className={field('text', 'mt-1')} value={state.configuration.interventions[1]} onChange={(event) => configure({ ...state.configuration, interventions: [state.configuration.interventions[0], Number(event.target.value) || 0] })} /></label>
               {state.configuration.kind === 'dynamic-linear-scm' && (
@@ -434,41 +439,46 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
                     ? <label className="block"><span className={fieldLabel}>Intervention row</span><input type="number" min={selectedMaxLag + 1} max={prepared.observations} className={field('text', 'mt-1')} value={state.configuration.schedule.row} onChange={(event) => configureDynamicStartRow(Math.max(selectedMaxLag + 1, Math.min(prepared.observations, Math.floor(Number(event.target.value) || selectedMaxLag + 1))))} /></label>
                     : <label className="block"><span className={fieldLabel}>First intervention row</span><input type="number" min={selectedMaxLag + 1} max={prepared.observations} className={field('text', 'mt-1')} value={state.configuration.schedule.startRow} onChange={(event) => configureDynamicStartRow(Math.max(selectedMaxLag + 1, Math.min(prepared.observations, Math.floor(Number(event.target.value) || selectedMaxLag + 1))))} /></label>}
                   <label className="block"><span className={fieldLabel}>Horizon points</span><input type="number" min={1} max={dynamicMaxHorizon} className={field('text', 'mt-1')} value={state.configuration.steps} onChange={(event) => configureDynamicSteps(Math.max(1, Math.min(dynamicMaxHorizon, Math.floor(Number(event.target.value) || 1))))} /></label>
-                  <p className="m-0 self-end text-body text-faint">The horizon includes the intervention row. Point mode replaces one treatment value; persistent mode replaces the treatment equation throughout the horizon.</p>
+                  <p className={cn(fieldHint, 'm-0 col-span-full max-w-[65ch]')}>The horizon includes the intervention row. In point mode, one treatment value is replaced. In persistent mode, the treatment equation is replaced for the entire horizon.</p>
                 </>
               )}
             </div>
+            </SettingsStep>
             {state.configuration.kind === 'linear-scm' && (
-              <div className="mt-4">
+              <SettingsStep number={3} title="Infer disturbance terms">
                 <RadioList
+                  className="max-w-3xl"
+                  legendHidden
                   legend="Infer disturbance terms"
                   value={state.configuration.observationNoise === null ? 'exact' : 'noise'}
                   onChange={(mode) => configureObservationNoise(mode === 'exact' ? null : 0.1)}
                   options={[
-                    { value: 'exact', label: 'Exactly', hint: 'Recovers each disturbance term exactly from the fitted equations.' },
-                    { value: 'noise', label: 'Allow observation noise', hint: 'Infers disturbance terms allowing observation noise at the chosen scale.' },
+                    { value: 'exact', label: 'Exactly', hint: 'Each disturbance term is recovered exactly from the fitted equations.' },
+                    { value: 'noise', label: 'Allow observation noise', hint: 'Disturbance terms are inferred, allowing for observation noise at the chosen scale.' },
                   ]}
                 />
                 {state.configuration.observationNoise !== null && (
-                  <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
-                    <label className="block"><span className={fieldLabel}>Noise scale</span><input type="number" step="any" min={0.0001} aria-label="Observation noise scale" className={field('text', 'mt-1')} value={state.configuration.observationNoise} onChange={(event) => configureObservationNoise(Math.max(0.0001, Number(event.target.value) || 0.0001))} /></label>
+                  <div>
+                    <label className="block max-w-xs"><span className={fieldLabel}>Noise scale</span><input type="number" step="any" min={0.0001} aria-label="Observation noise scale" className={field('text', 'mt-1')} value={state.configuration.observationNoise} onChange={(event) => configureObservationNoise(Math.max(0.0001, Number(event.target.value) || 0.0001))} /></label>
                   </div>
                 )}
-              </div>
+              </SettingsStep>
             )}
             {dynamicConfiguration !== null && (
-              <div className="mt-4 border-t border-hair pt-4">
+              <SettingsStep number={3} title="Report uncertainty">
                 <RadioList frame="none"
+                  className="max-w-3xl"
+                  legendHidden
                   legend="Sampling uncertainty"
                   value={dynamicConfiguration.uncertainty.kind}
                   onChange={configureDynamicUncertaintyMode}
                   options={[
-                    { value: 'blockBootstrap', label: 'Block-bootstrap interval', hint: 'Refits the dynamic equations to circular blocks and reports pointwise and aggregate confidence intervals.' },
-                    { value: 'none', label: 'Point estimate only', hint: 'Reports the fitted counterfactual path without a sampling interval.' },
+                    { value: 'blockBootstrap', label: 'Block-bootstrap interval', hint: 'The dynamic equations are refitted to samples drawn using circular blocks. Confidence intervals are reported for individual time points and aggregate effects.' },
+                    { value: 'none', label: 'Point estimate only', hint: 'The fitted counterfactual path is reported without a sampling interval.' },
                   ]}
                 />
                 {dynamicBootstrap !== null && (
-                  <div className="mt-3 grid gap-3 @md/panel:grid-cols-2 @4xl/panel:grid-cols-5">
+                  <div className="grid max-w-4xl items-start gap-4 @md/panel:grid-cols-2 @4xl/panel:grid-cols-4">
                     <label className="block"><span className={fieldLabel}>Bootstrap refits</span><input type="number" min={20} max={5000} className={field('text', 'mt-1')} value={dynamicBootstrap.samples} onChange={(event) => configureDynamicUncertainty({ ...dynamicBootstrap, samples: Math.max(20, Math.min(5000, Math.floor(Number(event.target.value) || 20))) })} /></label>
                     <div>
                       <span className={fieldLabel}>Block length</span>
@@ -485,16 +495,19 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
                     <label className="block"><span className={fieldLabel}>Seed</span><input type="number" min={0} max={0xffff_ffff} step={1} className={field('text', 'mt-1')} value={dynamicBootstrap.seed} onChange={(event) => configureDynamicUncertainty({ ...dynamicBootstrap, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
                   </div>
                 )}
-              </div>
+              </SettingsStep>
             )}
-            {method.ok && <p className={prose('mb-0 mt-3 text-faint')}>{method.value.summary}</p>}
+            </div>
+            {method.ok && <p className={cn(fieldHint, 'mb-0 mt-8 max-w-[65ch]')}>{method.value.summary}</p>}
+            <div className={cn(actionGap, 'grid gap-3')}>
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             <JobNotice job={job} />
-            <div className="mt-4 flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <button type="button" className={button('signal')} disabled={eligibility === null || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 Run counterfactual
               </button>
               {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
+            </div>
             </div>
             {job.kind === 'running' && job.progress !== null && (
               <div className="mt-2 max-w-sm text-label text-faint">
@@ -519,7 +532,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
         </section>
       )}
       {runs.length === 0 && identified.length > 0 && (
-        <EmptyState>Set two values for the treatment and run the counterfactual.</EmptyState>
+        <EmptyState>Set two treatment values and run the counterfactual.</EmptyState>
       )}
     </section>
   )
@@ -550,7 +563,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
 
   const ledger = (
     <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Counterfactual ledger">
-      {runs.length === 0 && <li className="px-3 py-2 text-faint">Choose 2 treatment values and run the counterfactual.</li>}
+      {runs.length === 0 && <li className="px-3 py-2 text-faint">Choose two treatment values and run the counterfactual.</li>}
       {[...runs].reverse().map((run) => {
         const bound = studies.find((candidate) => candidate.id === run.study)
         return bound === undefined ? null : (
@@ -566,7 +579,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
       title="Delete this counterfactual?"
       danger
       confirmLabel="Delete run"
-      message="Removes this counterfactual record. Recorded results cannot be restored."
+      message="This will remove the counterfactual record. Once deleted, the results cannot be restored."
       onConfirm={() => { if (pendingDelete !== null) onDeleteRun(pendingDelete.id) }}
       onClose={() => setPendingDelete(null)}
     />

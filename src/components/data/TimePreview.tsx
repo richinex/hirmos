@@ -34,5 +34,5 @@ export function TimePreview({ file, profile, column, interpretation = SOURCE_TYP
       return state.preview.kind === 'ordinal' ? row.parsed : new Date(row.parsed).toISOString().replace('T', ' ').replace('.000Z', '')
     } },
   ]
-  return <EvidenceTable title="Time preview" help="First 12 source rows. Preparation validates every time value and checks for duplicate time points." rows={state.preview.rows} columns={columns} rowKey={(_, index) => String(index)} noun="row" empty="No source rows." frame="none" />
+  return <EvidenceTable title="Time preview" help="First 12 source rows. Preparation validates each time value and checks for duplicate time points." rows={state.preview.rows} columns={columns} rowKey={(_, index) => String(index)} noun="row" empty="No source rows." frame="none" />
 }

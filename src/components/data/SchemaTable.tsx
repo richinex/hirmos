@@ -208,7 +208,7 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
       )}
       count={countLine(visible.length, rows.length, 'column', sortText)}
       foot={summary.kind === 'failed'
-        ? <p role="status" className="m-0 flex items-center gap-1.5 border-t border-hair px-3.5 py-1.5 text-label text-faint"><Icon name="info" size={12} /> Column summaries could not be computed for this file.</p>
+        ? <p role="status" className="m-0 flex items-center gap-1.5 border-t border-hair px-3.5 py-1.5 text-label text-faint"><Icon name="info" size={12} /> Column summaries could not be generated for this file.</p>
         : undefined}
     >
       <table className={tableCn}>
@@ -231,7 +231,7 @@ export function SchemaTable({ profile, summary, selectedColumn, onSelectColumn }
         </thead>
         <tbody>
           {table.getRowModel().rows.length === 0 && (
-            <tr><td colSpan={columns.length} className="px-3.5 py-6 text-center text-body text-faint">No column matches. Loosen the search or the type filter.</td></tr>
+            <tr><td colSpan={columns.length} className="px-3.5 py-6 text-center text-body text-faint">No columns match the criteria. Broaden the search or adjust the type filter.</td></tr>
           )}
           {table.getRowModel().rows.map((row) => {
             const selected = row.original.id === selectedColumn

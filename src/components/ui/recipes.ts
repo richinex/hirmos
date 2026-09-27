@@ -125,7 +125,21 @@ export const field = (variant: 'text' | 'mono' = 'text', extra?: string): string
 
 /** The label above a field. Ink, not muted: the label is the anchor of the group, and muted sat one
  *  step from the faint hint below it, which made label, hint and placeholder read as one grey. */
-export const fieldLabel = 'block text-label font-medium text-ink'
+export const fieldLabel = 'block text-body font-medium text-ink'
+
+/** 500, because the theme's medium weight is 700. */
+export const stepTitle = 'font-heading text-subtitle [font-weight:500] text-ink text-balance'
+
+export const settingsStack = 'grid gap-6'
+
+export const fieldRow = {
+  two: 'grid max-w-3xl items-start gap-4 @md/panel:grid-cols-2',
+  three: 'grid max-w-4xl items-start gap-4 @md/panel:grid-cols-3',
+} as const
+
+export const stepsStack = '@6xl/panel:columns-2 @6xl/panel:gap-x-16 [&>*]:mb-8 [&>*:last-child]:mb-0 [&>*]:break-inside-avoid'
+
+export const actionGap = 'mt-12'
 
 /** The help line below a field. Body size and the token's 1.5 line height, because the old
  *  11px/leading-snug pairing put multi-sentence help below the WCAG line-height floor. Named here

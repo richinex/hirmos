@@ -18,7 +18,9 @@ import { useChartTheme } from '@/charts/theme'
 import { LagListField } from '@/components/ui/LagListField'
 import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { Select } from '@/components/ui/Select'
-import { button, field, fieldLabel, fieldHint, label, num, panel, sectionTitle, well } from '@/components/ui/recipes'
+import { actionGap, button, field, fieldHint, fieldLabel, fieldRow, label, num, panel, sectionTitle, stepsStack, well } from '@/components/ui/recipes'
+import { SettingsStep } from '@/components/ui/SettingsStep'
+import { cn } from '@/lib/utils'
 import {
   describeCountSeriesReadiness,
   newCountSeriesModelId,
@@ -154,17 +156,27 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
       {selector}
       <h3 id="count-series-title" className="mb-0 mt-3 text-body font-medium text-ink">Negative-binomial count model</h3>
       <p className={`${fieldHint} mb-0 mt-1 max-w-[65ch]`}>Fit a count model and search the selected range for a temporary, fading or persistent change.</p>
-      <fieldset disabled={job.kind === 'running'} className="m-0 mt-4 grid min-w-0 items-start gap-4 border-0 p-0 @lg/panel:grid-cols-2"><legend className="sr-only">Count model specification</legend>
-        <label className="block"><span className={fieldLabel}>Count series</span><Select className={field('text', 'mt-1')} value={outcome ?? ''} onChange={(event) => setOutcome(event.target.value === '' ? null : event.target.value as ColumnId)}><option value="">Choose series</option>{columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}</Select></label>
-        <div><span className={fieldLabel}>Mean link</span><SegmentedControl className="mt-1" ariaLabel="Count-series mean link" value={link} onChange={setLink} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>
-        <LagListField label="Past count lags" lags={pastObservationLags} onChange={setPastObservationLags} />
-        <LagListField label="Past mean lags" lags={pastMeanLags} onChange={setPastMeanLags} />
-        <label className="block"><span className={fieldLabel}>Candidate start row</span><input type="number" min={2} max={prepared.observations} className={field('text', 'mt-1')} value={candidateStart + 1} onChange={(event) => setCandidateStart(Math.max(1, Math.floor(Number(event.target.value) || 2) - 1))} /></label>
-        <label className="block"><span className={fieldLabel}>Candidate end row</span><input type="number" min={2} max={prepared.observations} className={field('text', 'mt-1')} value={candidateEnd + 1} onChange={(event) => setCandidateEnd(Math.max(1, Math.floor(Number(event.target.value) || 2) - 1))} /></label>
-        <div><span className={fieldLabel}>Intervention shape</span><SegmentedControl className="mt-1" ariaLabel="Count-series intervention shape" value={delta === 0 ? 'point' : delta === 1 ? 'persistent' : 'decaying'} onChange={(kind) => setDelta(kind === 'point' ? 0 : kind === 'persistent' ? 1 : 0.8)} options={[{ value: 'point', label: 'Point' }, { value: 'decaying', label: 'Decaying' }, { value: 'persistent', label: 'Persistent' }]} /></div>
-        {delta > 0 && delta < 1 && <label className="block"><span className={fieldLabel}>Decay δ</span><input type="number" min={0.01} max={0.99} step={0.01} className={field('text', 'mt-1')} value={delta} onChange={(event) => setDelta(Math.max(0.01, Math.min(0.99, Number(event.target.value) || 0.8)))} /></label>}
+      <fieldset disabled={job.kind === 'running'} className="m-0 mt-8 min-w-0 border-0 p-0"><legend className="sr-only">Count model specification</legend>
+        <div className={stepsStack}>
+          <SettingsStep number={1} title="Fit the count model">
+            <label className="block max-w-md"><span className={fieldLabel}>Count series</span><Select className={field('text', 'mt-1')} value={outcome ?? ''} onChange={(event) => setOutcome(event.target.value === '' ? null : event.target.value as ColumnId)}><option value="">Choose series</option>{columns.map((column) => <option key={column.id} value={column.id}>{column.name}</option>)}</Select></label>
+            <div><span className={fieldLabel}>Mean link</span><SegmentedControl className="mt-1" ariaLabel="Count-series mean link" value={link} onChange={setLink} options={[{ value: 'identity', label: 'Additive' }, { value: 'log', label: 'Multiplicative' }]} /></div>
+            <div className={fieldRow.two}>
+              <LagListField label="Past count lags" lags={pastObservationLags} onChange={setPastObservationLags} />
+              <LagListField label="Past mean lags" lags={pastMeanLags} onChange={setPastMeanLags} />
+            </div>
+          </SettingsStep>
+          <SettingsStep number={2} title="Search for a change">
+            <div className={fieldRow.two}>
+              <label className="block"><span className={fieldLabel}>Candidate start row</span><input type="number" min={2} max={prepared.observations} className={field('text', 'mt-1')} value={candidateStart + 1} onChange={(event) => setCandidateStart(Math.max(1, Math.floor(Number(event.target.value) || 2) - 1))} /></label>
+              <label className="block"><span className={fieldLabel}>Candidate end row</span><input type="number" min={2} max={prepared.observations} className={field('text', 'mt-1')} value={candidateEnd + 1} onChange={(event) => setCandidateEnd(Math.max(1, Math.floor(Number(event.target.value) || 2) - 1))} /></label>
+            </div>
+            <div><span className={fieldLabel}>Intervention shape</span><SegmentedControl className="mt-1" ariaLabel="Count-series intervention shape" value={delta === 0 ? 'point' : delta === 1 ? 'persistent' : 'decaying'} onChange={(kind) => setDelta(kind === 'point' ? 0 : kind === 'persistent' ? 1 : 0.8)} options={[{ value: 'point', label: 'Point' }, { value: 'decaying', label: 'Decaying' }, { value: 'persistent', label: 'Persistent' }]} /></div>
+            {delta > 0 && delta < 1 && <label className="block max-w-xs"><span className={fieldLabel}>Decay δ</span><input type="number" min={0.01} max={0.99} step={0.01} className={field('text', 'mt-1')} value={delta} onChange={(event) => setDelta(Math.max(0.01, Math.min(0.99, Number(event.target.value) || 0.8)))} /></label>}
+          </SettingsStep>
+        </div>
       </fieldset>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}>
         <button type="button" className={button('signal')} aria-busy={job.kind === 'running'} disabled={outcome === null || session.blocked} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit and scan</button>
         <span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label="Count model running" />}</span>
         <span role="status" className="sr-only">{job.kind === 'running' ? job.stage : ''}</span>
