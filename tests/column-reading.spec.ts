@@ -224,3 +224,30 @@ test('a pipeline input reads a declared column as its type, and the recipe repla
   expect(outcome.unknown).toBe('unknown-input')
   expect(outcome.closed).toBe('session-closed')
 })
+
+test('declaring on the pipeline input card rereads the file: the card and its preview show the new type', async ({ page }, info) => {
+  test.skip(info.project.name !== 'chromium', 'One layout is enough for the card; the phone layout shares it.')
+  test.setTimeout(120_000)
+  await page.goto('/app')
+  await page.getByRole('textbox', { name: 'Project name' }).fill('Read as on a pipeline input')
+  await page.getByRole('button', { name: 'Create project', exact: true }).click()
+  await page.getByRole('radio', { name: 'Build a pipeline' }).click()
+  await page.getByRole('button', { name: 'Open the editor' }).click()
+  await page.getByTestId('pipeline-canvas').waitFor({ timeout: 90_000 })
+  const card = page.locator('[data-testid^="block-input-"]').last()
+  if (await card.count() === 0) await page.getByRole('toolbar', { name: 'Add a block' }).getByRole('button', { name: /^Input/ }).click()
+  await page.locator('[data-testid^="block-input-"]').last().locator('p').first().click()
+  await page.getByLabel('File for this card').setInputFiles({ name: 'patients.csv', mimeType: 'text/csv', buffer: Buffer.from(YES_NO) })
+  await page.locator('[data-testid^="block-input-"]').last().getByText(/4 rows/).waitFor({ timeout: 60_000 })
+  await page.locator('summary').filter({ hasText: 'Columns' }).first().click()
+  const row = (name: string) => page.getByTestId('block-schema').locator('li').filter({ has: page.getByRole('combobox', { name: `Read ${name} as`, exact: true }) })
+  // Two declarations back to back, as a reader setting several columns makes them.
+  for (const name of ['death', 'dnr1']) {
+    await expect(row(name)).toContainText('BOOLEAN')
+    await page.getByRole('combobox', { name: `Read ${name} as`, exact: true }).click()
+    await page.getByRole('option', { name: 'Text', exact: true }).click()
+    await row(name).getByText('declared').waitFor()
+  }
+  for (const name of ['death', 'dnr1']) await expect(row(name)).toContainText('VARCHARdeclared', { timeout: 30_000 })
+  await expect(page.getByRole('columnheader', { name: /death/ }).first()).toContainText('VARCHAR')
+})

@@ -165,7 +165,7 @@ test('unlocks estimation for every identified result and not for an identificati
   expect(result).toEqual({ backdoor: true, levelTwo: true, levelThree: true, failure: false })
 })
 
-test('binds a per-row effect to the T-learner alone, and refuses it for an average target', async ({ page }, testInfo) => {
+test('binds a per-row effect to the T-learner, reports their mean for ATE, and refuses ATT', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Domain contract runs once')
   await page.goto('/app')
   const result = await page.evaluate(async () => {
@@ -179,30 +179,40 @@ test('binds a per-row effect to the T-learner alone, and refuses it for an avera
       graph: { nodes: [], laggedArrows: 0 },
     }
     const average = { ...perRow, estimand: { kind: 'average-treatment-effect', scale: 'additive' } }
+    const treated = { ...perRow, estimand: { kind: 'average-treatment-effect-on-treated', scale: 'additive' } }
     const prepared = { kind: 'prepared-cross-section', observations: 4, columns: ['price', 'sales', 'w'] }
     const identification = { result: { kind: 'identified', adjustment: { kind: 'canonical', variables: [covariate] } } }
     const configuration = estimation.defaultConfiguration('t-learner', prepared, perRow)
     const evidence = { kind: 'tLearner', observations: 4, controlRows: 2, treatedRows: 2, seed: 7, trees: 200, minLeaf: 5, effects: [1, 2, 3, 4], average: 2.5, uncertainty: { kind: 'none' } }
     const bound = estimation.causalEstimateFrom(perRow, identification, { kind: 't-learner-run', configuration, evidence })
-    const refused = estimation.causalEstimateFrom(average, identification, { kind: 't-learner-run', configuration, evidence })
+    const averaged = estimation.causalEstimateFrom(average, identification, { kind: 't-learner-run', configuration, evidence })
+    const refused = estimation.causalEstimateFrom(treated, identification, { kind: 't-learner-run', configuration, evidence })
     const tLearner = methods.methodDefinition(estimation.methodIdOf('t-learner'))
     const dml = methods.methodDefinition(estimation.methodIdOf('dml-plr'))
     if (!tLearner.ok || !dml.ok) throw new Error('method definitions missing')
     const context = { identification: identification.result, prepared, stationarity: null, document: null, study: perRow, panelPreflight: { kind: 'not-applicable' }, treatmentIsBinary: true, outcomeIsCount: false }
     return {
       bound,
+      averaged,
       refused,
       summary: estimation.summariseRowEffects([1, 2, 3, 4]),
       defaultEstimator: estimation.defaultEstimatorFor(identification.result, prepared, perRow),
       dmlRefused: estimation.evaluateEstimatorEligibility(dml.value, { ...context, configuration: estimation.defaultConfiguration('dml-plr', prepared, perRow) }),
       tLearnerAllowed: estimation.evaluateEstimatorEligibility(tLearner.value, { ...context, configuration }),
+      tLearnerForAverage: estimation.evaluateEstimatorEligibility(tLearner.value, { ...context, study: average, configuration }),
+      tLearnerForTreated: estimation.evaluateEstimatorEligibility(tLearner.value, { ...context, study: treated, configuration }),
     }
   })
   expect(result.bound?.effect).toMatchObject({ kind: 'perRow', overall: 2.5, effects: [1, 2, 3, 4] })
   expect(result.bound?.interval.kind).toBe('none')
+  // An average target is the mean of the row effects; a treated-only average is not what the T-learner reports.
+  expect(result.averaged?.estimand.kind).toBe('average-treatment-effect')
+  expect(result.averaged?.effect).toEqual({ kind: 'additive', value: 2.5, unit: '' })
   expect(result.refused).toBeNull()
   expect(result.summary).toMatchObject({ rows: 4, minimum: 1, median: 2.5, maximum: 4, positiveShare: 1 })
   expect(result.defaultEstimator).toBe('t-learner')
   expect(result.dmlRefused.kind).toBe('refused')
   expect(result.tLearnerAllowed.kind).not.toBe('refused')
+  expect(result.tLearnerForAverage.kind).not.toBe('refused')
+  expect(result.tLearnerForTreated.kind).toBe('refused')
 })

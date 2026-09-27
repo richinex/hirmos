@@ -2159,11 +2159,16 @@ function targetCompatibility(estimand: Estimand, configuration: EstimatorConfigu
   if (configuration.kind === 'sharp-rd') return estimand.kind === 'local-cutoff-effect'
     ? reported('The study and estimator both target the local effect at the recorded cutoff.')
     : notReported('Sharp RD estimates the average treatment effect at the cutoff. For a time-based design, this is the event time. In Study design, choose “At an assignment cutoff (sharp RD)”. Then set the running variable and cutoff.')
-  // The T-learner reports one effect per row and no average target, so it is decided before the per-target rules.
+  // The T-learner estimates one effect per row; their mean over every row is the average effect.
   if (configuration.kind === 't-learner') {
-    return estimand.kind === 'conditional-average-treatment-effect-per-row'
-      ? reported('Estimator and study both target the effect for each row.')
-      : notReported('The T-learner reports one effect per row, but the study records an average target.')
+    switch (estimand.kind) {
+      case 'conditional-average-treatment-effect-per-row': return reported('Estimator and study both target the effect for each row.')
+      case 'average-treatment-effect': return reported('The study targets ATE, which the T-learner reports as the mean of its row effects over every row.')
+      case 'average-treatment-effect-on-treated': return notReported('The study targets ATT. The T-learner reports the mean over every row, not over the treated rows.')
+      case 'conditional-average-treatment-effect': return notReported(`This study targets the effect within groups of ${estimand.modifier.name}. Only the double machine learning estimators report group effects.`)
+      case 'local-cutoff-effect': return notReported('This cutoff-local target requires the sharp RD estimator.')
+      default: return assertNever(estimand)
+    }
   }
   switch (estimand.kind) {
     case 'local-cutoff-effect': return notReported('This cutoff-local target requires the sharp RD estimator.')
@@ -2200,6 +2205,25 @@ export function dmlNuisanceInputs(adjustment: readonly StudyVariable[], estimand
 }
 
 /** What the T-learner's outcome forests see, and what each row's effect is conditioned on: the identified set, then the per-row target's modifiers not already in it. */
+/** A T-learner run's effect for each prepared row, in row order, or null when they do not cover every row. */
+export const tLearnerRowEffects = (evidence: TLearnerEvidence | CrossFittedTLearnerEvidence): NonEmptyArray<number> | null =>
+  isNonEmpty(evidence.effects) && evidence.effects.length === evidence.observations ? evidence.effects : null
+
+/**
+ * What a T-learner run reports for the study's target: every row's effect for a per-row study, and
+ * their mean over every row for an average-effect study. Other targets are not reported.
+ */
+export const tLearnerEffect = (estimand: Estimand, average: number, effects: NonEmptyArray<number>): EffectEstimate | null => {
+  switch (estimand.kind) {
+    case 'conditional-average-treatment-effect-per-row': return { kind: 'perRow', overall: average, effects }
+    case 'average-treatment-effect': return { kind: 'additive', value: average, unit: '' }
+    case 'average-treatment-effect-on-treated':
+    case 'conditional-average-treatment-effect':
+    case 'local-cutoff-effect': return null
+    default: return assertNever(estimand)
+  }
+}
+
 export function tLearnerInputs(adjustment: readonly StudyVariable[], estimand: Estimand | null): readonly StudyVariable[] {
   const modifiers = estimand?.kind === 'conditional-average-treatment-effect-per-row' ? estimand.modifiers : []
   return [...adjustment, ...modifiers.filter((modifier) => !adjustment.some((variable) => variable.column === modifier.column))]
@@ -2896,13 +2920,12 @@ export function causalEstimateFrom(
       }
     }
     case 't-learner-run': {
-      // The T-learner reports one effect per row and nothing else, so it binds only to the per-row target.
-      if (study.estimand.kind !== 'conditional-average-treatment-effect-per-row') return null
       const { evidence } = run
-      if (!isNonEmpty(evidence.effects) || evidence.effects.length !== evidence.observations) return null
-      if (!tLearnerRunMatches(run.configuration, evidence)) return null
+      const effects = tLearnerRowEffects(evidence)
+      if (effects === null || !tLearnerRunMatches(run.configuration, evidence)) return null
+      const effect = tLearnerEffect(study.estimand, evidence.average, effects)
+      if (effect === null) return null
       const sample = { observations: evidence.observations, parameters: 0, degreesOfFreedom: null }
-      const effect = { kind: 'perRow', overall: evidence.average, effects: evidence.effects } as const
       switch (evidence.kind) {
         case 'tLearner': return {
           kind: 'causal-estimate',

@@ -1,4 +1,5 @@
 import type { CounterfactualRunArtifact } from './counterfactual'
+import { namesInProse } from '@/lib/format/names'
 import type { DiscoveryRunArtifact } from './discovery'
 import { assertNever, isNonEmpty, type NonEmptyArray } from './dop'
 import {
@@ -6,6 +7,7 @@ import {
   boundsReading,
   headlineValue,
   summariseRowEffects,
+  tLearnerRowEffects,
   treatmentModelStoppedEarly,
   type EstimateInterval,
   type EstimationRunArtifact,
@@ -209,9 +211,18 @@ const additiveIntervalForOutcome = (interval: EstimateInterval, outcome: string)
   }
 }
 
+/** The adjustment variables inside a sentence: named when few, counted when many. */
+const adjustmentNames = (run: EstimationRunArtifact): string =>
+  namesInProse(adjustmentLabels(run.estimate.adjustment).map(plainName), (count) => `the ${count} variables of the identified adjustment set`)
+
 const adjustedFor = (run: EstimationRunArtifact): string => adjustmentLabels(run.estimate.adjustment).length === 0
   ? 'without additional measured adjustment variables'
-  : `after adjustment for ${adjustmentLabels(run.estimate.adjustment).map(plainName).join(', ')}`
+  : `after adjustment for ${adjustmentNames(run)}`
+
+/** The opening of a bottom line that says what the estimate accounted for. */
+const accountingOpening = (run: EstimationRunArtifact): string => adjustmentLabels(run.estimate.adjustment).length === 0
+  ? 'Without additional measured adjustment variables'
+  : `After accounting for ${adjustmentNames(run)}`
 
 const targetPopulation = (study: StudySpecification): string => study.estimand.kind === 'average-treatment-effect-on-treated'
   ? 'among rows that received treatment'
@@ -235,7 +246,9 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
       ? `Difference in ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group.`
       : `Difference in ${outcome} per 1-unit increase in ${treatment}.`
-    case 't-learner-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0, estimated for each row.`
+    case 't-learner-run': return run.estimate.effect.kind === 'perRow'
+      ? `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0, estimated for each row.`
+      : `Mean over every row of the difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
     case 'frontdoor-two-stage-run': return `Difference in expected ${outcome} with ${treatment} set to ${run.evidence.treatmentValue} rather than ${run.evidence.controlValue}.`
     case 'instrumental-variable-run': return `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
     case 'count-glm-run': return `Ratio of expected ${outcome} counts for a 1-unit increase in ${treatment}.`
@@ -317,10 +330,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
     }
     case 'backdoor-linear-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
-      const adjustment = adjustmentLabels(run.estimate.adjustment).map(plainName)
-      const opening = adjustment.length === 0
-        ? 'Without additional measured adjustment variables'
-        : `After accounting for ${adjustment.join(', ')}`
+      const opening = accountingOpening(run)
       const statements: NonEmptyArray<InterpretationStatement> = [
         { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}.` },
         additiveIntervalForOutcome(estimate.interval, study.outcome.name),
@@ -332,10 +342,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
     case 'propensity-matching-run':
     case 'doubly-robust-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
-      const adjustment = adjustmentLabels(run.estimate.adjustment).map(plainName)
-      const opening = adjustment.length === 0
-        ? 'Without additional measured adjustment variables'
-        : `After accounting for ${adjustment.join(', ')}`
+      const opening = accountingOpening(run)
       const method = run.kind === 'propensity-weighting-run'
         ? 'The sample is reweighted by the inverse probability of treatment.'
         : run.kind === 'propensity-matching-run'
@@ -352,10 +359,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
     }
     case 'continuous-gps-run': {
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
-      const adjustment = adjustmentLabels(run.estimate.adjustment).map(plainName)
-      const opening = adjustment.length === 0
-        ? 'Without additional measured adjustment variables'
-        : `After accounting for ${adjustment.join(', ')}`
+      const opening = accountingOpening(run)
       const stabilized = run.configuration.scale === 'stabilized'
         ? `Weights are stabilized by the marginal density of the treatment and sum to ${Math.round(run.evidence.weightSum)} across ${run.evidence.observations} rows.`
         : `Weights are the inverse density alone and sum to ${Math.round(run.evidence.weightSum)} across ${run.evidence.observations} rows. With a continuous treatment, stabilizing is necessary rather than optional.`
@@ -411,13 +415,13 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       ] }
     }
     case 't-learner-run': {
-      const perRow = estimate.effect.kind === 'perRow' ? estimate.effect : null
-      const rows = perRow === null ? null : summariseRowEffects(perRow.effects)
+      const effects = tLearnerRowEffects(run.evidence)
+      const rows = effects === null ? null : summariseRowEffects(effects)
       const adjustment = adjustedFor(run)
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: perRow === null || rows === null
+        { kind: 'magnitude', text: rows === null
           ? `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(headlineValue(estimate.effect))} on average across rows, ${adjustment}.`
-          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(perRow.overall)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}. ${formatPercent(rows.positiveShare, { precision: 0 }).text} are above zero.` },
+          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(run.evidence.average)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}. ${formatPercent(rows.positiveShare, { precision: 0 }).text} are above zero.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : { kind: 'uncertainty', text: `The ${formatPercent(estimate.interval.level, { precision: 0 }).text} confidence interval for the average effect is ${number(estimate.interval.lower)} to ${number(estimate.interval.upper)}. It uses a conservative uncertainty calculation based on refitting both forests on resampled rows. Individual row intervals appear in the table below.` },
         { kind: 'qualification', text: `Each row’s effect is the treated ${armModel(run.evidence)} prediction minus the control ${armModel(run.evidence)} prediction at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual. ${run.evidence.kind === 'crossFittedTLearner' ? 'Each row is predicted by the models fitted on the other half of the rows. ' : ''}The spread across rows shows variation in fitted predictions and can also contain fitting noise; it is not an uncertainty interval.` },
       ] }

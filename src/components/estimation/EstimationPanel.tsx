@@ -97,6 +97,7 @@ import {
   stationaryMarksOf,
   summariseRowEffects,
   tLearnerInputs,
+  tLearnerRowEffects,
   type CausalEffectsAdjustment,
   type CausalEffectsAdjustmentProblem,
   type CausalEstimate,
@@ -116,6 +117,7 @@ import {
 } from '@/domain/panel'
 import { describeIdentificationStrategy, estimableIdentification, estimandSentence, identifiedInstruments, type IdentificationArtifact, type IdentificationId, type StudySpecification, type StudyVariable } from '@/domain/study'
 import type { SelectedSource } from '@/domain/workflow'
+import { namesFigure, namesInProse } from '@/lib/format/names'
 import { formatCount, formatEstimate, formatInterval, formatP, formatPercent, formatStatistic, formatWords, type Formatted } from '@/lib/format/number'
 import { formatTime, formatTimestamp } from '@/lib/format/date'
 import { lowerFirst } from '@/lib/text'
@@ -128,6 +130,10 @@ import { ESTIMATION_PARAMETER_HELP } from '@/domain/parameterHelp'
 const PSS_CASES: Record<'c' | 'ct', readonly (2 | 3 | 4 | 5)[]> = { c: [2, 3], ct: [4, 5] }
 const TRACE_LEVELS: readonly (90 | 95 | 99)[] = [90, 95, 99]
 const VECM_TERMS = [['n', 'None'], ['co', 'Constant outside'], ['ci', 'Constant inside'], ['coli', 'Constant and trend']] as const
+
+/** An adjustment set as a figure: named when short, counted when long. */
+const adjustmentFigure = (names: readonly string[], none: string): Formatted =>
+  formatWords(names.length === 0 ? none : namesFigure(names, 'variables').value)
 
 const ESTIMATOR_GROUP_LABELS: Readonly<Record<EstimatorGroupId, string>> = {
   'adjusted-outcome': 'Adjustment',
@@ -489,8 +495,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       }
       case 't-learner-run': {
         const { evidence } = run
-        // The bound estimate carries the effects as a non-empty list; the raw evidence only promises a list.
-        const summary = run.estimate.effect.kind === 'perRow' ? summariseRowEffects(run.estimate.effect.effects) : null
+        const rows = tLearnerRowEffects(evidence)
+        const summary = rows === null ? null : summariseRowEffects(rows)
         const rowEffects = { label: 'Row effects', value: formatWords(summary === null ? 'none' : `${formatStatistic('raw', summary.minimum).text} to ${formatStatistic('raw', summary.maximum).text}`), context: summary === null ? '' : <Metadata><span>median {formatStatistic('raw', summary.median).text}</span><span>{formatPercent(summary.positiveShare, { precision: 0 }).text} above zero</span></Metadata> }
         switch (evidence.kind) {
           case 'tLearner': return [
@@ -533,7 +539,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'State preparation', value: formatWords(`${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'observedStates').length} observed, ${evidence.statePreparations.filter((entry) => entry.strategy.kind === 'quantiles').length} quantile`), context: describeDiscreteStatePreparations(evidence.statePreparations) },
           { label: 'Expected outcome', value: formatWords(`${formatStatistic('raw', evidence.expectations[0]).text} → ${formatStatistic('raw', evidence.expectations[1]).text}`), context: 'under do(low) and do(high)' },
           ...(evidence.parentsAdjusted.join(', ') === adjustmentLabels(run.estimate.adjustment).join(', ') ? [] : [
-  { label: 'Adjustment set', value: formatWords(evidence.parentsAdjusted.length === 0 ? 'none' : evidence.parentsAdjusted.join(', ')), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : evidence.minimalAdjustmentSet.join(', ')}` },
+  { label: 'Adjustment set', value: adjustmentFigure(evidence.parentsAdjusted, 'none'), context: evidence.minimalAdjustmentSet === null ? 'no minimal adjustment set' : `minimal set ${evidence.minimalAdjustmentSet.length === 0 ? 'empty' : namesInProse(evidence.minimalAdjustmentSet, (count) => `of ${count} variables`)}` },
           ]),
         ]
       }
@@ -560,8 +566,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           switch (evidence.fit.kind) {
             case 'unfitted': return []
             case 'invalidAdjustment': return []
-            case 'adjustedLinear': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: <Metadata><span>{adjustmentStrategyLabel(evidence.fit.selection)}</span><span>linear</span><span>τ max {evidence.tauMax}</span></Metadata> }]
-            case 'adjustedKnn': return [{ label: 'Adjustment set', value: formatWords(evidence.fit.adjustmentSet.length === 0 ? 'None' : evidence.fit.adjustmentSet.map(nodeName).join(', ')), context: <Metadata><span>{adjustmentStrategyLabel(evidence.fit.selection)}</span><span>{evidence.fit.k}-neighbour</span><span>τ max {evidence.tauMax}</span></Metadata> }]
+            case 'adjustedLinear': return [{ label: 'Adjustment set', value: adjustmentFigure(evidence.fit.adjustmentSet.map(nodeName), 'None'), context: <Metadata><span>{adjustmentStrategyLabel(evidence.fit.selection)}</span><span>linear</span><span>τ max {evidence.tauMax}</span></Metadata> }]
+            case 'adjustedKnn': return [{ label: 'Adjustment set', value: adjustmentFigure(evidence.fit.adjustmentSet.map(nodeName), 'None'), context: <Metadata><span>{adjustmentStrategyLabel(evidence.fit.selection)}</span><span>{evidence.fit.k}-neighbour</span><span>τ max {evidence.tauMax}</span></Metadata> }]
             case 'wrightParents': return [
               { label: 'Direct effect', value: formatStatistic('raw', evidence.fit.directEffect), context: 'sum of direct path contrasts' },
               { label: 'Indirect effect', value: formatStatistic('raw', evidence.fit.indirectEffect), context: <Metadata><span>{evidence.fit.paths.length} directed paths</span><span>{evidence.fit.coefficients.length} parent coefficients</span></Metadata> },
@@ -639,15 +645,20 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       default: return assertNever(run)
     }
   })()
-  const adjustmentValue = formatWords(run.kind === 'panel-intervention-run'
-    ? run.evidence.kind === 'staggeredDid' ? 'Adoption-cohort comparisons' : 'Unit and time weights'
-    : run.kind === 'frontdoor-two-stage-run'
-    ? `stage 1: ${run.evidence.firstStageAdjustment.length === 0 ? 'none' : run.evidence.firstStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}, stage 2: ${run.evidence.secondStageAdjustment.length === 0 ? 'none' : run.evidence.secondStageAdjustment.map((index) => run.columns[index]?.name ?? index).join(', ')}`
-    : run.kind === 'instrumental-variable-run'
-      ? 'None; the estimator uses no covariates'
-    : run.estimate.adjustment.kind === 'structural-parent-model'
-      ? `${run.estimate.adjustment.coefficients} parent coefficients, ${run.estimate.adjustment.paths} directed paths`
-      : adjustmentLabels(run.estimate.adjustment).length === 0 ? 'None' : adjustmentLabels(run.estimate.adjustment).join(', '))
+  // The design-specific tiles say what stands in for an adjustment set; otherwise the set itself, counted when
+  // long with its first names beneath. The identification record lists every one.
+  const adjustmentTile = ((): { readonly value: Formatted; readonly preview: string | null } => {
+    if (run.kind === 'panel-intervention-run') return { value: formatWords(run.evidence.kind === 'staggeredDid' ? 'Adoption-cohort comparisons' : 'Unit and time weights'), preview: null }
+    if (run.kind === 'frontdoor-two-stage-run') {
+      const stage = (columns: readonly number[]) => columns.length === 0 ? 'none' : columns.map((index) => run.columns[index]?.name ?? index).join(', ')
+      return { value: formatWords(`stage 1: ${stage(run.evidence.firstStageAdjustment)}, stage 2: ${stage(run.evidence.secondStageAdjustment)}`), preview: null }
+    }
+    if (run.kind === 'instrumental-variable-run') return { value: formatWords('None; the estimator uses no covariates'), preview: null }
+    if (run.estimate.adjustment.kind === 'structural-parent-model') return { value: formatWords(`${run.estimate.adjustment.coefficients} parent coefficients, ${run.estimate.adjustment.paths} directed paths`), preview: null }
+    const names = adjustmentLabels(run.estimate.adjustment)
+    return { value: adjustmentFigure(names, 'None'), preview: names.length === 0 ? null : namesFigure(names, 'variables').preview }
+  })()
+  const adjustmentValue = adjustmentTile.value
 
   // A method that reports the set it actually fitted names the same members as the recorded estimate
   // whenever it accepted them, so the two tiles would print one value twice and leave the grid's last
@@ -667,8 +678,8 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         context={run.kind === 'panel-intervention-run'
           ? 'This design does not use a DAG adjustment set.'
           : declaredCategorical.length > 0
-            ? `Categorical: ${declaredCategorical.join(', ')}. One column per level.`
-            : restated?.context}
+            ? `Categorical: ${namesInProse(declaredCategorical, (count) => `${count} variables`)}. One column per level.`
+            : adjustmentTile.preview ?? restated?.context}
       />
       {tiles.filter((tile) => tile !== restated).map((tile) => <MetricTile key={tile.label} label={tile.label} size="compact" frame="cell" value={tile.value} context={tile.context} />)}
     </MetricGrid>
@@ -755,10 +766,11 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
     : null), [estimate, current, theme])
   // Per-row effects are drawn as their distribution, with the average marked, since a thousand points have no order to plot.
   const rowChart = useMemo(() => {
-    if (estimate.effect.kind !== 'perRow') return null
-    const summary = summariseRowEffects(estimate.effect.effects)
-    return histogramOption({ name: `effect of ${study.treatment.name} on ${study.outcome.name}`, bins: summary.bins, nullCount: 0, marks: [{ name: 'average', value: estimate.effect.overall }, { name: 'median', value: summary.median }] }, theme)
-  }, [estimate, study.treatment.name, study.outcome.name, theme])
+    const rows = run.kind === 't-learner-run' ? tLearnerRowEffects(run.evidence) : null
+    if (run.kind !== 't-learner-run' || rows === null) return null
+    const summary = summariseRowEffects(rows)
+    return histogramOption({ name: `effect of ${study.treatment.name} on ${study.outcome.name}`, bins: summary.bins, nullCount: 0, marks: [{ name: 'average', value: run.evidence.average }, { name: 'median', value: summary.median }] }, theme)
+  }, [run, study.treatment.name, study.outcome.name, theme])
   const body = (
     <>
       <div className="mt-3">

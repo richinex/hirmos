@@ -314,4 +314,26 @@ mod tests {
             value["counterfactualIdentification"]["untreatedExpression"]
         );
     }
+
+    /// The RHC exercise's graph: 82 confounders into treatment and outcome, as wide as the
+    /// indicator columns `pd.get_dummies` makes from its 50 confounders.
+    #[test]
+    fn backdoor_identification_names_every_confounder_of_a_wide_graph() {
+        let confounders = 82;
+        let nodes = confounders + 2;
+        let names: Vec<String> = (0..nodes).map(|node| format!("v{node}")).collect();
+        let mut edges = vec![(0, 1)];
+        for confounder in 2..nodes {
+            edges.push((confounder, 0));
+            edges.push((confounder, 1));
+        }
+        let started = std::time::Instant::now();
+        let result = backdoor_identification(nodes, &names, &edges, 0, 1, &[], IdentificationEstimand::Ate).unwrap();
+        let elapsed = started.elapsed();
+        let value = serde_json::to_value(&result).unwrap();
+        assert_eq!(value["result"]["kind"], "identified");
+        let canonical: Vec<usize> = serde_json::from_value(value["result"]["canonicalSet"].clone()).unwrap();
+        assert_eq!(canonical, (2..nodes).collect::<Vec<_>>());
+        assert!(elapsed.as_secs_f64() < 5.0, "an {nodes}-node graph took {elapsed:?}");
+    }
 }
