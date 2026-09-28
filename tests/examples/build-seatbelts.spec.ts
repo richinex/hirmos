@@ -15,7 +15,7 @@ const choose = async (trigger: Locator, label: string) => {
   await trigger.click()
   await trigger.page().getByRole('listbox').getByRole('option', { name: label, exact: true }).click()
 }
-const chapter = (page: Page, name: RegExp) => page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name }).click()
+const chapter = (page: Page, name: RegExp) => page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name }).click()
 
 test.skip(!process.env.BUILD_EXAMPLE, 'set BUILD_EXAMPLE=1 to rebuild the shipped example')
 

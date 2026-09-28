@@ -22,9 +22,9 @@ export const chapter = async (page: Page, name: RegExp) => {
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog')).toHaveCount(0)
   }
-  const toggle = page.getByRole('button', { name: 'Expand chapter list' })
+  const toggle = page.getByRole('button', { name: 'Expand section list' })
   if (await toggle.isVisible()) await toggle.click()
-  const destination = page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name })
+  const destination = page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name })
   // A reopened project unlocks its chapters once the file is restored, which can take a while under load.
   await expect(destination).not.toHaveAttribute('aria-disabled', 'true', { timeout: 60_000 })
   await destination.click()

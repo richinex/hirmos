@@ -287,7 +287,7 @@ test('opens the shipped example Estimation chapter without the compatibility bou
   test.skip(testInfo.project.name !== 'chromium', 'Example rendering runs once')
   await page.goto('/app')
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByText('The Estimation chapter could not be displayed.')).toHaveCount(0)
   await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 })
@@ -321,7 +321,7 @@ test('replaces an unstamped saved example even when it has the shipped project c
 
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await expect(page.getByText('The example changed in this build, so your earlier copy was replaced.')).toBeVisible()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 
   const releases = await page.evaluate(async () => {
@@ -371,7 +371,7 @@ test('opening an unchanged project preserves its saved time', async ({ page }, t
 
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await page.waitForTimeout(700)
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 
   const savedAt = await page.evaluate(async () => {

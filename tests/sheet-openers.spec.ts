@@ -14,7 +14,7 @@ test('mobile sheet openers have depth without changing size or dialog behaviour'
     const h = React.createElement
     createRoot(host).render(h(WorkbenchLayout, {
       id: 'sheet-test', stage: h('h1', null, 'Stationarity tests'),
-      inspector: { title: 'Prepared dataset and method requirements', trigger: { label: 'Requirements', icon: 'fact_check' }, body: h('p', null, 'Method requirements') },
+      inspector: { title: 'Prepared dataset and method requirements', trigger: { label: 'Requirements', icon: 'contract' }, body: h('p', null, 'Method requirements') },
       bottom: { title: 'Saved runs', trigger: { label: 'History', icon: 'history' }, body: h('p', { className: 'text-body' }, 'Saved analyses') },
     }))
   })

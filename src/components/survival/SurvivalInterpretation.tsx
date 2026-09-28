@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Icon } from '@/components/Icon'
 import { prose, well } from '@/components/ui/recipes'
 import type { SurvivalRunArtifact } from '@/domain/survival'
 import { SurvivalEquation } from './SurvivalEquation'
@@ -10,7 +11,7 @@ export function SurvivalInterpretation({ run, bottomLine, uncertainty, mustBeTru
     <p className={prose('mb-0 mt-1 text-ink')}>{bottomLine}</p>
     <h5 className="mb-0 mt-3 border-t border-hair pt-3 text-label font-medium text-bone">Uncertainty</h5>
     <p className={prose('mb-0 mt-1 text-muted')}>{uncertainty}</p>
-    <h5 className="mb-0 mt-3 border-t border-hair pt-3 text-label font-medium text-bone">What must be true</h5>
+    <h5 className="mb-0 mt-3 flex items-center gap-1.5 border-t border-hair pt-3 text-label font-medium text-bone"><Icon name="gavel" size={14} className="text-faint" />What must be true</h5>
     <p className={prose('mb-0 mt-1 text-faint')}>{mustBeTrue}</p>
     <SurvivalEquation run={run} />
   </section>

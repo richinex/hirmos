@@ -99,7 +99,7 @@ function SqlEditor({ inputs, onPrepared, onCleared, clearLabel = 'Choose other f
     <div className="mac-terminal m-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[10px]">
       <div className="mac-terminal-bar relative flex h-7 shrink-0 select-none items-center px-2">
         <span className="flex gap-2" aria-hidden><i className="size-3 rounded-full bg-[#FF5F57]" /><i className="size-3 rounded-full bg-[#FEBC2E]" /><i className="size-3 rounded-full bg-[#28C840]" /></span>
-        <span className="mac-terminal-title absolute left-1/2 -translate-x-1/2 truncate text-body">duckdb{size !== null ? ` — ${size.cols}×${size.rows}` : ''}</span>
+        <span className="mac-terminal-title absolute left-1/2 -translate-x-1/2 truncate text-body">duckdb{size !== null ? `, ${size.cols}×${size.rows}` : ''}</span>
         {query === 'running' && state.kind !== 'running-script' && <button type="button" aria-label="Cancel query" title="Cancel query" className={iconControl('quiet', 'absolute right-1 h-6 w-6')} disabled={cancellation.kind === 'requesting'} onClick={() => void controller.cancel()}><Icon name="stop" size={16} /></button>}
       </div>
       <div ref={attachConsole} inert={state.kind === 'running-script'} className="sql-console mac-terminal-body min-h-0 flex-1 min-w-0 overflow-hidden px-2 pt-2 pb-4" aria-label="SQL console" />

@@ -29,7 +29,7 @@ test('the grid fields show the grid the run searches, and refuse bad text with i
   test.skip(info.project.name !== 'chromium', 'One layout is enough for three text fields.')
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open NSW job training and 1978 earnings', exact: true }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Estimation/ }).click()
   await page.getByRole('radio', { name: /^Propensity score/ }).click()
   await page.getByRole('radio', { name: /^Inverse propensity weighting/ }).click()
   await page.getByRole('radio', { name: 'Boosted', exact: true }).click()

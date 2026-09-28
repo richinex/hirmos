@@ -36,9 +36,9 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   await prepare(page, { structure: 'time series', time: 'month', frequency: 'Monthly', columns: ['x', 'y', 'count'] })
   await expect(page.getByRole('radio', { name: /^Count model/ })).toHaveCount(0)
   const chapter = async (name: RegExp) => {
-    const toggle = page.getByRole('button', { name: 'Expand chapter list' })
+    const toggle = page.getByRole('button', { name: 'Expand section list' })
     if (phone && await toggle.isVisible()) await toggle.click()
-    await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name }).click()
+    await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name }).click()
   }
   await chapter(/Time-series analysis/)
   await expect(page.getByRole('heading', { name: 'Time-series analysis', exact: true })).toBeVisible()
@@ -108,7 +108,7 @@ test('standalone time-series fits, shared results, persistence and deletion', as
   expect(await page.locator('body').evaluate((el) => el.scrollWidth <= window.innerWidth + 1)).toBe(true)
   await page.screenshot({ path: info.outputPath('results.png') })
   // The export control sits in the rail's sheet, which closes after every chapter choice.
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   const download = page.waitForEvent('download', { timeout: 30_000 })
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
   const exported = await download

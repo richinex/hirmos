@@ -62,8 +62,8 @@ test('estimator chips use the prepared treatment and outcome before a run', asyn
   test.skip(testInfo.project.name !== 'chromium', 'Example workflow runs once')
   await page.goto('/app')
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Estimation/ }).click()
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' })).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Estimation/ }).click()
   await expect(page.getByRole('button', { name: 'Checking treatment and outcome…' })).toBeHidden({ timeout: 30_000 })
   // The chapter opens on the family of the example's latest run; the chips under test are in the adjustment family.
   await page.getByRole('radiogroup', { name: 'Estimator family' }).getByRole('radio').first().click()

@@ -10,7 +10,7 @@ import type { HirmosGraph } from './HirmosGraph'
 const graphChunk = import('./HirmosGraph')
 
 /** The hero headline, one slot per word so the reveal is markup, not a script. */
-const HEADLINE = 'Hirmos offers a framework for causal inference.'.split(' ')
+const HEADLINE = 'A scratchpad for causal inference.'.split(' ')
 
 const WORKFLOW = [
   { number: '01', title: 'Prepare', copy: 'Profile the source, define the observation structure, resolve missingness, and record transformations.' },
@@ -111,7 +111,6 @@ export function Landing() {
 
         <div className="landing-width landing-hero-shell">
           <section className="landing-hero-copy" aria-labelledby="landing-title">
-            <p className="landing-eyebrow">My causal inference workbench</p>
             <h1 id="landing-title" className="landing-headline">
               {HEADLINE.map((word, index) => (
                 <Fragment key={word}>

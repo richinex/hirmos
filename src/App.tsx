@@ -587,9 +587,9 @@ function App() {
           type="button"
           data-rail-toggle
           className={iconControl('quiet', 'dashboard-menu')}
-          aria-label={navOpen ? 'Collapse chapter list' : 'Expand chapter list'}
+          aria-label={navOpen ? 'Collapse section list' : 'Expand section list'}
           aria-expanded={navOpen}
-          title={`${navOpen ? 'Collapse' : 'Expand'} chapter list (⌘B)`}
+          title={`${navOpen ? 'Collapse' : 'Expand'} section list (⌘B)`}
           onClick={() => setNavOpen((open) => !open)}
         ><Icon name={navOpen ? 'left_panel_close' : 'left_panel_open'} size={20} /></button>
         <span className="dashboard-breadcrumb min-w-0 truncate text-body text-muted">

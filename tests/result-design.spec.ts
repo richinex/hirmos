@@ -3,8 +3,8 @@ import {expect,test} from '@playwright/test'
 test('a counterfactual run uses the shared cards without changing its figures', async ({ page }, info) => {
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open A simulated process with a collider', exact: true }).click()
-  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand chapter list' }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Counterfactuals/ }).click()
+  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand section list' }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Counterfactuals/ }).click()
   await page.getByRole('button', { name: 'Run counterfactual', exact: true }).click()
   const cards = page.locator('.metric-cards[aria-label="Counterfactual summary"]').first()
   await expect(cards).toBeVisible({ timeout: 60_000 })
@@ -24,8 +24,8 @@ for (const example of [
   test(`${example.name} retains readable summary cards`, async ({ page }, info) => {
     await page.goto('/app/projects')
     await page.getByRole('button', { name: `Open ${example.name}`, exact: true }).click()
-    if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand chapter list' }).click()
-    await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: example.chapter }).click()
+    if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand section list' }).click()
+    await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: example.chapter }).click()
     const cards = page.locator(`.metric-cards[aria-label="${example.summary}"]`).first()
     await expect(cards).toBeVisible()
     expect(await cards.locator('.metric-tile').count()).toBeGreaterThan(0)
@@ -68,8 +68,8 @@ test('example cards are lit blocks and table headers sit on their surface in bot
 test('dashboard summary cards and borderless equations retain content on desktop and mobile',async({page},info)=>{
   await page.goto('/app/projects')
   await page.getByRole('button',{name:/Open Breast cancer/i}).click()
-  if(info.project.name==='mobile-chromium')await page.getByRole('button',{name:'Expand chapter list'}).click()
-  await page.getByRole('navigation',{name:'Workspace chapters'}).getByRole('button',{name:/Survival analysis/}).click()
+  if(info.project.name==='mobile-chromium')await page.getByRole('button',{name:'Expand section list'}).click()
+  await page.getByRole('navigation',{name:'Workspace sections'}).getByRole('button',{name:/Survival analysis/}).click()
   const cards=page.getByTestId('survival-summary-cards').first()
   await expect(cards.locator('.metric-tile')).toHaveCount(3)
   await expect(cards.getByText(/log likelihood/)).toBeVisible()

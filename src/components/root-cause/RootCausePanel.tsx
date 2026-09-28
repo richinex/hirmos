@@ -265,10 +265,10 @@ export function RootCausePanel(props: Props) {
     onRun={props.onEffects} onDelete={props.onDeleteEffects} onGraph={props.onGraph}
     navigation={<SegmentedControl<Analysis> ariaLabel="Analysis type" variant="line" size="sm" value={analysis} options={analyses} onChange={setAnalysis} />}
   />
-  return <WorkbenchLayout id="root-cause" inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: requirements }}
+  return <WorkbenchLayout id="root-cause" inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: requirements }}
     bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Run history (${props.workspace.runs.length})`, defaultCollapsed: true, body: <RunHistory runs={props.workspace.runs} selected={latest?.id} onSelect={setSelected} onDelete={props.onDelete} /> }}
     stage={<section aria-labelledby="root-cause-title" className="@container/panel flex flex-col gap-5">
-      <div><ChapterHeading id="root-cause-title" className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>Explain an unusual observation, attribute a change between datasets, or estimate outcomes after specified changes to variables.</p></div>
+      <div><ChapterHeading id="root-cause-title" className="mb-2">Causal model analysis</ChapterHeading><p className={chapterIntro}>A causal model encodes assumptions about how variables influence one another and the mechanisms that generate their values. It distinguishes between observing a value and intervening to set a value. In this section, we fit the mechanisms to the data and examine how interventions or changes propagate through the system. The results depend on the graph structure, the fitted mechanisms, and the underlying assumptions.</p></div>
       {!graph.ok ? <section className={panel('space-y-4 p-(--panel-space)')} aria-label="Root-cause graph selection">
         <h3 className={`${sectionTitle} m-0`}>{graph.error.kind === 'no-selection' ? 'Choose the causal graph' : 'Review the selected graph'}</h3>
         <p className={`${fieldHint} max-w-[65ch]`}>{describeRootCauseGraphProblem(graph.error)} In the editor, select <strong className="font-medium text-ink">Use for causal model analysis</strong> to return here with that revision selected.</p>

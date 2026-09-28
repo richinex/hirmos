@@ -14,9 +14,9 @@ test('survival shares select-all and clear actions without selecting reserved co
   await page.getByRole('button', { name: 'Clear selected columns', exact: true }).click()
   await expect(page.getByRole('checkbox', { checked: true })).toHaveCount(0)
   await prepare(page, { structure: 'cross-section', columns: ['time', 'status', 'age', 'karno', 'prior', 'diagtime', 'trt'] })
-  const toggle = page.getByRole('button', { name: 'Expand chapter list' })
+  const toggle = page.getByRole('button', { name: 'Expand section list' })
   if (await toggle.isVisible()) await toggle.click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ }).click()
   const setup = page.locator('section[aria-labelledby="survival-setup-title"]')
   const covariates = setup.getByRole('group', { name: 'Covariates', exact: true })
   for (const analysis of ['Cox regression', 'Aalen regression', 'Survival forest']) {

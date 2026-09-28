@@ -130,7 +130,8 @@ export const fieldLabel = 'block text-body font-medium text-ink'
 /** 500, because the theme's medium weight is 700. */
 export const stepTitle = 'font-heading text-subtitle [font-weight:500] text-ink text-balance'
 
-export const settingsStack = 'grid gap-6'
+// One column that cannot grow past its container, so a long option name truncates instead of overflowing.
+export const settingsStack = 'grid grid-cols-1 gap-6'
 
 export const fieldRow = {
   two: 'grid max-w-3xl items-start gap-4 @md/panel:grid-cols-2',

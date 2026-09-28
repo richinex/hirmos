@@ -197,9 +197,9 @@ export function ChapterNav({ chapters, active, open, onOpen, onClose, onNavigate
           <span className="dashboard-brand-mark"><HirmosMark size={26} /></span>
           <span className="dashboard-nav-label text-title font-semibold tracking-tight">hirmos</span>
         </InternalLink>
-        {phone && <button type="button" className="dashboard-nav-close" aria-label="Close chapter list" onClick={onClose}><Icon name="close" size={20} /></button>}
+        {phone && <button type="button" className="dashboard-nav-close" aria-label="Close section list" onClick={onClose}><Icon name="close" size={20} /></button>}
       </div>
-      <nav aria-label="Workspace chapters" className="dashboard-chapters">
+      <nav aria-label="Workspace sections" className="dashboard-chapters">
         {CHAPTER_SECTIONS.map(section => <section key={section.title} className="dashboard-nav-group">
           <h2 className="dashboard-nav-label dashboard-nav-heading">{section.title}</h2>
           <ol aria-label={section.title}>

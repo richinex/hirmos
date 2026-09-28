@@ -1509,7 +1509,7 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
 
   return (
     <>
-      <WorkbenchLayout id="survival" stage={stage} inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: inspector }} bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Survival runs (${runs.length})`, body: ledger, defaultSize: 150 }} />
+      <WorkbenchLayout id="survival" stage={stage} inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: inspector }} bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Survival runs (${runs.length})`, body: ledger, defaultSize: 150 }} />
       <ConfirmDialog
         open={pendingDelete !== null}
         title="Delete this survival run?"

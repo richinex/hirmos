@@ -81,7 +81,7 @@ test('composed impact through controls, component plot, cancellation and restora
   expect(await page.locator('body').evaluate(e=>e.scrollWidth<=innerWidth+1)).toBe(true)
   await choose(page,'Model contribution','X_1')
   await page.screenshot({path:info.outputPath('structural-predictor.png')})
-  const open = page.getByRole('button',{name:'Expand chapter list',exact:true})
+  const open = page.getByRole('button',{name:'Expand section list',exact:true})
   if (await open.isVisible()) await open.click()
   const download = page.waitForEvent('download')
   await page.getByRole('button',{name:'Export project',exact:true}).click()

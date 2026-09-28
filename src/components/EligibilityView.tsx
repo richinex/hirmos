@@ -1,6 +1,17 @@
+import { Icon } from '@/components/Icon'
 import { Alert } from '@/components/ui/Alert'
+import { useOpenStationarityTests } from '@/components/data/useOpenStationarityTests'
 import { assertNever } from '@/domain/dop'
-import { isStageNote, type MethodEligibility } from '@/domain/methods'
+import { stageGroups, type MethodEligibility } from '@/domain/methods'
+import type { LevelIssueAction } from '@/domain/stationarityAssessment'
+
+const actionLabel = (action: LevelIssueAction): string => {
+  switch (action) {
+    case 'run-stationarity-tests': return 'Run stationarity tests'
+    case 'test-first-difference': return 'Test the first difference'
+    default: return assertNever(action)
+  }
+}
 
 /** Concise pre-run status. Detailed conditions and evidence are centralised in MethodCaveats. */
 export function EligibilityView({ eligibility, subject = 'this prepared dataset' }: {
@@ -8,10 +19,7 @@ export function EligibilityView({ eligibility, subject = 'this prepared dataset'
   /** What the refusal is about, for the headline: "this prepared dataset", "this study". */
   readonly subject?: string
 }) {
-  // The one unassessed condition worth a sentence on the stage: series that are integrated in levels.
-  const stationarityNote = eligibility.kind === 'caution'
-    ? eligibility.unresolved.find(isStageNote)?.missingEvidence ?? null
-    : null
+  const openStationarityTests = useOpenStationarityTests()
   switch (eligibility.kind) {
     case 'eligible':
       return (
@@ -19,13 +27,23 @@ export function EligibilityView({ eligibility, subject = 'this prepared dataset'
           <p className="m-0">Available; all pre-run checks completed</p>
         </Alert>
       )
-    case 'caution':
+    case 'caution': {
+      // One line per group of series that share a reason; the series are listed in the requirements panel,
+      // and the one action is the test that is missing.
+      const groups = eligibility.unresolved.flatMap(stageGroups)
+      const action = groups.map((group) => group.action).find((candidate) => candidate !== null) ?? null
       return (
-        <Alert tone="warn" live={false} className="mt-4">
+        <Alert tone="warn" live={false} className="mt-4" testId="eligibility-notice">
           <p className="m-0">Review required; the estimator remains runnable</p>
-          {stationarityNote !== null && <p className="mb-0 mt-1 text-muted">{stationarityNote}</p>}
+          {groups.map((group) => <p key={group.summary} className="mb-0 mt-1 text-muted">{group.summary}</p>)}
+          {action !== null && openStationarityTests !== null && (
+            <button type="button" className="mt-2 inline-flex items-center gap-1 text-body font-medium text-link" onClick={openStationarityTests}>
+              {actionLabel(action)}<Icon name="arrow_forward" size={16} />
+            </button>
+          )}
         </Alert>
       )
+    }
     case 'refused':
       return (
         <Alert tone="danger" className="mt-4">

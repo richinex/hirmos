@@ -131,7 +131,7 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
 
   return <WorkbenchLayout id="time-series-interrupted"
     bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(run) => props.onDeleteRun(run.id)} /> }}
-    inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={TIME_SERIES_METHODS.interrupted} prepared={props.prepared} source={props.source.name} /> }}
+    inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Data and method requirements', body: <TimeSeriesRequirements method={TIME_SERIES_METHODS.interrupted} prepared={props.prepared} source={props.source.name} /> }}
     stage={<section className="@container/panel flex flex-col gap-5">
       <TimeSeriesHeading />
       <section className={panel('p-(--panel-space)')} aria-label="Time-series setup">

@@ -56,7 +56,7 @@ test('T-learner bootstrap runs through Estimation and exports row intervals', as
   if (info.project.name === 'mobile-chromium') {
     await page.keyboard.press('Escape')
     await expect(page.getByRole('dialog', { name: 'Inspector', exact: true })).toBeHidden()
-    await expect(page.getByRole('button', { name: 'Expand chapter list', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Expand section list', exact: true })).toBeVisible()
   }
   await chapter(page, /Study design/)
   await choose('Causal graph', 'T-learner verification')

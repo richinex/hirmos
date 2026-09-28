@@ -943,8 +943,8 @@ export function identificationFrom(
       kind: 'graph-assumption',
       id: 'no-unmeasured-confounding',
       statement: adjustmentSet.length === 0
-        ? `No unmeasured common cause of ${treatment} and ${outcome} exists. Test sensitivity to this assumption in the sensitivity chapter.`
-        : `No unmeasured common cause of ${treatment} and ${outcome} remains after adjusting for ${setText}. Test sensitivity to this assumption in the sensitivity chapter.`,
+        ? `No unmeasured common cause of ${treatment} and ${outcome} exists. Test sensitivity to this assumption in the sensitivity section.`
+        : `No unmeasured common cause of ${treatment} and ${outcome} remains after adjusting for ${setText}. Test sensitivity to this assumption in the sensitivity section.`,
     },
     { kind: 'design-assumption', id: 'consistency', statement: study.designAssumptions.consistency.statement, rationale: study.designAssumptions.consistency.rationale },
     { kind: 'design-assumption', id: 'no-interference', statement: study.designAssumptions.noInterference.statement, rationale: study.designAssumptions.noInterference.rationale },

@@ -804,7 +804,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
               <p className={label('m-0 text-muted')}>Compare with</p>
               <Select aria-label="Compare with" className={field('text', 'w-64')} value={ghostId} onChange={(event) => setGhostId(event.target.value)}>
                 <option value="">No other run</option>
-                {ghosts.map((other) => <option key={other.id} value={String(other.id)}>{describeEstimator(other.configuration.kind)} — {formatTime(other.createdAt)}</option>)}
+                {ghosts.map((other) => <option key={other.id} value={String(other.id)}>{describeEstimator(other.configuration.kind)}, {formatTime(other.createdAt)}</option>)}
               </Select>
             </div>
           )}
@@ -1714,7 +1714,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </div>
             )}
             <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Fold seed" help={ESTIMATION_PARAMETER_HELP.dml.foldSeed} /><input type="number" min={0} aria-label="Fold seed" className={field('text', 'mt-1')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.floor(Number(event.target.value) || 0)) })} /></label>
-            <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity chapter repeats this fit at the same seed before its refuters.</p>
+            <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Five shuffled folds, 200 random-forest trees, minimum leaf 5, learner seed 7. The Sensitivity section repeats this fit at the same seed before its refuters.</p>
             </SettingsStep>
           </div>
         )
@@ -2174,7 +2174,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     <section aria-labelledby="estimation-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="estimation-title" className="mb-2">Estimation</ChapterHeading>
-        <p className={chapterIntro}>Identification determines how the causal question can be expressed using observed data. Estimation applies a statistical method to that expression. In this chapter, choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
+        <p className={chapterIntro}>Identification determines how to express the causal question using observed data. Estimation applies a statistical method to that expression. In this section, you choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="estimation-setup-title">
@@ -2191,7 +2191,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => dispatch({ type: 'identification-chosen', selection: estimationSelection(identified.find((candidate) => candidate.id === event.target.value) ?? null, studies, prepared) })}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
-                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} — ${bound.dagName}`}</option>
+                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)}, ${bound.dagName}`}</option>
                 })}
               </Select>
                 {identification !== null && identification.result.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
@@ -2339,7 +2339,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     <WorkbenchLayout
       id="estimation"
       stage={stage}
-      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Study and method requirements', body: inspector }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Study and method requirements', body: inspector }}
       bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: comparison === null ? 150 : 150 + comparison.height }}
     />
     </>

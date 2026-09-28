@@ -262,7 +262,7 @@ test('runs grouped survival analysis from two SQL inputs through the ordinary pr
   await expect(page.getByText('Choose the observation structure')).toBeVisible({ timeout: 30_000 })
   await prepare(page, { structure: 'cross-section', columns: ['duration', 'status', 'frequency'] })
 
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ }).click()
   await page.getByRole('radio', { name: 'Kaplan–Meier' }).click()
   await choose(page, 'Duration', 'duration')
   await choose(page, 'Event 1 observed, 0 censored', 'status')

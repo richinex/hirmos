@@ -97,6 +97,8 @@
   --color-warn: #8A5700;
   --color-danger: #B23A3A;
   --color-highlight: rgba(255, 255, 255, 0.35);
+  --color-track: #E3EAF1;
+  --color-knob: #FFFFFF;
   --color-rail: #16305A;
   --color-rail-active: #234478;
   --color-rail-ink: #FFFFFF;
@@ -338,13 +340,17 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
   font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
 }
 
-/* Native scrolling everywhere; transparent thumbs at rest keep the geometry stable. */
-* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
-*[data-scrolling] { scrollbar-color: var(--scroll-thumb, var(--color-hair)) transparent; }
-::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
-::-webkit-scrollbar-track { background: transparent; }
-*[data-scrolling]::-webkit-scrollbar-thumb { background: var(--scroll-thumb, var(--color-hair)); }
+/* Native scrolling everywhere; transparent thumbs at rest keep the geometry stable. In @layer base so a
+   scroller can hide its bar with `[scrollbar-width:none]`; unlayered, this rule would win and the browser
+   would keep an 11px track under the content. */
+@layer base {
+  * { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  *[data-scrolling] { scrollbar-color: var(--scroll-thumb, var(--color-hair)) transparent; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: transparent; border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  *[data-scrolling]::-webkit-scrollbar-thumb { background: var(--scroll-thumb, var(--color-hair)); }
+}
 
 /* The SQL console: the terminal paints its own viewport black under and beside the canvas, which would read
    as a second box inside the window. Both take the window body's colour, so the console is one surface. */
@@ -375,6 +381,14 @@ button:not([role='combobox']):not(:disabled):not([aria-disabled='true']):active,
    `rise` — a settle, not a bounce, which would read wrong on a technical instrument. */
 @keyframes pop { from { opacity: 0; transform: translateY(8px) scale(0.99); } to { opacity: 1; transform: none; } }
 .pop { animation: pop var(--motion-base) cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
+/* The segmented control's knob moves each edge on its own clock, set by the component in --segment-left and --segment-right. */
+.segment-knob {
+  transition-property: left, right, top, bottom, transform;
+  transition-duration: var(--segment-left), var(--segment-right), var(--motion-base), var(--motion-base), var(--motion-fast);
+  transition-timing-function: var(--default-transition-timing-function);
+}
+.segment-knob[data-motion="off"] { transition: none; }
 
 /* The extraction-flow edge while its unit runs: a dash march along the gradient stroke, reading as
    "data in flight" from the source card to the unit. Killed with everything else by reduced-motion. */

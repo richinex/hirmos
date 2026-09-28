@@ -1,7 +1,7 @@
 import { Icon } from '@/components/Icon'
 import { Tooltip } from '@/components/ui/Tooltip'
 import { assertNever, type NonEmptyArray } from '@/domain/dop'
-import { isStageNote, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
+import { stageGroups, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
 import type { Identification } from '@/domain/study'
 import { IdentificationRecord } from '@/components/IdentificationRecord'
 import { prose } from '@/components/ui/recipes'
@@ -125,12 +125,22 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
                 {[...conditions(method), ...readingRules(method)].map((caveat) => {
                   const reading = caveat.category === 'interpretation'
                   const evaluation = reading ? undefined : evaluations.get(caveat.id)
-                  const evidence = evaluation !== undefined && isStageNote(evaluation) ? null : evidenceText(evaluation)
+                  // Grouped series are listed here under their reason; the stage carries only the group's line.
+                  const groups = evaluation === undefined ? [] : stageGroups(evaluation)
+                  const evidence = groups.length > 0 ? null : evidenceText(evaluation)
                   return (
                     <li key={caveat.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2 text-body">
                       <p className="m-0 text-ink">{caveat.requirement}</p>
                       {reading ? <span className="whitespace-nowrap text-label text-faint">Interpretation</span> : <Status evaluation={evaluation} />}
                       {evidence !== null && evidence.length > 0 && <p className="col-span-2 m-0 text-muted">{evidence}</p>}
+                      {groups.map((group) => (
+                        <div key={group.summary} className="col-span-2">
+                          <p className="m-0 text-muted">{group.reason}</p>
+                          <ul className="mb-0 mt-1 list-disc space-y-0.5 pl-5 text-faint">
+                            {group.series.map((series) => <li key={series.name}>{series.name}{series.detail === null ? '' : `, ${series.detail}`}</li>)}
+                          </ul>
+                        </div>
+                      ))}
                       {!reading && evaluation?.kind !== 'satisfied' && <p className="col-span-2 m-0 text-faint">If this is not met: {caveat.consequenceIfUnmet}</p>}
                     </li>
                   )

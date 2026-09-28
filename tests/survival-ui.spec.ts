@@ -17,9 +17,9 @@ const openExample = async (page: Page, name: string): Promise<void> => {
 }
 
 const openSurvivalChapter = async (page: Page, phone: boolean): Promise<void> => {
-  if (phone) await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  if (phone) await page.getByRole('button', { name: 'Expand section list' }).click()
   await page
-    .getByRole('navigation', { name: 'Workspace chapters' })
+    .getByRole('navigation', { name: 'Workspace sections' })
     .getByRole('button', { name: /Survival analysis/ })
     .click()
 }
@@ -69,12 +69,12 @@ test('the standalone survival chapter renders in desktop and phone workbenches',
   await openSurvivalChapter(page, phone)
 
   await expect(page.getByRole('heading', { name: 'Survival analysis', exact: true })).toBeVisible()
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Run survival analysis' })).toBeVisible()
   await expect(page.locator('main#stage')).toHaveCSS('display', 'flex')
   // Idle scrollbars are thin and transparent everywhere; they show only while scrolling.
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toHaveCSS('scrollbar-width', 'thin')
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toHaveCSS('scrollbar-color', 'rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)')
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' })).toHaveCSS('scrollbar-width', 'thin')
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' })).toHaveCSS('scrollbar-color', 'rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)')
 })
 
 test('does not expose an implementation error when a no-covariate example run is refused', async ({ page }, testInfo) => {
@@ -162,7 +162,7 @@ test('runs right-censored flexsurv on the exact breast-cancer package data', asy
   await expect(page.getByText('Survival runs (1)')).toBeVisible()
 
   await page
-    .getByRole('navigation', { name: 'Workspace chapters' })
+    .getByRole('navigation', { name: 'Workspace sections' })
     .getByRole('button', { name: /Results/ })
     .click()
   await expect(page.getByRole('heading', { name: 'Results', exact: true })).toBeVisible()
@@ -438,7 +438,7 @@ test('recovers the planted start-stop Weibull PH truth through the chapter', asy
   await expectRow('complexity', 0.4, 0.1)
 
   // Leaving and returning shows the controls as the recorded run set them, not the defaults.
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Data studio/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Data studio/ }).click()
   await openSurvivalChapter(page, false)
   await expect(page.getByRole('radio', { name: 'Start–stop' })).toBeChecked()
   for (const covariate of ['feature_active', 'experience', 'complexity']) await expect(page.getByRole('checkbox', { name: covariate, exact: true })).toBeChecked()

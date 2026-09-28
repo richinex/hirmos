@@ -38,8 +38,8 @@ test('panel, figure, editor and toolbar scrollbars are hidden at rest', async ({
 test('chapter scrollbar follows scrolling without shifting navigation', async ({ page }, info) => {
   await page.setViewportSize({ width: info.project.name === 'chromium' ? 1280 : 390, height: 480 })
   await page.goto('/app')
-  await page.getByRole('button', { name: 'Expand chapter list', exact: true }).click()
-  const nav = page.getByRole('navigation', { name: 'Workspace chapters' })
+  await page.getByRole('button', { name: 'Expand section list', exact: true }).click()
+  const nav = page.getByRole('navigation', { name: 'Workspace sections' })
   await expect(nav).toBeVisible()
   await expect.poll(() => nav.evaluate(element => element.getBoundingClientRect().left)).toBe(0)
   const hidden = 'rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)'

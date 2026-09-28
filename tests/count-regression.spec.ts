@@ -104,7 +104,7 @@ for(const name of names)test(`${name} completes using the UI and survives projec
   await result.scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath(`${name}-result.png`)})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true)
-  const navigation=page.getByRole('button',{name:'Expand chapter list',exact:true})
+  const navigation=page.getByRole('button',{name:'Expand section list',exact:true})
   if(await navigation.isVisible())await navigation.click()
   const download=page.waitForEvent('download')
   await page.getByRole('button',{name:'Export project',exact:true}).click()

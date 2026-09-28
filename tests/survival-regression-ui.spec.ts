@@ -16,9 +16,9 @@ test('new survival regressions preserve covariates, validate settings, render an
   await expect(page.getByText('Choose the observation structure')).toBeVisible({ timeout: 90_000 })
   await prepare(page, { structure: 'cross-section', columns: ['time', 'status', 'age', 'karno', 'prior', 'diagtime', 'trt'] })
   const chapter = async (pattern: RegExp) => {
-    const toggle = page.getByRole('button', { name: 'Expand chapter list' })
+    const toggle = page.getByRole('button', { name: 'Expand section list' })
     if (phone && await toggle.isVisible()) await toggle.click()
-    await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: pattern }).click()
+    await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: pattern }).click()
   }
   await chapter(/Survival analysis/)
   const setup = page.locator('section[aria-labelledby="survival-setup-title"]')

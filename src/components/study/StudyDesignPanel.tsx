@@ -424,7 +424,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
     <section aria-labelledby="study-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="study-title" className="mb-2">Study design</ChapterHeading>
-        <p className={chapterIntro}>A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. Bind the question to a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
+        <p className={chapterIntro}>A causal question specifies the treatment, outcome, intervention contrast, effect measure, and target population. In this section, you represent the data-generating process with a DAG, enumerate measured back-door adjustment sets, and run the ID algorithm to determine whether the interventional distribution can be written using observed probabilities.</p>
       </div>
 
       <CausalHierarchy />
@@ -507,7 +507,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                   >
                     <option value="">Choose a variable</option>
                     {modifierCandidates.map(({ node, role, allowed }) => (
-                      <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : ` — ${roleWord(role)}`}</option>
+                      <option key={node.id} value={node.id} disabled={!allowed}>{node.name}{role === null ? '' : `, ${roleWord(role)}`}</option>
                     ))}
                   </Select>
                 </label>
@@ -697,7 +697,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
     <WorkbenchLayout
       id="study"
       stage={stage}
-      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Graph, roles, and method requirements', body: inspector }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Graph, roles, and method requirements', body: inspector }}
       bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Studies (${studies.length})`, body: ledger, defaultSize: 150 }}
     />
   )

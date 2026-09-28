@@ -73,7 +73,7 @@ export function Select({ value, onChange, children, className, disabled, id, tri
         id={id}
         aria-label={ariaLabel}
         aria-labelledby={ariaLabelledBy}
-        className={cn('inline-flex items-center justify-between gap-2 text-left data-[placeholder]:text-faint', className)}
+        className={cn('inline-flex max-w-full items-center justify-between gap-2 text-left data-[placeholder]:text-faint', className)}
       >
         {trigger ?? (
           <>

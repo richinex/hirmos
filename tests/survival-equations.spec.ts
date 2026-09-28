@@ -120,8 +120,8 @@ test('fixed-time conversion differences keep their sign and probability scale', 
 test('the equation expands in the existing result and remains readable on both screen sizes', async ({ page }, info) => {
   await page.goto('/app/projects')
   await page.getByRole('button', { name: /Open Breast cancer/i }).click()
-  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand chapter list' }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ }).click()
+  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand section list' }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ }).click()
   const equation = page.getByTestId('survival-equation').first()
   await expect(equation).not.toHaveAttribute('open', '')
   await equation.getByText('Model equation', { exact: true }).click()
@@ -146,8 +146,8 @@ test('the equation expands in the existing result and remains readable on both s
 test('interval details remain collapsed until requested and typeset when opened', async ({ page }, info) => {
   await page.goto('/app/projects')
   await page.getByRole('button', { name: /Open Feature adoption/i }).click()
-  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand chapter list' }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Survival analysis/ }).click()
+  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand section list' }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Survival analysis/ }).click()
   const equation = page.getByTestId('survival-equation').first()
   await equation.getByText('Model equation', { exact: true }).click()
   const detail = equation.getByTestId('survival-equation-detail')

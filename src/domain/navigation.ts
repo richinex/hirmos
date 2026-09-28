@@ -98,7 +98,7 @@ export const isCanonicalLocation = (pathname: string, search: string, route: Rou
 export function describeRouteProblem(problem: RouteProblem): string {
   switch (problem.kind) {
     case 'unknown-path': return `There is no page at “${problem.path}”`
-    case 'invalid-chapter-query': return `Unknown chapter “${problem.value}” in the URL`
+    case 'invalid-chapter-query': return `Unknown section “${problem.value}” in the URL`
     default: {
       const exhaustive: never = problem
       return exhaustive

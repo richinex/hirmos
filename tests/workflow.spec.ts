@@ -116,7 +116,7 @@ test('refuses a header-only CSV after canonical parsing', async ({ page }, testI
 
 test('rejects an unknown chapter query without losing the workflow entry point', async ({ page }) => {
   await page.goto('/app?chapter=unknown')
-  await expect(page.getByRole('alert')).toContainText('Unknown chapter “unknown”')
+  await expect(page.getByRole('alert')).toContainText('Unknown section “unknown”')
   await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible()
 })
 
@@ -127,10 +127,10 @@ test('keeps the current stage usable on a phone', async ({ page }, testInfo) => 
   await page.getByRole('button', { name: 'Inspect data' }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
 
-  const mobileNav = page.locator('nav[aria-label="Workspace chapters"]')
+  const mobileNav = page.locator('nav[aria-label="Workspace sections"]')
   const sidebar = page.locator('.dashboard-sidebar').filter({ has: mobileNav })
   await expect(sidebar).toHaveAttribute('inert', '')
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   await expect(sidebar).not.toHaveAttribute('inert', '')
   await expect(mobileNav.getByRole('button', { name: /Data studio/ })).toHaveAttribute('aria-current', 'page')
   await expect(mobileNav.getByRole('button', { name: /Discovery lab/ })).toHaveAttribute('aria-disabled', 'true')
@@ -168,8 +168,8 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await expect(mobileGrangerTable.getByRole('columnheader', { name: 'Sum-of-squared-residuals F statistic' })).toBeVisible()
   await expect(mobileGranger.getByText('not an intervention effect', { exact: false }).first()).toBeVisible()
 
-  const mobileNav = page.locator('nav[aria-label="Workspace chapters"]')
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  const mobileNav = page.locator('nav[aria-label="Workspace sections"]')
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   await mobileNav.getByRole('button', { name: /Discovery lab/ }).click()
 
   // Exact, so the family segmented control above it is not matched as well. The keys move within one
@@ -194,7 +194,7 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('button', { name: 'Run cMLP' }).click()
   await expect(page.getByRole('button', { name: 'Cancel run' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   await mobileNav.getByRole('button', { name: /Data studio/ }).click()
   const discoveryActivity = page.getByRole('button', { name: 'Discovery running in Discovery lab; open it' })
   await expect(discoveryActivity).toBeVisible()
@@ -213,11 +213,11 @@ test('keeps temporal discovery usable on a phone without widening the page', asy
   await page.getByRole('button', { name: 'Run cMLP' }).click()
 
   await expect(page.getByRole('button', { name: 'Cancel run' })).toBeVisible()
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   await mobileNav.getByRole('button', { name: /Data studio/ }).click()
   await expect(discoveryActivity).toBeVisible()
   await expect(discoveryActivity).toBeHidden({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   await mobileNav.getByRole('button', { name: /Discovery lab/ }).click()
   await expect(page.getByText('Lag-resolved neural Granger evidence')).toBeVisible({ timeout: 30_000 })
   // On a phone the run ledger is a bottom pane opened from a bar under the stage; its button carries the count.
@@ -262,7 +262,7 @@ test('runs DirectLiNGAM for independent observations and carries its relations i
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Cross-section, 96 rows' })).toBeVisible({ timeout: 30_000 })
 
-  const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
+  const navigation = page.getByRole('navigation', { name: 'Workspace sections' })
   await navigation.getByRole('button', { name: /Discovery lab/ }).click()
   await expect(page.getByRole('heading', { name: 'Causal discovery', exact: true })).toBeVisible()
   // Methods are grouped into families, so only the selected family's methods are on the page. The
@@ -461,7 +461,7 @@ test('keeps the current chapter visible until a cold lazy chapter is ready', asy
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Cross-section, 4 rows' })).toBeVisible({ timeout: 30_000 })
 
-  const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
+  const navigation = page.getByRole('navigation', { name: 'Workspace sections' })
   await navigation.getByRole('button', { name: /DAG workspace/ }).click()
   await chunkRequested
   await expect(page).toHaveURL(/\/app$/)

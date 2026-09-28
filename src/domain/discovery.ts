@@ -26,7 +26,7 @@ import type {
   PreparedDatasetVersionId,
   StationarityEvidenceArtifact,
 } from './preprocessing'
-import { levelModelVerdict } from './stationarityAssessment'
+import { levelEvidence, nonEmptyGroups, summaries } from './levelEvidence'
 
 export const pcmciPlusEvidenceSchema = z.object({
   kind: z.literal('pcmciPlus'),
@@ -1602,15 +1602,14 @@ export function evaluateDiscoveryEligibility(
         unresolved.push({ kind: 'unresolved', caveat, missingEvidence: 'Run stationarity tests for this prepared dataset version in Data studio.' })
         continue
       }
-      const verdicts = prepared.columns.map((column) => ({ name: columnNameOf(column), verdict: levelModelVerdict(columnNameOf(column), stationarity.variables.find((variable) => variable.column === column)?.assessment ?? null) }))
-      const integrated = verdicts.filter((entry) => entry.verdict.kind === 'refused').map((entry) => entry.name)
-      const open = verdicts.filter((entry) => entry.verdict.kind === 'unresolved').map((entry) => entry.verdict.reason)
-      if (integrated.length === 0 && open.length === 0) {
-        satisfied.push({ kind: 'satisfied', caveat, evidence: `${verdicts.map((entry) => entry.name).join(', ')} ${verdicts.length === 1 ? 'is' : 'are'} stationary on the prepared scale.` })
+      const readings = prepared.columns.map((column) => ({ name: columnNameOf(column), assessment: stationarity.variables.find((variable) => variable.column === column)?.assessment ?? null }))
+      const { refused, cautions } = levelEvidence(readings, { integrated: 'links found on levels can be spurious; a differenced version is the safer input.' })
+      const review = [...refused, ...cautions]
+      if (review.length === 0) {
+        satisfied.push({ kind: 'satisfied', caveat, evidence: `${readings.map((entry) => entry.name).join(', ')} ${readings.length === 1 ? 'is' : 'are'} stationary on the prepared scale.` })
         continue
       }
-      const integratedText = integrated.length === 0 ? '' : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) in levels, so links found on levels can be spurious; a differenced version is the safer input.`
-      unresolved.push({ kind: 'unresolved', caveat, missingEvidence: [integratedText, ...open].filter((text) => text.length > 0).join(' ') })
+      unresolved.push({ kind: 'unresolved', caveat, missingEvidence: summaries(review), groups: nonEmptyGroups(review) })
       continue
     }
     unresolved.push({ kind: 'unresolved', caveat, missingEvidence: '' })

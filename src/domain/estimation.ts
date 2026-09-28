@@ -9,7 +9,8 @@ import type { ColumnId } from './dataset'
 import { armaErrorFieldsSchema } from './interruptedSeries'
 import type { DagDocument, EditableDag } from './dag'
 import { assertNever, brand, err, flattenNonEmpty, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
-import type { CaveatEvaluation, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
+import type { CaveatEvaluation, EvidenceGroup, MethodCaveat, MethodDefinition, MethodEligibility, MethodId } from './methods'
+import { levelEvidence, nonEmptyGroups, summaries } from './levelEvidence'
 import {
   BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
   CONTINUOUS_GPS_METHOD_ID,
@@ -2045,6 +2046,9 @@ const levelReadings = (context: EligibilityContext): readonly { readonly name: s
   return variables.map((variable) => ({ name: variable.name, assessment: context.stationarity?.variables.find((candidate) => candidate.column === variable.column)?.assessment ?? null }))
 }
 
+/** What a regression fitted in levels risks on an I(1) series. */
+const REGRESSION_IN_LEVELS = { integrated: 'a regression on those values can show a spurious relation. Create a differenced prepared version or use a suitable cointegration method.' } as const
+
 /** Level-model verdicts for the treatment, the outcome and the adjustment set on a time series. */
 const levelVerdicts = (context: EligibilityContext): readonly LevelModelVerdict[] =>
   levelReadings(context).map((reading) => levelModelVerdict(reading.name, reading.assessment))
@@ -2106,26 +2110,16 @@ const applyLevelRule = (
   id: string,
   context: EligibilityContext,
   satisfy: (id: string, evidence: string) => void,
-  leave: (id: string, missingEvidence: string) => void,
+  leave: (id: string, missingEvidence: string, groups?: NonEmptyArray<EvidenceGroup>) => void,
   violate: (id: string, evidence: string) => void,
 ): void => {
   if (context.prepared.kind === 'prepared-panel') { leave(id, 'Rows are a panel; trends are assessed within units, which this rule does not cover.'); return }
   if (context.prepared.kind !== 'prepared-time-series') { satisfy(id, 'Independent observations carry no stochastic trend.'); return }
   if (context.stationarity === null) { leave(id, 'Run stationarity tests for this prepared dataset version in Data studio.'); return }
-  const readings = levelReadings(context)
-  // I(2) or an unsettled order refuses (DESIGN.md, integration table); I(1) warns in one sentence, since the verdict is itself a test.
-  const higher = readings.filter((reading) => reading.assessment?.kind === 'higherOrderOrUnresolved')
-  if (higher.length > 0) { violate(id, higher.map((reading) => levelModelVerdict(reading.name, reading.assessment).reason).join(' ')); return }
-  const integrated = readings.filter((reading) => reading.assessment?.kind === 'differenceStationary').map((reading) => reading.name)
-  const open = readings
-    .filter((reading) => reading.assessment?.kind !== 'differenceStationary')
-    .map((reading) => levelModelVerdict(reading.name, reading.assessment))
-    .filter((verdict) => verdict.kind === 'unresolved')
-    .map((verdict) => verdict.reason)
-  const integratedText = integrated.length === 0
-    ? ''
-    : `${integrated.join(', ')} ${integrated.length === 1 ? 'is' : 'are'} I(1) on the prepared scale, so a regression on those values can show a spurious relation. Create a differenced prepared version or use a suitable cointegration method.`
-  if (integrated.length > 0 || open.length > 0) { leave(id, [integratedText, ...open].filter((text) => text.length > 0).join(' ')); return }
+  // I(2) or an unsettled order refuses (DESIGN.md, integration table); I(1) warns, since the verdict is itself a test.
+  const { refused, cautions } = levelEvidence(levelReadings(context), REGRESSION_IN_LEVELS)
+  if (refused.length > 0) { violate(id, summaries(refused)); return }
+  if (cautions.length > 0) { leave(id, summaries(cautions), nonEmptyGroups(cautions)); return }
   satisfy(id, levelVerdicts(context).map((verdict) => verdict.reason).join(' ') || 'No study variables to check.')
 }
 
@@ -2237,7 +2231,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
   const unresolved: Unresolved[] = []
   const violations: Violated[] = []
   const satisfy = (id: string, evidence: string) => satisfied.push({ kind: 'satisfied', caveat: findCaveat(method, id), evidence })
-  const leave = (id: string, missingEvidence: string) => unresolved.push({ kind: 'unresolved', caveat: findCaveat(method, id), missingEvidence })
+  const leave = (id: string, missingEvidence: string, groups?: NonEmptyArray<EvidenceGroup>) => unresolved.push({ kind: 'unresolved', caveat: findCaveat(method, id), missingEvidence, ...(groups === undefined ? {} : { groups }) })
   const violate = (id: string, evidence: string) => violations.push({ kind: 'violated', caveat: findCaveat(method, id), evidence })
   const adjustment = identification.kind === 'identified'
     ? identification.adjustment.variables.length === 0 ? 'nothing' : identification.adjustment.variables.map((variable) => variable.name).join(', ')
@@ -2268,7 +2262,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else if (configuration.errors.kind === 'arma') satisfy('linear-serial-dependence', `An ARMA(${configuration.errors.p}, ${configuration.errors.q}) error process is fitted with the coefficients by maximum likelihood; the interval comes from that fit.`)
       else satisfy('linear-serial-dependence', timeSeries ? 'Heteroskedasticity and autocorrelation consistent (HAC) Newey–West interval selected for time-series rows.' : 'The prepared dataset holds independent rows, so the classical interval applies.')
       satisfy('linear-hac-bandwidth', 'The run records the bandwidth from the default rule.')
-      leave('linear-functional-form', 'Check linearity with the residual diagnostics in the sensitivity chapter.')
+      leave('linear-functional-form', 'Check linearity with the residual diagnostics in the sensitivity section.')
       leave('linear-overlap', 'Inspect treatment overlap against the adjustment variables in Data studio.')
       if (timeSeries) leave('linear-not-time-graph', 'Lagged effects are not estimated by this method.')
       else satisfy('linear-not-time-graph', 'Independent observations carry no lag structure.')
@@ -2615,10 +2609,11 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else satisfy('causal-effects-stationary-dag', `Stationary DAG read from “${context.document.name}” with its lagged arrows kept.`)
       if (context.stationarity === null) leave('causal-effects-stationarity', 'Run stationarity tests for this prepared dataset version in Data studio.')
       else {
-        const verdicts = context.stationarity.variables.map((variable) => levelModelVerdict(context.document?.current.graph.nodes.find((node) => node.kind === 'observed' && node.column === variable.column)?.name ?? variable.column, variable.assessment))
-        const review = verdicts.filter((verdict) => verdict.kind !== 'allowed')
-        if (review.length > 0) leave('causal-effects-stationarity', `${review.map((verdict) => verdict.reason).join(' ')} CausalEffects assumes a stationary temporal graph; continuing keeps the prepared values unchanged and records this conflict with the run.`)
-        else satisfy('causal-effects-stationarity', `All ${verdicts.length} prepared series are stationary in levels.`)
+        const readings = context.stationarity.variables.map((variable) => ({ name: context.document?.current.graph.nodes.find((node) => node.kind === 'observed' && node.column === variable.column)?.name ?? variable.column, assessment: variable.assessment }))
+        const { refused, cautions } = levelEvidence(readings, REGRESSION_IN_LEVELS)
+        const review = [...refused, ...cautions]
+        if (review.length > 0) leave('causal-effects-stationarity', `${summaries(review)} CausalEffects assumes a stationary temporal graph; continuing keeps the prepared values unchanged and records this conflict with the run.`, nonEmptyGroups(review))
+        else satisfy('causal-effects-stationarity', `All ${readings.length} prepared series are stationary in levels.`)
       }
       if (configuration.estimator.kind === 'wrightParents') {
         leave('causal-effects-identifiable', 'The run checks whether the graph contains directed treatment–outcome paths that Wright path tracing can evaluate.')

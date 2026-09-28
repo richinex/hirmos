@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test'
 const THEMES = ['dark', 'light'] as const
 
 /** Every surface a reader can meet text on. */
-const GROUNDS = ['--color-stage', '--color-panel', '--color-column', '--color-well', '--color-raised'] as const
+const GROUNDS = ['--color-stage', '--color-panel', '--color-column', '--color-well', '--color-raised', '--color-track', '--color-knob'] as const
 
 /** The text ramp, floor last. */
 const TEXT = ['--color-ink', '--color-bone', '--color-muted', '--color-faint'] as const

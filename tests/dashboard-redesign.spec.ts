@@ -48,12 +48,12 @@ test('dashboard cards, responsive navigation and prepared data remain usable', a
   await expect(page.locator('.example-card')).toHaveCount(1)
   await page.getByRole('button', { name: 'Open AI adoption, company-wide', exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /^Survival analysis/ }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' })).toBeVisible()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /^Survival analysis/ }).click()
   await expect(page.getByRole('heading', { name: 'Survival analysis', exact: true })).toBeVisible()
   if (info.project.name === 'mobile-chromium') {
-    await expect(page.getByRole('button', { name: 'Expand chapter list' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Expand section list' })).toBeVisible()
   }
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
   expect(overflow).toBeLessThanOrEqual(1)

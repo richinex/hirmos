@@ -18,7 +18,7 @@ test('a pipeline editor that will not download says so', async ({ page }) => {
 
   expect(blocked, 'the editor chunk was never intercepted').toBeGreaterThan(0)
   await expect(page.getByTestId('editor-problem')).toContainText('could not be downloaded', { timeout: 30_000 })
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' })).toBeVisible()
 })
 
 /** Pyodide behind a VPN neither arrives nor fails, so the wait needs its own deadline. */
@@ -61,6 +61,6 @@ test('a SQL workspace that will not download shows the chapter error, not a blan
 
   expect(blocked, 'the SQL workspace chunk was never intercepted').toBeGreaterThan(0)
   await expect(page.getByText('could not be displayed')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('navigation', { name: 'Workspace chapters' })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: 'Workspace sections' })).toBeVisible()
   expect(await page.locator('#root').evaluate((root) => root.children.length), 'the workbench unmounted').toBeGreaterThan(0)
 })

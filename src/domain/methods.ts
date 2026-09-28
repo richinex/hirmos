@@ -1,4 +1,5 @@
 import { brand, err, mapNonEmpty, ok, type Brand, type NonEmptyArray, type Result } from './dop'
+import type { LevelIssueAction } from './stationarityAssessment'
 
 export type MethodId = Brand<string, 'MethodId'>
 export type MethodCaveatId = Brand<string, 'MethodCaveatId'>
@@ -44,14 +45,25 @@ export interface MethodDefinition {
   readonly caveats: NonEmptyArray<MethodCaveat>
 }
 
+/**
+ * Series that share one reason for review. The stage shows the summary line; the requirements panel
+ * heads its list of the series with the reason, so a series is named in one place however many there are.
+ */
+export interface EvidenceGroup {
+  readonly summary: string
+  readonly reason: string
+  readonly series: NonEmptyArray<{ readonly name: string; readonly detail: string | null }>
+  readonly action: LevelIssueAction | null
+}
+
 export type CaveatEvaluation =
   | { readonly kind: 'satisfied'; readonly caveat: MethodCaveat; readonly evidence: string }
-  | { readonly kind: 'unresolved'; readonly caveat: MethodCaveat; readonly missingEvidence: string }
+  | { readonly kind: 'unresolved'; readonly caveat: MethodCaveat; readonly missingEvidence: string; readonly groups?: NonEmptyArray<EvidenceGroup> }
   | { readonly kind: 'violated'; readonly caveat: MethodCaveat; readonly evidence: string }
 
-/** The one unassessed condition the stage states beside the run button: integrated series in levels. The inspector row then carries only its status, so the sentence appears once. */
-export const isStageNote = (evaluation: CaveatEvaluation): boolean =>
-  evaluation.kind === 'unresolved' && evaluation.caveat.category === 'stationarity-and-dynamics' && evaluation.missingEvidence.includes('I(1)')
+/** An unresolved condition the stage states beside the run button, one line per group of series. */
+export const stageGroups = (evaluation: CaveatEvaluation): readonly EvidenceGroup[] =>
+  evaluation.kind === 'unresolved' ? evaluation.groups ?? [] : []
 
 export type MethodEligibility =
   | {

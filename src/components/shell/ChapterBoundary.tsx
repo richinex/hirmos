@@ -22,11 +22,11 @@ export class ChapterBoundary extends Component<{ readonly chapter: string; reado
   override render(): ReactNode {
     if (this.state.error === null) return this.props.children
     return (
-      <Alert tone="warn" live={false} className="rise my-auto max-w-2xl">
-        <p className="m-0">The {this.props.chapter} chapter could not be displayed.</p>
+      <Alert tone="warn" live={false} className="rise mx-4 my-auto max-w-2xl">
+        <p className="m-0">The {this.props.chapter} section could not be displayed.</p>
         <p className="mb-0 mt-1 text-muted">
           A run recorded by an earlier build of Hirmos is usually the cause: it does not carry a field this version reads.
-          Delete that run from another chapter that still opens, or reset the example project in Projects, then run it again.
+          Delete that run from another section that still opens, or reset the example project in Projects, then run it again.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" className={button('quiet')} onClick={() => this.setState({ error: null })}>Try again</button>

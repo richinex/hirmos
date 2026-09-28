@@ -32,6 +32,8 @@
   --color-warn: #8A5700;
   --color-danger: #B23A3A;
   --color-highlight: rgba(255, 255, 255, 0.35);
+  --color-track: #E3EAF1;        /* a segmented control's track, pressed into the panel */
+  --color-knob: #FFFFFF;         /* the knob on a track, lit from above */
   /* The band: the rail and the header. */
   --color-rail: #16305A;
   --color-rail-active: #234478;
@@ -45,6 +47,11 @@
   /* A block on the canvas: a soft contact shadow, no ring and no top line; the value step does the rest. */
   --shadow-lift: 0 1px 2px rgb(22 32 46 / .06), 0 2px 8px rgb(22 32 46 / .04);
   --shadow-float: 0 2px 4px rgb(22 32 46 / .12), 0 24px 48px rgb(22 32 46 / .18);
+  /* A track is pressed in: an inner shadow from the top edge and an inner hairline. The knob on it is a
+     raised surface: a hairline ring, a contact shadow, a short drop, and the top highlight. */
+  --shadow-track: inset 0 1px 2px rgb(22 32 46 / .12), inset 0 0 0 1px rgb(22 32 46 / .05);
+  --shadow-knob: 0 0 0 1px rgb(22 32 46 / .07), 0 1px 2px rgb(22 32 46 / .14), 0 3px 8px -2px rgb(22 32 46 / .12), inset 0 1px 0 var(--color-highlight);
+  --gradient-knob: linear-gradient(to bottom, rgb(255 255 255 / .5), rgb(255 255 255 / 0));
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
@@ -73,6 +80,8 @@
   --color-warn: #F2C14E;
   --color-danger: #F28B82;
   --color-highlight: rgba(255, 255, 255, 0.07);
+  --color-track: #0F151E;
+  --color-knob: #243244;         /* dark enough that the faintest text still holds 4.5:1 on it */
   --color-rail: #0A1426;
   --color-rail-active: #1B2E4E;
   --color-rail-ink: #EAF0F7;
@@ -84,4 +93,7 @@
   --color-rail-danger: #F28B82;
   --shadow-lift: 0 1px 2px rgb(0 0 0 / .25), 0 2px 8px rgb(0 0 0 / .18);
   --shadow-float: 0 2px 4px rgb(0 0 0 / .4), 0 24px 48px rgb(0 0 0 / .5);
+  --shadow-track: inset 0 1px 2px rgb(0 0 0 / .12), inset 0 0 0 1px rgb(0 0 0 / .05);
+  --shadow-knob: 0 0 0 1px rgb(0 0 0 / .07), 0 1px 2px rgb(0 0 0 / .14), 0 3px 8px -2px rgb(0 0 0 / .12), inset 0 1px 0 var(--color-highlight);
+  --gradient-knob: linear-gradient(to bottom, rgb(255 255 255 / .16), rgb(255 255 255 / 0));
 }

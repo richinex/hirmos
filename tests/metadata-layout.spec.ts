@@ -43,8 +43,8 @@ test('column identity and requirement tallies fit without repeated labels', asyn
 test('the company-wide example shows each variable role once', async ({ page }, info) => {
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open AI adoption, company-wide', exact: true }).click()
-  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand chapter list' }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Study design/ }).click()
+  if (info.project.name === 'mobile-chromium') await page.getByRole('button', { name: 'Expand section list' }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Study design/ }).click()
   const roles = page.getByRole('list', { name: 'Variable roles', exact: true })
   if (info.project.name === 'mobile-chromium') await page.getByRole('group', { name: 'Panes' }).getByRole('button').filter({ hasText: /requirements|graph/i }).first().click()
   await expect(roles).toBeVisible()

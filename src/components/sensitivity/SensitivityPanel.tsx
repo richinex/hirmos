@@ -351,7 +351,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     <section aria-labelledby="sensitivity-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="sensitivity-title" className="mb-2">Sensitivity</ChapterHeading>
-        <p className={chapterIntro}>A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this chapter, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
+        <p className={chapterIntro}>A sensitivity analysis examines how an estimate changes when a specified part of the analysis is perturbed. In this section, apply procedures supported by the selected estimator and interpret each result against that procedure's reference value. Please note that stability under one perturbation does not assess the remaining assumptions.</p>
       </div>
 
       <section className={panel('p-(--panel-space)')} aria-labelledby="sensitivity-setup-title">
@@ -367,7 +367,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
               <Select className={field('text', 'mt-1')} value={state.estimationRun ?? ''} onChange={(event) => dispatch({ type: 'run-chosen', run: event.target.value === '' ? null : (event.target.value as EstimationRunId) })}>
                 {[...estimationRuns].reverse().map((run) => {
                   const bound = studies.find((candidate) => candidate.id === run.study)
-                  return <option key={run.id} value={run.id}>{bound === undefined ? run.id : `${estimandSentence(bound)} — ${describeEstimator(run.configuration.kind)} — ${formatTime(run.createdAt)}`}</option>
+                  return <option key={run.id} value={run.id}>{bound === undefined ? run.id : `${estimandSentence(bound)}, ${describeEstimator(run.configuration.kind)}, ${formatTime(run.createdAt)}`}</option>
                 })}
               </Select>
             </label>
@@ -509,7 +509,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
     <WorkbenchLayout
       id="sensitivity"
       stage={stage}
-      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Estimate and method requirements', body: inspector }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Estimate and method requirements', body: inspector }}
       bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Probes (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>

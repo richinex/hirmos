@@ -15,7 +15,7 @@ async function upload(page: Page, name: string, file: string) {
 }
 
 async function exportProject(page: Page) {
-  const open = page.getByRole('button', { name: 'Expand chapter list', exact: true })
+  const open = page.getByRole('button', { name: 'Expand section list', exact: true })
   if (await open.isVisible()) await open.click()
   const download = page.waitForEvent('download')
   await page.getByRole('button', { name: 'Export project', exact: true }).click()
@@ -25,7 +25,7 @@ async function exportProject(page: Page) {
 }
 
 async function capture(page: Page, info: TestInfo, name: string) {
-  const close = page.getByRole('button', { name: 'Collapse chapter list', exact: true })
+  const close = page.getByRole('button', { name: 'Collapse section list', exact: true })
   if (await close.isVisible()) await close.click()
   await page.getByText('Current estimate', { exact: true }).first().scrollIntoViewIfNeeded()
   await page.screenshot({ path: info.outputPath(name) })

@@ -51,7 +51,7 @@ for (const dataset of ['mpg', 'river']) test(`${dataset}: actual influence butto
   await page.getByRole('radio', { name: 'Independent observations' }).check()
   for (const name of example.names) await page.getByRole('checkbox', { name, exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  const navigation = page.getByRole('navigation', { name: 'Workspace chapters' })
+  const navigation = page.getByRole('navigation', { name: 'Workspace sections' })
   await navigation.getByRole('button', { name: /DAG workspace/ }).click()
   await page.getByRole('button', { name: /^Substantive knowledge/ }).click()
   await page.getByLabel('DAG name').fill(`${dataset} reference graph`)

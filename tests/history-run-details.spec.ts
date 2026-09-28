@@ -4,8 +4,8 @@ test('technical metadata belongs only to its history entry', async ({ page }, in
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Sensitivity/ }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Sensitivity/ }).click()
   await expect(page.getByTestId('sidebar-run-details')).toHaveCount(0)
   await expect(page.getByRole('combobox', { name: 'Run record', exact: true })).toHaveCount(0)
   if (info.project.name === 'mobile-chromium') {

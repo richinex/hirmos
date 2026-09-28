@@ -872,7 +872,7 @@ export function DagWorkspace({
     <div className="mb-3">
       <div>
         <ChapterHeading id="dag-workspace-title" className="mb-2">DAG workspace</ChapterHeading>
-        <p className={chapterIntro}>A directed acyclic graph (DAG) represents assumptions about how data is generated. Nodes represent variables, and each arrow states an assumed direct causal relationship. In this chapter, build the graph for your causal question and record the reason for each arrow. Discovery results can contribute evidence, but they do not determine the graph.</p>
+        <p className={chapterIntro}>A directed acyclic graph (DAG) represents assumptions about how data is generated. Nodes represent variables, and each arrow states an assumed direct causal relationship. In this section, build the graph for your causal question and record the reason for each arrow. Discovery results can contribute evidence, but they do not determine the graph.</p>
       </div>
     </div>
   )
@@ -952,7 +952,7 @@ export function DagWorkspace({
           </div>
           <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'latent-variable-add-requested' })}><Icon name="add" size={14} /> Unmeasured variable</button>
           <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'paste-requested' })}><Icon name="content_paste" size={14} /> From text</button>
-          <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'new-document-requested' })}>Create a DAG</button>
+          <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'new-document-requested' })}>New DAG</button>
         </div>
       </div>
       {/* A fixed label width keeps the two selects aligned whether they sit side by side or wrap onto their own lines. */}

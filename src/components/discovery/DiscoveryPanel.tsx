@@ -1878,10 +1878,10 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     <section aria-labelledby="discovery-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="discovery-title" className="mb-2">Causal discovery</ChapterHeading>
-        <p className={chapterIntro}>Causal discovery uses data patterns to propose relationships between variables, including same-period and lagged relations when time is considered. In this chapter, select a method suited to the observation structure and compare the candidate relationships it produces. The results depend on the method’s assumptions and do not independently establish a causal graph.</p>
+        <p className={chapterIntro}>Causal discovery uses data patterns to propose relationships between variables, including same-period and lagged relations when time is considered. In this section, select a method suited to the observation structure and compare the candidate relationships it produces. The results depend on the method’s assumptions and do not independently establish a causal graph.</p>
       </div>
 
-      <div className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <section className={panel('p-(--panel-space)')} aria-labelledby="discovery-method-title">
           <h3 id="discovery-method-title" className={cn(sectionTitle, 'mb-3 mt-0')}>Discovery method</h3>
           <SegmentedControl
@@ -2182,7 +2182,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
     <WorkbenchLayout
       id="discovery"
       stage={stage}
-      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Prepared dataset and method requirements', body: inspector }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Prepared dataset and method requirements', body: inspector }}
       bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
   )

@@ -20,7 +20,7 @@ test('fits the paper\'s smoking-ban model through the UI and reads it as the pap
   await page.getByRole('button', { name: /Inspect data/ }).click()
   await expect(page.getByText('Choose the observation structure')).toBeVisible({ timeout: 60_000 })
   await prepare(page, { structure: 'time series', time: 'time', frequency: 'Monthly', columns: ['aces', 'stdpop', 'smokban'] })
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Time-series analysis/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Time-series analysis/ }).click()
   await page.getByRole('radio', { name: 'Interrupted series', exact: true }).click()
   const fit = page.getByRole('button', { name: 'Fit interrupted series', exact: true })
   await expect(fit).toBeDisabled()
@@ -84,7 +84,7 @@ test('fits the paper\'s smoking-ban model through the UI and reads it as the pap
   await page.screenshot({ path: info.outputPath('sicily-arma.png'), fullPage: true })
 
   // Every run lands in the Results ledger with the same reading.
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /Results/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Results/ }).click()
   const ledger = page.getByRole('region', { name: 'Time-series result' })
   await expect(ledger).toHaveCount(3)
   await expect(ledger.first()).toContainText('ARMA(0, 1) errors')

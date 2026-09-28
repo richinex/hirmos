@@ -25,7 +25,7 @@ test('automatic full-data supply-chain change matches Docker through Run analysi
   await page.getByRole('radio', { name: 'Independent observations' }).check()
   for (const name of oracle.names) await page.getByRole('checkbox', { name, exact: true }).check()
   await page.getByRole('button', { name: 'Create prepared dataset version' }).click()
-  await page.getByRole('navigation', { name: 'Workspace chapters' }).getByRole('button', { name: /DAG workspace/ }).click()
+  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /DAG workspace/ }).click()
   await page.getByRole('button', { name: /^Substantive knowledge/ }).click()
   await page.getByLabel('DAG name').fill('Supply-chain reference graph')
   await page.getByRole('button', { name: 'Create DAG draft' }).click()

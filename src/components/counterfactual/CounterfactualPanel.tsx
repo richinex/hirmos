@@ -376,7 +376,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
     <section aria-labelledby="counterfactual-title" className="@container/panel flex flex-col gap-5">
       <div>
         <ChapterHeading id="counterfactual-title" className="mb-2">Counterfactuals</ChapterHeading>
-        <p className={chapterIntro}>A counterfactual compares outcomes for the same unit or system under different interventions. The row-wise model treats each observation independently. The dynamic model keeps the recorded lags, infers the innovation at each time point, and carries the intervention through the later series.</p>
+        <p className={chapterIntro}>Counterfactual reasoning examines what would have occurred if an action or condition had differed, given the actual outcome. It involves considering a parallel scenario for the same individual, unit, or system. In this context, a causal model is used to estimate the counterfactual outcome. The result depends on the chosen model and its underlying assumptions.</p>
       </div>
       <section className={panel('p-(--panel-space)')} aria-labelledby="counterfactual-setup-title">
         <h3 id="counterfactual-setup-title" className={cn(sectionTitle, 'mb-6 mt-0')}>Structural counterfactual</h3>
@@ -391,7 +391,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
               <Select className={field('text', 'mt-1')} value={state.identification ?? ''} onChange={(event) => dispatch({ type: 'identification-chosen', identification: event.target.value === '' ? null : (event.target.value as IdentificationId) })}>
                 {identified.map((candidate) => {
                   const bound = studies.find((item) => item.id === candidate.study)
-                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)} — ${bound.dagName}`}</option>
+                  return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)}, ${bound.dagName}`}</option>
                 })}
               </Select>
             </label>
@@ -590,7 +590,7 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
     <WorkbenchLayout
       id="counterfactual"
       stage={stage}
-      inspector={{ trigger: { label: 'Requirements', icon: 'fact_check' }, title: 'Study and method requirements', body: inspector }}
+      inspector={{ trigger: { label: 'Requirements', icon: 'contract' }, title: 'Study and method requirements', body: inspector }}
       bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Runs (${runs.length})`, body: <>{ledger}{deleteDialog}</>, defaultSize: 150 }}
     />
     </>

@@ -4,7 +4,7 @@ test('sidebar project name and folder follow the rail foreground in both themes'
   await page.goto('/app/projects')
   await page.getByRole('button', { name: 'Open AI adoption, company-wide', exact: true }).click()
   await expect(page.locator('#data-profile-title')).toBeVisible({ timeout: 30_000 })
-  await page.getByRole('button', { name: 'Expand chapter list' }).click()
+  await page.getByRole('button', { name: 'Expand section list' }).click()
   const link = page.locator('.dashboard-project-link')
   await expect(link).toBeVisible()
   for (const theme of ['light', 'dark']) {

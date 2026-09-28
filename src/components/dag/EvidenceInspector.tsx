@@ -146,7 +146,7 @@ export function EvidenceInspector({
             if (next !== undefined) onRunSelected(next.id)
           }}
         >
-          {runs.map((candidate, index) => <option key={candidate.id} value={candidate.id}>{methodTitle(candidate)} — {index + 1}</option>)}
+          {runs.map((candidate, index) => <option key={candidate.id} value={candidate.id}>{methodTitle(candidate)}, {index + 1}</option>)}
         </Select>
       </div>
       <EvidenceGraph view={view} selected={selectedCandidate?.run === run.id ? selectedCandidate : null} />
