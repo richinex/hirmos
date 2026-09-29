@@ -1,5 +1,6 @@
 import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
 import { z } from 'zod'
+import { causalForestEvidenceSchema, sameCausalForestTarget, causalForestSettingsMatch } from '@/domain/causalForest'
 import { sameStructuralModel } from '@/domain/structuralImpact'
 import { ardlModelResponseSchema } from '@/domain/ardlModel'
 import { rootCauseResponseSchema } from '@/domain/rootCauseAnalysis'
@@ -388,6 +389,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'seasonalAdjust', rows: command.rows, columns: command.columns, period: command.period, robust: command.robust, adjust: command.adjust }
     case 'double-ml':
       return { kind: 'doubleMl', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, model: command.model, att: command.att, seed: command.seed, groups: command.groups }
+    case 'causal-forest':
+      return { kind: 'causalForest', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, target: command.target, configuration: command.configuration, columnNames: command.columnNames ?? [] }
     case 't-learner':
       return { kind: 'tLearner', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, seed: command.seed, uncertainty: command.uncertainty }
     case 'cross-fitted-t-learner':
@@ -851,6 +854,16 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result = doubleMlEvidenceSchema.safeParse(decoded)
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'double-ml-succeeded', request: command.request, result: result.data })
+        return
+      }
+      case 'causal-forest': {
+        const envelope = z.object({ kind: z.literal('causalForest'), evidence: causalForestEvidenceSchema }).strict().safeParse(decoded)
+        if (!envelope.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(envelope.error) }); return }
+        const result = envelope.data.evidence
+        if (!sameCausalForestTarget(result.target, command.target) || !causalForestSettingsMatch(command.configuration, result) || result.observations !== command.rows || result.variableImportance.length !== command.adjustment.length) {
+          fail(command.request, { kind: 'worker-protocol-failed', detail: 'The causal forest result does not match the requested target, confidence level or data dimensions.' }); return
+        }
+        emit({ kind: 'causal-forest-succeeded', request: command.request, result })
         return
       }
       case 't-learner': {

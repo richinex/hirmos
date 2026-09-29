@@ -1,30 +1,37 @@
 //! R's dqrdc2 rank rule and the coefficient branch of dqrsl.
 
-pub(super) struct Qr {
+pub(crate) struct Qr {
     a: Vec<f64>,
     aux: Vec<f64>,
     pivot: Vec<usize>,
     pub rank: usize,
     n: usize,
+    columns: usize,
 }
 
 impl Qr {
-    pub fn new(mut a: Vec<f64>, n: usize, tolerance: f64) -> Self {
-        let mut aux: Vec<f64> = (0..n).map(|j| norm(&a[j * n..(j + 1) * n])).collect();
+    pub fn new(a: Vec<f64>, n: usize, tolerance: f64) -> Self {
+        Self::rectangular(a, n, n, tolerance)
+    }
+
+    /// Same R QR operations for an overdetermined design; square callers are unchanged.
+    pub fn rectangular(mut a: Vec<f64>, n: usize, columns: usize, tolerance: f64) -> Self {
+        assert!(n >= columns && a.len() == n * columns);
+        let mut aux: Vec<f64> = (0..columns).map(|j| norm(&a[j * n..(j + 1) * n])).collect();
         let mut original: Vec<f64> = aux
             .iter()
             .map(|v| if *v == 0.0 { 1.0 } else { *v })
             .collect();
-        let mut pivot: Vec<usize> = (0..n).collect();
-        let mut rank = n;
-        for l in 0..n {
+        let mut pivot: Vec<usize> = (0..columns).collect();
+        let mut rank = columns;
+        for l in 0..columns {
             while l < rank && aux[l] < original[l] * tolerance {
                 for row in 0..n {
                     let saved = a[row + l * n];
-                    for j in l + 1..n {
+                    for j in l + 1..columns {
                         a[row + (j - 1) * n] = a[row + j * n];
                     }
-                    a[row + (n - 1) * n] = saved;
+                    a[row + (columns - 1) * n] = saved;
                 }
                 aux[l..].rotate_left(1);
                 original[l..].rotate_left(1);
@@ -46,7 +53,7 @@ impl Qr {
                 a[row + l * n] *= reciprocal;
             }
             a[l + l * n] += 1.0;
-            for j in l + 1..n {
+            for j in l + 1..columns {
                 let t = -(l..n).fold(0.0, |sum, row| a[row + l * n].mul_add(a[row + j * n], sum))
                     / a[l + l * n];
                 for row in l..n {
@@ -72,16 +79,47 @@ impl Qr {
             pivot,
             rank,
             n,
+            columns,
         }
     }
 
+    /// Full-rank (X'X)^-1 from the existing R factor, in original column order.
+    pub fn inverse_crossproduct(&self) -> Option<Vec<Vec<f64>>> {
+        if self.rank != self.columns {
+            return None;
+        }
+        let p = self.columns;
+        let mut inverse = vec![vec![0.0; p]; p];
+        for column in 0..p {
+            for row in (0..=column).rev() {
+                let diagonal = self.a[row + row * self.n];
+                if diagonal == 0.0 {
+                    return None;
+                }
+                let mut value = if row == column { 1.0 } else { 0.0 };
+                for j in row + 1..=column {
+                    value -= self.a[row + j * self.n] * inverse[j][column];
+                }
+                inverse[row][column] = value / diagonal;
+            }
+        }
+        let mut result = vec![vec![0.0; p]; p];
+        for i in 0..p {
+            for j in 0..p {
+                result[self.pivot[i]][self.pivot[j]] =
+                    (0..p).map(|k| inverse[i][k] * inverse[j][k]).sum();
+            }
+        }
+        Some(result)
+    }
+
     pub fn solve(&self, rhs: &[f64]) -> Option<Vec<f64>> {
-        if self.rank != self.n {
+        if self.rank != self.columns || rhs.len() != self.n {
             return None;
         }
         let n = self.n;
         let mut b = rhs.to_vec();
-        for j in 0..n.saturating_sub(1) {
+        for j in 0..self.columns.min(n.saturating_sub(1)) {
             if self.aux[j] == 0.0 {
                 continue;
             }
@@ -95,7 +133,7 @@ impl Qr {
                 b[i] = t.mul_add(self.a[i + j * n], b[i]);
             }
         }
-        for j in (0..n).rev() {
+        for j in (0..self.columns).rev() {
             if self.a[j + j * n] == 0.0 {
                 return None;
             }
@@ -104,8 +142,8 @@ impl Qr {
                 b[i] = (-b[j]).mul_add(self.a[i + j * n], b[i]);
             }
         }
-        let mut result = vec![0.0; n];
-        for j in 0..n {
+        let mut result = vec![0.0; self.columns];
+        for j in 0..self.columns {
             result[self.pivot[j]] = b[j];
         }
         Some(result)
@@ -157,6 +195,7 @@ mod tests {
             let qr = Qr {
                 a,
                 n,
+                columns: n,
                 rank: n,
                 aux: serde_json::from_value(reference["aux"].clone()).unwrap(),
                 pivot: reference["pivot"]

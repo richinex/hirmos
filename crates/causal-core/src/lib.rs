@@ -3,6 +3,10 @@
 //! Only modules adopted by the application live here. The browser-facing contract remains in the
 //! separate `hirmos-wasm` façade so scientific implementations do not acquire UI serialization.
 
+pub mod grf;
+mod mt19937_64;
+mod arm_log;
+mod arm_log_data;
 mod arm_pow;
 mod arm_pow_data;
 pub mod backdoor;
@@ -200,3 +204,5 @@ pub use adjustment_sets::{dagitty_adjustment_sets, AdjustmentSetAnalysis, Adjust
 pub mod panel_glm;
 
 pub mod panel_design;
+
+pub mod continuous_did;

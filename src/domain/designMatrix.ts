@@ -118,6 +118,7 @@ export const expandsDesign = (estimator: EstimatorId): boolean =>
   || estimator === 'dml-plr'
   || estimator === 'dml-irm'
   || estimator === 't-learner'
+  || estimator === 'causal-forest'
   || estimator === 'propensity-weighting'
   || estimator === 'propensity-matching'
   || estimator === 'doubly-robust'

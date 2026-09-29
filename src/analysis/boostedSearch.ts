@@ -5,7 +5,9 @@ import {
   type AnalysisWorkerCommand,
   type AnalysisWorkerProblem,
 } from '@/workers/analysisProtocol'
-import { AsyncSemaphore, computeMaxWorkers } from './workerPool'
+import { AsyncSemaphore, computeMaxWorkers, createPoolScope } from './workerPool'
+
+const cancelled = (): AnalysisWorkerProblem => ({ kind: 'analysis-cancelled', detail: 'The analysis run was cancelled.' })
 
 export interface BoostedCandidate {
   readonly learningRate: number
@@ -41,14 +43,22 @@ const runSlice = (
   design: { readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[] },
   grid: BoostedGrid,
   slice: Slice,
+  signal: AbortSignal,
 ): Promise<Result<readonly BoostedCandidate[], AnalysisWorkerProblem>> =>
   new Promise((resolve) => {
     const request = newWorkerRequestId()
     const settle = (outcome: Result<readonly BoostedCandidate[], AnalysisWorkerProblem>) => {
+      signal.removeEventListener('abort', abort)
       worker.onmessage = null
       worker.onerror = null
       resolve(outcome)
     }
+    const abort = () => {
+      worker.terminate()
+      settle(err(cancelled()))
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) { abort(); return }
     worker.onmessage = (message: MessageEvent<unknown>) => {
       const parsed = parseAnalysisWorkerEvent(message.data)
       if (!parsed.ok) { settle(err({ kind: 'worker-protocol-failed', detail: parsed.error.detail })); return }
@@ -103,7 +113,9 @@ export async function runBoostedGridSearch(
   onProgress?: (completed: number, total: number) => void,
 ): Promise<Result<{ readonly best: BoostedCandidate; readonly workers: number }, AnalysisWorkerProblem>> {
   const slices = slicesOf(grid)
+  if (slices.length === 0) return err({ kind: 'worker-protocol-failed', detail: 'The grid search has no candidates.' })
   const size = Math.min(computeMaxWorkers(), slices.length)
+  const scope = createPoolScope()
   const workers: Worker[] = []
   const semaphore = new AsyncSemaphore(size)
   const scored = new Array<readonly BoostedCandidate[] | null>(slices.length).fill(null)
@@ -122,10 +134,10 @@ export async function runBoostedGridSearch(
       for (;;) {
         const index = next
         next += 1
-        if (index >= slices.length || failure !== null) return
+        if (index >= slices.length || failure !== null || scope.signal.aborted) return
         await semaphore.acquire()
         try {
-          const outcome = await runSlice(worker, values, rows, columns, design, grid, slices[index]!)
+          const outcome = await runSlice(worker, values, rows, columns, design, grid, slices[index]!, scope.signal)
           if (!outcome.ok) { failure ??= outcome.error; return }
           scored[index] = outcome.value
           completed += 1
@@ -139,8 +151,10 @@ export async function runBoostedGridSearch(
     failure ??= { kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }
   } finally {
     for (const worker of workers) worker.terminate()
+    scope.release()
   }
 
+  if (scope.signal.aborted) return err(cancelled())
   if (failure !== null) return err(failure)
   const merged = scored.flatMap((entry) => entry ?? [])
   if (merged.length === 0) {

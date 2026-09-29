@@ -160,6 +160,9 @@ pub struct EventWindow {
 }
 
 impl EventWindow {
+    pub fn bounds(&self) -> (Option<i64>, Option<i64>, Option<u32>) {
+        (self.first, self.last, self.balance)
+    }
     pub fn new(first: Option<i64>, last: Option<i64>, balance: Option<u32>) -> Result<Self, Error> {
         if matches!((first, last), (Some(a), Some(b)) if a > b) {
             return Err(Error::InvalidWindow);

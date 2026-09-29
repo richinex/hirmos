@@ -534,6 +534,53 @@ pub fn lbfgsb<F>(
     pgtol: f64,
     maxls: usize,
     max_iter: usize,
+    f_and_grad: F,
+) -> LbfgsbResult
+where
+    F: FnMut(&[f64]) -> (f64, Vec<f64>),
+{
+    lbfgsb_driver(
+        x0, l0, u0, nbd0, m, factr, pgtol, maxls, max_iter, false, f_and_grad,
+    )
+}
+
+/// R's pre-3.0 feasible-subspace step, sharing the remaining solver machinery.
+/// This entry point does not change the SciPy-compatible solver above.
+/// Subspace adaptation follows R src/appl/lbfgsb.c::subsm (R Core Team,
+/// GPL-2.0-or-later), rather than the 2011 projected-step safeguard.
+#[allow(clippy::too_many_arguments)]
+pub fn lbfgsb_r<F>(
+    x0: &[f64],
+    l0: &[f64],
+    u0: &[f64],
+    nbd0: &[i32],
+    m: usize,
+    factr: f64,
+    pgtol: f64,
+    maxls: usize,
+    max_iter: usize,
+    f_and_grad: F,
+) -> LbfgsbResult
+where
+    F: FnMut(&[f64]) -> (f64, Vec<f64>),
+{
+    lbfgsb_driver(
+        x0, l0, u0, nbd0, m, factr, pgtol, maxls, max_iter, true, f_and_grad,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn lbfgsb_driver<F>(
+    x0: &[f64],
+    l0: &[f64],
+    u0: &[f64],
+    nbd0: &[i32],
+    m: usize,
+    factr: f64,
+    pgtol: f64,
+    maxls: usize,
+    max_iter: usize,
+    r_subspace: bool,
     mut f_and_grad: F,
 ) -> LbfgsbResult
 where
@@ -727,7 +774,7 @@ where
             if info == 0 {
                 info = subsm(
                     n, m, nfree, &index, &l, &u, &nbd, &mut z, &mut r, &mut xp, &ws, &wy, theta,
-                    &x, &g, col, head, &mut wa, &wn,
+                    r_subspace, &x, &g, col, head, &mut wa, &wn,
                 );
             }
             if info != 0 {
@@ -1464,6 +1511,7 @@ fn subsm(
     ws: &Mat,
     wy: &Mat,
     theta: f64,
+    r_subspace: bool,
     xx: &[f64],
     gg: &[f64],
     col: usize,
@@ -1509,50 +1557,55 @@ fn subsm(
         pointr = pointr % m + 1;
     }
     for i in 1..=nsub {
-        d[i] *= ONE / theta;
-    }
-
-    let mut iword = 0;
-    xp[1..=n].copy_from_slice(&x[1..=n]);
-    for i in 1..=nsub {
-        let k = ind[i];
-        let dk = d[i];
-        let xk = x[k];
-        if nbd[k] != 0 {
-            if nbd[k] == 1 {
-                x[k] = l[k].max(xk + dk);
-                if x[k] == l[k] {
-                    iword = 1;
-                }
-            } else if nbd[k] == 2 {
-                let xk2 = l[k].max(xk + dk);
-                x[k] = u[k].min(xk2);
-                if x[k] == l[k] || x[k] == u[k] {
-                    iword = 1;
-                }
-            } else if nbd[k] == 3 {
-                x[k] = u[k].min(xk + dk);
-                if x[k] == u[k] {
-                    iword = 1;
-                }
-            }
+        if r_subspace {
+            d[i] /= theta;
         } else {
-            x[k] = xk + dk;
+            d[i] *= ONE / theta;
         }
     }
-    if iword == 0 {
-        return 0;
-    }
-    let mut dd_p = ZERO;
-    for i in 1..=n {
-        dd_p += (x[i] - xx[i]) * gg[i];
-    }
-    if dd_p > ZERO {
-        x[1..=n].copy_from_slice(&xp[1..=n]);
-    } else {
-        return 0;
-    }
 
+    if !r_subspace {
+        let mut iword = 0;
+        xp[1..=n].copy_from_slice(&x[1..=n]);
+        for i in 1..=nsub {
+            let k = ind[i];
+            let dk = d[i];
+            let xk = x[k];
+            if nbd[k] != 0 {
+                if nbd[k] == 1 {
+                    x[k] = l[k].max(xk + dk);
+                    if x[k] == l[k] {
+                        iword = 1;
+                    }
+                } else if nbd[k] == 2 {
+                    let xk2 = l[k].max(xk + dk);
+                    x[k] = u[k].min(xk2);
+                    if x[k] == l[k] || x[k] == u[k] {
+                        iword = 1;
+                    }
+                } else if nbd[k] == 3 {
+                    x[k] = u[k].min(xk + dk);
+                    if x[k] == u[k] {
+                        iword = 1;
+                    }
+                }
+            } else {
+                x[k] = xk + dk;
+            }
+        }
+        if iword == 0 {
+            return 0;
+        }
+        let mut dd_p = ZERO;
+        for i in 1..=n {
+            dd_p += (x[i] - xx[i]) * gg[i];
+        }
+        if dd_p > ZERO {
+            x[1..=n].copy_from_slice(&xp[1..=n]);
+        } else {
+            return 0;
+        }
+    }
     let mut alpha = ONE;
     let mut temp1 = alpha;
     let mut ibd = 0usize;

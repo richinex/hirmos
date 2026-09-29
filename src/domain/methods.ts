@@ -171,6 +171,7 @@ export const CAUSAL_IMPACT_METHOD_ID = methodId('causal-impact')
 export const DML_PLR_METHOD_ID = methodId('dml-plr')
 export const DML_IRM_METHOD_ID = methodId('dml-irm')
 export const T_LEARNER_METHOD_ID = methodId('t-learner')
+export const CAUSAL_FOREST_METHOD_ID = methodId('causal-forest')
 export const DML_REFUTATION_METHOD_ID = methodId('dml-refutation-batch')
 export const ARDL_PSS_METHOD_ID = methodId('ardl-pss')
 export const VECM_METHOD_ID = methodId('vecm')
@@ -1930,6 +1931,19 @@ const dmlCaveats = (model: 'plr' | 'irm'): NonEmptyArray<MethodCaveat> => [
   },
 ]
 
+const CAUSAL_FOREST: MethodDefinition = {
+  id: CAUSAL_FOREST_METHOD_ID, name: 'Causal forest', family: 'estimation',
+  summary: 'Estimate conditional treatment effects with an honest forest. Report binary treatment contrasts or continuous treatment slopes according to the recorded study target.',
+  caveats: [
+    { id: caveatId('forest-adjustment'), category: 'identification', requirement: 'Identification requires a valid adjustment set and covariates measured before treatment.', consequenceIfUnmet: 'Flexible estimation does not remove unmeasured confounding or justify conditioning on variables affected by treatment.', sources: [{ kind: 'paper', title: 'Generalized random forests (Athey, Tibshirani and Wager, 2019)', locator: 'Section 6; https://doi.org/10.1214/18-AOS1709' }] },
+    { id: caveatId('forest-sampling'), category: 'sampling-structure', requirement: 'This route uses independent observations.', consequenceIfUnmet: 'This product route does not yet pass cluster identifiers or model serial dependence. Repeated observations require a supported dependence specification.', sources: [{ kind: 'hirmos-constraint', locator: 'Causal forest browser route: independent observations; clustered core inference is not exposed here.' }] },
+    { id: caveatId('forest-target'), category: 'functional-form', requirement: 'Binary targets require both treatment groups. Continuous targets require conditional treatment variation and assumptions supporting a causal slope.', consequenceIfUnmet: 'A continuous partial effect is not an arbitrary treatment contrast or an unrestricted dose-response curve.', sources: [{ kind: 'paper', title: 'Generalized random forests (Athey, Tibshirani and Wager, 2019)', locator: 'Section 6, exogenous random-coefficient model and local moment equation' }] },
+    { id: caveatId('forest-overlap'), category: 'identification', requirement: 'Treatment must vary at the covariate values relevant to the target population.', consequenceIfUnmet: 'Effects in regions without treatment variation are not supported. Overlap weighting changes the target population; it does not recover effects everywhere.', sources: [{ kind: 'paper', title: 'Balancing covariates via propensity score weighting (Li, Morgan and Zaslavsky, 2018)', locator: 'JASA 113(521); overlap weights' }] },
+    { id: caveatId('forest-settings'), category: 'computation', requirement: 'Forest settings must be valid and recorded with the result.', consequenceIfUnmet: 'Invalid settings prevent estimation. Failed tuning is reported rather than silently substituted.', sources: [{ kind: 'hirmos-constraint', locator: 'Causal forest configuration and worker contract' }] },
+    { id: caveatId('forest-reading'), category: 'interpretation', requirement: 'Conditional predictions describe averages at covariate values, not observed individual effects. Row intervals are pointwise.', consequenceIfUnmet: 'A spread of predictions alone does not establish treatment-effect heterogeneity.', sources: [{ kind: 'paper', title: 'Everyday causal inference', locator: 'Section 12, heterogeneous treatment effects; https://www.everydaycausal.com/heterogeneous-effects.html' }, { kind: 'paper', title: 'GRF calibration test documentation', locator: 'https://grf-labs.github.io/grf/reference/test_calibration.html' }] },
+  ],
+}
+
 const T_LEARNER: MethodDefinition = {
   id: T_LEARNER_METHOD_ID,
   name: 'T-learner',
@@ -2619,6 +2633,7 @@ export const METHOD_CATALOG: NonEmptyArray<MethodDefinition> = [
   DML_PLR,
   DML_IRM,
   T_LEARNER,
+  CAUSAL_FOREST,
   DML_REFUTATION,
   ARDL_PSS,
   VECM,
@@ -2650,7 +2665,7 @@ export const COUNTERFACTUAL_METHODS: NonEmptyArray<MethodDefinition> = [LINEAR_S
 
 export const DML_SENSITIVITY_METHODS: NonEmptyArray<MethodDefinition> = [DML_REFUTATION]
 
-export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [SHARP_RD, BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
+export const ESTIMATION_METHODS: NonEmptyArray<MethodDefinition> = [SHARP_RD, BACKDOOR_LINEAR_REGRESSION, FRONTDOOR_TWO_STAGE, INSTRUMENTAL_VARIABLE, BAYESIAN_GAUSSIAN, POISSON_GLM, NEGATIVE_BINOMIAL, NEGATIVE_BINOMIAL_INGARCH, NEGBIN_NUTS, DML_PLR, DML_IRM, T_LEARNER, CAUSAL_FOREST, CAUSAL_EFFECTS_TOTAL, CAUSAL_IMPACT, SYNTHETIC_CONTROL, PANEL_INTERVENTION, ARDL_PSS, VECM, DISCRETE_BN, BINARY_ETT]
 
 export const STATIONARITY_METHODS: NonEmptyArray<MethodDefinition> = [ADF, KPSS, ZIVOT_ANDREWS]
 export const TIME_SERIES_METHODS = { ardl: ARDL_PSS, vecm: VECM, interrupted: INTERRUPTED_SERIES } as const

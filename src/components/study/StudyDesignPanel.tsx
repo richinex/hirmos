@@ -81,13 +81,18 @@ const ledgerLabel = (result: IdentificationArtifact['result']): string => {
 }
 
 const ASSIGNMENT_KINDS: readonly AssignmentMechanism['kind'][] = ['randomised', 'policy-change', 'observed-choice']
-const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'local-cutoff-effect', 'conditional-average-treatment-effect', 'conditional-average-treatment-effect-per-row']
+const ESTIMAND_KINDS: readonly Estimand['kind'][] = ['average-treatment-effect', 'average-treatment-effect-on-treated', 'average-treatment-effect-on-controls', 'overlap-weighted-average-treatment-effect', 'local-cutoff-effect', 'conditional-average-treatment-effect', 'conditional-average-treatment-effect-per-row', 'average-partial-effect', 'variance-weighted-average-partial-effect', 'conditional-partial-effect-per-row']
 
 const estimandLabel = (kind: Estimand['kind']): string => {
   switch (kind) {
     case 'local-cutoff-effect': return 'At an assignment cutoff (sharp RD)'
     case 'average-treatment-effect': return 'All prepared rows (ATE)'
     case 'average-treatment-effect-on-treated': return 'Treated rows (ATT)'
+    case 'average-treatment-effect-on-controls': return 'Control rows (ATC)'
+    case 'overlap-weighted-average-treatment-effect': return 'Overlap-weighted population'
+    case 'average-partial-effect': return 'Average partial effect of a continuous treatment'
+    case 'variance-weighted-average-partial-effect': return 'Variance-weighted partial effect'
+    case 'conditional-partial-effect-per-row': return 'Conditional partial effect for each row'
     case 'conditional-average-treatment-effect': return 'Within groups of a variable (CATE)'
     case 'conditional-average-treatment-effect-per-row': return 'Each row, given its covariates (CATE per row)'
     default: return assertNever(kind)
@@ -99,6 +104,11 @@ const estimandHint = (kind: Estimand['kind']): string => {
     case 'local-cutoff-effect': return 'Estimate the effect at a cutoff where treatment switches from 0 to 1. This local contrast is not a population-wide ATE.'
     case 'average-treatment-effect': return 'Average the treatment contrast over the prepared population.'
     case 'average-treatment-effect-on-treated': return 'Average the treatment contrast among rows with treatment = 1. Current ETT estimators require a binary treatment; eligibility also depends on the identifying strategy.'
+    case 'average-treatment-effect-on-controls': return 'Average the binary treatment contrast among rows with treatment = 0.'
+    case 'overlap-weighted-average-treatment-effect': return 'Weight binary treatment effects by e(X)(1 − e(X)), where e(X) is the conditional treatment probability. This changes the target population.'
+    case 'average-partial-effect': return 'Average conditional treatment slopes across the population. A causal interpretation requires unconfoundedness and the treatment model assumptions, not just a continuous treatment column.'
+    case 'variance-weighted-average-partial-effect': return 'Average conditional treatment slopes with weights proportional to conditional treatment variance. This differs from an equally weighted average partial effect.'
+    case 'conditional-partial-effect-per-row': return 'Estimate conditional treatment slopes at each row’s covariate values. These are not individual effects or a flexible dose-response curve.'
     case 'conditional-average-treatment-effect': return 'Average the treatment contrast within each group of an effect modifier, a variable the treatment does not reach. The double machine learning estimators report the group effects.'
     case 'conditional-average-treatment-effect-per-row': return 'This is the ATE conditioned on specific values of covariates, reported for every prepared row (CATE per row) at that row’s own values of the adjustment variables and any effect modifiers you name.'
     default: return assertNever(kind)
@@ -481,6 +491,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
             </div>
           </SettingsStep>
           <SettingsStep number={2} title="Target population">
+            <div className="panel-scroll max-h-[min(24rem,55dvh)] max-w-3xl overflow-y-auto" data-testid="study-target-options">
             <RadioList
               legend="Target population"
               legendHidden
@@ -489,6 +500,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
               onChange={(estimand) => onDraftChanged({ ...draft, estimand })}
               options={ESTIMAND_KINDS.map((kind) => ({ value: kind, label: estimandLabel(kind), hint: estimandHint(kind) }))}
             />
+            </div>
             {state.draft.estimand === 'local-cutoff-effect' && <div className={fieldRow.two}>
               <label className="block"><span className={fieldLabel}>Running variable</span><Select aria-label="Running variable" className={field('text', 'mt-1')} value={state.draft.cutoff?.variable ?? ''} onChange={event => onDraftChanged({ ...draft, cutoff: { variable: event.target.value === '' ? null : event.target.value as DagNodeId, value: draft.cutoff?.value ?? '0' } })}>
                 <option value="">Choose a variable</option>{modifierCandidates.map(({ node, allowed }) => <option key={node.id} value={node.id} disabled={!allowed}>{node.name}</option>)}
@@ -524,7 +536,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
                 </label>
               </div>
             )}
-            {state.draft.estimand === 'conditional-average-treatment-effect-per-row' && (
+            {(state.draft.estimand === 'conditional-average-treatment-effect-per-row' || state.draft.estimand === 'conditional-partial-effect-per-row') && (
               <fieldset className="m-0 min-w-0 border-0 p-0" aria-label="Effect modifiers">
                 <legend className={fieldLabel}>Effect modifiers</legend>
                 <p className={cn(fieldHint, 'mt-1')}>Variables the effect may vary with, joined to the adjustment set as what each row’s effect is conditioned on.</p>

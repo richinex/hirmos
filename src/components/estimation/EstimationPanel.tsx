@@ -9,6 +9,11 @@ import { SelectionActions } from '@/components/ui/SelectionActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { TLearnerUncertainty } from './TLearnerUncertainty'
+import { CausalForestControls } from './CausalForestControls'
+import { CausalForestAnalysisControls, CausalForestSamplingControls } from './CausalForestAnalysisControls'
+import { forestAnalysisColumns, type ForestAnalysis } from '@/domain/causalForestAnalysis'
+import { CausalForestResults } from './CausalForestResults'
+import { causalForestInputs, causalForestTarget, parseCausalForestEvidence, type ForestFeature } from '@/domain/causalForest'
 import { CausalImpactInference } from './CausalImpactInference'
 import { SharpRdResult } from './SharpRdResult'
 import { BayesianImpactResult } from './BayesianImpactResult'
@@ -60,7 +65,7 @@ import { SettingsStep } from '@/components/ui/SettingsStep'
 import { cn } from '@/lib/utils'
 import type { DagDocument } from '@/domain/dag'
 import type { ColumnId, DatasetProfile } from '@/domain/dataset'
-import { assertNever, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
+import { assertNever, err, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { describeDesignExpansionProblem, designLayouts, expandDesign, expandsDesign } from '@/domain/designMatrix'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
 import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
@@ -337,6 +342,7 @@ function RunRecord({ run }: { readonly run: EstimationRunArtifact }) {
         <dt>Prepared dataset</dt><dd className={literal('m-0 break-all')}>{run.preparedDataset}</dd>
         <dt>Columns</dt><dd className="m-0">{run.columns.map((column) => column.name).join(', ')}</dd>
         <dt>Configuration</dt><dd className={literal('m-0 break-all')}>{JSON.stringify(run.configuration)}</dd>
+        {run.kind === 'causal-forest-run' && <><dt>Fitted forest settings</dt><dd className={literal('m-0 break-all')}>{JSON.stringify(run.evidence.fitted)}</dd></>}
         <dt>Created</dt><dd className={literal('m-0')}>{formatTimestamp(run.createdAt)}</dd>
         <dt>Method</dt><dd className={literal('m-0')}>{run.method}</dd>
       </dl>
@@ -493,6 +499,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           { label: 'Most influential comparison units', value: formatWords(topWeights || 'none'), context: 'largest synthetic-DID unit weights' },
         ]
       }
+      case 'causal-forest-run': return []
       case 't-learner-run': {
         const { evidence } = run
         const rows = tLearnerRowEffects(evidence)
@@ -774,7 +781,9 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
   const body = (
     <>
       <div className="mt-3">
-        <EstimateHeadline estimate={estimate} sentence={sentence} scaleLine={scaleLine} sampleLine={sampleLine} stepLabel={stepLabel} accent={current} testId="effect-estimate" />
+        {run.kind === 'causal-forest-run'
+          ? <CausalForestResults evidence={run.evidence} outcome={study.outcome.name} columns={run.columns} />
+          : <EstimateHeadline estimate={estimate} sentence={sentence} scaleLine={scaleLine} sampleLine={sampleLine} stepLabel={stepLabel} accent={current} testId="effect-estimate" />}
       </div>
       {groupChart !== null && estimate.effect.kind === 'byGroup' && (
         <div className="mt-3">
@@ -854,7 +863,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
   if (!current) {
     // History rows fold to one line in the runs drawer; only the current estimate keeps the stage.
     return (
-      <RunFold title={sentence} figure={headlineFigure(estimate).text} stamp={stamp} onDelete={onDelete === undefined ? undefined : () => onDelete(run)} deleteLabel="Delete this run">
+      <RunFold title={sentence} figure={run.kind === 'causal-forest-run' && estimate.effect.kind === 'perRow' ? `${estimate.effect.effects.length} conditional predictions` : headlineFigure(estimate).text} stamp={stamp} onDelete={onDelete === undefined ? undefined : () => onDelete(run)} deleteLabel="Delete this run">
         <RunDetails label="Estimation run details"><RunRecord run={run} /></RunDetails>
         {body}
       </RunFold>
@@ -1059,7 +1068,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     try {
       const [{ materialisePrepared, describePreparedMaterialisationProblem }, analysis] = await Promise.all([import('@/data/prepared'), import('@/analysis/client')])
       if (!session.current(current)) return
-      const materialise = async (columns: NonEmptyArray<StudyVariable>) => {
+      const materialise = async (columns: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>>) => {
         const matrix = await materialisePrepared(source, profile, prepared, columns.map((column) => column.column) as unknown as NonEmptyArray<ColumnId>)
         if (!session.current(current)) throw new DOMException('The estimation run was cancelled.', 'AbortError')
         if (!matrix.ok) throw new Error(describePreparedMaterialisationProblem(matrix.error))
@@ -1206,6 +1215,43 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The identification is no longer identified.')
           return
         }
+        case 'causal-forest': {
+          const target = causalForestTarget(study.estimand)
+          if (target === null) { dispatch({ type: 'run-failed', detail: 'The recorded target is not supported by causal forest.' }); return }
+          const inputs = causalForestInputs(identification.result.adjustment.variables, study.estimand)
+          const auxiliary = configuration.analysis === undefined ? [] : forestAnalysisColumns(configuration.analysis)
+          const required = [study.treatment.column, study.outcome.column, ...inputs.map(c => c.column)]
+          const extra: Pick<StudyVariable, 'column' | 'name'>[] = []
+          for (const id of auxiliary) {
+            if (id === study.treatment.column || id === study.outcome.column) throw new Error('Use separate columns for forest sampling, projection and priority scores, not the treatment or outcome.')
+            if (required.includes(id as ColumnId)) continue
+            const column = profile.columns.find(c => c.id === id && prepared.columns.includes(c.id))
+            if (column === undefined) throw new Error('An auxiliary forest column is not in the prepared dataset.')
+            extra.push({ column: column.id, name: column.name })
+          }
+          const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...inputs]
+          const materialized: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> = [...columns, ...extra]
+          const matrix = await materialise(materialized)
+          const layouts = [...designLayouts(columns, 2, configuration.kind, state.encodings), ...extra.map(() => ({ kind: 'numeric' } as const))]
+          const design = expandDesign(matrix.values, matrix.rowCount, materialized.length, layouts)
+          if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map(column => column.name)) }); return }
+          const evidence = await analysis.runCausalForest(design.value.values, matrix.rowCount, design.value.columnCount,
+            { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2, 2 + inputs.length).flat(), target, configuration,
+              columnNames: materialized.flatMap((column, index) => design.value.expanded[index]!.map(() => column.column)) })
+          if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
+          const features = inputs.flatMap<ForestFeature>((column, index) => {
+            const levels = design.value.levels[index + 2]!
+            return levels.length === 0 ? [{ kind: 'numeric', column: column.column, name: column.name } as const]
+              : levels.map(level => ({ kind: 'indicator', column: column.column, name: column.name, level } as const))
+          })
+          const labelled = parseCausalForestEvidence({ ...evidence.value, features })
+          if (!labelled.ok) { dispatch({ type: 'run-failed', detail: 'The encoded covariate labels do not match the forest result.' }); return }
+          const run = { kind: 'causal-forest-run', configuration, evidence: labelled.value } as const
+          const estimate = causalEstimateFrom(study, identification, run)
+          finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact,
+            'The forest could not report the recorded target for every required observation. Review the sample and forest settings.')
+          return
+        }
         case 't-learner': {
           const inputs = tLearnerInputs(identification.result.adjustment.variables, study.estimand)
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...inputs]
@@ -1238,8 +1284,10 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 }
                 const treated = await chooseArm(1)
                 if (!treated.ok) return treated
+                if (!session.current(current)) return err({ kind: 'analysis-cancelled', detail: 'The analysis run was cancelled.' } as const)
                 const control = await chooseArm(0)
                 if (!control.ok) return control
+                if (!session.current(current)) return err({ kind: 'analysis-cancelled', detail: 'The analysis run was cancelled.' } as const)
                 return analysis.runCrossFittedTLearner(design.value.values, matrix.rowCount, design.value.columnCount,
                   { ...shared, ...command, selection: { kind: 'chosen', treated: treated.value, control: control.value } })
               }
@@ -1555,6 +1603,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             })
           }
           const searched = await search()
+          if (!session.current(current)) return
           if (!searched.ok) {
             dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(searched.error) })
             return
@@ -1620,19 +1669,22 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     ? 0
     : stationaryMarksOf(document).statLag + configuration.treatmentLag
 
-  const categoricalChecklist = selectedEstimatorIsVisible && expandsDesign(state.estimator) && identification !== null
-    && identification.result.kind === 'identified'
-    && identification.result.adjustment.variables.length > 0
+  const encodingVariables = identification?.result.kind !== 'identified' ? []
+    : state.estimator === 'causal-forest' ? causalForestInputs(identification.result.adjustment.variables, study?.estimand ?? null)
+    : state.estimator === 't-learner' ? tLearnerInputs(identification.result.adjustment.variables, study?.estimand ?? null)
+    : identification.result.adjustment.variables
+  const categoricalChecklist = selectedEstimatorIsVisible && expandsDesign(state.estimator)
+    && encodingVariables.length > 0
     ? (
       <ColumnChecklist
                   title="Categorical covariates"
                   help="Tick the covariates whose values are categories rather than quantities. A ticked covariate becomes one column per level instead of one numeric column."
-                  columns={identification.result.adjustment.variables.map((variable) => ({ id: variable.column, name: variable.name }))}
-                  selected={identification.result.adjustment.variables
+                  columns={encodingVariables.map((variable) => ({ id: variable.column, name: variable.name }))}
+                  selected={encodingVariables
                     .filter((variable) => state.encodings[variable.column]?.kind === 'categorical')
                     .map((variable) => variable.column)}
                   onChange={(selected) => {
-                    for (const variable of identification.result.kind === 'identified' ? identification.result.adjustment.variables : []) {
+                    for (const variable of encodingVariables) {
                       const encoding = selected.includes(variable.column) ? 'categorical' as const : 'numeric' as const
                       if ((state.encodings[variable.column]?.kind ?? 'numeric') !== encoding) {
                         dispatch({ type: 'encoding-declared', column: variable.column, encoding: { kind: encoding } })
@@ -1792,6 +1844,22 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             </SettingsStep>
           </div>
         )
+      }
+      case 'causal-forest': {
+        const analyse = (analysis: ForestAnalysis) => configure({ ...configuration, analysis: { ...analysis,
+          labels: forestAnalysisColumns(analysis).flatMap(id => { const column = profile.columns.find(c => c.id === id); return column === undefined ? [] : [{ column: column.id, name: column.name }] }),
+        } })
+        const numbered = (number: number) => categoricalChecklist === null ? undefined : number
+        return <div className="grid grid-cols-1 gap-8 @6xl/panel:grid-cols-2 @6xl/panel:items-start @6xl/panel:gap-x-16">
+          {covariatesStep(1)}
+          <SettingsStep number={numbered(2)} title="Fit the causal forest" className="@6xl/panel:row-span-2">
+            <CausalForestControls configuration={configuration} onChange={configure} />
+            <CausalForestSamplingControls value={configuration.analysis} columns={controlCandidates} onChange={analyse} />
+          </SettingsStep>
+          <SettingsStep number={numbered(3)} title="Summarize effect heterogeneity">
+            <CausalForestAnalysisControls value={configuration.analysis} columns={controlCandidates} onChange={analyse} />
+          </SettingsStep>
+        </div>
       }
       case 't-learner': {
         const model = configuration.model
@@ -2274,7 +2342,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <dt className="text-faint">Outcome</dt><dd className="m-0 text-ink">{study.outcome.name}</dd>
               <dt className="text-faint">Graph</dt><dd className="m-0 text-ink"><Metadata><span>{study.dagName}</span><span><span className={literal()}>{study.dagRevision.slice(0, 8)}</span></span></Metadata></dd>
               <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{describeIdentificationStrategy(identification.result)}</dd>
-              <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}><Metadata><span>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Independent'}</span><span>{formatCount(prepared.observations).text}</span></Metadata></dd>
+              <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}><Metadata><span>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Cross-section'}</span><span>{formatCount(prepared.observations).text}</span></Metadata></dd>
               {studyScale !== null && <><dt className="text-faint">Analysis scale</dt><dd className="m-0 text-ink">{studyScale}</dd></>}
             </dl>
           </>

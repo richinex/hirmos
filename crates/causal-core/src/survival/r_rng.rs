@@ -239,7 +239,7 @@ impl RRng {
         value & ((1_u64 << count) - 1)
     }
 
-    fn sample_index(&mut self, upper: usize) -> usize {
+    pub(crate) fn sample_index(&mut self, upper: usize) -> usize {
         if upper == 0 {
             return 0;
         }
@@ -268,7 +268,7 @@ impl RRng {
 
 // Wichura's AS 241 implementation used by R 4.4.1 qnorm. This is the
 // lower-tail, non-logarithmic standard-normal path called by norm_rand().
-fn standard_normal_quantile(probability: f64) -> f64 {
+pub(crate) fn standard_normal_quantile(probability: f64) -> f64 {
     if probability <= 0.0 {
         return f64::NEG_INFINITY;
     }

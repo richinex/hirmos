@@ -2,7 +2,7 @@
 
 mod curves;
 mod influence;
-mod qr;
+pub(crate) mod qr;
 mod summary;
 pub use curves::{coefficient_curves, CoefficientPoint};
 pub use influence::Influence;

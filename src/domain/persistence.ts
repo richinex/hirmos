@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTarget, sameCausalForestTarget, causalForestSettingsMatch } from './causalForest'
 import { staggeredRecordMatches } from './staggeredDid'
 import { sharpRdConfigurationSchema, parseSharpRdEvidence, sharpRdRecordMatches } from './sharpRd'
 import { EMPTY_ROOT_CAUSE, rootCauseWorkspaceSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
@@ -593,6 +594,17 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
           || (configuration.data.start.kind === 'row' && configuration.data.start.row - 1 !== evidence.value.nPre)
           || (configuration.data.window.kind === 'to-row' && configuration.data.window.row !== evidence.value.postEnd)) {
         return err({ kind:'invalid-snapshot', detail:'The saved causal-impact result does not match its inference settings.' })
+      }
+    }
+    if (run.kind === 'causal-forest-run') {
+      const settings = causalForestConfigurationSchema.safeParse(run.configuration)
+      const evidence = causalForestEvidenceSchema.safeParse(run.evidence)
+      const study = parsed.data.studies.find(study => study.id === run.study)
+      const target = study === undefined ? null : causalForestTarget((study as unknown as StudySpecification).estimand)
+      if (!settings.success || !evidence.success || target === null
+          || !sameCausalForestTarget(target, evidence.data.target)
+          || !causalForestSettingsMatch(settings.data, evidence.data)) {
+        return err({ kind: 'invalid-snapshot', detail: 'The saved causal forest result does not match its study target or forest settings.' })
       }
     }
     if (run.kind !== 't-learner-run') continue

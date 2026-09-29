@@ -32,6 +32,8 @@ pub mod weighted;
 // Compile the existing source directly while the port remains isolated here.
 #[path = "../../causal-core/src/lapack_cholesky.rs"]
 mod lapack_cholesky;
+#[path = "../../causal-core/src/mt19937_64.rs"]
+mod mt19937_64;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {

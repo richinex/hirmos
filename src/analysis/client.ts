@@ -1,4 +1,20 @@
 import { err, ok, type Result } from '@/domain/dop'
+import { cancelPooledAnalyses } from './workerPool'
+import type { CausalForestConfiguration, CausalForestEvidence, CausalForestTarget } from '@/domain/causalForest'
+
+export function runCausalForest(values: Float64Array, rows: number, columns: number, design: {
+  readonly treatment: number; readonly outcome: number; readonly adjustment: readonly number[]
+  readonly target: CausalForestTarget; readonly configuration: CausalForestConfiguration
+  readonly columnNames?: readonly string[]
+}): Promise<Result<CausalForestEvidence, AnalysisWorkerProblem>> {
+  if (design.configuration.tuning.kind === 'all') {
+    return import('./forestTuning').then(({ runForestTuning }) => runForestTuning(values, {
+      ...design, rows, columns, adjustment: [...design.adjustment], columnNames: [...(design.columnNames ?? [])],
+    }))
+  }
+  const request = newWorkerRequestId()
+  return post('causal-forest-succeeded', { kind: 'causal-forest', request, values, rows, columns, ...design }, values)
+}
 import type { AalenEvidence, ForestEvidence } from '@/domain/survivalRegression'
 import type { AalenWorkerDesign, ForestWorkerDesign } from '@/workers/analysisProtocol'
 
@@ -183,6 +199,7 @@ const failAll = (problem: AnalysisWorkerProblem) => {
 }
 
 export const cancelAnalysisRuns = (): void => {
+  cancelPooledAnalyses()
   failAll({ kind: 'analysis-cancelled', detail: 'The analysis run was cancelled.' })
 }
 

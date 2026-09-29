@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { CAUSAL_FOREST_METHOD_ID } from './methods'
+import { DEFAULT_CAUSAL_FOREST, causalForestConfigurationSchema, causalForestTarget, causalForestInputs, sameCausalForestTarget, type CausalForestConfiguration, type CausalForestEvidence } from './causalForest'
 import { sameStructuralModel, structuralModelSchema, structuralImpactSettingsSchema, structuralContributionSchema } from './structuralImpact'
 import type { SharpRdConfiguration, SharpRdEvidence } from './sharpRd'
 import { SHARP_RD_METHOD_ID } from './methods'
@@ -454,6 +456,7 @@ export interface ContinuousGpsConfiguration {
 }
 
 export type EstimatorConfiguration =
+  | CausalForestConfiguration
   | SharpRdConfiguration
   | PropensityWeightingConfiguration
   | PropensityMatchingConfiguration
@@ -493,7 +496,7 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
     id: 'adjusted-outcome',
     name: 'Covariate-adjusted outcome models',
     description: 'Regression, count-model and orthogonal-score estimators using an identified adjustment set.',
-    estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 't-learner'],
+    estimators: ['backdoor-linear-regression', 'bayesian-gaussian', 'poisson-glm', 'negative-binomial-p', 'negbin-nuts', 'dml-plr', 'dml-irm', 't-learner', 'causal-forest'],
   },
   {
     id: 'propensity-score',
@@ -537,6 +540,7 @@ export const designLayoutOf = (estimator: EstimatorId, encoding: CovariateEncodi
     case 'dml-plr':
     case 'dml-irm':
     case 't-learner':
+    case 'causal-forest':
       return { kind: 'indicators' }
     case 'propensity-weighting':
     case 'propensity-matching':
@@ -577,6 +581,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
     case 'dml-plr': return DML_PLR_METHOD_ID
     case 'dml-irm': return DML_IRM_METHOD_ID
     case 't-learner': return T_LEARNER_METHOD_ID
+    case 'causal-forest': return CAUSAL_FOREST_METHOD_ID
     case 'ardl-pss': return ARDL_PSS_METHOD_ID
     case 'vecm': return VECM_METHOD_ID
     case 'synthetic-control': return SYNTHETIC_CONTROL_METHOD_ID
@@ -611,6 +616,7 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
     case 'dml-plr': return { kind: estimator, att: false, seed: 7 }
     case 'dml-irm': return { kind: estimator, att: study?.estimand.kind === 'average-treatment-effect-on-treated', seed: 7 }
     case 't-learner': return { kind: estimator, model: { kind: 'forest', seed: 7, uncertainty: { kind: 'none' } } }
+    case 'causal-forest': return DEFAULT_CAUSAL_FOREST
     case 'ardl-pss': return { kind: estimator, maxLag: 4, trend: 'ct', case: 4 }
     case 'vecm': return { kind: estimator, maxLags: 4, deterministic: 'co', significance: 95, breakIndex: null }
     case 'synthetic-control': {
@@ -1990,6 +1996,7 @@ interface RunIdentity {
 }
 
 export type EstimationRunArtifact =
+  | RunIdentity & { readonly kind: 'causal-forest-run'; readonly method: typeof CAUSAL_FOREST_METHOD_ID; readonly configuration: CausalForestConfiguration; readonly evidence: CausalForestEvidence }
   | RunIdentity & { readonly kind: 'sharp-rd-run'; readonly method: typeof SHARP_RD_METHOD_ID; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
   | RunIdentity & { readonly kind: 'backdoor-linear-run'; readonly method: typeof BACKDOOR_LINEAR_REGRESSION_METHOD_ID; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
   | RunIdentity & { readonly kind: 'propensity-weighting-run'; readonly method: typeof PROPENSITY_WEIGHTING_METHOD_ID; readonly configuration: PropensityWeightingConfiguration; readonly evidence: PropensityWeightingEvidence }
@@ -2147,6 +2154,10 @@ const reported = (evidence: string): TargetVerdict => ({ kind: 'reported', evide
 const notReported = (evidence: string): TargetVerdict => ({ kind: 'not-reported', evidence })
 
 function targetCompatibility(estimand: Estimand, configuration: EstimatorConfiguration): TargetVerdict {
+  if (configuration.kind === 'causal-forest') return causalForestTarget(estimand) === null
+    ? notReported('Causal forest does not report a cutoff-local effect or the configured grouped-effect target. Choose an average or a conditional effect at each row’s covariate values.')
+    : reported('The forest reports the treatment target and population recorded in Study design.')
+  if (estimand.kind === 'average-treatment-effect-on-controls' || estimand.kind === 'overlap-weighted-average-treatment-effect' || estimand.kind === 'average-partial-effect' || estimand.kind === 'variance-weighted-average-partial-effect' || estimand.kind === 'conditional-partial-effect-per-row') return notReported('This estimator does not report the recorded target. Choose causal forest for this target.')
   if (configuration.kind === 'panel-intervention') return estimand.kind === 'average-treatment-effect-on-treated'
     ? reported('The panel comparison targets the average effect on the treated group.')
     : notReported('Panel DiD targets the treated group. Record an ATT study before running; existing saved runs retain their original labels.')
@@ -2214,6 +2225,11 @@ export const tLearnerEffect = (estimand: Estimand, average: number, effects: Non
     case 'average-treatment-effect-on-treated':
     case 'conditional-average-treatment-effect':
     case 'local-cutoff-effect': return null
+    case 'average-treatment-effect-on-controls':
+    case 'overlap-weighted-average-treatment-effect':
+    case 'average-partial-effect':
+    case 'variance-weighted-average-partial-effect':
+    case 'conditional-partial-effect-per-row': return null
     default: return assertNever(estimand)
   }
 }
@@ -2252,6 +2268,30 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else leave('rd-design', 'Justify continuity of potential outcomes, no precise manipulation and no other change at the cutoff. The fit checks sharp assignment, not these causal assumptions.')
       if (prepared.kind !== 'prepared-cross-section') violate('rd-sample', 'This RD implementation requires independent observations; it does not provide clustered or time-series uncertainty.')
       else leave('rd-sample', 'The fit checks support on both sides and selects the mserd bandwidth. Inspect observations near the cutoff.')
+      break
+    }
+    case 'causal-forest': {
+      const inputs = identification.kind === 'identified' ? causalForestInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
+      if (identification.kind !== 'identified' || inputs.length === 0) violate('forest-adjustment', 'Identify a measured adjustment set and at least one pretreatment covariate. An empty set can be supplemented with recorded effect modifiers.')
+      else satisfy('forest-adjustment', `The forest uses ${inputs.map(variable => variable.name).join(', ')}.`)
+      if (prepared.kind !== 'prepared-cross-section') violate('forest-sampling', 'Prepare the evaluation observations as a cross-section and select a cluster identifier for dependent rows. This method does not model temporal treatment histories.')
+      else if (configuration.analysis !== undefined && configuration.analysis.sampling.kind !== 'independent') leave('forest-sampling', 'The forest samples clusters and accounts for clustering in inference. Justify independence between clusters; clustering does not resolve confounding.')
+      else leave('forest-sampling', 'Confirm that observations are independent, or select their cluster identifier.')
+      const target = context.study === null ? null : causalForestTarget(context.study.estimand)
+      if (configuration.analysis?.averageMethod === 'tmle' && !(target?.kind === 'binary-average' && target.population !== 'overlap')) violate('forest-tmle-target', 'TMLE requires a binary ATE, ATT or ATC target.')
+      if (configuration.analysis?.projection.kind === 'linear' && configuration.analysis.projection.overlap && target?.kind !== 'binary-average' && target?.kind !== 'binary-conditional') violate('forest-projection-target', 'Overlap-weighted projection requires a binary treatment.')
+      if (configuration.analysis?.moderation !== undefined && target?.kind !== 'binary-average' && target?.kind !== 'binary-conditional') violate('forest-moderation-target', 'Cluster-score moderation requires a binary treatment.')
+      if (configuration.analysis?.ranking.kind === 'external') leave('forest-ranking-independence', 'The priority scores must be constructed independently of this evaluation sample. A recorded rationale does not verify this assumption.')
+      if (target?.kind === 'binary-average' || target?.kind === 'binary-conditional') {
+        if (context.treatmentIsBinary === false) violate('forest-target', 'The treatment is not coded 0 and 1. For a continuous treatment, record a partial-effect target in Study design.')
+        else if (context.treatmentIsBinary === null) leave('forest-target', 'The fit checks that treatment is 0 or 1 and that both groups are present.')
+        else satisfy('forest-target', 'Treatment values are 0 and 1; the fit also checks that both groups are present.')
+      } else leave('forest-target', 'Assess whether unconfoundedness and the exogenous random-coefficient treatment model support a causal slope interpretation. The graph alone does not establish this functional form.')
+      leave('forest-overlap', 'Inspect treatment variation across the adjustment variables. Conditional treatment probabilities or variances must support the chosen target.')
+      const validated = causalForestConfigurationSchema.safeParse(configuration)
+      if (!validated.success) violate('forest-settings', validated.error.issues.map(issue => issue.message).join(' '))
+      else satisfy('forest-settings', `${configuration.trees} trees; seed ${configuration.seed}; ${configuration.confidenceLevel * 100}% confidence level. Selected tuning settings are saved when tuning is requested.`)
+      leave('forest-reading', 'Read pointwise intervals and the calibration test alongside conditional predictions. Predictions alone do not establish heterogeneity.')
       break
     }
     case 'backdoor-linear-regression': {
@@ -2713,6 +2753,7 @@ export function causalEstimateFrom(
   study: StudySpecification,
   identification: IdentificationArtifact,
   run:
+    | { readonly kind: 'causal-forest-run'; readonly configuration: CausalForestConfiguration; readonly evidence: CausalForestEvidence }
     | { readonly kind: 'sharp-rd-run'; readonly configuration: SharpRdConfiguration; readonly evidence: SharpRdEvidence }
     | { readonly kind: 'backdoor-linear-run'; readonly configuration: BackdoorLinearConfiguration; readonly evidence: BackdoorLinearEvidence }
     | { readonly kind: 'propensity-weighting-run'; readonly configuration: PropensityWeightingConfiguration; readonly evidence: PropensityWeightingEvidence }
@@ -2913,6 +2954,27 @@ export function causalEstimateFrom(
         adjustment,
         sample: { observations: evidence.observations, parameters: 1 + adjustmentSet.length, degreesOfFreedom: null },
       }
+    }
+    case 'causal-forest-run': {
+      const { evidence } = run
+      const target = causalForestTarget(study.estimand)
+      if (target === null || !sameCausalForestTarget(target, evidence.target) || evidence.confidenceLevel !== run.configuration.confidenceLevel) return null
+      const sample = { observations: evidence.observations, parameters: 0, degreesOfFreedom: null }
+      if (target.kind === 'binary-average' || target.kind === 'continuous-average') {
+        if (evidence.summary.kind !== 'estimated') return null
+        return { kind: 'causal-estimate', estimand: study.estimand, effect: { kind: 'additive', value: evidence.summary.estimate, unit: '' },
+          interval: { kind: 'confidence', level: evidence.confidenceLevel, ...evidence.summary.interval }, standardError: evidence.summary.standardError, adjustment, sample }
+      }
+      const effects: number[] = []
+      for (const prediction of evidence.predictions) {
+        if (prediction.kind === 'unavailable') return null
+        effects.push(prediction.estimate)
+      }
+      if (!isNonEmpty(effects)) return null
+      return { kind: 'causal-estimate', estimand: study.estimand,
+        effect: { kind: 'perRow', effects, overall: effects.reduce((total, effect) => total + effect, 0) / effects.length },
+        interval: { kind: 'none', reason: 'Pointwise intervals are reported with each conditional prediction, not as one interval for all rows.' },
+        standardError: null, adjustment, sample }
     }
     case 't-learner-run': {
       const { evidence } = run
@@ -3237,6 +3299,7 @@ export function linearReading(run: { readonly configuration: BackdoorLinearConfi
 
 /** The estimator the chapter opens with for a record: the one its strategy calls for, else the plain adjustment route for the row structure. */
 export function defaultEstimatorFor(identification: Identification | null, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorId {
+  if (study !== null && ['average-treatment-effect-on-controls', 'overlap-weighted-average-treatment-effect', 'average-partial-effect', 'variance-weighted-average-partial-effect', 'conditional-partial-effect-per-row'].includes(study.estimand.kind)) return 'causal-forest'
   if (study?.estimand.kind === 'local-cutoff-effect') return 'sharp-rd'
   // A conditional target is reported only by the DML estimators; the partially linear one runs for any treatment.
   if (study?.estimand.kind === 'conditional-average-treatment-effect') return 'dml-plr'
@@ -3267,6 +3330,7 @@ export function describeEstimator(estimator: EstimatorId): string {
     case 'dml-plr': return 'Double machine learning, partially linear'
     case 'dml-irm': return 'Double machine learning, interactive'
     case 't-learner': return 'T-learner'
+    case 'causal-forest': return 'Causal forest'
     case 'ardl-pss': return 'ARDL long run'
     case 'vecm': return 'VECM'
     case 'synthetic-control': return 'Synthetic control'

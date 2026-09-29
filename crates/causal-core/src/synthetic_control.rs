@@ -209,7 +209,7 @@ pub struct SyntheticControlPredictionBand {
     pub mspe_ratio: f64,
 }
 
-fn t_cdf(t: f64, degrees_of_freedom: f64) -> f64 {
+pub(crate) fn t_cdf(t: f64, degrees_of_freedom: f64) -> f64 {
     if t == 0.0 {
         return 0.5;
     }

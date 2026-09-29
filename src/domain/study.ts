@@ -43,6 +43,11 @@ export type Estimand =
   | { readonly kind: 'local-cutoff-effect'; readonly scale: 'additive'; readonly running: StudyVariable; readonly cutoff: number; readonly assignment: 'at-or-above' }
   | { readonly kind: 'average-treatment-effect'; readonly scale: 'additive' }
   | { readonly kind: 'average-treatment-effect-on-treated'; readonly scale: 'additive'; readonly treatedValue: 1 }
+  | { readonly kind: 'average-treatment-effect-on-controls'; readonly scale: 'additive' }
+  | { readonly kind: 'overlap-weighted-average-treatment-effect'; readonly scale: 'additive' }
+  | { readonly kind: 'average-partial-effect'; readonly scale: 'additive' }
+  | { readonly kind: 'variance-weighted-average-partial-effect'; readonly scale: 'additive' }
+  | { readonly kind: 'conditional-partial-effect-per-row'; readonly scale: 'additive'; readonly modifiers: readonly StudyVariable[] }
   /** The average effect within each group of an effect modifier: an ATE stratified by a variable other than the treatment. */
   | { readonly kind: 'conditional-average-treatment-effect'; readonly scale: 'additive'; readonly modifier: StudyVariable; readonly grouping: ModifierGrouping }
   /** One effect per prepared row: the average treatment contrast conditioned on that row's values of the adjustment
@@ -282,12 +287,17 @@ function estimandOf(draft: StudyDesignDraft, document: DagDocument, treatment: D
     }
     case 'average-treatment-effect': return ok({ kind: 'average-treatment-effect', scale: 'additive' })
     case 'average-treatment-effect-on-treated': return ok({ kind: 'average-treatment-effect-on-treated', scale: 'additive', treatedValue: 1 })
+    case 'average-treatment-effect-on-controls':
+    case 'overlap-weighted-average-treatment-effect':
+    case 'average-partial-effect':
+    case 'variance-weighted-average-partial-effect': return ok({ kind: draft.estimand, scale: 'additive' })
     case 'conditional-average-treatment-effect': {
       if (draft.modifier === null) return err({ kind: 'modifier-required' })
       const modifier = modifierVariable(document, treatment, outcome, draft.modifier)
       if (!modifier.ok) return modifier
       return ok({ kind: 'conditional-average-treatment-effect', scale: 'additive', modifier: modifier.value, grouping: draft.grouping })
     }
+    case 'conditional-partial-effect-per-row':
     case 'conditional-average-treatment-effect-per-row': {
       const modifiers: StudyVariable[] = []
       for (const id of draft.modifiers) {
@@ -295,7 +305,7 @@ function estimandOf(draft: StudyDesignDraft, document: DagDocument, treatment: D
         if (!modifier.ok) return modifier
         modifiers.push(modifier.value)
       }
-      return ok({ kind: 'conditional-average-treatment-effect-per-row', scale: 'additive', modifiers })
+      return ok({ kind: draft.estimand, scale: 'additive', modifiers })
     }
     default: return assertNever(draft.estimand)
   }
@@ -318,6 +328,11 @@ export const estimandSentence = (study: StudySpecification): string => {
     case 'local-cutoff-effect': return `Local effect of ${study.treatment.name} on ${study.outcome.name} at ${study.estimand.running.name} = ${study.estimand.cutoff}`
     case 'average-treatment-effect': return `Average effect of ${study.treatment.name} on ${study.outcome.name}`
     case 'average-treatment-effect-on-treated': return `Average effect of ${study.treatment.name} on ${study.outcome.name} among treated rows`
+    case 'average-treatment-effect-on-controls': return `Average effect of ${study.treatment.name} on ${study.outcome.name} among control rows`
+    case 'overlap-weighted-average-treatment-effect': return `Overlap-weighted effect of ${study.treatment.name} on ${study.outcome.name}`
+    case 'average-partial-effect': return `Average partial effect of ${study.treatment.name} on ${study.outcome.name}`
+    case 'variance-weighted-average-partial-effect': return `Variance-weighted partial effect of ${study.treatment.name} on ${study.outcome.name}`
+    case 'conditional-partial-effect-per-row': return `Conditional partial effect of ${study.treatment.name} on ${study.outcome.name}`
     case 'conditional-average-treatment-effect': return `Effect of ${study.treatment.name} on ${study.outcome.name} within groups of ${study.estimand.modifier.name}`
     case 'conditional-average-treatment-effect-per-row': return `Effect of ${study.treatment.name} on ${study.outcome.name} for each row`
     default: return assertNever(study.estimand)
@@ -331,6 +346,11 @@ export const describeEstimand = (study: StudySpecification): string => {
     case 'local-cutoff-effect': return `The additive treatment effect at ${study.estimand.running.name} = ${study.estimand.cutoff}, where treatment switches from 0 below the cutoff to 1 at or above it. This is not an average effect over all prepared rows.`
     case 'average-treatment-effect': return `Average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over all ${study.population.observations} prepared rows.`
     case 'average-treatment-effect-on-treated': return `Average treatment effect on the treated of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged over prepared rows with ${study.treatment.name} = 1.`
+    case 'average-treatment-effect-on-controls': return `Average the binary treatment contrast among rows with ${study.treatment.name} = 0.`
+    case 'overlap-weighted-average-treatment-effect': return 'Average the binary treatment contrast with weights proportional to e(X)(1 − e(X)), where e(X) is the treatment probability given the covariates.'
+    case 'average-partial-effect': return 'Average the conditional outcome-treatment covariance divided by conditional treatment variance. A causal slope interpretation requires unconfoundedness and the treatment model assumptions.'
+    case 'variance-weighted-average-partial-effect': return 'Average conditional partial effects with weights proportional to conditional treatment variance. This is not an equally weighted population average.'
+    case 'conditional-partial-effect-per-row': return 'Estimate the conditional outcome-treatment covariance divided by conditional treatment variance at each row’s covariate values. These are slopes, not arbitrary treatment contrasts.'
     case 'conditional-average-treatment-effect': return `Conditional average treatment effect of ${study.treatment.name} on ${study.outcome.name}: ${effect}, averaged within each group of ${study.estimand.modifier.name} (${describeGrouping(study.estimand.grouping)}) over the ${study.population.observations} prepared rows.`
     case 'conditional-average-treatment-effect-per-row': {
       const modifiers = study.estimand.modifiers.map((variable) => variable.name)
@@ -348,6 +368,11 @@ export function identifiedExpression(study: StudySpecification, adjustmentSet: r
   const z = adjustmentSet.map((variable) => variable.name).join(', ')
   switch (study.estimand.kind) {
     case 'local-cutoff-effect': return `τ(${study.estimand.cutoff}) = lim(x↓c) E[${y} | ${study.estimand.running.name}=x] − lim(x↑c) E[${y} | ${study.estimand.running.name}=x], c=${study.estimand.cutoff}; under continuity and sharp assignment.`
+    case 'average-treatment-effect-on-controls': return `ATC = E[τ(Z) | ${t}=0], τ(z)=E[${y}|${t}=1,Z=z]−E[${y}|${t}=0,Z=z], Z={${z}}`
+    case 'overlap-weighted-average-treatment-effect': return `E[e(Z)(1−e(Z))τ(Z)] / E[e(Z)(1−e(Z))], e(z)=P(${t}=1|Z=z), τ(z)=E[${y}|${t}=1,Z=z]−E[${y}|${t}=0,Z=z], Z={${z}}`
+    case 'average-partial-effect': return `E[β(Z)], β(z)=Cov(${y},${t}|Z=z)/Var(${t}|Z=z), Z={${z}}; causal interpretation additionally requires the treatment model assumptions.`
+    case 'variance-weighted-average-partial-effect': return `E[Var(${t}|Z)β(Z)]/E[Var(${t}|Z)], β(z)=Cov(${y},${t}|Z=z)/Var(${t}|Z=z), Z={${z}}`
+    case 'conditional-partial-effect-per-row': return `β(x)=Cov(${y},${t}|X=x)/Var(${t}|X=x), X contains the adjustment variables and recorded effect modifiers; causal interpretation additionally requires the treatment model assumptions.`
     case 'average-treatment-effect':
       return adjustmentSet.length === 0
         ? `ATE(t₁,t₀) = E[${y} | ${t}=t₁] − E[${y} | ${t}=t₀]`
@@ -383,6 +408,11 @@ export function identifiedExpressionTex(study: StudySpecification, adjustmentSet
   const z = adjustmentSet.map((variable) => texName(variable.name)).join(', ')
   switch (study.estimand.kind) {
     case 'local-cutoff-effect': return String.raw`\tau(c)=\lim_{x\downarrow c}\mathbb{E}[${y}\mid ${texName(study.estimand.running.name)}=x]-\lim_{x\uparrow c}\mathbb{E}[${y}\mid ${texName(study.estimand.running.name)}=x],\quad c=${study.estimand.cutoff}`
+    case 'average-treatment-effect-on-controls': return String.raw`\mathrm{ATC}=\mathbb{E}[\tau(Z)\mid ${t}=0],\quad \tau(z)=\mathbb{E}[${y}\mid ${t}=1,Z=z]-\mathbb{E}[${y}\mid ${t}=0,Z=z]`
+    case 'overlap-weighted-average-treatment-effect': return String.raw`\frac{\mathbb{E}[e(Z)(1-e(Z))\tau(Z)]}{\mathbb{E}[e(Z)(1-e(Z))]},\quad e(z)=P(${t}=1\mid Z=z)`
+    case 'average-partial-effect': return String.raw`\mathbb{E}[\beta(Z)],\quad \beta(z)=\frac{\operatorname{Cov}(${y},${t}\mid Z=z)}{\operatorname{Var}(${t}\mid Z=z)}`
+    case 'variance-weighted-average-partial-effect': return String.raw`\frac{\mathbb{E}[\operatorname{Var}(${t}\mid Z)\beta(Z)]}{\mathbb{E}[\operatorname{Var}(${t}\mid Z)]},\quad \beta(z)=\frac{\operatorname{Cov}(${y},${t}\mid Z=z)}{\operatorname{Var}(${t}\mid Z=z)}`
+    case 'conditional-partial-effect-per-row': return String.raw`\beta(x)=\frac{\operatorname{Cov}(${y},${t}\mid X=x)}{\operatorname{Var}(${t}\mid X=x)}`
     case 'average-treatment-effect':
       return adjustmentSet.length === 0
         ? String.raw`\mathrm{ATE}(t_1,t_0) = \mathbb{E}[${y} \mid ${t}=t_1] - \mathbb{E}[${y} \mid ${t}=t_0]`

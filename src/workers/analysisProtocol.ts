@@ -1,5 +1,6 @@
 import { countRegressionRequestSchema, countRegressionEvidenceSchema, type CountRegressionRequest, type CountRegressionEvidence } from '@/domain/countRegression'
 import { z } from 'zod'
+import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTargetSchema, type CausalForestConfiguration, type CausalForestEvidence, type CausalForestTarget } from '@/domain/causalForest'
 import { staggeredRequestSchema, staggeredEvidenceSchema, type StaggeredRequest, type StaggeredEvidence } from '@/domain/staggeredDid'
 import { structuralModelSchema, type StructuralModel } from '@/domain/structuralImpact'
 import { rootCauseRequestSchema, rootCauseEvidenceSchema, type RootCauseRequest, type RootCauseEvidence } from '@/domain/rootCauseAnalysis'
@@ -902,6 +903,19 @@ export type AnalysisWorkerCommand =
       readonly groups: DmlGroupsRequest
     }
   | {
+      readonly kind: 'causal-forest'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly rows: number
+      readonly columns: number
+      readonly treatment: number
+      readonly outcome: number
+      readonly adjustment: readonly number[]
+      readonly target: CausalForestTarget
+      readonly configuration: CausalForestConfiguration
+      readonly columnNames?: readonly string[]
+    }
+  | {
       readonly kind: 't-learner'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1305,6 +1319,7 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'series-structure-succeeded'; readonly request: WorkerRequestId; readonly result: SeriesStructureEvidence }
   | { readonly kind: 'seasonal-adjusted'; readonly request: WorkerRequestId; readonly result: SeasonalAdjustedEvidence }
   | { readonly kind: 'double-ml-succeeded'; readonly request: WorkerRequestId; readonly result: DoubleMlEvidence }
+  | { readonly kind: 'causal-forest-succeeded'; readonly request: WorkerRequestId; readonly result: CausalForestEvidence }
   | { readonly kind: 't-learner-succeeded'; readonly request: WorkerRequestId; readonly result: TLearnerEvidence }
   | { readonly kind: 'cross-fitted-t-learner-succeeded'; readonly request: WorkerRequestId; readonly result: CrossFittedTLearnerEvidence }
   | { readonly kind: 'ardl-succeeded'; readonly request: WorkerRequestId; readonly result: ArdlEvidence }
@@ -2130,6 +2145,19 @@ const commandSchema = z.discriminatedUnion('kind', [
     groups: dmlGroupsRequestSchema,
   }).strict(),
   z.object({
+    kind: z.literal('causal-forest'),
+    request: requestSchema,
+    values: z.instanceof(Float64Array),
+    rows: z.number().int().min(2),
+    columns: z.number().int().min(3),
+    treatment: z.number().int().nonnegative(),
+    outcome: z.number().int().nonnegative(),
+    adjustment: z.array(z.number().int().nonnegative()).min(1),
+    target: causalForestTargetSchema,
+    configuration: causalForestConfigurationSchema,
+    columnNames: z.array(z.string().min(1)).optional(),
+  }).strict(),
+  z.object({
     kind: z.literal('t-learner'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -2517,6 +2545,7 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('series-structure-succeeded'), request: requestSchema, result: seriesStructureEvidenceSchema }).strict(),
   z.object({ kind: z.literal('seasonal-adjusted'), request: requestSchema, result: seasonalAdjustedEvidenceSchema }).strict(),
   z.object({ kind: z.literal('double-ml-succeeded'), request: requestSchema, result: doubleMlEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('causal-forest-succeeded'), request: requestSchema, result: causalForestEvidenceSchema }).strict(),
   z.object({ kind: z.literal('t-learner-succeeded'), request: requestSchema, result: tLearnerEvidenceSchema }).strict(),
   z.object({ kind: z.literal('cross-fitted-t-learner-succeeded'), request: requestSchema, result: crossFittedTLearnerEvidenceSchema }).strict(),
   z.object({ kind: z.literal('ardl-succeeded'), request: requestSchema, result: ardlEvidenceSchema }).strict(),
@@ -2865,6 +2894,9 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
   if (parsed.data.kind === 'double-ml-succeeded') {
     const result = doubleMlEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'double-ml-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
+  }
+  if (parsed.data.kind === 'causal-forest-succeeded') {
+    return ok({ kind: 'causal-forest-succeeded', request: request.value, result: parsed.data.result })
   }
   if (parsed.data.kind === 't-learner-succeeded') {
     const result = tLearnerEvidenceSchema.safeParse(parsed.data.result)

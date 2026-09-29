@@ -1504,6 +1504,13 @@ pub(crate) enum AnalysisCommand {
     },
     /// EconML's T-learner: one random forest per treatment arm on the adjustment columns, and the
     /// effect at every row as the treated prediction minus the control prediction.
+    CausalForest {
+        rows: usize, columns: usize, treatment: usize, outcome: usize,
+        adjustment: Vec<usize>, target: crate::causal_forest::Target,
+        configuration: crate::causal_forest::Configuration,
+        #[serde(default)]
+        column_names: Vec<String>,
+    },
     TLearner {
         rows: usize,
         columns: usize,
@@ -3283,6 +3290,7 @@ pub(crate) enum AnalysisResult {
         level: f64,
         groups: DmlGroupEvidence,
     },
+    CausalForest { evidence: crate::causal_forest::Evidence },
     TLearner {
         observations: usize,
         control_rows: usize,

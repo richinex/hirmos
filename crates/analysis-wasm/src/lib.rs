@@ -4,6 +4,8 @@
 //! The façade owns browser-facing validation and serialization. It does not reinterpret test
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
+mod causal_forest;
+mod causal_forest_analysis;
 use hirmos_causal_core::ardl::{ardl_select_order, bounds_test, uecm, Trend};
 use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
 use hirmos_causal_core::causal_effects::{
@@ -87,6 +89,22 @@ use serde::Serialize;
 use spec_math::cephes64::{ndtri, stdtri};
 use std::collections::{BTreeMap, HashMap};
 use wasm_bindgen::prelude::*;
+
+mod causal_forest_pool;
+
+#[wasm_bindgen(js_name = planForestTuning)]
+pub fn plan_forest_tuning(values: &[f64], request: &str) -> Result<String, JsValue> {
+    let request = serde_json::from_str(request).map_err(|e| JsValue::from_str(&format!("Invalid forest tuning request: {e}")))?;
+    let reply = causal_forest_pool::plan(values, request).map_err(|e| JsValue::from_str(&e))?;
+    serde_json::to_string(&reply).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+#[wasm_bindgen(js_name = scoreForestTuning)]
+pub fn score_forest_tuning(batch: &str, index: usize) -> Result<String, JsValue> {
+    let batch = serde_json::from_str(batch).map_err(|e| JsValue::from_str(&format!("Invalid forest tuning batch: {e}")))?;
+    let score = causal_forest_pool::score(&batch, index).map_err(|e| JsValue::from_str(&e))?;
+    serde_json::to_string(&score).map_err(|e| JsValue::from_str(&e.to_string()))
+}
 
 mod missingness;
 mod staggered_did;
@@ -955,6 +973,9 @@ pub fn run_analysis(
             seed,
             groups,
         ),
+        AnalysisCommand::CausalForest { rows, columns, treatment, outcome, adjustment, target, configuration, column_names } =>
+            causal_forest::fit_named(values, rows, columns, treatment, outcome, &adjustment, target, configuration, &column_names)
+                .map(|evidence| AnalysisResult::CausalForest { evidence }),
         AnalysisCommand::TLearner {
             rows,
             columns,

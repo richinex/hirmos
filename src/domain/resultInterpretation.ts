@@ -246,6 +246,9 @@ export function resultScaleLine(run: EstimationRunArtifact, study: StudySpecific
     case 'double-ml-run': return run.estimate.effect.kind === 'byGroup'
       ? `Difference in ${outcome} per 1-unit increase in ${treatment}, within each ${plainName(run.estimate.effect.modifier)} group.`
       : `Difference in ${outcome} per 1-unit increase in ${treatment}.`
+    case 'causal-forest-run': return run.evidence.target.kind === 'binary-average' || run.evidence.target.kind === 'binary-conditional'
+      ? `Contrast in ${outcome} between treatment 1 and treatment 0.`
+      : `Conditional slope of ${outcome} with respect to ${treatment}.`
     case 't-learner-run': return run.estimate.effect.kind === 'perRow'
       ? `Difference in expected ${outcome} with ${treatment} set to 1 rather than 0, estimated for each row.`
       : `Mean over every row of the difference in expected ${outcome} with ${treatment} set to 1 rather than 0.`
@@ -283,6 +286,11 @@ export function resultHeadline(run: EstimationRunArtifact, study: StudySpecifica
     case 'local-cutoff-effect': return `Local effect on ${outcome} at ${plainName(study.estimand.running.name)} = ${number(study.estimand.cutoff)}`
     case 'average-treatment-effect': return `Effect of changing ${treatment} on ${outcome}`
     case 'average-treatment-effect-on-treated': return `Effect of changing ${treatment} on ${outcome} among treated rows`
+    case 'average-treatment-effect-on-controls': return `Average treatment effect on ${outcome} among control rows`
+    case 'overlap-weighted-average-treatment-effect': return `Overlap-weighted average treatment effect on ${outcome}`
+    case 'average-partial-effect': return `Average partial effect of ${treatment} on ${outcome}`
+    case 'variance-weighted-average-partial-effect': return `Variance-weighted average partial effect of ${treatment} on ${outcome}`
+    case 'conditional-partial-effect-per-row': return `Conditional partial effect of ${treatment} on ${outcome}`
     case 'conditional-average-treatment-effect': return `Effect of changing ${treatment} on ${outcome} within groups of ${plainName(study.estimand.modifier.name)}`
     case 'conditional-average-treatment-effect-per-row': return `Effect of changing ${treatment} on ${outcome} for each row`
     default: return assertNever(study.estimand)
@@ -414,6 +422,10 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
         { kind: 'qualification', text: `This can be interpreted as ${run.evidence.att ? 'an effect among treated rows' : 'an effect over the prepared population'} only if the adjustment variables account for the common causes, comparable treatment conditions exist for similar rows, and rows are independent. Cross-fitting cannot correct for a missing common cause.` },
       ] }
     }
+    case 'causal-forest-run': return { kind: 'result-interpretation', statements: [
+      { kind: 'qualification', text: 'Conditional predictions describe average effects at the recorded covariate values, not observed individual treatment effects. Variation in fitted predictions alone does not establish treatment-effect heterogeneity.' },
+      { kind: 'qualification', text: 'A causal interpretation requires the recorded identification assumptions and adequate treatment variation conditional on the covariates. Pointwise intervals do not provide simultaneous coverage of all predictions.' },
+    ] }
     case 't-learner-run': {
       const effects = tLearnerRowEffects(run.evidence)
       const rows = effects === null ? null : summariseRowEffects(effects)

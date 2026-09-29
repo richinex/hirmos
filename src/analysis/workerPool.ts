@@ -1,10 +1,22 @@
 /**
  * A pool of analysis workers for work that splits into independent pieces.
  *
- * The ordinary run path keeps its single worker. Only the boosted grid search fans out, because
- * its candidates share no state: one fit per (learning rate, depth) pair, scored at every tree
- * count as a prefix of that fit.
+ * The ordinary run path keeps its single worker. Independent search tasks fan out while sharing
+ * the same cancellation owner as that ordinary path.
  */
+
+const activePools = new Set<AbortController>()
+
+/** Register before launching tasks; release in finally, including failed worker creation. */
+export function createPoolScope() {
+  const controller = new AbortController()
+  activePools.add(controller)
+  return { signal: controller.signal, abort: () => controller.abort(), release: () => { activePools.delete(controller) } }
+}
+
+export function cancelPooledAnalyses(): void {
+  for (const controller of activePools) controller.abort()
+}
 
 /** FIFO counting semaphore, so a pool at capacity queues rather than oversubscribing. */
 export class AsyncSemaphore {
