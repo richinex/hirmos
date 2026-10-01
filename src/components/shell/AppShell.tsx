@@ -27,7 +27,7 @@ export function AppShell({ skipTarget, mode, header, nav, stage, footer }: AppSh
         <main id={skipTarget} className="flex min-h-0 min-w-0 flex-1">
           {mode === 'reading' ? (
             <div className="panel-scroll min-w-0 flex-1 overflow-y-auto [container-type:size]">
-              <div className="dashboard-reading @container/panel mx-auto flex min-h-full w-full max-w-[1440px] flex-col px-5 py-8 sm:px-8 lg:px-10">{stage}</div>
+              <div className="dashboard-reading @container/panel mx-auto flex min-h-full w-full max-w-[1440px] flex-col px-5 pt-0 pb-8 sm:px-8 lg:px-10">{stage}</div>
             </div>
           ) : stage}
         </main>

@@ -13,7 +13,8 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
    with the names, as a sheet: nothing behind it reflows, and a press anywhere off it puts it away. */
 .dashboard .dashboard-reading { padding: 2rem; }
 .dashboard .project-create { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1.25rem; border-radius: 12px; background: var(--color-panel); box-shadow: var(--shadow-lift); }
-.dashboard .workbench-stage { padding: 28px; }
+/* The stage starts flush under the header, so the chapter heading lines up with the inspector's title row. */
+.dashboard .workbench-stage { padding: 0 28px 28px; }
 .dashboard .workbench-inspector { background: var(--color-panel); }
 .dashboard .workbench-inspector { border-color: var(--color-line); }
 .dashboard .seam { background: transparent; }
@@ -59,11 +60,11 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
   .dashboard .example-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 767px) {
-  .dashboard .dashboard-reading { padding: 1.5rem 1rem; }
+  .dashboard .dashboard-reading { padding: .5rem 1rem 1.5rem; }
   .dashboard .example-cards { gap: 16px; }
   .dashboard .example-card { padding: 24px; }
   .dashboard .result-surface { padding: 16px; }
   :root[data-surface="workbench"] .dashboard-button { min-height: 2.75rem; }
   .dashboard .metric-cards { grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); padding: 16px; gap: 16px; }
-  .dashboard .workbench-stage { padding: 20px 16px; }
+  .dashboard .workbench-stage { padding: 8px 16px 20px; }
 }
