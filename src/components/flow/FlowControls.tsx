@@ -21,8 +21,8 @@ export function FlowControls({ fit, fitLabel = 'Fit the canvas', children }: {
   const { fitView, zoomIn, zoomOut } = useReactFlow()
   const isMobile = useIsMobile()
   return (
-    <Panel position={isMobile ? 'bottom-center' : 'bottom-right'} className={isMobile ? '!mx-0 !my-2' : '!m-2'} style={isMobile ? { transform: 'translateX(-50%)' } : undefined}>
-      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', isMobile ? 'flex-row' : 'flex-col')} role="toolbar" aria-label="Canvas">
+    <Panel position={isMobile ? 'bottom-center' : 'bottom-right'} className={isMobile ? '!mx-0 !my-2' : '!m-2'} style={isMobile ? { transform: 'translateX(-50%)', maxWidth: 'calc(100vw - 2rem)' } : undefined}>
+      <div className={cn('flex overflow-hidden rounded-lg border border-hair bg-panel/95 backdrop-blur', isMobile ? 'flex-row flex-wrap justify-center' : 'flex-col')} role="toolbar" aria-label="Canvas">
         <ZoomButtons onIn={() => void zoomIn({ duration: 160 })} onOut={() => void zoomOut({ duration: 160 })} onFit={() => void fitView({ ...fit, duration: 220 })} fitLabel={fitLabel} />
         {children}
       </div>

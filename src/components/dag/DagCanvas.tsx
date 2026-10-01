@@ -1,5 +1,4 @@
 import { createPortal } from 'react-dom'
-import * as Popover from '@radix-ui/react-popover'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -33,7 +32,7 @@ import '@xyflow/react/dist/style.css'
 import { XYHandle, isMouseEvent } from '@xyflow/system'
 import { Icon } from '@/components/Icon'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { button, iconControl, label, literal } from '@/components/ui/recipes'
+import { iconControl, label, literal } from '@/components/ui/recipes'
 import {
   describeDagEditProblem,
   inspectDagEdgeAddition,
@@ -440,17 +439,29 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
 }) {
   const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
   const control = flowControl
-  const [displayOpen, setDisplayOpen] = useState(false)
   return (
     <FlowControls fit={FIT_VIEW} fitLabel="Fit graph">
-        <Popover.Root open={displayOpen} onOpenChange={setDisplayOpen}>
-          <Popover.Trigger asChild><button type="button" className={control} title="Graph display" aria-label="Graph display"><Icon name="tune" size={14} /></button></Popover.Trigger>
-          <Popover.Portal><Popover.Content side="top" align="end" sideOffset={8} collisionPadding={8} className="pop float z-(--z-dialog) w-64 rounded-lg border border-line bg-panel p-2 text-ink">
-            <button type="button" className={button('quiet', 'flex w-full items-center gap-2 text-left')} disabled={disconnectedCount === 0} aria-pressed={variableView === 'connected'} onClick={() => { onToggleVariables(); setDisplayOpen(false) }}><Icon name={variableView === 'all' ? 'visibility_off' : 'visibility'} size={16} />{variableView === 'all' ? 'Hide disconnected variables' : `Show disconnected variables (${disconnectedCount})`}</button>
-            <p className="px-3 pb-2 text-micro text-muted">Hidden variables remain in the DAG.</p>
-            <button type="button" className={button('quiet', 'flex w-full items-center gap-2 text-left')} aria-pressed={drawing === 'sketch'} onClick={() => { onToggleDrawing(); setDisplayOpen(false) }}><Icon name="draw" size={16} />{drawing === 'clean' ? 'Show sketch preview' : 'Use clean drawing'}</button>
-          </Popover.Content></Popover.Portal>
-        </Popover.Root>
+        <button
+          type="button"
+          className={control}
+          disabled={disconnectedCount === 0}
+          title={`${variableView === 'all' ? 'Hide disconnected variables' : `Show disconnected variables (${disconnectedCount})`}. Hidden variables remain in the DAG.`}
+          aria-label={variableView === 'all' ? 'Hide disconnected variables' : `Show disconnected variables (${disconnectedCount})`}
+          aria-pressed={variableView === 'connected'}
+          onClick={onToggleVariables}
+        >
+          <Icon name={variableView === 'all' ? 'visibility' : 'visibility_off'} size={16} />
+        </button>
+        <button
+          type="button"
+          className={control}
+          title={drawing === 'clean' ? 'Use hand-drawn style' : 'Use clean drawing'}
+          aria-label={drawing === 'clean' ? 'Use hand-drawn style' : 'Use clean drawing'}
+          aria-pressed={drawing === 'sketch'}
+          onClick={onToggleDrawing}
+        >
+          <Icon name="draw" size={16} fill={drawing === 'sketch'} />
+        </button>
         <button
           type="button"
           className={control}
@@ -668,7 +679,7 @@ export function DagCanvas({
   // The card size is measured from the names, so the model re-runs once the document's fonts have loaded.
   const metricsVersion = useTextMetricsVersion()
   const [labelsShown, setLabelsShown] = useState(false)
-  const [drawing, setDrawing] = useState<DrawingStyle>('clean')
+  const [drawing, setDrawing] = useState<DrawingStyle>('sketch')
   const [variableView, setVariableView] = useState<VariableView>('all')
   const connectedIds = useMemo(() => new Set(document.current.graph.edges.flatMap(edge => [edge.cause, edge.effect])), [document.current.graph.edges])
   const disconnectedCount = document.current.graph.nodes.filter(node => !connectedIds.has(node.id)).length

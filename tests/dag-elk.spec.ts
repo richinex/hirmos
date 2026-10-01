@@ -69,6 +69,10 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
   await page.getByRole('button', { name: 'Expand graph', exact: true }).click()
   await page.getByRole('button', { name: 'Tidy graph' }).click()
   await expect(page.locator('.react-flow__node')).toHaveCount(3)
+  await expect(page.locator('[data-sketch-stroke]')).toHaveCount(6)
+  await expect(page.getByRole('button', { name: 'Use clean drawing', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('button', { name: 'Use clean drawing', exact: true }).click()
+  await expect(page.locator('[data-sketch-stroke]')).toHaveCount(0)
   await expect.poll(() => page.locator('.react-flow__edge-path').evaluateAll(paths => paths.every(path => !/[QC]/.test(path.getAttribute('d') ?? '')))).toBe(true)
   await page.getByRole('button', { name: 'Show arrow labels' }).click()
   await expect(page.getByText('needs rationale', { exact: true }).first()).toBeVisible()
@@ -87,9 +91,26 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   await page.screenshot({ path: info.outputPath('triangle-dark.png') })
   expect(await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('style')))).toEqual(beforeTheme)
-  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
-  await page.getByRole('button', { name: 'Show sketch preview', exact: true }).click()
+  await expect(page.getByRole('toolbar', { name: 'Canvas', exact: true }).getByRole('button', { name: 'Use hand-drawn style', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Use hand-drawn style', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Use clean drawing', exact: true })).toHaveAttribute('aria-pressed', 'true')
   await expect(page.locator('[data-sketch-stroke]')).toHaveCount(6)
+  // The sketch must replace clean strokes with a visibly rough, two-pass path,
+  // rather than merely mounting a renderer whose output still looks straight.
+  const sketchGeometry = await page.locator('[data-sketch-stroke^="edge:"] path').evaluateAll(paths => paths.map(element => {
+    const path = element as SVGPathElement
+    const start = path.getPointAtLength(0)
+    const end = path.getPointAtLength(path.getTotalLength())
+    const length = Math.hypot(end.x - start.x, end.y - start.y)
+    let deviation = 0
+    for (let i = 1; i < 100; i++) {
+      const p = path.getPointAtLength(path.getTotalLength() * i / 100)
+      deviation = Math.max(deviation, Math.abs((end.x - start.x) * (start.y - p.y) - (start.x - p.x) * (end.y - start.y)) / length)
+    }
+    return { moves: (path.getAttribute('d')?.match(/M/g) ?? []).length, deviation }
+  }))
+  expect(sketchGeometry.every(path => path.moves >= 2)).toBe(true)
+  expect(Math.max(...sketchGeometry.map(path => path.deviation))).toBeGreaterThan(1)
   const sketchPaths = await page.locator('[data-sketch-stroke] path').evaluateAll(paths => paths.map(p => p.getAttribute('d')))
   for (const theme of ['light', 'dark']) {
     await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
@@ -97,7 +118,6 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
     expect(await page.locator('[data-sketch-stroke] path').evaluateAll(paths => paths.map(p => p.getAttribute('d')))).toEqual(sketchPaths)
     expect(await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('style')))).toEqual(beforeTheme)
   }
-  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
   await page.getByRole('button', { name: 'Use clean drawing', exact: true }).click()
   await expect(page.locator('[data-sketch-stroke]')).toHaveCount(0)
   const card = page.locator('.react-flow__node').first()
@@ -198,8 +218,9 @@ test('Proposition 99 can hide disconnected variables without changing its DAG', 
   await page.getByRole('button', { name: 'Expand graph', exact: true }).click()
   await expect(page.locator('.react-flow__node')).toHaveCount(40)
   await page.screenshot({ path: info.outputPath('prop99-all-variables.png') })
-  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
   await page.getByRole('button', { name: 'Hide disconnected variables', exact: true }).click()
+  await expect(page.getByRole('button', { name: /Show disconnected variables/ })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('button', { name: 'Graph display', exact: true })).toHaveCount(0)
   await expect(page.locator('.react-flow__node')).toHaveCount(2)
   await expect(page.locator('.react-flow__edge-path')).toHaveCount(1)
   await page.getByRole('button', { name: 'Fit graph', exact: true }).click()
@@ -220,8 +241,8 @@ test('Proposition 99 can hide disconnected variables without changing its DAG', 
   const toolbar = await page.getByRole('toolbar', { name: 'Canvas', exact: true }).boundingBox()
   expect(toolbar!.x).toBeGreaterThanOrEqual(0)
   expect(toolbar!.x + toolbar!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
-  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
   await page.getByRole('button', { name: /Show disconnected variables/ }).click()
+  await expect(page.getByRole('button', { name: 'Hide disconnected variables', exact: true })).toHaveAttribute('aria-pressed', 'false')
   await expect(page.locator('.react-flow__node')).toHaveCount(40)
   await expect(page.locator('.react-flow__edge-path')).toHaveCount(1)
   expect(errors).toEqual([])

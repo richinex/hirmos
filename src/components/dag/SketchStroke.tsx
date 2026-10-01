@@ -12,8 +12,8 @@ export default memo(function SketchStroke({ id, path, style }: {
     for (const character of id) seed = ((seed * 31 + character.charCodeAt(0)) >>> 0)
     const generator = rough.generator()
     return generator.toPaths(generator.path(path, {
-      seed: seed || 1, roughness: 0.55, bowing: 0.3, maxRandomnessOffset: 0.7,
-      preserveVertices: true, disableMultiStroke: true,
+      seed: seed || 1, roughness: 1.2, bowing: 1, maxRandomnessOffset: 2,
+      preserveVertices: true, disableMultiStroke: false,
     }))
   }, [id, path])
   return <g data-sketch-stroke={id} style={{ ...style, pointerEvents: 'none' }}>
