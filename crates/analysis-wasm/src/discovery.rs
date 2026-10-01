@@ -1878,6 +1878,8 @@ mod tests {
             | AnalysisCommand::DynamicLinearScmCounterfactual { .. }
             | AnalysisCommand::NegbinNuts { .. }
             | AnalysisCommand::BayesianGaussian { .. }
+            | AnalysisCommand::NetworkQuery { .. }
+            | AnalysisCommand::ConditionalGaussianQuery { .. }
             | AnalysisCommand::DiscreteBnQuery { .. }
             | AnalysisCommand::IdentifiedDiscreteQuery { .. }
             | AnalysisCommand::BinaryEtt { .. }

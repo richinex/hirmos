@@ -3,6 +3,8 @@
 use std::collections::BTreeMap;
 
 use hirmos_causal_core::do_calculus::{identify_conditional_outcomes, Admg};
+use hirmos_causal_core::do_calculus::Expression;
+use hirmos_causal_core::discrete_bn::Dag;
 use hirmos_causal_core::identified_expression::{
     evaluate_distribution, evaluate_expression, DiscreteTable, EvaluationError,
 };
@@ -20,6 +22,25 @@ struct IdcOracleCase {
 }
 
 const WEIGHTS: [usize; 8] = [1, 2, 3, 5, 7, 11, 13, 17];
+
+#[test]
+fn graph_simplification_retains_real_conditions_and_latent_paths() {
+    let graph = |edges: &[(&str, &str)]| Dag::new(&edges.iter().map(|(a,b)| (a.to_string(),b.to_string())).collect::<Vec<_>>(), &[]);
+    let expression = Expression::conditional("Y".into(), vec!["W".into(), "X".into()]);
+    let candidates = ["W".to_string()].into_iter().collect();
+    // W -> X -> Y: conditioning on X blocks W. The query's X is retained.
+    let simplified = expression.simplify_irrelevant_conditions(&graph(&[("W","X"),("X","Y")]), &candidates);
+    assert_eq!(simplified, Expression::conditional("Y".into(), vec!["X".into()]));
+    // Conditioning on a collider opens W -> X <- Y. Do not drop W.
+    assert_eq!(expression.simplify_irrelevant_conditions(&graph(&[("W","X"),("Y","X")]), &candidates), expression);
+    // A latent common cause is still a path, even though it is not a data column.
+    assert_eq!(expression.simplify_irrelevant_conditions(&graph(&[("U","W"),("U","Y"),("X","Y")]), &candidates), expression);
+    // Product, sum and ratio traverse the same rule; no new weighting factor.
+    let nested = Expression::normalize_marginalize(Expression::marginalize(Expression::product([expression.clone(), Expression::joint(["X".into()])]), ["X".into()]), ["Y".into()]);
+    let reduced = nested.simplify_irrelevant_conditions(&graph(&[("W","X"),("X","Y")]), &candidates);
+    assert!(!reduced.free_variables().contains("W"));
+    assert!(nested.free_variables().contains("W"));
+}
 
 fn oracle_table() -> DiscreteTable {
     let mut columns = BTreeMap::from([

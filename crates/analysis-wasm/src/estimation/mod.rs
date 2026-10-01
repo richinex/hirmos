@@ -1315,7 +1315,7 @@ mod tests {
                 2,
                 Some(IdentifiedDiscreteCondition {
                     variable: 0,
-                    state: 1,
+                    state: DiscreteConditionState::Index { state: 1 },
                 }),
             )
             .unwrap(),
@@ -1327,6 +1327,69 @@ mod tests {
         assert_eq!(result["result"]["kind"], "identified");
         assert_eq!(result["result"]["algorithm"], "IDC");
         assert!((result["result"]["normalizationLow"].as_f64().unwrap() - 1.0).abs() < 1e-12);
+    }
+
+    /// Setting a sprinkler and observing rain turns the condition into an action; cloudiness then
+    /// cannot affect the grass. The evaluator removes the redundant condition by d-separation.
+    #[test]
+    fn identified_discrete_query_simplifies_a_redundant_condition() {
+        let (rows, values) = complete_binary_columns(4);
+        let names = vec!["Cloudy", "Sprinkler", "Rain", "Wet_Grass"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let result = serde_json::to_value(
+            identified_discrete_query(
+                &values,
+                rows,
+                4,
+                &[0, 1, 2, 3],
+                &names,
+                &[(0, 1), (0, 2), (1, 3), (2, 3)],
+                1,
+                3,
+                &[],
+                2,
+                Some(IdentifiedDiscreteCondition { variable: 2, state: DiscreteConditionState::Highest }),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result["result"]["kind"], "identified");
+        assert_eq!(result["result"]["algorithm"], "IDC");
+        let expression = result["result"]["expression"].as_str().unwrap();
+        assert!(!expression.contains("Cloudy"), "{expression}");
+        assert!((result["result"]["normalizationLow"].as_f64().unwrap() - 1.0).abs() < 1e-12);
+        assert!((result["result"]["normalizationHigh"].as_f64().unwrap() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn identified_discrete_query_matches_pinned_bnlearn_nonuniform_tables() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!("../../../causal-core/oracle/fixtures/identified_sprinkler_bnlearn.json")).unwrap();
+        let names = fixture["names"].as_array().unwrap().iter().map(|v| v.as_str().unwrap().to_owned()).collect::<Vec<_>>();
+        for case in fixture["cases"].as_array().unwrap() {
+            let patterns = case["patterns"].as_array().unwrap();
+            let counts = case["counts"].as_array().unwrap();
+            let rows: usize = counts.iter().map(|v| v.as_u64().unwrap() as usize).sum();
+            let mut values = Vec::new();
+            for col in 0..4 {
+                for (pattern, count) in patterns.iter().zip(counts) {
+                    values.extend(std::iter::repeat_n(pattern[col].as_f64().unwrap(), count.as_u64().unwrap() as usize));
+                }
+            }
+            for budget in [2, 3, 5] {
+                for (rain, state) in [(0, DiscreteConditionState::Lowest), (1, DiscreteConditionState::Highest), (1, DiscreteConditionState::Index { state: 1 })] {
+                    let result = serde_json::to_value(identified_discrete_query(&values, rows, 4, &[0,1,2,3], &names, &[(0,1),(0,2),(1,3),(2,3)], 1, 3, &[], budget, Some(IdentifiedDiscreteCondition { variable: 2, state })).unwrap()).unwrap();
+                    for (s, key) in ["distributionLow", "distributionHigh"].into_iter().enumerate() {
+                        let actual = result["result"][key][1][1].as_f64().unwrap();
+                        let expected = case["wet_probabilities"][rain * 2 + s].as_f64().unwrap();
+                        assert!((actual - expected).abs() < 1e-12, "{} {budget} {rain} {s}: {actual} != {expected}", case["name"]);
+                    }
+                    assert_eq!(result["query"]["state"], rain.to_string());
+                }
+            }
+            assert!(identified_discrete_query(&values, rows, 4, &[0,1,2,3], &names, &[(0,1),(0,2),(1,3),(2,3)], 1, 3, &[], 5, Some(IdentifiedDiscreteCondition { variable: 2, state: DiscreteConditionState::Index { state: 2 } })).err().unwrap().contains("absent"));
+        }
     }
 
     #[test]

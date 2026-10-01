@@ -37,6 +37,7 @@ mod lapack_lu;
 mod slsqp;
 mod nelder_mead;
 mod least_squares;
+pub mod conditional_gaussian;
 mod linalg;
 pub mod mackinnon;
 pub mod missing_data;

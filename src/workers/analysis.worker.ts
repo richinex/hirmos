@@ -43,6 +43,8 @@ import { parseStationarityBattery } from '@/domain/stationarity'
 import { parseBackdoorIdentificationEvidence } from '@/domain/study'
 import { dagCheckEvidenceSchema } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema } from '@/domain/intervention'
+import { networkQueryEvidenceSchema } from '@/domain/networkQuery'
+import {conditionalGaussianEvidenceSchema} from '@/domain/conditionalGaussianQuery'
 import { parseComparisonSurvivalEvidence, parseCoxRegressionEvidence, parseFlexSurvEvidence, parseMultiStateSurvivalEvidence, parseNonparametricSurvivalEvidence, parsePenalizedAftEvidence } from '@/domain/survival'
 import { parseAalenEvidence, parseForestEvidence } from '@/domain/survivalRegression'
 import {
@@ -425,6 +427,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
       return { kind: 'negbinNuts', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, confounder: command.confounder, warmup: command.warmup, samples: command.samples, seed: command.seed }
     case 'bayesian-gaussian':
       return { kind: 'bayesianGaussian', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, warmup: command.warmup, samples: command.samples, seed: command.seed }
+    case 'network-query': return {kind:'networkQuery',query:command.query}
+    case 'conditional-gaussian-query': return {kind:'conditionalGaussianQuery',query:command.query}
     case 'discrete-bn-query':
       return { kind: 'discreteBnQuery', rows: command.rows, columns: command.columns, nodes: command.nodes, names: command.names, edges: command.edges, treatment: command.treatment, outcome: command.outcome, bins: command.bins, equivalentSampleSize: command.equivalentSampleSize }
     case 'identified-discrete-query':
@@ -979,6 +983,16 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         if (!result.success) { fail(command.request, { kind: 'worker-protocol-failed', detail: z.prettifyError(result.error) }); return }
         emit({ kind: 'bayesian-gaussian-succeeded', request: command.request, result: result.data })
         return
+      }
+      case 'network-query': {
+        const result=networkQueryEvidenceSchema.safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(result.error)});return}
+        emit({kind:'network-query-succeeded',request:command.request,result:result.data});return
+      }
+      case 'conditional-gaussian-query': {
+        const result=conditionalGaussianEvidenceSchema.safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:z.prettifyError(result.error)});return}
+        emit({kind:'conditional-gaussian-query-succeeded',request:command.request,result:result.data});return
       }
       case 'discrete-bn-query': {
         const result = discreteBnEvidenceSchema.safeParse(decoded)

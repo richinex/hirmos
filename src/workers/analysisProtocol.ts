@@ -20,6 +20,14 @@ export const adjustedRegressionErrorModelSchema = z.union([
 ])
 export type AdjustedRegressionErrorModel = z.infer<typeof adjustedRegressionErrorModelSchema>
 
+/** Which discretised state a condition fixes: the first, the last, or one by position. */
+export const discreteConditionStateSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('lowest') }).strict(),
+  z.object({ kind: z.literal('index'), state: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('highest') }).strict(),
+])
+export type DiscreteConditionState = z.infer<typeof discreteConditionStateSchema>
+
 /** The fixed effects the adjusted regression absorbs: one per unit, or one per unit and one per period, from label columns of the matrix. */
 export const adjustedRegressionFixedEffectsSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('unit'), column: z.number().int().nonnegative() }).strict(),
@@ -29,6 +37,8 @@ export const adjustedRegressionFixedEffectsSchema = z.discriminatedUnion('kind',
 export type AdjustedRegressionFixedEffects = z.infer<typeof adjustedRegressionFixedEffectsSchema>
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
+import { networkQuerySchema, networkQueryEvidenceSchema, type NetworkQuery, type NetworkQueryEvidence } from '@/domain/networkQuery'
+import {conditionalGaussianQuerySchema,conditionalGaussianEvidenceSchema,type ConditionalGaussianQuery,type ConditionalGaussianEvidence} from '@/domain/conditionalGaussianQuery'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
 import type { GrangerSsrEvidence } from '@/domain/granger'
 import { parseSeasonalAdjustedEvidence, seasonalAdjustedEvidenceSchema, type SeasonalAdjustedEvidence } from '@/domain/seasonal'
@@ -1092,6 +1102,13 @@ export type AnalysisWorkerCommand =
       readonly seed: number
     }
   | {
+      readonly kind: 'network-query'
+      readonly request: WorkerRequestId
+      readonly values: Float64Array
+      readonly query: NetworkQuery
+    }
+  | {readonly kind:'conditional-gaussian-query';readonly request:WorkerRequestId;readonly values:Float64Array;readonly query:ConditionalGaussianQuery}
+  | {
       readonly kind: 'discrete-bn-query'
       readonly request: WorkerRequestId
       readonly values: Float64Array
@@ -1118,7 +1135,7 @@ export type AnalysisWorkerCommand =
       readonly outcome: number
       readonly unobserved: readonly number[]
       readonly bins: number
-      readonly condition: { readonly variable: number; readonly state: number } | null
+      readonly condition: { readonly variable: number; readonly state: DiscreteConditionState } | null
     }
   | {
       readonly kind: 'binary-ett'
@@ -1357,6 +1374,8 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'panel-intervention-succeeded'; readonly request: WorkerRequestId; readonly result: PanelInterventionEvidence }
   | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
   | { readonly kind: 'bayesian-gaussian-succeeded'; readonly request: WorkerRequestId; readonly result: BayesianGaussianEvidence }
+  | { readonly kind: 'network-query-succeeded'; readonly request: WorkerRequestId; readonly result: NetworkQueryEvidence }
+  | {readonly kind:'conditional-gaussian-query-succeeded';readonly request:WorkerRequestId;readonly result:ConditionalGaussianEvidence}
   | { readonly kind: 'discrete-bn-succeeded'; readonly request: WorkerRequestId; readonly result: DiscreteBnEvidence }
   | { readonly kind: 'identified-discrete-query-succeeded'; readonly request: WorkerRequestId; readonly result: IdentifiedDiscreteQueryEvidence }
   | { readonly kind: 'binary-ett-succeeded'; readonly request: WorkerRequestId; readonly result: BinaryEttEvidence }
@@ -2324,6 +2343,10 @@ const commandSchema = z.discriminatedUnion('kind', [
     seed: z.number().int().nonnegative(),
   }).strict(),
   z.object({
+    kind: z.literal('network-query'),request:requestSchema,values:z.instanceof(Float64Array),query:networkQuerySchema,
+  }).strict(),
+  z.object({kind:z.literal('conditional-gaussian-query'),request:requestSchema,values:z.instanceof(Float64Array),query:conditionalGaussianQuerySchema}).strict(),
+  z.object({
     kind: z.literal('discrete-bn-query'),
     request: requestSchema,
     values: z.instanceof(Float64Array),
@@ -2350,7 +2373,7 @@ const commandSchema = z.discriminatedUnion('kind', [
     outcome: z.number().int().nonnegative(),
     unobserved: z.array(z.number().int().nonnegative()),
     bins: z.number().int().min(2).max(10),
-    condition: z.object({ variable: z.number().int().nonnegative(), state: z.number().int().nonnegative() }).strict().nullable(),
+    condition: z.object({ variable: z.number().int().nonnegative(), state: discreteConditionStateSchema }).strict().nullable(),
   }).strict(),
   z.object({
     kind: z.literal('binary-ett'),
@@ -2588,6 +2611,8 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('panel-intervention-succeeded'), request: requestSchema, result: panelInterventionEvidenceSchema }).strict(),
   z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
   z.object({ kind: z.literal('bayesian-gaussian-succeeded'), request: requestSchema, result: bayesianGaussianEvidenceSchema }).strict(),
+  z.object({ kind: z.literal('network-query-succeeded'), request: requestSchema, result: networkQueryEvidenceSchema }).strict(),
+  z.object({kind:z.literal('conditional-gaussian-query-succeeded'),request:requestSchema,result:conditionalGaussianEvidenceSchema}).strict(),
   z.object({ kind: z.literal('discrete-bn-succeeded'), request: requestSchema, result: discreteBnEvidenceSchema }).strict(),
   z.object({ kind: z.literal('identified-discrete-query-succeeded'), request: requestSchema, result: identifiedDiscreteQueryEvidenceSchema }).strict(),
   z.object({ kind: z.literal('binary-ett-succeeded'), request: requestSchema, result: binaryEttEvidenceSchema }).strict(),
@@ -2985,6 +3010,8 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     const result = bayesianGaussianEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'bayesian-gaussian-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
+  if (parsed.data.kind === 'network-query-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'conditional-gaussian-query-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'discrete-bn-succeeded') {
     const result = discreteBnEvidenceSchema.safeParse(parsed.data.result)
     return result.success ? ok({ kind: 'discrete-bn-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })

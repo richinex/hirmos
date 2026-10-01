@@ -177,6 +177,7 @@ export type WorkflowEvent =
   | { readonly type: 'dag-document-revised'; readonly document: DagDocument }
   | { readonly type: 'dag-check-created'; readonly check: DagCheckArtifact }
   | { readonly type: 'intervention-query-created'; readonly query: InterventionQueryArtifact }
+  | { readonly type: 'intervention-query-deleted'; readonly query: InterventionQueryArtifact['id'] }
   | { readonly type: 'study-draft-changed'; readonly draft: StudyDesignDraft }
   | { readonly type: 'study-identified'; readonly study: StudySpecification; readonly identification: IdentificationArtifact }
   | { readonly type: 'estimation-run-created'; readonly run: EstimationRunArtifact }
@@ -487,6 +488,9 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         && event.query.preparedDataset === state.prepared.id
         && state.dagDocuments.some((document) => document.id === event.query.dagDocument)) {
         return { ...state, interventionQueries: [...state.interventionQueries, event.query] }
+      }
+      if (event.type === 'intervention-query-deleted') {
+        return { ...state, interventionQueries: state.interventionQueries.filter((query) => query.id !== event.query) }
       }
       if (event.type === 'study-draft-changed') return { ...state, studyDraft: event.draft }
       if (event.type === 'study-identified'

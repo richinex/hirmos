@@ -35,6 +35,11 @@ export function Sheet({ open, onClose, title, maxH = '78dvh', side = 'bottom', c
             : 'fixed inset-x-0 bottom-0 z-(--z-overlay) flex flex-col rounded-t-3xl border-t border-edge bg-raised pb-[env(safe-area-inset-bottom)] text-ink outline-none'}
           style={side === 'left' ? undefined : { maxHeight: maxH }}
           onOpenAutoFocus={() => { opener.current = document.activeElement as HTMLElement | null }}
+          onEscapeKeyDown={(event) => {
+            // Let a non-empty search field clear first. Radix handles Escape in capture phase,
+            // before FilterField's key handler can prevent the sheet from closing.
+            if (event.target instanceof HTMLInputElement && event.target.type === 'search' && event.target.value !== '') event.preventDefault()
+          }}
           onCloseAutoFocus={(event) => {
             const element = opener.current
             if (!element?.isConnected) return

@@ -19,11 +19,11 @@ export function RunFold({ title, figure, stamp, onDelete, deleteLabel, defaultOp
   return (
     <li>
       <details className="group/fold" open={defaultOpen}>
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-start gap-x-3 gap-y-1 px-3 py-1.5 transition-colors hover:bg-well [&::-webkit-details-marker]:hidden">
           <Icon name="expand_more" size={14} className="shrink-0 text-faint transition-transform duration-(--motion-fast) group-open/fold:rotate-180" />
-          <span className={caption('min-w-0 text-ink')}>{title}</span>
+          <span className={caption('min-w-0 flex-1 text-ink')}>{title}</span>
           {figure !== undefined && <span className={num('text-label text-ink')}>{figure}</span>}
-          <span className={num('ml-auto text-label text-faint')}>{stamp}</span>
+          <span className={num('ml-auto shrink-0 text-label text-faint')}>{stamp}</span>
           {onDelete !== undefined && (
             <button
               type="button"

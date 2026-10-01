@@ -991,6 +991,7 @@ function App() {
                         checks={workflow.dagChecks}
                         interventionQueries={workflow.interventionQueries}
                         onInterventionQuery={(query) => dispatch({ type: 'intervention-query-created', query })}
+                        onDeleteInterventionQuery={(query) => dispatch({ type: 'intervention-query-deleted', query })}
                         onDocumentCreated={(document) => dispatch({ type: 'dag-document-created', document })}
                         onDocumentRevised={(document) => dispatch({ type: 'dag-document-revised', document })}
                         onCheck={(check) => dispatch({ type: 'dag-check-created', check })}

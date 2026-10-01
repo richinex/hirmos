@@ -121,6 +121,52 @@ impl Expression {
         Self::ratio(expression, denominator)
     }
 
+    /// The variables an evaluation must fix: every variable a probability mentions that no
+    /// enclosing sum binds.
+    pub fn free_variables(&self) -> BTreeSet<Variable> {
+        match self {
+            Self::Probability { children, parents } => {
+                children.iter().chain(parents).cloned().collect()
+            }
+            Self::Product(factors) => factors.iter().flat_map(Self::free_variables).collect(),
+            Self::Sum { ranges, expression } => {
+                expression.free_variables().difference(ranges).cloned().collect()
+            }
+            Self::Ratio { numerator, denominator } => numerator
+                .free_variables()
+                .union(&denominator.free_variables())
+                .cloned()
+                .collect(),
+        }
+    }
+
+    /// Remove conditioning arguments only when d-separation in the original DAG
+    /// entails their irrelevance. Keep latent nodes in that DAG. This is a Markov
+    /// simplification for numerical evaluation, not an additional ID rule and not
+    /// an average with an invented weighting distribution.
+    pub fn simplify_irrelevant_conditions(
+        &self,
+        graph: &crate::discrete_bn::Dag,
+        candidates: &BTreeSet<Variable>,
+    ) -> Self {
+        match self {
+            Self::Probability { children, parents } => {
+                let mut retained = parents.clone();
+                for candidate in candidates {
+                    if !retained.contains(candidate) { continue; }
+                    let remaining = retained.iter().filter(|p| *p != candidate).cloned().collect::<Vec<_>>();
+                    if children.iter().all(|child| !graph.is_dconnected(child, candidate, &remaining)) {
+                        retained = remaining;
+                    }
+                }
+                Self::Probability { children: children.clone(), parents: retained }
+            }
+            Self::Product(factors) => Self::product(factors.iter().map(|f| f.simplify_irrelevant_conditions(graph, candidates))),
+            Self::Sum { ranges, expression } => Self::marginalize(expression.simplify_irrelevant_conditions(graph, candidates), ranges.iter().cloned()),
+            Self::Ratio { numerator, denominator } => Self::ratio(numerator.simplify_irrelevant_conditions(graph, candidates), denominator.simplify_irrelevant_conditions(graph, candidates)),
+        }
+    }
+
     /// Stable y0-style text used in parity fixtures and audit records.
     pub fn to_y0(&self) -> String {
         match self {

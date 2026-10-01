@@ -11,6 +11,8 @@ import type { DiscoveryRunArtifact } from './discovery'
 import type { GrangerEvidenceArtifact } from './granger'
 import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
+import { networkQueryArtifactSchema } from './networkQuery'
+import {conditionalGaussianArtifactSchema} from './conditionalGaussianQuery'
 import { brand, err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
 import { backdoorLinearConfigurationSchema, backdoorLinearEvidenceSchema } from './estimation'
@@ -208,7 +210,16 @@ const envelopeSchema = z.object({
   discoveryRuns: z.array(artifact),
   dagDocuments: z.array(artifact),
   dagChecks: z.array(artifact).default([]),
-  interventionQueries: z.array(artifact).default([]),
+  interventionQueries: z.array(artifact.superRefine((value,ctx)=>{
+    if(value.kind==='network-query'){
+      const parsed=networkQueryArtifactSchema.safeParse(value)
+      if(!parsed.success)ctx.addIssue({code:'custom',message:z.prettifyError(parsed.error)})
+    }
+    if(value.kind==='conditional-gaussian-query'){
+      const parsed=conditionalGaussianArtifactSchema.safeParse(value)
+      if(!parsed.success)ctx.addIssue({code:'custom',message:z.prettifyError(parsed.error)})
+    }
+  })).default([]),
   studyDraft: z.object({}).passthrough(),
   studies: z.array(artifact),
   identifications: z.array(artifact),

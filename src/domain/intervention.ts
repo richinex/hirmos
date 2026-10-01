@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import type { NetworkQueryArtifact } from './networkQuery'
+import type { ConditionalGaussianArtifact } from './conditionalGaussianQuery'
 import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
 import type { DagDocument, DagDocumentId, DagNode, DagNodeId, DagRevisionId } from './dag'
 import { discreteStatePreparationSchema, type DiscreteBnEvidence } from './estimation'
@@ -77,7 +79,8 @@ export type InterventionQueryRoute =
       readonly result: IdentifiedDiscreteQueryEvidence
     }
 
-export interface InterventionQueryArtifact {
+export type InterventionQueryArtifact = ContrastQueryArtifact | NetworkQueryArtifact | ConditionalGaussianArtifact
+export interface ContrastQueryArtifact {
   readonly kind: 'intervention-query'
   readonly id: InterventionQueryId
   readonly dagDocument: DagDocumentId
@@ -132,7 +135,7 @@ export function describeInterventionReadiness(problem: InterventionReadinessProb
 const figure = (value: number): string => (Math.abs(value) >= 100 ? value.toFixed(0) : Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(2)).replace('-', '\u2212')
 
 /** The answer in one sentence: both expectations, their difference, and what the surgery adjusted for. */
-export function describeInterventionVerdict(artifact: InterventionQueryArtifact): string {
+export function describeInterventionVerdict(artifact: ContrastQueryArtifact): string {
   switch (artifact.route.kind) {
     case 'bayesian-network': {
       const { result } = artifact.route

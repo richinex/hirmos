@@ -5,6 +5,8 @@
 //! evidence or copy the numerical implementations out of the Hirmos causal core.
 
 mod causal_forest;
+mod network_query;
+mod conditional_gaussian_query;
 mod causal_forest_analysis;
 use hirmos_causal_core::ardl::{ardl_select_order, bounds_test, uecm, Trend};
 use hirmos_causal_core::bayesian_gaussian::{posterior_effect_summary, BayesianGaussianScm};
@@ -1181,6 +1183,8 @@ pub fn run_analysis(
             samples,
             seed,
         ),
+        AnalysisCommand::NetworkQuery { query } => network_query::run(values, query),
+        AnalysisCommand::ConditionalGaussianQuery { query } => conditional_gaussian_query::run(values, query),
         AnalysisCommand::DiscreteBnQuery {
             rows,
             columns,

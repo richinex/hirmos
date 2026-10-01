@@ -16,7 +16,7 @@ export function runCausalForest(values: Float64Array, rows: number, columns: num
   return post('causal-forest-succeeded', { kind: 'causal-forest', request, values, rows, columns, ...design }, values)
 }
 import type { AalenEvidence, ForestEvidence } from '@/domain/survivalRegression'
-import type { AalenWorkerDesign, AdjustedRegressionErrorModel, AdjustedRegressionFixedEffects, ForestWorkerDesign } from '@/workers/analysisProtocol'
+import type { AalenWorkerDesign, AdjustedRegressionErrorModel, AdjustedRegressionFixedEffects, DiscreteConditionState, ForestWorkerDesign } from '@/workers/analysisProtocol'
 
 export function runAalen(values: Float64Array, rows: number, columns: number, design: AalenWorkerDesign): Promise<Result<AalenEvidence, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
@@ -62,6 +62,18 @@ import type { PandasResamplingEvidence, ResamplingAggregation } from '@/domain/r
 import type { BackdoorIdentificationEvidence } from '@/domain/study'
 import type { DagCheckEvidence } from '@/domain/dagValidation'
 import type { IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
+import type { NetworkQuery, NetworkQueryEvidence } from '@/domain/networkQuery'
+import type {ConditionalGaussianQuery,ConditionalGaussianEvidence} from '@/domain/conditionalGaussianQuery'
+
+export function runConditionalGaussianQuery(values:Float64Array,query:ConditionalGaussianQuery):Promise<Result<ConditionalGaussianEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('conditional-gaussian-query-succeeded',{kind:'conditional-gaussian-query',request,values,query},values)
+}
+
+export function runNetworkQuery(values:Float64Array,query:NetworkQuery):Promise<Result<NetworkQueryEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('network-query-succeeded',{kind:'network-query',request,values,query},values)
+}
 import type { ComparisonSurvivalEvidence, CoxRegressionEvidence, FlexSurvEvidence, MultiStateSurvivalEvidence, NonparametricSurvivalEvidence, ParametricSurvivalFamily, PenalizedAftEvidence, ProportionalHazardsFamily } from '@/domain/survival'
 import {
   newWorkerRequestId,
@@ -1281,7 +1293,7 @@ export function runDiscreteBnQuery(values: Float64Array, rows: number, columns: 
   return post('discrete-bn-succeeded', { kind: 'discrete-bn-query', request, values, rows, columns, ...design }, values)
 }
 
-export function runIdentifiedDiscreteQuery(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[]; readonly bins: number; readonly condition: { readonly variable: number; readonly state: number } | null }): Promise<IdentifiedDiscreteQueryOutcome> {
+export function runIdentifiedDiscreteQuery(values: Float64Array, rows: number, columns: number, design: { readonly observedNodes: readonly number[]; readonly names: readonly string[]; readonly edges: readonly (readonly [number, number])[]; readonly treatment: number; readonly outcome: number; readonly unobserved: readonly number[]; readonly bins: number; readonly condition: { readonly variable: number; readonly state: DiscreteConditionState } | null }): Promise<IdentifiedDiscreteQueryOutcome> {
   const request = newWorkerRequestId()
   return post('identified-discrete-query-succeeded', { kind: 'identified-discrete-query', request, values, rows, columns, ...design }, values)
 }

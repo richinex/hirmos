@@ -480,6 +480,10 @@ pub fn estimate_cpd(
             for s in 0..node_card {
                 counts[s * n_cols + col] /= total;
             }
+        } else {
+            // pgmpy MaximumLikelihoodEstimator uses a uniform conditional for
+            // a parent configuration absent from the training table.
+            for s in 0..node_card { counts[s * n_cols + col] = 1.0 / node_card as f64; }
         }
     }
     Cpd {
@@ -492,6 +496,61 @@ pub fn estimate_cpd(
 }
 
 impl DiscreteBn {
+    /// Truncated factorisation followed by conditioning. Empty interventions
+    /// give ordinary observational inference. Unlike parent adjustment, this
+    /// also supports simultaneous interventions and post-intervention evidence.
+    pub fn distribution(
+        &self,
+        targets: &[String],
+        interventions: &HashMap<String, String>,
+        evidence: &HashMap<String, String>,
+    ) -> Result<Vec<(Vec<String>, f64)>, String> {
+        if targets.is_empty() || targets.iter().collect::<BTreeSet<_>>().len() != targets.len() {
+            return Err("Choose distinct outcome variables.".into());
+        }
+        for name in targets.iter().chain(interventions.keys()).chain(evidence.keys()) {
+            if !self.state_names.contains_key(name) { return Err(format!("Unknown query variable: {name}")); }
+        }
+        if interventions.keys().any(|n| evidence.contains_key(n)) || targets.iter().any(|n| interventions.contains_key(n) || evidence.contains_key(n)) {
+            return Err("Outcome, intervention and observation variables must be distinct.".into());
+        }
+        let mut assignment = HashMap::new();
+        for (name, state) in interventions.iter().chain(evidence.iter()) {
+            let index = self.state_names[name].iter().position(|s| s == state)
+                .ok_or_else(|| format!("State {state} is absent for {name}."))?;
+            assignment.insert(name.clone(), index);
+        }
+        // Ancestral pruning is performed on the intervened graph. No CPD of an
+        // observed node is removed: evidence must retain its likelihood factor.
+        let edges = self.dag.edges.iter().filter(|(_, b)| !interventions.contains_key(b)).cloned().collect::<Vec<_>>();
+        let graph = Dag::new(&edges, &self.dag.nodes);
+        let roots = targets.iter().chain(evidence.keys()).cloned().collect::<Vec<_>>();
+        let relevant = graph.ancestral_graph(&roots).nodes;
+        let free = relevant.iter().filter(|n| !assignment.contains_key(*n)).collect::<Vec<_>>();
+        let count = free.iter().try_fold(1usize, |a, n| a.checked_mul(self.state_names[*n].len()))
+            .ok_or("The query state space exceeds the addressable size.")?;
+        let mut out = std::collections::BTreeMap::<Vec<String>, f64>::new();
+        for combination in 0..count {
+            let mut remaining = combination;
+            for name in &free {
+                let card = self.state_names[*name].len();
+                assignment.insert((*name).clone(), remaining % card);
+                remaining /= card;
+            }
+            let mut probability = 1.0;
+            for node in &relevant {
+                if interventions.contains_key(node) { continue; }
+                let cpd = self.cpd(node);
+                probability *= cpd.values[assignment[node] * cpd.n_cols() + cpd.column(&assignment)];
+            }
+            let key = targets.iter().map(|n| self.state_names[n][assignment[n]].clone()).collect();
+            *out.entry(key).or_default() += probability;
+        }
+        let mass: f64 = out.values().sum();
+        if !mass.is_finite() || mass <= 0.0 { return Err("The observed evidence has zero probability under this model.".into()); }
+        Ok(out.into_iter().map(|(states, p)| (states, p / mass)).collect())
+    }
+
     /// Fits every node's CPD with a BDeu prior.
     pub fn fit(dag: Dag, data: &HashMap<String, Vec<String>>, equivalent_sample_size: f64) -> Self {
         // pgmpy's state names are the sorted unique observed values.

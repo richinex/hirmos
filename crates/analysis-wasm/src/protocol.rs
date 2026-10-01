@@ -906,11 +906,20 @@ pub(crate) enum CounterfactualIdentificationEvidence {
     },
 }
 
+/// Which discretised state a condition fixes: the first, the last, or one by position.
+#[derive(Clone, Copy, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum DiscreteConditionState {
+    Lowest,
+    Index { state: usize },
+    Highest,
+}
+
 #[derive(Clone, Copy, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct IdentifiedDiscreteCondition {
     pub(crate) variable: usize,
-    pub(crate) state: usize,
+    pub(crate) state: DiscreteConditionState,
 }
 
 #[derive(Clone, Copy, Serialize)]
@@ -1608,6 +1617,8 @@ pub(crate) enum AnalysisCommand {
         samples: usize,
         seed: u64,
     },
+    NetworkQuery { query: crate::network_query::NetworkQuery },
+    ConditionalGaussianQuery { query: crate::conditional_gaussian_query::Query },
     DiscreteBnQuery {
         rows: usize,
         columns: usize,
@@ -3481,6 +3492,12 @@ pub(crate) enum AnalysisResult {
         histogram_counts: Vec<u32>,
         curves: Vec<BayesianGaussianCurve>,
     },
+    NetworkQuery {
+        observations: usize,
+        states: Vec<Vec<(String, f64)>>,
+        distribution: Vec<(Vec<String>, f64)>,
+    },
+    ConditionalGaussianQuery { observations:usize, outcome:usize, mean:f64, std:f64, configuration_rows:usize },
     DiscreteBnQuery {
         observations: usize,
         bins: usize,

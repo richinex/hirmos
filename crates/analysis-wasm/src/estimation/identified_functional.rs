@@ -621,6 +621,7 @@ pub(crate) fn identified_discrete_query(
         .iter()
         .map(|&position| names[position].clone())
         .collect::<Vec<_>>();
+    let evaluation_graph = hirmos_causal_core::discrete_bn::Dag::new(&named_edges, names);
     let projection = latent_projection(names.iter().cloned(), named_edges, latent_names)
         .map_err(|error| format!("identified discrete query graph is invalid: {error:?}"))?;
     let treatment_name = names[treatment].clone();
@@ -644,7 +645,15 @@ pub(crate) fn identified_discrete_query(
         None => (IdentifiedDiscreteQueryKind::Unconditional, None, None),
         Some(condition) => {
             let name = names[condition.variable].clone();
-            let state = condition.state.to_string();
+            let states = table.states(&name).ok_or_else(|| {
+                format!("identified discrete query condition {name} is absent from the observed table")
+            })?;
+            let state = match condition.state {
+                DiscreteConditionState::Lowest => states.first().cloned(),
+                DiscreteConditionState::Highest => states.last().cloned(),
+                DiscreteConditionState::Index { state } => Some(state.to_string()),
+            }
+            .ok_or_else(|| format!("identified discrete query condition {name} has no states"))?;
             let means = &means_by_position[&condition.variable];
             let representative_value = means.get(&state).copied().ok_or_else(|| {
                 format!("identified discrete query condition state {state} is absent for {name} after discretisation")
@@ -708,6 +717,20 @@ pub(crate) fn identified_discrete_query(
             ))
         }
     };
+    // ID may retain redundant predecessor conditions. Eliminate only arguments
+    // whose irrelevance follows from the original graph, including its latent nodes.
+    let mut fixed_names = std::collections::BTreeSet::from([treatment_name.clone(), outcome_name.clone()]);
+    fixed_names.extend(condition_name.iter().cloned());
+    let free = expression
+        .free_variables()
+        .difference(&fixed_names)
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    let expression = expression.simplify_irrelevant_conditions(&evaluation_graph, &free);
+    let unresolved = expression.free_variables().difference(&fixed_names).cloned().collect::<Vec<_>>();
+    if !unresolved.is_empty() {
+        return Err(format!("The identified expression still requires values for {}. Graph-based simplification could not remove them; this evaluator cannot estimate this query without an additional justified reduction.", unresolved.join(", ")));
+    }
     let fixed = |treatment_state: String| {
         let mut assignment = BTreeMap::from([(treatment_name.clone(), treatment_state)]);
         if let (Some(name), Some(state)) = (&condition_name, &condition_state) {

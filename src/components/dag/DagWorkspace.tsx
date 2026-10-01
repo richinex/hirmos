@@ -78,6 +78,7 @@ interface DagWorkspaceProps {
   readonly prepared: PreparedDatasetArtifact
   readonly interventionQueries: readonly InterventionQueryArtifact[]
   readonly onInterventionQuery: (query: InterventionQueryArtifact) => void
+  readonly onDeleteInterventionQuery: (query: InterventionQueryArtifact['id']) => void
   readonly discoveryRuns: readonly DiscoveryRunArtifact[]
   readonly documents: readonly DagDocument[]
   readonly checks: readonly DagCheckArtifact[]
@@ -692,7 +693,7 @@ export function DagWorkspace({
   onUseForStudy,
   onUseForRootCause,
   studyDraft,
-  onStudyDraftChanged, source, interventionQueries, onInterventionQuery }: DagWorkspaceProps) {
+  onStudyDraftChanged, source, interventionQueries, onInterventionQuery, onDeleteInterventionQuery }: DagWorkspaceProps) {
   const [state, dispatch] = useReducer(stepDagWorkspace, documents, initialState)
 
   const createDocument = () => {
@@ -1091,6 +1092,7 @@ export function DagWorkspace({
           prepared={prepared}
           queries={interventionQueries}
           onQuery={onInterventionQuery}
+          onDeleteQuery={onDeleteInterventionQuery}
           onOverlay={setInterventionOverlay}
         />
       )}

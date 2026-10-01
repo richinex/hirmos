@@ -614,7 +614,7 @@ test('runs ID, IDC and hedge outcomes through the discrete intervention boundary
     const conditionalData = completeBinary(3)
     const conditional = await analysis.runIdentifiedDiscreteQuery(conditionalData.values, conditionalData.rows, 3, {
       observedNodes: [0, 1, 2], names: ['Z', 'X', 'Y'], edges: [[0, 1], [0, 2], [1, 2]],
-      treatment: 1, outcome: 2, unobserved: [], bins: 2, condition: { variable: 0, state: 1 },
+      treatment: 1, outcome: 2, unobserved: [], bins: 2, condition: { variable: 0, state: { kind: 'index', state: 1 } },
     })
     const hedgeData = completeBinary(2)
     const hedge = await analysis.runIdentifiedDiscreteQuery(hedgeData.values, hedgeData.rows, 2, {
