@@ -1180,7 +1180,7 @@ const BACKDOOR_IDENTIFICATION: MethodDefinition = {
       id: caveatId('backdoor-minimal-set-choice'),
       category: 'interpretation',
       requirement: 'When several minimal sets exist, choose among them using measurement quality, observed support and the planned model before estimation.',
-      consequenceIfUnmet: 'Choosing the set whose estimate is preferred introduces an unrecorded analysis-selection decision.',
+      consequenceIfUnmet: 'Choosing the set whose estimate you prefer adds a decision about the analysis that the record does not show.',
       sources: [VAN_DER_ZANDER_2014, TAKATA_2010],
     },
     {
@@ -1535,7 +1535,7 @@ const INSTRUMENTAL_VARIABLE: MethodDefinition = {
     {
       id: caveatId('iv-identified-instrument'),
       category: 'identification',
-      requirement: 'Each instrument meets the two level 2 definitional requirements for a valid instrument. As-if-random: any backdoor paths between the instrument and the outcome can be blocked. Exclusion: the instrument is a cause of the outcome only indirectly through the treatment.',
+      requirement: 'Each instrument meets the two level 2 definitional requirements for a valid instrument. As-if-random: any back-door paths between the instrument and the outcome can be blocked. Exclusion: the instrument is a cause of the outcome only indirectly through the treatment.',
       consequenceIfUnmet: 'With either path present there is no instrumental variable estimand.',
       sources: [NESS_CH11('§11.3.2 the instrumental variable estimand'), dowhy('dowhy/graph.py#get_instruments'), hirmos('crates/causal-core/src/iv.rs#identify_instrument_set')],
     },
@@ -1719,7 +1719,7 @@ const CAUSAL_EFFECTS_TOTAL: MethodDefinition = {
     {
       id: caveatId('causal-effects-identifiable'),
       category: 'identification',
-      requirement: 'The selected generated set, or a set supplied by the user, blocks every non-causal treatment–outcome path in the projected graph.',
+      requirement: 'In the projected graph, the selected generated set, or a set supplied by the user, blocks every path between treatment and outcome that is not causal.',
       consequenceIfUnmet: 'The run refuses the adjustment set and does not fit an effect model.',
       sources: [RUNGE_2021, VAN_DER_ZANDER_2014],
     },
@@ -2073,7 +2073,7 @@ const ARDL_PSS: MethodDefinition = {
   id: ARDL_PSS_METHOD_ID,
   name: 'ARDL long run',
   family: 'estimation',
-  summary: 'Models an outcome using its earlier values and current and earlier predictor values. For eligible lag orders, an error-correction form tests for a long-run relationship.',
+  summary: 'The outcome is modelled from its earlier values and from current and earlier predictor values. For eligible lag orders, an error-correction form tests for a long-run relationship.',
   caveats: [
     {
       id: caveatId('ardl-orders-assessed'),
@@ -2166,7 +2166,7 @@ const SYNTHETIC_CONTROL: MethodDefinition = {
     {
       id: caveatId('synthetic-panel-layout'),
       category: 'sampling-structure',
-      requirement: 'Rows are periods, one column is the treated unit, donor columns are untreated units over the same periods.',
+      requirement: 'Rows are periods, one column is the treated unit, and the donor columns are untreated units over the same periods.',
       consequenceIfUnmet: 'Weights fitted on unrelated series match noise.',
       sources: [ABADIE_2010],
     },
@@ -2269,7 +2269,7 @@ const NEGBIN_NUTS: MethodDefinition = {
     {
       id: caveatId('nuts-convergence'),
       category: 'computation',
-      requirement: 'No divergent transitions and acceptance near the 0.8 target; warmup, draws and seed are recorded.',
+      requirement: 'There are no divergent transitions, acceptance is near the 0.8 target, and the warmup, draws and seed are recorded.',
       consequenceIfUnmet: 'Posterior summaries from a chain with divergent transitions may not reliably represent the target distribution.',
       sources: [HOFFMAN_GELMAN_2014, BETANCOURT_2017, pyro('pyro/infer/mcmc/nuts.py:57-93'), hirmos('crates/causal-core/src/nuts.rs#multinomial_nuts')],
     },
@@ -2324,7 +2324,7 @@ const BAYESIAN_GAUSSIAN: MethodDefinition = {
     {
       id: caveatId('bayes-gaussian-convergence'),
       category: 'computation',
-      requirement: 'No divergent transitions and acceptance near the 0.8 target across all chains; warmup, draws and seed are recorded.',
+      requirement: 'There are no divergent transitions, acceptance is near the 0.8 target in every chain, and the warmup, draws and seed are recorded.',
       consequenceIfUnmet: 'Posterior summaries from a chain with divergent transitions may not reliably represent the target distribution.',
       sources: [HOFFMAN_GELMAN_2014, BETANCOURT_2017, hirmos('crates/causal-core/src/nuts.rs#multinomial_nuts')],
     },

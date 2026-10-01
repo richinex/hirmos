@@ -887,12 +887,12 @@ export function identificationFrom(
         {
           kind: 'graph-result',
           id: 'instrument-set',
-          statement: `${names} ${plural ? 'meet' : 'meets'} the two level 2 definitional requirements for a valid instrument in “${study.dagName}”. As-if-random: any backdoor paths between the instrument and ${study.outcome.name} can be blocked. Exclusion: the instrument is a cause of ${study.outcome.name} only indirectly through ${study.treatment.name}.`,
+          statement: `${names} ${plural ? 'meet' : 'meets'} the two level 2 definitional requirements for a valid instrument in “${study.dagName}”. As-if-random: any back-door paths between the instrument and ${study.outcome.name} can be blocked. Exclusion: the instrument is a cause of ${study.outcome.name} only indirectly through ${study.treatment.name}.`,
         },
         {
           kind: 'graph-assumption',
           id: 'instrument-exclusion',
-          statement: `None of the other causes of ${study.outcome.name} are also causes of ${names}, so there are no backdoor paths between the ${plural ? 'instruments' : 'instrument'} and the outcome; and if the causal path from ${names} to ${study.treatment.name} were removed there would be no causal path from ${names} to ${study.outcome.name}.`,
+          statement: `None of the other causes of ${study.outcome.name} are also causes of ${names}, so no back-door path connects the ${plural ? 'instruments' : 'instrument'} and the outcome. If the causal path from ${names} to ${study.treatment.name} were removed, no causal path would remain from ${names} to ${study.outcome.name}.`,
         },
         { kind: 'design-assumption', id: 'consistency', statement: study.designAssumptions.consistency.statement, rationale: study.designAssumptions.consistency.rationale },
         { kind: 'design-assumption', id: 'no-interference', statement: study.designAssumptions.noInterference.statement, rationale: study.designAssumptions.noInterference.rationale },

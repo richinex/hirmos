@@ -546,7 +546,7 @@ export const ESTIMATOR_GROUPS: NonEmptyArray<EstimatorGroup> = [
   {
     id: 'propensity-score',
     name: 'Propensity-score estimators',
-    description: 'Weighting, matching and doubly robust estimation from a fitted propensity score, and the generalised score when the treatment is continuous.',
+    description: 'A fitted propensity score is used for weighting, matching and doubly robust estimation; the generalised score is used when the treatment is continuous.',
     estimators: ['propensity-weighting', 'propensity-matching', 'doubly-robust', 'continuous-gps'],
   },
   {
@@ -2398,7 +2398,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
         violate('iv-identified-instrument', `The identification record names no observed instrument for ${treatmentName} and ${outcomeName}. If the instrumental variables are latent, an instrumental variable estimand cannot be targeted.`)
       } else {
         const names = instruments.map((variable) => variable.name).join(', ')
-        satisfy('iv-identified-instrument', `${names} ${instruments.length === 1 ? 'meets' : 'meet'} as-if-random (any backdoor paths between the instrument and ${outcomeName} can be blocked) and exclusion (the instrument is a cause of ${outcomeName} only indirectly through ${treatmentName}) in the recorded graph.`)
+        satisfy('iv-identified-instrument', `${names} ${instruments.length === 1 ? 'meets' : 'meet'} as-if-random (any back-door paths between the instrument and ${outcomeName} can be blocked) and exclusion (the instrument is a cause of ${outcomeName} only indirectly through ${treatmentName}) in the recorded graph.`)
       }
       leave('iv-linearity', `Assess whether ${outcomeName} and ${treatmentName} are linear in the instrument: the estimate is the ratio of the coefficients of the linear models ${outcomeName} ~ instrument and ${treatmentName} ~ instrument, fitted without covariates.`)
       leave('iv-effect-homogeneity', `Assess whether each unit’s ${treatmentName} is affected in the same way by the common causes of ${treatmentName} and ${outcomeName}, and each unit’s ${outcomeName} likewise; the estimator reports one effect for every unit.`)
@@ -2511,9 +2511,9 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       const prefix = configuration.kind
       const nuisance = identification.kind === 'identified' ? dmlNuisanceInputs(identification.adjustment.variables, context.study?.estimand ?? null) : []
       if (identification.kind !== 'identified') violate(`${prefix}-identified-adjustment`, 'No measured back-door adjustment set was found, so there is no identified set for the nuisance learners.')
-      else if (nuisance.length === 0) violate(`${prefix}-identified-adjustment`, 'The identified adjustment set is empty; double machine learning needs covariates to partial out. Use the adjusted linear regression, or target the effect within groups of a modifier.')
+      else if (nuisance.length === 0) violate(`${prefix}-identified-adjustment`, 'The identified adjustment set is empty, so double machine learning has no covariates to partial out. Use the adjusted linear regression, or target the effect within groups of a modifier.')
       else satisfy(`${prefix}-identified-adjustment`, `Nuisance learners see ${nuisance.map((variable) => variable.name).join(', ')}.`)
-      if (panel) violate(`${prefix}-independent-rows`, 'The rows are a panel; shuffled folds would split a unit across folds, and cross-fitting that keeps each unit together is not available.')
+      if (panel) violate(`${prefix}-independent-rows`, 'The rows are a panel, so shuffled folds would split a unit across folds, and cross-fitting that keeps each unit together is not available.')
       else if (timeSeries) violate(`${prefix}-independent-rows`, 'The rows are a time series and the folds are shuffled; cross-fitting with time blocks or rolling windows is not available.')
       else satisfy(`${prefix}-independent-rows`, 'The prepared dataset holds independent rows, so shuffled folds are valid.')
       if (configuration.kind === 'dml-irm') {
@@ -2542,7 +2542,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else satisfy('t-learner-identified-adjustment', `Both arm models see ${inputs.map((variable) => variable.name).join(', ')}, and each row’s effect is conditioned on those values.`)
       if (context.treatmentIsBinary === null) leave('t-learner-binary-treatment', 'The treatment column has not been read yet; it is checked when the run starts.')
       else if (context.treatmentIsBinary) satisfy('t-learner-binary-treatment', 'Every treatment value is 0 or 1.')
-      else violate('t-learner-binary-treatment', 'The treatment holds values other than 0 and 1; one outcome model per arm needs a binary treatment.')
+      else violate('t-learner-binary-treatment', 'One outcome model per arm cannot be fitted because the treatment holds values other than 0 and 1.')
       if (panel) leave('t-learner-independent-rows', 'Rows repeat within units; the arm models treat them as independent draws.')
       else if (timeSeries) leave('t-learner-independent-rows', 'The rows are a time series; the arm models treat them as independent draws.')
       else satisfy('t-learner-independent-rows', 'The prepared dataset holds independent rows.')
@@ -2702,8 +2702,8 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       else if (context.observedGraphIsBinary) satisfy('ett-binary-table', 'Every observed graph variable contains only 0 and 1.')
       else violate('ett-binary-table', 'At least one observed graph variable contains a value other than 0 or 1; no discretisation is applied.')
       leave('ett-positive-conditioning-mass', 'The run evaluates every conditional denominator and refuses zero observed mass.')
-      if (timeSeries) violate('ett-independent-rows', 'The prepared rows are a time series; the empirical table would count serially dependent rows as independent.')
-      else if (panel) violate('ett-independent-rows', 'The prepared rows repeat units; the empirical table would count dependent rows as independent.')
+      if (timeSeries) violate('ett-independent-rows', 'The prepared rows are a time series, so the empirical table would count serially dependent rows as independent.')
+      else if (panel) violate('ett-independent-rows', 'The prepared rows repeat units, so the empirical table would count dependent rows as independent.')
       else leave('ett-independent-rows', 'Confirm that the cross-sectional rows are independently sampled.')
       satisfy('ett-no-interval', 'The run is recorded as a point estimate with no sampling interval.')
       break
@@ -2725,7 +2725,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (configuration.estimator.kind === 'wrightParents') {
         leave('causal-effects-identifiable', 'The run checks whether the graph contains directed treatment–outcome paths that Wright path tracing can evaluate.')
       } else if (configuration.estimator.adjustment.kind === 'explicit') {
-        leave('causal-effects-identifiable', 'The run checks the supplied time-indexed set against every open non-causal treatment–outcome path and refuses an invalid set.')
+        leave('causal-effects-identifiable', 'The run checks the supplied time-indexed set against every open path between treatment and outcome that is not causal and refuses an invalid set.')
       } else {
         leave('causal-effects-identifiable', `Whether the ${configuration.estimator.adjustment.kind === 'optimal' ? 'complete O-set' : configuration.estimator.adjustment.kind === 'minimizedOptimal' ? 'minimized O-set' : 'collider-minimized O-set'} exists is decided by the run; a refusal is reported as not identifiable.`)
       }

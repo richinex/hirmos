@@ -206,7 +206,7 @@ const describeAdjustmentProblems = (
     case 'queryOutcome': return `${timeIndexedNodeLabel(problem.node, names)} is the outcome node in this query.`
     case 'laterTreatmentOccurrence': return `${timeIndexedNodeLabel(problem.node, names)} is a later occurrence of the treatment variable than the intervention node.`
     case 'forbiddenNode': return `${timeIndexedNodeLabel(problem.node, names)} is excluded by the time-indexed adjustment criterion.`
-    case 'openNonCausalPath': return 'The complete set leaves at least one non-causal treatment–outcome path open.'
+    case 'openNonCausalPath': return 'The complete set leaves open at least one path between treatment and outcome that is not causal.'
     default: return assertNever(problem)
   }
 }).join(' ')
@@ -218,19 +218,27 @@ const intervalText = (estimate: CausalEstimate): string => {
 }
 
 
+/** The HAC bandwidth rule the hint refers to, typeset like every other formula in the workbench. */
+/** The HC1 small-sample factor the hint refers to; G counts the absorbed fixed effects when there are any. */
+const hc1Factor = (absorbsEffects: boolean) => absorbsEffects
+  ? { tex: 'c = \\dfrac{n}{n - G - k}', plain: 'c = n / (n − G − k)' }
+  : { tex: 'c = \\dfrac{n}{n - k}', plain: 'c = n / (n − k)' }
+
+const HAC_BANDWIDTH = { tex: 'L = \\left\\lfloor 4\\left(\\dfrac{n}{100}\\right)^{2/9} \\right\\rfloor', plain: 'L = floor(4 (n/100)^(2/9))' } as const
+
 /** What the chosen error treatment assumes and how its interval is built, for the hint under the control. */
 const describeErrorTreatment = (errors: LinearErrors, fixedEffects: FixedEffects): string => {
   const effects = fixedEffects.kind === 'none' ? null : fixedEffects.kind === 'unit-and-time' ? `${fixedEffects.name} and ${fixedEffects.timeName} effects` : `${fixedEffects.name} effects`
   switch (errors.kind) {
     case 'classical': return effects !== null
-      ? `95% confidence level. The classical interval assumes errors are independent and share a common variance; its degrees of freedom count the ${effects} as parameters.`
-      : '95% confidence level. The classical interval assumes errors are independent and share a common variance.'
+      ? `The interval uses a 95% confidence level. The classical interval assumes errors are independent and share a common variance; its degrees of freedom count the ${effects} as parameters.`
+      : 'The interval uses a 95% confidence level. The classical interval assumes errors are independent and share a common variance.'
     case 'hc1': return effects !== null
-      ? `95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by n / (n − G − k), where G counts the ${effects}.`
-      : '95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by n / (n − k).'
-    case 'cluster': return `95% confidence level. The clustered interval allows errors to correlate within each value of ${errors.name} and treats the clusters as independent. A finite-sample correction accounts for the cluster count and fitted parameters. With two-way effects, both effect dimensions count towards that correction. With one-way effects, effects nested within clusters do not.`
-    case 'hac': return '95% confidence level. Heteroskedasticity- and autocorrelation-consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of floor(4 (n/100)^(2/9)) lags.'
-    case 'arma': return '95% confidence level.'
+      ? `The interval uses a 95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by the factor c, where n is the number of rows and G counts the ${effects}:`
+      : 'The interval uses a 95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by the factor c, where n is the number of rows:'
+    case 'cluster': return `The interval uses a 95% confidence level. The clustered interval allows errors to correlate within each value of ${errors.name} and treats the clusters as independent. A finite-sample correction accounts for the cluster count and fitted parameters. With two-way effects, both effect dimensions count towards that correction. With one-way effects, effects nested within clusters do not.`
+    case 'hac': return 'The interval uses a 95% confidence level. Heteroskedasticity- and autocorrelation-consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of L lags, where n is the number of rows:'
+    case 'arma': return 'The interval uses a 95% confidence level.'
     default: return assertNever(errors)
   }
 }
@@ -241,7 +249,7 @@ const describeFixedEffectsChoice = (fixedEffects: FixedEffects): string => {
     case 'none': return 'Every row is used as observed. Choose fixed effects when the same unit appears in several rows.'
     case 'time': return `Period effects account for additive differences shared by rows with the same ${fixedEffects.name}. They do not account for persistent differences between units.`
     case 'unit': return `Each variable is replaced by its deviation from the mean of its ${fixedEffects.name}. The run lists adjustment variables absorbed by these effects.`
-    case 'unit-and-time': return `The regression removes additive ${fixedEffects.name} and ${fixedEffects.timeName} effects before fitting the remaining variation. The run lists adjustment variables absorbed by those effects. This also supports unbalanced panels.`
+    case 'unit-and-time': return `The regression removes additive ${fixedEffects.name} and ${fixedEffects.timeName} effects before fitting the remaining variation. The run lists adjustment variables absorbed by those effects. Unbalanced panels are also supported.`
     default: return assertNever(fixedEffects)
   }
 }
@@ -1297,7 +1305,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const modifier = study.estimand.kind === 'conditional-average-treatment-effect' ? study.estimand.modifier : null
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...nuisance]
           const matrix = await materialise(columns)
-          if (configuration.kind === 'dml-irm' && columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the interactive model needs a 0/1 treatment.` }); return }
+          if (configuration.kind === 'dml-irm' && columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `The interactive model cannot be fitted because ${study.treatment.name} is not a 0/1 treatment.` }); return }
           const groups: DmlGroupsRequest = study.estimand.kind !== 'conditional-average-treatment-effect'
             ? { kind: 'none' }
             : study.estimand.grouping.kind === 'levels'
@@ -1353,7 +1361,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           const inputs = tLearnerInputs(identification.result.adjustment.variables, study.estimand)
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...inputs]
           const matrix = await materialise(columns)
-          if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the T-learner fits one outcome model per arm and needs a 0/1 treatment.` }); return }
+          if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `The T-learner fits one outcome model per arm, so it cannot be fitted because ${study.treatment.name} is not a 0/1 treatment.` }); return }
           const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
           if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
           const shared = { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat() }
@@ -1508,7 +1516,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         case 'bayesian-gaussian': {
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
           const matrix = await materialise(columns)
-          if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `${study.treatment.name} is not binary; the Gaussian model needs a 0/1 treatment.` }); return }
+          if (columnAt(matrix.values, matrix.rowCount, 0).some((value) => value !== 0 && value !== 1)) { dispatch({ type: 'run-failed', detail: `The Gaussian model cannot be fitted because ${study.treatment.name} is not a 0/1 treatment.` }); return }
           const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
           if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
           const evidence = await analysis.runBayesianGaussian(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), warmup: configuration.warmup, samples: configuration.samples, seed: configuration.seed })
@@ -1903,6 +1911,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               ? [{ value: 'classical', label: 'Classical' }, { value: 'hc1', label: 'Robust (HC1)' }, { value: 'cluster', label: 'Clustered', disabled: timeCandidates.length === 0, title: timeCandidates.length === 0 ? 'Requires a cluster column outside the regression design.' : undefined }]
               : [{ value: 'classical', label: 'Classical' }, { value: 'hc1', label: 'Robust (HC1)' }, { value: 'cluster', label: 'Clustered', disabled: timeCandidates.length === 0, title: timeCandidates.length === 0 ? 'Requires a cluster column outside the regression design.' : undefined }, { value: 'hac', label: 'Newey–West HAC' }, { value: 'arma', label: 'ARMA errors' }]} />
             <p className={cn(fieldHint, 'max-w-[65ch]')}>{describeErrorTreatment(configuration.errors, configuration.fixedEffects)}</p>
+            {configuration.errors.kind === 'hc1' && <div className="formula mt-1 max-w-[65ch] text-body"><Formula {...hc1Factor(configuration.fixedEffects.kind !== 'none')} /></div>}
+            {configuration.errors.kind === 'hac' && <div className="formula mt-1 max-w-[65ch] text-body"><Formula {...HAC_BANDWIDTH} /></div>}
             {configuration.errors.kind === 'cluster' && <div className="mt-3">
               <ParameterLabel className={fieldLabel} label="Cluster column" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.clusterColumn} />
               {timeCandidates.length === 0
@@ -2286,7 +2296,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                       <option value="explicit">User-supplied set</option>
                     </Select>
                   </label>
-                  <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>The generated choices are computed from the stationary graph. A user-supplied set is checked against every open non-causal treatment–outcome path before fitting.</p>
+                  <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>The generated choices are computed from the stationary graph. A user-supplied set is checked against every open path between treatment and outcome that is not causal before fitting.</p>
                 </div>
                 {explicitAdjustment !== null && (
                   <div className="grid max-w-3xl gap-2">
@@ -2294,7 +2304,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                       <ParameterLabel className={fieldLabel} label="Adjustment members" help={ESTIMATION_PARAMETER_HELP.causalEffects.adjustmentMembers} />
                       <button type="button" className={button('quiet')} disabled={temporalAdjustmentCandidates.length === 0 || adjustmentDraft.kind === 'editing'} onClick={() => setAdjustmentDraft({ kind: 'editing', variable: null, lag: 0 })}>Add member</button>
                     </div>
-                    {explicitAdjustment.nodes.length === 0 && <p className="m-0 text-body text-faint">The empty set will be tested. It is valid only when the graph has no open non-causal treatment–outcome path.</p>}
+                    {explicitAdjustment.nodes.length === 0 && <p className="m-0 text-body text-faint">The empty set will be tested. It is valid only when the graph has no open path between treatment and outcome that is not causal.</p>}
                     {adjustmentDraft.kind === 'editing' && (
                       <div className={well('grid grid-cols-[minmax(0,1fr)_8rem_auto_auto] items-end gap-2 p-2')}>
                         <label className="block">

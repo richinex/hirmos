@@ -342,7 +342,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const instruments = run.evidence.instruments.map((index) => run.columns[index]?.name ?? 'the instrument').join(', ')
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Using ${plainName(instruments)} as the source of treatment variation, a 1-unit increase in ${plainName(study.treatment.name)} changes expected ${plainName(study.outcome.name)} by ${number(effect)} in the fitted model.` },
+        { kind: 'magnitude', text: `With ${plainName(instruments)} as the source of treatment variation, a 1-unit increase in ${plainName(study.treatment.name)} changes expected ${plainName(study.outcome.name)} by ${number(effect)} in the fitted model.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
         { kind: 'qualification', text: `This can be interpreted as an effect only if ${plainName(instruments)} changes treatment, affects the outcome only through treatment, and is otherwise unrelated to causes of the outcome. The instrument must also provide enough treatment variation for a useful estimate, and the linear-effect model must fit.` },
       ] }
@@ -398,7 +398,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `${ratioMeaning(ratio, study.outcome.name)} for each 1-unit increase in ${plainName(study.treatment.name)}, ${adjustedFor(run)}. The fitted expected-count ratio is ${formatEstimate(ratio, countRatioScale).text}.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'count-ratio' }),
-        { kind: 'qualification', text: `This can be interpreted as an effect only if the adjustment variables block the non-causal treatment–outcome paths, the outcome is a genuine count, the fitted relationship is adequate, and rows are independent. ${countAssumption} The ratio compares modelled expected counts, not observed totals.` },
+        { kind: 'qualification', text: `This can be interpreted as an effect only if the adjustment variables block the paths between treatment and outcome that are not causal, the outcome is a genuine count, the fitted relationship is adequate, and rows are independent. ${countAssumption} The ratio compares modelled expected counts, not observed totals.` },
       ] }
     }
     case 'negative-binomial-ingarch-run': {
@@ -446,7 +446,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: rows === null
           ? `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(headlineValue(estimate.effect))} on average across rows, ${adjustment}.`
-          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(run.evidence.average)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}. ${formatPercent(rows.positiveShare, { precision: 0 }).text} are above zero.` },
+          : `Setting ${study.treatment.name} from 0 to 1 changes expected ${study.outcome.name} by ${number(run.evidence.average)} on average across the ${formatCount(rows.rows).text} rows, ${adjustment}. The row effects run from ${number(rows.minimum)} to ${number(rows.maximum)}; the middle half lies between ${number(rows.lowerQuartile)} and ${number(rows.upperQuartile)}, with a median of ${number(rows.median)}. Of the row effects, ${formatPercent(rows.positiveShare, { precision: 0 }).text} are above zero.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : { kind: 'uncertainty', text: `The ${formatPercent(estimate.interval.level, { precision: 0 }).text} confidence interval for the average effect is ${number(estimate.interval.lower)} to ${number(estimate.interval.upper)}. It uses a conservative uncertainty calculation based on refitting both forests on resampled rows. Individual row intervals appear in the table below.` },
         { kind: 'qualification', text: `Each row’s effect is the treated ${armModel(run.evidence)} prediction minus the control ${armModel(run.evidence)} prediction at that row’s values of the adjustment variables: the average contrast for rows like it, not that row’s own counterfactual. ${run.evidence.kind === 'crossFittedTLearner' ? 'Each row is predicted by the models fitted on the other half of the rows. ' : ''}The spread across rows shows variation in fitted predictions and can also contain fitting noise; it is not an uncertainty interval.` },
       ] }
@@ -534,7 +534,7 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       return { kind: 'result-interpretation', statements: [
         { kind: 'magnitude', text: `Setting ${plainName(study.treatment.name)} to 1 rather than 0 gives ${change(effect, study.outcome.name)} on average in the fitted model, ${adjustedFor(run)}.` },
         estimate.interval.kind === 'none' ? noInterval(estimate.interval.reason) : intervalStatement(estimate.interval, { kind: 'additive' }),
-        { kind: 'uncertainty', text: `${formatPercent(run.evidence.probabilityPositive, { precision: 1 }).text} of retained posterior effect draws are above zero. This is a probability under the specified model and priors, not the probability that the causal assumptions are true.` },
+        { kind: 'uncertainty', text: `Of the retained posterior effect draws, ${formatPercent(run.evidence.probabilityPositive, { precision: 1 }).text} are above zero. This is a probability under the specified model and priors, not the probability that the causal assumptions are true.` },
         { kind: 'qualification', text: 'This can be interpreted as an effect only if the recorded adjustment variables account for the common causes, treatment is genuinely binary, the additive outcome model fits, rows are independent, and the priors suit the outcome scale.' },
       ] }
     }
@@ -720,7 +720,7 @@ export function interpretCounterfactualResult(run: CounterfactualRunArtifact, st
         }
       })()
       return { kind: 'result-interpretation', statements: [
-        { kind: 'magnitude', text: `Hirmos replays ${evidence.effects.length} observed ${stepLabel}s with ${plainName(study.treatment.name)} set to ${number(evidence.interventions[1])} rather than ${number(evidence.interventions[0])} ${schedule}. While keeping each period’s recovered unexplained shock fixed, modelled ${plainName(study.outcome.name)} differs by ${number(evidence.averageEffect)} per ${stepLabel} on average, and the period-by-period differences sum to ${number(evidence.cumulativeEffect)}.` },
+        { kind: 'magnitude', text: `Hirmos replays ${evidence.effects.length} observed ${stepLabel}s with ${plainName(study.treatment.name)} set to ${number(evidence.interventions[1])} rather than ${number(evidence.interventions[0])} ${schedule}. With each period’s recovered unexplained shock held fixed, modelled ${plainName(study.outcome.name)} differs by ${number(evidence.averageEffect)} per ${stepLabel} on average, and the period-by-period differences sum to ${number(evidence.cumulativeEffect)}.` },
         { kind: 'uncertainty', text: `${uncertainty} Resampling represents coefficient-estimation uncertainty under the recorded graph and stationary block-bootstrap assumptions; it does not cover graph choice, preprocessing, an unsuitable model, or uncertainty about the intervention schedule.` },
         { kind: 'qualification', text: 'This is a retrospective replay of observed periods, not a forecast of new periods. It has a counterfactual meaning only if the recorded lagged graph and linear equations are suitable and changing treatment would leave every other equation and recovered period-specific shock unchanged.' },
       ] }

@@ -249,7 +249,7 @@ export function evaluateCounterfactualEligibility(method: MethodDefinition, cont
   switch (configuration.kind) {
     case 'linear-scm':
       if (latent.length > 0) violate('scm-graph-complete', `${latent.map((node) => node.name).join(', ')} ${latent.length === 1 ? 'is' : 'are'} unmeasured; every equation needs its parents in the data.`)
-      else if (identification.kind !== 'identified') violate('scm-graph-complete', 'No measured back-door adjustment set was found; the fitted equations would carry an open back-door path.')
+      else if (identification.kind !== 'identified') violate('scm-graph-complete', 'No measured back-door adjustment set was found, so the fitted equations would carry an open back-door path.')
       else satisfy('scm-graph-complete', `All ${study.graph.nodes.length} nodes are measured and the study is identified by back-door adjustment.`)
       leave('scm-structural-equations', 'Linearity with additive noise is assumed; the equations’ R² and residual scales are reported with the run.')
       if (configuration.interventions[0] === configuration.interventions[1]) violate('scm-abduction', 'The two intervention values are equal, so every row-level effect is zero by construction.')
@@ -266,7 +266,7 @@ export function evaluateCounterfactualEligibility(method: MethodDefinition, cont
       else satisfy('dynamic-scm-graph-complete', `All ${study.graph.nodes.length} graph nodes are measured; contemporaneous and lagged arrows are passed at their recorded time indices.`)
       const startRow = configuration.schedule.kind === 'point' ? configuration.schedule.row : configuration.schedule.startRow
       if (startRow < 2) violate('dynamic-scm-history', 'The intervention starts before one complete lag of observed history is available. The required history depends on the graph’s maximum lag.')
-      else satisfy('dynamic-scm-history', `The intervention begins at row ${startRow}. Before fitting, the preceding history is checked against the graph’s maximum lag.`)
+      else satisfy('dynamic-scm-history', `The intervention begins at row ${startRow}. Before the model is fitted, the preceding history is checked against the graph’s maximum lag.`)
       leave('dynamic-scm-modularity', 'The replay holds every non-treatment equation and each time point’s recovered innovation fixed across worlds; this cross-world invariance is a structural assumption.')
       if (configuration.interventions[0] === configuration.interventions[1]) violate('dynamic-scm-intervention-schedule', 'The two intervention values are equal, so the contrast is zero by construction.')
       else satisfy('dynamic-scm-intervention-schedule', configuration.schedule.kind === 'point' ? `One-time intervention at row ${configuration.schedule.row}.` : `Persistent intervention from row ${configuration.schedule.startRow} through the ${configuration.steps}-point horizon.`)
@@ -276,7 +276,7 @@ export function evaluateCounterfactualEligibility(method: MethodDefinition, cont
           break
         case 'blockBootstrap':
           if (configuration.uncertainty.samples < 20) violate('dynamic-scm-no-interval', 'At least 20 block-bootstrap refits are required.')
-          else satisfy('dynamic-scm-no-interval', `${configuration.uncertainty.samples} block-bootstrap refits at ${Math.round(configuration.uncertainty.confidenceLevel * 100)}% confidence. Before fitting, the selected block length is checked to ensure at least 2 blocks remain.`)
+          else satisfy('dynamic-scm-no-interval', `${configuration.uncertainty.samples} block-bootstrap refits at ${Math.round(configuration.uncertainty.confidenceLevel * 100)}% confidence. Before the model is fitted, the selected block length is checked to ensure at least 2 blocks remain.`)
           break
         default: assertNever(configuration.uncertainty)
       }

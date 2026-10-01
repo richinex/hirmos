@@ -59,7 +59,7 @@ const PROBES: NonEmptyArray<SensitivityProbe> = ['linear-refutation', 'unobserve
 
 const probeHint = (probe: SensitivityProbe): string => {
   switch (probe) {
-    case 'linear-refutation': return 'Refits the linear back-door estimate under placebo-treatment, data-subset and random-common-cause perturbations, with residual diagnostics.'
+    case 'linear-refutation': return 'Hirmos refits the linear back-door estimate under placebo-treatment, data-subset and random-common-cause perturbations, and reports residual diagnostics.'
     case 'unobserved-confounding': return 'Adds a simulated confounder sized from the observed common causes and refits the linear back-door estimate.'
     case 'dml-refutation': return 'Repeats the double machine learning fit, then runs the placebo, random common cause and confounding bounds probes from one seed.'
     default: return assertNever(probe)
@@ -330,7 +330,7 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
         }
         case 'unobserved-confounding': {
           const treatment = Array.from(matrix.value.values.subarray(0, matrix.value.rowCount))
-          if (treatment.some((value) => value !== 0 && value !== 1)) { fail(`${study.treatment.name} is not binary; the simulation flips a 0 or 1 treatment.`); return }
+          if (treatment.some((value) => value !== 0 && value !== 1)) { fail(`The simulation flips a 0 or 1 treatment, so it cannot run because ${study.treatment.name} is not binary.`); return }
           const result = await analysis.runUnobservedConfounding(matrix.value.values, matrix.value.rowCount, columns.length, { treatment: 0, outcome: 1, adjustment, seed: configuration.seed, kappaT: kappaValues(configuration.kappaT), kappaY: kappaValues(configuration.kappaY) })
           if (!session.current(current)) return
           if (!result.ok) { fail(describeAnalysisWorkerProblem(result.error)); return }
