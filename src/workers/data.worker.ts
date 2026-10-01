@@ -107,7 +107,7 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         return
       }
       case 'materialize-panel': {
-        const result = await materializePanelLong(source.value, command.profile, command.unitColumn, command.timeColumn, command.outcomeColumn, command.treatmentColumn, command.covariates)
+        const result = await materializePanelLong(source.value, command.profile, command.unitColumn, command.timeColumn, command.outcomeColumn, command.treatmentColumn, command.covariates, command.clusterColumn)
         if (!result.ok) { emit({ kind: 'panel-data-failed', request: command.request, problem: result.error }); return }
         emit({ kind: 'panel-materialization-succeeded', request: command.request, matrix: result.value }, [result.value.values.buffer])
         return

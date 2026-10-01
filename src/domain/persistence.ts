@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTarget, sameCausalForestTarget, causalForestSettingsMatch } from './causalForest'
-import { staggeredRecordMatches } from './staggeredDid'
+import { staggeredRecordMatches, staggeredConfigurationSchema } from './staggeredDid'
 import { sharpRdConfigurationSchema, parseSharpRdEvidence, sharpRdRecordMatches } from './sharpRd'
 import { EMPTY_ROOT_CAUSE, rootCauseWorkspaceSchema, type RootCauseWorkspace } from './rootCauseAnalysis'
 import type { CounterfactualRunArtifact } from './counterfactual'
@@ -586,6 +586,11 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
       const study=parsed.data.studies.find(candidate=>candidate.id===run.study)
       const identification=parsed.data.identifications.find(candidate=>candidate.id===run.identification)
       if(!staggeredRecordMatches(run,study)||identification?.study!==run.study||prepared.value===null||Reflect.get(prepared.value,'id')!==run.preparedDataset) return err({kind:'invalid-snapshot',detail:'The saved staggered DiD result does not match its treated-group study, specification or prepared panel.'})
+      const configuration = staggeredConfigurationSchema.safeParse(run.configuration)
+      if (configuration.success && 'clustering' in configuration.data && configuration.data.clustering.kind === 'column') {
+        const column = configuration.data.clustering.column
+        if (!profile?.columns.some(c => c.id === column)) return err({kind:'invalid-snapshot',detail:'The saved staggered DiD cluster column is not in the dataset profile.'})
+      }
     }
     if (run.kind === 'panel-intervention-run' && ((typeof run.evidence === 'object' && run.evidence !== null && Reflect.get(run.evidence, 'kind') === 'panelAdjusted')
       || (typeof run.configuration === 'object' && run.configuration !== null && Reflect.get(run.configuration, 'primary') === 'adjusted'))) {

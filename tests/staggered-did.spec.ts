@@ -4,7 +4,74 @@ import {addArrow,chapter,choose,createDag,identify} from './examples/support'
 
 const input=JSON.parse(readFileSync('crates/causal-core/fixtures/staggered-did/mpdta-input.json','utf8')) as Record<string,number>[]
 const reference=JSON.parse(readFileSync('crates/causal-core/fixtures/staggered-did/mpdta.json','utf8'))
-const csv=['unit,year,outcome,treated,lpop',...input.map(r=>[r.countyreal,r.year,r.lemp,r['first.treat']!==0&&r.year!>=r['first.treat']!?1:0,r.lpop].join(','))].join('\n')
+const csv=['unit,year,outcome,treated,lpop,state',...input.map(r=>[r.countyreal,r.year,r.lemp,r['first.treat']!==0&&r.year!>=r['first.treat']!?1:0,r.lpop,`state-${String(Math.floor(r.countyreal!/1000)).padStart(3,'0')}`].join(','))].join('\n')
+
+test('cluster labels stay aligned through data and WASM workers and invalid groupings are refused',async({page})=>{
+  test.setTimeout(120_000)
+  await page.goto('/app')
+  // Preserve R's numeric unit order when the kernel sorts string identities.
+  const keyedCsv=['unit,year,outcome,treated,lpop,state',...input.map(r=>[
+    `unit-${String(r.countyreal).padStart(8,'0')}`,r.year,r.lemp,
+    r['first.treat']!==0&&r.year!>=r['first.treat']!?1:0,r.lpop,
+    `state-${String(Math.floor(r.countyreal!/1000)).padStart(3,'0')}`,
+  ].join(','))].join('\n')
+  const result=await page.evaluate(async csv=>{
+    const data=await import(new URL('/src/data/client.ts',location.href).href)
+    const workflow=await import(new URL('/src/domain/workflow.ts',location.href).href)
+    const analysis=await import(new URL('/src/analysis/client.ts',location.href).href)
+    const d=await import(new URL('/src/domain/staggeredDid.ts',location.href).href)
+    const panel=await import(new URL('/src/domain/panel.ts',location.href).href)
+    const file=new File([csv],'clustered.csv',{type:'text/csv'})
+    const profiled=await data.profileSourceInWorker(workflow.newImportRequestId(),file)
+    if(!profiled.ok)throw Error(JSON.stringify(profiled.error))
+    const profile=profiled.value
+    const column=(name:string)=>profile.columns.find((c:{name:string})=>c.name===name).id
+    const selection={unit:column('unit'),time:column('year'),outcome:column('outcome'),treatment:column('treated'),covariates:[column('lpop')],clusterColumn:column('state')}
+    const materialized=await data.materializePanelInWorker(file,profile,selection)
+    if(!materialized.ok)throw Error(JSON.stringify(materialized.error))
+    const matrix=materialized.value
+    const spec={...d.defaultStaggeredSpecification,inference:{kind:'bootstrapSimultaneous',iterations:999,seed:731}}
+    const clustering={kind:'column',column:column('state')}
+    const prepared=d.staggeredInput(matrix,spec,clustering)
+    if(!prepared.ok)throw Error(prepared.error)
+    const run=await analysis.runStaggeredDid(prepared.value.values,prepared.value.model)
+    if(!run.ok)throw Error(JSON.stringify(run.error))
+    const labels=[...matrix.cluster.labels]
+    const repeated=matrix.units.findIndex((u:string,i:number)=>i>0&&matrix.units.indexOf(u)<i)
+    labels[repeated]='changed'
+    const config={kind:'panel-intervention',primary:'staggered',covariates:selection.covariates,specification:spec}
+    const noCluster={...matrix};delete noCluster.cluster
+    const missingCsv=csv.replace(/state-\d+/,'')
+    if(missingCsv===csv)throw Error('The missing-cluster fixture did not remove a label.')
+    const missingFile=new File([missingCsv],'missing-cluster.csv',{type:'text/csv'})
+    const missingProfile=await data.profileSourceInWorker(workflow.newImportRequestId(),missingFile)
+    if(!missingProfile.ok)throw Error(JSON.stringify(missingProfile.error))
+    const col=(name:string)=>missingProfile.value.columns.find((c:{name:string})=>c.name===name).id
+    const missing=await data.materializePanelInWorker(missingFile,missingProfile.value,{unit:col('unit'),time:col('year'),outcome:col('outcome'),treatment:col('treated'),clusterColumn:col('state')})
+    return {
+      evidence:run.value,
+      changed:d.staggeredInput({...matrix,cluster:{...matrix.cluster,labels}},spec,clustering).ok,
+      absent:d.staggeredInput(noCluster,spec,clustering).ok,
+      unrequested:d.staggeredInput(matrix,spec).ok,
+      single:d.staggeredInput({...matrix,cluster:{...matrix.cluster,labels:labels.map(()=> 'one')}},spec,clustering).ok,
+      analytical:d.staggeredInput(matrix,{...spec,inference:{kind:'analytical'}},clustering).ok,
+      malformed:panel.parsePanelLongMatrix({...matrix,cluster:{...matrix.cluster,labels:[]}},profile).ok,
+      missing:missing.ok,
+      legacy:d.staggeredConfigurationSchema.safeParse(config).success,
+      current:d.staggeredConfigurationSchema.safeParse({...config,clustering}).success,
+      badConfig:d.staggeredConfigurationSchema.safeParse({...config,clustering,specification:{...spec,inference:{kind:'analytical'}}}).success,
+    }
+  },keyedCsv)
+  const oracle=JSON.parse(readFileSync('crates/causal-core/fixtures/staggered-did/inference.json','utf8'))
+  const expected=oracle.cases[1]
+  expect(result.evidence.clusterCount).toBe(new Set(expected.clusters).size)
+  for(let i=0;i<oracle.event.length;i++) {
+    expect(result.evidence.events.intervals[i].standardError).toBeCloseTo(expected.se[i],9)
+    expect(result.evidence.events.intervals[i].lower).toBeCloseTo(expected.simultaneous_lower[i],9)
+    expect(result.evidence.events.intervals[i].upper).toBeCloseTo(expected.simultaneous_upper[i],9)
+  }
+  expect({...result,evidence:undefined}).toEqual({evidence:undefined,changed:false,absent:false,unrequested:false,single:false,analytical:false,malformed:false,missing:false,legacy:true,current:true,badConfig:false})
+})
 
 test('staggered DiD travels through the data and WASM workers and preserves source effects',async({page})=>{
   test.setTimeout(120_000)
@@ -102,6 +169,11 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await expect(page.getByRole(info.project.name==='mobile-chromium'?'dialog':'tooltip')).not.toBeEmpty()
   await page.keyboard.press('Escape')
   await page.getByRole('group',{name:'Staggered DiD covariates',exact:true}).getByRole('checkbox',{name:'lpop',exact:true}).check()
+  await choose(page,'Staggered cluster column','state')
+  await page.getByRole('radio',{name:'Analytical',exact:true}).click()
+  await expect(page.getByRole('button',{name:/^Run panel difference-in-differences/i}).first()).toBeDisabled()
+  await expect(page.getByText('Select pointwise or simultaneous bootstrap to use the cluster column.',{exact:true})).toBeVisible()
+  await page.getByRole('radio',{name:'Simultaneous bootstrap',exact:true}).click()
   await page.getByTestId('staggered-did-controls').scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath('staggered-controls.png')})
   const run=page.getByRole('button',{name:/^Run panel difference-in-differences/i}).first()
@@ -118,7 +190,10 @@ test('staggered adoption completes through the UI and restores its plots',async(
   }
   await result.getByRole('radio',{name:'Event study',exact:true}).click()
   await page.getByRole('button',{name:'Change theme',exact:true}).click()
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme-transition','')
   if(await page.locator('html').getAttribute('data-theme')!=='dark') await page.getByRole('button',{name:'Change theme',exact:true}).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme','dark')
+  await expect(page.locator('html')).not.toHaveAttribute('data-theme-transition','')
   await page.screenshot({path:info.outputPath('staggered-dark.png')})
   await page.getByRole('button',{name:'Open Event-study effects in a floating window',exact:true}).first().click()
   await expect(page.getByRole('dialog')).toBeVisible()
@@ -132,14 +207,18 @@ test('staggered adoption completes through the UI and restores its plots',async(
   if(!path) throw Error('No exported project')
   const snapshot=JSON.parse(readFileSync(path,'utf8')).project
   expect(snapshot.estimationRuns).toHaveLength(1)
+  expect(snapshot.estimationRuns[0].configuration.clustering.kind).toBe('column')
+  expect(snapshot.estimationRuns[0].evidence.clusterCount).toBeLessThan(500)
   expect(snapshot.estimationRuns[0].evidence.overall.dynamic.estimate).toBeCloseTo(reference.cases.nevertreated_varying_adjusted.overall_att,9)
   const restored=await page.evaluate(async snapshot=>{
     const persistence=await import(new URL('/src/domain/persistence.ts',location.href).href)
     const valid=persistence.parseSnapshotValue(snapshot)
     const bad=structuredClone(snapshot);bad.estimationRuns[0].evidence.version=2
-    return {valid:valid.ok,invalid:persistence.parseSnapshotValue(bad).ok}
+    const cluster=structuredClone(snapshot);cluster.estimationRuns[0].configuration.clustering.column='unknown-column'
+    const unit=structuredClone(snapshot);unit.estimationRuns[0].configuration.clustering={kind:'unit'}
+    return {valid:valid.ok,invalid:persistence.parseSnapshotValue(bad).ok,unknownCluster:persistence.parseSnapshotValue(cluster).ok,changedClustering:persistence.parseSnapshotValue(unit).ok}
   },snapshot)
-  expect(restored).toEqual({valid:true,invalid:false})
+  expect(restored).toEqual({valid:true,invalid:false,unknownCluster:false,changedClustering:false})
   await page.reload()
   await page.getByRole('button',{name:'Open Staggered DiD source verification',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()

@@ -2,11 +2,12 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl'
 import { SelectionActions } from '@/components/ui/SelectionActions'
 import { ParameterLabel } from '@/components/ui/ParameterLabel'
 import { SettingsDisclosure } from '@/components/ui/SettingsDisclosure'
+import { Select } from '@/components/ui/Select'
 import { field, fieldLabel, fieldRow, settingsStack } from '@/components/ui/recipes'
 import type { ColumnId } from '@/domain/dataset'
 import type { StaggeredConfiguration } from '@/domain/staggeredDid'
 
-export function StaggeredDidControls({configuration,candidates,onChange}:{readonly configuration:StaggeredConfiguration;readonly candidates:readonly {readonly id:ColumnId;readonly name:string}[];readonly onChange:(value:StaggeredConfiguration)=>void}) {
+export function StaggeredDidControls({configuration,candidates,clusterCandidates,onChange}:{readonly configuration:StaggeredConfiguration;readonly candidates:readonly {readonly id:ColumnId;readonly name:string}[];readonly clusterCandidates:readonly {readonly id:ColumnId;readonly name:string}[];readonly onChange:(value:StaggeredConfiguration)=>void}) {
   const spec=configuration.specification
   const update=(value:Partial<typeof spec>)=>onChange({...configuration,specification:{...spec,...value}})
   return <div className={settingsStack} data-testid="staggered-did-controls">
@@ -16,7 +17,15 @@ export function StaggeredDidControls({configuration,candidates,onChange}:{readon
       <SegmentedControl className="mt-1" ariaLabel="Staggered baseline" value={spec.baseline} onChange={baseline=>update({baseline})} options={[{value:'varying',label:'Varying'},{value:'universal',label:'Universal'}]} /></div>
     <div className="max-w-3xl"><div className="flex items-center justify-between gap-2"><ParameterLabel className={fieldLabel} label="Adjustment covariates" help="Without covariates, comparisons use outcome changes. With covariates, the panel doubly robust score uses a logistic propensity model and linear comparison-outcome model. Covariates are taken at the comparison baseline; do not include variables affected by treatment." /><SelectionActions selectLabel="Select all staggered DiD covariates" clearLabel="Clear staggered DiD covariates" onSelectAll={()=>onChange({...configuration,covariates:candidates.map(c=>c.id)})} onClear={()=>onChange({...configuration,covariates:[]})} /></div>
       <div role="group" aria-label="Staggered DiD covariates" className="mt-1 flex flex-wrap gap-2">{candidates.map(c=><label key={c.id} className="flex items-center gap-1.5 text-body text-ink"><input type="checkbox" checked={configuration.covariates.includes(c.id)} onChange={e=>onChange({...configuration,covariates:e.target.checked?[...configuration.covariates,c.id]:configuration.covariates.filter(id=>id!==c.id)})} />{c.name}</label>)}</div></div>
-    <div><ParameterLabel className={fieldLabel} label="Uncertainty" help="This choice changes standard errors and intervals, not ATT estimates. Analytical uses pointwise intervals; simultaneous bootstrap covers each plotted family jointly. Overall ATT intervals remain pointwise. Units are the independent resampling clusters." />
+    <label><ParameterLabel className={fieldLabel} label="Independent clusters" help="By default, each panel unit is a cluster. Select a column when units belong to larger independent groups, such as firms within states. Each unit must remain in one cluster. Additional clustering requires bootstrap inference." />
+      <Select aria-label="Staggered cluster column" className={field('text','mt-1 w-full max-w-xs')} value={configuration.clustering?.kind==='column'?configuration.clustering.column:''} onChange={e=>{
+        if(e.target.value===''){onChange({...configuration,clustering:{kind:'unit'}});return}
+        const column=clusterCandidates.find(c=>c.id===e.target.value)
+        if(column!==undefined)onChange({...configuration,clustering:{kind:'column',column:column.id}})
+      }}><option value="">Each panel unit</option>{clusterCandidates.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</Select>
+    </label>
+    {configuration.clustering?.kind==='column'&&spec.inference.kind==='analytical'&&<p className="m-0 text-body text-muted" role="status">Select pointwise or simultaneous bootstrap to use the cluster column.</p>}
+    <div><ParameterLabel className={fieldLabel} label="Uncertainty" help="This choice changes standard errors and intervals, not ATT estimates. Analytical uses pointwise intervals; simultaneous bootstrap covers each plotted family jointly. Overall ATT intervals remain pointwise. Bootstrap resampling uses the selected independent clusters." />
       <SegmentedControl className="mt-1" ariaLabel="Staggered uncertainty" value={spec.inference.kind} onChange={kind=>update({inference:kind==='analytical'?{kind}:{kind,iterations:spec.inference.kind==='analytical'?999:spec.inference.iterations,seed:spec.inference.kind==='analytical'?731:spec.inference.seed}})} options={[{value:'analytical',label:'Analytical'},{value:'bootstrapPointwise',label:'Pointwise bootstrap'},{value:'bootstrapSimultaneous',label:'Simultaneous bootstrap'}]} /></div>
     <div className={fieldRow.three}>
       <label><ParameterLabel className={fieldLabel} label="Anticipation periods" help="The number of periods before adoption in which treatment may already affect outcomes." /><input aria-label="Anticipation periods" className={field('text','mt-1 w-full')} type="number" min={0} step={1} value={spec.anticipation} onChange={e=>update({anticipation:Number(e.target.value)})} /></label>

@@ -2412,12 +2412,13 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (configuration.primary === 'staggered') {
         if (prepared.kind !== 'prepared-panel' || !prepared.panel.balanced) violate('panel-balanced-layout', 'Staggered DiD requires a balanced long panel with unit and time keys.')
         else satisfy('panel-balanced-layout', 'A balanced panel is prepared. Each unit’s first treatment period is derived from its binary treatment indicator; treatment must remain on afterwards.')
-        if (!staggeredConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the event window and inference settings.')
+        if (configuration.clustering?.kind==='column' && configuration.specification.inference.kind==='analytical') violate('panel-pre-fit', 'Additional clustering requires pointwise or simultaneous bootstrap inference.')
+        else if (!staggeredConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the event window and inference settings.')
         else satisfy('panel-pre-fit', 'Group-time ATT compares adoption cohorts with the selected comparison group. Numeric covariates use the comparison baseline.')
         leave('panel-parallel-trends', 'Identification requires parallel untreated trends, conditional on the selected covariates when adjustment is used, and treatment overlap.')
         leave('panel-no-anticipation', configuration.specification.anticipation === 0 ? 'Assume no treatment effect before adoption.' : 'Assume no treatment effect before the specified anticipation window.')
         leave('panel-no-spillovers', 'Treatment of one unit must not affect another unit’s outcome.')
-        leave('panel-no-interval', 'Inference treats panel units as independent clusters. Simultaneous bands cover the effects within each reported family; overall ATT intervals are pointwise.')
+        leave('panel-no-interval', `${configuration.clustering?.kind==='column'?'Inference treats the groups in the selected cluster column as independent. Each unit must remain in one group.':'Inference treats panel units as independent clusters.'} Simultaneous bands cover the effects within each reported family; overall ATT intervals are pointwise.`)
         break
       }
       if (prepared.kind !== 'prepared-panel') {

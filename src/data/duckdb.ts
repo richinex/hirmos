@@ -699,6 +699,7 @@ export async function materializePanelLong(
   outcomeColumnId: ColumnId,
   treatmentColumnId: ColumnId,
   covariateIds: readonly ColumnId[] = [],
+  clusterColumnId?: ColumnId,
 ): Promise<Result<PanelLongMatrix, PanelDataProblem>> {
   const duplicate = firstDuplicate([unitColumnId, timeColumnId, outcomeColumnId, treatmentColumnId, ...covariateIds])
   if (duplicate !== null) return err({ kind: 'duplicate-column', id: duplicate })
@@ -715,6 +716,9 @@ export async function materializePanelLong(
   const outcomeColumn = boundOutcome.value
   const treatmentColumn = boundTreatment.value
   const numericColumns = [outcomeColumn, treatmentColumn]
+  const boundCluster = clusterColumnId === undefined ? null : panelColumn(profile, clusterColumnId)
+  if (boundCluster !== null && !boundCluster.ok) return boundCluster
+  const clusterColumn = boundCluster?.value ?? null
   for (const id of covariateIds) {
     const bound = panelColumn(profile, id)
     if (!bound.ok) return bound
@@ -741,6 +745,7 @@ export async function materializePanelLong(
       SELECT CAST(${unit} AS VARCHAR) AS unit_label,
              (dense_rank() OVER (ORDER BY ${time}) - 1)::INTEGER AS time_code,
              CAST(${time} AS VARCHAR) AS time_label,
+             ${clusterColumn === null ? '' : `CAST(${sqlIdentifier(clusterColumn.name)} AS VARCHAR) AS cluster_label,`}
              ${numericProjection}
       FROM ${relation}
     `)
@@ -748,6 +753,8 @@ export async function materializePanelLong(
     const timeVector = table.getChild('time_code')
     const timeLabelVector = table.getChild('time_label')
     const numericVectors = numericColumns.map((column, index) => ({ column, vector: table.getChild(`value_${index}`) }))
+    const clusterVector = clusterColumn === null ? null : table.getChild('cluster_label')
+    const clusterLabels: string[] = []
     const units: string[] = []
     const periodCodes: number[] = []
     const periodsByCode = new Map<number, string>()
@@ -755,6 +762,11 @@ export async function materializePanelLong(
     let problem: PanelDataProblem | null = null
     for (let row = 0; row < table.numRows; row += 1) {
       const unitValue = unitVector?.get(row)
+      if (clusterColumn !== null) {
+        const label = clusterVector?.get(row)
+        if (label === null || label === undefined || String(label) === '') { problem = { kind: 'missing-key', name: clusterColumn.name, row }; break }
+        clusterLabels.push(String(label))
+      }
       const timeValue = timeVector?.get(row)
       const timeLabel = timeLabelVector?.get(row)
       if (unitValue === null || unitValue === undefined || String(unitValue) === '') { problem = { kind: 'missing-key', name: unitColumn.name, row }; break }
@@ -782,7 +794,7 @@ export async function materializePanelLong(
       .map(([code, label]): PanelPeriod => ({ code, label }))
     outcome = problem !== null || !isNonEmpty(units) || !isNonEmpty(periodCodes) || !isNonEmpty(periods)
       ? err(problem ?? { kind: 'panel-data-failed', detail: 'The panel query returned no rows.' })
-      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods, values, covariates: covariateIds })
+      : ok({ kind: 'panel-long-matrix', sourceFingerprint: profile.source.fingerprint, rowCount: table.numRows, units, periodCodes, periods, values, covariates: covariateIds, ...(clusterColumnId === undefined ? {} : { cluster: { column: clusterColumnId, labels: clusterLabels } }) })
   } catch (cause) { outcome = err({ kind: 'panel-data-failed', detail: detailOf(cause) }) }
   try { if (connection !== null) await connection.close(); await running.value.db.dropFile(registeredPath) } catch (cause) {
     return err({ kind: 'panel-data-failed', detail: `Panel cleanup failed: ${detailOf(cause)}` })

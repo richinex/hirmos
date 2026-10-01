@@ -958,6 +958,9 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         const result=staggeredEvidenceSchema.safeParse(raw)
         if(!result.success) {fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
         if(result.data.observations!==command.model.rows || result.data.covariates!==command.model.columns-1 || !sameStaggeredSpecification(result.data.specification,command.model.specification)) {fail(command.request,{kind:'worker-protocol-failed',detail:'The staggered DiD result does not match its requested specification.'});return}
+        const retained = new Set(result.data.units)
+        const clusterCount = new Set(command.model.units.flatMap((unit,i)=>retained.has(unit)?[command.model.clusters===null?unit:command.model.clusters[i]!]:[])).size
+        if(clusterCount!==result.data.clusterCount){fail(command.request,{kind:'worker-protocol-failed',detail:'The reported clusters do not match the retained panel units.'});return}
         emit({kind:'staggered-did-succeeded',request:command.request,result:result.data});return
       }
       case 'panel-adjusted':

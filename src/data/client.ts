@@ -375,11 +375,11 @@ export function inspectPanelInWorker(file: File, profile: DatasetProfile, unitCo
   })
 }
 
-export function materializePanelInWorker(file: File, profile: DatasetProfile, columns: { readonly unit: ColumnId; readonly time: ColumnId; readonly outcome: ColumnId; readonly treatment: ColumnId; readonly covariates?: readonly ColumnId[] }): Promise<PanelMaterializationOutcome> {
+export function materializePanelInWorker(file: File, profile: DatasetProfile, columns: { readonly unit: ColumnId; readonly time: ColumnId; readonly outcome: ColumnId; readonly treatment: ColumnId; readonly covariates?: readonly ColumnId[]; readonly clusterColumn?: ColumnId }): Promise<PanelMaterializationOutcome> {
   const request = newImportRequestId()
   return new Promise((resolve) => {
     pending.set(request, { kind: 'panel-materialization', profile, resolve })
-    const command: DataWorkerCommand = { kind: 'materialize-panel', request, file, profile, unitColumn: columns.unit, timeColumn: columns.time, outcomeColumn: columns.outcome, treatmentColumn: columns.treatment, covariates: columns.covariates ?? [] }
+    const command: DataWorkerCommand = { kind: 'materialize-panel', request, file, profile, unitColumn: columns.unit, timeColumn: columns.time, outcomeColumn: columns.outcome, treatmentColumn: columns.treatment, covariates: columns.covariates ?? [], clusterColumn: columns.clusterColumn }
     try { dataWorker().postMessage(command) } catch (cause: unknown) {
       pending.delete(request); resolve(err({ kind: 'worker-unavailable', detail: cause instanceof Error ? cause.message : String(cause) }))
     }

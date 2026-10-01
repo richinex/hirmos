@@ -18,6 +18,8 @@ export interface PanelStructureEvidence {
 
 /** Long-form panel values in source-row order. Values are outcome then treatment, column-major. */
 export interface PanelLongMatrix {
+  /** Optional grouping metadata, read in the same query as the analysis values. */
+  readonly cluster?: { readonly column: ColumnId; readonly labels: readonly string[] }
   readonly covariates?: readonly ColumnId[]
   readonly kind: 'panel-long-matrix'
   readonly sourceFingerprint: SourceFingerprint
@@ -338,6 +340,7 @@ const structureSchema = z.object({
 }).strict()
 
 const longMatrixSchema = z.object({
+  cluster: z.object({ column: z.string().min(1), labels: z.array(z.string().min(1)) }).strict().optional(),
   covariates: z.array(z.string()).default([]),
   kind: z.literal('panel-long-matrix'),
   sourceFingerprint: z.string(),
@@ -348,7 +351,7 @@ const longMatrixSchema = z.object({
   values: z.instanceof(Float64Array),
 }).strict()
 
-const keyMatrixSchema = longMatrixSchema.omit({ values: true, covariates: true }).extend({ kind: z.literal('panel-key-matrix') }).strict()
+const keyMatrixSchema = longMatrixSchema.omit({ values: true, covariates: true, cluster: true }).extend({ kind: z.literal('panel-key-matrix') }).strict()
 
 /** Rows are 0-based source indices; messages print them 1-based, as the preview table and the Rust façade do. */
 export const panelDataProblemSchema = z.discriminatedUnion('kind', [
@@ -402,6 +405,10 @@ export function parsePanelStructure(value: unknown, profile: DatasetProfile): Re
 export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): Result<PanelLongMatrix, PanelBoundaryProblem> {
   const parsed = longMatrixSchema.safeParse(value)
   if (!parsed.success) return err({ kind: 'invalid-panel-boundary', detail: z.prettifyError(parsed.error) })
+  const clusterColumn = parsed.data.cluster === undefined ? null : bindColumn(profile, parsed.data.cluster.column)
+  if (parsed.data.cluster !== undefined && (clusterColumn === null || parsed.data.cluster.labels.length !== parsed.data.rowCount)) {
+    return err({ kind: 'invalid-panel-boundary', detail: 'Panel cluster labels must match the source columns and row count.' })
+  }
   if (parsed.data.sourceFingerprint !== profile.source.fingerprint || parsed.data.rowCount !== profile.rowCount) {
     return err({ kind: 'invalid-panel-boundary', detail: 'The long panel belongs to another source or row count.' })
   }
@@ -440,6 +447,7 @@ export function parsePanelLongMatrix(value: unknown, profile: DatasetProfile): R
     periods,
     values: parsed.data.values,
     covariates,
+    ...(parsed.data.cluster !== undefined && clusterColumn !== null ? { cluster: { column: clusterColumn, labels: parsed.data.cluster.labels } } : {}),
   })
 }
 

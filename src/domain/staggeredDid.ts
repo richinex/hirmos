@@ -18,8 +18,18 @@ export const staggeredSpecificationSchema = z.object({
 }).strict().refine(s => s.firstEvent === null || s.lastEvent === null || s.firstEvent <= s.lastEvent, 'The first event time must not exceed the last event time.')
 export type StaggeredSpecification = z.infer<typeof staggeredSpecificationSchema>
 export const defaultStaggeredSpecification: StaggeredSpecification = { controls:'never-treated', baseline:'varying', anticipation:0, firstEvent:null, lastEvent:null, balance:null, confidence:0.95, inference:{kind:'bootstrapSimultaneous', iterations:999, seed:731} }
-export const staggeredConfigurationSchema = z.object({kind:z.literal('panel-intervention'),primary:z.literal('staggered'),covariates:uniqueColumns,specification:staggeredSpecificationSchema}).strict()
-export interface StaggeredConfiguration { readonly kind:'panel-intervention'; readonly primary:'staggered'; readonly covariates:readonly ColumnId[]; readonly specification:StaggeredSpecification }
+const clusteringSchema = z.discriminatedUnion('kind', [
+  z.object({kind:z.literal('unit')}).strict(),
+  z.object({kind:z.literal('column'),column:z.string().min(1)}).strict(),
+])
+export type StaggeredClustering = { readonly kind:'unit' } | { readonly kind:'column'; readonly column:ColumnId }
+const legacyConfigurationSchema = z.object({kind:z.literal('panel-intervention'),primary:z.literal('staggered'),covariates:uniqueColumns,specification:staggeredSpecificationSchema}).strict()
+// Missing clustering is accepted only as the historical, unit-clustered format.
+export const staggeredConfigurationSchema = z.union([
+  legacyConfigurationSchema,
+  legacyConfigurationSchema.extend({clustering:clusteringSchema}).strict(),
+]).refine(c => !('clustering' in c && c.clustering.kind === 'column' && c.specification.inference.kind === 'analytical'), 'Additional clustering requires bootstrap inference.')
+export interface StaggeredConfiguration { readonly kind:'panel-intervention'; readonly primary:'staggered'; readonly covariates:readonly ColumnId[]; readonly specification:StaggeredSpecification; readonly clustering?:StaggeredClustering }
 
 export const staggeredIntervalSchema = z.discriminatedUnion('kind', [
   z.object({kind:z.literal('reference')}).strict(),
@@ -68,9 +78,23 @@ export const staggeredRequestSchema = z.object({rows:integer.positive(),columns:
 export type StaggeredRequest = z.infer<typeof staggeredRequestSchema>
 
 /** Derive cohorts from absorbing binary assignment, never from the outcome. */
-export function staggeredInput(matrix: PanelLongMatrix, specification:StaggeredSpecification): Result<{readonly values:Float64Array; readonly model:StaggeredRequest},string> {
+export function staggeredInput(matrix: PanelLongMatrix, specification:StaggeredSpecification, clustering:StaggeredClustering = {kind:'unit'}): Result<{readonly values:Float64Array; readonly model:StaggeredRequest},string> {
   const rows=matrix.rowCount, columns=matrix.values.length/rows
   if(!Number.isInteger(columns)||columns<2||matrix.units.length!==rows||matrix.periodCodes.length!==rows) return err('The panel values and keys are not aligned.')
+  let clusters: readonly string[] | null = null
+  if (clustering.kind === 'column') {
+    if (specification.inference.kind === 'analytical') return err('Additional clustering requires bootstrap inference. Choose pointwise or simultaneous bootstrap.')
+    if (matrix.cluster === undefined || matrix.cluster.column !== clustering.column || matrix.cluster.labels.length !== rows) return err('Cluster labels must be read with the panel values from the selected column.')
+    clusters = matrix.cluster.labels
+    const byUnit = new Map<string,string>()
+    for (let i=0;i<rows;i++) {
+      const label=clusters[i]!,unit=matrix.units[i]!
+      if (label.length === 0) return err('Every panel row needs an observed cluster label.')
+      if (byUnit.has(unit) && byUnit.get(unit)!==label) return err(`Cluster membership changes for ${unit}. Each unit must remain in one cluster.`)
+      byUnit.set(unit,label)
+    }
+    if (new Set(clusters).size < 2) return err('Clustered inference requires at least two clusters.')
+  } else if (matrix.cluster !== undefined) return err('The materialized cluster column does not match unit-level clustering.')
   const byUnit=new Map<string,Map<number,number>>()
   for(let i=0;i<rows;i++) {
     const unit=matrix.units[i]!,time=matrix.periodCodes[i]!,treatment=matrix.values[rows+i]!
@@ -94,7 +118,7 @@ export function staggeredInput(matrix: PanelLongMatrix, specification:StaggeredS
   values.set(matrix.values.subarray(0,rows))
   values.set(matrix.values.subarray(2*rows),rows)
   if(values.some(v=>!Number.isFinite(v))) return err('Outcomes and covariates must be observed for every unit and period.')
-  const parsed=staggeredRequestSchema.safeParse({rows,columns:columns-1,units:[...matrix.units],times:[...matrix.periodCodes],adoption:matrix.units.map(unit=>adoption.get(unit)!),weights:null,clusters:null,specification})
+  const parsed=staggeredRequestSchema.safeParse({rows,columns:columns-1,units:[...matrix.units],times:[...matrix.periodCodes],adoption:matrix.units.map(unit=>adoption.get(unit)!),weights:null,clusters,specification})
   return parsed.success?ok({values,model:parsed.data}):err(z.prettifyError(parsed.error))
 }
 export function sameStaggeredSpecification(a:StaggeredSpecification,b:StaggeredSpecification):boolean {
@@ -108,6 +132,8 @@ export function staggeredRecordMatches(raw:unknown,rawStudy:unknown):boolean {
   const study=z.object({id:z.string(),estimand:target,outcome:z.object({column:z.string()}),treatment:z.object({column:z.string()})}).safeParse(rawStudy)
   if(!run.success||!study.success) return false
   const {configuration:c,evidence:e,columns,estimate}=run.data,headline=e.overall.dynamic
+  const clustered = 'clustering' in c && c.clustering.kind === 'column'
+  if (clustered ? e.clusterCount < 2 || e.specification.inference.kind === 'analytical' : e.clusterCount !== e.units.length) return false
   return run.data.study===study.data.id&&sameStaggeredSpecification(c.specification,e.specification)&&c.covariates.length===e.covariates&&columns.length===2+c.covariates.length
     && columns[0]?.column===study.data.outcome.column&&columns[1]?.column===study.data.treatment.column&&c.covariates.every((id,i)=>columns[i+2]?.column===id&&id!==study.data.outcome.column&&id!==study.data.treatment.column)
     && headline.kind!=='reference'&&estimate.effect.value===headline.estimate&&estimate.standardError===(headline.kind==='estimated'?headline.standardError:null)

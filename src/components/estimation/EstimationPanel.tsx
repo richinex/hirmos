@@ -1442,10 +1442,10 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           if (configuration.primary === 'staggered') {
             if(panelBinding===null) {dispatch({type:'run-failed',detail:'Select panel unit, time, outcome and treatment columns.'});return}
             const { materializePanelInWorker } = await import('@/data/client')
-            const materialized=await materializePanelInWorker(source.file,profile,{unit:panelBinding.unit,time:panelBinding.time,outcome:panelBinding.outcome,treatment:panelBinding.treatment,covariates:configuration.covariates})
+            const materialized=await materializePanelInWorker(source.file,profile,{unit:panelBinding.unit,time:panelBinding.time,outcome:panelBinding.outcome,treatment:panelBinding.treatment,covariates:configuration.covariates,clusterColumn:configuration.clustering?.kind==='column'?configuration.clustering.column:undefined})
             if(!session.current(current)) return
             if(!materialized.ok){dispatch({type:'run-failed',detail:describePanelDataProblem(materialized.error)});return}
-            const input=staggeredInput(materialized.value,configuration.specification)
+            const input=staggeredInput(materialized.value,configuration.specification,configuration.clustering)
             if(!input.ok){dispatch({type:'run-failed',detail:input.error});return}
             const evidence=await analysis.runStaggeredDid(input.value.values,input.value.model)
             if(!evidence.ok){dispatch({type:'run-failed',detail:describeAnalysisWorkerProblem(evidence.error)});return}
@@ -2154,12 +2154,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <div className={stepsStack}>
             <SettingsStep number={configuration.primary === 'did' ? undefined : 1} title="Choose the method">
               <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Choose the method before fitting. Conventional DiD can use one period before and one after adoption.</p>
-              <SegmentedControl wrap className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification} : primary === 'regression' || primary === 'doublyRobust'
+              <SegmentedControl wrap className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification,clustering:{kind:'unit'}} : primary === 'regression' || primary === 'doublyRobust'
                 ? { kind: 'panel-intervention', primary: 'adjusted', covariates: [], specification: primary === 'regression' ? { kind: 'regression' } : { kind: 'doublyRobust', folds: 2, seed: 1234, trimming: 0.01, normalization: 'in-sample' } }
                 : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Regression' }, { value: 'doublyRobust', label: 'Doubly robust' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'}]} />
             </SettingsStep>
             {configuration.primary === 'staggered' && <SettingsStep number={2} title="Compare cohorts">
-              <StaggeredDidControls configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} onChange={configure} />
+              <StaggeredDidControls configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} clusterCandidates={profile.columns.filter(c=>c.id!==study?.treatment.column&&c.id!==study?.outcome.column&&(prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn)))} onChange={configure} />
             </SettingsStep>}
             {configuration.primary === 'adjusted' && <SettingsStep number={2} title="Adjust for covariates">
               <AdjustedDidControls configuration={configuration} candidates={controlCandidates.filter(c => prepared.kind !== 'prepared-panel' || (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn))} onChange={configure} />
