@@ -10,34 +10,8 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 .workbench-bottom-content { --text-body: .8125rem; }
 .inspector-content :where(h3, h4) { font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--color-ink); }
 .inspector-content :where(dl > dt) { font-size: var(--text-label); font-weight: 500; }
-.dashboard-header { height: 3.75rem; background-color: var(--color-rail); color: var(--color-rail-ink); padding-inline: 1.25rem; }
-.dashboard-header { --color-ink: var(--color-rail-ink); --color-muted: var(--color-rail-faint); --color-faint: var(--color-rail-faint); --color-well: var(--color-rail-active); --color-line: var(--color-rail-active); }
 .dashboard-breadcrumb { display: flex; align-items: center; }
-/* The rail is a 5rem column of icons that the workspace leaves room for. Opened, it grows out over the stage
    with the names, as a sheet: nothing behind it reflows, and a press anywhere off it puts it away. */
-.dashboard-sidebar { position: absolute; inset-block: 0; left: 0; width: 5rem; display: flex; flex-direction: column; background-color: var(--color-rail); min-height: 0; z-index: var(--z-overlay); transition: width var(--motion-base) cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow var(--motion-base); }
-.dashboard-sidebar[data-open="true"] { width: 16rem; box-shadow: var(--shadow-float); }
-.dashboard-workspace { margin-left: 5rem; }
-.dashboard-brand { display: flex; height: 3.75rem; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 0 1.25rem; }
-.dashboard-sidebar { --color-ink: var(--color-rail-ink); --color-muted: var(--color-rail-faint); --color-faint: var(--color-rail-faint); --color-signal: var(--color-rail-signal); --color-well: var(--color-rail-active); --color-raised: var(--color-rail-active); }
-.dashboard-brand-mark { display: grid; place-items: center; }
-.dashboard-brand .text-title { font-family: var(--font-heading); font-weight: 500; }
-.dashboard-chapters { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 12px; }
-.dashboard-chapters { --scroll-thumb: var(--color-rail-faint); }
-.dashboard-nav-group + .dashboard-nav-group { margin-top: 20px; }
-.dashboard-nav-heading { font-size: var(--text-label); line-height: 1rem; font-weight: 700; color: var(--color-faint); margin: 0 12px 8px; }
-.dashboard-chapters ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 4px; }
-.dashboard-nav-item { position: relative; display: flex; gap: 12px; align-items: center; min-height: 2.25rem; width: 100%; border-radius: 6px; padding: 0 12px; text-align: left; font-size: var(--text-subtitle); line-height: 1.5rem; color: var(--color-muted); transition: background-color 150ms, color 150ms; }
-.dashboard-nav-item:hover:not([aria-disabled]) { color: var(--color-ink); background: var(--color-well); }
-.dashboard-nav-item[aria-current="page"] { color: var(--color-rail-signal); background: var(--color-rail-active); font-weight: 700; }
-.dashboard-nav-item[aria-disabled] { cursor: not-allowed; color: var(--color-faint); }
-.dashboard-nav-status { flex-shrink: 0; opacity: .7; }
-.dashboard-project { display: flex; gap: 4px; margin: 12px; padding: 8px; align-items: center; border-radius: 10px; background: var(--color-well); }
-.dashboard-project-link { display: flex; gap: 10px; align-items: center; min-width: 0; flex: 1; font-size: var(--text-body); color: var(--color-rail-ink); }
-.dashboard-project-link > .material-symbols-rounded { flex-shrink: 0; }
-.dashboard-nav-close { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 6px; color: var(--color-muted); }
-.dashboard-nav-close:hover { background: var(--color-raised); }
-.dashboard-scrim { position: absolute; inset: 0; background: rgb(8 15 28 / .5); z-index: var(--z-overlay); }
 .dashboard .dashboard-reading { padding: 2rem; }
 .dashboard .project-create { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1.25rem; border-radius: 12px; background: var(--color-panel); box-shadow: var(--shadow-lift); }
 .dashboard .workbench-stage { padding: 28px; }
@@ -85,16 +59,7 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 @container examples (min-width: 64rem) {
   .dashboard .example-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
-@media (min-width: 768px) {
-  .dashboard-sidebar[data-open="false"] .dashboard-nav-label, .dashboard-sidebar[data-open="false"] .dashboard-nav-status { display: none; }
-  .dashboard-sidebar[data-open="false"] .dashboard-nav-item { justify-content: center; padding-inline: 8px; }
-  .dashboard-sidebar[data-open="false"] .dashboard-project { justify-content: center; }
-}
 @media (max-width: 767px) {
-  .dashboard-sidebar { width: min(280px, 85vw); transform: translateX(-100%); transition: transform 180ms ease-out; }
-  .dashboard-sidebar[data-open="true"] { width: min(280px, 85vw); transform: translateX(0); }
-  .dashboard-workspace { margin-left: 0; }
-  .dashboard-header { height: 3.75rem; padding-inline: 1rem; }
   .dashboard .dashboard-reading { padding: 1.5rem 1rem; }
   .dashboard .example-cards { gap: 16px; }
   .dashboard .example-card { padding: 24px; }

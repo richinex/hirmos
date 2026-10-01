@@ -594,12 +594,17 @@ function App() {
         <button
           type="button"
           data-rail-toggle
-          className={iconControl('quiet', 'dashboard-menu')}
+          className={cn(
+            'relative h-10 w-10 shrink-0 rounded-full bg-rail transition-opacity hover:opacity-85',
+            'before:absolute before:left-3 before:h-[2px] before:w-4 before:rounded-full before:bg-rail-ink before:transition-[top,transform] before:duration-(--motion-base) before:content-[""]',
+            'after:absolute after:left-3 after:h-[2px] after:w-4 after:rounded-full after:bg-rail-ink after:transition-[top,transform] after:duration-(--motion-base) after:content-[""]',
+            navOpen ? 'before:top-[19px] before:rotate-[135deg] after:top-[19px] after:-rotate-[135deg]' : 'before:top-[15px] after:top-[23px]',
+          )}
           aria-label={navOpen ? 'Collapse section list' : 'Expand section list'}
           aria-expanded={navOpen}
           title={`${navOpen ? 'Collapse' : 'Expand'} section list (⌘B)`}
           onClick={() => setNavOpen((open) => !open)}
-        ><Icon name={navOpen ? 'left_panel_close' : 'left_panel_open'} size={20} /></button>
+        />
         <span className="dashboard-breadcrumb min-w-0 truncate text-body text-muted">
           {project !== null && <span className="hidden min-w-0 items-center sm:inline-flex"><span className="truncate">{project.name}</span><Icon name="chevron_right" size={16} className="mx-2" /></span>}
           <span className="font-medium text-ink">{activeName}</span>
