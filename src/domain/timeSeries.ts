@@ -1,4 +1,5 @@
 import {countRegressionRequestSchema,countRegressionEvidenceSchema,sameCountRequest} from './countRegression'
+import {panelRegressionRequestSchema,panelRegressionEvidenceSchema,baconRequestSchema,baconEvidenceSchema,panelRegressionDraftSchema,sameSpecification,regressionControlsMatch,baconControlsMatch} from './panelRegression'
 import { z } from 'zod'
 import { plotTimeSchema } from './longRun'
 import { ardlModelRequestSchema, ardlModelEvidenceSchema } from './ardlModel'
@@ -30,6 +31,8 @@ export const ARDL_TERMS = {
 export type ArdlTerms = keyof typeof ARDL_TERMS
 
 export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
+  z.object({...identity,kind:z.literal('panel-regression'),controls:panelRegressionDraftSchema,outcome:column,variables:z.array(column).min(1),specification:panelRegressionRequestSchema,evidence:panelRegressionEvidenceSchema}).strict(),
+  z.object({...identity,kind:z.literal('bacon'),controls:panelRegressionDraftSchema,outcome:column,variables:z.array(column).min(2),periods:z.array(z.string()).min(1),specification:baconRequestSchema,evidence:baconEvidenceSchema}).strict(),
   z.object({...identity,kind:z.literal('count-regression'),outcome:column,variables:z.array(column).min(1),periods:z.array(z.string()),specification:countRegressionRequestSchema,evidence:countRegressionEvidenceSchema}).strict(),
   z.object({
     ...identity, kind: z.literal('ardl-model'), outcome: column,
@@ -74,6 +77,16 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
   const fail = (message: string) => ctx.addIssue({ code: 'custom', message })
   if (run.plotTime !== undefined && run.plotTime.values.length !== run.evidence.observations) fail('Chart dates must match the prepared observations.')
   switch (run.kind) {
+    case 'panel-regression':
+      if(!regressionControlsMatch(run.controls,run.specification,run.variables))fail('The saved regression controls cannot reproduce its specification.')
+      if(run.controls.model.kind!==run.specification.specification.kind||run.controls.outcome!==run.outcome.id||Number(run.controls.confidence)!==run.specification.confidence)fail('Saved controls disagree with the regression specification.')
+      if(!sameSpecification(run.specification,run.evidence.request)||run.variables[run.specification.outcome]?.id!==run.outcome.id||run.variables.length>run.specification.columns||run.variables.length<run.specification.columns-1||run.variables.some((v,i)=>v.name!==run.specification.names[i]))fail('The regression result does not match its saved columns and specification.')
+      return
+    case 'bacon':
+      if(!baconControlsMatch(run.controls,run.specification,run.variables))fail('The saved decomposition controls cannot reproduce its specification.')
+      if(run.controls.model.kind!=='bacon'||run.controls.outcome!==run.outcome.id)fail('Saved controls disagree with the decomposition specification.')
+      if(!sameSpecification(run.specification.specification,run.evidence.specification)||run.evidence.observations!==run.specification.rows||run.variables.length!==run.specification.columns||run.variables[run.specification.outcome]?.id!==run.outcome.id)fail('The decomposition does not match its saved columns and specification.')
+      return
     case 'count-regression': {
       if(!sameCountRequest(run.specification,run.evidence.request)||run.variables.length!==run.specification.columns||new Set(run.variables.map(c=>c.id)).size!==run.variables.length||run.variables[run.specification.outcome]?.id!==run.outcome.id)fail('The saved count regression does not match its variables and specification.')
       return
@@ -169,6 +182,8 @@ export function parseTimeSeriesRun(value: unknown): Result<TimeSeriesRun, string
 
 export const timeSeriesRunLabel = (run: TimeSeriesRun): string => {
   switch (run.kind) {
+    case 'panel-regression': return `${run.specification.specification.kind==='eventStudy'?'Regression event study':'Interaction regression'} for ${run.outcome.name}`
+    case 'bacon': return `Goodman–Bacon decomposition for ${run.outcome.name}`
     case 'count-regression': return `Count regression for ${run.outcome.name}`
     case 'ardl-model': return `ARDL for ${run.outcome.name}`
     case 'ardl': return `ARDL for ${run.outcome.name} and ${run.predictor.name}`

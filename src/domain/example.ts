@@ -1,5 +1,5 @@
 import type { PersistedProject, SavedProjectHeader } from '@/domain/persistence'
-import { assertNever, err, ok, type Result } from '@/domain/dop'
+import { err, ok, type Result } from '@/domain/dop'
 
 /**
  * The shipped examples: complete walkthroughs, each a project bundle with its source file inside.
@@ -90,7 +90,7 @@ export const SHIPPED_EXAMPLES: readonly [ShippedExample, ...ShippedExample[]] = 
     name: 'AI adoption, March cohort',
     sourceName: 'cohort-march.csv',
     bundleUrl: '/examples/ai-adoption-cohort.hirmos.json',
-    question: 'intervention', approach: 'Panel DiD and synthetic DiD', shape: 'panel', size: '6 teams × 24 months', estimationRuns: 1, glyph: 'panel', collection: 'ai-code-quality',
+    question: 'intervention', approach: 'Conventional and synthetic DiD (ATT)', shape: 'panel', size: '6 teams × 24 months', estimationRuns: 2, glyph: 'panel', collection: 'ai-code-quality',
   },
   {
     id: id('c1d8e7f2-3a49-4b6d-8e5f-4f1b2c3d6a93'),
@@ -191,8 +191,7 @@ export const shippedExampleById = (candidate: SavedProjectHeader['id']): Shipped
   SHIPPED_EXAMPLES.find((example) => example.id === candidate) ?? null
 
 export type ExampleCopyAssessment =
-  | { readonly kind: 'current-release'; readonly snapshot: PersistedProject }
-  | { readonly kind: 'replace-with-shipped'; readonly reason: 'missing-stamp' | 'different-release' }
+  | { readonly kind: 'saved-copy'; readonly snapshot: PersistedProject }
   | { readonly kind: 'invalid-copy'; readonly detail: string }
 
 export type ExampleStampProblem = { readonly kind: 'wrong-project'; readonly actual: SavedProjectHeader['id'] }
@@ -209,24 +208,15 @@ export function stampExampleRelease(
 
 /**
  * Decide what opening a built-in example means; the caller performs the selected storage action.
- * The release identity is the export that produced the bundle: edits keep the stamp, so a copy of
- * this release is kept with them, while a copy of an older release, or one with no stamp at all,
- * is replaced so newly completed chapters are not hidden behind stale browser state.
+ * Opening retains the saved copy, including edits to an older or unstamped release.
+ * Only the separately confirmed Reset action may replace it with the shipped example.
  */
 export function assessExampleCopy(
   stored: PersistedProject,
-  shippedExportedAt: string,
   exampleId: SavedProjectHeader['id'] = EXAMPLE_PROJECT_ID,
 ): ExampleCopyAssessment {
   if (stored.project.id !== exampleId) {
     return { kind: 'invalid-copy', detail: 'The record stored under the example key belongs to another project.' }
   }
-  switch (stored.origin.kind) {
-    case 'user': return { kind: 'replace-with-shipped', reason: 'missing-stamp' }
-    case 'shipped-example':
-      return stored.origin.exportedAt === shippedExportedAt
-        ? { kind: 'current-release', snapshot: stored }
-        : { kind: 'replace-with-shipped', reason: 'different-release' }
-    default: return assertNever(stored.origin)
-  }
+  return { kind: 'saved-copy', snapshot: stored }
 }

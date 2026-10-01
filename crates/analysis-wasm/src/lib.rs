@@ -78,9 +78,9 @@ use hirmos_causal_core::{
 use hirmos_causal_core::{
     backdoor_linear_ate, dagitty_adjustment_sets, durbin_watson, identify_conditional_outcomes,
     identify_frontdoor_set, identify_instrument_set, identify_outcomes, infer_kappa_t,
-    infer_kappa_y, latent_projection, ols_hac, refute_data_subset, refute_placebo,
+    infer_kappa_y, latent_projection, ols_cluster, ols_hac, ols_hc1, ols_two_way, ols_within, refute_data_subset, refute_placebo,
     refute_random_common_cause, shapiro, unobserved_common_cause_grid, AdjustmentSetAnalysis, Dag,
-    IdentificationError,
+    IdentificationError, WithinErrors,
 };
 use hirmos_causal_core::{cluster_redundant, correlation_matrix, vif_redundant};
 use nalgebra::DMatrix;
@@ -108,6 +108,8 @@ pub fn score_forest_tuning(batch: &str, index: usize) -> Result<String, JsValue>
 
 mod missingness;
 mod staggered_did;
+mod bacon;
+mod panel_regression;
 mod count_regression;
 mod calendar;
 
@@ -660,6 +662,7 @@ pub fn run_analysis(
             hac_max_lags,
             level,
             error_model,
+            fixed_effects,
         } => backdoor_linear(
             values,
             rows,
@@ -670,6 +673,7 @@ pub fn run_analysis(
             hac_max_lags,
             level,
             error_model,
+            fixed_effects,
         ),
         AnalysisCommand::PropensityWeighting {
             rows,
@@ -1077,6 +1081,8 @@ pub fn run_analysis(
         AnalysisCommand::PanelAdjusted { rows, columns, units, times, specification } => panel_adjusted(values, rows, columns, &units, &times, specification),
         AnalysisCommand::CountRegression { request } => count_regression::run(values, request).map(|evidence| AnalysisResult::CountRegression { evidence }),
         AnalysisCommand::StaggeredDid { request } => staggered_did::run(values, request).map(|evidence| AnalysisResult::StaggeredDid { evidence }),
+        AnalysisCommand::Bacon { request } => bacon::run(values, request).map(|evidence| AnalysisResult::Bacon { evidence }),
+        AnalysisCommand::PanelRegression { request } => panel_regression::run(values, request).map(|evidence| AnalysisResult::PanelRegression { evidence }),
         AnalysisCommand::PanelIntervention {
             primary,
             rows,

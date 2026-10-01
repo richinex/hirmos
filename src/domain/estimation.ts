@@ -54,22 +54,66 @@ export type EstimationRunId = Brand<string, 'EstimationRunId'>
 
 /**
  * How the adjusted regression's errors are treated: independent (the classical interval),
- * serially correlated with a Newey–West interval, or an ARMA(p, q) process fitted jointly with
- * the coefficients by maximum likelihood, whose coefficient and interval then replace the OLS ones.
+ * heteroskedastic (the HC1 interval), correlated within the clusters a column names (the
+ * clustered interval), serially correlated with a Newey–West interval, or an ARMA(p, q) process
+ * fitted jointly with the coefficients by maximum likelihood, whose coefficient and interval then
+ * replace the OLS ones.
  */
 export type LinearErrors =
   | { readonly kind: 'classical' }
+  | { readonly kind: 'hc1' }
+  | { readonly kind: 'cluster'; readonly column: ColumnId; readonly name: string }
   | { readonly kind: 'hac' }
   | { readonly kind: 'arma'; readonly p: number; readonly q: number; readonly maxIter: number }
 export type CovarianceChoice = LinearErrors['kind']
 
+/** The fixed effects the regression absorbs: none, one per unit, or one per unit and one per period; the label columns stay outside the design. */
+export type FixedEffects =
+  | { readonly kind: 'none' }
+  | { readonly kind: 'time'; readonly column: ColumnId; readonly name: string }
+  | { readonly kind: 'unit'; readonly column: ColumnId; readonly name: string }
+  | { readonly kind: 'unit-and-time'; readonly column: ColumnId; readonly name: string; readonly timeColumn: ColumnId; readonly timeName: string }
+
 export const CONFIDENCE_LEVEL = 0.95
+
+export function selectFixedEffects(kind: FixedEffects['kind'], first: { readonly id: ColumnId; readonly name: string } | null, second: { readonly id: ColumnId; readonly name: string } | null): Result<FixedEffects, { readonly kind: 'missing-column' | 'duplicate-columns' }> {
+  switch (kind) {
+    case 'none': return ok({ kind })
+    case 'unit':
+    case 'time': return first === null ? err({ kind: 'missing-column' }) : ok({ kind, column: first.id, name: first.name })
+    case 'unit-and-time':
+      if (first === null || second === null) return err({ kind: 'missing-column' })
+      return first.id === second.id ? err({ kind: 'duplicate-columns' }) : ok({ kind, column: first.id, name: first.name, timeColumn: second.id, timeName: second.name })
+    default: return assertNever(kind)
+  }
+}
 
 export interface BackdoorLinearConfiguration {
   readonly kind: 'backdoor-linear-regression'
   readonly errors: LinearErrors
+  readonly fixedEffects: FixedEffects
   readonly level: typeof CONFIDENCE_LEVEL
 }
+
+/** Persisted configurations are parsed before they can become runnable state. */
+export const backdoorLinearConfigurationSchema = z.object({
+  kind: z.literal('backdoor-linear-regression'),
+  level: z.literal(0.95),
+  errors: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('classical') }).strict(),
+    z.object({ kind: z.literal('hc1') }).strict(),
+    z.object({ kind: z.literal('hac') }).strict(),
+    z.object({ kind: z.literal('cluster'), column: z.string().min(1), name: z.string().min(1) }).strict(),
+    z.object({ kind: z.literal('arma'), p: z.number().int().nonnegative(), q: z.number().int().nonnegative(), maxIter: z.number().int().positive() }).strict(),
+  ]),
+  fixedEffects: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('none') }).strict(),
+    z.object({ kind: z.literal('unit'), column: z.string().min(1), name: z.string().min(1) }).strict(),
+    z.object({ kind: z.literal('time'), column: z.string().min(1), name: z.string().min(1) }).strict(),
+    z.object({ kind: z.literal('unit-and-time'), column: z.string().min(1), name: z.string().min(1), timeColumn: z.string().min(1), timeName: z.string().min(1) }).strict(),
+  ]),
+}).strict().refine(value => value.fixedEffects.kind !== 'unit-and-time' || value.fixedEffects.column !== value.fixedEffects.timeColumn, 'Unit and time columns must differ.')
+  .refine(value => value.fixedEffects.kind === 'none' || value.errors.kind !== 'hac' && value.errors.kind !== 'arma', 'Fixed effects do not support series error models.')
 
 export interface FrontdoorTwoStageConfiguration {
   readonly kind: 'frontdoor-two-stage'
@@ -603,7 +647,7 @@ export const methodIdOf = (estimator: EstimatorId): MethodId => {
 
 export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedDatasetArtifact, study: StudySpecification | null): EstimatorConfiguration => {
   switch (estimator) {
-    case 'backdoor-linear-regression': return { kind: estimator, errors: { kind: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical' }, level: CONFIDENCE_LEVEL }
+    case 'backdoor-linear-regression': return { kind: estimator, errors: { kind: prepared.kind === 'prepared-time-series' ? 'hac' : 'classical' }, fixedEffects: { kind: 'none' }, level: CONFIDENCE_LEVEL }
     case 'frontdoor-two-stage': return { kind: estimator, interventions: [0, 1], simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
     case 'instrumental-variable': return { kind: estimator, simulations: 399, sampleSizeFraction: 1, level: CONFIDENCE_LEVEL, seed: 0 }
     case 'poisson-glm':
@@ -655,7 +699,8 @@ export const defaultConfiguration = (estimator: EstimatorId, prepared: PreparedD
 export const backdoorLinearEvidenceSchema = z.object({
   kind: z.literal('backdoorLinear'),
   observations: z.number().int().positive(),
-  parameters: z.number().int().min(2),
+  /** The fitted coefficients: at least the intercept and the treatment, or the treatment alone with fixed effects. */
+  parameters: z.number().int().min(1),
   treatment: z.number().int().nonnegative(),
   outcome: z.number().int().nonnegative(),
   adjustment: z.array(z.number().int().nonnegative()),
@@ -671,9 +716,11 @@ export const backdoorLinearEvidenceSchema = z.object({
   hacInterval: z.tuple([z.number().finite(), z.number().finite()]),
   hacPValue: z.number().min(0).max(1),
   durbinWatson: z.number().finite().nonnegative(),
-  /** The same design refitted with an ARMA error process, when one was requested. */
+  /** The treatment coefficient's HC1 or clustered interval, or the design refitted with an ARMA error process, when one was requested. */
   errorModel: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('neweyWest') }).strict(),
+    z.object({ kind: z.literal('hc1'), standardError: z.number().finite().nonnegative(), interval: z.tuple([z.number().finite(), z.number().finite()]), pValue: z.number().min(0).max(1) }).strict(),
+    z.object({ kind: z.literal('cluster'), clusters: z.number().int().min(2), standardError: z.number().finite().nonnegative(), interval: z.tuple([z.number().finite(), z.number().finite()]), pValue: z.number().min(0).max(1) }).strict(),
     z.object({
       kind: z.literal('arma'),
       estimate: z.number().finite(),
@@ -682,6 +729,13 @@ export const backdoorLinearEvidenceSchema = z.object({
       pValue: z.number().min(0).max(1),
       errors: armaErrorFieldsSchema,
     }).strict(),
+  ]),
+  /** The unit column absorbed as fixed effects, with the adjustment columns that do not vary within a unit. */
+  fixedEffects: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('none') }).strict(),
+    z.object({ kind: z.literal('time'), column: z.number().int().nonnegative(), periods: z.number().int().min(2), absorbed: z.array(z.number().int().nonnegative()) }).strict(),
+    z.object({ kind: z.literal('unit'), column: z.number().int().nonnegative(), units: z.number().int().min(2), absorbed: z.array(z.number().int().nonnegative()) }).strict(),
+    z.object({ kind: z.literal('unitAndTime'), unit: z.number().int().nonnegative(), time: z.number().int().nonnegative(), units: z.number().int().min(2), periods: z.number().int().min(2), absorbed: z.array(z.number().int().nonnegative()) }).strict(),
   ]),
 }).strict()
 
@@ -2297,9 +2351,20 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
     case 'backdoor-linear-regression': {
       if (adjustment === null) violate('linear-identified-adjustment', 'No measured back-door adjustment set was found, so this adjusted regression cannot run.')
       else satisfy('linear-identified-adjustment', `Identified by back-door adjustment for ${adjustment}.`)
-      if (panel) leave('linear-serial-dependence', 'Rows repeat within units; neither interval accounts for within-unit correlation.')
-      else if (timeSeries && configuration.errors.kind === 'classical') violate('linear-serial-dependence', 'The rows are a time series and the classical interval assumes independent errors. Choose the HAC interval or an ARMA error process.')
+      if (configuration.fixedEffects.kind !== 'none') {
+        satisfy('linear-fixed-effects', configuration.fixedEffects.kind === 'time'
+          ? `Period effects account for additive differences shared by rows with the same ${configuration.fixedEffects.name}. Unit-specific differences are not absorbed.`
+          : configuration.fixedEffects.kind === 'unit'
+          ? `Unit effects account for additive differences that stay constant within each ${configuration.fixedEffects.name}. Time-varying confounding is not automatically removed.`
+          : `Unit and period effects account for additive differences between ${configuration.fixedEffects.name} groups and changes shared within each ${configuration.fixedEffects.timeName}. Unit-specific time-varying confounding is not automatically removed.`)
+        if (configuration.errors.kind === 'hac' || configuration.errors.kind === 'arma') violate('linear-serial-dependence', 'Fixed effects use the within-unit deviations of each row. Choose the classical, robust (HC1) or clustered interval.')
+      } else if (panel) leave('linear-fixed-effects', 'Rows repeat within units. Choose fixed effects by the unit column so that causes fixed within a unit drop out.')
+      else leave('linear-fixed-effects', 'Without fixed effects, a causal interpretation relies on the recorded adjustment assumptions.')
+      if (configuration.errors.kind === 'cluster') satisfy('linear-serial-dependence', `Errors may correlate within each value of ${configuration.errors.name}; the interval treats the clusters as independent.`)
+      else if (panel) leave('linear-serial-dependence', 'Rows repeat within units. Choose the clustered interval with the unit column so that errors may correlate within a unit.')
+      else if (timeSeries && configuration.errors.kind !== 'hac' && configuration.errors.kind !== 'arma') violate('linear-serial-dependence', 'The rows are a time series and this interval assumes errors that are not serially correlated. Choose the HAC interval or an ARMA error process.')
       else if (configuration.errors.kind === 'arma') satisfy('linear-serial-dependence', `An ARMA(${configuration.errors.p}, ${configuration.errors.q}) error process is fitted with the coefficients by maximum likelihood; the interval comes from that fit.`)
+      else if (configuration.errors.kind === 'hc1') satisfy('linear-serial-dependence', 'The prepared dataset contains independent rows. The interval permits error variance to differ between rows.')
       else satisfy('linear-serial-dependence', timeSeries ? 'Heteroskedasticity and autocorrelation consistent (HAC) Newey–West interval selected for time-series rows.' : 'The prepared dataset holds independent rows, so the classical interval applies.')
       satisfy('linear-hac-bandwidth', 'The run records the bandwidth from the default rule.')
       leave('linear-functional-form', 'Check linearity with the residual diagnostics in the sensitivity section.')
@@ -2383,8 +2448,8 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (configuration.primary === 'adjusted') {
         if (!adjustedDidConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the DiD covariate selection and inference settings before running.')
         const layout = context.panelPreflight.kind === 'ready' ? context.panelPreflight.layout : null
-        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1)) violate('panel-balanced-layout', 'Regression and DR DiD require exactly one before and one after period.')
-        satisfy('panel-pre-fit', 'This two-period fit does not estimate synthetic weights.')
+        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1)) violate('panel-pre-fit', 'The implemented regression and doubly robust DiD specifications require one pre-treatment and one post-treatment period. This is a method restriction, not an invalid panel grid.')
+        else if (layout !== null) satisfy('panel-pre-fit', 'The selected two-period specification has one pre-treatment and one post-treatment period.')
         if (configuration.specification.kind === 'doublyRobust') {
           if (configuration.covariates.length === 0) violate('panel-pre-fit', 'Select at least one baseline covariate for DR DiD.')
           if (layout !== null && configuration.specification.folds > Math.min(layout.controls.length, layout.treated.length)) violate('panel-pre-fit', 'The fold count cannot exceed the smaller treatment group.')
@@ -3278,8 +3343,20 @@ export function describeCovariance(errors: LinearErrors): string {
   switch (errors.kind) {
     case 'hac': return 'Newey–West HAC'
     case 'classical': return 'Classical'
+    case 'hc1': return 'Robust (HC1)'
+    case 'cluster': return `Clustered by ${errors.name}`
     case 'arma': return `ARMA(${errors.p}, ${errors.q}) errors`
     default: return assertNever(errors)
+  }
+}
+
+export function describeFixedEffects(fixedEffects: FixedEffects): string | null {
+  switch (fixedEffects.kind) {
+    case 'none': return null
+    case 'unit': return `Fixed effects by ${fixedEffects.name}`
+    case 'time': return `Time fixed effects by ${fixedEffects.name}`
+    case 'unit-and-time': return `Fixed effects by ${fixedEffects.name} and ${fixedEffects.timeName}`
+    default: return assertNever(fixedEffects)
   }
 }
 
@@ -3289,6 +3366,11 @@ export function linearReading(run: { readonly configuration: BackdoorLinearConfi
   switch (run.configuration.errors.kind) {
     case 'classical': return { estimate: evidence.estimate, standardError: evidence.standardError, interval: evidence.interval }
     case 'hac': return { estimate: evidence.estimate, standardError: evidence.hacStandardError, interval: evidence.hacInterval }
+    case 'hc1':
+    case 'cluster': {
+      const model = evidence.errorModel
+      return model.kind === run.configuration.errors.kind ? { estimate: evidence.estimate, standardError: model.standardError, interval: model.interval } : null
+    }
     case 'arma': {
       const reading = armaReading(run)
       return reading === null ? null : { estimate: reading.estimate, standardError: reading.standardError, interval: reading.interval }

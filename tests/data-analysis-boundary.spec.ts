@@ -213,6 +213,9 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
   await page.goto('/app')
   const raw = await page.evaluate(async () => {
     const persistence = await import(new URL('/src/domain/persistence.ts', window.location.href).href)
+    const bundle = await (await fetch('/examples/seatbelts.hirmos.json')).json()
+    const regression = bundle.project.estimationRuns.find((run: { kind: string }) => run.kind === 'backdoor-linear-run')
+    if (regression === undefined) throw Error('Missing reference regression')
     const parsed = persistence.parseSnapshotValue({
       kind: 'hirmos-project',
       version: 1,
@@ -230,7 +233,7 @@ test('upgrades saved version-1 transformation fields at the persistence boundary
       studyDraft: {},
       studies: [],
       identifications: [],
-      estimationRuns: [{ id: 'run', kind: 'backdoor-linear-run', estimate: { adjustmentSet: [{ node: 'node-z', column: 'z', name: 'Z' }] } }],
+      estimationRuns: [{ ...regression, estimate: { ...regression.estimate, adjustment: undefined, adjustmentSet: [{ node: 'node-z', column: 'z', name: 'Z' }] } }],
       sensitivityRuns: [],
       counterfactualRuns: [],
     })
@@ -292,7 +295,7 @@ test('opens the shipped example Estimation chapter without the compatibility bou
   await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
 })
 
-test('replaces an unstamped saved example even when it has the shipped project creation time', async ({ page }, testInfo) => {
+test('preserves an unstamped saved example even when it has the shipped project creation time', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Example release compatibility runs once')
   await page.goto('/app')
   await page.evaluate(async () => {
@@ -320,9 +323,8 @@ test('replaces an unstamped saved example even when it has the shipped project c
   await page.reload()
 
   await page.getByRole('button', { name: 'Open Seat-belt law and road deaths', exact: true }).click()
-  await expect(page.getByText('The example changed in this build, so your earlier copy was replaced.')).toBeVisible()
-  await page.getByRole('navigation', { name: 'Workspace sections' }).getByRole('button', { name: /Estimation/ }).click()
-  await expect(page.getByText('Runs (2)', { exact: true })).toBeVisible()
+  await expect(page.locator('#data-profile-title')).toBeVisible()
+  await expect(page.getByText('The example changed in this build, so your earlier copy was replaced.')).toHaveCount(0)
 
   const releases = await page.evaluate(async () => {
     const [exampleModule, bundleModule, store] = await Promise.all([
@@ -338,11 +340,15 @@ test('replaces an unstamped saved example even when it has the shipped project c
       storedCreatedAt: stored.value.project.createdAt,
       shippedCreatedAt: shipped.value.project.project.createdAt,
       storedOrigin: stored.value.origin,
+      runs: stored.value.estimationRuns,
+      studies: stored.value.studies,
       shippedExportedAt: shipped.value.exportedAt,
     }
   })
   expect(releases.storedCreatedAt).toBe(releases.shippedCreatedAt)
-  expect(releases.storedOrigin).toEqual({ kind: 'shipped-example', exportedAt: releases.shippedExportedAt })
+  expect(releases.storedOrigin).toEqual({ kind: 'user' })
+  expect(releases.runs).toEqual([])
+  expect(releases.studies).toEqual([])
 })
 
 test('opening an unchanged project preserves its saved time', async ({ page }, testInfo) => {
@@ -386,7 +392,7 @@ test('opening an unchanged project preserves its saved time', async ({ page }, t
   expect(savedAt).toBe(originalSavedAt)
 })
 
-test('classifies current, different and missing example release stamps explicitly', async ({ page }, testInfo) => {
+test('preserves current, different and missing example release stamps on opening', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Example release decisions run once')
   await page.goto('/app')
   const assessments = await page.evaluate(async () => {
@@ -399,7 +405,7 @@ test('classifies current, different and missing example release stamps explicitl
     if (!parsed.ok) throw new Error(`Example bundle failed: ${parsed.error.kind}`)
     const stamped = exampleModule.stampExampleRelease(parsed.value.project, parsed.value.exportedAt)
     if (!stamped.ok) throw new Error(`Example could not be stamped: ${stamped.error.kind}`)
-    const current = exampleModule.assessExampleCopy(stamped.value, parsed.value.exportedAt)
+    const current = exampleModule.assessExampleCopy(stamped.value)
     const reexported = bundleModule.buildBundle(stamped.value, { kind: 'not-included' }, '2026-09-04T12:00:00.000Z')
     const reimported = bundleModule.parseBundle(bundleModule.serialiseBundle(reexported))
     if (!reimported.ok) throw new Error(`Re-exported example failed: ${reimported.error.kind}`)
@@ -407,16 +413,19 @@ test('classifies current, different and missing example release stamps explicitl
       current: current.kind,
       different: exampleModule.assessExampleCopy(
         { ...stamped.value, origin: { kind: 'shipped-example', exportedAt: '2026-01-01T00:00:00.000Z' } },
-        parsed.value.exportedAt,
-      ),
-      missing: exampleModule.assessExampleCopy({ ...stamped.value, origin: { kind: 'user' } }, parsed.value.exportedAt),
-      reimported: exampleModule.assessExampleCopy(reimported.value.project, parsed.value.exportedAt).kind,
+      ).kind,
+      missing: exampleModule.assessExampleCopy({ ...stamped.value, origin: { kind: 'user' } }).kind,
+      reimported: exampleModule.assessExampleCopy(reimported.value.project).kind,
+      wrongProject: exampleModule.assessExampleCopy(stamped.value, 'wrong-project').kind,
+      unchanged: current.snapshot === stamped.value,
     }
   })
-  expect(assessments.current).toBe('current-release')
-  expect(assessments.different).toEqual({ kind: 'replace-with-shipped', reason: 'different-release' })
-  expect(assessments.missing).toEqual({ kind: 'replace-with-shipped', reason: 'missing-stamp' })
-  expect(assessments.reimported).toBe('current-release')
+  expect(assessments.current).toBe('saved-copy')
+  expect(assessments.different).toBe('saved-copy')
+  expect(assessments.missing).toBe('saved-copy')
+  expect(assessments.reimported).toBe('saved-copy')
+  expect(assessments.wrongProject).toBe('invalid-copy')
+  expect(assessments.unchanged).toBe(true)
 })
 
 test('serves workbench deep links without changing their paths', async ({ page }, testInfo) => {

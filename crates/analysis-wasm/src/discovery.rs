@@ -1812,6 +1812,8 @@ mod tests {
             | AnalysisCommand::DoublyRobust { .. }
             | AnalysisCommand::ContinuousGps { .. }
             | AnalysisCommand::StaggeredDid { .. }
+            | AnalysisCommand::Bacon { .. }
+            | AnalysisCommand::PanelRegression { .. }
             | AnalysisCommand::InterruptedSeries { .. }
             | AnalysisCommand::SharpRd { .. }
             | AnalysisCommand::StructuralCausalImpact { .. }

@@ -9,7 +9,7 @@ export type MethodFamily = 'diagnostic' | 'discovery' | 'identification' | 'esti
 export type MethodSource =
   | {
       readonly kind: 'reference-implementation'
-      readonly repository: 'statsmodels' | 'tigramite' | 'lingam' | 'dowhy' | 'pyro' | 'ruptures' | 'pgmpy' | 'econml' | 'causationentropy' | 'causalnex' | 'synthdid'
+      readonly repository: 'statsmodels' | 'tigramite' | 'lingam' | 'dowhy' | 'pyro' | 'ruptures' | 'pgmpy' | 'econml' | 'causationentropy' | 'causalnex' | 'synthdid' | 'linearmodels'
       readonly revision: string
       readonly locator: string
     }
@@ -134,6 +134,8 @@ const econml = (locator: string): MethodSource => ({ kind: 'reference-implementa
 const causationEntropy = (locator: string): MethodSource => ({ kind: 'reference-implementation', repository: 'causationentropy', revision: CAUSATION_ENTROPY_REVISION, locator })
 const causalnex = (locator: string): MethodSource => ({ kind: 'reference-implementation', repository: 'causalnex', revision: CAUSALNEX_REVISION, locator })
 const synthdid = (locator: string): MethodSource => ({ kind: 'reference-implementation', repository: 'synthdid', revision: SYNTHDID_REVISION, locator })
+const LINEARMODELS_REVISION = 'v6.1'
+const linearmodels = (locator: string): MethodSource => ({ kind: 'reference-implementation', repository: 'linearmodels', revision: LINEARMODELS_REVISION, locator })
 
 const hirmos = (locator: string): MethodSource => ({ kind: 'hirmos-constraint', locator })
 
@@ -245,6 +247,9 @@ const FACURE_CH5 = (locator: string): MethodSource => paper('Causal Inference in
 const ROSENBAUM_RUBIN_1983 = paper('The central role of the propensity score in observational studies for causal effects (Rosenbaum and Rubin, 1983)', 'Biometrika 70(1), 41\u201355')
 const HIRANO_IMBENS_2004 = paper('The propensity score with continuous treatments (Hirano and Imbens, 2004)', 'Applied Bayesian Modeling and Causal Inference, 73\u201384')
 const NEWEY_WEST_1987 = paper('A Simple, Positive Semi-definite, Heteroskedasticity and Autocorrelation Consistent Covariance Matrix (Newey and West, 1987)', 'Econometrica 55(3), 703–708')
+const MACKINNON_WHITE_1985 = paper('Some heteroskedasticity-consistent covariance matrix estimators with improved finite sample properties (MacKinnon and White, 1985)', 'Journal of Econometrics 29(3), 305–325')
+const CAMERON_MILLER_2015 = paper('A Practitioner’s Guide to Cluster-Robust Inference (Cameron and Miller, 2015)', 'Journal of Human Resources 50(2), 317–372')
+const WOOLDRIDGE_2010 = paper('Econometric Analysis of Cross Section and Panel Data, second edition (Wooldridge, 2010)', 'MIT Press, §10.5 fixed effects methods')
 const GRANGER_NEWBOLD_1974 = paper('Spurious regressions in econometrics (Granger and Newbold, 1974)', 'Journal of Econometrics 2(2), 111–120')
 const DICKEY_FULLER_1979 = paper('Distribution of the Estimators for Autoregressive Time Series with a Unit Root (Dickey and Fuller, 1979)', 'Journal of the American Statistical Association 74(366), 427–431')
 const KPSS_1992 = paper('Testing the Null Hypothesis of Stationarity against the Alternative of a Unit Root (Kwiatkowski, Phillips, Schmidt and Shin, 1992)', 'Journal of Econometrics 54(1–3), 159–178')
@@ -1423,7 +1428,7 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
   id: BACKDOOR_LINEAR_REGRESSION_METHOD_ID,
   name: 'Adjusted linear regression',
   family: 'estimation',
-  summary: 'Least squares of the outcome on the treatment and the adjustment set; the treatment coefficient is the effect, with a classical or Newey–West interval, or the same design fitted with ARMA errors by maximum likelihood.',
+  summary: 'Regress the outcome on the treatment and adjustment variables. Optional fixed effects account for additive unit differences, common period differences, or both. Choose uncertainty appropriate to the observations. A causal interpretation of the treatment coefficient depends on the identifying assumptions and the regression specification.',
   caveats: [
     {
       id: caveatId('linear-identified-adjustment'),
@@ -1431,6 +1436,13 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
       requirement: 'The covariates are an identified adjustment set; regression cannot close an open back-door path.',
       consequenceIfUnmet: 'The coefficient is an association.',
       sources: [NESS_CH11('§11.4.1 regression with back-door confounders'), RUIZ_DE_VILLA_CH7('§7.4.5 total effect theorem')],
+    },
+    {
+      id: caveatId('linear-fixed-effects'),
+      category: 'identification',
+      requirement: 'Fixed effects account for additive unit differences, common period differences, or both. Treatment must retain variation after absorbing those effects. A causal interpretation also requires appropriate adjustment and exogeneity assumptions.',
+      consequenceIfUnmet: 'Remaining confounding can bias the coefficient. If the fixed effects absorb the treatment, its coefficient cannot be estimated.',
+      sources: [WOOLDRIDGE_2010, linearmodels('linearmodels/panel/model.py#PanelOLS'), linearmodels('linearmodels/panel/covariance.py#ClusteredCovariance')],
     },
     {
       id: caveatId('linear-functional-form'),
@@ -1442,9 +1454,9 @@ const BACKDOOR_LINEAR_REGRESSION: MethodDefinition = {
     {
       id: caveatId('linear-serial-dependence'),
       category: 'noise-and-dependence',
-      requirement: 'On time-series rows use the HAC (Newey–West) interval or fit an ARMA error process with the coefficients; the classical interval assumes independent errors.',
-      consequenceIfUnmet: 'Autocorrelated errors can make classical intervals unreliable.',
-      sources: [NEWEY_WEST_1987, statsmodels('statsmodels/stats/sandwich_covariance.py#cov_hac_simple'), HYNDMAN_FPP_DHR, statsmodels('statsmodels/tsa/statespace/sarimax.py#SARIMAX')],
+      requirement: 'The interval selection aligns with the error structure: classical for independent errors with constant variance, robust (HC1) for heteroskedastic errors, clustered for repeated measures within units, and for time-series data, the HAC (Newey–West) interval or an ARMA error process fitted using the coefficients.',
+      consequenceIfUnmet: 'Heteroskedastic, clustered, or autocorrelated errors can render the classical interval unreliable.',
+      sources: [MACKINNON_WHITE_1985, CAMERON_MILLER_2015, NEWEY_WEST_1987, statsmodels('statsmodels/stats/sandwich_covariance.py#cov_hc1'), statsmodels('statsmodels/stats/sandwich_covariance.py#cov_cluster'), statsmodels('statsmodels/stats/sandwich_covariance.py#cov_hac_simple'), HYNDMAN_FPP_DHR, statsmodels('statsmodels/tsa/statespace/sarimax.py#SARIMAX')],
     },
     {
       id: caveatId('linear-hac-bandwidth'),
@@ -2221,8 +2233,8 @@ const PANEL_INTERVENTION: MethodDefinition = {
     },
     {
       id: caveatId('panel-pre-fit'), category: 'finite-sample',
-      requirement: 'Synthetic DiD needs pre-period variation to fit weights. Regression and doubly robust DiD need exactly two periods and adequate covariate support; DR DiD also needs treatment overlap within its folds.',
-      consequenceIfUnmet: 'Synthetic weights may be unstable or undefined even when conventional DID is computable.',
+      requirement: 'Synthetic DiD needs pre-period variation to fit weights. The implemented regression and doubly robust specifications require one pre-treatment and one post-treatment period, with adequate covariate support. Doubly robust DiD also needs treatment overlap within its folds.',
+      consequenceIfUnmet: 'The selected specification cannot be fitted even when the panel grid is valid and another DiD method is available.',
       sources: [ARKHANGELSKY_2021, ABADIE_2021, synthdid('R/solver.R; R/synthdid.R')],
     },
     {

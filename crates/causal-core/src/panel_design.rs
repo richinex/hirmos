@@ -1,5 +1,6 @@
 //! Deterministic complete-panel design construction. No cross-team lagging.
 use nalgebra::DMatrix;
+pub mod bacon;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, PartialEq)]
@@ -29,7 +30,107 @@ pub struct Design {
     pub reference_unit: u64,
     pub reference_period: i64,
 }
+
+/// Out-of-window treated rows either share the reference or enter endpoint bins.
+#[derive(Clone, Copy)]
+pub enum EventTails {
+    Reference,
+    Bin,
+}
+pub struct EventWindow {
+    pub first: i64,
+    pub last: i64,
+    pub reference: i64,
+    pub tails: EventTails,
+}
+/// Regressors only: the existing within fitter absorbs unit/time effects.
+pub struct EventRegressors {
+    pub matrix: DMatrix<f64>,
+    pub original_rows: Vec<usize>,
+    pub keys: Vec<(u64, i64)>,
+    pub event_periods: Vec<i64>,
+    pub support: Vec<usize>,
+}
 impl Panel {
+    /// Pooled lead/lag indicators across adoption cohorts, retaining every row.
+    /// Columns are selected covariates followed by event periods in sorted order.
+    /// This is a TWFE design, not a cohort ATT aggregation.
+    pub fn pooled_events(
+        &self,
+        adoption: &BTreeMap<u64, Option<i64>>,
+        covariates: &[usize],
+        window: EventWindow,
+    ) -> Result<EventRegressors, Error> {
+        let units: BTreeSet<_> = self.keys.iter().map(|k| k.0).collect();
+        if adoption.keys().copied().collect::<BTreeSet<_>>() != units
+            || !adoption.values().any(Option::is_some)
+            || covariates.iter().any(|c| *c >= self.values.ncols())
+            || covariates.iter().collect::<BTreeSet<_>>().len() != covariates.len()
+            || window.first >= window.last
+            || window.reference < window.first
+            || window.reference > window.last
+        {
+            return Err(Error::InvalidEvent);
+        }
+        if matches!(window.tails, EventTails::Bin)
+            && (window.reference == window.first || window.reference == window.last)
+        {
+            return Err(Error::InvalidEvent);
+        }
+        let offsets: Vec<Option<i64>> = self
+            .keys
+            .iter()
+            .map(|(u, t)| {
+                adoption[u]
+                    .map(|g| t.checked_sub(g).ok_or(Error::InvalidEvent))
+                    .transpose()
+            })
+            .collect::<Result<_, _>>()?;
+        if !offsets.contains(&Some(window.reference)) {
+            return Err(Error::UnsupportedEvent);
+        }
+        // Bound allocation by actual observations, not an arbitrary user range.
+        let observed: BTreeSet<i64> = offsets
+            .iter()
+            .flatten()
+            .copied()
+            .map(|e| match window.tails {
+                EventTails::Reference => e,
+                EventTails::Bin => e.clamp(window.first, window.last),
+            })
+            .filter(|e| *e >= window.first && *e <= window.last && *e != window.reference)
+            .collect();
+        let expected = window
+            .last
+            .checked_sub(window.first)
+            .ok_or(Error::InvalidEvent)?;
+        if observed.len() as u128 != expected as u128 {
+            return Err(Error::UnsupportedEvent);
+        }
+        let events: Vec<_> = observed.into_iter().collect();
+        let mut support = vec![0; events.len()];
+        let matrix = DMatrix::from_fn(self.keys.len(), covariates.len() + events.len(), |i, j| {
+            if j < covariates.len() {
+                return self.values[(i, covariates[j])];
+            }
+            let event = offsets[i].map(|e| match window.tails {
+                EventTails::Reference => e,
+                EventTails::Bin => e.clamp(window.first, window.last),
+            });
+            let yes = event == Some(events[j - covariates.len()]);
+            if yes {
+                support[j - covariates.len()] += 1;
+            }
+            f64::from(yes)
+        });
+        Ok(EventRegressors {
+            matrix,
+            original_rows: self.original.clone(),
+            keys: self.keys.clone(),
+            event_periods: events,
+            support,
+        })
+    }
     pub fn new(keys: &[(u64, i64)], values: DMatrix<f64>) -> Result<Self, Error> {
         if keys.is_empty() {
             return Err(Error::Empty);

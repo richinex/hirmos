@@ -59,7 +59,7 @@ pub use backdoor::{
     refute_placebo, refute_random_common_cause, Dag,
 };
 pub use dowhy_bootstrap::{BootstrapError, DowhyBootstrap};
-pub use estimation::{durbin_watson, ols_hac, wls, HacOls, WlsFit};
+pub use estimation::{durbin_watson, ols_cluster, ols_hac, ols_hc1, ols_two_way, ols_within, wls, HacOls, SandwichOls, WithinErrors, WithinOls, WlsFit};
 pub use frontdoor::{
     frontdoor_two_stage, frontdoor_two_stage_with_progress, identify_frontdoor_set,
     FrontdoorBootstrap, FrontdoorError, FrontdoorIdentificationError, FrontdoorInput,

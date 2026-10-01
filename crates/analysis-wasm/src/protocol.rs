@@ -1009,6 +1009,8 @@ pub(crate) enum IdentifiedDiscreteResult {
 pub(crate) enum AnalysisCommand {
     CountRegression { request: crate::count_regression::Request },
     StaggeredDid { request: crate::staggered_did::Request },
+    Bacon { request: crate::bacon::Request },
+    PanelRegression { request: crate::panel_regression::Request },
     RootCause { request: crate::root_cause::Request },
     GcmEffects { request: crate::gcm_effects::Request },
     GcmInfluence { request: crate::gcm_influence::Request },
@@ -1283,6 +1285,9 @@ pub(crate) enum AnalysisCommand {
         level: f64,
         /// The error process beside the Newey-West interval: none, or an ARMA fitted by maximum likelihood.
         error_model: LinearErrorModel,
+        /// The fixed effects the regression absorbs, when it has any.
+        #[serde(default)]
+        fixed_effects: Option<FixedEffectsModel>,
     },
     PropensityWeighting {
         rows: usize,
@@ -1908,12 +1913,15 @@ pub(crate) enum PropensityWeightScale {
     Stabilized,
 }
 
-/// The error process of a linear fit: independent errors with a Newey-West interval, or an
-/// ARMA(p, q) process fitted by maximum likelihood with the regression (statsmodels SARIMAX).
+/// The error process of a linear fit: independent errors with a Newey-West interval, a
+/// heteroskedasticity-consistent (HC1) covariance, a covariance clustered by the labels in one
+/// column of the matrix, or an ARMA(p, q) process fitted by maximum likelihood with the regression.
 #[derive(Clone, Copy, serde::Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum LinearErrorModel {
     NeweyWest,
+    Hc1,
+    Cluster { column: usize },
     Arma { p: usize, q: usize, max_iter: usize },
 }
 
@@ -1943,13 +1951,38 @@ pub(crate) enum ArmaCovarianceEvidence {
     RankDeficient { rank: usize, parameters: usize },
 }
 
-/// The adjusted linear regression's coefficient under an ARMA error process, beside the OLS
-/// and Newey-West readings of the same design.
+/// The adjusted linear regression's treatment coefficient under the requested error treatment,
+/// beside the OLS and Newey-West readings of the same design: the HC1 or clustered interval of
+/// the OLS coefficient, or the coefficient refitted with an ARMA error process.
 #[derive(Clone, serde::Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub(crate) enum LinearErrorEvidence {
     NeweyWest,
+    Hc1 { standard_error: f64, interval: [f64; 2], p_value: f64 },
+    Cluster { clusters: usize, standard_error: f64, interval: [f64; 2], p_value: f64 },
     Arma { estimate: f64, standard_error: f64, interval: [f64; 2], p_value: f64, errors: ArmaErrorEvidence },
+}
+
+/// The fixed effects a regression absorbs: one per unit, or one per unit and one per period, from
+/// label columns of the matrix.
+#[derive(Clone, Copy, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum FixedEffectsModel {
+    Unit { column: usize },
+    Time { column: usize },
+    UnitAndTime { unit: usize, time: usize },
+}
+
+/// Whether the regression absorbed fixed effects, and what they absorbed.
+#[derive(Clone, serde::Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", rename_all_fields = "camelCase")]
+pub(crate) enum FixedEffectsEvidence {
+    None,
+    Time { column: usize, periods: usize, absorbed: Vec<usize> },
+    /// `absorbed` holds the design columns with no variation within a unit.
+    Unit { column: usize, units: usize, absorbed: Vec<usize> },
+    /// `absorbed` holds the design columns the unit and period effects together absorb.
+    UnitAndTime { unit: usize, time: usize, units: usize, periods: usize, absorbed: Vec<usize> },
 }
 
 /// Which fit the series gets, with only the settings that fit needs.
@@ -2599,6 +2632,8 @@ pub(crate) enum DagFalsificationEvidence {
 pub(crate) enum AnalysisResult {
     CountRegression { evidence: crate::count_regression::Evidence },
     StaggeredDid { evidence: crate::staggered_did::Evidence },
+    Bacon { evidence: crate::bacon::Evidence },
+    PanelRegression { evidence: crate::panel_regression::Evidence },
     RootCause { evidence: crate::root_cause::Evidence },
     GcmEffects { evidence: crate::gcm_effects::Evidence },
     GcmInfluence { evidence: crate::gcm_influence::Evidence },
@@ -3006,6 +3041,7 @@ pub(crate) enum AnalysisResult {
         hac_p_value: f64,
         durbin_watson: f64,
         error_model: LinearErrorEvidence,
+        fixed_effects: FixedEffectsEvidence,
     },
     PropensityWeighting {
         observations: usize,

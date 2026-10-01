@@ -81,7 +81,11 @@ export const ESTIMATION_PARAMETER_HELP = {
     bootstrapSeed: 'Seed used to reproduce the bootstrap samples.',
   },
   adjustedRegression: {
-    interval: 'How the errors are treated: independent, serially correlated with a robust interval, or an ARMA process fitted with the coefficients.',
+    interval: 'How the errors are treated: independent, unequal in variance, correlated within clusters, serially correlated with a robust interval, or an ARMA process fitted with the coefficients.',
+    clusterColumn: 'Select the column whose values identify clusters, such as the unit in repeated observations. This column should be outside the design matrix.',
+    fixedEffects: 'Account for additive differences between units, differences shared within periods, or both. Treatment must retain variation after removing the selected effects.',
+    unitColumn: 'Select the column whose values identify the unit observed repeatedly, such as a person or a firm. This column should be outside the design matrix.',
+    timeColumn: 'Select the column identifying each period, such as the month. Period effects account for additive differences shared within periods. Keep this column outside the regression design.',
     autoregressiveOrder: 'p',
     movingAverageOrder: 'q',
     armaIterations: 'Maximum number of optimiser iterations.',

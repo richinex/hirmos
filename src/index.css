@@ -540,7 +540,10 @@ button[aria-busy="true"]::after {
 .metric-cards > .metric-tile, .metric-cards > li > .metric-tile { min-width: 0; border: 0; border-radius: 0; background: transparent; padding: 0; }
 .metric-card-values { min-width: 0; }
 .metric-card .metric-card-values, .metric-cards .metric-card-values { display: flex; flex-direction: column; align-items: flex-start; gap: .625rem; margin-top: .625rem; }
-.metric-card .metric-card-number, .metric-cards .metric-card-number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: var(--text-heading); font-weight: 400; margin: 0; }
+.metric-card .metric-card-number, .metric-cards .metric-card-number { min-width: 0; max-width: 100%; overflow-wrap: anywhere; font-size: var(--text-heading); line-height: 1.25; font-weight: 400; margin: 0; }
+/* A value that would wrap at the figure size steps down one scale step and wraps on one-unit lines. */
+.metric-card .metric-card-number[data-length="phrase"], .metric-cards .metric-card-number[data-length="phrase"] { font-size: var(--text-title); line-height: 1.5rem; font-weight: 500; letter-spacing: 0; }
+.metric-tile[data-size="compact"] .metric-card-number[data-length="phrase"] { font-size: var(--text-subtitle); line-height: 1.5rem; }
 .metric-card-context { min-width: 0; }
 .metric-cards.stationarity-metrics { padding: .5rem .75rem; gap: .5rem 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); }
 .stationarity-metrics .metric-card-number { font-size: var(--text-title); }

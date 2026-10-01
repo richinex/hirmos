@@ -1,4 +1,5 @@
 import {countRegressionEvidenceSchema,sameCountRequest} from '@/domain/countRegression'
+import {panelRegressionEvidenceSchema,baconEvidenceSchema,sameSpecification} from '@/domain/panelRegression'
 import { z } from 'zod'
 import { causalForestEvidenceSchema, sameCausalForestTarget, causalForestSettingsMatch } from '@/domain/causalForest'
 import { sameStructuralModel } from '@/domain/structuralImpact'
@@ -327,6 +328,7 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
         hacMaxLags: command.hacMaxLags,
         level: command.level,
         errorModel: command.errorModel,
+        fixedEffects: command.fixedEffects,
       }
     case 'propensity-weighting':
       return { kind: 'propensityWeighting', rows: command.rows, columns: command.columns, treatment: command.treatment, outcome: command.outcome, adjustment: command.adjustment, scale: command.scale, fit: command.fit }
@@ -414,6 +416,8 @@ const rustCommand = (command: AnalysisWorkerCommand): object => {
     case 'panel-intervention':
       return { kind: 'panelIntervention', rows: command.rows, units: command.units, times: command.times, placeboReplications: command.placeboReplications, seed: command.seed, primary: command.primary ?? 'syntheticDid' }
     case 'count-regression': return {kind:'countRegression',request:command.model}
+    case 'panel-regression': return {kind:'panelRegression',request:command.model}
+    case 'bacon': return {kind:'bacon',request:command.model}
     case 'staggered-did': return {kind:'staggeredDid',request:command.model}
     case 'panel-adjusted':
       return { kind: 'panelAdjusted', rows: command.rows, columns: command.columns, units: command.units, times: command.times, specification: command.specification }
@@ -931,6 +935,18 @@ self.onmessage = (message: MessageEvent<unknown>) => {
         if(!wrapper.success){fail(command.request,{kind:'worker-protocol-failed',detail:wrapper.error.message});return}
         if(!sameCountRequest(wrapper.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The count regression result differs from the requested specification.'});return}
         emit({kind:'count-regression-succeeded',request:command.request,result:wrapper.data.evidence});return
+      }
+      case 'panel-regression': {
+        const result=z.object({kind:z.literal('panelRegression'),evidence:panelRegressionEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!sameSpecification(result.data.evidence.request,command.model)){fail(command.request,{kind:'worker-protocol-failed',detail:'The regression result does not match its request.'});return}
+        emit({kind:'panel-regression-succeeded',request:command.request,result:result.data.evidence});return
+      }
+      case 'bacon': {
+        const result=z.object({kind:z.literal('bacon'),evidence:baconEvidenceSchema}).strict().safeParse(decoded)
+        if(!result.success){fail(command.request,{kind:'worker-protocol-failed',detail:result.error.message});return}
+        if(!sameSpecification(result.data.evidence.specification,command.model.specification)||result.data.evidence.observations!==command.model.rows){fail(command.request,{kind:'worker-protocol-failed',detail:'The decomposition result does not match its request.'});return}
+        emit({kind:'bacon-succeeded',request:command.request,result:result.data.evidence});return
       }
       case 'staggered-did': {
         const wrapper=z.object({kind:z.literal('staggeredDid'),evidence:z.unknown()}).safeParse(decoded)

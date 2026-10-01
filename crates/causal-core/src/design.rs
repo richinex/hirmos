@@ -5,6 +5,10 @@ pub enum DesignError {
     NonFiniteValue { column: String, row: usize },
     NoLevels { column: String },
     SingleLevel { column: String },
+    InvalidTerm { term: usize },
+    InvalidReference { column: usize },
+    DuplicateName { column: String },
+    NonFiniteInteraction { term: usize, row: usize },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,7 +80,10 @@ fn levels(values: &Values) -> Vec<String> {
             let mut distinct: Vec<String> = text.to_vec();
             distinct.sort();
             distinct.dedup();
-            distinct.into_iter().map(|value| level_label(&value)).collect()
+            distinct
+                .into_iter()
+                .map(|value| level_label(&value))
+                .collect()
         }
     }
 }
@@ -140,6 +147,15 @@ fn push_encoded(
     names: &mut Vec<String>,
     series: &mut Vec<Vec<f64>>,
 ) -> Result<(), DesignError> {
+    push_encoded_reference(column, None, names, series)
+}
+
+fn push_encoded_reference(
+    column: &Column,
+    reference: Option<&str>,
+    names: &mut Vec<String>,
+    series: &mut Vec<Vec<f64>>,
+) -> Result<(), DesignError> {
     let found = levels(&column.values);
     if found.is_empty() {
         return Err(DesignError::NoLevels {
@@ -151,8 +167,12 @@ fn push_encoded(
             column: column.name.clone(),
         });
     }
-    let dropped = usize::from(column.encoding == Encoding::TreatmentContrast);
-    for level in found.iter().skip(dropped) {
+    let omitted = if column.encoding == Encoding::TreatmentContrast {
+        reference.or_else(|| found.first().map(String::as_str))
+    } else {
+        None
+    };
+    for level in found.iter().filter(|level| Some(level.as_str()) != omitted) {
         names.push(match column.encoding {
             Encoding::TreatmentContrast => format!("C({})[T.{level}]", column.name),
             _ => format!("{}_{level}", column.name),
@@ -197,6 +217,115 @@ pub fn patsy_dmatrix(columns: &[Column]) -> Result<Design, DesignError> {
     }
     for column in columns.iter().filter(|c| c.encoding == Encoding::Numeric) {
         push_numeric(column, &mut names, &mut series)?;
+    }
+    Ok(assemble(rows, names, series))
+}
+
+/// A model term refers to source columns, before categorical expansion.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Term {
+    Main(usize),
+    Pair(usize, usize),
+    Triple(usize, usize, usize),
+}
+
+/// Hierarchical interactions with an intercept. Reuses the ordinary numeric and
+/// categorical encoders; this is not a formula parser. Terms include all their
+/// lower-order terms. Main effects precede pairs, which precede triples. Within
+/// a degree, first appearance determines order. The first component varies
+/// fastest within a categorical interaction, as in R's model.matrix.
+///
+/// References are explicit labels from the existing level encoder. Missing
+/// entries retain its default first-level reference. Indicator encoding remains
+/// full indicator encoding; rank decisions belong to the fitter, not this step.
+pub fn hierarchical_design(
+    columns: &[Column],
+    terms: &[Term],
+    references: &std::collections::BTreeMap<usize, String>,
+) -> Result<Design, DesignError> {
+    let rows = validate(columns)?;
+    let mut seen_names = std::collections::BTreeSet::new();
+    for c in columns {
+        if !seen_names.insert(&c.name) {
+            return Err(DesignError::DuplicateName {
+                column: c.name.clone(),
+            });
+        }
+    }
+    for (&i, level) in references {
+        let column = columns
+            .get(i)
+            .ok_or(DesignError::InvalidReference { column: i })?;
+        if column.encoding != Encoding::TreatmentContrast || !levels(&column.values).contains(level)
+        {
+            return Err(DesignError::InvalidReference { column: i });
+        }
+    }
+    let mut expanded: Vec<Vec<usize>> = Vec::new();
+    for (index, term) in terms.iter().enumerate() {
+        let mut factors = match *term {
+            Term::Main(a) => vec![a],
+            Term::Pair(a, b) => vec![a, b],
+            Term::Triple(a, b, c) => vec![a, b, c],
+        };
+        factors.sort_unstable();
+        if factors.iter().any(|i| *i >= columns.len()) || factors.windows(2).any(|p| p[0] == p[1]) {
+            return Err(DesignError::InvalidTerm { term: index });
+        }
+        for mask in 1..(1usize << factors.len()) {
+            let subset: Vec<_> = factors
+                .iter()
+                .enumerate()
+                .filter_map(|(j, i)| (mask & (1 << j) != 0).then_some(*i))
+                .collect();
+            if !expanded.contains(&subset) {
+                expanded.push(subset);
+            }
+        }
+    }
+    expanded.sort_by_key(Vec::len);
+    let mut bases = Vec::with_capacity(columns.len());
+    for (i, column) in columns.iter().enumerate() {
+        let mut names = Vec::new();
+        let mut series = Vec::new();
+        match column.encoding {
+            Encoding::Numeric => push_numeric(column, &mut names, &mut series)?,
+            Encoding::Indicators | Encoding::TreatmentContrast => push_encoded_reference(
+                column,
+                references.get(&i).map(String::as_str),
+                &mut names,
+                &mut series,
+            )?,
+        }
+        bases.push((names, series));
+    }
+    let mut names = vec!["Intercept".to_string()];
+    let mut series = vec![vec![1.; rows]];
+    for (term, factors) in expanded.iter().enumerate() {
+        let mut products = vec![(String::new(), vec![1.; rows])];
+        for &factor in factors {
+            let (labels, values) = &bases[factor];
+            let mut next = Vec::new();
+            for (label, column) in labels.iter().zip(values) {
+                for (prefix, product) in &products {
+                    let name = if prefix.is_empty() {
+                        label.clone()
+                    } else {
+                        format!("{prefix}:{label}")
+                    };
+                    let values: Vec<_> = product.iter().zip(column).map(|(a, b)| a * b).collect();
+                    if let Some(row) = values.iter().position(|v| !v.is_finite()) {
+                        return Err(DesignError::NonFiniteInteraction { term, row });
+                    }
+                    next.push((name, values));
+                }
+            }
+            products = next;
+        }
+        for (name, values) in products {
+            names.push(name);
+            series.push(values);
+        }
     }
     Ok(assemble(rows, names, series))
 }

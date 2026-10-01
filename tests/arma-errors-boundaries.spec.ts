@@ -80,13 +80,15 @@ test('the adjusted regression reads the coefficient the configured error treatme
     estimate: 1, standardError: 0.5, interval: [0, 2], degreesOfFreedom: 17, residualSd: 1, rSquared: 0.5,
     hacMaxLags: 2, hacStandardError: 0.6, hacInterval: [-0.2, 2.2], hacPValue: 0.1, durbinWatson: 1.9,
     errorModel: { kind: 'arma', estimate: 1.2, standardError: 0.4, interval: [0.4, 2.0], pValue: 0.01, errors: fields },
+    fixedEffects: { kind: 'none' },
   })
   const level = 0.95 as const
-  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'classical' }, level }, evidence })).toEqual({ estimate: 1, standardError: 0.5, interval: [0, 2] })
-  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'hac' }, level }, evidence })).toEqual({ estimate: 1, standardError: 0.6, interval: [-0.2, 2.2] })
-  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'arma', p: 1, q: 1, maxIter: 50 }, level }, evidence })).toEqual({ estimate: 1.2, standardError: 0.4, interval: [0.4, 2.0] })
+  const fixedEffects = { kind: 'none' } as const
+  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'classical' }, fixedEffects, level }, evidence })).toEqual({ estimate: 1, standardError: 0.5, interval: [0, 2] })
+  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'hac' }, fixedEffects, level }, evidence })).toEqual({ estimate: 1, standardError: 0.6, interval: [-0.2, 2.2] })
+  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'arma', p: 1, q: 1, maxIter: 50 }, fixedEffects, level }, evidence })).toEqual({ estimate: 1.2, standardError: 0.4, interval: [0.4, 2.0] })
   const without = { ...evidence, errorModel: { kind: 'neweyWest' as const } }
-  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'arma', p: 1, q: 1, maxIter: 50 }, level }, evidence: without })).toBeNull()
+  expect(linearReading({ configuration: { kind: 'backdoor-linear-regression', errors: { kind: 'arma', p: 1, q: 1, maxIter: 50 }, fixedEffects, level }, evidence: without })).toBeNull()
   expect(backdoorLinearEvidenceSchema.safeParse({ ...without, errorModel: { kind: 'arma', errors: fields } }).success).toBe(false)
   expect(describeCovariance({ kind: 'arma', p: 2, q: 1, maxIter: 50 })).toBe('ARMA(2, 1) errors')
 })

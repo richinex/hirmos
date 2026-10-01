@@ -13,6 +13,7 @@ import type { CountSeriesModelArtifact } from './countSeries'
 import type { InterventionQueryArtifact } from './intervention'
 import { brand, err, ok, type Result } from './dop'
 import type { EstimationRunArtifact } from './estimation'
+import { backdoorLinearConfigurationSchema, backdoorLinearEvidenceSchema } from './estimation'
 import { tLearnerEvidenceSchema, crossFittedTLearnerEvidenceSchema, tLearnerConfigurationSchema, tLearnerRunMatches, parseCausalImpactEvidence, bayesianImpactSettingsSchema, impactInferenceMatches } from './estimation'
 import type { PreparedDatasetArtifact, StationarityEvidenceArtifact } from './preprocessing'
 import type { SensitivityRunArtifact } from './sensitivity'
@@ -318,11 +319,12 @@ const upgradeEstimationRunRecord = (record: Record<string, unknown>): Record<str
     && typeof evidence === 'object' && evidence !== null) {
     const covariance = Reflect.get(configuration, 'covariance')
     const { covariance: _legacyCovariance, ...rest } = configuration as Record<string, unknown>
+    // A run saved before fixed effects were a choice absorbed none.
     return {
       ...value,
       estimate: upgradedEstimate,
-      configuration: covariance === 'hac' || covariance === 'classical' ? { ...rest, errors: { kind: covariance } } : configuration,
-      evidence: { errorModel: { kind: 'neweyWest' }, ...evidence },
+      configuration: { fixedEffects: { kind: 'none' }, ...(covariance === 'hac' || covariance === 'classical' ? { ...rest, errors: { kind: covariance } } : configuration) },
+      evidence: { errorModel: { kind: 'neweyWest' }, fixedEffects: { kind: 'none' }, ...evidence },
     }
   }
   // A propensity run saved while boosted scoring was a flag: a cross-fitted run's recorded
@@ -530,8 +532,8 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   if (!prepared.ok) return prepared
   if (parsed.data.timeSeriesRuns.length > 0) {
     const series = prepared.value as PreparedDatasetArtifact | null
-    if ((series?.kind !== 'prepared-time-series' && series?.kind !== 'prepared-panel') || !Array.isArray(series.columns)
-      || series.kind === 'prepared-panel' && parsed.data.timeSeriesRuns.some(run=>run.kind!=='count-regression')
+    if (series===null || !Array.isArray(series.columns)
+      || series.kind !== 'prepared-time-series' && parsed.data.timeSeriesRuns.some(run=>!(run.kind==='panel-regression'&&run.specification.specification.kind==='interactions')&&!(series.kind==='prepared-panel'&&['count-regression','panel-regression','bacon'].includes(run.kind)))
       || parsed.data.timeSeriesRuns.some((run) => !timeSeriesRunMatches(run, series))) {
       return err({ kind: 'invalid-snapshot', detail: 'A time-series run does not belong to the prepared time series in this project.' })
     }
@@ -550,6 +552,25 @@ export function parseSnapshotValue(value: unknown): Result<PersistedProject, Sna
   const studyDraft: StudyDesignDraft = { ...EMPTY_STUDY_DRAFT, ...storedDraft }
   const estimationRuns = parsed.data.estimationRuns.map((run) => upgradeEstimationRunRecord(run))
   for (const run of estimationRuns) {
+    if (run.kind === 'backdoor-linear-run') {
+      const configuration = backdoorLinearConfigurationSchema.safeParse(run.configuration)
+      const evidence = backdoorLinearEvidenceSchema.safeParse(run.evidence)
+      if (!configuration.success || !evidence.success) return err({ kind: 'invalid-snapshot', detail: 'The saved adjusted regression has an invalid configuration or result.' })
+      const effects = configuration.data.fixedEffects
+      const groupings = [
+        ...(effects.kind === 'none' ? [] : [{ column: effects.column, name: effects.name }]),
+        ...(effects.kind === 'unit-and-time' ? [{ column: effects.timeColumn, name: effects.timeName }] : []),
+        ...(configuration.data.errors.kind === 'cluster' ? [configuration.data.errors] : []),
+      ]
+      if (groupings.some(group => !profile?.columns.some(column => column.id === group.column && column.name === group.name))) {
+        return err({ kind: 'invalid-snapshot', detail: 'A saved fixed-effect or cluster column does not match the dataset profile.' })
+      }
+      const expected = effects.kind === 'unit-and-time' ? 'unitAndTime' : effects.kind
+      const errors = configuration.data.errors.kind
+      if (evidence.data.fixedEffects.kind !== expected || evidence.data.errorModel.kind !== (errors === 'classical' || errors === 'hac' ? 'neweyWest' : errors)) {
+        return err({ kind: 'invalid-snapshot', detail: 'The saved adjusted regression result does not match its fixed effects or uncertainty specification.' })
+      }
+    }
     if(run.kind==='panel-intervention-run' && ((typeof run.evidence==='object'&&run.evidence!==null&&Reflect.get(run.evidence,'kind')==='staggeredDid') || (typeof run.configuration==='object'&&run.configuration!==null&&Reflect.get(run.configuration,'primary')==='staggered'))) {
       const study=parsed.data.studies.find(candidate=>candidate.id===run.study)
       const identification=parsed.data.identifications.find(candidate=>candidate.id===run.identification)

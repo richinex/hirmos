@@ -402,8 +402,8 @@ function App() {
     await adoptBundle(parsed.value)
   }
   /**
-   * A shipped example. Edits to this release are retained, while a copy made from an older shipped
-   * release is replaced so newly completed chapters are not hidden behind stale browser state.
+   * Load the shipped example for first use or an explicitly confirmed reset.
+   * Opening an existing copy retains its studies, settings and saved analyses.
    */
   const loadExampleBundle = async (example: ShippedExample) => {
     setImportProblem(null)
@@ -436,15 +436,23 @@ function App() {
     if (bundle === undefined) return
     const existing = await loadProject(example.id)
     if (existing.ok) {
-      const assessment = assessExampleCopy(existing.value, bundle.exportedAt, example.id)
+      const assessment = assessExampleCopy(existing.value, example.id)
       switch (assessment.kind) {
-        case 'current-release': await openWithBundleData(assessment.snapshot, bundle.data); return
-        case 'replace-with-shipped':
-          setExampleNotice('The example changed in this build, so your earlier copy was replaced.')
-          break
+        case 'saved-copy':
+          // An edited example may use a different file. Never attach the new release's source to it.
+          if (assessment.snapshot.profile?.source.fingerprint === bundle.project.profile?.source.fingerprint) {
+            await openWithBundleData(assessment.snapshot, bundle.data)
+          } else await reopenProject(example.id)
+          return
         case 'invalid-copy': setImportProblem(assessment.detail); return
         default: assertNever(assessment)
       }
+    }
+    if (!existing.ok && existing.error.kind !== 'not-found') {
+      setImportProblem(existing.error.kind === 'storage-unavailable'
+        ? `The browser store could not be read: ${existing.error.detail}`
+        : describeSnapshotProblem(existing.error))
+      return
     }
     await adoptBundle(bundle)
   }
@@ -471,7 +479,7 @@ function App() {
     if (chapter === 'data') return project !== null
     if (chapter === 'survival') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'root-cause') return workflow.kind === 'profiled' && workflow.prepared !== null
-    if (chapter === 'time-series') return workflow.kind === 'profiled' && (workflow.prepared?.kind === 'prepared-time-series' || workflow.prepared?.kind === 'prepared-panel')
+    if (chapter === 'time-series') return workflow.kind === 'profiled' && workflow.prepared!==null
     if (chapter === 'discovery') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'study') return validatedDag
@@ -487,7 +495,7 @@ function App() {
     switch (chapter) {
       case 'projects': return project === null ? 'not-started' : 'done'
       case 'data': return project === null ? 'locked' : prepared ? 'done' : 'in-progress'
-      case 'time-series': return workflow.kind !== 'profiled' || (workflow.prepared?.kind !== 'prepared-time-series' && workflow.prepared?.kind !== 'prepared-panel') ? 'locked' : workflow.timeSeriesRuns.length + workflow.countSeriesModels.length > 0 ? 'done' : 'not-started'
+      case 'time-series': return workflow.kind !== 'profiled' || workflow.prepared===null ? 'locked' : workflow.timeSeriesRuns.length + workflow.countSeriesModels.length > 0 ? 'done' : 'not-started'
       case 'survival': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
@@ -620,7 +628,7 @@ function App() {
       {resetExample !== null && <ConfirmDialog
         open
         title={`Reset ${resetExample.name}?`}
-        message="This restores the original example and removes changes and saved analyses from your copy."
+        message="This restores the current shipped example and removes changes and saved analyses from your copy."
         confirmLabel="Reset example"
         danger
         onConfirm={() => void restoreExample(resetExample)}
@@ -1084,7 +1092,7 @@ function App() {
                     </Suspense>
                     </ChapterBoundary>
                   )}
-                  {activeChapter === 'time-series' && (workflow.prepared?.kind === 'prepared-time-series' || workflow.prepared?.kind === 'prepared-panel') && (
+                  {activeChapter === 'time-series' && workflow.prepared!==null && (
                     <ChapterBoundary chapter="Time-series analysis">
                     <Suspense fallback={<ChapterSkeleton label="Loading time-series analysis…" />}>
                       <TimeSeriesPanel key={workflow.prepared.id} source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}

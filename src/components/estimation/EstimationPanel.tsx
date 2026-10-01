@@ -38,6 +38,7 @@ import { runBoostedGridSearch } from '@/analysis/boostedSearch'
 import { BoostedSearchFields } from './BoostedSearchFields'
 import { BootstrapIntervalFields } from './BootstrapIntervalFields'
 import type { BoostedTreatmentModel, PropensityTreatmentModel } from '@/workers/analysisProtocol'
+import { adjustedRegressionPlan } from '@/analysis/adjustedRegressionPlan'
 import { histogramOption } from '@/charts/data/histogram'
 import { counterfactualCurvesOption } from '@/charts/estimation/counterfactualCurves'
 import { impactPathOption } from '@/charts/estimation/impactPath'
@@ -68,7 +69,7 @@ import type { ColumnId, DatasetProfile } from '@/domain/dataset'
 import { assertNever, err, isNonEmpty, mapNonEmpty, ok, type NonEmptyArray, type Result } from '@/domain/dop'
 import { describeDesignExpansionProblem, designLayouts, expandDesign, expandsDesign } from '@/domain/designMatrix'
 import { ColumnChecklist } from '@/components/ui/ColumnChecklist'
-import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER, type LinearErrorModel } from '@/domain/interruptedSeries'
+import { DEFAULT_ARMA_ITERATIONS, MAX_ARMA_ORDER } from '@/domain/interruptedSeries'
 import { ArmaUncertaintyAlert } from './ArmaUncertaintyAlert'
 import {
   additive,
@@ -78,7 +79,11 @@ import {
   causalEstimateFrom,
   contemporaneousAdjustmentVariables,
   type PropensityUncertainty,
+  type LinearErrors,
+  type FixedEffects,
   describeCovariance,
+  describeFixedEffects,
+  selectFixedEffects,
   describeDiscreteStatePreparations,
   describeEstimator,
   describeInstrumentalVariableRoute, dmlNuisanceInputs,
@@ -212,6 +217,34 @@ const intervalText = (estimate: CausalEstimate): string => {
   return `[${figure.bounds.lower}, ${figure.bounds.upper}]`
 }
 
+
+/** What the chosen error treatment assumes and how its interval is built, for the hint under the control. */
+const describeErrorTreatment = (errors: LinearErrors, fixedEffects: FixedEffects): string => {
+  const effects = fixedEffects.kind === 'none' ? null : fixedEffects.kind === 'unit-and-time' ? `${fixedEffects.name} and ${fixedEffects.timeName} effects` : `${fixedEffects.name} effects`
+  switch (errors.kind) {
+    case 'classical': return effects !== null
+      ? `95% confidence level. The classical interval assumes errors are independent and share a common variance; its degrees of freedom count the ${effects} as parameters.`
+      : '95% confidence level. The classical interval assumes errors are independent and share a common variance.'
+    case 'hc1': return effects !== null
+      ? `95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by n / (n − G − k), where G counts the ${effects}.`
+      : '95% confidence level. The robust (HC1) interval allows the error variance to differ between rows and scales each squared residual by n / (n − k).'
+    case 'cluster': return `95% confidence level. The clustered interval allows errors to correlate within each value of ${errors.name} and treats the clusters as independent. A finite-sample correction accounts for the cluster count and fitted parameters. With two-way effects, both effect dimensions count towards that correction. With one-way effects, effects nested within clusters do not.`
+    case 'hac': return '95% confidence level. Heteroskedasticity- and autocorrelation-consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of floor(4 (n/100)^(2/9)) lags.'
+    case 'arma': return '95% confidence level.'
+    default: return assertNever(errors)
+  }
+}
+
+/** What the fixed-effects choice does to the regression, for the hint under the control. */
+const describeFixedEffectsChoice = (fixedEffects: FixedEffects): string => {
+  switch (fixedEffects.kind) {
+    case 'none': return 'Every row is used as observed. Choose fixed effects when the same unit appears in several rows.'
+    case 'time': return `Period effects account for additive differences shared by rows with the same ${fixedEffects.name}. They do not account for persistent differences between units.`
+    case 'unit': return `Each variable is replaced by its deviation from the mean of its ${fixedEffects.name}. The run lists adjustment variables absorbed by these effects.`
+    case 'unit-and-time': return `The regression removes additive ${fixedEffects.name} and ${fixedEffects.timeName} effects before fitting the remaining variation. The run lists adjustment variables absorbed by those effects. This also supports unbalanced panels.`
+    default: return assertNever(fixedEffects)
+  }
+}
 
 const eligibilityHint = (eligibility: MethodEligibility): string => {
   switch (eligibility.kind) {
@@ -398,10 +431,22 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       }
       case 'backdoor-linear-run': {
         const { evidence } = run
+        const absorbedNames = evidence.fixedEffects.kind === 'none' ? [] : evidence.fixedEffects.absorbed.map((column) => run.columns[column]?.name ?? String(column))
+        const counted = (n: number, singular: string, plural: string) => formatCount(n, { noun: n === 1 ? singular : plural })
         return [
-          { label: 'R squared', value: formatStatistic('score', evidence.rSquared), context: `${formatCount(evidence.parameters).text} parameters` },
+          evidence.fixedEffects.kind !== 'none'
+            ? { label: 'R squared, within', value: formatStatistic('score', evidence.rSquared), context: <Metadata><span>{counted(evidence.parameters, 'regressor', 'regressors').text}</span><span>{evidence.fixedEffects.kind === 'time' ? counted(evidence.fixedEffects.periods, 'period', 'periods').text : counted(evidence.fixedEffects.units, 'unit', 'units').text}</span>{evidence.fixedEffects.kind === 'unitAndTime' && <span>{counted(evidence.fixedEffects.periods, 'period', 'periods').text}</span>}</Metadata> }
+            : { label: 'R squared', value: formatStatistic('score', evidence.rSquared), context: `${formatCount(evidence.parameters).text} parameters` },
           { label: 'Residual SD', value: formatStatistic('sd', evidence.residualSd), context: <Metadata><span>{formatCount(evidence.degreesOfFreedom).text} degrees of freedom</span><span>Durbin–Watson {formatStatistic('raw', evidence.durbinWatson).text}</span></Metadata> },
-          { label: 'Newey–West bandwidth', value: formatCount(evidence.hacMaxLags, { noun: 'lag' }), context: `heteroskedasticity and autocorrelation consistent p ${formatP(evidence.hacPValue, { withLabel: false }).text}` },
+          evidence.fixedEffects.kind !== 'none'
+            ? { label: 'Absorbed by the fixed effects', value: absorbedNames.length === 0 ? formatWords('none') : formatCount(absorbedNames.length), context: absorbedNames.length === 0 ? 'No adjustment columns were removed during absorption.' : absorbedNames.join(', ') }
+            : { label: 'Newey–West bandwidth', value: formatCount(evidence.hacMaxLags, { noun: 'lag' }), context: `heteroskedasticity and autocorrelation consistent p ${formatP(evidence.hacPValue, { withLabel: false }).text}` },
+          ...(evidence.errorModel.kind === 'hc1' ? [
+            { label: 'Robust SE (HC1)', value: formatStatistic('raw', evidence.errorModel.standardError), context: `p ${formatP(evidence.errorModel.pValue, { withLabel: false }).text}` },
+          ] : []),
+          ...(evidence.errorModel.kind === 'cluster' ? [
+            { label: 'Clustered SE', value: formatStatistic('raw', evidence.errorModel.standardError), context: <Metadata><span>{formatCount(evidence.errorModel.clusters, { noun: 'clusters' }).text}</span><span>p {formatP(evidence.errorModel.pValue, { withLabel: false }).text}</span></Metadata> },
+          ] : []),
           ...(evidence.errorModel.kind === 'arma' ? [
             { label: `ARMA(${evidence.errorModel.errors.p}, ${evidence.errorModel.errors.q}) errors`, value: formatWords([...evidence.errorModel.errors.ar, ...evidence.errorModel.errors.ma].map((term) => `${term.name} ${formatStatistic('raw', term.coefficient).text}`).join(', ')), context: <Metadata><span>innovation variance {formatStatistic('raw', evidence.errorModel.errors.sigma2).text}</span><span>AIC {formatStatistic('raw', evidence.errorModel.errors.aic).text}</span><span>{evidence.errorModel.errors.converged ? `converged in ${evidence.errorModel.errors.iterations} iterations` : `stopped at ${evidence.errorModel.errors.iterations} iterations`}</span></Metadata> },
           ] : []),
@@ -491,12 +536,13 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
           .map((weight, index) => ({ weight, unit: evidence.units[index] ?? `control ${index + 1}` }))
           .sort((left, right) => right.weight - left.weight)
           .slice(0, 3)
-          .map(({ weight, unit }) => `${unit} ${formatStatistic('score', weight).text}`)
-          .join('; ')
+        const [heaviest, ...nextWeights] = topWeights
         return [
-          { label: 'Method comparison', value: formatWords(`DID ${formatStatistic('raw', evidence.did.estimate).text}, synthetic control ${formatStatistic('raw', evidence.syntheticControl.estimate).text}, synthetic DID ${formatStatistic('raw', evidence.syntheticDid.estimate).text}`), context: <Metadata><span>synthetic DID chosen as the main result before fitting</span><span>{formatCount(evidence.nPost).text} post periods</span></Metadata> },
+          { label: 'Synthetic DID', value: formatStatistic('raw', evidence.syntheticDid.estimate), context: <Metadata><span>chosen as the main result before fitting</span><span>DID {formatStatistic('raw', evidence.did.estimate).text}</span><span>synthetic control {formatStatistic('raw', evidence.syntheticControl.estimate).text}</span><span>{formatCount(evidence.nPost).text} post periods</span></Metadata> },
           { label: 'Panel layout', value: formatWords(`${evidence.treatedUnits} treated, ${evidence.controlUnits} comparison`), context: `${evidence.units.length} units × ${evidence.times.length} periods` },
-          { label: 'Most influential comparison units', value: formatWords(topWeights || 'none'), context: 'largest synthetic-DID unit weights' },
+          heaviest === undefined
+            ? { label: 'Largest comparison weight', value: formatWords('none'), context: 'no synthetic-DID unit weights' }
+            : { label: 'Largest comparison weight', value: formatStatistic('score', heaviest.weight), context: <Metadata><span>unit {heaviest.unit}</span>{nextWeights.map(({ unit, weight }) => <span key={unit}>{unit} {formatStatistic('score', weight).text}</span>)}</Metadata> },
         ]
       }
       case 'causal-forest-run': return []
@@ -763,7 +809,7 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
         curve,
       }, theme)
   }, [curves, curveIndex, adjustmentVariables, study.outcome.name, study.treatment.name, theme])
-  const stamp = <RunMeta>{[describeEstimator(run.configuration.kind), ...(run.kind === 'backdoor-linear-run' ? [describeCovariance(run.configuration.errors)] : []), formatTime(run.createdAt)]}</RunMeta>
+  const stamp = <RunMeta>{[describeEstimator(run.configuration.kind), ...(run.kind === 'backdoor-linear-run' ? [describeFixedEffects(run.configuration.fixedEffects), describeCovariance(run.configuration.errors)].filter((part): part is string => part !== null) : []), formatTime(run.createdAt)]}</RunMeta>
   // A grouped effect draws each group's interval on the shared axis, the whole-population average last.
   const groupChart = useMemo(() => (estimate.effect.kind === 'byGroup'
     ? runComparisonOption([
@@ -841,7 +887,11 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
           {estimate.interval.kind === 'confidence' && (estimate.interval.lower > 0 || estimate.interval.upper < 0) ? 'The interval excludes zero.' : 'The interval includes zero: the data do not rule out no effect.'}{' '}
           {run.configuration.errors.kind === 'arma'
             ? <>For comparison, least squares gives <span className={num('text-bone')}>{formatStatistic('raw', run.evidence.estimate).text}</span> with a Newey–West interval of <span className={num('text-bone')}>{intervalText({ ...estimate, effect: { kind: 'additive', value: run.evidence.estimate, unit: '' }, interval: { kind: 'confidence', level: run.evidence.level, lower: run.evidence.hacInterval[0], upper: run.evidence.hacInterval[1] } })}</span>.</>
-            : <>For comparison, the {run.configuration.errors.kind === 'hac' ? 'classical' : 'HAC'} interval is <span className={num('text-bone')}>{intervalText({ ...estimate, interval: { kind: 'confidence', level: run.evidence.level, lower: run.configuration.errors.kind === 'hac' ? run.evidence.interval[0] : run.evidence.hacInterval[0], upper: run.configuration.errors.kind === 'hac' ? run.evidence.interval[1] : run.evidence.hacInterval[1] } })}</span>.</>}
+            : run.configuration.errors.kind === 'classical'
+              ? (run.configuration.fixedEffects.kind !== 'none'
+                ? null
+                : <>For comparison, the HAC interval is <span className={num('text-bone')}>{intervalText({ ...estimate, interval: { kind: 'confidence', level: run.evidence.level, lower: run.evidence.hacInterval[0], upper: run.evidence.hacInterval[1] } })}</span>.</>)
+              : <>For comparison, the classical interval is <span className={num('text-bone')}>{intervalText({ ...estimate, interval: { kind: 'confidence', level: run.evidence.level, lower: run.evidence.interval[0], upper: run.evidence.interval[1] } })}</span>.</>}
         </p>
       )}
       {run.kind === 'backdoor-linear-run' && armaReading(run)?.errors.converged === false && (
@@ -1183,11 +1233,58 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       switch (configuration.kind) {
         case 'backdoor-linear-regression': {
           const columns: NonEmptyArray<StudyVariable> = [study.treatment, study.outcome, ...identification.result.adjustment.variables]
-          const matrix = await materialise(columns)
-          const design = expandDesign(matrix.values, matrix.rowCount, columns.length, designLayouts(columns, 2, configuration.kind, state.encodings))
+          // Grouping columns ride along after the design as numeric columns; they are not part of the fit.
+          type Grouping = Pick<StudyVariable, 'column' | 'name'>
+          const effects = configuration.fixedEffects
+          const unit: Grouping | null = effects.kind === 'none' ? null : { column: effects.column, name: effects.name }
+          const time: Grouping | null = effects.kind === 'unit-and-time' ? { column: effects.timeColumn, name: effects.timeName } : null
+          const cluster: Grouping | null = configuration.errors.kind === 'cluster' ? { column: configuration.errors.column, name: configuration.errors.name } : null
+          for (const [role, grouping] of [['unit', unit], ['time', time], ['cluster', cluster]] as const) {
+            if (grouping !== null && columns.some((column) => column.column === grouping.column)) throw new Error(`The ${role} column must be outside the design: not the treatment, the outcome or an adjustment variable.`)
+          }
+          if (unit !== null && time !== null && time.column === unit.column) throw new Error('The unit and time columns must differ.')
+          const groupings = [...new Map([unit, time, cluster].filter((grouping): grouping is Grouping => grouping !== null).map((grouping) => [grouping.column, grouping])).values()]
+          // A panel's own keys are read beside the design; any other grouping column is materialised with it.
+          const panel = prepared.kind === 'prepared-panel' ? prepared : null
+          const isPanelKey = (grouping: Grouping) => panel !== null && (grouping.column === panel.sampling.unitColumn || grouping.column === panel.sampling.timeColumn)
+          const extras = groupings.filter((grouping) => !isPanelKey(grouping))
+          const materialized: NonEmptyArray<Pick<StudyVariable, 'column' | 'name'>> = [...columns, ...extras]
+          const matrix = await materialise(materialized)
+          const layouts = [...designLayouts(columns, 2, configuration.kind, state.encodings), ...extras.map(() => ({ kind: 'numeric' } as const))]
+          const design = expandDesign(matrix.values, matrix.rowCount, materialized.length, layouts)
           if (!design.ok) { dispatch({ type: 'run-failed', detail: describeDesignExpansionProblem(design.error, columns.map((column) => column.name)) }); return }
-          const errorModel: LinearErrorModel = configuration.errors.kind === 'arma' ? { kind: 'arma', p: configuration.errors.p, q: configuration.errors.q, maxIter: configuration.errors.maxIter } : { kind: 'neweyWest' }
-          const evidence = await analysis.runBackdoorLinear(design.value.values, matrix.rowCount, design.value.columnCount, { treatment: 0, outcome: 1, adjustment: design.value.expanded.slice(2).flat(), hacMaxLags: null, level: configuration.level, errorModel })
+          const adjustment = design.value.expanded.slice(2, 2 + identification.result.adjustment.variables.length).flat()
+          let values = design.value.values
+          let columnCount = design.value.columnCount
+          const columnOf = new Map<ColumnId, number>()
+          for (const [at, grouping] of extras.entries()) {
+            const index = design.value.expanded[columns.length + at]?.[0]
+            if (index === undefined) { dispatch({ type: 'run-failed', detail: 'A selected grouping column is missing from the prepared regression matrix.' }); return }
+            columnOf.set(grouping.column, index)
+          }
+          if (panel !== null && groupings.some(isPanelKey)) {
+            const { materializePanelKeysInWorker } = await import('@/data/client')
+            const keys = await materializePanelKeysInWorker(source.file, profile, panel.sampling.unitColumn, panel.sampling.timeColumn)
+            if (!session.current(current)) return
+            if (!keys.ok) { dispatch({ type: 'run-failed', detail: describePanelDataProblem(keys.error) }); return }
+            if (keys.value.sourceFingerprint !== profile.source.fingerprint || keys.value.rowCount !== matrix.rowCount) { dispatch({ type: 'run-failed', detail: 'The panel keys no longer match the prepared rows. Recreate the prepared panel version.' }); return }
+            const append = (codes: readonly number[]): number => {
+              const coded = new Float64Array(values.length + matrix.rowCount)
+              coded.set(values)
+              codes.forEach((code, row) => { coded[columnCount * matrix.rowCount + row] = code })
+              values = coded
+              columnCount += 1
+              return columnCount - 1
+            }
+            if (groupings.some((grouping) => grouping.column === panel.sampling.unitColumn)) {
+              const labels = [...new Set(keys.value.units)].sort()
+              columnOf.set(panel.sampling.unitColumn, append(keys.value.units.map((label: string) => labels.indexOf(label))))
+            }
+            if (groupings.some((grouping) => grouping.column === panel.sampling.timeColumn)) columnOf.set(panel.sampling.timeColumn, append(keys.value.periodCodes))
+          }
+          const plan = adjustedRegressionPlan(configuration, columnOf)
+          if (!plan.ok) { dispatch({ type: 'run-failed', detail: 'A selected fixed-effect or cluster column could not be materialised. Review the grouping columns.' }); return }
+          const evidence = await analysis.runBackdoorLinear(values, matrix.rowCount, columnCount, { treatment: 0, outcome: 1, adjustment, hacMaxLags: null, level: configuration.level, ...plan.value })
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const run = { kind: 'backdoor-linear-run', configuration, evidence: evidence.value } as const
           const estimate = causalEstimateFrom(study, identification, run)
@@ -1660,6 +1757,12 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
 
   const latestRun = runs.at(-1) ?? null
   const controlCandidates = study === null ? [] : profile.columns.filter((column) => prepared.columns.includes(column.id) && column.id !== study.outcome.column && column.id !== study.treatment.column)
+  // A unit or cluster column identifies groups of rows; it cannot also be a regressor. A panel's own unit key comes first.
+  const designColumns = new Set(identification !== null && 'adjustment' in identification.result ? identification.result.adjustment.variables.map((variable) => variable.column) : [])
+  const panelUnit = prepared.kind === 'prepared-panel' ? profile.columns.find((column) => column.id === prepared.sampling.unitColumn) ?? null : null
+  const groupingCandidates = [...(panelUnit === null ? [] : [panelUnit]), ...controlCandidates.filter((column) => !designColumns.has(column.id) && column.id !== panelUnit?.id)]
+  const panelTime = prepared.kind === 'prepared-panel' ? profile.columns.find((column) => column.id === prepared.sampling.timeColumn) ?? null : null
+  const timeCandidates = [...(panelTime === null ? [] : [panelTime]), ...groupingCandidates.filter((column) => column.id !== panelTime?.id)]
   const temporalAdjustmentCandidates = document === null || study === null
     ? []
     : document.current.graph.nodes.flatMap((node, index) => node.kind === 'observed'
@@ -1733,13 +1836,81 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         return (
           <div className={stepsStack}>
             {covariatesStep(1)}
-            <SettingsStep number={categoricalChecklist === null ? undefined : 2} title="Report uncertainty">
+            <SettingsStep number={categoricalChecklist === null ? undefined : 2} title="Fixed effects">
+            <div>
+            <ParameterLabel className={fieldLabel} label="Fixed effects" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.fixedEffects} />
+            <SegmentedControl className="mt-1" ariaLabel="Fixed effects" value={configuration.fixedEffects.kind} onChange={(kind) => {
+              const current = configuration.fixedEffects
+              const unit = kind === 'time' ? panelTime ?? timeCandidates[0] ?? null : current.kind === 'none' || current.kind === 'time' ? groupingCandidates[0] ?? null : { id: current.column, name: current.name }
+              const time = current.kind === 'unit-and-time' ? { id: current.timeColumn, name: current.timeName } : timeCandidates.find((candidate) => candidate.id !== unit?.id) ?? null
+              const selection = selectFixedEffects(kind, unit, time)
+              if (!selection.ok) return
+              const fixedEffects = selection.value
+              // Series error processes are not supported by the within fit. Clustering is independent.
+              const errors: LinearErrors = fixedEffects.kind !== 'none'
+                ? (configuration.errors.kind === 'hac' || configuration.errors.kind === 'arma' ? { kind: 'classical' } : configuration.errors)
+                : configuration.errors
+              configure({ ...configuration, fixedEffects, errors })
+            }} options={[
+              { value: 'none', label: 'None' },
+              { value: 'unit', label: 'By unit', ariaLabel: 'By unit', disabled: groupingCandidates.length === 0, title: groupingCandidates.length === 0 ? 'Requires a grouping column outside the regression design.' : undefined },
+              { value: 'time', label: 'By time', ariaLabel: 'By time', disabled: timeCandidates.length === 0, title: timeCandidates.length === 0 ? 'Requires a period column outside the regression design.' : undefined },
+              { value: 'unit-and-time', label: 'By unit and time', ariaLabel: 'By unit and time', disabled: !groupingCandidates.some(unit => timeCandidates.some(time => time.id !== unit.id)), title: !groupingCandidates.some(unit => timeCandidates.some(time => time.id !== unit.id)) ? 'Requires distinct unit and period columns outside the regression design.' : undefined },
+            ]} />
+            <p className={cn(fieldHint, 'max-w-[65ch]')}>{describeFixedEffectsChoice(configuration.fixedEffects)}</p>
+            {configuration.fixedEffects.kind !== 'none' && <div className="mt-3">
+              <ParameterLabel className={fieldLabel} label={configuration.fixedEffects.kind === 'time' ? 'Time column' : 'Unit column'} help={configuration.fixedEffects.kind === 'time' ? ESTIMATION_PARAMETER_HELP.adjustedRegression.timeColumn : ESTIMATION_PARAMETER_HELP.adjustedRegression.unitColumn} />
+              {(configuration.fixedEffects.kind === 'time' ? timeCandidates : groupingCandidates).length === 0
+                ? <p className={cn(fieldHint, 'max-w-[65ch]')}>No prepared column is outside the design. Prepare the dataset again with the unit column selected, and leave that column out of the graph.</p>
+                : <Select aria-label={configuration.fixedEffects.kind === 'time' ? 'Time column' : 'Unit column'} className={field('text', 'mt-1 w-full max-w-xs')} value={configuration.fixedEffects.column} onChange={(event) => {
+                  const column = (configuration.fixedEffects.kind === 'time' ? timeCandidates : groupingCandidates).find((candidate) => candidate.id === event.target.value)
+                  if (column === undefined) return
+                  if (configuration.fixedEffects.kind === 'unit-and-time' && column.id === configuration.fixedEffects.timeColumn) return
+                  const fixedEffects: FixedEffects = configuration.fixedEffects.kind === 'unit-and-time'
+                    ? { ...configuration.fixedEffects, column: column.id, name: column.name }
+                    : { kind: configuration.fixedEffects.kind === 'time' ? 'time' : 'unit', column: column.id, name: column.name }
+                  configure({ ...configuration, fixedEffects })
+                }}>
+                  {(configuration.fixedEffects.kind === 'time' ? timeCandidates : groupingCandidates).filter(candidate => configuration.fixedEffects.kind !== 'unit-and-time' || candidate.id !== configuration.fixedEffects.timeColumn).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                </Select>}
+            </div>}
+            {configuration.fixedEffects.kind === 'unit-and-time' && <div className="mt-3">
+              <ParameterLabel className={fieldLabel} label="Time column" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.timeColumn} />
+              {timeCandidates.filter((candidate) => configuration.fixedEffects.kind === 'unit-and-time' && candidate.id !== configuration.fixedEffects.column).length === 0
+                ? <p className={cn(fieldHint, 'max-w-[65ch]')}>No prepared column is outside the design besides the unit column. Prepare the dataset again with the time column selected, and leave that column out of the graph.</p>
+                : <Select aria-label="Time column" className={field('text', 'mt-1 w-full max-w-xs')} value={configuration.fixedEffects.timeColumn} onChange={(event) => {
+                  const column = timeCandidates.find((candidate) => candidate.id === event.target.value)
+                  if (column === undefined || configuration.fixedEffects.kind !== 'unit-and-time') return
+                  configure({ ...configuration, fixedEffects: { ...configuration.fixedEffects, timeColumn: column.id, timeName: column.name } })
+                }}>
+                  {timeCandidates.filter((candidate) => configuration.fixedEffects.kind === 'unit-and-time' && candidate.id !== configuration.fixedEffects.column).map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                </Select>}
+            </div>}
+            </div>
+            </SettingsStep>
+            <SettingsStep number={categoricalChecklist === null ? undefined : 3} title="Report uncertainty">
             <div>
             <ParameterLabel className={fieldLabel} label="Errors" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.interval} />
-            <SegmentedControl className="mt-1" ariaLabel="Error treatment" value={configuration.errors.kind} onChange={(kind) => configure({ ...configuration, errors: kind === 'arma' ? { kind, p: 1, q: 0, maxIter: DEFAULT_ARMA_ITERATIONS } : { kind } })} options={[{ value: 'hac', label: 'Newey–West HAC' }, { value: 'classical', label: 'Classical' }, { value: 'arma', label: 'ARMA errors' }]} />
-            <p className={cn(fieldHint, 'max-w-[65ch]')}>{configuration.errors.kind === 'arma'
-              ? '95% confidence level.'
-              : '95% confidence level. Heteroskedasticity and autocorrelation consistent (HAC) covariance uses a Bartlett kernel and a bandwidth of floor(4 (n/100)^(2/9)) lags. The classical interval assumes independent errors.'}</p>
+            <SegmentedControl className="mt-1" ariaLabel="Error treatment" value={configuration.errors.kind} onChange={(kind) => {
+              const unit = configuration.fixedEffects.kind === 'none' ? null : configuration.fixedEffects
+              const candidate = panelUnit ?? timeCandidates[0]
+              const clusterBy = configuration.errors.kind === 'cluster' ? configuration.errors : candidate === undefined ? unit : { column: candidate.id, name: candidate.name }
+              if (kind === 'cluster') {
+                if (clusterBy === null) return
+                configure({ ...configuration, errors: { kind, column: clusterBy.column, name: clusterBy.name } })
+              } else configure({ ...configuration, errors: kind === 'arma' ? { kind, p: 1, q: 0, maxIter: DEFAULT_ARMA_ITERATIONS } : { kind } })
+            }} options={configuration.fixedEffects.kind !== 'none'
+              ? [{ value: 'classical', label: 'Classical' }, { value: 'hc1', label: 'Robust (HC1)' }, { value: 'cluster', label: 'Clustered', disabled: timeCandidates.length === 0, title: timeCandidates.length === 0 ? 'Requires a cluster column outside the regression design.' : undefined }]
+              : [{ value: 'classical', label: 'Classical' }, { value: 'hc1', label: 'Robust (HC1)' }, { value: 'cluster', label: 'Clustered', disabled: timeCandidates.length === 0, title: timeCandidates.length === 0 ? 'Requires a cluster column outside the regression design.' : undefined }, { value: 'hac', label: 'Newey–West HAC' }, { value: 'arma', label: 'ARMA errors' }]} />
+            <p className={cn(fieldHint, 'max-w-[65ch]')}>{describeErrorTreatment(configuration.errors, configuration.fixedEffects)}</p>
+            {configuration.errors.kind === 'cluster' && <div className="mt-3">
+              <ParameterLabel className={fieldLabel} label="Cluster column" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.clusterColumn} />
+              {timeCandidates.length === 0
+                ? <p className={cn(fieldHint, 'max-w-[65ch]')}>No prepared column is outside the design. Prepare the dataset again with the cluster column selected, and leave that column out of the graph.</p>
+                : <Select aria-label="Cluster column" className={field('text', 'mt-1 w-full max-w-xs')} value={configuration.errors.column} onChange={(event) => { const column = timeCandidates.find((candidate) => candidate.id === event.target.value); if (column !== undefined) configure({ ...configuration, errors: { kind: 'cluster', column: column.id, name: column.name } }) }}>
+                  {timeCandidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+                </Select>}
+            </div>}
             {configuration.errors.kind === 'arma' && <div className="mt-3 grid gap-3 @md/panel:grid-cols-3">
               <label className="block"><ParameterLabel className={fieldLabel} label="Autoregressive order" help={ESTIMATION_PARAMETER_HELP.adjustedRegression.autoregressiveOrder} />
                 <input aria-label="Autoregressive order" type="number" min={0} max={MAX_ARMA_ORDER} className={field('text', 'mt-1')} value={configuration.errors.p} onChange={(event) => configure({ ...configuration, errors: { kind: 'arma', p: Number(event.target.value), q: configuration.errors.kind === 'arma' ? configuration.errors.q : 0, maxIter: configuration.errors.kind === 'arma' ? configuration.errors.maxIter : DEFAULT_ARMA_ITERATIONS } })} /></label>
@@ -1983,7 +2154,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           <div className={stepsStack}>
             <SettingsStep number={configuration.primary === 'did' ? undefined : 1} title="Choose the method">
               <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Choose the method before fitting. Conventional DiD can use one period before and one after adoption.</p>
-              <SegmentedControl className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification} : primary === 'regression' || primary === 'doublyRobust'
+              <SegmentedControl wrap className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification} : primary === 'regression' || primary === 'doublyRobust'
                 ? { kind: 'panel-intervention', primary: 'adjusted', covariates: [], specification: primary === 'regression' ? { kind: 'regression' } : { kind: 'doublyRobust', folds: 2, seed: 1234, trimming: 0.01, normalization: 'in-sample' } }
                 : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Regression' }, { value: 'doublyRobust', label: 'Doubly robust' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'}]} />
             </SettingsStep>
@@ -1999,8 +2170,6 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                 <label className="block"><ParameterLabel className={fieldLabel} label="Placebo seed" help={ESTIMATION_PARAMETER_HELP.panelIntervention.placeboSeed} /><input type="number" min={0} max={0xffff_ffff} aria-label="Panel placebo seed" className={field('text', 'mt-1 w-full')} value={configuration.seed} onChange={(event) => configure({ ...configuration, seed: Math.max(0, Math.min(0xffff_ffff, Math.floor(Number(event.target.value) || 0))) })} /></label>
               </div>
             </SettingsStep>}
-            {configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted">Checking treatment timing, treated and control units, pre/post periods, and control pre-period variation…</p>}
-            {configuration.primary !== 'staggered' && panelPreflight.kind === 'ready' && <p className="m-0 text-body text-muted"><Metadata><span>Ready: {panelPreflight.layout.treated.length} treated and {panelPreflight.layout.controls.length} control units</span><span>{panelPreflight.layout.prePeriods} pre- and {panelPreflight.layout.postPeriods} post-periods</span><span>adoption at {panelPreflight.layout.adoption.label}.</span></Metadata></p>}
           </div>
         )
       case 'negbin-nuts':
@@ -2348,6 +2517,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           </>
         )}
       </section>
+      {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted" role="status">Checking panel structure and treatment timing…</p>}
+      {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'ready' && <section aria-label="Checked panel structure" className="space-y-2">
+        <p className="m-0 flex items-center gap-1.5 text-body text-ok"><Icon name="check_circle" size={16} />Panel structure checked</p>
+        <MetricGrid label="Panel structure">
+          <MetricTile size="compact" frame="cell" label="Treated / control units" value={formatWords(`${formatCount(panelPreflight.layout.treated.length).text} / ${formatCount(panelPreflight.layout.controls.length).text}`)} />
+          <MetricTile size="compact" frame="cell" label="Pre / post periods" value={formatWords(`${formatCount(panelPreflight.layout.prePeriods).text} / ${formatCount(panelPreflight.layout.postPeriods).text}`)} />
+          <MetricTile size="compact" frame="cell" label="Adoption period" value={formatWords(panelPreflight.layout.adoption.label)} />
+        </MetricGrid>
+      </section>}
       <MethodCaveats
         methods={method.ok ? [method.value] : ESTIMATION_METHODS}
         eligibility={eligibility}
@@ -2361,7 +2539,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     const comparable = runs.filter((run) => run.study === identification?.study && run.estimate.effect.kind === 'additive')
     if (comparable.length < 2) return null
     const rows: RunComparisonRow[] = comparable.map((run, index) => ({
-      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? `, ${describeCovariance(run.configuration.errors)}` : ''}, ${formatTime(run.createdAt)}`,
+      label: `${describeEstimator(run.configuration.kind)}${run.kind === 'backdoor-linear-run' ? `${[describeFixedEffects(run.configuration.fixedEffects), describeCovariance(run.configuration.errors)].filter((part) => part !== null).map((part) => `, ${part}`).join('')}` : ''}, ${formatTime(run.createdAt)}`,
       estimate: run.estimate.effect.kind === 'additive' ? run.estimate.effect.value : 0,
       lower: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.lower,
       upper: run.estimate.interval.kind === 'none' ? null : run.estimate.interval.upper,

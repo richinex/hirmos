@@ -220,9 +220,20 @@ const adjustedFor = (run: EstimationRunArtifact): string => adjustmentLabels(run
   : `after adjustment for ${adjustmentNames(run)}`
 
 /** The opening of a bottom line that says what the estimate accounted for. */
-const accountingOpening = (run: EstimationRunArtifact): string => adjustmentLabels(run.estimate.adjustment).length === 0
-  ? 'Without additional measured adjustment variables'
-  : `After accounting for ${adjustmentNames(run)}`
+const accountingOpening = (run: EstimationRunArtifact): string => {
+  const effects = run.kind === 'backdoor-linear-run' ? run.configuration.fixedEffects : { kind: 'none' as const }
+  const unit = effects.kind === 'unit' || effects.kind === 'time' ? ` and a fixed effect for each ${plainName(effects.name)}` : effects.kind === 'unit-and-time' ? ` and a fixed effect for each ${plainName(effects.name)} and each ${plainName(effects.timeName)}` : ''
+  return adjustmentLabels(run.estimate.adjustment).length === 0
+    ? (unit === '' ? 'Without additional measured adjustment variables' : `After accounting for ${unit.slice(5)}`)
+    : `After accounting for ${adjustmentNames(run)}${unit}`
+}
+
+/** Which adjustment variables the unit fixed effects absorbed, as a sentence, or nothing when none were. */
+const absorbedSentence = (run: EstimationRunArtifact): string => {
+  if (run.kind !== 'backdoor-linear-run' || run.configuration.fixedEffects.kind === 'none' || run.evidence.fixedEffects.kind === 'none' || run.evidence.fixedEffects.absorbed.length === 0) return ''
+  const names = run.evidence.fixedEffects.absorbed.map((column) => plainName(run.columns[column]?.name ?? String(column)))
+  return ` The fixed effects absorb ${namesInProse(names, (count) => `${count} of the adjustment variables`)}. Their coefficients cannot be estimated separately in this specification.`
+}
 
 const targetPopulation = (study: StudySpecification): string => study.estimand.kind === 'average-treatment-effect-on-treated'
   ? 'among rows that received treatment'
@@ -340,9 +351,11 @@ export function interpretEstimationResult(run: EstimationRunArtifact, study: Stu
       const effect = estimate.effect.kind === 'additive' ? estimate.effect.value : Number.NaN
       const opening = accountingOpening(run)
       const statements: NonEmptyArray<InterpretationStatement> = [
-        { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}.` },
+        { kind: 'magnitude', text: `${opening}, a 1-unit higher level of ${plainName(study.treatment.name)} is associated with ${change(effect, study.outcome.name)} on average ${targetPopulation(study)}.${absorbedSentence(run)}` },
         additiveIntervalForOutcome(estimate.interval, study.outcome.name),
-        { kind: 'qualification', text: 'This should be interpreted as a total effect only if the recorded adjustment variables account for the important common causes of treatment and outcome, while leaving out variables through which treatment works or variables that would create bias when controlled. Comparable treatment levels must exist among otherwise similar observations, and the straight-line model must suit the data.' },
+        { kind: 'qualification', text: run.configuration.fixedEffects.kind !== 'none'
+          ? 'Fixed effects account for additive differences in the selected groups. A causal interpretation requires the remaining treatment variation to be unrelated to unmeasured causes of the outcome, conditional on the specification. Fixed effects do not automatically remove time-varying confounding or bias from inappropriate adjustment. The linear model and a common treatment slope must also suit the question.'
+          : 'This should be interpreted as a total effect only if the recorded adjustment variables account for the important common causes of treatment and outcome, while leaving out variables through which treatment works or variables that would create bias when controlled. Comparable treatment levels must exist among otherwise similar observations, and the straight-line model must suit the data.' },
       ]
       return { kind: 'result-interpretation', statements }
     }

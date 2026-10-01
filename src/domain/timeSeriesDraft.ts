@@ -1,4 +1,5 @@
 import {initialCountRegression,type CountRegressionDraft} from './countRegression'
+import {initialPanelRegression,type PanelRegressionDraft} from './panelRegression'
 import type { ColumnId } from './dataset'
 import { assertNever, type NonEmptyArray } from './dop'
 import type { CountSeriesLink } from './countSeries'
@@ -62,7 +63,8 @@ export interface InterruptedDraft {
 export interface TimeSeriesDraft {
   readonly prepared: PreparedDatasetVersionId
   readonly regression: CountRegressionDraft
-  readonly analysis: 'count' | 'ardl' | 'vecm' | 'interrupted' | 'regression'
+  readonly panelRegression: PanelRegressionDraft
+  readonly analysis: 'count' | 'ardl' | 'vecm' | 'interrupted' | 'regression' | 'panel-regression'
   readonly ardl: ArdlDraft
   readonly longRun: Readonly<Record<'ardl' | 'vecm', LongRunDraft>>
   readonly count: CountDraft
@@ -70,6 +72,7 @@ export interface TimeSeriesDraft {
 }
 type FieldEvent<T, Kind extends string> = { [K in keyof T]: { readonly type: Kind; readonly field: K; readonly value: T[K] } }[keyof T]
 export type TimeSeriesEvent =
+  | {readonly type:'panel-regression';readonly value:PanelRegressionDraft}
   | {readonly type:'regression';readonly value:CountRegressionDraft}
   | { readonly type: 'analysis'; readonly analysis: TimeSeriesDraft['analysis'] }
   | FieldEvent<ArdlDraft, 'ardl'>
@@ -90,11 +93,12 @@ function longRunDraft(model: 'ardl' | 'vecm', runs: readonly TimeSeriesRun[]): L
 }
 
 export function retainTimeSeriesDraft(current: TimeSeriesDraft | null, workflow: Workflow): TimeSeriesDraft | null {
-  if (workflow.kind !== 'profiled' || (workflow.prepared?.kind !== 'prepared-time-series' && workflow.prepared?.kind !== 'prepared-panel')) return null
+  if (workflow.kind !== 'profiled' || workflow.prepared===null) return null
   const prepared = workflow.prepared
   if (current?.prepared === prepared.id) return current
   return {
-    prepared: prepared.id, analysis: prepared.kind === 'prepared-panel' ? 'regression' : 'count',
+    prepared: prepared.id, analysis: prepared.kind === 'prepared-panel' ? 'regression' : prepared.kind==='prepared-time-series'?'count':'panel-regression',
+    panelRegression:workflow.timeSeriesRuns.filter(r=>r.kind==='panel-regression'||r.kind==='bacon').at(-1)?.controls??{...initialPanelRegression(),...(prepared.kind==='prepared-panel'?{}:{model:{kind:'interactions',predictors:[],terms:[]}})},
     regression: initialCountRegression(prepared.kind === 'prepared-panel'),
     ardl: { outcome: null, roles: {}, mode: 'search', starting: {}, fixedOrders: {}, minimum: '1', outcomeLag: '2', holdBack: '', terms: 'constant', horizon: '12', future: { kind: 'none' } },
     longRun: { ardl: longRunDraft('ardl', workflow.timeSeriesRuns), vecm: longRunDraft('vecm', workflow.timeSeriesRuns) },
@@ -105,6 +109,7 @@ export function retainTimeSeriesDraft(current: TimeSeriesDraft | null, workflow:
 
 export function stepTimeSeriesDraft(state: TimeSeriesDraft, event: TimeSeriesEvent): TimeSeriesDraft {
   switch (event.type) {
+    case 'panel-regression': return {...state,panelRegression:event.value}
     case 'regression': return {...state,regression:event.value}
     case 'analysis': return { ...state, analysis: event.analysis }
     case 'ardl': return { ...state, ardl: { ...state.ardl, [event.field]: event.value } }

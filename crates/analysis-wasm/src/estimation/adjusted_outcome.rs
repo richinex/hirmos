@@ -12,6 +12,7 @@ pub(crate) fn backdoor_linear(
     hac_max_lags: Option<usize>,
     level: f64,
     error_model: LinearErrorModel,
+    fixed_effects: Option<FixedEffectsModel>,
 ) -> Result<AnalysisResult, String> {
     validate_dense_matrix("backdoor linear estimate", values, rows, columns)?;
     let mut used = vec![treatment, outcome];
@@ -58,6 +59,55 @@ pub(crate) fn backdoor_linear(
                 .to_owned(),
         );
     }
+    let y: Vec<f64> = (0..rows).map(|row| data[(row, outcome)]).collect();
+    // statsmodels' bandwidth when `maxlags` is not given: floor(4 (n/100)^(2/9)).
+    let max_lags = hac_max_lags
+        .unwrap_or_else(|| (4.0 * (rows as f64 / 100.0).powf(2.0 / 9.0)).floor() as usize);
+    // Labels are matched exactly; each distinct value of the column is one group.
+    let groups_of = |column: usize, noun: &str| -> Result<(Vec<u64>, usize), String> {
+        if column >= columns || used.contains(&column) {
+            return Err(format!("backdoor linear estimate needs a {noun} column outside the design"));
+        }
+        let labels: Vec<f64> = (0..rows).map(|row| data[(row, column)]).collect();
+        if labels.iter().any(|label| !label.is_finite()) {
+            return Err(format!("backdoor linear estimate {noun} labels must be finite"));
+        }
+        let mut distinct = labels.clone();
+        distinct.sort_by(f64::total_cmp);
+        distinct.dedup();
+        if distinct.len() < 2 {
+            return Err(format!("backdoor linear estimate needs at least two {noun}s"));
+        }
+        let groups = labels
+            .iter()
+            .map(|label| distinct.binary_search_by(|candidate| candidate.total_cmp(label)).expect("label is distinct") as u64)
+            .collect();
+        Ok((groups, distinct.len()))
+    };
+
+    match fixed_effects {
+        None => {}
+        Some(FixedEffectsModel::Unit { column }) => {
+            return backdoor_linear_within(&data, rows, treatment, outcome, adjustment, &y, max_lags, level, error_model, column, groups_of(column, "unit")?, None);
+        }
+        Some(FixedEffectsModel::Time { column }) => {
+            let mut result = backdoor_linear_within(&data, rows, treatment, outcome, adjustment, &y, max_lags, level, error_model, column, groups_of(column, "period")?, None)?;
+            if let AnalysisResult::BackdoorLinear { fixed_effects, .. } = &mut result {
+                if let FixedEffectsEvidence::Unit { units, absorbed, .. } = fixed_effects {
+                    *fixed_effects = FixedEffectsEvidence::Time { column, periods: *units, absorbed: std::mem::take(absorbed) };
+                }
+            }
+            return Ok(result);
+        }
+        Some(FixedEffectsModel::UnitAndTime { unit, time }) => {
+            if unit == time {
+                return Err("backdoor linear estimate needs distinct unit and time columns".to_owned());
+            }
+            let periods = groups_of(time, "period")?;
+            return backdoor_linear_within(&data, rows, treatment, outcome, adjustment, &y, max_lags, level, error_model, unit, groups_of(unit, "unit")?, Some((time, periods)));
+        }
+    }
+
     // Design [1, treatment, adjustment...]; the classical fit comes from the ported OLS, the HAC fit
     // from the ported 805 estimation layer.
     let design = DMatrix::<f64>::from_fn(rows, parameters, |row, column| match column {
@@ -65,17 +115,22 @@ pub(crate) fn backdoor_linear(
         1 => data[(row, treatment)],
         _ => data[(row, adjustment[column - 2])],
     });
-    let y: Vec<f64> = (0..rows).map(|row| data[(row, outcome)]).collect();
     let classical = Ols::fit(&design, &DVector::from_column_slice(&y));
     let degrees_of_freedom = rows - parameters;
     let standard_error = classical.params[1] / classical.tvalues()[1];
     let t = stdtri(degrees_of_freedom as isize, 0.975);
-    // statsmodels' bandwidth when `maxlags` is not given: floor(4 (n/100)^(2/9)).
-    let max_lags = hac_max_lags
-        .unwrap_or_else(|| (4.0 * (rows as f64 / 100.0).powf(2.0 / 9.0)).floor() as usize);
     let hac = ols_hac(&y, &design, max_lags);
     let error_model = match error_model {
         LinearErrorModel::NeweyWest => LinearErrorEvidence::NeweyWest,
+        LinearErrorModel::Hc1 => {
+            let fit = ols_hc1(&y, &design);
+            LinearErrorEvidence::Hc1 { standard_error: fit.bse[1], interval: [fit.conf_int[1].0, fit.conf_int[1].1], p_value: fit.pvalues[1] }
+        }
+        LinearErrorModel::Cluster { column } => {
+            let (groups, clusters) = groups_of(column, "cluster")?;
+            let fit = ols_cluster(&y, &design, &groups);
+            LinearErrorEvidence::Cluster { clusters, standard_error: fit.bse[1], interval: [fit.conf_int[1].0, fit.conf_int[1].1], p_value: fit.pvalues[1] }
+        }
         LinearErrorModel::Arma { p, q, max_iter } => {
             let order = arma_order("backdoor linear estimate", rows, p, q, max_iter)?;
             let fit = fit_arma_regression(&y, &design, order, max_iter);
@@ -110,6 +165,104 @@ pub(crate) fn backdoor_linear(
         hac_p_value: hac.pvalues[1],
         durbin_watson: durbin_watson(&hac.resid),
         error_model,
+        fixed_effects: FixedEffectsEvidence::None,
+    })
+}
+
+/// The same regression with one fixed effect per unit, and one per period when a time column is
+/// given: the design has no intercept and is fitted on the within deviations; the interval is
+/// classical, HC1, or clustered by the unit.
+#[allow(clippy::too_many_arguments)]
+fn backdoor_linear_within(
+    data: &DMatrix<f64>,
+    rows: usize,
+    treatment: usize,
+    outcome: usize,
+    adjustment: &[usize],
+    y: &[f64],
+    max_lags: usize,
+    level: f64,
+    error_model: LinearErrorModel,
+    unit: usize,
+    (groups, units): (Vec<u64>, usize),
+    time: Option<(usize, (Vec<u64>, usize))>,
+) -> Result<AnalysisResult, String> {
+    let cluster_labels = match error_model {
+        LinearErrorModel::Cluster { column } => {
+            if column >= data.ncols() || column == treatment || column == outcome || adjustment.contains(&column) {
+                return Err("Choose a cluster column outside the regression design.".to_owned());
+            }
+            Some((0..rows).map(|row| {
+                let value = data[(row, column)];
+                if value == 0.0 { 0 } else { value.to_bits() }
+            }).collect::<Vec<_>>())
+        }
+        _ => None,
+    };
+    let errors = match error_model {
+        LinearErrorModel::NeweyWest => WithinErrors::Classical,
+        LinearErrorModel::Hc1 => WithinErrors::Hc1,
+        LinearErrorModel::Cluster { .. } => WithinErrors::ClusterBy(cluster_labels.as_deref().ok_or("Cluster labels are missing.")?),
+        LinearErrorModel::Arma { .. } => {
+            return Err("backdoor linear estimate with fixed effects has no ARMA error process; the rows are a panel, not one series".to_owned());
+        }
+    };
+    let design = DMatrix::<f64>::from_fn(rows, 1 + adjustment.len(), |row, column| match column {
+        0 => data[(row, treatment)],
+        _ => data[(row, adjustment[column - 1])],
+    });
+    let fit_with = |errors: WithinErrors| match &time {
+        None => ols_within(y, &design, &groups, errors),
+        Some((_, (periods, _))) => ols_two_way(y, &design, &groups, periods, errors),
+    };
+    let classical = fit_with(WithinErrors::Classical).map_err(|problem| problem.to_string())?;
+    if classical.kept.first() != Some(&0) {
+        return Err("backdoor linear estimate treatment does not vary within the units, so its fixed effects absorb it".to_owned());
+    }
+    let effects = units + time.as_ref().map_or(0, |(_, (_, periods))| periods - 1);
+    if rows <= effects + classical.kept.len() {
+        return Err(format!(
+            "backdoor linear estimate needs more than {} observations for {} regressors and {effects} fixed effects",
+            effects + classical.kept.len(),
+            classical.kept.len()
+        ));
+    }
+    let requested = match errors {
+        WithinErrors::Classical => None,
+        WithinErrors::Hc1 | WithinErrors::Cluster | WithinErrors::ClusterBy(_) => Some(fit_with(errors).map_err(|problem| problem.to_string())?),
+    };
+    let error_model = match (error_model, requested) {
+        (LinearErrorModel::Hc1, Some(fit)) => LinearErrorEvidence::Hc1 { standard_error: fit.bse[0], interval: [fit.conf_int[0].0, fit.conf_int[0].1], p_value: fit.pvalues[0] },
+        (LinearErrorModel::Cluster { .. }, Some(fit)) => LinearErrorEvidence::Cluster { clusters: cluster_labels.as_ref().ok_or("Cluster labels are missing.")?.iter().collect::<std::collections::BTreeSet<_>>().len(), standard_error: fit.bse[0], interval: [fit.conf_int[0].0, fit.conf_int[0].1], p_value: fit.pvalues[0] },
+        _ => LinearErrorEvidence::NeweyWest,
+    };
+    let hac = ols_hac(&classical.within_outcome, &classical.within_design, max_lags);
+    Ok(AnalysisResult::BackdoorLinear {
+        observations: rows,
+        parameters: classical.kept.len(),
+        treatment,
+        outcome,
+        adjustment: adjustment.to_vec(),
+        level,
+        estimate: classical.params[0],
+        standard_error: classical.bse[0],
+        interval: [classical.conf_int[0].0, classical.conf_int[0].1],
+        degrees_of_freedom: classical.df_resid,
+        residual_sd: (classical.ssr / classical.df_resid as f64).sqrt(),
+        r_squared: classical.rsquared_within,
+        hac_max_lags: max_lags,
+        hac_standard_error: hac.bse[0],
+        hac_interval: [hac.conf_int[0].0, hac.conf_int[0].1],
+        hac_p_value: hac.pvalues[0],
+        durbin_watson: durbin_watson(&classical.resid),
+        error_model,
+        fixed_effects: {
+            let absorbed = classical.dropped.iter().map(|&column| adjustment[column - 1]).collect();
+            match time {
+                None => FixedEffectsEvidence::Unit { column: unit, units, absorbed },
+                Some((time, (_, periods))) => FixedEffectsEvidence::UnitAndTime { unit, time, units, periods, absorbed },
+            }
+        },
     })
 }
 

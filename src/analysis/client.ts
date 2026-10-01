@@ -16,7 +16,7 @@ export function runCausalForest(values: Float64Array, rows: number, columns: num
   return post('causal-forest-succeeded', { kind: 'causal-forest', request, values, rows, columns, ...design }, values)
 }
 import type { AalenEvidence, ForestEvidence } from '@/domain/survivalRegression'
-import type { AalenWorkerDesign, ForestWorkerDesign } from '@/workers/analysisProtocol'
+import type { AalenWorkerDesign, AdjustedRegressionErrorModel, AdjustedRegressionFixedEffects, ForestWorkerDesign } from '@/workers/analysisProtocol'
 
 export function runAalen(values: Float64Array, rows: number, columns: number, design: AalenWorkerDesign): Promise<Result<AalenEvidence, AnalysisWorkerProblem>> {
   const request = newWorkerRequestId()
@@ -739,7 +739,8 @@ export function runBackdoorLinear(
     readonly adjustment: readonly number[]
     readonly hacMaxLags: number | null
     readonly level: number
-    readonly errorModel: LinearErrorModel
+    readonly errorModel: AdjustedRegressionErrorModel
+    readonly fixedEffects: AdjustedRegressionFixedEffects | null
   },
 ): Promise<BackdoorLinearOutcome> {
   const request = newWorkerRequestId()
@@ -1219,6 +1220,14 @@ export function runSyntheticControl(values: Float64Array, rows: number, columns:
 export function runCountRegression(values:Float64Array, model:import('@/domain/countRegression').CountRegressionRequest):Promise<Result<import('@/domain/countRegression').CountRegressionEvidence,AnalysisWorkerProblem>> {
   const request=newWorkerRequestId()
   return post('count-regression-succeeded',{kind:'count-regression',request,values,model},values)
+}
+export function runPanelRegression(values:Float64Array,model:import('@/domain/panelRegression').PanelRegressionRequest):Promise<Result<import('@/domain/panelRegression').PanelRegressionEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('panel-regression-succeeded',{kind:'panel-regression',request,values,model},values)
+}
+export function runBacon(values:Float64Array,model:import('@/domain/panelRegression').BaconRequest):Promise<Result<import('@/domain/panelRegression').BaconEvidence,AnalysisWorkerProblem>> {
+  const request=newWorkerRequestId()
+  return post('bacon-succeeded',{kind:'bacon',request,values,model},values)
 }
 export function runStaggeredDid(values:Float64Array, model:import('@/domain/staggeredDid').StaggeredRequest):Promise<Result<import('@/domain/staggeredDid').StaggeredEvidence,AnalysisWorkerProblem>> {
   const request=newWorkerRequestId()

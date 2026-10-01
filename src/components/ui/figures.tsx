@@ -1,5 +1,7 @@
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Metadata } from './Metadata'
+import { fontFor, textWidth, useTextMetricsVersion, type TextTier } from '@/lib/textMetrics'
+import { useElementWidth } from '@/lib/useElementWidth'
 import { label as labelCn, num, well } from './recipes'
 import { formatEstimate, formatInterval, type EffectScale, type Formatted, type IntervalType } from '@/lib/format/number'
 import { cn } from '@/lib/utils'
@@ -38,11 +40,21 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
   readonly className?: string
 }) {
   const figure = size === 'hero' ? 'text-metric' : size === 'compact' ? 'text-title' : 'text-heading'
+  const [values, width] = useElementWidth<HTMLDivElement>()
+  const version = useTextMetricsVersion()
+  // The figure size is for a value that sits on one line. One that would wrap there, words or several
+  // figures joined, steps down a tier and wraps on one-unit lines; the width comes from pretext, not a reflow.
+  const tier: TextTier = size === 'compact' ? 'title' : 'heading'
+  const length = useMemo(() => {
+    if (size === 'hero' || width === 0) return 'figure'
+    void version
+    return textWidth(value.text, fontFor(tier, 600)) <= width ? 'figure' : 'phrase'
+  }, [size, width, value.text, tier, version])
   return (
     <div data-size={size} className={cn('@container metric-tile', frame === 'card' ? 'metric-card' : 'bg-well', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
       <span className={labelCn('metric-card-label block text-muted')}>{label}</span>
-      <div className="metric-card-values">
-        <p className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
+      <div ref={values} className="metric-card-values">
+        <p data-length={length} className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
         {context && <p className={num('metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]')}>{context}</p>}
       </div>
     </div>

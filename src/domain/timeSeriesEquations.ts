@@ -94,6 +94,8 @@ export function timeSeriesEquations(run: TimeSeriesRun | CountSeriesModelArtifac
       }
     }
     case 'count-regression': return {general:[],definitions:['The design includes the recorded predictor terms and fixed effects.'],fitted:{kind:'unavailable',explanation:'Coefficients and joint contrasts are reported in the result table.'},reference:'statsmodels 0.14.6 NegativeBinomialP, GLM Binomial and sandwich covariance.'}
+    case 'panel-regression': return {general:[],definitions:['The design uses the recorded reference periods and interactions.'],fitted:{kind:'unavailable',explanation:'Coefficients and their uncertainty are reported in the result table.'},reference:'lfe 3.1.1 and estimatr 2.0.0.'}
+    case 'bacon': return {general:[],definitions:['The two-way fixed-effects coefficient is reconstructed from its weighted comparisons.'],fitted:{kind:'unavailable',explanation:'Comparison estimates and weights are reported in the result table.'},reference:'Goodman-Bacon (2021); bacondecomp 0.1.1.'}
     case 'interrupted-series': {
       const { specification: s, evidence: e } = run
       const count = s.model.kind === 'count'

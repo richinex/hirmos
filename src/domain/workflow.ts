@@ -541,7 +541,8 @@ export function stepWorkflow(state: Workflow, event: WorkflowEvent): Workflow {
         return { ...state, survivalRuns: state.survivalRuns.filter((run) => run.id !== event.run) }
       }
       if (event.type === 'time-series-run-created'
-        && (state.prepared?.kind === 'prepared-time-series' || state.prepared?.kind === 'prepared-panel' && event.run.kind === 'count-regression')
+        && state.prepared!==null
+        && (state.prepared.kind === 'prepared-time-series' || event.run.kind==='panel-regression'&&event.run.specification.specification.kind==='interactions'||state.prepared.kind === 'prepared-panel' && ['count-regression','panel-regression','bacon'].includes(event.run.kind))
         && timeSeriesRunMatches(event.run, state.prepared)) {
         return { ...state, timeSeriesRuns: [...state.timeSeriesRuns, event.run] }
       }

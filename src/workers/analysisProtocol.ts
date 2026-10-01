@@ -1,4 +1,5 @@
 import { countRegressionRequestSchema, countRegressionEvidenceSchema, type CountRegressionRequest, type CountRegressionEvidence } from '@/domain/countRegression'
+import {panelRegressionRequestSchema,panelRegressionEvidenceSchema,baconRequestSchema,baconEvidenceSchema,type PanelRegressionRequest,type PanelRegressionEvidence,type BaconRequest,type BaconEvidence} from '@/domain/panelRegression'
 import { z } from 'zod'
 import { causalForestConfigurationSchema, causalForestEvidenceSchema, causalForestTargetSchema, type CausalForestConfiguration, type CausalForestEvidence, type CausalForestTarget } from '@/domain/causalForest'
 import { staggeredRequestSchema, staggeredEvidenceSchema, type StaggeredRequest, type StaggeredEvidence } from '@/domain/staggeredDid'
@@ -10,6 +11,22 @@ import { aalenEvidenceSchema, forestEvidenceSchema, forestSettingsSchema, type A
 import { multicollinearityEvidenceSchema, parseMulticollinearityEvidence, type MulticollinearityEvidence } from '@/domain/multicollinearity'
 import { countSeriesInterventionScanEvidenceSchema, parseCountSeriesInterventionScanEvidence, type CountSeriesInterventionScanEvidence } from '@/domain/countSeries'
 import { interruptedImpactSchema, interruptedModelSchema, interruptedSeasonalSchema, interruptedSeriesEvidenceSchema, linearErrorModelSchema, parseInterruptedSeriesEvidence, type InterruptedImpact, type InterruptedModel, type InterruptedSeasonal, type InterruptedSeriesEvidence, type LinearErrorModel } from '@/domain/interruptedSeries'
+
+/** The adjusted regression's error treatments: the series error models, an HC1 covariance, or a covariance clustered by one column of the matrix. */
+export const adjustedRegressionErrorModelSchema = z.union([
+  linearErrorModelSchema,
+  z.object({ kind: z.literal('hc1') }).strict(),
+  z.object({ kind: z.literal('cluster'), column: z.number().int().nonnegative() }).strict(),
+])
+export type AdjustedRegressionErrorModel = z.infer<typeof adjustedRegressionErrorModelSchema>
+
+/** The fixed effects the adjusted regression absorbs: one per unit, or one per unit and one per period, from label columns of the matrix. */
+export const adjustedRegressionFixedEffectsSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('unit'), column: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('time'), column: z.number().int().nonnegative() }).strict(),
+  z.object({ kind: z.literal('unitAndTime'), unit: z.number().int().nonnegative(), time: z.number().int().nonnegative() }).strict(),
+])
+export type AdjustedRegressionFixedEffects = z.infer<typeof adjustedRegressionFixedEffectsSchema>
 import { dagCheckEvidenceSchema, type DagCheckEvidence } from '@/domain/dagValidation'
 import { identifiedDiscreteQueryEvidenceSchema, type IdentifiedDiscreteQueryEvidence } from '@/domain/intervention'
 import { grangerSsrEvidenceSchema, parseGrangerSsrEvidence } from '@/domain/granger'
@@ -623,7 +640,8 @@ export type AnalysisWorkerCommand =
       readonly adjustment: readonly number[]
       readonly hacMaxLags: number | null
       readonly level: number
-      readonly errorModel: LinearErrorModel
+      readonly errorModel: AdjustedRegressionErrorModel
+      readonly fixedEffects: AdjustedRegressionFixedEffects | null
     }
   | {
       readonly kind: 'propensity-weighting'
@@ -1018,6 +1036,8 @@ export type AnalysisWorkerCommand =
       readonly values: Float64Array
       readonly model: CountRegressionRequest
     }
+  | {readonly kind:'panel-regression';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:PanelRegressionRequest}
+  | {readonly kind:'bacon';readonly request:WorkerRequestId;readonly values:Float64Array;readonly model:BaconRequest}
   | {
       readonly kind: 'staggered-did'
       readonly request: WorkerRequestId
@@ -1331,6 +1351,8 @@ export type AnalysisWorkerEvent =
   | { readonly kind: 'vecm-succeeded'; readonly request: WorkerRequestId; readonly result: VecmEvidence }
   | { readonly kind: 'synthetic-control-succeeded'; readonly request: WorkerRequestId; readonly result: SyntheticControlEvidence }
   | { readonly kind: 'count-regression-succeeded'; readonly request: WorkerRequestId; readonly result: CountRegressionEvidence }
+  | {readonly kind:'panel-regression-succeeded';readonly request:WorkerRequestId;readonly result:PanelRegressionEvidence}
+  | {readonly kind:'bacon-succeeded';readonly request:WorkerRequestId;readonly result:BaconEvidence}
   | { readonly kind: 'staggered-did-succeeded'; readonly request: WorkerRequestId; readonly result: StaggeredEvidence }
   | { readonly kind: 'panel-intervention-succeeded'; readonly request: WorkerRequestId; readonly result: PanelInterventionEvidence }
   | { readonly kind: 'negbin-nuts-succeeded'; readonly request: WorkerRequestId; readonly result: NegbinNutsEvidence }
@@ -1886,7 +1908,8 @@ const commandSchema = z.discriminatedUnion('kind', [
     adjustment: z.array(z.number().int().nonnegative()),
     hacMaxLags: z.number().int().nonnegative().nullable(),
     level: z.number().gt(0.5).lt(1),
-    errorModel: linearErrorModelSchema,
+    errorModel: adjustedRegressionErrorModelSchema,
+    fixedEffects: adjustedRegressionFixedEffectsSchema.nullable(),
   }).strict(),
   z.object({
     kind: z.literal('propensity-weighting'),
@@ -2253,6 +2276,8 @@ const commandSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('count-regression'), request: requestSchema, values:z.instanceof(Float64Array),model:countRegressionRequestSchema,
   }).strict(),
+  z.object({kind:z.literal('panel-regression'),request:requestSchema,values:z.instanceof(Float64Array),model:panelRegressionRequestSchema}).strict(),
+  z.object({kind:z.literal('bacon'),request:requestSchema,values:z.instanceof(Float64Array),model:baconRequestSchema}).strict(),
   z.object({
     kind: z.literal('staggered-did'), request: requestSchema, values:z.instanceof(Float64Array),model:staggeredRequestSchema,
   }).strict(),
@@ -2557,6 +2582,8 @@ const eventSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('vecm-succeeded'), request: requestSchema, result: vecmEvidenceSchema }).strict(),
   z.object({ kind: z.literal('synthetic-control-succeeded'), request: requestSchema, result: syntheticControlEvidenceSchema }).strict(),
   z.object({kind:z.literal('count-regression-succeeded'),request:requestSchema,result:countRegressionEvidenceSchema}).strict(),
+  z.object({kind:z.literal('panel-regression-succeeded'),request:requestSchema,result:panelRegressionEvidenceSchema}).strict(),
+  z.object({kind:z.literal('bacon-succeeded'),request:requestSchema,result:baconEvidenceSchema}).strict(),
   z.object({ kind:z.literal('staggered-did-succeeded'),request:requestSchema,result:staggeredEvidenceSchema }).strict(),
   z.object({ kind: z.literal('panel-intervention-succeeded'), request: requestSchema, result: panelInterventionEvidenceSchema }).strict(),
   z.object({ kind: z.literal('negbin-nuts-succeeded'), request: requestSchema, result: negbinNutsEvidenceSchema }).strict(),
@@ -2622,6 +2649,7 @@ export function parseAnalysisWorkerCommand(value: unknown): Result<AnalysisWorke
     return err({ kind: 'invalid-command', detail: 'The Granger matrix must contain exactly two columns.' })
   }
   if (parsed.data.kind === 'count-regression' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Count regression matrix dimensions disagree.'})
+  if ((parsed.data.kind === 'panel-regression'||parsed.data.kind==='bacon') && parsed.data.values.length!==parsed.data.model.rows*parsed.data.model.columns) return err({kind:'invalid-command',detail:'Panel analysis matrix dimensions disagree.'})
   if (parsed.data.kind === 'staggered-did' && parsed.data.values.length !== parsed.data.model.rows * parsed.data.model.columns) return err({kind:'invalid-command',detail:'Staggered DiD matrix dimensions disagree.'})
   if (parsed.data.kind === 'panel-adjusted' && (parsed.data.values.length !== parsed.data.rows * parsed.data.columns || parsed.data.units.length !== parsed.data.rows || parsed.data.times.length !== parsed.data.rows)) {
     return err({ kind: 'invalid-command', detail: 'Adjusted DiD values and keys must describe the same rows.' })
@@ -2943,6 +2971,7 @@ export function parseAnalysisWorkerEvent(value: unknown): Result<AnalysisWorkerE
     return result.success ? ok({ kind: 'sharp-rd-succeeded', request: request.value, result: result.data }) : err({ kind: 'invalid-event', detail: z.prettifyError(result.error) })
   }
   if (parsed.data.kind === 'count-regression-succeeded') return ok({...parsed.data,request:request.value})
+  if (parsed.data.kind === 'panel-regression-succeeded'||parsed.data.kind==='bacon-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'staggered-did-succeeded') return ok({...parsed.data,request:request.value})
   if (parsed.data.kind === 'panel-intervention-succeeded') {
     const result = panelInterventionEvidenceSchema.safeParse(parsed.data.result)
