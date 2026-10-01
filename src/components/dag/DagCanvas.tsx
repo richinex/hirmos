@@ -46,9 +46,9 @@ import {
 } from '@/domain/dag'
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
 import { affectedDagEdges } from '@/domain/dagValidation'
-import { assertNever, isNonEmpty } from '@/domain/dop'
+import { assertNever, err, isNonEmpty, ok, type Result } from '@/domain/dop'
 import { DEFAULT_CARD_SIZE, type DagCardSize, type DagLayoutOrientation } from './dagCanvasModel'
-import { extendHeldPositions, layoutDag, movedRoute, type DagLayout, type DagRoute, type LayoutProblem } from './elkLayout'
+import { extendHeldPositions, layoutDag, movedRoute, separateCards, type DagLayout, type DagRoute, type LayoutProblem } from './elkLayout'
 import { dagCardSize } from './dagCardSize'
 import { useTextMetricsVersion } from '@/lib/textMetrics'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
@@ -213,6 +213,8 @@ const centreOf = (node: InternalNode) => ({
 const ANCHOR_CLEAR = 5.5
 /** One fit for first paint and the buttons: a small graph never zooms past 100%. */
 const FIT_VIEW = { padding: 0.18, maxZoom: 1 } as const
+/** Above this many cards the role placement is skipped and ELK's layered layout stays: the role constraints grow with the graph and the drawing stops reading as a book diagram. */
+const ROLE_LAYOUT_LIMIT = 60
 /** How long the cards take to move to a new layout. */
 const ARRANGE_MS = 320
 /** The point just above the card's top edge, where a self-loop leaves and re-enters. */
@@ -691,18 +693,34 @@ export function DagCanvas({
   const [layoutState, setLayoutState] = useState<LayoutState>({ kind: 'pending', previous: null })
   const [layoutAttempt, setLayoutAttempt] = useState(0)
   const size = useMemo(() => dagCardSize(document.current.graph.nodes.map(node => node.name)), [document.current.graph.nodes, metricsVersion])
+  // A chosen treatment and outcome give every card a role, and the roles decide where cards go.
+  const study = flow === null ? '' : `${flow.treatment}\u0000${flow.outcome}`
   // Only geometry changes trigger layout. Selecting evidence, a query or labels does not move cards.
-  const layoutKey = JSON.stringify([document.id, visibleGraph.nodes.map(n => n.id), visibleGraph.edges.map(e => [e.id, e.cause, e.effect, routeLabelText(e)]), orientation, size.width, size.height])
+  const layoutKey = JSON.stringify([document.id, visibleGraph.nodes.map(n => n.id), visibleGraph.edges.map(e => [e.id, e.cause, e.effect, routeLabelText(e)]), orientation, size.width, size.height, study])
   useEffect(() => {
     let current = true
     setLayoutState(state => ({ kind: 'pending', previous: retainedLayout(state) }))
-    const preserve = previousBinding.current === `${document.id}\u0000${orientation}\u0000${size.width}x${size.height}` && placedByHand.current.size > 0
+    const preserve = previousBinding.current === `${document.id}\u0000${orientation}\u0000${size.width}x${size.height}\u0000${study}` && placedByHand.current.size > 0
     const held = new Map(latestNodes.current.map(node => [node.id, node.position]))
+    const byRole = flow !== null && !preserve && visibleGraph.nodes.length <= ROLE_LAYOUT_LIMIT
     void layoutDag(visibleGraph, orientation, size).then(async result => {
-      if (result.ok && preserve) {
-        const { routeFixedDag } = await import('./fixedRouting')
-        const positions = await extendHeldPositions(visibleGraph, held, size)
-        result = positions.ok ? await routeFixedDag(visibleGraph, positions.value, size, result.value) : positions
+      // ELK still runs first: its self-loop shapes are kept when another step places the cards.
+      if (result.ok && (preserve || byRole)) {
+        const automatic = result.value
+        const placed = await (async (): Promise<Result<DagLayout, LayoutProblem>> => {
+          try {
+            const { routeFixedDag } = await import('./fixedRouting')
+            const byRoles = byRole && flow !== null ? (await import('./roleLayout')).placeByRole(visibleGraph, flow, orientation, size) : null
+            const positions = byRoles === null
+              ? await extendHeldPositions(visibleGraph, held, size)
+              : byRoles.ok ? await separateCards(byRoles.value, size) : byRoles
+            return positions.ok ? await routeFixedDag(visibleGraph, positions.value, size, automatic) : positions
+          } catch (cause) {
+            return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) })
+          }
+        })()
+        // A role placement that fails leaves ELK's drawing in place rather than an empty canvas.
+        result = placed.ok || !byRole ? placed : ok(automatic)
       }
       if (!current) return
       setLayoutState(state => result.ok
@@ -772,8 +790,8 @@ export function DagCanvas({
   }, [reducedMotion, setNodes, stopMotion])
   useEffect(() => stopMotion, [stopMotion])
 
-  // Orientation and card-size changes reset manual placement. Changing study roles only changes styling.
-  const bindingKey = `${document.id}\u0000${orientation}\u0000${model.size.width}x${model.size.height}`
+  // Orientation, card-size and study changes reset manual placement: each one lays the whole drawing out again.
+  const bindingKey = `${document.id}\u0000${orientation}\u0000${model.size.width}x${model.size.height}\u0000${study}`
   const previousBinding = useRef(bindingKey)
   useEffect(() => {
     if (previousBinding.current !== bindingKey) {

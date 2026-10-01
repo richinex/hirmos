@@ -86,6 +86,8 @@ export default defineConfig({
   define: { __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0') },
   plugins: [react(), tailwindcss(), appRoute(), duckdbBinaries(), pyodideRuntime()],
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  // WebCola is CommonJS reached only through a lazily loaded module, so the dev server would otherwise find it mid-session and serve a stale copy.
+  optimizeDeps: { include: ['webcola/dist/src/layout'] },
   server: {
     port: 5179,
     // Tailwind's plugin reloads the page whenever a file it scans changes; keep non-app files out of the watcher.

@@ -20,6 +20,34 @@ export type LayoutProblem =
   | { readonly kind: 'engine'; readonly message: string }
   | { readonly kind: 'invalid-result' }
 
+/**
+ * Separates cards that overlap, keeping their arrangement. The role placement treats non-overlap as
+ * one goal among its hard rules and can leave cards on top of each other; ELK's overlap removal
+ * resolves that without changing which side of the line a card is on.
+ */
+export async function separateCards(positions: ReadonlyMap<DagNodeId, LayoutPoint>, size: DagCardSize): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
+  if (positions.size < 2) return ok(positions)
+  try {
+    engine ??= new ELK({ workerFactory: () => new ElkWorker() })
+    const raw = await engine.layout({
+      id: 'separation',
+      layoutOptions: { 'elk.algorithm': 'sporeOverlap', 'elk.spacing.nodeNode': '24', 'elk.padding': '[top=34,left=34,bottom=34,right=34]' },
+      children: [...positions].map(([id, at]) => ({ id, x: at.x, y: at.y, width: size.width, height: size.height })),
+      edges: [],
+    })
+    const parsed = output.safeParse(raw)
+    if (!parsed.success) return err({ kind: 'invalid-result' })
+    const separated = new Map<DagNodeId, LayoutPoint>()
+    const placed = new Map(parsed.data.children.map(child => [child.id, child]))
+    for (const id of positions.keys()) {
+      const child = placed.get(id)
+      if (child === undefined) return err({ kind: 'invalid-result' })
+      separated.set(id, { x: child.x, y: child.y })
+    }
+    return ok(separated)
+  } catch (cause) { return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) }) }
+}
+
 /** Pack new cards outside the occupied rectangle without changing existing manual positions. */
 export async function extendHeldPositions(graph: EditableDag, held: ReadonlyMap<string, LayoutPoint>, size: DagCardSize): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
   const existing = graph.nodes.flatMap(node => { const position = held.get(node.id); return position === undefined ? [] : [{ id: node.id, ...position }] })
