@@ -5,6 +5,7 @@ import { assertNever, brand, err, ok, type Brand, type Result } from './dop'
 import type { DagDocument, DagDocumentId, DagNode, DagNodeId, DagRevisionId } from './dag'
 import { discreteStatePreparationSchema, type DiscreteBnEvidence } from './estimation'
 import type { PreparedDatasetVersionId } from './preprocessing'
+import { formatStatistic } from '@/lib/format/number'
 
 /**
  * The do-operator as a first-class question on the graph: set one node, read another. The answer
@@ -131,8 +132,8 @@ export function describeInterventionReadiness(problem: InterventionReadinessProb
   }
 }
 
-/** Figures at the precision the tiles use, with a true minus sign. */
-const figure = (value: number): string => (Math.abs(value) >= 100 ? value.toFixed(0) : Math.abs(value) >= 10 ? value.toFixed(1) : value.toFixed(2)).replace('-', '\u2212')
+/** Figures through the formatter the tiles use, so the sentence and the tiles show the same digits. */
+const figure = (value: number): string => formatStatistic('raw', value).text
 
 /** The answer in one sentence: both expectations, their difference, and what the surgery adjusted for. */
 export function describeInterventionVerdict(artifact: ContrastQueryArtifact): string {
