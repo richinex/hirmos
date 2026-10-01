@@ -589,7 +589,7 @@ function App() {
 
   const header = (
     <>
-      <div className="flex min-w-0 items-center gap-4">
+      <div className="flex min-w-0 items-center">
         {/* The round toggle sits in the corner above the rail: two bars that turn into a cross while the lobe is out. */}
         <button
           type="button"
@@ -605,10 +605,6 @@ function App() {
           title={`${navOpen ? 'Collapse' : 'Expand'} section list (⌘B)`}
           onClick={() => setNavOpen((open) => !open)}
         />
-        <span className="dashboard-breadcrumb min-w-0 truncate text-body text-muted">
-          {project !== null && <span className="hidden min-w-0 items-center sm:inline-flex"><span className="truncate">{project.name}</span><Icon name="chevron_right" size={16} className="mx-2" /></span>}
-          <span className="font-medium text-ink">{activeName}</span>
-        </span>
       </div>
       <div className="flex min-w-0 items-center gap-1.5">
         {storageFailure !== null && (

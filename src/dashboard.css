@@ -10,7 +10,6 @@ details[open] > .disclosure-summary > .disclosure-hide { display: inline-flex; }
 .workbench-bottom-content { --text-body: .8125rem; }
 .inspector-content :where(h3, h4) { font-size: 1rem; font-weight: 600; line-height: 1.5; color: var(--color-ink); }
 .inspector-content :where(dl > dt) { font-size: var(--text-label); font-weight: 500; }
-.dashboard-breadcrumb { display: flex; align-items: center; }
    with the names, as a sheet: nothing behind it reflows, and a press anywhere off it puts it away. */
 .dashboard .dashboard-reading { padding: 2rem; }
 .dashboard .project-create { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; padding: 1.25rem; border-radius: 12px; background: var(--color-panel); box-shadow: var(--shadow-lift); }
