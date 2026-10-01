@@ -1,4 +1,43 @@
 import { expect, test } from '@playwright/test'
+import { chapter } from './examples/support'
+
+test('narrow DAG controls fill the pane without orphaned actions or overflow', async ({ page }, info) => {
+  test.skip(info.project.name !== 'mobile-chromium', 'mobile layout sweep')
+  await page.goto('/app/projects')
+  await page.getByRole('button', { name: 'Open Proposition 99 and cigarette sales', exact: true }).click()
+  await expect(page.locator('#data-profile-title')).toBeVisible()
+  await chapter(page, /^DAG workspace/)
+  await page.keyboard.press('Escape')
+  const controls = page.getByRole('group', { name: 'DAG editing controls', exact: true })
+  for (const width of [320, 393, 600]) {
+    await page.setViewportSize({ width, height: 851 })
+    await controls.scrollIntoViewIfNeeded()
+    const treatment = await page.getByRole('combobox', { name: 'Treatment', exact: true }).boundingBox()
+    const outcome = await page.getByRole('combobox', { name: 'Outcome', exact: true }).boundingBox()
+    expect(treatment!.y).toBeCloseTo(outcome!.y, 1)
+    expect(treatment!.width).toBeCloseTo(outcome!.width, 1)
+    const undo = await page.getByRole('button', { name: 'Undo DAG revision', exact: true }).boundingBox()
+    const create = await page.getByRole('button', { name: 'New DAG', exact: true }).boundingBox()
+    expect(undo!.y).toBeCloseTo(create!.y, 1)
+    const add = await page.getByRole('button', { name: 'Unmeasured variable', exact: true }).boundingBox()
+    const paste = await page.getByRole('button', { name: 'From text', exact: true }).boundingBox()
+    expect(add!.y).toBeCloseTo(paste!.y, 1)
+    expect(add!.width).toBeCloseTo(paste!.width, 1)
+    expect(create!.x).toBeCloseTo(outcome!.x, 1)
+    expect(create!.x).toBeCloseTo(paste!.x, 1)
+    expect(create!.width).toBeCloseTo(outcome!.width, 1)
+    expect(create!.width).toBeCloseTo(paste!.width, 1)
+    for (const box of [treatment, outcome, undo, create, add, paste]) {
+      expect(box!.x).toBeGreaterThanOrEqual(0)
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+      expect(box!.height).toBeGreaterThanOrEqual(44)
+    }
+    for (const theme of ['light', 'dark']) {
+      await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+      await controls.screenshot({ path: info.outputPath(`dag-controls-${width}-${theme}.png`) })
+    }
+  }
+})
 
 test('DAG actions share dimensions on desktop and in the mobile inspector', async ({ page }, info) => {
   await page.goto('/app/projects')

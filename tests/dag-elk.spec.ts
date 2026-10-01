@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { prepare, createDag } from './examples/support'
+import { prepare, createDag, chapter } from './examples/support'
 
 const corpus = JSON.parse(readFileSync(new URL('./fixtures/dagitty/examples.json', import.meta.url), 'utf8'))
 
@@ -53,6 +53,7 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
   test.setTimeout(90_000)
   const errors: string[] = []
   page.on('pageerror', error => errors.push(error.message))
+  page.on('console', message => { if (message.text().includes('new nodeTypes or edgeTypes object')) errors.push(message.text()) })
   await page.goto('/app')
   await page.getByRole('textbox', { name: 'Project name' }).fill('ELK triangle')
   await page.getByRole('button', { name: 'Create project' }).click()
@@ -86,17 +87,30 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'dark'))
   await page.screenshot({ path: info.outputPath('triangle-dark.png') })
   expect(await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('style')))).toEqual(beforeTheme)
+  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
+  await page.getByRole('button', { name: 'Show sketch preview', exact: true }).click()
+  await expect(page.locator('[data-sketch-stroke]')).toHaveCount(6)
+  const sketchPaths = await page.locator('[data-sketch-stroke] path').evaluateAll(paths => paths.map(p => p.getAttribute('d')))
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.screenshot({ path: info.outputPath(`triangle-sketch-${theme}.png`) })
+    expect(await page.locator('[data-sketch-stroke] path').evaluateAll(paths => paths.map(p => p.getAttribute('d')))).toEqual(sketchPaths)
+    expect(await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(n => n.getAttribute('style')))).toEqual(beforeTheme)
+  }
+  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
+  await page.getByRole('button', { name: 'Use clean drawing', exact: true }).click()
+  await expect(page.locator('[data-sketch-stroke]')).toHaveCount(0)
   const card = page.locator('.react-flow__node').first()
-  const original = await card.getAttribute('style')
+  const original = await card.evaluate(node => (node as HTMLElement).style.transform)
   const grip = await card.locator('.dag-card-grip').boundingBox()
   expect(grip).not.toBeNull()
   await page.mouse.move(grip!.x + grip!.width / 2, grip!.y + grip!.height / 2)
   await page.mouse.down()
   await page.mouse.move(grip!.x + grip!.width / 2 + 100, grip!.y + grip!.height / 2 + 70, { steps: 12 })
   await page.mouse.up()
-  await expect(card).not.toHaveAttribute('style', original!)
+  await expect.poll(() => card.evaluate(node => (node as HTMLElement).style.transform)).not.toBe(original)
   await page.getByRole('button', { name: 'Tidy graph' }).click()
-  await expect(card).toHaveAttribute('style', original!)
+  await expect.poll(() => card.evaluate(node => (node as HTMLElement).style.transform)).toBe(original)
   const selectArrow = async (cause: string, effect: string) => {
     let previous = ''
     let stable = 0
@@ -120,6 +134,26 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
   await expect(page.getByRole('button', { name: 'Reconnect effect endpoint' })).toBeVisible()
   await page.getByRole('button', { name: 'Remove selected arrow' }).click()
   await expect(page.locator('.react-flow__edge-path')).toHaveCount(2)
+  // Adding an arrow after moving a card must not rearrange any existing card.
+  const heldCard = page.locator('.react-flow__node[aria-label="Observed variable: Prize"]')
+  const heldGrip = await heldCard.locator('.dag-card-grip').boundingBox()
+  await page.mouse.move(heldGrip!.x + heldGrip!.width / 2, heldGrip!.y + heldGrip!.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(heldGrip!.x + heldGrip!.width / 2 + 40, heldGrip!.y + heldGrip!.height / 2 + 20, { steps: 8 })
+  await page.mouse.up()
+  const heldPositions = await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => ({ id: node.getAttribute('data-id'), transform: (node as HTMLElement).style.transform })))
+  const causeBox = await heldCard.boundingBox()
+  const effectBox = await page.locator('.react-flow__node[aria-label="Observed variable: Opened"]').boundingBox()
+  await page.mouse.move(causeBox!.x + causeBox!.width / 2, causeBox!.y + causeBox!.height - 7)
+  await page.mouse.down()
+  await page.mouse.move(effectBox!.x + effectBox!.width / 2, effectBox!.y + effectBox!.height - 7, { steps: 10 })
+  await page.mouse.up()
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(3)
+  expect(await page.locator('.react-flow__node').evaluateAll(nodes => nodes.map(node => ({ id: node.getAttribute('data-id'), transform: (node as HTMLElement).style.transform })))).toEqual(heldPositions)
+  await page.screenshot({ path: info.outputPath('triangle-held-new-arrow.png') })
+  await selectArrow('Prize', 'Opened')
+  await page.getByRole('button', { name: 'Remove selected arrow' }).click()
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(2)
   await selectArrow('Prize', 'Choice')
   let knob = await page.getByRole('button', { name: 'Reconnect cause endpoint' }).boundingBox()
   await expect.poll(async () => {
@@ -137,6 +171,94 @@ test('triangle layout, labels, arrow selection and Tidy work in the canvas', asy
   await expect(page.locator('.react-flow__edge[aria-label^="Prize causes Choice "]')).toHaveCount(1)
   await page.screenshot({ path: info.outputPath('triangle-selected.png') })
   expect(errors).toEqual([])
+})
+
+test('Proposition 99 can hide disconnected variables without changing its DAG', async ({ page }, info) => {
+  test.setTimeout(90_000)
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  await page.goto('/app/projects')
+  await page.getByRole('button', { name: 'Open Proposition 99 and cigarette sales', exact: true }).click()
+  await expect(page.locator('#data-profile-title')).toBeVisible()
+  await chapter(page, /^DAG workspace/)
+  if (info.project.name === 'mobile-chromium') await page.keyboard.press('Escape')
+  const unexpandedEditor = page.getByLabel('Causal DAG editor', { exact: true })
+  await expect(page.locator('.react-flow__node')).toHaveCount(40)
+  await unexpandedEditor.scrollIntoViewIfNeeded()
+  await expect.poll(() => page.locator('.react-flow__node').evaluateAll(nodes => nodes.some(n => {
+    const b = n.getBoundingClientRect(); const canvas = n.closest('[aria-label="Causal DAG editor"]')!.getBoundingClientRect()
+    return b.left >= canvas.left && b.right <= canvas.right && b.top >= canvas.top && b.bottom <= canvas.bottom
+  }))).toBe(true)
+  await page.screenshot({ path: info.outputPath('prop99-unexpanded.png') })
+  const editorBox = await unexpandedEditor.boundingBox()
+  const controls = await page.getByRole('toolbar', { name: 'Canvas', exact: true }).boundingBox()
+  expect(controls!.y).toBeGreaterThanOrEqual(editorBox!.y)
+  expect(controls!.y + controls!.height).toBeLessThanOrEqual(editorBox!.y + editorBox!.height)
+  await expect(page.getByRole('button', { name: 'Expand graph', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Expand graph', exact: true }).click()
+  await expect(page.locator('.react-flow__node')).toHaveCount(40)
+  await page.screenshot({ path: info.outputPath('prop99-all-variables.png') })
+  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
+  await page.getByRole('button', { name: 'Hide disconnected variables', exact: true }).click()
+  await expect(page.locator('.react-flow__node')).toHaveCount(2)
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(1)
+  await page.getByRole('button', { name: 'Fit graph', exact: true }).click()
+  await expect.poll(() => page.locator('.react-flow__node').evaluateAll(nodes => nodes.every(n => {
+    const b = n.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight
+  }))).toBe(true)
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => document.documentElement.setAttribute('data-theme', t), theme)
+    await page.screenshot({ path: info.outputPath(`prop99-connected-${theme}.png`) })
+  }
+  await page.getByRole('button', { name: 'Return graph to the page', exact: true }).click()
+  await unexpandedEditor.scrollIntoViewIfNeeded()
+  await expect.poll(() => page.locator('.react-flow__node').evaluateAll(nodes => nodes.every(n => {
+    const b = n.getBoundingClientRect(); const canvas = n.closest('[aria-label="Causal DAG editor"]')!.getBoundingClientRect()
+    return b.left >= canvas.left && b.right <= canvas.right && b.top >= canvas.top && b.bottom <= canvas.bottom
+  }))).toBe(true)
+  await page.screenshot({ path: info.outputPath('prop99-unexpanded-connected.png') })
+  const toolbar = await page.getByRole('toolbar', { name: 'Canvas', exact: true }).boundingBox()
+  expect(toolbar!.x).toBeGreaterThanOrEqual(0)
+  expect(toolbar!.x + toolbar!.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+  await page.getByRole('button', { name: 'Graph display', exact: true }).click()
+  await page.getByRole('button', { name: /Show disconnected variables/ }).click()
+  await expect(page.locator('.react-flow__node')).toHaveCount(40)
+  await expect(page.locator('.react-flow__edge-path')).toHaveCount(1)
+  expect(errors).toEqual([])
+})
+
+test('fixed-position routing avoids obstacles and labels clear the cards', async ({ page }) => {
+  await page.goto('/app')
+  const result = await page.evaluate(async () => {
+    const layoutPath = '/src/components/dag/elkLayout.ts'
+    const fixedPath = '/src/components/dag/fixedRouting.ts'
+    const labelPath = '/src/components/dag/routeLabels.ts'
+    const { layoutDag } = await import(/* @vite-ignore */ layoutPath)
+    const { routeFixedDag } = await import(/* @vite-ignore */ fixedPath)
+    const { placeRouteLabels, routeLabelSize } = await import(/* @vite-ignore */ labelPath)
+    const graph = { nodes: ['A', 'B', 'C'].map(id => ({ id })), edges: [{ id: 'ab', cause: 'A', effect: 'B', timing: { kind: 'contemporaneous' }, support: { kind: 'unstated' } }] }
+    const size = { width: 164, height: 58, nameLines: 1 }
+    const automatic = await layoutDag(graph, 'across', size)
+    if (!automatic.ok) return { problem: automatic.error }
+    const positions = new Map([['A', { x: 0, y: 120 }], ['B', { x: 500, y: 120 }], ['C', { x: 250, y: 120 }]])
+    const fixed = await routeFixedDag(graph, positions, size, automatic.value)
+    if (!fixed.ok) return { problem: fixed.error }
+    const points = fixed.value.routes.get('ab').points
+    let crossed = false
+    for (let i = 1; i < points.length; i++) for (let step = 0; step <= 100; step++) {
+      const t = step / 100
+      const x = points[i - 1].x * (1 - t) + points[i].x * t
+      const y = points[i - 1].y * (1 - t) + points[i].y * t
+      if (x > 250 && x < 414 && y > 120 && y < 178) crossed = true
+    }
+    const label = placeRouteLabels(graph, fixed.value, size).get('ab')
+    const dimensions = routeLabelSize(graph.edges[0])
+    return { crossed, labelClear: label?.kind === 'clear', fixed: [...fixed.value.nodes], labels: dimensions }
+  })
+  expect(result).not.toHaveProperty('problem')
+  expect(result.crossed).toBe(false)
+  expect(result.labelClear).toBe(true)
+  expect(result.fixed).toEqual([['A', { x: 0, y: 120 }], ['B', { x: 500, y: 120 }], ['C', { x: 250, y: 120 }]])
 })
 
 test('larger bound graph retains causal colours and readable routes', async ({ page }, info) => {

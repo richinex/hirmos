@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom'
+import * as Popover from '@radix-ui/react-popover'
 import { escapeFor, pushLayer } from '@/lib/dismissal'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -13,6 +14,8 @@ import {
   ReactFlow,
   useConnection,
   useInternalNode,
+  useNodesInitialized,
+  useStore,
   useStoreApi,
   useNodesState,
   useReactFlow,
@@ -30,7 +33,7 @@ import '@xyflow/react/dist/style.css'
 import { XYHandle, isMouseEvent } from '@xyflow/system'
 import { Icon } from '@/components/Icon'
 import { Tooltip } from '@/components/ui/Tooltip'
-import { iconControl, label, literal } from '@/components/ui/recipes'
+import { button, iconControl, label, literal } from '@/components/ui/recipes'
 import {
   describeDagEditProblem,
   inspectDagEdgeAddition,
@@ -44,9 +47,9 @@ import {
 } from '@/domain/dag'
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
 import { affectedDagEdges } from '@/domain/dagValidation'
-import { assertNever } from '@/domain/dop'
+import { assertNever, isNonEmpty } from '@/domain/dop'
 import { DEFAULT_CARD_SIZE, type DagCardSize, type DagLayoutOrientation } from './dagCanvasModel'
-import { layoutDag, movedRoute, type DagLayout, type DagRoute, type LayoutProblem } from './elkLayout'
+import { extendHeldPositions, layoutDag, movedRoute, type DagLayout, type DagRoute, type LayoutProblem } from './elkLayout'
 import { dagCardSize } from './dagCardSize'
 import { useTextMetricsVersion } from '@/lib/textMetrics'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
@@ -54,6 +57,11 @@ import type { InterventionOverlay } from '@/domain/intervention'
 import { FlowControls, flowControl } from '@/components/flow/FlowControls'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import { dagPointerTarget, type ScreenTargetBox } from './dagPointerTarget'
+import { placeRouteLabels, routeLabelText, type RouteLabel } from './routeLabels'
+
+const SketchStroke = lazy(() => import('./SketchStroke'))
+type DrawingStyle = 'clean' | 'sketch'
+type VariableView = 'all' | 'connected'
 
 interface DagNodeData extends Record<string, unknown> {
   readonly name: string
@@ -67,6 +75,7 @@ interface DagNodeData extends Record<string, unknown> {
   readonly intervention: 'set' | 'read' | null
   /** The size every card in this graph is drawn at, fitted to the longest name (dagCardSize.ts). */
   readonly size: DagCardSize
+  readonly drawing: DrawingStyle
 }
 
 type CanvasNode = Node<DagNodeData, 'dagVariable'>
@@ -76,6 +85,8 @@ interface DagEdgeData extends Record<string, unknown> {
   readonly route: DagRoute
   /** Severed by the intervention: an arrow into the set node. */
   readonly cut: boolean
+  readonly drawing: DrawingStyle
+  readonly labelPlacement: RouteLabel | null
 }
 
 type CanvasEdge = Edge<DagEdgeData, 'dagEdge'>
@@ -141,7 +152,7 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
       style={{
         width: data.size.width,
         height: data.size.height,
-        borderColor: refused
+        borderColor: data.drawing === 'sketch' ? 'transparent' : refused
           ? 'var(--color-danger)'
           : isTarget
             ? 'var(--color-signal)'
@@ -157,6 +168,11 @@ function DagVariableCard({ id, data, selected }: NodeProps<CanvasNode>) {
         opacity: refused ? 0.4 : undefined,
       }}
     >
+      {data.drawing === 'sketch' && <svg aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-visible" width={data.size.width} height={data.size.height} style={{ color: refused ? 'var(--color-danger)' : data.intervention === 'set' ? 'var(--color-signal)' : data.intervention === 'read' ? 'var(--color-info)' : evidenceColor ?? (data.kind === 'latent' ? 'var(--color-faint)' : 'var(--color-muted)') }}>
+        <Suspense fallback={<rect x={0} y={0} width={data.size.width} height={data.size.height} rx={8} fill="none" stroke="currentColor" />}>
+          <SketchStroke id={`card:${id}`} path={`M 8 0 H ${data.size.width - 8} Q ${data.size.width} 0 ${data.size.width} 8 V ${data.size.height - 8} Q ${data.size.width} ${data.size.height} ${data.size.width - 8} ${data.size.height} H 8 Q 0 ${data.size.height} 0 ${data.size.height - 8} V 8 Q 0 0 8 0 Z`} style={{ strokeWidth: 1, strokeDasharray: data.kind === 'latent' ? '3 3' : undefined }} />
+        </Suspense>
+      </svg>}
       <Handle
         id="card"
         type="source"
@@ -200,10 +216,6 @@ const ANCHOR_CLEAR = 5.5
 const FIT_VIEW = { padding: 0.18, maxZoom: 1 } as const
 /** How long the cards take to move to a new layout. */
 const ARRANGE_MS = 320
-/** Labels sit nearer the cause than the midpoint: arrows converging on one effect then keep their labels apart. */
-const LABEL_ALONG = 0.32
-/** Perpendicular distance from the line to the label's centre, in flow units. */
-const LABEL_OFFSET = 11
 /** The point just above the card's top edge, where a self-loop leaves and re-enters. */
 const topPoint = (node: InternalNode) => {
   const centre = centreOf(node)
@@ -253,19 +265,22 @@ function DagEdgePath({ id, source, target, data, style, markerEnd, label: edgeLa
   if (!sourceNode || !targetNode || data === undefined) return null
   const [first, ...rest] = routePoints(data.route, sourceNode, targetNode)
   const path = `M ${first.x} ${first.y} ${rest.map(p => `L ${p.x} ${p.y}`).join(' ')}`
-  const next = rest[0] ?? first
-  const length = Math.hypot(next.x - first.x, next.y - first.y) || 1
+  const labelCentre = data.labelPlacement?.centre ?? first
+  const sourcePosition = sourceNode.internals.positionAbsolute
+  const targetPosition = targetNode.internals.positionAbsolute
   const labelAt = {
-    x: first.x + (next.x - first.x) * LABEL_ALONG + (next.y - first.y) / length * LABEL_OFFSET,
-    y: first.y + (next.y - first.y) * LABEL_ALONG - (next.x - first.x) / length * LABEL_OFFSET,
+    x: labelCentre.x + (sourcePosition.x - data.route.sourcePosition.x + targetPosition.x - data.route.targetPosition.x) / 2,
+    y: labelCentre.y + (sourcePosition.y - data.route.sourcePosition.y + targetPosition.y - data.route.targetPosition.y) / 2,
   }
   return (
     <>
-      <BaseEdge id={id} path={path} style={style} markerEnd={markerEnd as string | undefined} />
+      <BaseEdge id={id} path={path} style={data.drawing === 'sketch' ? { ...style, stroke: 'transparent' } : style} markerEnd={markerEnd as string | undefined} />
+      {data.drawing === 'sketch' && <Suspense fallback={<path d={path} fill="none" style={style} />}><SketchStroke id={`edge:${id}`} path={path} style={{ ...style, color: style?.stroke }} /></Suspense>}
       {typeof edgeLabel === 'string' && edgeLabel.length > 0 && (
         <EdgeLabelRenderer>
           <span
             className={literal('pointer-events-none absolute rounded border border-hair bg-panel px-1.5 py-0.5 text-micro text-faint')}
+            data-route-label={data.labelPlacement?.kind}
             style={{ transform: `translate(-50%, -50%) translate(${labelAt.x}px, ${labelAt.y}px)` }}
           >
             {edgeLabel}
@@ -384,10 +399,13 @@ function DagGrid() {
 /** Refits the view when the canvas box changes size, so a pane resize or a taller stage never leaves the graph cut off. */
 function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTMLDivElement | null>; readonly layoutKey: string }) {
   const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
+  const initialized = useNodesInitialized()
+  const nodeCount = useStore(store => store.nodes.length)
   useEffect(() => {
+    if (!initialized) return
     const timer = window.setTimeout(() => { void fitView({ ...FIT_VIEW, duration: 160 }) }, 60)
     return () => window.clearTimeout(timer)
-  }, [fitView, layoutKey])
+  }, [fitView, initialized, layoutKey, nodeCount])
   useEffect(() => {
     const element = host.current
     if (element === null) return
@@ -406,7 +424,7 @@ function RefitOnResize({ host, layoutKey }: { readonly host: React.RefObject<HTM
   return null
 }
 
-function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleExpand, labelsShown, onToggleLabels }: {
+function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleExpand, labelsShown, onToggleLabels, drawing, onToggleDrawing, variableView, disconnectedCount, onToggleVariables }: {
   readonly onTidy: () => void
   readonly viewLocked: boolean
   readonly onToggleLock: () => void
@@ -414,11 +432,25 @@ function CanvasControls({ onTidy, viewLocked, onToggleLock, expanded, onToggleEx
   readonly onToggleExpand: () => void
   readonly labelsShown: boolean
   readonly onToggleLabels: () => void
+  readonly drawing: DrawingStyle
+  readonly onToggleDrawing: () => void
+  readonly variableView: VariableView
+  readonly disconnectedCount: number
+  readonly onToggleVariables: () => void
 }) {
   const { fitView } = useReactFlow<CanvasNode, CanvasEdge>()
   const control = flowControl
+  const [displayOpen, setDisplayOpen] = useState(false)
   return (
     <FlowControls fit={FIT_VIEW} fitLabel="Fit graph">
+        <Popover.Root open={displayOpen} onOpenChange={setDisplayOpen}>
+          <Popover.Trigger asChild><button type="button" className={control} title="Graph display" aria-label="Graph display"><Icon name="tune" size={14} /></button></Popover.Trigger>
+          <Popover.Portal><Popover.Content side="top" align="end" sideOffset={8} collisionPadding={8} className="pop float z-(--z-dialog) w-64 rounded-lg border border-line bg-panel p-2 text-ink">
+            <button type="button" className={button('quiet', 'flex w-full items-center gap-2 text-left')} disabled={disconnectedCount === 0} aria-pressed={variableView === 'connected'} onClick={() => { onToggleVariables(); setDisplayOpen(false) }}><Icon name={variableView === 'all' ? 'visibility_off' : 'visibility'} size={16} />{variableView === 'all' ? 'Hide disconnected variables' : `Show disconnected variables (${disconnectedCount})`}</button>
+            <p className="px-3 pb-2 text-micro text-muted">Hidden variables remain in the DAG.</p>
+            <button type="button" className={button('quiet', 'flex w-full items-center gap-2 text-left')} aria-pressed={drawing === 'sketch'} onClick={() => { onToggleDrawing(); setDisplayOpen(false) }}><Icon name="draw" size={16} />{drawing === 'clean' ? 'Show sketch preview' : 'Use clean drawing'}</button>
+          </Popover.Content></Popover.Portal>
+        </Popover.Root>
         <button
           type="button"
           className={control}
@@ -510,7 +542,7 @@ const retainedLayout = (state: LayoutState): DagLayout | null => {
   }
 }
 
-const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, layout: DagLayout | null, labelsShown: boolean): {
+const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, layout: DagLayout | null, labelsShown: boolean, drawing: DrawingStyle): {
   readonly nodes: CanvasNode[]
   readonly edges: CanvasEdge[]
   /** The size every card is drawn at; a change relays the whole drawing, since kept positions were fitted to the old size. */
@@ -518,6 +550,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
 } => {
   const size = dagCardSize(document.current.graph.nodes.map((node) => node.name))
   const placements = layout?.nodes
+  const labelPlacements = layout === null ? new Map<DagEdgeId, RouteLabel>() : placeRouteLabels(document.current.graph, layout, size)
   const highlighted = evidenceColumns(candidate)
   const validation = document.current.validation
   const problemEdges = new Set(validation.structure.kind === 'invalid' ? validation.structure.issues.flatMap(affectedDagEdges) : [])
@@ -541,14 +574,13 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
           ? 'var(--color-warn)'
           : edge.evidence.length > 0 ? 'var(--color-info)' : 'var(--color-muted)'
     const flowWords = edgeFlow === null ? '' : edgeFlow.biasing ? '; lies on an open biasing path' : edgeFlow.causal ? '; lies on a directed causal path' : '; not on an active treatment–outcome path'
-    const timingLabel = edge.timing.kind === 'lagged' ? `t−${edge.timing.lag}` : ''
-    const edgeLabel = [timingLabel, unstated ? 'needs rationale' : ''].filter((part) => part.length > 0).join('; ')
+    const edgeLabel = routeLabelText(edge)
     return [{
       id: edge.id,
       type: 'dagEdge',
       source: edge.cause,
       target: edge.effect,
-      data: { edge, route, cut },
+      data: { edge, route, cut, drawing, labelPlacement: labelPlacements.get(edge.id) ?? null },
       label: cut ? 'cut by do()' : labelsShown ? edgeLabel : '',
       // User-space units keep the head 6px long whatever the stroke width, so selection does not swell it.
       markerEnd: { type: MarkerType.ArrowClosed, color: stroke, markerUnits: 'userSpaceOnUse', width: 24, height: 24, strokeWidth: 1 },
@@ -587,6 +619,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
           droppable: true,
           intervention: intervention === null ? null : node.id === intervention.set ? 'set' : node.id === intervention.read ? 'read' : null,
           size,
+          drawing,
         },
         ariaLabel: `${node.kind === 'latent' ? 'Unmeasured' : 'Observed'} variable: ${node.name}`,
       }]
@@ -635,15 +668,31 @@ export function DagCanvas({
   // The card size is measured from the names, so the model re-runs once the document's fonts have loaded.
   const metricsVersion = useTextMetricsVersion()
   const [labelsShown, setLabelsShown] = useState(false)
+  const [drawing, setDrawing] = useState<DrawingStyle>('clean')
+  const [variableView, setVariableView] = useState<VariableView>('all')
+  const connectedIds = useMemo(() => new Set(document.current.graph.edges.flatMap(edge => [edge.cause, edge.effect])), [document.current.graph.edges])
+  const disconnectedCount = document.current.graph.nodes.filter(node => !connectedIds.has(node.id)).length
+  const visibleGraph = useMemo(() => {
+    if (variableView === 'all') return document.current.graph
+    const connected = document.current.graph.nodes.filter(node => connectedIds.has(node.id))
+    return isNonEmpty(connected) ? { ...document.current.graph, nodes: connected } : document.current.graph
+  }, [document.current.graph, variableView, connectedIds])
   const [layoutState, setLayoutState] = useState<LayoutState>({ kind: 'pending', previous: null })
   const [layoutAttempt, setLayoutAttempt] = useState(0)
   const size = useMemo(() => dagCardSize(document.current.graph.nodes.map(node => node.name)), [document.current.graph.nodes, metricsVersion])
   // Only geometry changes trigger layout. Selecting evidence, a query or labels does not move cards.
-  const layoutKey = JSON.stringify([document.id, document.current.graph.nodes.map(n => n.id), document.current.graph.edges.map(e => [e.id, e.cause, e.effect]), orientation, size.width, size.height])
+  const layoutKey = JSON.stringify([document.id, visibleGraph.nodes.map(n => n.id), visibleGraph.edges.map(e => [e.id, e.cause, e.effect, routeLabelText(e)]), orientation, size.width, size.height])
   useEffect(() => {
     let current = true
     setLayoutState(state => ({ kind: 'pending', previous: retainedLayout(state) }))
-    void layoutDag(document.current.graph, orientation, size).then(result => {
+    const preserve = previousBinding.current === `${document.id}\u0000${orientation}\u0000${size.width}x${size.height}` && placedByHand.current.size > 0
+    const held = new Map(latestNodes.current.map(node => [node.id, node.position]))
+    void layoutDag(visibleGraph, orientation, size).then(async result => {
+      if (result.ok && preserve) {
+        const { routeFixedDag } = await import('./fixedRouting')
+        const positions = await extendHeldPositions(visibleGraph, held, size)
+        result = positions.ok ? await routeFixedDag(visibleGraph, positions.value, size, result.value) : positions
+      }
       if (!current) return
       setLayoutState(state => result.ok
         ? { kind: 'ready', value: result.value }
@@ -653,7 +702,7 @@ export function DagCanvas({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey contains the engine's entire geometry input
   }, [layoutKey, layoutAttempt])
   const layout = retainedLayout(layoutState)
-  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, layout, labelsShown), [document, flow, intervention, layout, selectedEvidence, labelsShown])
+  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, layout, labelsShown, drawing), [document, flow, intervention, layout, selectedEvidence, labelsShown, drawing])
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(model.nodes)
   // The gesture is read in React Flow's callbacks, which fire from listeners bound at pointer-down, so a ref carries it as well as state.
   const [gesture, setGesture] = useState<Gesture | null>(null)
@@ -722,7 +771,7 @@ export function DagCanvas({
     }
 
     const positions = new Map(latestNodes.current.map((node) => [node.id, node.position]))
-    const kept = (id: string) => (placedByHand.current.has(id) ? positions.get(id) : undefined)
+    const kept = (id: string) => (placedByHand.current.size > 0 ? positions.get(id) : undefined)
     arrange(model.nodes.map((next) => {
       const held = kept(next.id)
       return held === undefined ? next : { ...next, position: held }
@@ -731,7 +780,7 @@ export function DagCanvas({
 
   const tidy = () => {
     placedByHand.current.clear()
-    if (layoutState.kind === 'failed') setLayoutAttempt(attempt => attempt + 1)
+    setLayoutAttempt(attempt => attempt + 1)
     arrange(model.nodes)
   }
   /** Notes every card the pointer moves; a drag also stops any rearrangement still in motion. */
@@ -743,6 +792,7 @@ export function DagCanvas({
       }
     }
     onNodesChange(changes)
+    if (changes.some(change => change.type === 'position' && change.dragging === false)) setLayoutAttempt(attempt => attempt + 1)
   }, [onNodesChange, stopMotion])
   // The canvas sits inside a scrolling stage, so a wheel over it is ambiguous. Locked is the safer
   // default: the wheel scrolls the page, ⌘ or Ctrl with the wheel still zooms, and the buttons always work.
@@ -879,7 +929,7 @@ export function DagCanvas({
       ref={hostRef}
       className={expanded
         ? 'fixed inset-3 z-(--z-dialog) flex flex-col overflow-hidden rounded-xl border border-edge bg-well float'
-        : 'relative flex min-h-[16rem] flex-1 flex-col overflow-hidden rounded-xl border border-edge bg-well @max-md/panel:min-h-[26rem]'}
+        : 'relative flex min-h-[22rem] flex-1 flex-col overflow-hidden rounded-xl border border-edge bg-well @max-md/panel:min-h-[26rem]'}
       aria-label="Causal DAG editor"
       onKeyDown={keyDown}
     >
@@ -970,7 +1020,7 @@ export function DagCanvas({
               }}
             />
           )}
-          <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} labelsShown={labelsShown} onToggleLabels={() => setLabelsShown((shown) => !shown)} />
+          <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} labelsShown={labelsShown} onToggleLabels={() => setLabelsShown((shown) => !shown)} drawing={drawing} onToggleDrawing={() => setDrawing(style => style === 'clean' ? 'sketch' : 'clean')} variableView={variableView} disconnectedCount={disconnectedCount} onToggleVariables={() => { placedByHand.current.clear(); setVariableView(view => view === 'all' ? 'connected' : 'all'); setRearrangements(count => count + 1) }} />
           <RefitOnResize host={hostRef} layoutKey={`${bindingKey}\u0000${rearrangements}`} />
         </ReactFlow>
         </div>

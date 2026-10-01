@@ -932,44 +932,40 @@ export function DagWorkspace({
 
   const document = selectedDocument
   const stage = (
-    <section aria-labelledby="dag-workspace-title" className="@container/panel flex h-full min-h-0 flex-col">
+    <section aria-labelledby="dag-workspace-title" className="@container/panel flex min-h-full flex-1 flex-col">
       {header}
       {documents.length > 1 && (
         <SegmentedControl wrap className="mb-3 self-start" ariaLabel="DAG documents" value={document.id}
           onChange={(id) => dispatch({ type: 'document-selected', document: id, latestRun: latestRunId(discoveryRuns) })}
           options={documents.map((candidate) => ({ value: candidate.id, label: candidate.name }))} />
       )}
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h3 className="mb-1 mt-0 text-title font-medium text-ink">{document.name}</h3>
-          <p className="m-0 text-label text-faint">{describeDagOrigin(document.origin)}</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3" role="group" aria-label="DAG editing controls">
+        <div className="grid w-full grid-cols-2 gap-3 @3xl/panel:flex @3xl/panel:w-auto" role="group" aria-label="Study binding">
+          <label className="block min-w-0 text-label text-ink @3xl/panel:flex @3xl/panel:items-center @3xl/panel:gap-2"><span>Treatment</span>
+            <Select aria-label="Treatment" className={field('text', 'mt-1 w-full @3xl/panel:mt-0 @3xl/panel:w-32')} value={boundTreatment ?? ''} onChange={(event) => bind('treatment', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
+              <option value="">Choose</option>
+              {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundOutcome}>{node.name}</option>)}
+            </Select>
+          </label>
+          <label className="block min-w-0 text-label text-ink @3xl/panel:flex @3xl/panel:items-center @3xl/panel:gap-2"><span>Outcome</span>
+            <Select aria-label="Outcome" className={field('text', 'mt-1 w-full @3xl/panel:mt-0 @3xl/panel:w-32')} value={boundOutcome ?? ''} onChange={(event) => bind('outcome', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
+              <option value="">Choose</option>
+              {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundTreatment}>{node.name}</option>)}
+            </Select>
+          </label>
         </div>
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-4" role="toolbar" aria-label="DAG actions">
-          <div className="flex basis-full items-center gap-2 sm:basis-auto" role="group" aria-label="DAG revision controls">
-            <button type="button" disabled={document.history.length === 0} className={button('quiet')} onClick={() => moveRevision(document, 'undo')} aria-label="Undo DAG revision" title="Undo DAG revision"><Icon name="undo" size={15} /></button>
-            <span className="whitespace-nowrap text-label tabular-nums text-muted">Revision {document.history.length + 1} of {document.history.length + document.future.length + 1}</span>
-            <button type="button" disabled={document.future.length === 0} className={button('quiet')} onClick={() => moveRevision(document, 'redo')} aria-label="Redo DAG revision" title="Redo DAG revision"><Icon name="redo" size={15} /></button>
-            <ParameterHelp label="revision history" help={`${document.audit.length} revisions retained. Undo and redo change the active revision without deleting retained revisions.`} />
+        <div className="grid w-full grid-cols-2 items-stretch gap-3 @3xl/panel:flex @3xl/panel:w-auto @3xl/panel:flex-wrap @3xl/panel:items-center" role="toolbar" aria-label="DAG actions">
+          <div className="col-span-2 grid grid-cols-2 items-center gap-3 @3xl/panel:contents">
+          <div className="flex w-full min-w-0 items-center gap-2 @3xl/panel:w-auto" role="group" aria-label="DAG revision controls">
+            <button type="button" disabled={document.history.length === 0} className={button('quiet', 'min-w-0 flex-1 @3xl/panel:flex-none')} onClick={() => moveRevision(document, 'undo')} aria-label="Undo DAG revision" title="Undo DAG revision"><Icon name="undo" size={15} /></button>
+            <span className="whitespace-nowrap text-label tabular-nums text-muted"><span className="sr-only">Revision {document.history.length + 1} of {document.history.length + document.future.length + 1}</span><span aria-hidden className="@sm/panel:hidden">{document.history.length + 1} / {document.history.length + document.future.length + 1}</span><span aria-hidden className="hidden @sm/panel:inline">Revision {document.history.length + 1} of {document.history.length + document.future.length + 1}</span></span>
+            <button type="button" disabled={document.future.length === 0} className={button('quiet', 'min-w-0 flex-1 @3xl/panel:flex-none')} onClick={() => moveRevision(document, 'redo')} aria-label="Redo DAG revision" title="Redo DAG revision"><Icon name="redo" size={15} /></button>
           </div>
-          <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'latent-variable-add-requested' })}><Icon name="add" size={14} /> Unmeasured variable</button>
-          <button type="button" className={button('quiet', 'inline-flex items-center gap-1.5')} onClick={() => dispatch({ type: 'paste-requested' })}><Icon name="content_paste" size={14} /> From text</button>
-          <button type="button" className={button('quiet')} onClick={() => dispatch({ type: 'new-document-requested' })}>New DAG</button>
+          <button type="button" className={button('quiet', 'min-w-0 w-full @3xl/panel:w-auto')} onClick={() => dispatch({ type: 'new-document-requested' })}>New DAG</button>
+          </div>
+          <button type="button" className={button('quiet', 'inline-flex w-full min-w-0 items-center gap-1.5 whitespace-normal @3xl/panel:w-auto')} onClick={() => dispatch({ type: 'latent-variable-add-requested' })}><Icon name="add" size={14} /> Unmeasured variable</button>
+          <button type="button" className={button('quiet', 'inline-flex w-full min-w-0 items-center gap-1.5 @3xl/panel:w-auto')} onClick={() => dispatch({ type: 'paste-requested' })}><Icon name="content_paste" size={14} /> From text</button>
         </div>
-      </div>
-      {/* A fixed label width keeps the two selects aligned whether they sit side by side or wrap onto their own lines. */}
-      <div className="mb-6 flex flex-wrap items-center gap-3" role="group" aria-label="Study binding">
-        <label className="flex items-center gap-3 text-body text-ink"><span className="w-20 shrink-0">Treatment</span>
-          <Select aria-label="Treatment" className={field('text', 'w-40')} value={boundTreatment ?? ''} onChange={(event) => bind('treatment', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
-            <option value="">Choose</option>
-            {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundOutcome}>{node.name}</option>)}
-          </Select>
-        </label>
-        <label className="flex items-center gap-3 text-body text-ink"><span className="w-20 shrink-0">Outcome</span>
-          <Select aria-label="Outcome" className={field('text', 'w-40')} value={boundOutcome ?? ''} onChange={(event) => bind('outcome', event.target.value === '' ? null : (event.target.value as DagNodeId))}>
-            <option value="">Choose</option>
-            {document.current.graph.nodes.filter((node) => node.kind === 'observed').map((node) => <option key={node.id} value={node.id} disabled={node.id === boundTreatment}>{node.name}</option>)}
-          </Select>
-        </label>
       </div>
       {state.latentVariable.kind === 'adding' && (
         <form className={well('mb-3 flex flex-wrap items-end gap-2 p-3')} onSubmit={(event) => { event.preventDefault(); addLatentVariable(document) }}>
@@ -1052,6 +1048,11 @@ export function DagWorkspace({
   const rootCause = prepareRootCauseGraph(document, prepared)
   const inspector = (
     <div className="flex flex-col gap-4">
+      <section aria-labelledby="dag-document-title">
+        <h3 id="dag-document-title" className="mb-1 mt-0 text-body font-medium text-ink">{document.name}</h3>
+        <p className="m-0 text-label text-muted">{describeDagOrigin(document.origin)}</p>
+        <div className="mt-2 flex items-center gap-2 text-label text-muted"><span>Revision {document.history.length + 1} of {document.history.length + document.future.length + 1}</span><ParameterHelp label="revision history" help={`${document.audit.length} revisions retained. Undo and redo change the active revision without deleting retained revisions.`} /></div>
+      </section>
       <SegmentedControl size="sm" fill ariaLabel="DAG inspector" value={inspectorTab} onChange={setInspectorTab} options={[
         { value: 'selection', label: <span className="flex items-center gap-1.5"><Icon name="ads_click" size={14} />Selection</span> },
         { value: 'evidence', label: <span className="flex items-center gap-1.5"><Icon name="schema" size={14} />Evidence</span> },
@@ -1120,7 +1121,7 @@ export function DagWorkspace({
     <WorkbenchLayout
       id="dag"
       stage={stage}
-      stageScroll={false}
+      stageScroll
       inspector={{
         title: 'Inspector',
         body: inspector,

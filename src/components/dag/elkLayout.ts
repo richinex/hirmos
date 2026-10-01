@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { err, ok, type Result, type NonEmptyArray } from '@/domain/dop'
 import type { EditableDag, DagEdgeId, DagNodeId } from '@/domain/dag'
 import type { DagCardSize, DagLayoutOrientation } from './dagCanvasModel'
+import { routeLabelSize } from './routeLabels'
 
 export type LayoutPoint = { readonly x: number; readonly y: number }
 export interface DagRoute {
@@ -18,6 +19,35 @@ export interface DagLayout {
 export type LayoutProblem =
   | { readonly kind: 'engine'; readonly message: string }
   | { readonly kind: 'invalid-result' }
+
+/** Pack new cards outside the occupied rectangle without changing existing manual positions. */
+export async function extendHeldPositions(graph: EditableDag, held: ReadonlyMap<string, LayoutPoint>, size: DagCardSize): Promise<Result<ReadonlyMap<DagNodeId, LayoutPoint>, LayoutProblem>> {
+  const existing = graph.nodes.flatMap(node => { const position = held.get(node.id); return position === undefined ? [] : [{ id: node.id, ...position }] })
+  const added = graph.nodes.filter(node => !held.has(node.id))
+  if (added.length === 0) return ok(new Map(existing.map(node => [node.id, { x: node.x, y: node.y }])))
+  if (existing.length === 0) return err({ kind: 'invalid-result' })
+  try {
+    engine ??= new ELK({ workerFactory: () => new ElkWorker() })
+    const left = Math.min(...existing.map(node => node.x))
+    const top = Math.min(...existing.map(node => node.y))
+    const width = Math.max(...existing.map(node => node.x + size.width)) - left
+    const height = Math.max(...existing.map(node => node.y + size.height)) - top
+    const raw = await engine.layout({ id: 'packing', layoutOptions: { 'elk.algorithm': 'box', 'elk.spacing.nodeNode': '46' }, children: [
+      { id: 'occupied', width, height }, ...added.map(node => ({ id: node.id, width: size.width, height: size.height })),
+    ] })
+    const parsed = output.safeParse(raw)
+    if (!parsed.success) return err({ kind: 'invalid-result' })
+    const occupied = parsed.data.children.find(node => node.id === 'occupied')
+    if (!occupied) return err({ kind: 'invalid-result' })
+    const positions = new Map<DagNodeId, LayoutPoint>(existing.map(node => [node.id, { x: node.x, y: node.y }]))
+    for (const node of added) {
+      const placed = parsed.data.children.find(placed => placed.id === node.id)
+      if (!placed) return err({ kind: 'invalid-result' })
+      positions.set(node.id, { x: placed.x - occupied.x + left, y: placed.y - occupied.y + top })
+    }
+    return ok(positions)
+  } catch (cause) { return err({ kind: 'engine', message: cause instanceof Error ? cause.message : String(cause) }) }
+}
 
 const point = z.object({ x: z.number().finite(), y: z.number().finite() })
 const output = z.object({
@@ -47,7 +77,7 @@ export async function layoutDag(graph: EditableDag, orientation: DagLayoutOrient
         'elk.randomSeed': '1',
       },
       children: graph.nodes.map(node => ({ id: node.id, width: size.width, height: size.height })),
-      edges: graph.edges.map(edge => ({ id: edge.id, sources: [edge.cause], targets: [edge.effect] })),
+      edges: graph.edges.map(edge => ({ id: edge.id, sources: [edge.cause], targets: [edge.effect], labels: [{ id: `${edge.id}:label`, ...routeLabelSize(edge), layoutOptions: { 'elk.edgeLabels.placement': 'CENTER' } }] })),
     })
     const parsed = output.safeParse(raw)
     if (!parsed.success) return err({ kind: 'invalid-result' })
