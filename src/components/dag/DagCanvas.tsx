@@ -13,7 +13,6 @@ import {
   ReactFlow,
   useConnection,
   useInternalNode,
-  useStore,
   useStoreApi,
   useNodesState,
   useReactFlow,
@@ -46,7 +45,8 @@ import {
 import type { DiscoveryCandidate } from '@/domain/dagEvidence'
 import { affectedDagEdges } from '@/domain/dagValidation'
 import { assertNever } from '@/domain/dop'
-import { DEFAULT_CARD_SIZE, layoutDagForCanvas, type DagCardSize, type DagLayoutOrientation } from './dagCanvasModel'
+import { DEFAULT_CARD_SIZE, type DagCardSize, type DagLayoutOrientation } from './dagCanvasModel'
+import { layoutDag, movedRoute, type DagLayout, type DagRoute, type LayoutProblem } from './elkLayout'
 import { dagCardSize } from './dagCardSize'
 import { useTextMetricsVersion } from '@/lib/textMetrics'
 import { roleWord, type DagCausalFlow } from '@/domain/dagFlow'
@@ -73,8 +73,7 @@ type CanvasNode = Node<DagNodeData, 'dagVariable'>
 
 interface DagEdgeData extends Record<string, unknown> {
   readonly edge: DirectedDagEdge
-  /** Sideways shift in flow units when another arrow joins the same two variables, so the pair does not overprint. */
-  readonly offset: number
+  readonly route: DagRoute
   /** Severed by the intervention: an arrow into the set node. */
   readonly cut: boolean
 }
@@ -197,10 +196,10 @@ const centreOf = (node: InternalNode) => ({
 
 /** An arrow ends this far outside the card border, so the head never touches the card. */
 const ANCHOR_CLEAR = 5.5
-/** Sideways spacing between arrows that join the same two variables. */
-const PAIR_SPACING = 12
 /** One fit for first paint and the buttons: a small graph never zooms past 100%. */
 const FIT_VIEW = { padding: 0.18, maxZoom: 1 } as const
+/** How long the cards take to move to a new layout. */
+const ARRANGE_MS = 320
 /** Labels sit nearer the cause than the midpoint: arrows converging on one effect then keep their labels apart. */
 const LABEL_ALONG = 0.32
 /** Perpendicular distance from the line to the label's centre, in flow units. */
@@ -228,29 +227,8 @@ const anchorPoint = (node: InternalNode, toward: { readonly x: number; readonly 
   return { x: centre.x + dx * reach + (dx / length) * ANCHOR_CLEAR, y: centre.y + dy * reach + (dy / length) * ANCHOR_CLEAR }
 }
 
-type Point = { readonly x: number; readonly y: number }
-/** Control-point distance for an arrow that has to bow around a card: the curve's peak clears half a card plus its label. */
-const BOW_CLEARANCE = 108
-/** A card counts as crossed when the line comes within this many units of its border. */
-const OBSTACLE_PAD = 10
-const quadraticAt = (from: Point, control: Point, to: Point, t: number): Point => ({
-  x: (1 - t) * (1 - t) * from.x + 2 * (1 - t) * t * control.x + t * t * to.x,
-  y: (1 - t) * (1 - t) * from.y + 2 * (1 - t) * t * control.y + t * t * to.y,
-})
-/** Whether a curve (or a straight line, when `control` is the midpoint) passes over any of the cards, sampled along its length. */
-const crossesAny = (from: Point, control: Point, to: Point, obstacles: readonly InternalNode[]): boolean => {
-  const boxes = obstacles.map((node) => {
-    const centre = centreOf(node)
-    const halfWidth = cardWidth(node) / 2 + OBSTACLE_PAD
-    const halfHeight = cardHeight(node) / 2 + OBSTACLE_PAD
-    return { left: centre.x - halfWidth, right: centre.x + halfWidth, top: centre.y - halfHeight, bottom: centre.y + halfHeight }
-  })
-  for (let step = 1; step < 40; step += 1) {
-    const point = quadraticAt(from, control, to, step / 40)
-    if (boxes.some((box) => point.x > box.left && point.x < box.right && point.y > box.top && point.y < box.bottom)) return true
-  }
-  return false
-}
+const routePoints = (route: DagRoute, source: InternalNode, target: InternalNode) =>
+  movedRoute(route, source.internals.positionAbsolute, target.internals.positionAbsolute)
 
 /**
  * The preview ends where the committed arrow will: at the card's border facing the origin once a card
@@ -272,49 +250,15 @@ function DagConnectionLine({ fromNode, toNode, toX, toY, connectionStatus, conne
 function DagEdgePath({ id, source, target, data, style, markerEnd, label: edgeLabel }: EdgeProps<CanvasEdge>) {
   const sourceNode = useInternalNode(source)
   const targetNode = useInternalNode(target)
-  const nodeLookup = useStore((state) => state.nodeLookup)
-  if (!sourceNode || !targetNode) return null
-  const geometry = ((): { readonly path: string; readonly labelAt: { readonly x: number; readonly y: number } } => {
-    if (source === target) {
-      // A lagged self-edge leaves and re-enters the top edge as a loop; its label sits above the loop.
-      const top = topPoint(sourceNode)
-      return {
-        path: `M ${top.x - 5} ${top.y} C ${top.x - 52} ${top.y - 58}, ${top.x + 52} ${top.y - 58}, ${top.x + 5} ${top.y}`,
-        labelAt: { x: top.x, y: top.y - 52 },
-      }
-    }
-    const origin = anchorPoint(sourceNode, centreOf(targetNode))
-    const end = anchorPoint(targetNode, centreOf(sourceNode))
-    const length = Math.hypot(end.x - origin.x, end.y - origin.y) || 1
-    const normal = { x: -(end.y - origin.y) / length, y: (end.x - origin.x) / length }
-    const obstacles = [...nodeLookup.values()].filter((node) => node.id !== source && node.id !== target)
-    const midpoint = { x: (origin.x + end.x) / 2, y: (origin.y + end.y) / 2 }
-    if (crossesAny(origin, midpoint, end, obstacles)) {
-      // The straight line would run over another card: bow around it, on the first side that is clear.
-      const candidates = [1, -1].map((side) => {
-        const control = { x: midpoint.x + normal.x * BOW_CLEARANCE * side, y: midpoint.y + normal.y * BOW_CLEARANCE * side }
-        const from = anchorPoint(sourceNode, control)
-        const to = anchorPoint(targetNode, control)
-        return { side, control, from, to, clear: !crossesAny(from, control, to, obstacles) }
-      })
-      const bow = candidates.find((candidate) => candidate.clear) ?? candidates[0]
-      const at = quadraticAt(bow.from, bow.control, bow.to, LABEL_ALONG)
-      return {
-        path: `M ${bow.from.x} ${bow.from.y} Q ${bow.control.x} ${bow.control.y} ${bow.to.x} ${bow.to.y}`,
-        labelAt: { x: at.x + normal.x * bow.side * LABEL_OFFSET, y: at.y + normal.y * bow.side * LABEL_OFFSET },
-      }
-    }
-    // Arrows between the same two variables straddle the dots on a shared normal, whichever way each one points.
-    const shift = (data?.offset ?? 0) * (source < target ? 1 : -1)
-    const from = { x: origin.x + normal.x * shift, y: origin.y + normal.y * shift }
-    const to = { x: end.x + normal.x * shift, y: end.y + normal.y * shift }
-    return {
-      path: `M ${from.x} ${from.y} L ${to.x} ${to.y}`,
-      // The label sits beside the line, offset along the unit normal, so it never masks the dash it describes.
-      labelAt: { x: from.x + (to.x - from.x) * LABEL_ALONG - normal.x * LABEL_OFFSET, y: from.y + (to.y - from.y) * LABEL_ALONG - normal.y * LABEL_OFFSET },
-    }
-  })()
-  const { path, labelAt } = geometry
+  if (!sourceNode || !targetNode || data === undefined) return null
+  const [first, ...rest] = routePoints(data.route, sourceNode, targetNode)
+  const path = `M ${first.x} ${first.y} ${rest.map(p => `L ${p.x} ${p.y}`).join(' ')}`
+  const next = rest[0] ?? first
+  const length = Math.hypot(next.x - first.x, next.y - first.y) || 1
+  const labelAt = {
+    x: first.x + (next.x - first.x) * LABEL_ALONG + (next.y - first.y) / length * LABEL_OFFSET,
+    y: first.y + (next.y - first.y) * LABEL_ALONG - (next.x - first.x) / length * LABEL_OFFSET,
+  }
   return (
     <>
       <BaseEdge id={id} path={path} style={style} markerEnd={markerEnd as string | undefined} />
@@ -355,9 +299,11 @@ function EdgeActionBar({ edge, coarse, onReverse, onConfound, onRemove, onLift, 
   const store = useStoreApi()
   const sourceNode = useInternalNode(edge.source)
   const targetNode = useInternalNode(edge.target)
-  if (!sourceNode || !targetNode) return null
-  const from = anchorPoint(sourceNode, centreOf(targetNode))
-  const to = anchorPoint(targetNode, centreOf(sourceNode))
+  if (!sourceNode || !targetNode || edge.data === undefined) return null
+  const points = routePoints(edge.data.route, sourceNode, targetNode)
+  const from = points[0]
+  const to = points[points.length - 1] ?? from
+  const vertical = Math.abs(to.y - from.y) > Math.abs(to.x - from.x)
   const lift = (endpoint: Endpoint) => (event: React.MouseEvent<HTMLButtonElement> | React.TouchEvent<HTMLButtonElement>) => {
     const native = event.nativeEvent
     if (isMouseEvent(native) && native.button !== 0) return
@@ -396,7 +342,7 @@ function EdgeActionBar({ edge, coarse, onReverse, onConfound, onRemove, onLift, 
       <>
         <div
           className="nodrag nopan pointer-events-auto absolute flex overflow-hidden float rounded-lg border border-hair bg-panel"
-          style={{ transform: `translate(-50%, -140%) translate(${(from.x + to.x) / 2}px, ${(from.y + to.y) / 2}px)`, zIndex: 10 }}
+          style={{ transform: `${vertical ? 'translate(24px, -50%)' : 'translate(-50%, -140%)'} translate(${(from.x + to.x) / 2}px, ${(from.y + to.y) / 2}px)`, zIndex: 10 }}
         >
           <button type="button" className={iconControl('quiet', 'rounded-none border-0')} title="Reverse arrow" aria-label="Reverse selected arrow" onClick={onReverse}><Icon name="swap_horiz" size={14} /></button>
           <button type="button" className={iconControl('quiet', 'rounded-none border-0 border-l border-hair')} title="Replace with an unmeasured common cause" aria-label="Confound selected arrow" onClick={onConfound}><Icon name="call_split" size={14} /></button>
@@ -551,27 +497,34 @@ const EXPANDED_CANVAS_LAYER = 'dag-canvas-expanded'
 
 const IDLE_HINT = 'Draw an arrow by dragging from one card to another. Move a card by dragging its name. Select an arrow to reverse or remove it. To reconnect an arrow, drag either endpoint to another card.'
 
-const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, orientation: DagLayoutOrientation, labelsShown: boolean): {
+type LayoutState =
+  | { readonly kind: 'pending'; readonly previous: DagLayout | null }
+  | { readonly kind: 'ready'; readonly value: DagLayout }
+  | { readonly kind: 'failed'; readonly problem: LayoutProblem; readonly previous: DagLayout | null }
+
+const retainedLayout = (state: LayoutState): DagLayout | null => {
+  switch (state.kind) {
+    case 'ready': return state.value
+    case 'pending': case 'failed': return state.previous
+    default: return assertNever(state)
+  }
+}
+
+const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null, flow: DagCausalFlow | null, intervention: InterventionOverlay | null, layout: DagLayout | null, labelsShown: boolean): {
   readonly nodes: CanvasNode[]
   readonly edges: CanvasEdge[]
   /** The size every card is drawn at; a change relays the whole drawing, since kept positions were fitted to the old size. */
   readonly size: DagCardSize
 } => {
   const size = dagCardSize(document.current.graph.nodes.map((node) => node.name))
-  const placements = new Map(layoutDagForCanvas(document.current.graph, flow === null ? null : { treatment: flow.treatment, outcome: flow.outcome }, orientation, size).map((placed) => [placed.id, placed]))
+  const placements = layout?.nodes
   const highlighted = evidenceColumns(candidate)
   const validation = document.current.validation
   const problemEdges = new Set(validation.structure.kind === 'invalid' ? validation.structure.issues.flatMap(affectedDagEdges) : [])
   const latentNodes = new Set(document.current.graph.nodes.filter((node) => node.kind === 'latent').map((node) => node.id))
-  const pairKey = (edge: DirectedDagEdge): string => [edge.cause, edge.effect].sort().join('\u0000')
-  const pairSizes = new Map<string, number>()
-  for (const edge of document.current.graph.edges) pairSizes.set(pairKey(edge), (pairSizes.get(pairKey(edge)) ?? 0) + 1)
-  const pairSeen = new Map<string, number>()
-  const edges: CanvasEdge[] = document.current.graph.edges.map((edge): CanvasEdge => {
-    const key = pairKey(edge)
-    const rank = pairSeen.get(key) ?? 0
-    pairSeen.set(key, rank + 1)
-    const offset = (rank - ((pairSizes.get(key) ?? 1) - 1) / 2) * PAIR_SPACING
+  const edges: CanvasEdge[] = document.current.graph.edges.flatMap((edge): CanvasEdge[] => {
+    const route = layout?.routes.get(edge.id)
+    if (route === undefined) return [] // A new arrow waits for the engine, not an invented route.
     const invalid = problemEdges.has(edge.id)
     const unstated = edge.support.kind === 'unstated'
     const edgeFlow = flow?.edges.get(edge.id) ?? null
@@ -590,12 +543,12 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
     const flowWords = edgeFlow === null ? '' : edgeFlow.biasing ? '; lies on an open biasing path' : edgeFlow.causal ? '; lies on a directed causal path' : '; not on an active treatment–outcome path'
     const timingLabel = edge.timing.kind === 'lagged' ? `t−${edge.timing.lag}` : ''
     const edgeLabel = [timingLabel, unstated ? 'needs rationale' : ''].filter((part) => part.length > 0).join('; ')
-    return {
+    return [{
       id: edge.id,
       type: 'dagEdge',
       source: edge.cause,
       target: edge.effect,
-      data: { edge, offset, cut },
+      data: { edge, route, cut },
       label: cut ? 'cut by do()' : labelsShown ? edgeLabel : '',
       // User-space units keep the head 6px long whatever the stroke width, so selection does not swell it.
       markerEnd: { type: MarkerType.ArrowClosed, color: stroke, markerUnits: 'userSpaceOnUse', width: 24, height: 24, strokeWidth: 1 },
@@ -605,18 +558,22 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
         ...(cut ? { strokeDasharray: '2 5', opacity: 0.7 } : edge.timing.kind === 'lagged' ? { strokeDasharray: '7 4' } : latentNodes.has(edge.cause) ? { strokeDasharray: '3 3' } : {}),
       },
       ariaLabel: `${nameOfDagNode(document, edge.cause)} causes ${nameOfDagNode(document, edge.effect)}${edge.timing.kind === 'lagged' ? ` at lag ${edge.timing.lag}` : ' contemporaneously'}${unstated ? '; rationale not yet recorded' : ''}${flowWords}${cut ? '; cut by the intervention' : ''}`,
-    }
+    }]
   })
   return {
     size,
-    nodes: document.current.graph.nodes.map((node) => {
-      const placed = placements.get(node.id) ?? { x: 34, y: 34 }
+    nodes: document.current.graph.nodes.flatMap((node): CanvasNode[] => {
+      const placed = placements?.get(node.id)
+      if (placed === undefined) return []
       const source = node.kind === 'observed' && highlighted?.source === node.column
       const target = node.kind === 'observed' && highlighted?.target === node.column
       const evidenceRole: DagNodeData['evidenceRole'] = source && target ? 'both' : source ? 'source' : target ? 'target' : 'none'
-      return {
+      return [{
         id: node.id,
         type: 'dagVariable',
+        // The engine and the card share known dimensions, including immediately after portal remount.
+        initialWidth: size.width,
+        initialHeight: size.height,
         position: { x: placed.x, y: placed.y },
         data: {
           name: node.name,
@@ -632,7 +589,7 @@ const canvasModel = (document: DagDocument, candidate: DiscoveryCandidate | null
           size,
         },
         ariaLabel: `${node.kind === 'latent' ? 'Unmeasured' : 'Observed'} variable: ${node.name}`,
-      }
+      }]
     }),
     edges,
   }
@@ -665,7 +622,8 @@ export function DagCanvas({
   readonly onEdgeSelected: (edge: DagEdgeId | null) => void
 }) {
   const hostRef = useRef<HTMLDivElement>(null)
-  // A canvas narrower than three rails runs the layout down the page instead of across it.
+  const [expanded, setExpanded] = useState(false)
+  // A narrow canvas runs the layout down the page instead of across it.
   const [orientation, setOrientation] = useState<DagLayoutOrientation>('across')
   useEffect(() => {
     const host = hostRef.current
@@ -673,12 +631,29 @@ export function DagCanvas({
     const observer = new ResizeObserver(([entry]) => { setOrientation(entry.contentRect.width < 600 ? 'down' : 'across') })
     observer.observe(host)
     return () => observer.disconnect()
-  }, [])
+  }, [expanded])
   // The card size is measured from the names, so the model re-runs once the document's fonts have loaded.
   const metricsVersion = useTextMetricsVersion()
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- metricsVersion invalidates the measurements the model is built on
   const [labelsShown, setLabelsShown] = useState(false)
-  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, orientation, labelsShown), [document, flow, intervention, orientation, selectedEvidence, metricsVersion, labelsShown])
+  const [layoutState, setLayoutState] = useState<LayoutState>({ kind: 'pending', previous: null })
+  const [layoutAttempt, setLayoutAttempt] = useState(0)
+  const size = useMemo(() => dagCardSize(document.current.graph.nodes.map(node => node.name)), [document.current.graph.nodes, metricsVersion])
+  // Only geometry changes trigger layout. Selecting evidence, a query or labels does not move cards.
+  const layoutKey = JSON.stringify([document.id, document.current.graph.nodes.map(n => n.id), document.current.graph.edges.map(e => [e.id, e.cause, e.effect]), orientation, size.width, size.height])
+  useEffect(() => {
+    let current = true
+    setLayoutState(state => ({ kind: 'pending', previous: retainedLayout(state) }))
+    void layoutDag(document.current.graph, orientation, size).then(result => {
+      if (!current) return
+      setLayoutState(state => result.ok
+        ? { kind: 'ready', value: result.value }
+        : { kind: 'failed', problem: result.error, previous: retainedLayout(state) })
+    })
+    return () => { current = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutKey contains the engine's entire geometry input
+  }, [layoutKey, layoutAttempt])
+  const layout = retainedLayout(layoutState)
+  const model = useMemo(() => canvasModel(document, selectedEvidence, flow, intervention, layout, labelsShown), [document, flow, intervention, layout, selectedEvidence, labelsShown])
   const [nodes, setNodes, onNodesChange] = useNodesState<CanvasNode>(model.nodes)
   // The gesture is read in React Flow's callbacks, which fire from listeners bound at pointer-down, so a ref carries it as well as state.
   const [gesture, setGesture] = useState<Gesture | null>(null)
@@ -691,43 +666,89 @@ export function DagCanvas({
   }, [document])
   const selectedCanvasEdge = model.edges.find((edge) => edge.id === selectedEdge) ?? null
 
-  // Dragged positions survive every revision; a newcomer takes its layout slot unless a card already
-  // sits there, in which case it steps down until it finds clear ground.
-  useEffect(() => {
-    setNodes((current) => {
-      const occupied: { x: number; y: number }[] = []
-      const overlaps = (position: { x: number; y: number }) =>
-        occupied.some((taken) => Math.abs(taken.x - position.x) < model.size.width + 12 && Math.abs(taken.y - position.y) < model.size.height + 12)
-      return model.nodes.map((next) => {
-        const existing = current.find((node) => node.id === next.id)
-        let position = existing === undefined ? next.position : existing.position
-        if (existing === undefined) {
-          while (overlaps(position)) position = { x: position.x, y: position.y + model.size.height + 46 }
-        }
-        occupied.push(position)
-        return { ...next, position }
-      })
+  // Cards someone has dragged keep their place; every other card follows the layout as the graph changes.
+  const placedByHand = useRef<Set<string>>(new Set())
+  const latestNodes = useRef(nodes)
+  latestNodes.current = nodes
+  const reducedMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const motion = useRef<number | null>(null)
+  const stopMotion = useCallback(() => {
+    if (motion.current !== null) cancelAnimationFrame(motion.current)
+    motion.current = null
+  }, [])
+  // A finished rearrangement refits the view, so cards that moved out of sight come back into it.
+  const [rearrangements, setRearrangements] = useState(0)
+  /**
+   * Moves the cards to their new places. React Flow draws arrows from the positions in its store, so
+   * the positions themselves are stepped frame by frame; a CSS transition would leave the arrows behind.
+   */
+  const arrange = useCallback((targets: readonly CanvasNode[]) => {
+    stopMotion()
+    const starts = new Map(latestNodes.current.map((node) => [node.id, node.position]))
+    const moved = targets.some((node) => {
+      const from = starts.get(node.id)
+      return from !== undefined && (Math.abs(from.x - node.position.x) > 0.5 || Math.abs(from.y - node.position.y) > 0.5)
     })
-  }, [model.nodes, model.size, setNodes])
 
-  const tidy = () => {
-    setNodes(model.nodes)
-  }
-  // Binding the study changes every card's role, turning the layout changes every slot, and a new card size
-  // (a longer name arriving) outgrows the positions the cards were placed at, so the drawing is laid out again.
-  const bindingKey = `${flow === null ? '' : `${flow.treatment}\u0000${flow.outcome}`}\u0000${orientation}\u0000${model.size.width}x${model.size.height}`
+    if (!moved || reducedMotion) {
+      setNodes([...targets])
+      if (moved) setRearrangements((count) => count + 1)
+      return
+    }
+
+    const began = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - began) / ARRANGE_MS)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setNodes(targets.map((node) => {
+        const from = starts.get(node.id) ?? node.position
+        return { ...node, position: { x: from.x + (node.position.x - from.x) * eased, y: from.y + (node.position.y - from.y) * eased } }
+      }))
+      if (t < 1) { motion.current = requestAnimationFrame(step); return }
+      motion.current = null
+      setRearrangements((count) => count + 1)
+    }
+    motion.current = requestAnimationFrame(step)
+  }, [reducedMotion, setNodes, stopMotion])
+  useEffect(() => stopMotion, [stopMotion])
+
+  // Orientation and card-size changes reset manual placement. Changing study roles only changes styling.
+  const bindingKey = `${document.id}\u0000${orientation}\u0000${model.size.width}x${model.size.height}`
   const previousBinding = useRef(bindingKey)
   useEffect(() => {
-    if (previousBinding.current === bindingKey) return
-    previousBinding.current = bindingKey
-    setNodes(model.nodes)
-  }, [bindingKey, model])
+    if (previousBinding.current !== bindingKey) {
+      previousBinding.current = bindingKey
+      placedByHand.current.clear()
+    }
+
+    const positions = new Map(latestNodes.current.map((node) => [node.id, node.position]))
+    const kept = (id: string) => (placedByHand.current.has(id) ? positions.get(id) : undefined)
+    arrange(model.nodes.map((next) => {
+      const held = kept(next.id)
+      return held === undefined ? next : { ...next, position: held }
+    }))
+  }, [arrange, bindingKey, model.nodes, model.size])
+
+  const tidy = () => {
+    placedByHand.current.clear()
+    if (layoutState.kind === 'failed') setLayoutAttempt(attempt => attempt + 1)
+    arrange(model.nodes)
+  }
+  /** Notes every card the pointer moves; a drag also stops any rearrangement still in motion. */
+  const nodesChanged = useCallback((changes: Parameters<typeof onNodesChange>[0]) => {
+    for (const change of changes) {
+      if (change.type === 'position' && change.dragging === true) {
+        stopMotion()
+        placedByHand.current.add(change.id)
+      }
+    }
+    onNodesChange(changes)
+  }, [onNodesChange, stopMotion])
   // The canvas sits inside a scrolling stage, so a wheel over it is ambiguous. Locked is the safer
   // default: the wheel scrolls the page, ⌘ or Ctrl with the wheel still zooms, and the buttons always work.
   const [viewLocked, setViewLocked] = useState(true)
   // A finger is imprecise: connections snap from further away and a tap on one dot then another also connects.
   const coarse = useMediaQuery('(pointer: coarse)')
-  const [expanded, setExpanded] = useState(false)
   useEffect(() => (expanded ? pushLayer(EXPANDED_CANVAS_LAYER) : undefined), [expanded])
   useEffect(() => {
     if (!expanded) return undefined
@@ -808,27 +829,28 @@ export function DagCanvas({
     const problem = onEdgeReconnected(causalEdge.id, causalEdge.effect, causalEdge.cause)
     setConnectionNotice(problem === null ? { kind: 'edge-reversed' } : { kind: 'edge-refused', problem })
   }
+  /** The graph's variables by id; cards are matched to them on every frame of a rearrangement. */
+  const graphNodes = useMemo(() => new Map<string, DagNodeId>(document.current.graph.nodes.map((node) => [node.id, node.id])), [document.current.graph.nodes])
   /** Every card's screen box, marked with whether the gesture in hand may land on it. */
   const cardBoxes = useCallback((eligible: (node: DagNodeId) => boolean): ScreenTargetBox[] => {
     const host = hostRef.current
     if (host === null) return []
     const boxes: ScreenTargetBox[] = []
     for (const element of host.querySelectorAll<HTMLElement>('.react-flow__node')) {
-      const rawId = element.dataset.id
-      const node = document.current.graph.nodes.find((candidate) => candidate.id === rawId)
+      const node = element.dataset.id === undefined ? undefined : graphNodes.get(element.dataset.id)
       if (node === undefined) continue
       const rect = element.getBoundingClientRect()
-      boxes.push({ node: node.id, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, eligible: eligible(node.id) })
+      boxes.push({ node, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom, eligible: eligible(node) })
     }
     return boxes
-  }, [document.current.graph.nodes])
+  }, [graphNodes])
 
   const displayedNodes = nodes.map((node): CanvasNode => {
-    const domainNode = document.current.graph.nodes.find((candidate) => candidate.id === node.id)
+    const domainNode = graphNodes.get(node.id)
     if (domainNode === undefined) return node
     // The card body draws arrows, so the name is what moves it.
     const dragged = { ...node, dragHandle: `.${CARD_GRIP}` }
-    if (gesture !== null) return { ...dragged, data: { ...node.data, droppable: landable(gesture, domainNode.id) } }
+    if (gesture !== null) return { ...dragged, data: { ...node.data, droppable: landable(gesture, domainNode) } }
     return dragged
   })
 
@@ -872,7 +894,7 @@ export function DagCanvas({
               : { ...edge, selected: false, style: { ...edge.style, opacity: 0.3 } })}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
-          onNodesChange={onNodesChange}
+          onNodesChange={nodesChanged}
           onConnect={connect}
           onConnectStart={(_event, params) => {
             setConnectionNotice(null)
@@ -908,7 +930,9 @@ export function DagCanvas({
           connectOnClick={false}
           connectionDragThreshold={coarse ? 8 : 1}
           nodeDragThreshold={coarse ? 8 : 1}
-          elevateEdgesOnSelect
+          // Raised SVG edges intercept the HTML reconnect grips drawn over them.
+          // Selection is shown by stroke width and colour, not by changing the hit-test layer.
+          elevateEdgesOnSelect={false}
           zoomOnDoubleClick={false}
           zoomOnScroll={!viewLocked}
           preventScrolling={!viewLocked}
@@ -947,7 +971,7 @@ export function DagCanvas({
             />
           )}
           <CanvasControls onTidy={tidy} viewLocked={viewLocked} onToggleLock={() => setViewLocked((locked) => !locked)} expanded={expanded} onToggleExpand={() => setExpanded((open) => !open)} labelsShown={labelsShown} onToggleLabels={() => setLabelsShown((shown) => !shown)} />
-          <RefitOnResize host={hostRef} layoutKey={bindingKey} />
+          <RefitOnResize host={hostRef} layoutKey={`${bindingKey}\u0000${rearrangements}`} />
         </ReactFlow>
         </div>
       </div>
@@ -959,7 +983,7 @@ export function DagCanvas({
             </button>
           </Tooltip>
           <p role="status" className={`m-0 min-w-0 flex-1 text-label ${refusedNotice ? 'text-warn' : 'text-ink'}`}>
-            {connectionNotice === null ? '' : describeConnectionNotice(connectionNotice)}
+            {layoutState.kind === 'failed' ? 'The graph could not be laid out. Try Tidy again.' : connectionNotice === null ? '' : describeConnectionNotice(connectionNotice)}
           </p>
         </div>
         {flow !== null && (
