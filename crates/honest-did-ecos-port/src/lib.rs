@@ -69,33 +69,84 @@ pub struct Solution {
     pub gap: f64,
 }
 
-pub fn solve(cost: &[f64], g: &Matrix, h: &[f64], linear: usize, cones: &[usize], a: &Matrix, b: &[f64]) -> Result<Solution,&'static str> {
+fn valid_problem(cost: &[f64], g: &Matrix, h: &[f64], linear: usize, cones: &[usize], a: &Matrix, b: &[f64]) -> bool {
     let n=cost.len();
-    if n==0 || !g.valid() || !a.valid() || g.columns!=n || a.columns!=n || h.len()!=g.rows || b.len()!=a.rows
-        || cones.iter().try_fold(linear,|sum,q|sum.checked_add(*q))!=Some(g.rows)
-        || cones.iter().any(|q| *q<2) || cost.iter().chain(h).chain(b).any(|v| !v.is_finite()) {
-        return Err("Invalid conic problem");
+    n>0 && g.valid() && a.valid() && g.columns==n && a.columns==n && h.len()==g.rows && b.len()==a.rows
+        && cones.iter().try_fold(linear,|sum,q|sum.checked_add(*q))==Some(g.rows)
+        && !cones.iter().any(|q| *q<2) && cost.iter().chain(h).chain(b).all(|v| v.is_finite())
+}
+
+// Vectors own stable heap allocations for every pointer retained by ECOS.
+// The raw workspace is private, not Send/Sync, and freed before its inputs.
+struct Workspace {
+    w: *mut preproc::pwork,
+    g: Matrix,
+    a: Matrix,
+    cost: Vec<f64>,
+    h: Vec<f64>,
+    b: Vec<f64>,
+    cones: Vec<i64>,
+}
+
+impl Workspace {
+    fn new(cost: &[f64], g: &Matrix, h: &[f64], linear: usize, cones: &[usize], a: &Matrix, b: &[f64]) -> Result<Self,&'static str> {
+        if !valid_problem(cost,g,h,linear,cones,a,b) { return Err("Invalid conic problem"); }
+        let mut owned=Self { w:core::ptr::null_mut(),g:g.clone(),a:a.clone(),cost:cost.to_vec(),h:h.to_vec(),b:b.to_vec(),cones:cones.iter().map(|q| *q as i64).collect() };
+        unsafe {
+            owned.w=preproc::ECOS_setup(cost.len() as i64,g.rows as i64,a.rows as i64,linear as i64,
+                owned.cones.len() as i64,owned.cones.as_mut_ptr(),0,owned.g.values.as_mut_ptr(),owned.g.offsets.as_mut_ptr(),owned.g.indices.as_mut_ptr(),
+                if a.rows==0 {core::ptr::null_mut()} else {owned.a.values.as_mut_ptr()},
+                if a.rows==0 {core::ptr::null_mut()} else {owned.a.offsets.as_mut_ptr()},
+                if a.rows==0 {core::ptr::null_mut()} else {owned.a.indices.as_mut_ptr()},
+                owned.cost.as_mut_ptr(),owned.h.as_mut_ptr(),owned.b.as_mut_ptr());
+            if owned.w.is_null() { return Err("ECOS setup failed"); }
+            (*(*owned.w).stgs).verbose=0;
+        }
+        Ok(owned)
     }
-    let mut g=g.clone(); let mut a=a.clone();
-    let mut cost=cost.to_vec(); let mut h=h.to_vec(); let mut b=b.to_vec();
-    let mut cones:Vec<i64>=cones.iter().map(|q| *q as i64).collect();
-    unsafe {
-        let w=preproc::ECOS_setup(n as i64,g.rows as i64,a.rows as i64,linear as i64,
-            cones.len() as i64,cones.as_mut_ptr(),0,g.values.as_mut_ptr(),g.offsets.as_mut_ptr(),g.indices.as_mut_ptr(),
-            if a.rows==0 {core::ptr::null_mut()} else {a.values.as_mut_ptr()},
-            if a.rows==0 {core::ptr::null_mut()} else {a.offsets.as_mut_ptr()},
-            if a.rows==0 {core::ptr::null_mut()} else {a.indices.as_mut_ptr()},
-            cost.as_mut_ptr(),h.as_mut_ptr(),b.as_mut_ptr());
-        if w.is_null() { return Err("ECOS setup failed"); }
-        (*(*w).stgs).verbose=0;
+
+    fn run(&mut self) -> Solution {
+        let w=self.w;
+        unsafe {
         // C-compatible layouts are identical in the two generated modules.
+        // ECOS_solve invokes init: no primal/dual iterate is warm-started.
         let status=ecos::ECOS_solve(w.cast());
         let info=&*(*w).info;
-        let result=Solution { x:core::slice::from_raw_parts((*w).x,n).to_vec(),
-            dual_inequalities: core::slice::from_raw_parts((*w).z,g.rows).to_vec(),
+        Solution { x:core::slice::from_raw_parts((*w).x,self.cost.len()).to_vec(),
+            dual_inequalities: core::slice::from_raw_parts((*w).z,self.g.rows).to_vec(),
             objective:info.pcost,status,iterations:info.iter,
-            primal_residual:info.pres,dual_residual:info.dres,gap:info.gap };
-        preproc::ECOS_cleanup(w,0);
-        Ok(result)
+            primal_residual:info.pres,dual_residual:info.dres,gap:info.gap }
+        }
     }
+}
+
+impl Drop for Workspace {
+    fn drop(&mut self) {
+        if !self.w.is_null() { unsafe { preproc::ECOS_cleanup(self.w,0); } }
+    }
+}
+
+/// A fixed linear constraint system with changing objectives. Symbolic ordering,
+/// allocation and equilibration are reused; numerical factorization and the
+/// reference cold-start initialization are performed on every solve.
+pub struct LinearObjectiveWorkspace(Workspace);
+
+impl LinearObjectiveWorkspace {
+    pub fn new(g: &Matrix, h: &[f64], a: &Matrix, b: &[f64]) -> Result<Self,&'static str> {
+        if !g.valid() || !a.valid() || g.columns!=a.columns { return Err("Invalid conic problem"); }
+        let cost=vec![0.;g.columns];
+        Workspace::new(&cost,g,h,g.rows,&[],a,b).map(Self)
+    }
+
+    pub fn solve(&mut self, cost: &[f64]) -> Result<Solution,&'static str> {
+        if cost.len()!=self.0.cost.len() || cost.iter().any(|v| !v.is_finite()) { return Err("Invalid conic objective"); }
+        // ECOS backscales its objective on exit. Replace it on its original scale
+        // before the next cold start, without re-equilibrating fixed constraints.
+        self.0.cost.copy_from_slice(cost);
+        Ok(self.0.run())
+    }
+}
+
+pub fn solve(cost: &[f64], g: &Matrix, h: &[f64], linear: usize, cones: &[usize], a: &Matrix, b: &[f64]) -> Result<Solution,&'static str> {
+    Ok(Workspace::new(cost,g,h,linear,cones,a,b)?.run())
 }

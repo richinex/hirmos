@@ -51,21 +51,9 @@ fn rows(a: &DMatrix<f64>) -> Vec<Vec<f64>> {
 }
 fn lp(
     cost: &DVector<f64>,
-    g: &Matrix,
-    b: &DVector<f64>,
-    e: &Matrix,
-    rhs: &DVector<f64>,
+    workspace: &mut ecos_reference_port::LinearObjectiveWorkspace,
 ) -> Result<ecos_reference_port::Solution, Error> {
-    let out = ecos_reference_port::solve(
-        cost.as_slice(),
-        g,
-        b.as_slice(),
-        g.rows,
-        &[],
-        e,
-        rhs.as_slice(),
-    )
-    .map_err(failure)?;
+    let out = workspace.solve(cost.as_slice()).map_err(failure)?;
     match out.status {
         0 | 10 => Ok(out),
         1 | 11 => Err(Error::Optimization(
@@ -355,15 +343,18 @@ fn dual_bounds(
     let equality = w.transpose();
     let mut rhs = DVector::zeros(w.ncols());
     rhs[0] = 1.0;
-    // Only the objective changes during dual-bound search. Preserve each fresh
-    // ECOS solve, but build its immutable sparse constraints once per search.
+    // Only the objective changes during dual-bound search. Preserve each ECOS
+    // cold start and numerical factorization; prepare fixed constraints once.
     let g = Matrix::from_rows(&rows(&(-DMatrix::identity(y.len(), y.len()))), y.len())
         .map_err(failure)?;
     let equality = Matrix::from_rows(&rows(&equality), y.len()).map_err(failure)?;
     let zero = DVector::zeros(y.len());
-    let solve = |v: f64| -> Result<(bool, DVector<f64>), Error> {
+    let mut workspace = ecos_reference_port::LinearObjectiveWorkspace::new(
+        &g, zero.as_slice(), &equality, rhs.as_slice(),
+    ).map_err(failure)?;
+    let mut solve = |v: f64| -> Result<(bool, DVector<f64>), Error> {
         let f = &s + &c * v;
-        let out = lp(&(-f), &g, &zero, &equality, &rhs)?;
+        let out = lp(&(-f), &mut workspace)?;
         Ok(((v + out.objective).abs() <= 1e-6, DVector::from_vec(out.x)))
     };
     if !solve(eta)?.0 {

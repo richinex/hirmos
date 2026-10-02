@@ -7,7 +7,8 @@
     "SOC-only build without exponential cones",
     "retain 64-bit indices on native and WASM",
     "Rust-owned allocation and scalar sqrt/abs",
-    "double NaN classification instead of Darwin long-double shim"
+    "double NaN classification instead of Darwin long-double shim",
+    "Rust-owned reusable workspace for fixed linear constraints and changing objectives; retain ECOS cold initialization and numerical factorization for each solve"
   ],
   "files": [
     {
