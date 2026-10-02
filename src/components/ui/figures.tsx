@@ -1,5 +1,6 @@
 import { useMemo, type ReactNode } from 'react'
 import { Metadata } from './Metadata'
+import { ParameterHelp } from './ParameterLabel'
 import { fontFor, textWidth, useTextMetricsVersion, type TextTier } from '@/lib/textMetrics'
 import { useElementWidth } from '@/lib/useElementWidth'
 import { label as labelCn, num, well } from './recipes'
@@ -30,10 +31,12 @@ export function FigureParts({ value, unitClass = 'text-bone' }: { readonly value
   )
 }
 
-export function MetricTile({ label, value, context, size = 'default', frame = 'card', className }: {
+export function MetricTile({ label, value, context, help, size = 'default', frame = 'card', className }: {
   readonly label: string
   readonly value: Formatted
   readonly context?: ReactNode
+  /** Background for the label, behind the info icon rather than on the tile. */
+  readonly help?: string
   readonly size?: 'hero' | 'default' | 'compact'
   /** `cell` is for a value inside a group that supplies its surface. */
   readonly frame?: 'card' | 'cell'
@@ -52,7 +55,9 @@ export function MetricTile({ label, value, context, size = 'default', frame = 'c
   }, [size, width, value.text, tier, version])
   return (
     <div data-size={size} className={cn('@container metric-tile', frame === 'card' ? 'metric-card' : 'bg-well', size === 'compact' ? 'px-3 py-2.5' : 'px-4 py-3', className)}>
-      <span className={labelCn('metric-card-label block text-muted')}>{label}</span>
+      {help === undefined
+        ? <span className={labelCn('metric-card-label block text-muted')}>{label}</span>
+        : <span className={labelCn('metric-card-label flex items-center gap-1.5 text-muted')}>{label}<ParameterHelp label={label} help={help} /></span>}
       <div ref={values} className="metric-card-values">
         <p data-length={length} className={cn('metric-card-number mb-0 mt-1 font-semibold leading-none tracking-tight text-ink', figure, '@max-[9rem]:text-title')} title={value.exact || value.srText}><FigureParts value={value} /></p>
         {context && <p className={num('metric-card-context mb-0 mt-1 text-body text-bone [overflow-wrap:anywhere]')}>{context}</p>}

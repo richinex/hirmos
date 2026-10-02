@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useCallback, useRef, useState } from 'react'
@@ -120,8 +121,9 @@ function SqlEditor({ inputs, onPrepared, onCleared, clearLabel = 'Choose other f
           {script.kind === 'editing' && <>
             {scriptResult.kind === 'none' && state.kind !== 'running-script' && <p className={fieldHint}>Review the SQL before execution. Opening this file does not run it.</p>}
             <textarea aria-label="SQL file contents" disabled={busy} spellCheck={false} className={field('text', 'min-h-64 w-full font-mono text-label')} value={script.text} onChange={event => controller.editScript(event.target.value)} />
-            <button type="button" className={button('signal', 'mt-3 w-full')} disabled={busy || !script.text.trim()} onClick={() => void controller.runScript()}>Run SQL</button>
-            {state.kind === 'running-script' && <button type="button" className={button('quiet', 'mt-2 w-full')} onClick={() => void controller.cancel()}>Cancel query</button>}
+            <RunActions className="mt-3" running={state.kind === 'running-script'} onCancel={() => void controller.cancel()} orbLabel="SQL running">
+              <button type="button" className={button('signal', 'w-full')} disabled={busy || !script.text.trim()} aria-busy={state.kind === 'running-script'} onClick={() => void controller.runScript()}>Run SQL</button>
+            </RunActions>
             {scriptResult.kind === 'failed' && <p role="alert" className="text-danger">{scriptResult.detail}</p>}
             {scriptResult.kind === 'complete' && <EvidenceTable title="Final statement result" rows={scriptResult.rows} columns={scriptResult.columns.map((name, index) => ({ id: String(index), header: name, value: (row: readonly string[]) => row[index] ?? '' }))} rowKey={(_, index) => String(index)} noun="row" empty="The script completed without result rows." total={scriptResult.count} maxHeight="max-h-48" />}
           </>}

@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { SelectionActions } from '@/components/ui/SelectionActions'
@@ -1450,10 +1451,9 @@ export function SurvivalPanel({ source, profile, prepared, runs, onRun: recordRu
         </div>
         <div className={cn(actionGap, 'grid gap-3')}>
         <JobNotice job={job} />
-        <div className="flex items-center gap-3">
-          <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked} onClick={() => void execute()}>{job.kind === 'running' ? 'Running…' : 'Run survival analysis'}</button>
-          {job.kind === 'running' && <><Orb state="solving" aria-label="Survival analysis running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
-        </div>
+        <RunActions running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Survival analysis running">
+          <button type="button" className={button('signal')} disabled={job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>Run survival analysis</button>
+        </RunActions>
         </div>
       </section>
 

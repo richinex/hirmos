@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -502,12 +503,11 @@ export function CounterfactualPanel({ source, profile, prepared, documents, stud
             <div className={cn(actionGap, 'grid gap-3')}>
             {eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             <JobNotice job={job} />
-            <div className="flex items-center gap-3">
+            <RunActions running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Counterfactual running">
               <button type="button" className={button('signal')} disabled={eligibility === null || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 Run counterfactual
               </button>
-              {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
-            </div>
+            </RunActions>
             </div>
             {job.kind === 'running' && job.progress !== null && (
               <div className="mt-2 max-w-sm text-label text-faint">

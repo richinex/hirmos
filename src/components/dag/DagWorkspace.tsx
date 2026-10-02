@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -612,18 +613,15 @@ function GraphCheckPanel({ source, profile, prepared, document, checks, onCheck 
           <p className="mb-0 mt-1 text-label text-faint">Test the conditional independences implied by this revision against the prepared data.</p>
         </div>
       </div>
-      {plan.kind === 'test' && (
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+      {plan.kind === 'test' && (<>
+        <RunActions className="mt-3" running={job.kind === 'running'} onCancel={session.cancel} orb="weaving" orbLabel="Graph checks running">
           <button type="button" className={button('outline', 'w-full')} disabled={job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>
             {current === undefined ? 'Run checks' : 'Run again'}
           </button>
-          {job.kind === 'running' && <>
-            <Orb state="weaving" aria-label="Graph checks running" />
-            <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>
-            <p role="status" className="m-0 basis-full text-label text-muted">{progressText}</p>
-          </>}
-        </div>
-      )}
+        </RunActions>
+        {/* The progress line keeps its height while idle, like the cancel slot, so a run does not move the inspector. */}
+        <p role="status" className="m-0 mt-1 min-h-5 text-label text-muted">{job.kind === 'running' ? progressText : ''}</p>
+      </>)}
       <JobNotice job={job} />
       {plan.kind === 'not-testable' && <p className="mb-0 mt-2 text-body text-faint">No observed local-Markov implication is available to test for this revision.</p>}
       {plan.kind === 'requires-lag-aware-validation' && <p className="mb-0 mt-2 text-body text-faint">This checker cannot test the graph’s lagged implications. Time-series tests must account for the recorded lags.</p>}

@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
@@ -125,6 +126,6 @@ export function ArdlModelPanel(props: TimeSeriesPanelProps & {readonly selector:
             {future.kind==='scenario'&&<div className={settingsStack}><p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Enter one value per future period, separated by spaces or commas. Supply the same number of periods for every included column. No future values are filled in automatically.</p>{futureColumns.map(c=><label key={c.id} className="block"><span className={fieldLabel}>Future {c.name}</span><textarea className={field('text','mt-1')} rows={2} value={future.columns[c.id]??''} onChange={e=>setFuture({kind:'scenario',columns:{...future.columns,[c.id]:e.target.value}})} /></label>)}</div>}
           </SettingsStep>
         </div>
-      </fieldset><div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}><button className={button('signal')} disabled={session.blocked||outcome===null||predictors.length===0} aria-busy={job.kind==='running'} onClick={job.kind==='running'?undefined:()=>void fit()}>Fit ARDL</button><span className="inline-flex h-5 w-5">{job.kind==='running'&&<Orb state="solving" aria-label="ARDL running" />}</span>{job.kind==='running'&&<button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div>
+      </fieldset><RunActions className={actionGap} running={job.kind==='running'} onCancel={session.cancel} orbLabel="ARDL running"><button className={button('signal')} disabled={session.blocked||outcome===null||predictors.length===0} aria-busy={job.kind==='running'} onClick={job.kind==='running'?undefined:()=>void fit()}>Fit ARDL</button></RunActions>
       <JobNotice job={job} /></section>{runs.slice(-1).map(run=><TimeSeriesRunResult key={run.id} run={run} />)}</section>} />
 }

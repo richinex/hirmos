@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import {useMemo,useState} from 'react'
 import {RunFold} from '@/components/ui/RunFold'
 import {formatTime} from '@/lib/format/date'
@@ -89,7 +90,7 @@ export function NetworkQueryPanel({document,source,profile,prepared,records,onQu
       <label><span className={fieldLabel}>Parameter estimation</span><Select aria-label="Parameter estimation" className={field('text')} value={ess===0?'mle':'bdeu'} onChange={e=>setEss(e.target.value==='mle'?0:DEFAULT_BDEU_EQUIVALENT_SAMPLE_SIZE)}><option value="mle">Maximum likelihood</option><option value="bdeu">BDeu</option></Select></label></div>
     {ess>0&&<label><span className={fieldLabel}>Equivalent sample size</span><input className={field('text')} aria-label="Query equivalent sample size" type="number" min={1} value={ess} onChange={e=>{if(Number.isFinite(e.target.valueAsNumber)&&e.target.valueAsNumber>0)setEss(e.target.valueAsNumber)}} /></label>}
     {problem!==null&&<Alert tone="danger">{problem}</Alert>}<JobNotice job={session.job}/>
-    <div className="mt-4 flex gap-2"><button className={button('signal')} disabled={problem!==null||outcomes.length===0||session.blocked||session.job.kind==='running'} onClick={()=>void run()}>Evaluate probability</button>{session.job.kind==='running'&&<button className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div>
+    <RunActions className="mt-4" running={session.job.kind==='running'} onCancel={session.cancel} orbLabel="Probability query running"><button className={button('signal')} disabled={problem!==null||outcomes.length===0||session.blocked||session.job.kind==='running'} aria-busy={session.job.kind==='running'} onClick={()=>void run()}>Evaluate probability</button></RunActions>
     <ul aria-label="Probability queries" className="m-0 mt-4 list-none divide-y divide-hair p-0 text-body">{[...records].reverse().map((r,index)=><Distribution key={r.id} record={r} open={index===0} onDelete={onDelete}/>)}</ul>
   </div>
 }

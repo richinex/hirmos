@@ -9,24 +9,27 @@ import {MetricGrid,MetricTile} from '@/components/ui/figures'
 import {formatStatistic,formatWords,formatP} from '@/lib/format/number'
 import {resultSurface,resultTitle} from '@/components/ui/recipes'
 import type {BaconEvidence} from '@/domain/panelRegression'
+import {periodLabel} from '@/domain/periodLabels'
 
 const number=(v:number|string)=>typeof v==='number'?formatStatistic('raw',v).text:v
 const probability=(v:number|string)=>typeof v==='number'?formatP(v,{withLabel:false}).text:v
-function comparison(c:Extract<BaconEvidence['decomposition'],{kind:'unadjusted'}>['components'][number]['comparison']):string{
+function comparison(c:Extract<BaconEvidence['decomposition'],{kind:'unadjusted'}>['components'][number]['comparison'],labels:ReadonlyMap<number,string>):string{
+  const label=(code:number)=>periodLabel(code,labels)
   switch(c.kind){
-    case 'treatedVsNever':return `Adoption ${c.adoption}: treated vs never treated`
-    case 'earlierVsLater':return `${c.earlier} vs ${c.later}: earlier vs later treated`
-    case 'laterVsEarlier':return `${c.later} vs ${c.earlier}: later vs earlier treated`
-    case 'laterVsAlways':return `Adoption ${c.adoption}: later vs always treated`
-    case 'bothTreated':return `Adoption ${c.earlier} and ${c.later}: both treated`
+    case 'treatedVsNever':return `Adoption ${label(c.adoption)}: treated vs never treated`
+    case 'earlierVsLater':return `${label(c.earlier)} vs ${label(c.later)}: earlier vs later treated`
+    case 'laterVsEarlier':return `${label(c.later)} vs ${label(c.earlier)}: later vs earlier treated`
+    case 'laterVsAlways':return `Adoption ${label(c.adoption)}: later vs always treated`
+    case 'bothTreated':return `Adoption ${label(c.earlier)} and ${label(c.later)}: both treated`
     default:return assertNever(c)
   }
 }
 export function BaconResult({run}:{readonly run:Extract<TimeSeriesRun,{kind:'bacon'}>}){
   const e=run.evidence,theme=useChartTheme()
-  const rows=useMemo(()=>e.decomposition.kind==='unadjusted'?e.decomposition.components.map((c,index)=>({index,label:comparison(c.comparison),estimate:c.estimate,weight:c.weight})):[{index:0,label:'Within timing groups',estimate:e.decomposition.withinEstimate,weight:e.decomposition.withinWeight},...e.decomposition.between.map((c,i)=>({index:i+1,label:comparison(c.comparison),estimate:c.estimate,weight:c.weight}))],[e])
+  const labels=useMemo(()=>new Map(run.periods.map((label,code)=>[code,label])),[run.periods])
+  const rows=useMemo(()=>e.decomposition.kind==='unadjusted'?e.decomposition.components.map((c,index)=>({index,label:comparison(c.comparison,labels),estimate:c.estimate,weight:c.weight})):[{index:0,label:'Within timing groups',estimate:e.decomposition.withinEstimate,weight:e.decomposition.withinWeight},...e.decomposition.between.map((c,i)=>({index:i+1,label:comparison(c.comparison,labels),estimate:c.estimate,weight:c.weight}))],[e,labels])
   const option=useMemo(()=>({...baseOption(theme,'Goodman–Bacon comparison estimates and weights.'),grid:gridAuto({top:24,bottom:30}),tooltip:tooltip(theme,'item'),xAxis:valueAxis(theme,'Comparison weight'),yAxis:valueAxis(theme,'Comparison estimate'),series:[{id:'comparisons',name:'Comparison',type:'scatter',symbolSize:8,data:rows.map(r=>({name:r.label,value:[r.weight,r.estimate]})),itemStyle:{color:theme.signal},markLine:{silent:true,symbol:'none',label:{formatter:()=>`TWFE ${number(e.twfe)}`,position:'insideEndTop'},data:[{yAxis:e.twfe,name:'TWFE coefficient'}]}}]}),[e,rows,theme])
-  return <section className={resultSurface()} aria-label="Bacon decomposition result"><h3 className={resultTitle}>Goodman–Bacon decomposition for {run.outcome.name}</h3><MetricGrid label="Decomposition summary"><MetricTile label="TWFE coefficient" value={formatWords(number(e.twfe))}/><MetricTile label="Reconstructed coefficient" value={formatWords(number(e.reconstructed))}/></MetricGrid><p className="text-body text-muted">This decomposes the two-way fixed-effects coefficient. It is not a separate estimate of the effect among treated units. Comparisons that use already-treated units as controls can complicate interpretation when effects vary over time or across cohorts.</p><p className="text-label text-faint">Adoption codes follow the saved period order: {run.periods.map((p,i)=>`${i}: ${p}`).join(', ')}. No confidence interval is calculated for this decomposition.</p><ExpandableChart label="Bacon comparison weights" option={option} className="h-[300px]"/><EvidenceTable title="Weighted comparisons" rows={rows} rowKey={r=>String(r.index)} noun="comparison" empty="No comparisons" columns={[{id:'label',header:'Comparison',value:r=>r.label},{id:'estimate',header:'Estimate',value:r=>r.estimate,format:number,align:'right'},{id:'weight',header:'Weight',value:r=>r.weight,format:number,align:'right'}]}/></section>
+  return <section className={resultSurface()} aria-label="Bacon decomposition result"><h3 className={resultTitle}>Goodman–Bacon decomposition for {run.outcome.name}</h3><MetricGrid label="Decomposition summary"><MetricTile label="TWFE coefficient" value={formatWords(number(e.twfe))}/><MetricTile label="Reconstructed coefficient" value={formatWords(number(e.reconstructed))}/></MetricGrid><p className="text-body text-muted">This decomposes the two-way fixed-effects coefficient. It is not a separate estimate of the effect among treated units. Comparisons that use already-treated units as controls can complicate interpretation when effects vary over time or across cohorts.</p><p className="text-label text-faint">No confidence interval is calculated for this decomposition.</p><ExpandableChart label="Bacon comparison weights" option={option} className="h-[300px]"/><EvidenceTable title="Weighted comparisons" rows={rows} rowKey={r=>String(r.index)} noun="comparison" empty="No comparisons" columns={[{id:'label',header:'Comparison',value:r=>r.label},{id:'estimate',header:'Estimate',value:r=>r.estimate,format:number,align:'right'},{id:'weight',header:'Weight',value:r=>r.weight,format:number,align:'right'}]}/></section>
 }
 export function PanelRegressionResult({run}:{readonly run:Extract<TimeSeriesRun,{kind:'panel-regression'}>}){
   const e=run.evidence,s=e.request.specification,theme=useChartTheme()

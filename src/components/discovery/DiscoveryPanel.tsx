@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
@@ -2097,7 +2098,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
               </div>
             </div>
           )}
-          <div className="flex flex-wrap items-center gap-3">
+          <RunActions running={job.kind === 'running'} onCancel={cancelRun} orbLabel="Discovery running">
             <button
               type="button"
               className={button('signal')}
@@ -2107,8 +2108,7 @@ export function DiscoveryPanel({ source, profile, prepared, stationarity, runs, 
             >
               Run {method.name}
             </button>
-            {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={cancelRun}>Cancel run</button>}
-          </div>
+          </RunActions>
           </div>
             </>
           )}

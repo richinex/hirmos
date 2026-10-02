@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
@@ -101,5 +102,5 @@ export function CountRegressionPanel(props:Omit<TimeSeriesPanelProps,'prepared'>
       <div className={fieldRow.three}>{input('Confidence level',draft.confidence,confidence=>set({...draft,confidence}))}{input('Optimizer iterations',draft.iterations,iterations=>set({...draft,iterations}))}{input('Optimizer tolerance',draft.tolerance,tolerance=>set({...draft,tolerance}))}</div>
     </SettingsStep>
     </div>
-    </fieldset><div className={cn(actionGap,'grid gap-3')}>{problem!==null&&<Alert tone="info" live={false}>{problem}</Alert>}<div className="flex items-center gap-3"><button type="button" className={button('signal')} disabled={problem!==null||session.blocked||job.kind==='running'} onClick={()=>void execute()}>Fit regression</button><span className="inline-flex h-5 w-5 items-center">{job.kind==='running'&&<Orb state="solving" aria-label="Regression running"/>}</span>{job.kind==='running'&&<button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div></div><JobNotice job={job}/></section>{runs.slice(-1).map(run=><CountRegressionResult key={run.id} run={run}/>)}</section>}/>
+    </fieldset><div className={cn(actionGap,'grid gap-3')}>{problem!==null&&<Alert tone="info" live={false}>{problem}</Alert>}<RunActions running={job.kind==='running'} onCancel={session.cancel} orbLabel="Regression running"><button type="button" className={button('signal')} disabled={problem!==null||session.blocked||job.kind==='running'} aria-busy={job.kind==='running'} onClick={()=>void execute()}>Fit regression</button></RunActions></div><JobNotice job={job}/></section>{runs.slice(-1).map(run=><CountRegressionResult key={run.id} run={run}/>)}</section>}/>
 }

@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import {CountRegressionPanel} from './CountRegressionPanel'
 import {PanelRegressionPanel} from './PanelRegressionPanel'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -133,7 +134,7 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
       </SettingsStep>}
     </div>
   </fieldset>
-  <div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}><button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button><span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label={`${model.toUpperCase()} running`} />}</span>{job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}</div></>
+  <RunActions className={actionGap} running={job.kind === 'running'} onCancel={session.cancel} orbLabel={`${model.toUpperCase()} running`}><button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit {model.toUpperCase()}</button></RunActions></>
 
   return <WorkbenchLayout id={`time-series-${model}`}
     bottom={{ trigger: { label: 'History', icon: 'history' }, title: `Time-series runs (${runs.length})`, defaultSize: 150, body: <TimeSeriesHistory entries={runs} onDelete={(entry) => props.onDeleteRun(entry.id)} /> }}

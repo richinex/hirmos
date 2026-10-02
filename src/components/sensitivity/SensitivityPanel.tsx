@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { RunDetails } from '@/components/ui/RunDetails'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -424,12 +425,11 @@ export function SensitivityPanel({ source, profile, prepared, studies, estimatio
             <div className={cn(actionGap, 'grid gap-3')}>
             {eligibility.kind === 'refused' && <Alert tone="warn" live={false}><p className="m-0">{eligibility.reason}</p></Alert>}
             <JobNotice job={job} />
-            <div className="flex items-center gap-3">
+            <RunActions running={job.kind === 'running'} onCancel={session.cancel} orb="working" orbLabel="Probe running">
               <button type="button" className={button('signal')} disabled={eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
                 Run {lowerFirst(describeProbe(state.probe))}
               </button>
-              {job.kind === 'running' && <><Orb state="working" aria-label="Probe running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
-            </div>
+            </RunActions>
             </div>
           </>
         )}

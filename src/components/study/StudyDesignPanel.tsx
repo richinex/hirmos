@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { Metadata } from '@/components/ui/Metadata'
 import { ChapterHeading } from '@/components/ui/ChapterHeading'
@@ -603,7 +604,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
         <JobNotice job={job} />
         {choiceProblem !== null && <Alert tone="danger" className="mt-3">{choiceProblem}</Alert>}
         {adjustmentChoice !== null && <AdjustmentSetChoicePanel study={adjustmentChoice.study} evidence={adjustmentChoice.evidence} onChoose={(choice) => recordIdentification(adjustmentChoice.study, adjustmentChoice.evidence, choice)} />}
-        <div className="mt-4 flex items-center gap-3">
+        <RunActions className="mt-4" running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Identification running">
           <button
             type="button"
             className={button('signal')}
@@ -613,8 +614,7 @@ export function StudyDesignPanel({ prepared, documents, draft, onDraftChanged, s
           >
             Identify the effect
           </button>
-          {job.kind === 'running' && <><Orb state="solving" aria-label="Identification running" /><button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button></>}
-        </div>
+        </RunActions>
       </section>
 
       {newestRecorded !== null && (

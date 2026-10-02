@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { MetricGrid, MetricTile } from '@/components/ui/figures'
 import { ISO_WEEK_NOTE, TIME_INTERPRETATIONS } from '@/domain/timeInterpretation'
 import { STATIONARITY_TESTS_NOTE } from '@/domain/stationarity'
@@ -1005,7 +1006,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
       {/* The action closes the numbered steps it saves, ahead of the optional diagnostics. */}
       <JobNotice job={preparation.job} />
       {action.kind === 'blocked' ? <div id="preparation-requirement" className="mt-3"><Alert tone="info" live={false}>{action.reason}</Alert></div> : null}
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <RunActions className="mt-4" running={preparation.job.kind === 'running'} onCancel={preparation.cancel} orbLabel="Preparation running">
         <button
           type="button"
           className={button('signal')}
@@ -1016,8 +1017,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
         >
           Create prepared dataset version
         </button>
-        {preparation.job.kind === 'running' && <button type="button" className={button('quiet')} onClick={preparation.cancel}>Cancel preparation</button>}
-      </div>
+      </RunActions>
 
       {preparedTimeSeries !== null && <PreparedSeriesPreview key={preparedTimeSeries.id} source={source} profile={profile} prepared={preparedTimeSeries} />}
 
@@ -1065,7 +1065,7 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
             </div>
           </fieldset>
           <div className="mt-3">
-            <div className="mt-3 flex flex-wrap items-center gap-3">
+            <RunActions className="mt-3" running={job.kind === 'running'} onCancel={cancelDiagnostics} orbLabel="Stationarity tests running">
               <button
                 type="button"
                 className={button(testColumns.length > 0 ? 'signal' : 'quiet')}
@@ -1075,12 +1075,8 @@ export function PreprocessingPanel({ source, profile, onPrepared, onStationarity
               >
                 Run stationarity tests
               </button>
-              {job.kind === 'running' && <>
-                <Orb state="solving" aria-label="Stationarity tests running" />
-                <button type="button" className={button('quiet')} onClick={cancelDiagnostics}>Cancel tests</button>
-                <span role="status" className="sr-only">{job.progress?.completed ?? 0} of {job.progress?.total ?? 0} variables completed</span>
-              </>}
-            </div>
+              <span role="status" className="sr-only">{job.kind === 'running' ? `${job.progress?.completed ?? 0} of ${job.progress?.total ?? 0} variables completed` : ''}</span>
+            </RunActions>
           </div>
           {job.kind === 'failed' && <Alert tone="danger" className="mt-3"><p className="m-0">{job.detail}</p></Alert>}
           {job.kind === 'cancelled' && <Alert tone="info" className="mt-3"><p className="m-0">Stationarity tests cancelled. No new results were saved.</p></Alert>}

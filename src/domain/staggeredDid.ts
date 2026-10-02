@@ -128,7 +128,7 @@ export function sameStaggeredSpecification(a:StaggeredSpecification,b:StaggeredS
 export function staggeredRecordMatches(raw:unknown,rawStudy:unknown):boolean {
   const target=z.object({kind:z.literal('average-treatment-effect-on-treated'),scale:z.literal('additive'),treatedValue:z.literal(1)})
   const interval=z.discriminatedUnion('kind',[z.object({kind:z.literal('confidence'),level:finite,lower:finite,upper:finite}),z.object({kind:z.literal('none'),reason:z.string()})])
-  const run=z.object({study:z.string(),configuration:staggeredConfigurationSchema,evidence:staggeredEvidenceSchema,columns:z.array(z.object({column:z.string()})),timeLabels:z.array(z.string()),estimate:z.object({estimand:target,effect:z.object({kind:z.literal('additive'),value:finite}),standardError:finite.nullable(),interval})}).safeParse(raw)
+  const run=z.object({study:z.string(),configuration:staggeredConfigurationSchema,evidence:staggeredEvidenceSchema,columns:z.array(z.object({column:z.string()})),timeLabels:z.array(z.string()),sourcePeriods:z.array(z.object({code:integer,label:z.string().min(1)}).strict()).min(1),estimate:z.object({estimand:target,effect:z.object({kind:z.literal('additive'),value:finite}),standardError:finite.nullable(),interval})}).safeParse(raw)
   const study=z.object({id:z.string(),estimand:target,outcome:z.object({column:z.string()}),treatment:z.object({column:z.string()})}).safeParse(rawStudy)
   if(!run.success||!study.success) return false
   const {configuration:c,evidence:e,columns,estimate}=run.data,headline=e.overall.dynamic
@@ -138,6 +138,9 @@ export function staggeredRecordMatches(raw:unknown,rawStudy:unknown):boolean {
     && columns[0]?.column===study.data.outcome.column&&columns[1]?.column===study.data.treatment.column&&c.covariates.every((id,i)=>columns[i+2]?.column===id&&id!==study.data.outcome.column&&id!==study.data.treatment.column)
     && headline.kind!=='reference'&&estimate.effect.value===headline.estimate&&estimate.standardError===(headline.kind==='estimated'?headline.standardError:null)
     && run.data.timeLabels.length===e.times.length
+    && new Set(run.data.sourcePeriods.map(p=>p.code)).size===run.data.sourcePeriods.length
+    && e.times.every((code,i)=>run.data.sourcePeriods.find(p=>p.code===code)?.label===run.data.timeLabels[i])
+    && e.changes.every(change=>!('period' in change)||run.data.sourcePeriods.some(p=>p.code===change.period))
     && (headline.kind==='estimated'
       ? estimate.interval.kind==='confidence'&&estimate.interval.level===e.specification.confidence&&estimate.interval.lower===headline.lower&&estimate.interval.upper===headline.upper
       : estimate.interval.kind==='none')

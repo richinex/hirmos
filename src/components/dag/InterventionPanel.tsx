@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { RunFold } from '@/components/ui/RunFold'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -283,10 +284,9 @@ export function InterventionPanel({ document, source, profile, prepared, queries
       <p className={cn(fieldHint, 'mb-0 mt-4')}>Method: {identifiedRoute ? (condition.kind === 'selected' ? 'IDC expression' : 'ID expression') : 'fully observed Bayesian network'}</p>
       {!readiness.ok && <Alert tone="danger" className="mt-4">{describeInterventionReadiness(readiness.error)}</Alert>}
       <JobNotice job={job} />
-      <div className="mt-6 flex items-center gap-3">
+      <RunActions className="mt-6" running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Intervention running">
         <button type="button" className={button('signal')} disabled={!readiness.ok || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>Evaluate intervention</button>
-        {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
-      </div>
+      </RunActions>
       {recorded.length > 0 && <ul className="m-0 mt-4 list-none divide-y divide-hair p-0 text-body" aria-label="Intervention queries">{recorded.map((query, index) => <QueryRecord key={query.id} query={query} document={document} open={index === 0} onDelete={setPendingDelete} />)}</ul>}
       {deleteDialog}
     </section>

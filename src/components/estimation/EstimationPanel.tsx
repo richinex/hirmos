@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { PredictorSyntheticControls } from './PredictorSyntheticControls'
 import { PredictorSyntheticResult } from './PredictorSyntheticResult'
 import { RunDetails } from '@/components/ui/RunDetails'
@@ -318,7 +319,7 @@ function panelPeriodDisplay(run: Extract<EstimationRunArtifact, { readonly kind:
 
 function PanelEvidenceDetails({ run }: { readonly run: Extract<EstimationRunArtifact, { readonly kind: 'panel-intervention-run' }> }) {
   const { evidence } = run
-  if (evidence.kind === 'staggeredDid') return <StaggeredDidResult evidence={evidence} labels={panelPeriodDisplay(run).labels} />
+  if (evidence.kind === 'staggeredDid') return <StaggeredDidResult evidence={evidence} labels={panelPeriodDisplay(run).labels} sourcePeriods={run.sourcePeriods} />
   const controls = evidence.units.slice(0, evidence.controlUnits)
   const periods = panelPeriodDisplay(run)
   const preLabels = periods.labels.slice(0, evidence.nPre)
@@ -739,8 +740,9 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
         size="compact"
         frame="cell"
         value={adjustmentValue}
+        help={run.kind === 'panel-intervention-run' ? 'This design does not use a DAG adjustment set.' : undefined}
         context={run.kind === 'panel-intervention-run'
-          ? 'This design does not use a DAG adjustment set.'
+          ? undefined
           : declaredCategorical.length > 0
             ? `Categorical: ${namesInProse(declaredCategorical, (count) => `${count} variables`)}. One column per level.`
             : adjustmentTile.preview ?? restated?.context}
@@ -941,6 +943,14 @@ const ResultCard = memo(function ResultCard({ run, study, current, stepLabel, on
     </article>
   )
 })
+
+/** The run button's label. It shares a row with the running orb and the cancel button, so on a phone it stays short; results keep the full name. */
+const runLabel = (estimator: EstimatorId): string => {
+  switch (estimator) {
+    case 'panel-intervention': return 'Run panel DiD'
+    default: return `Run ${lowerFirst(describeEstimator(estimator))}`
+  }
+}
 
 export function EstimationPanel({ source, profile, prepared, stationarity, documents, studies, identifications, runs, sensitivityRuns, onRun, onDeleteRun, onOpenStudy, onActivity }: {
   readonly onActivity?: (activity: RunActivity | null) => void
@@ -1477,7 +1487,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             const columns:NonEmptyArray<StudyVariable>=[study.outcome,study.treatment,...configuration.covariates.map(column=>({column,node:study.outcome.node,name:profile.columns.find(c=>c.id===column)?.name??String(column)}))]
             const labels=evidence.value.times.map(time=>materialized.value.periods.find(p=>p.code===time)?.label??String(time))
             if(!isNonEmpty(labels)){dispatch({type:'run-failed',detail:'No retained panel periods were returned.'});return}
-            const run={kind:'panel-intervention-run',configuration,evidence:evidence.value,timeLabels:labels} as const
+            const run={kind:'panel-intervention-run',configuration,evidence:evidence.value,timeLabels:labels,sourcePeriods:materialized.value.periods.map(({code,label})=>({code,label}))} as const
             const estimate=causalEstimateFrom(study,identification,run)
             finish(estimate===null?null:{...identity,...run,method:methodIdOf(configuration.kind),columns,estimate},'The staggered DiD result does not match the treated-group study target.')
             return
@@ -1495,7 +1505,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
             const evidence = await analysis.runAdjustedDid(matrix.values, matrix.rowCount, 2+configuration.covariates.length, matrix.units, matrix.periodCodes, configuration.specification)
             if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
             const columns: NonEmptyArray<StudyVariable> = [study.outcome, study.treatment, ...configuration.covariates.map(column => ({ column, node: study.outcome.node, name: profile.columns.find(c => c.id === column)?.name ?? String(column) }))]
-            const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: mapNonEmpty(state.panelPreflight.layout.periods, period => period.label) } as const
+            const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: mapNonEmpty(state.panelPreflight.layout.periods, period => period.label), sourcePeriods: state.panelPreflight.layout.periods.map(({code,label})=>({code,label})) } as const
             const estimate = causalEstimateFrom(study, identification, run)
             finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate }, 'The adjusted panel result does not match its study target.')
             return
@@ -1511,7 +1521,7 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
           )
           if (!evidence.ok) { dispatch({ type: 'run-failed', detail: describeAnalysisWorkerProblem(evidence.error) }); return }
           const columns: NonEmptyArray<StudyVariable> = [study.outcome, study.treatment]
-          const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: mapNonEmpty(state.panelPreflight.layout.periods, (period) => period.label) } as const
+          const run = { kind: 'panel-intervention-run', configuration, evidence: evidence.value, timeLabels: mapNonEmpty(state.panelPreflight.layout.periods, (period) => period.label), sourcePeriods: state.panelPreflight.layout.periods.map(({code,label})=>({code,label})) } as const
           const estimate = causalEstimateFrom(study, identification, run)
           finish(estimate === null ? null : { ...identity, ...run, method: methodIdOf(configuration.kind), columns, estimate } as EstimationRunArtifact, 'The panel intervention run produced no estimate.')
           return
@@ -2496,16 +2506,16 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               </div>
               {selectedEstimatorIsVisible && <div className="mt-8">{controls}</div>}
             </div>
-            <div className={cn(actionGap, 'grid gap-3')}>
+            {/* One shrinkable column, so a long run row can never widen the notices above it. */}
+            <div className={cn(actionGap, 'grid grid-cols-[minmax(0,1fr)] gap-3')}>
             {selectedEstimatorIsVisible && eligibility !== null && <EligibilityView eligibility={eligibility} subject="this study" />}
             {studyDataError !== null && <Alert tone="danger"><p className="m-0">The treatment and outcome columns could not be checked: {studyDataError}</p></Alert>}
             <JobNotice job={job} />
-            <div className="flex min-h-10 flex-nowrap items-center gap-3" data-testid="estimation-run-row">
-              <button type="button" className={button('signal', 'shrink-0 whitespace-nowrap')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
-                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' ? 'Checking panel…' : `Run ${lowerFirst(describeEstimator(state.estimator))}`}
+            <RunActions className="min-h-10" testId="estimation-run-row" running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Estimator running">
+              <button type="button" className={button('signal', 'min-w-0')} disabled={job.kind === 'running' || session.blocked || !selectedEstimatorIsVisible || identification === null || eligibility === null || eligibility.kind === 'refused' || studyDataPending || studyDataError !== null || adjustmentDraftOpen || (configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind !== 'ready')} aria-busy={job.kind === 'running'} onClick={() => void execute()}>
+                {!selectedEstimatorIsVisible ? 'Choose a method' : studyDataPending ? 'Checking treatment and outcome…' : configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' ? 'Checking panel…' : runLabel(state.estimator)}
               </button>
-              {job.kind === 'running' && <><Orb state="solving" aria-label="Estimator running" /><button type="button" className={button('quiet', 'shrink-0 whitespace-nowrap')} onClick={session.cancel}>Cancel run</button></>}
-            </div>
+            </RunActions>
             </div>
           </>
         )}

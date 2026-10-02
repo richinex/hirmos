@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { DisclosureSummary } from '@/components/ui/DisclosureSummary'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
@@ -176,12 +177,10 @@ export function CountSeriesCard({ source, profile, prepared, artifacts, onArtifa
           </SettingsStep>
         </div>
       </fieldset>
-      <div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}>
+      <RunActions className={actionGap} running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Count model running">
         <button type="button" className={button('signal')} aria-busy={job.kind === 'running'} disabled={outcome === null || session.blocked} onClick={job.kind === 'running' ? undefined : () => void run()}>Fit and scan</button>
-        <span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label="Count model running" />}</span>
         <span role="status" className="sr-only">{job.kind === 'running' ? job.stage : ''}</span>
-        {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
-      </div>
+      </RunActions>
       <JobNotice job={job} />
       </section>
       {artifacts.length > 0 && <h3 className={`${sectionTitle} m-0`}>Results</h3>}

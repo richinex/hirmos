@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import {useMemo,useState} from 'react'
 import {RunFold} from '@/components/ui/RunFold'
 import {formatTime} from '@/lib/format/date'
@@ -187,8 +188,7 @@ function ConditionalGaussianForm({document,source,profile,prepared,records,onQue
     <JobNotice job={session.job}/>
     <div className="space-y-2">
       <p className={fieldHint}>{setup.kind!=='reviewed'?'Confirm the variable types before evaluating a query.':outcome===null?'Choose an outcome.':missing>0?`${missing} parent ${missing===1?'value is':'values are'} still required.`:'All required values are supplied.'}</p>
-      <button className={button('signal','w-full')} disabled={problem!==null||typeProblem!==null||outcome===null||setup.kind!=='reviewed'||missing>0||busy} onClick={()=>void run()}>Evaluate Gaussian query</button>
-      {session.job.kind==='running'&&<button className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
+      <RunActions running={session.job.kind==='running'} onCancel={session.cancel} orbLabel="Gaussian query running"><button className={button('signal','w-full')} disabled={problem!==null||typeProblem!==null||outcome===null||setup.kind!=='reviewed'||missing>0||busy} aria-busy={session.job.kind==='running'} onClick={()=>void run()}>Evaluate Gaussian query</button></RunActions>
     </div>
     <details><DisclosureSummary>About this model</DisclosureSummary><div className="mt-2 space-y-2">
       <p className={fieldHint}>Continuous parents enter a linear regression. Each observed combination of discrete parent values has its own regression and residual standard deviation.</p>

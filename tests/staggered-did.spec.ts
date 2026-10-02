@@ -102,14 +102,16 @@ test('staggered DiD travels through the data and WASM workers and preserves sour
     const study={id:'study',estimand:{kind:'average-treatment-effect-on-treated',scale:'additive',treatedValue:1},outcome:{column:column('outcome')},treatment:{column:column('treated')}}
     const identification={result:{kind:'identified',adjustment:{kind:'canonical',variables:[]}}}
     const configuration={kind:'panel-intervention',primary:'staggered',covariates:[column('lpop')],specification}
-    const artifact={kind:'panel-intervention-run',study:'study',configuration,evidence,columns:[study.outcome,study.treatment,{column:column('lpop')}],timeLabels:matrix.value.periods.map((p:{label:string})=>p.label)}
+    const artifact={kind:'panel-intervention-run',study:'study',configuration,evidence,columns:[study.outcome,study.treatment,{column:column('lpop')}],timeLabels:matrix.value.periods.map((p:{label:string})=>p.label),sourcePeriods:matrix.value.periods.map((p:{code:number;label:string})=>({code:p.code,label:p.label}))}
     const estimate=estimation.causalEstimateFrom(study,identification,artifact)
     const record={...artifact,estimate}
     const saved=staggered.staggeredRecordMatches(JSON.parse(JSON.stringify(record)),study)
+    const missingLabels=staggered.staggeredRecordMatches({...record,sourcePeriods:undefined},study)
+    const duplicateLabels=staggered.staggeredRecordMatches({...record,sourcePeriods:[...artifact.sourcePeriods,artifact.sourcePeriods[0]]},study)
     const corrupted=staggered.staggeredRecordMatches({...record,evidence:{...evidence,specification:{...specification,anticipation:1}}},study)
     const badValues=matrix.value.values.slice();badValues[matrix.value.rowCount]=0.5
     const invalid=staggered.staggeredInput({...matrix.value,values:badValues},specification)
-    return {evidence,bootstrap,universal,saved,corrupted,invalid,estimate}
+    return {evidence,bootstrap,universal,saved,corrupted,invalid,estimate,missingLabels,duplicateLabels}
   },csv)
   const expected=reference.cases.nevertreated_varying_adjusted
   expect(result.evidence.events.keys).toEqual(expected.event)
@@ -118,7 +120,11 @@ test('staggered DiD travels through the data and WASM workers and preserves sour
     expect(result.evidence.events.intervals[i].standardError).toBeCloseTo(expected.event_se[i],9)
     expect(result.bootstrap.events.intervals[i].estimate).toBeCloseTo(result.evidence.events.intervals[i].estimate,12)
   }
+  expect(result.missingLabels).toBe(false)
+  expect(result.duplicateLabels).toBe(false)
   expect(result.estimate.effect.value).toBeCloseTo(expected.overall_att,9)
+  expect(result.evidence.overall.simple.estimate).toBeCloseTo(expected.aggregations.simple.overall_att,9)
+  expect(result.evidence.overall.simple.standardError).toBeCloseTo(expected.aggregations.simple.overall_se,9)
   expect(result.bootstrap.events.coverage.kind).toBe('simultaneous')
   expect(result.evidence.events.coverage.kind).toBe('pointwise')
   expect(result.bootstrap.overall.dynamic.estimate).toBeCloseTo(result.evidence.overall.dynamic.estimate,12)
@@ -171,16 +177,18 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await page.getByRole('group',{name:'Staggered DiD covariates',exact:true}).getByRole('checkbox',{name:'lpop',exact:true}).check()
   await choose(page,'Staggered cluster column','state')
   await page.getByRole('radio',{name:'Analytical',exact:true}).click()
-  await expect(page.getByRole('button',{name:/^Run panel difference-in-differences/i}).first()).toBeDisabled()
+  await expect(page.getByRole('button',{name:'Run panel DiD',exact:true}).first()).toBeDisabled()
   await expect(page.getByText('Select pointwise or simultaneous bootstrap to use the cluster column.',{exact:true})).toBeVisible()
   await page.getByRole('radio',{name:'Simultaneous bootstrap',exact:true}).click()
   await page.getByTestId('staggered-did-controls').scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath('staggered-controls.png')})
-  const run=page.getByRole('button',{name:/^Run panel difference-in-differences/i}).first()
+  const run=page.getByRole('button',{name:'Run panel DiD',exact:true}).first()
   await expect(run).toBeEnabled()
   await run.click()
   const result=page.getByTestId('staggered-did-result').first()
   await expect(result).toBeVisible({timeout:60_000})
+  const simple=result.getByRole('table',{name:'Simple ATT',exact:true})
+  await expect(simple).toBeVisible()
   await result.scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath('staggered-event-study.png')})
   expect(await page.locator('body').evaluate(e=>e.scrollWidth<=innerWidth+1)).toBe(true)
@@ -207,6 +215,13 @@ test('staggered adoption completes through the UI and restores its plots',async(
   if(!path) throw Error('No exported project')
   const snapshot=JSON.parse(readFileSync(path,'utf8')).project
   expect(snapshot.estimationRuns).toHaveLength(1)
+  const simpleInterval=snapshot.estimationRuns[0].evidence.overall.simple
+  expect(simpleInterval.kind).toBe('estimated')
+  const simpleCells=await page.evaluate(async interval=>{
+    const {formatStatistic}=await import(new URL('/src/lib/format/number.ts',location.href).href)
+    return [interval.estimate,interval.standardError,interval.lower,interval.upper].map(value=>formatStatistic('raw',value).text)
+  },simpleInterval)
+  await expect(simple.getByRole('cell')).toHaveText(simpleCells)
   expect(snapshot.estimationRuns[0].configuration.clustering.kind).toBe('column')
   expect(snapshot.estimationRuns[0].evidence.clusterCount).toBeLessThan(500)
   expect(snapshot.estimationRuns[0].evidence.overall.dynamic.estimate).toBeCloseTo(reference.cases.nevertreated_varying_adjusted.overall_att,9)
@@ -226,9 +241,11 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await expect(page.getByRole('navigation',{name:'Workspace sections'}).getByRole('button',{name:/Estimation/})).not.toHaveAttribute('aria-disabled','true',{timeout:60_000})
   await chapter(page,/Estimation/)
   await expect(page.getByTestId('staggered-did-result').first()).toBeVisible()
+  await expect(page.getByTestId('staggered-did-result').first().getByRole('table',{name:'Simple ATT',exact:true})).toBeVisible()
+  await expect(page.getByTestId('staggered-did-result').first().getByRole('table',{name:'Simple ATT',exact:true}).getByRole('cell')).toHaveText(simpleCells)
   await page.getByRole('radio',{name:'Staggered adoption',exact:true}).click()
   await page.getByRole('spinbutton',{name:'Staggered bootstrap replications',exact:true}).fill('500000')
-  await page.getByRole('button',{name:/^Run panel difference-in-differences/i}).first().click()
+  await page.getByRole('button',{name:'Run panel DiD',exact:true}).first().click()
   await expect(page.getByRole('button',{name:'Cancel run',exact:true})).toBeVisible()
   await chapter(page,/Study design/)
   await chapter(page,/Estimation/)

@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -131,10 +132,11 @@ export function SeriesStructureCard({ source, profile, prepared, embedded = fals
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-body text-ink"><span className={label('block text-faint')}>Min segment</span><input type="number" min={1} max={200} className={field('text', 'mt-1 w-20')} value={minSize} onChange={(event) => setMinSize(Math.max(1, Math.min(200, Number(event.target.value) || 1)))} /></label>
           <label className="text-body text-ink"><span className={label('block text-faint')}>Max lag</span><input type="number" min={1} max={400} className={field('text', 'mt-1 w-20')} value={maxLag} onChange={(event) => setMaxLag(Math.max(1, Math.min(400, Number(event.target.value) || 1)))} /></label>
-          <button type="button" className={button('quiet')} disabled={session.blocked || job.kind === 'running'} aria-busy={job.kind === 'running'} onClick={() => void run()}>
-            Analyse temporal structure
-          </button>
-          {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel analysis</button>}
+          <RunActions running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Temporal structure analysis running">
+            <button type="button" className={button('quiet')} disabled={session.blocked || job.kind === 'running'} aria-busy={job.kind === 'running'} onClick={() => void run()}>
+              Analyse temporal structure
+            </button>
+          </RunActions>
         </div>
       </div>
       <MethodCaveats methods={SERIES_STRUCTURE_METHODS} />

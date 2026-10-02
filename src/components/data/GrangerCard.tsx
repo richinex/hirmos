@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { useMemo } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -179,10 +180,11 @@ export function GrangerCard({ source, profile, prepared, stationarity, evidence,
             {GRANGER_LAG_OPTIONS.map((value) => <option key={value} value={value}>{value}</option>)}
           </Select>
         </label>
-        <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>
-          Run Granger test
-        </button>
-        {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel tests</button>}
+        <RunActions running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Granger test running">
+          <button type="button" className={button('quiet')} disabled={!readiness.ok || eligibility.kind === 'refused' || job.kind === 'running' || session.blocked} aria-busy={job.kind === 'running'} onClick={() => void run()}>
+            Run Granger test
+          </button>
+        </RunActions>
       </div>
       {!readiness.ok && <Alert tone="danger" className="mt-2">{describeGrangerReadiness(readiness.error)}</Alert>}
       <JobNotice job={job} />

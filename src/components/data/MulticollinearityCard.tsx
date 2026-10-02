@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import { Metadata } from '@/components/ui/Metadata'
 import { useJob } from '@/analysis/JobsProvider'
 import { useWorkflow } from '@/components/WorkflowProvider'
@@ -145,8 +146,9 @@ export function MulticollinearityCard({ source, profile, prepared, onSelection }
             <label className="block"><span className={fieldLabel}>|r| threshold</span><input type="number" min={0.01} max={1} step={0.01} className={field('text', 'mt-1 w-full @xl/panel:w-28')} value={correlationThreshold} onChange={(event) => setCorrelationThreshold(Math.max(0.01, Math.min(1, Number(event.target.value) || 0.9)))} /></label>
             <label className="block"><span className={fieldLabel}>VIF threshold</span><input type="number" min={1.01} step={0.5} className={field('text', 'mt-1 w-full @xl/panel:w-28')} value={vifThreshold} onChange={(event) => setVifThreshold(Math.max(1.01, Number(event.target.value) || 10))} /></label>
           </div>
-          <button type="button" className={button('quiet')} disabled={availability.kind === 'unavailable' || session.blocked || job.kind === 'running'} aria-busy={job.kind === 'running'} onClick={() => void run()}>Analyse redundancy</button>
-          {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel analysis</button>}
+          <RunActions running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Redundancy analysis running">
+            <button type="button" className={button('quiet')} disabled={availability.kind === 'unavailable' || session.blocked || job.kind === 'running'} aria-busy={job.kind === 'running'} onClick={() => void run()}>Analyse redundancy</button>
+          </RunActions>
         </div>
       </div>
 

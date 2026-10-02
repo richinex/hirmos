@@ -1,3 +1,4 @@
+import { RunActions } from '@/components/ui/RunActions'
 import type { ReactNode } from 'react'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
@@ -199,11 +200,9 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
           </div>
           {problem !== null && draft.outcome !== null && <p role="status" className="m-0 text-body text-muted">{problem}</p>}
         </fieldset>
-        <div className={cn(actionGap, 'flex flex-wrap items-center gap-3')}>
+        <RunActions className={actionGap} running={job.kind === 'running'} onCancel={session.cancel} orbLabel="Interrupted series running">
           <button type="button" className={button('signal')} disabled={!ready || session.blocked} aria-busy={job.kind === 'running'} onClick={job.kind === 'running' ? undefined : () => void fit()}>Fit interrupted series</button>
-          <span className="inline-flex h-5 w-5 items-center">{job.kind === 'running' && <Orb state="solving" aria-label="Interrupted series running" />}</span>
-          {job.kind === 'running' && <button type="button" className={button('quiet')} onClick={session.cancel}>Cancel run</button>}
-        </div>
+        </RunActions>
         <JobNotice job={job} />
       </section>
       {runs.length === 0 && <p className="text-body text-muted">Choose the series, the intervention row and the impact model to begin.</p>}
