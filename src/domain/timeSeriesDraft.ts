@@ -63,6 +63,8 @@ export interface InterruptedDraft {
 export interface TimeSeriesDraft {
   readonly prepared: PreparedDatasetVersionId
   readonly regression: CountRegressionDraft
+  readonly cohortRegression: CountRegressionDraft
+  readonly regressionDesign: import('./regressionDesigns').RegressionDesign
   readonly panelRegression: PanelRegressionDraft
   readonly analysis: 'count' | 'ardl' | 'vecm' | 'interrupted' | 'regression' | 'panel-regression'
   readonly ardl: ArdlDraft
@@ -74,6 +76,8 @@ type FieldEvent<T, Kind extends string> = { [K in keyof T]: { readonly type: Kin
 export type TimeSeriesEvent =
   | {readonly type:'panel-regression';readonly value:PanelRegressionDraft}
   | {readonly type:'regression';readonly value:CountRegressionDraft}
+  | {readonly type:'cohort-regression';readonly value:CountRegressionDraft}
+  | {readonly type:'regression-design';readonly value:import('./regressionDesigns').RegressionDesign}
   | { readonly type: 'analysis'; readonly analysis: TimeSeriesDraft['analysis'] }
   | FieldEvent<ArdlDraft, 'ardl'>
   | FieldEvent<CountDraft, 'count'>
@@ -92,14 +96,21 @@ function longRunDraft(model: 'ardl' | 'vecm', runs: readonly TimeSeriesRun[]): L
   }
 }
 
+const designOfLinearModel=(model:PanelRegressionDraft['model']):import('./regressionDesigns').RegressionDesign=>
+  model.kind==='eventStudy'?{kind:'linear-event-study'}:model.kind==='interactions'?{kind:'interactions'}:{kind:'bacon'}
+
 export function retainTimeSeriesDraft(current: TimeSeriesDraft | null, workflow: Workflow): TimeSeriesDraft | null {
   if (workflow.kind !== 'profiled' || workflow.prepared===null) return null
   const prepared = workflow.prepared
   if (current?.prepared === prepared.id) return current
+  const panelRegression:PanelRegressionDraft=workflow.timeSeriesRuns.filter(r=>r.kind==='panel-regression'||r.kind==='bacon').at(-1)?.controls??{...initialPanelRegression(),...(prepared.kind==='prepared-panel'?{}:{model:{kind:'interactions',predictors:[],terms:[]}})}
   return {
     prepared: prepared.id, analysis: prepared.kind === 'prepared-panel' ? 'regression' : prepared.kind==='prepared-time-series'?'count':'panel-regression',
-    panelRegression:workflow.timeSeriesRuns.filter(r=>r.kind==='panel-regression'||r.kind==='bacon').at(-1)?.controls??{...initialPanelRegression(),...(prepared.kind==='prepared-panel'?{}:{model:{kind:'interactions',predictors:[],terms:[]}})},
+    panelRegression,
     regression: initialCountRegression(prepared.kind === 'prepared-panel'),
+    cohortRegression: {...initialCountRegression(true),model:{kind:'events',onset:null,cohort:'',window:{kind:'all'}}},
+    // The selection follows the restored linear draft, so a project last left on Bacon reopens on Bacon.
+    regressionDesign: designOfLinearModel(panelRegression.model),
     ardl: { outcome: null, roles: {}, mode: 'search', starting: {}, fixedOrders: {}, minimum: '1', outcomeLag: '2', holdBack: '', terms: 'constant', horizon: '12', future: { kind: 'none' } },
     longRun: { ardl: longRunDraft('ardl', workflow.timeSeriesRuns), vecm: longRunDraft('vecm', workflow.timeSeriesRuns) },
     count: { outcome: null, link: 'identity', pastObservationLags: [1], pastMeanLags: [1], candidateStart: Math.max(1, Math.floor(prepared.observations * 0.2)), candidateEnd: Math.max(1, Math.floor(prepared.observations * 0.8)), delta: 1 },
@@ -111,6 +122,8 @@ export function stepTimeSeriesDraft(state: TimeSeriesDraft, event: TimeSeriesEve
   switch (event.type) {
     case 'panel-regression': return {...state,panelRegression:event.value}
     case 'regression': return {...state,regression:event.value}
+    case 'cohort-regression': return {...state,cohortRegression:event.value}
+    case 'regression-design': return {...state,regressionDesign:event.value}
     case 'analysis': return { ...state, analysis: event.analysis }
     case 'ardl': return { ...state, ardl: { ...state.ardl, [event.field]: event.value } }
     case 'count': return { ...state, count: { ...state.count, [event.field]: event.value } }

@@ -166,7 +166,7 @@ export function InterruptedSeriesPanel(props: TimeSeriesPanelProps & { readonly 
               <div className="grid gap-4">
                 <div>
                   <ParameterLabel className={fieldLabel} label="Impact model" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.impactModel[draft.impact.kind]} />
-                  <SegmentedControl className="mt-1" wrap ariaLabel="Impact model" value={draft.impact.kind} onChange={(kind) => set('impact', kind === 'temporaryLevel' ? { kind, until: '' } : { kind })} options={[{ value: 'level', label: 'Level change' }, { value: 'levelAndSlope', label: 'Level and slope change' }, { value: 'slope', label: 'Slope change' }, { value: 'temporaryLevel', label: 'Temporary level change' }]} />
+                  <SegmentedControl className="mt-1" ariaLabel="Impact model" value={draft.impact.kind} onChange={(kind) => set('impact', kind === 'temporaryLevel' ? { kind, until: '' } : { kind })} options={[{ value: 'level', label: 'Level change' }, { value: 'levelAndSlope', label: 'Level and slope change' }, { value: 'slope', label: 'Slope change' }, { value: 'temporaryLevel', label: 'Temporary level change' }]} />
                 </div>
                 {draft.impact.kind === 'temporaryLevel' && <label className="block max-w-xs"><ParameterLabel className={fieldLabel} label="Until row" help={ESTIMATION_PARAMETER_HELP.interruptedSeries.untilRow} />
                   <input aria-label="Until row" type="number" min={2} max={rows} className={field('text', 'mt-1')} value={draft.impact.until} onChange={(e) => set('impact', { kind: 'temporaryLevel', until: e.target.value })} />

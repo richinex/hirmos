@@ -173,6 +173,11 @@ export const timeSeriesRunSchema = z.discriminatedUnion('kind', [
 
 export type TimeSeriesRun = z.infer<typeof timeSeriesRunSchema>
 export type TimeSeriesRunId = TimeSeriesRun['id']
+
+/** Presentation grouping only: persisted run identities and numerical contracts stay unchanged. */
+export type RegressionDesignRun = Extract<TimeSeriesRun, { kind: 'panel-regression' | 'bacon' | 'count-regression' }>
+export const isRegressionDesignRun = (run: TimeSeriesRun): run is RegressionDesignRun =>
+  run.kind === 'panel-regression' || run.kind === 'bacon' || (run.kind === 'count-regression' && (run.specification.design.kind === 'events' || run.specification.design.kind === 'summary'))
 export const newTimeSeriesRunId = (): TimeSeriesRunId => brand(crypto.randomUUID())
 
 export function parseTimeSeriesRun(value: unknown): Result<TimeSeriesRun, string> {
@@ -184,7 +189,7 @@ export const timeSeriesRunLabel = (run: TimeSeriesRun): string => {
   switch (run.kind) {
     case 'panel-regression': return `${run.specification.specification.kind==='eventStudy'?'Regression event study':'Interaction regression'} for ${run.outcome.name}`
     case 'bacon': return `Goodman–Bacon decomposition for ${run.outcome.name}`
-    case 'count-regression': return `Count regression for ${run.outcome.name}`
+    case 'count-regression': return `${run.specification.design.kind==='events'?'Event study, count model':run.specification.design.kind==='summary'?'Cohort summary, count model':'Count regression'} for ${run.outcome.name}`
     case 'ardl-model': return `ARDL for ${run.outcome.name}`
     case 'ardl': return `ARDL for ${run.outcome.name} and ${run.predictor.name}`
     case 'vecm': return `VECM for ${run.variables.map((variable) => variable.name).join(', ')}`

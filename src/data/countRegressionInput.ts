@@ -43,7 +43,9 @@ export async function prepareCountDesign(
       if (column < 0) return err({kind:'onset-missing'})
       const adoption = cohortAdoption(panel,column)
       if (!adoption.ok) return adoption
-      const common = {keys:panel.keys.map(([u,t]):[number,number]=>[u,t]),adoption:adoption.value,cohort:Number(model.cohort)-1,covariates}
+      const cohort=panel.periods.indexOf(model.cohort)
+      if(cohort<1||!adoption.value.some(([,period])=>period===cohort))return err({kind:'cohort-missing'})
+      const common = {keys:panel.keys.map(([u,t]):[number,number]=>[u,t]),adoption:adoption.value,cohort,covariates}
       const design:Design = model.kind === 'summary'
         ? {kind:'summary',...common}
         : {kind:'events',...common,window:model.window.kind==='all'?{kind:'all'}:{kind:'finite',first:Number(model.window.first),last:Number(model.window.last)}}

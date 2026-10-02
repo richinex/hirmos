@@ -23,7 +23,7 @@ import { BayesianImpactResult } from './BayesianImpactResult'
 import { ImpactEffectPanel } from './ImpactEffectPanel'
 import { StaggeredDidControls } from './StaggeredDidControls'
 import { StaggeredDidResult } from './StaggeredDidResult'
-import { defaultStaggeredSpecification, staggeredInput } from '@/domain/staggeredDid'
+import { defaultStaggeredSpecification, staggeredInput, recordedStaggeredAdjustment, staggeredAdjustmentDescriptions } from '@/domain/staggeredDid'
 import { AdjustedDidControls } from './AdjustedDidControls'
 import { AdjustedDidResult } from './AdjustedDidResult'
 import { describePanelDataProblem } from '@/domain/panel'
@@ -33,7 +33,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Icon } from '@/components/Icon'
 import { Select } from '@/components/ui/Select'
 import { LagListField } from '@/components/ui/LagListField'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { EChart } from '@/charts/EChart'
 import { ExpandableChart } from '@/charts/ExpandableChart'
 import type { VisibleWindow } from '@/charts/window'
@@ -52,6 +52,7 @@ import { runComparisonOption, type RunComparisonRow } from '@/charts/estimation/
 import { useChartTheme } from '@/charts/theme'
 import { EligibilityView } from '@/components/EligibilityView'
 import { MethodCaveats } from '@/components/MethodCaveats'
+import { IdentificationRecord } from '@/components/IdentificationRecord'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { Alert } from '@/components/ui/Alert'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -532,6 +533,7 @@ function Diagnostics({ run }: { readonly run: EstimationRunArtifact }) {
       case 'panel-intervention-run': {
         const { evidence } = run
         if (evidence.kind === 'staggeredDid') return [
+          {label:'Adjustment method',value:formatWords(staggeredAdjustmentDescriptions[recordedStaggeredAdjustment(evidence.specification).kind].label),context:'Group-time ATT estimation'},
           {label:'Cohorts',value:formatCount(evidence.cohorts.keys.length),context:'Distinct first-treatment periods'},
           {label:'Retained units',value:formatCount(evidence.units.length),context:String(evidence.times.length)+' periods'},
           {label:'Overall ATT',value:formatWords('Dynamic aggregation'),context:'Equal average of supported nonnegative event-time effects'},
@@ -952,7 +954,9 @@ const runLabel = (estimator: EstimatorId): string => {
   }
 }
 
-export function EstimationPanel({ source, profile, prepared, stationarity, documents, studies, identifications, runs, sensitivityRuns, onRun, onDeleteRun, onOpenStudy, onActivity }: {
+export function EstimationPanel({ source, profile, prepared, stationarity, documents, studies, identifications, runs, sensitivityRuns, onRun, onDeleteRun, onOpenStudy, onActivity, selector, onOpenBacon }: {
+  readonly selector?: ReactNode
+  readonly onOpenBacon?: (outcome:ColumnId,treatment:ColumnId) => void
   readonly onActivity?: (activity: RunActivity | null) => void
   readonly source: SelectedSource
   readonly profile: DatasetProfile
@@ -2190,14 +2194,18 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       case 'panel-intervention':
         return (
           <div className={stepsStack}>
-            <SettingsStep number={configuration.primary === 'did' ? undefined : 1} title="Choose the method">
-              <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Choose the method before fitting. Conventional DiD can use one period before and one after adoption.</p>
-              <SegmentedControl wrap className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification,clustering:{kind:'unit'}} : primary === 'regression' || primary === 'doublyRobust'
+            <SettingsStep number={configuration.primary === 'did' ? undefined : 1} title="Choose the method" className="[column-span:all]">
+              <p className={cn(fieldHint, 'm-0 max-w-[65ch]')}>Choose the method before fitting. Two-period regression and DR require one period before and one after adoption. Conventional DiD can also compare averages across multiple pre- and post-periods.</p>
+              <SegmentedControl className="justify-self-start" ariaLabel="Panel method" value={configuration.primary === 'adjusted' ? configuration.specification.kind : configuration.primary ?? 'syntheticDid'} onChange={(primary) => configure(primary === 'staggered' ? {kind:'panel-intervention',primary:'staggered',covariates:[],specification:defaultStaggeredSpecification,clustering:{kind:'unit'}} : primary === 'regression' || primary === 'doublyRobust'
                 ? { kind: 'panel-intervention', primary: 'adjusted', covariates: [], specification: primary === 'regression' ? { kind: 'regression' } : { kind: 'doublyRobust', folds: 2, seed: 1234, trimming: 0.01, normalization: 'in-sample' } }
-                : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Regression' }, { value: 'doublyRobust', label: 'Doubly robust' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'}]} />
+                : { kind: 'panel-intervention', primary, placeboReplications: 100, seed: 0 })} options={[{ value: 'did', label: 'Conventional' }, { value: 'regression', label: 'Two-period regression' }, { value: 'doublyRobust', label: 'Two-period DR' }, { value: 'syntheticDid', label: 'Synthetic' }, {value:'staggered',label:'Staggered adoption'}]} />
+              {prepared.kind==='prepared-panel'&&study!==null&&onOpenBacon!==undefined&&<div className="space-y-1"><button type="button" className={button('quiet')} disabled={job.kind==='running'||session.blocked} onClick={()=>onOpenBacon(study.outcome.column,study.treatment.column)}>Decompose the TWFE coefficient</button><p className={fieldHint}>Inspect the weighted comparisons in a two-way fixed-effects regression. This diagnostic does not estimate a separate ATT.</p></div>}
             </SettingsStep>
             {configuration.primary === 'staggered' && <SettingsStep number={2} title="Compare cohorts">
-              <StaggeredDidControls configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} clusterCandidates={profile.columns.filter(c=>c.id!==study?.treatment.column&&c.id!==study?.outcome.column&&(prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn)))} onChange={configure} />
+              <StaggeredDidControls section="comparison" configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} clusterCandidates={profile.columns.filter(c=>c.id!==study?.treatment.column&&c.id!==study?.outcome.column&&(prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn)))} onChange={configure} />
+            </SettingsStep>}
+            {configuration.primary === 'staggered' && <SettingsStep number={3} title="Report uncertainty">
+              <StaggeredDidControls section="reporting" configuration={configuration} candidates={controlCandidates.filter(c=>prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn))} clusterCandidates={profile.columns.filter(c=>c.id!==study?.treatment.column&&c.id!==study?.outcome.column&&(prepared.kind!=='prepared-panel'||(c.id!==prepared.panel.unitColumn&&c.id!==prepared.panel.timeColumn)))} onChange={configure} />
             </SettingsStep>}
             {configuration.primary === 'adjusted' && <SettingsStep number={2} title="Adjust for covariates">
               <AdjustedDidControls configuration={configuration} candidates={controlCandidates.filter(c => prepared.kind !== 'prepared-panel' || (c.id !== prepared.panel.unitColumn && c.id !== prepared.panel.timeColumn))} onChange={configure} />
@@ -2452,8 +2460,9 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
         <p className={chapterIntro}>Identification determines how to express the causal question using observed data. Estimation applies a statistical method to that expression. In this section, you choose a compatible estimator and examine the effect estimate, its uncertainty, and the method-specific diagnostics.</p>
       </div>
 
-      <section className={panel('p-(--panel-space)')} aria-labelledby="estimation-setup-title">
-        <h3 id="estimation-setup-title" className={cn(sectionTitle, 'mb-3 mt-0')}>{method.ok ? method.value.name : 'Estimator'}</h3>
+      {/* The selected method is named in the requirements panel, not above the choice that selects it. */}
+      <section className={panel('p-(--panel-space)')} aria-label="Estimator setup">
+        {selector !== undefined && <div className="mb-6">{selector}</div>}
         {identified.length === 0 ? (
           <Alert tone="info" live={false}>
             <p className="m-0"><button type="button" className="underline" onClick={onOpenStudy}>Open Study design</button> and identify a study first.</p>
@@ -2469,23 +2478,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                   return <option key={candidate.id} value={candidate.id}>{bound === undefined ? candidate.id : `${estimandSentence(bound)}, ${bound.dagName}`}</option>
                 })}
               </Select>
-                {identification !== null && identification.result.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Adjustment set: {identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
-                {identification !== null && identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Front-door mediator: {identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
-                {identification !== null && identifiedInstruments(identification.result) !== null && <span className={cn(fieldHint, 'block max-w-[65ch]')}><Metadata><span>Instruments: {(identifiedInstruments(identification.result) ?? []).map((variable) => variable.name).join(', ')}</span><span>{formatCount(study?.population.observations ?? 0).text} rows</span></Metadata></span>}
               </label>
               <div>
                 <SegmentedControl
-                  variant="line"
-                  size="sm"
                   ariaLabel="Estimator family"
                   value={visibleEstimatorGroup}
                   onChange={setVisibleEstimatorGroup}
                   options={ESTIMATOR_GROUPS.map((group) => ({ value: group.id, label: ESTIMATOR_GROUP_LABELS[group.id], title: group.name }))}
                 />
-                <div className="mb-2 mt-3">
-                  <h3 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h3>
-                  <p className="mb-0 mt-0.5 max-w-[65ch] text-label text-faint">{visibleGroup.description}</p>
-                </div>
+                <div className="mt-4">
                 <RadioList frame="none"
                   columns={2}
                   legend={visibleGroup.name}
@@ -2500,9 +2501,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
                       : []
                   })}
                 />
+                </div>
                 {!selectedEstimatorIsVisible && <p className={cn(fieldHint, 'mt-3')}>Choose a method from this family to configure it.</p>}
-                {selectedEstimatorIsVisible && method.ok && <p className={cn(fieldHint, 'mt-3 max-w-[65ch]')}>{method.value.summary}</p>}
-                {selectedEstimatorIsVisible && method.ok && method.value.summaryTex !== undefined && <div className="formula max-w-[65ch] text-body"><Formula {...method.value.summaryTex} /></div>}
               </div>
               {selectedEstimatorIsVisible && <div className="mt-8">{controls}</div>}
             </div>
@@ -2538,10 +2538,15 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
     </section>
   )
 
+  const [inspectorView, setInspectorView] = useState<'study' | 'method'>('method')
   const inspector = (
-    <div className="space-y-4">
-      <section aria-labelledby="estimation-study-title">
-        <h3 id="estimation-study-title" className="mb-2 mt-1 text-body font-medium text-ink">{study === null ? 'No study chosen' : estimandSentence(study)}</h3>
+    <div className="flex flex-col gap-4">
+      <h3 id="estimation-study-title" className="m-0 mt-1 text-body font-medium text-ink">{study === null ? 'No study chosen' : estimandSentence(study)}</h3>
+      <SegmentedControl size="sm" fill ariaLabel="Estimation inspector" value={inspectorView} onChange={setInspectorView} options={[
+        { value: 'study', label: <span className="flex items-center gap-1.5"><Icon name="science" size={14} />Study</span> },
+        { value: 'method', label: <span className="flex items-center gap-1.5"><Icon name="function" size={14} />Method</span> },
+      ]} />
+      {inspectorView === 'study' && <section aria-labelledby="estimation-study-title" className="flex flex-col gap-4">
         {study !== null && identification !== null && estimableIdentification(identification.result) && (
           <>
             <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-body" aria-label="Study binding">
@@ -2549,12 +2554,21 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
               <dt className="text-faint">Outcome</dt><dd className="m-0 text-ink">{study.outcome.name}</dd>
               <dt className="text-faint">Graph</dt><dd className="m-0 text-ink"><Metadata><span>{study.dagName}</span><span><span className={literal()}>{study.dagRevision.slice(0, 8)}</span></span></Metadata></dd>
               <dt className="text-faint">Strategy</dt><dd className="m-0 text-ink">{describeIdentificationStrategy(identification.result)}</dd>
+              {identification.result.kind === 'identified' && <><dt className="text-faint">Adjustment set</dt><dd className="m-0 text-ink">{identification.result.adjustment.variables.length === 0 ? 'none' : identification.result.adjustment.variables.map((variable) => variable.name).join(', ')}</dd></>}
+              {identification.result.kind === 'graphically-identified' && identification.result.frontdoor.kind === 'identified' && <><dt className="text-faint">Front-door mediator</dt><dd className="m-0 text-ink">{identification.result.frontdoor.mediators.map((variable) => variable.name).join(', ')}</dd></>}
+              {identifiedInstruments(identification.result) !== null && <><dt className="text-faint">Instruments</dt><dd className="m-0 text-ink">{(identifiedInstruments(identification.result) ?? []).map((variable) => variable.name).join(', ')}</dd></>}
               <dt className="text-faint">Rows</dt><dd className={num('m-0 text-ink')}><Metadata><span>{prepared.kind === 'prepared-time-series' ? 'Time series' : prepared.kind === 'prepared-panel' ? 'Panel' : 'Cross-section'}</span><span>{formatCount(prepared.observations).text}</span></Metadata></dd>
               {studyScale !== null && <><dt className="text-faint">Analysis scale</dt><dd className="m-0 text-ink">{studyScale}</dd></>}
             </dl>
           </>
         )}
-      </section>
+        {identification !== null && <IdentificationRecord identification={identification.result} />}
+      </section>}
+      {inspectorView === 'method' && <section aria-label="Method" className="flex flex-col gap-4">
+      <div>
+        <h4 className="m-0 text-body font-medium text-ink">{visibleGroup.name}</h4>
+        <p className="mb-0 mt-1 text-body text-muted">{visibleGroup.description}</p>
+      </div>
       {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'pending' && <p className="m-0 text-body text-muted" role="status">Checking panel structure and treatment timing…</p>}
       {configuration.kind === 'panel-intervention' && configuration.primary !== 'staggered' && panelPreflight.kind === 'ready' && <section aria-label="Checked panel structure" className="space-y-2">
         <p className="m-0 flex items-center gap-1.5 text-body text-ok"><Icon name="check_circle" size={16} />Panel structure checked</p>
@@ -2567,8 +2581,8 @@ export function EstimationPanel({ source, profile, prepared, stationarity, docum
       <MethodCaveats
         methods={method.ok ? [method.value] : ESTIMATION_METHODS}
         eligibility={eligibility}
-        identification={identification?.result ?? null}
       />
+      </section>}
     </div>
   )
 

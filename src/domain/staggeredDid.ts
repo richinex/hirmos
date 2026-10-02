@@ -11,13 +11,29 @@ export const staggeredInferenceSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('bootstrapPointwise'), iterations: integer.positive(), seed: integer.min(0).max(0xffffffff) }).strict(),
   z.object({ kind: z.literal('bootstrapSimultaneous'), iterations: integer.positive(), seed: integer.min(0).max(0xffffffff) }).strict(),
 ])
+export const staggeredAdjustmentSchema = z.discriminatedUnion('kind', [
+  z.object({kind:z.literal('doublyRobust')}).strict(),
+  z.object({kind:z.literal('outcomeRegression')}).strict(),
+  z.object({kind:z.literal('inverseProbability')}).strict(),
+])
+export type StaggeredAdjustment = z.infer<typeof staggeredAdjustmentSchema>
+export const staggeredAdjustmentDescriptions = {
+  doublyRobust: {label:'Doubly robust',description:'Uses a logistic propensity model and a linear model for outcome changes in the comparison group. Consistency requires at least one of these models to be correctly specified, along with the identifying assumptions.'},
+  outcomeRegression: {label:'Outcome regression',description:'Models outcome changes in the comparison group using linear regression. Consistency requires this outcome model to be correctly specified, along with the identifying assumptions.'},
+  inverseProbability: {label:'Inverse probability weighting',description:'Uses a logistic propensity model and normalized inverse probability weights. Consistency requires this propensity model to be correctly specified, along with the identifying assumptions.'},
+} as const satisfies Record<StaggeredAdjustment['kind'],{readonly label:string;readonly description:string}>
+// Runs saved before adjustment choices were introduced used the doubly robust score.
+export function recordedStaggeredAdjustment(spec:{readonly adjustment?:StaggeredAdjustment}):StaggeredAdjustment {
+  return spec.adjustment === undefined ? {kind:'doublyRobust'} : spec.adjustment
+}
 export const staggeredSpecificationSchema = z.object({
+  adjustment: staggeredAdjustmentSchema.optional(),
   controls: z.enum(['never-treated', 'not-yet-treated']), baseline: z.enum(['varying', 'universal']),
   anticipation: integer.min(0).max(0xffffffff), firstEvent: integer.nullable(), lastEvent: integer.nullable(), balance: integer.min(0).max(0xffffffff).nullable(),
   confidence: finite.gt(0).lt(1), inference: staggeredInferenceSchema,
 }).strict().refine(s => s.firstEvent === null || s.lastEvent === null || s.firstEvent <= s.lastEvent, 'The first event time must not exceed the last event time.')
 export type StaggeredSpecification = z.infer<typeof staggeredSpecificationSchema>
-export const defaultStaggeredSpecification: StaggeredSpecification = { controls:'never-treated', baseline:'varying', anticipation:0, firstEvent:null, lastEvent:null, balance:null, confidence:0.95, inference:{kind:'bootstrapSimultaneous', iterations:999, seed:731} }
+export const defaultStaggeredSpecification: StaggeredSpecification = { adjustment:{kind:'doublyRobust'}, controls:'never-treated', baseline:'varying', anticipation:0, firstEvent:null, lastEvent:null, balance:null, confidence:0.95, inference:{kind:'bootstrapSimultaneous', iterations:999, seed:731} }
 const clusteringSchema = z.discriminatedUnion('kind', [
   z.object({kind:z.literal('unit')}).strict(),
   z.object({kind:z.literal('column'),column:z.string().min(1)}).strict(),
@@ -67,6 +83,7 @@ export const staggeredEvidenceSchema = z.object({
   if(e.units.length*e.times.length!==e.retainedObservations || e.retainedObservations>e.observations || new Set(e.units).size!==e.units.length || e.times.some((t,i)=>i>0 && t<=e.times[i-1]!) || e.clusterCount>e.units.length) issue('Retained panel dimensions or identities are inconsistent.')
   if(e.support.length!==e.events.keys.length || e.support.some((s,i)=>s.event!==e.events.keys[i] || s.referenceCohorts.some(g=>!s.cohorts.includes(g)))) issue('Event support must align with the reported effects.')
   if(Object.values(e.overall).some(i=>i.kind==='reference')) issue('An overall ATT cannot be a normalized baseline.')
+  if(recordedStaggeredAdjustment(e.specification).kind==='outcomeRegression' && e.fits.length>0) issue('Outcome regression does not fit a propensity model.')
   const expected=e.specification.inference.kind==='bootstrapSimultaneous'?'simultaneous':'pointwise'
   if([e.events,e.cohorts,e.calendar,e.cells].some(f=>f.coverage.kind!==expected)) issue('Interval coverage does not match the requested inference.')
 })
@@ -122,7 +139,7 @@ export function staggeredInput(matrix: PanelLongMatrix, specification:StaggeredS
   return parsed.success?ok({values,model:parsed.data}):err(z.prettifyError(parsed.error))
 }
 export function sameStaggeredSpecification(a:StaggeredSpecification,b:StaggeredSpecification):boolean {
-  return a.controls===b.controls&&a.baseline===b.baseline&&a.anticipation===b.anticipation&&a.firstEvent===b.firstEvent&&a.lastEvent===b.lastEvent&&a.balance===b.balance&&a.confidence===b.confidence
+  return recordedStaggeredAdjustment(a).kind===recordedStaggeredAdjustment(b).kind&&a.controls===b.controls&&a.baseline===b.baseline&&a.anticipation===b.anticipation&&a.firstEvent===b.firstEvent&&a.lastEvent===b.lastEvent&&a.balance===b.balance&&a.confidence===b.confidence
     && a.inference.kind===b.inference.kind && (a.inference.kind==='analytical' || (b.inference.kind!=='analytical'&&a.inference.iterations===b.inference.iterations&&a.inference.seed===b.inference.seed))
 }
 export function staggeredRecordMatches(raw:unknown,rawStudy:unknown):boolean {

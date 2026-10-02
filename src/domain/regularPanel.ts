@@ -24,6 +24,7 @@ export type PanelProblem =
   | { readonly kind: 'design-mismatch' }
   | { readonly kind: 'predictor-missing' }
   | { readonly kind: 'onset-missing' }
+  | { readonly kind: 'cohort-missing' }
   | { readonly kind: 'onset-invalid'; readonly row: number }
   | { readonly kind: 'onset-reversed'; readonly row: number }
 
@@ -106,9 +107,10 @@ export function describePanelProblem(problem: PanelProblem): string {
     case 'calendar-alignment': return 'The dates do not align with the selected calendar frequency. Use consistent week dates or calendar period starts or ends.'
     case 'design-mismatch': return 'The regression design does not match the prepared data structure.'
     case 'predictor-missing': return 'Choose a predictor from the prepared model columns.'
-    case 'onset-missing': return 'Choose an onset indicator from the prepared model columns.'
-    case 'onset-invalid': return `The onset indicator at row ${problem.row + 1} must be 0 or 1.`
-    case 'onset-reversed': return `The onset indicator returns to 0 at row ${problem.row + 1}. It must remain 1 after onset.`
+    case 'onset-missing': return 'Choose a treatment indicator from the prepared model columns.'
+    case 'cohort-missing': return 'Choose an observed adoption period with a pre-treatment baseline.'
+    case 'onset-invalid': return `The treatment indicator at row ${problem.row + 1} must be 0 or 1.`
+    case 'onset-reversed': return `The treatment indicator returns to 0 at row ${problem.row + 1}. It must remain 1 after onset.`
     case 'structure': {
       const issue = problem.problem
       switch (issue.kind) {

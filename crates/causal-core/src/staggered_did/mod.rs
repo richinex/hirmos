@@ -198,15 +198,26 @@ pub struct Estimate {
     pub fit_status: Option<dr::FitStatus>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AdjustmentMethod {
+    DoublyRobust,
+    OutcomeRegression,
+    InverseProbability,
+}
+
 pub struct Adjusted<'a> {
     panel: &'a Panel,
     values: BTreeMap<(Unit, Period), Vec<f64>>,
     columns: usize,
+    method: AdjustmentMethod,
 }
 
 impl<'a> Adjusted<'a> {
     /// Covariates exclude the intercept; every panel key must occur exactly once.
     pub fn new(panel: &'a Panel, rows: Vec<(Unit, Period, Vec<f64>)>) -> Result<Self, Error> {
+        Self::new_with_method(panel, rows, AdjustmentMethod::DoublyRobust)
+    }
+    pub fn new_with_method(panel: &'a Panel, rows: Vec<(Unit, Period, Vec<f64>)>, method: AdjustmentMethod) -> Result<Self, Error> {
         let columns = rows
             .first()
             .map(|r| r.2.len())
@@ -235,6 +246,7 @@ impl<'a> Adjusted<'a> {
             panel,
             values,
             columns,
+            method,
         })
     }
     pub fn cell(&self, g: Period, t: Period, c: Controls, b: Baseline) -> Result<Cell, Error> {
@@ -375,21 +387,35 @@ fn cell_impl(
             selected.iter().map(|(i, _)| panel.weights[*i]).collect(),
         )
         .map_err(Error::Regression)?;
-        dr::panel_guard(&sample).map_err(Error::Regression)?;
-        let fit = dr::fit(&sample, 0.995).map_err(Error::Regression)?;
+        dr::panel_guard_for(&sample, adjusted.method).map_err(Error::Regression)?;
+        let (score, fit_status) = match adjusted.method {
+            AdjustmentMethod::DoublyRobust => {
+                let fit = dr::fit(&sample, 0.995).map_err(Error::Regression)?;
+                (fit.score, Some(fit.status))
+            }
+            AdjustmentMethod::InverseProbability => {
+                let fit = dr::fit_ipw(&sample, 0.995, dr::IpwNormalization::Hajek)
+                    .map_err(Error::Regression)?;
+                (fit.score, Some(fit.status))
+            }
+            AdjustmentMethod::OutcomeRegression => {
+                let fit = dr::fit_outcome_regression(&sample).map_err(Error::Regression)?;
+                (fit.score, None)
+            }
+        };
         let mut influence = vec![0.0; panel.series.len()];
         for (i, (unit, _)) in selected.iter().enumerate() {
             influence[*unit] =
-                panel.series.len() as f64 / selected.len() as f64 * fit.score.influence[i];
+                panel.series.len() as f64 / selected.len() as f64 * score.influence[i];
         }
         let se = influence.iter().map(|v| v * v).sum::<f64>().sqrt() / panel.series.len() as f64;
         return Ok(Cell::Estimated(Estimate {
-            att: fit.score.att,
+            att: score.att,
             se,
             influence,
             treated: treated.len(),
             controls: comparison.len(),
-            fit_status: Some(fit.status),
+            fit_status,
         }));
     }
     // DRDID's default trim.level excludes controls at propensity >= .995.

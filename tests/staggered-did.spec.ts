@@ -4,6 +4,7 @@ import {addArrow,chapter,choose,createDag,identify} from './examples/support'
 
 const input=JSON.parse(readFileSync('crates/causal-core/fixtures/staggered-did/mpdta-input.json','utf8')) as Record<string,number>[]
 const reference=JSON.parse(readFileSync('crates/causal-core/fixtures/staggered-did/mpdta.json','utf8'))
+const methodReference=JSON.parse(readFileSync('crates/causal-core/fixtures/staggered-did/methods-mpdta.json','utf8'))
 const csv=['unit,year,outcome,treated,lpop,state',...input.map(r=>[r.countyreal,r.year,r.lemp,r['first.treat']!==0&&r.year!>=r['first.treat']!?1:0,r.lpop,`state-${String(Math.floor(r.countyreal!/1000)).padStart(3,'0')}`].join(','))].join('\n')
 
 test('cluster labels stay aligned through data and WASM workers and invalid groupings are refused',async({page})=>{
@@ -134,6 +135,70 @@ test('staggered DiD travels through the data and WASM workers and preserves sour
   expect(result.invalid.ok).toBe(false)
 })
 
+test('all staggered adjustment scores preserve R effects through WASM and saved-run contracts',async({page})=>{
+  test.setTimeout(120_000)
+  await page.goto('/app')
+  const results=await page.evaluate(async csv=>{
+    const data=await import(new URL('/src/data/client.ts',location.href).href)
+    const workflow=await import(new URL('/src/domain/workflow.ts',location.href).href)
+    const analysis=await import(new URL('/src/analysis/client.ts',location.href).href)
+    const d=await import(new URL('/src/domain/staggeredDid.ts',location.href).href)
+    const estimation=await import(new URL('/src/domain/estimation.ts',location.href).href)
+    const file=new File([csv],'mpdta.csv',{type:'text/csv'})
+    const profiled=await data.profileSourceInWorker(workflow.newImportRequestId(),file)
+    if(!profiled.ok)throw Error(JSON.stringify(profiled.error))
+    const column=(name:string)=>profiled.value.columns.find((c:{name:string})=>c.name===name).id
+    const materialized=await data.materializePanelInWorker(file,profiled.value,{unit:column('unit'),time:column('year'),outcome:column('outcome'),treatment:column('treated'),covariates:[column('lpop')]})
+    if(!materialized.ok)throw Error(JSON.stringify(materialized.error))
+    const matrix=materialized.value
+    const records=[]
+    for(const kind of ['doublyRobust','outcomeRegression','inverseProbability']){
+      const specification={...d.defaultStaggeredSpecification,adjustment:{kind},inference:{kind:'analytical'}}
+      const input=d.staggeredInput(matrix,specification)
+      if(!input.ok)throw Error(input.error)
+      const ran=await analysis.runStaggeredDid(input.value.values,input.value.model)
+      if(!ran.ok)throw Error(JSON.stringify(ran.error))
+      const evidence=ran.value
+      const study={id:'study',estimand:{kind:'average-treatment-effect-on-treated',scale:'additive',treatedValue:1},outcome:{column:column('outcome')},treatment:{column:column('treated')}}
+      const configuration={kind:'panel-intervention',primary:'staggered',covariates:[column('lpop')],specification}
+      const artifact={kind:'panel-intervention-run',study:'study',configuration,evidence,columns:[study.outcome,study.treatment,{column:column('lpop')}],timeLabels:matrix.periods.map((p:{label:string})=>p.label),sourcePeriods:matrix.periods.map((p:{code:number;label:string})=>({code:p.code,label:p.label}))}
+      const estimate=estimation.causalEstimateFrom(study,{result:{kind:'identified',adjustment:{kind:'canonical',variables:[]}}},artifact)
+      const record={...artifact,estimate}
+      const legacy=structuredClone(record);delete legacy.configuration.specification.adjustment
+      records.push({kind,evidence,saved:d.staggeredRecordMatches(JSON.parse(JSON.stringify(record)),study),
+        changed:d.staggeredRecordMatches({...record,configuration:{...configuration,specification:{...specification,adjustment:{kind:kind==='outcomeRegression'?'inverseProbability':'outcomeRegression'}}}},study),
+        legacy:d.staggeredRecordMatches(legacy,study),
+        unknown:d.staggeredSpecificationSchema.safeParse({...specification,adjustment:{kind:'unknown'}}).success})
+    }
+    return records
+  },csv)
+  for(const result of results){
+    const oracle={doublyRobust:'dr',outcomeRegression:'reg',inverseProbability:'ipw'}[result.kind as 'doublyRobust'|'outcomeRegression'|'inverseProbability']
+    const expected=methodReference.cases[`${oracle}_nevertreated_varying_adjusted`]
+    expect(result.saved).toBe(true)
+    expect(result.changed).toBe(false)
+    expect(result.legacy).toBe(result.kind==='doublyRobust')
+    expect(result.unknown).toBe(false)
+    expect(result.evidence.specification.adjustment.kind).toBe(result.kind)
+    if(result.kind==='outcomeRegression')expect(result.evidence.fits).toEqual([])
+    for(let i=0;i<expected.att.length;i++){
+      expect(result.evidence.cells.intervals[i].estimate).toBeCloseTo(expected.att[i],9)
+      expect(result.evidence.cells.intervals[i].standardError).toBeCloseTo(expected.se[i],9)
+      for(let j=0;j<expected.att.length;j++) expect(result.evidence.cells.analyticalCovariance[i][j]).toBeCloseTo(expected.covariance[i][j],9)
+    }
+    for(let i=0;i<expected.event.length;i++){
+      expect(result.evidence.events.intervals[i].estimate).toBeCloseTo(expected.event_att[i],9)
+      expect(result.evidence.events.intervals[i].standardError).toBeCloseTo(expected.event_se[i],9)
+    }
+    expect(result.evidence.overall.dynamic.estimate).toBeCloseTo(expected.overall_att,9)
+    expect(result.evidence.overall.dynamic.standardError).toBeCloseTo(expected.overall_se,9)
+    for(const family of ['simple','group','calendar']){
+      expect(result.evidence.overall[family].estimate).toBeCloseTo(expected.aggregations[family].overall_att,9)
+      expect(result.evidence.overall[family].standardError).toBeCloseTo(expected.aggregations[family].overall_se,9)
+    }
+  }
+})
+
 test('staggered schemas refuse fabricated references and mismatched support',async({page})=>{
   await page.goto('/app')
   const result=await page.evaluate(async()=>{
@@ -148,7 +213,11 @@ test('staggered schemas refuse fabricated references and mismatched support',asy
   expect(result).toEqual({reference:false,interval:false,window:false,inference:false})
 })
 
-test('staggered adoption completes through the UI and restores its plots',async({page},info)=>{
+for(const adjustment of [
+  {kind:'doublyRobust',label:'Doubly robust',oracle:'dr'},
+  {kind:'outcomeRegression',label:'Outcome regression',oracle:'reg'},
+  {kind:'inverseProbability',label:'Inverse probability weighting',oracle:'ipw'},
+] as const) test(`staggered ${adjustment.kind} completes through the UI and restores its plots`,async({page},info)=>{
   test.setTimeout(240_000)
   await page.goto('/app')
   await page.getByRole('textbox',{name:'Project name'}).fill('Staggered DiD source verification')
@@ -169,6 +238,11 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await page.getByRole('radio',{name:/Panel difference-in-differences/}).click()
   await page.getByRole('radio',{name:'Staggered adoption',exact:true}).click()
   await expect(page.getByRole('radio',{name:'Simultaneous bootstrap',exact:true})).toBeChecked()
+  const methodChoice=page.getByRole('radiogroup',{name:'Staggered adjustment method',exact:true})
+  await expect(methodChoice.getByRole('radio',{name:'Doubly robust',exact:true})).toBeChecked()
+  await methodChoice.getByRole('radio',{name:adjustment.label,exact:true}).click()
+  await page.getByTestId('staggered-did-comparison').evaluate(element=>element.scrollIntoView({block:'start'}))
+  await page.screenshot({path:info.outputPath('staggered-adjustment-controls.png')})
   const help=page.getByTestId('staggered-did-controls').getByRole('button',{name:'About Uncertainty',exact:true})
   if(info.project.name==='mobile-chromium') await help.click()
   else await help.hover()
@@ -187,6 +261,7 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await run.click()
   const result=page.getByTestId('staggered-did-result').first()
   await expect(result).toBeVisible({timeout:60_000})
+  await expect(result.getByTestId('staggered-adjustment-result')).toContainText(adjustment.label)
   const simple=result.getByRole('table',{name:'Simple ATT',exact:true})
   await expect(simple).toBeVisible()
   await result.scrollIntoViewIfNeeded()
@@ -224,16 +299,20 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await expect(simple.getByRole('cell')).toHaveText(simpleCells)
   expect(snapshot.estimationRuns[0].configuration.clustering.kind).toBe('column')
   expect(snapshot.estimationRuns[0].evidence.clusterCount).toBeLessThan(500)
-  expect(snapshot.estimationRuns[0].evidence.overall.dynamic.estimate).toBeCloseTo(reference.cases.nevertreated_varying_adjusted.overall_att,9)
+  expect(snapshot.estimationRuns[0].evidence.overall.dynamic.estimate).toBeCloseTo(methodReference.cases[`${adjustment.oracle}_nevertreated_varying_adjusted`].overall_att,9)
+  expect(snapshot.estimationRuns[0].configuration.specification.adjustment.kind).toBe(adjustment.kind)
+  expect(snapshot.estimationRuns[0].evidence.specification.adjustment.kind).toBe(adjustment.kind)
+  if(adjustment.kind==='outcomeRegression') expect(snapshot.estimationRuns[0].evidence.fits).toEqual([])
   const restored=await page.evaluate(async snapshot=>{
     const persistence=await import(new URL('/src/domain/persistence.ts',location.href).href)
     const valid=persistence.parseSnapshotValue(snapshot)
     const bad=structuredClone(snapshot);bad.estimationRuns[0].evidence.version=2
     const cluster=structuredClone(snapshot);cluster.estimationRuns[0].configuration.clustering.column='unknown-column'
     const unit=structuredClone(snapshot);unit.estimationRuns[0].configuration.clustering={kind:'unit'}
-    return {valid:valid.ok,invalid:persistence.parseSnapshotValue(bad).ok,unknownCluster:persistence.parseSnapshotValue(cluster).ok,changedClustering:persistence.parseSnapshotValue(unit).ok}
+    const method=structuredClone(snapshot);method.estimationRuns[0].configuration.specification.adjustment={kind:method.estimationRuns[0].evidence.specification.adjustment.kind==='outcomeRegression'?'inverseProbability':'outcomeRegression'}
+    return {valid:valid.ok,invalid:persistence.parseSnapshotValue(bad).ok,unknownCluster:persistence.parseSnapshotValue(cluster).ok,changedClustering:persistence.parseSnapshotValue(unit).ok,changedAdjustment:persistence.parseSnapshotValue(method).ok}
   },snapshot)
-  expect(restored).toEqual({valid:true,invalid:false,unknownCluster:false,changedClustering:false})
+  expect(restored).toEqual({valid:true,invalid:false,unknownCluster:false,changedClustering:false,changedAdjustment:false})
   await page.reload()
   await page.getByRole('button',{name:'Open Staggered DiD source verification',exact:true}).click()
   await expect(page.getByRole('heading',{name:'Choose the data file again',exact:true})).toBeVisible()
@@ -244,6 +323,7 @@ test('staggered adoption completes through the UI and restores its plots',async(
   await expect(page.getByTestId('staggered-did-result').first().getByRole('table',{name:'Simple ATT',exact:true})).toBeVisible()
   await expect(page.getByTestId('staggered-did-result').first().getByRole('table',{name:'Simple ATT',exact:true}).getByRole('cell')).toHaveText(simpleCells)
   await page.getByRole('radio',{name:'Staggered adoption',exact:true}).click()
+  await expect(page.getByRole('radiogroup',{name:'Staggered adjustment method',exact:true}).getByRole('radio',{name:adjustment.label,exact:true})).toBeChecked()
   await page.getByRole('spinbutton',{name:'Staggered bootstrap replications',exact:true}).fill('500000')
   await page.getByRole('button',{name:'Run panel DiD',exact:true}).first().click()
   await expect(page.getByRole('button',{name:'Cancel run',exact:true})).toBeVisible()

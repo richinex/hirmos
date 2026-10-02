@@ -16,9 +16,9 @@ function source(name:string) {
     fixtureRows.push(keep?retained:-1)
     const y=keep?c.y[retained]:0,exposure=keep?c.exposure[retained++]:1
     const onset=c.design?.adoption?.[String(unit)]??null
-    return [unit,period,y,exposure,...raw[i]!,onset!==null&&period!>=onset?1:0]
+    return [unit,period!+(name.startsWith('nb2_cohort')?1980:0),y,exposure,...raw[i]!,onset!==null&&period!>=onset?1:0,...(name.startsWith('nb2_cohort')?[i/10+0.125]:[])]
   })
-  const headers=['unit','period','outcome','denominator',...raw[0]!.map((_,i)=>`x${i}`),'adopted']
+  const headers=['unit','period','outcome','denominator',...raw[0]!.map((_,i)=>`x${i}`),'adopted',...(name.startsWith('nb2_cohort')?['measurement']:[])]
   const columns=raw[0]!.length+2,values=Array.from({length:columns},(_,j)=>rows.map(r=>r[j+2]!)).flat()
   let design:object
   if(interrupted)design={kind:'interrupted',intervention:20,horizon:7,bandwidth:3,covariates:[{column:2,lag:0,name:'holiday'}]}
@@ -60,7 +60,7 @@ test('count models preserve pinned oracle fits through the WASM worker and rejec
 
 for(const name of names)test(`${name} completes using the UI and survives project reopening`,async({page},info)=>{
   test.setTimeout(240_000)
-  const s=source(name),interrupted=name==='nb2_its_standard_tolerance'
+  const s=source(name),interrupted=name==='nb2_its_standard_tolerance',cohorts=name.startsWith('nb2_cohort')
   await page.goto('/app')
   await page.getByRole('textbox',{name:'Project name'}).fill(`Count regression ${name}`)
   await page.getByRole('button',{name:'Create project',exact:true}).click()
@@ -73,10 +73,42 @@ for(const name of names)test(`${name} completes using the UI and survives projec
   await page.getByRole('button',{name:/Create prepared/}).click()
   await expect(page.getByRole('heading',{name:'Build a DAG or run discovery',exact:true})).toBeVisible({timeout:60_000})
   await chapter(page,/Time-series analysis/)
+  await expect(page.getByRole('heading',{name:'Time-series analysis',exact:true})).toBeVisible()
+  await expect(page.getByRole('heading',{name:'Estimation',exact:true})).toHaveCount(0)
+  await page.screenshot({path:info.outputPath(`${name}-time-series-setup.png`)})
   if(interrupted)await page.getByRole('radio',{name:'Count regression',exact:true}).click()
+  else {
+    await expect(page.getByRole('radio',{name:'Event study',exact:true})).toHaveCount(0)
+    await expect(page.getByRole('radio',{name:'Cohort summary',exact:true})).toHaveCount(0)
+    await expect(page.getByLabel('Predictor lags',{exact:true})).toBeVisible()
+    if(cohorts){
+      await page.getByRole('textbox',{name:'Predictor lags',exact:true}).fill('0, 1')
+      await chapter(page,/Estimation/)
+      await page.getByRole('radio',{name:'Regression designs',exact:true}).click()
+      await page.getByRole('radio',{name:'Event study',exact:true}).click()
+      await page.getByRole('radio',{name:'Count (negative binomial)',exact:true}).click()
+      await expect(page.getByRole('heading',{name:'Estimation',exact:true})).toBeVisible()
+      await expect(page.getByRole('heading',{name:'Time-series analysis',exact:true})).toHaveCount(0)
+      await page.screenshot({path:info.outputPath(`${name}-estimation-setup.png`)})
+      await expect(page.getByRole('radio',{name:'Distributed lags',exact:true})).toHaveCount(0)
+      await expect(page.getByLabel('Predictor lags',{exact:true})).toHaveCount(0)
+    }
+  }
   if(name==='binomial_team_week')await page.getByRole('radio',{name:'Grouped binomial',exact:true}).click()
-  if(name==='nb2_cohort_events'||name==='nb2_cohort_finite_window')await page.getByRole('radio',{name:'Cohort event study',exact:true}).click()
+  if(name==='nb2_cohort_events'||name==='nb2_cohort_finite_window')await page.getByRole('radio',{name:'Event study',exact:true}).click()
   if(name==='nb2_cohort_summary')await page.getByRole('radio',{name:'Cohort summary',exact:true}).click()
+  if(name==='nb2_cohort_events'){
+    await choose(page,'Outcome','measurement')
+    await expect(page.getByRole('radio',{name:'Count (negative binomial)',exact:true})).toBeDisabled()
+    await expect(page.getByRole('button',{name:'Fit event study',exact:true})).toBeDisabled()
+    await expect(page.getByText('Count models require finite, non-negative integer outcomes in the prepared data.').first()).toBeVisible()
+    await page.getByRole('radio',{name:'Linear',exact:true}).click()
+    await expect(page.getByRole('radio',{name:'Count (negative binomial)',exact:true})).toBeDisabled()
+    await choose(page,'Outcome','outcome')
+    await expect(page.getByRole('radio',{name:'Count (negative binomial)',exact:true})).toBeEnabled()
+    await page.getByRole('radio',{name:'Count (negative binomial)',exact:true}).click()
+  }
+  if(name==='nb2_cohort_summary')await expect(page.getByRole('radio',{name:'Linear',exact:true})).toBeDisabled()
   await choose(page,'Outcome','outcome')
   await choose(page,name==='binomial_team_week'?'Trials':'Exposure','denominator')
   if(interrupted){
@@ -84,8 +116,9 @@ for(const name of names)test(`${name} completes using the UI and survives projec
     await page.getByRole('textbox',{name:'Contrast periods after intervention',exact:true}).fill('7')
     await page.getByRole('checkbox',{name:'x0',exact:true}).check()
   }else if(name.startsWith('nb2_cohort')){
-    await choose(page,'Onset indicator','adopted')
-    await page.getByRole('textbox',{name:'Cohort onset period (from 1)',exact:true}).fill('8')
+    await choose(page,'Treatment indicator','adopted')
+    await expect(page.getByRole('combobox',{name:'Adoption cohort',exact:true})).toBeEnabled()
+    await choose(page,'Adoption cohort',String(s.c.design.cohort+1980))
     if(name==='nb2_cohort_finite_window'){
       await page.getByRole('radio',{name:'Specified window',exact:true}).click()
       await page.getByRole('textbox',{name:'First event period',exact:true}).fill(String(s.c.design.first))
@@ -97,13 +130,25 @@ for(const name of names)test(`${name} completes using the UI and survives projec
     await page.getByRole('checkbox',{name:'x1',exact:true}).check()
   }
   await page.getByRole('textbox',{name:'Optimizer tolerance',exact:true}).fill(String(s.c.tolerance))
-  await page.getByRole('button',{name:'Fit regression',exact:true}).click()
+  await page.getByRole('button',{name:cohorts?name==='nb2_cohort_summary'?'Fit cohort summary':'Fit event study':'Fit regression',exact:true}).click()
   const result=page.getByRole('region',{name:'Count regression result',exact:true})
   await expect(result).toBeVisible({timeout:120_000})
   await expect(result.getByRole('heading',{name:'Coefficients',exact:true})).toBeVisible()
   await result.scrollIntoViewIfNeeded()
   await page.screenshot({path:info.outputPath(`${name}-result.png`)})
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true)
+  if(cohorts){
+    const history=page.getByRole('button',{name:'Regression-design runs',exact:true})
+    if(await history.isVisible())await history.click()
+    await expect(page.getByRole('list',{name:'Regression-design runs',exact:true})).toBeVisible()
+    await chapter(page,/Time-series analysis/)
+    await expect(page.getByRole('heading',{name:'Time-series analysis',exact:true})).toBeVisible()
+    await expect(page.getByRole('textbox',{name:'Predictor lags',exact:true})).toHaveValue('0, 1')
+    await expect(page.getByRole('region',{name:'Count regression result',exact:true})).toHaveCount(0)
+    await chapter(page,/Estimation/)
+    await expect(page.getByRole('radio',{name:'Count (negative binomial)',exact:true})).toBeChecked()
+    await expect(page.getByRole('combobox',{name:'Adoption cohort',exact:true})).toContainText(String(s.c.design.cohort+1980))
+  }
   const navigation=page.getByRole('button',{name:'Expand section list',exact:true})
   if(await navigation.isVisible())await navigation.click()
   const download=page.waitForEvent('download')
@@ -113,6 +158,7 @@ for(const name of names)test(`${name} completes using the UI and survives projec
   const snapshot=JSON.parse(readFileSync(path,'utf8')).project
   const saved=snapshot.timeSeriesRuns.at(-1)
   expect(saved.kind).toBe('count-regression')
+  if(cohorts){expect(saved.specification.design.cohort).toBe(s.c.design.cohort);expect(saved.periods[0]).toBe('1980')}
   for(let i=0;i<s.c.fitted.length;i++){
     const expected=s.c.fitted[s.fixtureRows[saved.evidence.retained[i]]!]
     expect(Math.abs(saved.evidence.fitted[i]-expected)/(1+Math.abs(expected)),`${name} UI fitted ${i}`).toBeLessThan(1e-4)
@@ -136,5 +182,19 @@ for(const name of names)test(`${name} completes using the UI and survives projec
   await page.locator('input[type=file]').setInputFiles({name:'count-regression.csv',mimeType:'text/csv',buffer:Buffer.from(s.csv)})
   await chapter(page,/Time-series analysis/)
   if(interrupted)await page.getByRole('radio',{name:'Count regression',exact:true}).click()
+  else {
+    await expect(page.getByRole('radio',{name:'Event study',exact:true})).toHaveCount(0)
+    await expect(page.getByRole('radio',{name:'Cohort summary',exact:true})).toHaveCount(0)
+    await expect(page.getByLabel('Predictor lags',{exact:true})).toBeVisible()
+    if(cohorts){
+      await page.getByRole('textbox',{name:'Predictor lags',exact:true}).fill('0, 1')
+      await chapter(page,/Estimation/)
+      await page.getByRole('radio',{name:'Regression designs',exact:true}).click()
+      await page.getByRole('radio',{name:'Event study',exact:true}).click()
+      await page.getByRole('radio',{name:'Count (negative binomial)',exact:true}).click()
+      await expect(page.getByRole('radio',{name:'Distributed lags',exact:true})).toHaveCount(0)
+      await expect(page.getByLabel('Predictor lags',{exact:true})).toHaveCount(0)
+    }
+  }
   await expect(page.getByRole('region',{name:'Count regression result',exact:true})).toBeVisible({timeout:30_000})
 })

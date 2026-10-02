@@ -2458,7 +2458,7 @@ export function evaluateEstimatorEligibility(method: MethodDefinition, context: 
       if (configuration.primary === 'adjusted') {
         if (!adjustedDidConfigurationSchema.safeParse(configuration).success) violate('panel-pre-fit', 'Review the DiD covariate selection and inference settings before running.')
         const layout = context.panelPreflight.kind === 'ready' ? context.panelPreflight.layout : null
-        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1)) violate('panel-pre-fit', 'The implemented regression and doubly robust DiD specifications require one pre-treatment and one post-treatment period. This is a method restriction, not an invalid panel grid.')
+        if (layout !== null && (layout.prePeriods !== 1 || layout.postPeriods !== 1)) violate('panel-pre-fit', `The selected two-period DiD specification requires exactly one pre-treatment and one post-treatment period. Your panel has ${layout.prePeriods} pre- and ${layout.postPeriods} post-treatment periods. The panel structure is valid, but this specification cannot use it unchanged.`)
         else if (layout !== null) satisfy('panel-pre-fit', 'The selected two-period specification has one pre-treatment and one post-treatment period.')
         if (configuration.specification.kind === 'doublyRobust') {
           if (configuration.covariates.length === 0) violate('panel-pre-fit', 'Select at least one baseline covariate for DR DiD.')

@@ -4,7 +4,10 @@ import { assertNever, type NonEmptyArray } from '@/domain/dop'
 import { stageGroups, type CaveatEvaluation, type MethodCaveat, type MethodDefinition, type MethodEligibility, type MethodSource } from '@/domain/methods'
 import type { Identification } from '@/domain/study'
 import { IdentificationRecord } from '@/components/IdentificationRecord'
-import { prose } from '@/components/ui/recipes'
+import { Formula } from '@/components/ui/Formula'
+
+/** Requirements are read beside the work, so their prose takes the panel's body size, not the stage's reading size. */
+const SIDE_PROSE = 'mb-2 mt-0 max-w-[65ch] text-body text-pretty text-muted'
 
 interface MethodCaveatsProps {
   readonly methods: NonEmptyArray<MethodDefinition>
@@ -116,11 +119,12 @@ export function MethodCaveats({ methods, eligibility = null, identification = nu
           return (
             <RequirementsFold key={method.id} name={method.name} tally={evaluated ? tally(method, evaluations) : null} open={methods.length === 1} literature={literature(method)}>
               {!evaluated && (
-                <p className={prose('mb-2 mt-0 text-muted')}>
+                <p className={SIDE_PROSE}>
                   {[...(method.summary.length > 0 ? [method.summary] : []), ...method.caveats.flatMap((caveat) => (caveat.category === 'interpretation' ? [caveat.requirement] : [caveat.requirement, `If this is not met: ${caveat.consequenceIfUnmet}`]))].join(' ')}
                 </p>
               )}
-              {evaluated && method.summary.length > 0 && <p className={prose('mb-2 mt-0 text-muted')}>{method.summary}</p>}
+              {evaluated && method.summary.length > 0 && <p className={SIDE_PROSE}>{method.summary}</p>}
+              {method.summaryTex !== undefined && <div className="formula mb-2 text-body"><Formula {...method.summaryTex} /></div>}
               {evaluated && <ol className="m-0 list-none space-y-2 p-0">
                 {[...conditions(method), ...readingRules(method)].map((caveat) => {
                   const reading = caveat.category === 'interpretation'

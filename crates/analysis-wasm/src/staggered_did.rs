@@ -31,9 +31,24 @@ impl Inference {
         }
     }
 }
+#[derive(Clone, Copy, Deserialize, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+pub(crate) enum Adjustment { DoublyRobust, OutcomeRegression, InverseProbability }
+impl Adjustment {
+    fn method(self) -> did::AdjustmentMethod {
+        match self {
+            Self::DoublyRobust => did::AdjustmentMethod::DoublyRobust,
+            Self::OutcomeRegression => did::AdjustmentMethod::OutcomeRegression,
+            Self::InverseProbability => did::AdjustmentMethod::InverseProbability,
+        }
+    }
+}
 #[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct Specification {
+    /// Absent only in historical requests that used the doubly robust score.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    adjustment: Option<Adjustment>,
     controls: Controls,
     baseline: Baseline,
     anticipation: u32,
@@ -195,7 +210,7 @@ pub(crate) fn run(values: &[f64], request: Request) -> Result<Evidence, String> 
     let result = if columns == 1 {
         did::event_study(&panel,controls,baseline,anticipation,window)
     } else {
-        let adjusted = did::Adjusted::new(&panel, keep.iter().map(|&i| (observations[i].unit, observations[i].period, (1..columns).map(|j| values[j*rows+i]).collect())).collect()).map_err(problem)?;
+        let adjusted = did::Adjusted::new_with_method(&panel, keep.iter().map(|&i| (observations[i].unit, observations[i].period, (1..columns).map(|j| values[j*rows+i]).collect())).collect(), spec.adjustment.unwrap_or(Adjustment::DoublyRobust).method()).map_err(problem)?;
         adjusted.event_study(controls,baseline,anticipation,window)
     }.map_err(problem)?;
     let labels: BTreeMap<_,_> = cluster_by_unit.values().cloned().collect::<BTreeSet<_>>().into_iter().enumerate().map(|(i,label)| (label,i as u64)).collect();

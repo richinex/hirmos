@@ -1,6 +1,5 @@
 import { RunActions } from '@/components/ui/RunActions'
 import {CountRegressionPanel} from './CountRegressionPanel'
-import {PanelRegressionPanel} from './PanelRegressionPanel'
 import { useWorkflow } from '@/components/WorkflowProvider'
 import { useTimeSeriesDraft } from './useTimeSeriesDraft'
 import type { LongRunDraft, TimeSeriesDraft } from '@/domain/timeSeriesDraft'
@@ -157,16 +156,7 @@ function LongRunModel({ model, selector, ...props }: Props & { readonly model: M
 
 export function TimeSeriesPanel(props:Omit<Props,'prepared'>&{readonly prepared:PreparedDatasetArtifact}) {
   if(props.prepared.kind==='prepared-time-series') return <RegularTimeSeriesPanel {...props} prepared={props.prepared}/>
-  return <PanelAnalysis {...props}/>
-}
-function PanelAnalysis(props:Omit<Props,'prepared'>&{readonly prepared:PreparedDatasetArtifact}){
-  const analysis=useTimeSeriesDraft(props.prepared.id,s=>s.analysis),change=useWorkflow(s=>s.changeTimeSeries)
-  const [busy,setBusy]=useState(false)
-  const report=props.onActivity
-  const onActivity=useCallback((activity:RunActivity|null)=>{setBusy(activity!==null);report?.(activity)},[report])
-  const selector=props.prepared.kind==='prepared-panel'?<SegmentedControl variant="line" size="sm" wrap ariaLabel="Panel analysis type" disabled={busy} value={analysis==='regression'?'regression':'panel-regression'} options={[{value:'regression',label:'Count regression'},{value:'panel-regression',label:'Regression designs'}]} onChange={analysis=>change(props.prepared.id,{type:'analysis',analysis})}/>:undefined
-  if(props.prepared.kind==='prepared-panel'&&analysis==='regression')return <CountRegressionPanel {...props} selector={selector} onActivity={onActivity}/>
-  return <PanelRegressionPanel {...props} selector={selector} onActivity={onActivity}/>
+  return <CountRegressionPanel {...props}/>
 }
 function RegularTimeSeriesPanel(props: Props) {
   const analysis = useTimeSeriesDraft(props.prepared.id, state => state.analysis)

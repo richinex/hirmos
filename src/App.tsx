@@ -46,6 +46,7 @@ import {
   type SelectedSource,
 } from '@/domain/workflow'
 import { identificationAllowsEstimation } from '@/domain/study'
+import { isRegressionDesignRun } from '@/domain/timeSeries'
 import {
   type DiscoveryEvent,
 } from '@/domain/discovery'
@@ -59,7 +60,7 @@ const loadSurvivalPanel = () => import('@/components/survival/SurvivalPanel')
 const loadRootCausePanel = () => import('@/components/root-cause/RootCausePanel')
 const loadTimeSeriesPanel = () => import('@/components/time-series/TimeSeriesPanel')
 const loadStudyDesignPanel = () => import('@/components/study/StudyDesignPanel')
-const loadEstimationPanel = () => import('@/components/estimation/EstimationPanel')
+const loadEstimationPanel = () => import('@/components/estimation/EstimationWorkspace')
 const loadSensitivityPanel = () => import('@/components/sensitivity/SensitivityPanel')
 const loadCounterfactualPanel = () => import('@/components/counterfactual/CounterfactualPanel')
 const loadResultsPanel = () => import('@/components/results/ResultsPanel')
@@ -93,7 +94,7 @@ const TimeSeriesPanel = lazy(async () => ({ default: (await loadTimeSeriesPanel(
 
 const StudyDesignPanel = lazy(async () => ({ default: (await loadStudyDesignPanel()).StudyDesignPanel }))
 
-const EstimationPanel = lazy(async () => ({ default: (await loadEstimationPanel()).EstimationPanel }))
+const EstimationPanel = lazy(async () => ({ default: (await loadEstimationPanel()).EstimationWorkspace }))
 
 const SensitivityPanel = lazy(async () => ({ default: (await loadSensitivityPanel()).SensitivityPanel }))
 
@@ -479,11 +480,11 @@ function App() {
     if (chapter === 'data') return project !== null
     if (chapter === 'survival') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'root-cause') return workflow.kind === 'profiled' && workflow.prepared !== null
-    if (chapter === 'time-series') return workflow.kind === 'profiled' && workflow.prepared!==null
+    if (chapter === 'time-series') return workflow.kind === 'profiled' && workflow.prepared!==null && workflow.prepared.kind !== 'prepared-cross-section'
     if (chapter === 'discovery') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'dag') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'study') return validatedDag
-    if (chapter === 'estimation') return identifiedStudy
+    if (chapter === 'estimation') return workflow.kind === 'profiled' && workflow.prepared !== null
     if (chapter === 'sensitivity') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'counterfactual') return workflow.kind === 'profiled' && workflow.estimationRuns.length > 0
     if (chapter === 'results') return workflow.kind === 'profiled' && (causalModelRunCount(workflow.rootCause) > 0 || workflow.estimationRuns.length > 0 || workflow.survivalRuns.length > 0 || workflow.timeSeriesRuns.length > 0 || workflow.countSeriesModels.length > 0)
@@ -495,7 +496,7 @@ function App() {
     switch (chapter) {
       case 'projects': return project === null ? 'not-started' : 'done'
       case 'data': return project === null ? 'locked' : prepared ? 'done' : 'in-progress'
-      case 'time-series': return workflow.kind !== 'profiled' || workflow.prepared===null ? 'locked' : workflow.timeSeriesRuns.length + workflow.countSeriesModels.length > 0 ? 'done' : 'not-started'
+      case 'time-series': return workflow.kind !== 'profiled' || workflow.prepared===null || workflow.prepared.kind === 'prepared-cross-section' ? 'locked' : workflow.timeSeriesRuns.some(run => !isRegressionDesignRun(run)) || workflow.countSeriesModels.length > 0 ? 'done' : 'not-started'
       case 'survival': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
         : workflow.survivalRuns.length > 0 ? 'done' : 'not-started'
@@ -509,9 +510,9 @@ function App() {
       case 'study': return !validatedDag || workflow.kind !== 'profiled'
         ? 'locked'
         : identifiedStudy ? 'done' : workflow.studies.length > 0 ? 'refused' : 'not-started'
-      case 'estimation': return !identifiedStudy || workflow.kind !== 'profiled'
+      case 'estimation': return !prepared || workflow.kind !== 'profiled'
         ? 'locked'
-        : workflow.estimationRuns.length > 0 ? 'done' : 'not-started'
+        : workflow.estimationRuns.length > 0 || workflow.timeSeriesRuns.some(isRegressionDesignRun) ? 'done' : 'not-started'
       case 'sensitivity': return workflow.kind !== 'profiled' || workflow.estimationRuns.length === 0
         ? 'locked'
         : workflow.sensitivityRuns.length > 0 ? 'done' : 'not-started'
@@ -1049,6 +1050,9 @@ function App() {
                         studies={workflow.studies}
                         identifications={workflow.identifications}
                         runs={workflow.estimationRuns}
+                        designRuns={workflow.timeSeriesRuns}
+                        onDesignRun={(run) => dispatch({ type: 'time-series-run-created', run })}
+                        onDeleteDesignRun={(run) => dispatch({ type: 'time-series-run-deleted', run })}
                         sensitivityRuns={workflow.sensitivityRuns}
                         onRun={(run) => dispatch({ type: 'estimation-run-created', run })}
                         onDeleteRun={(run) => dispatch({ type: 'estimation-run-deleted', run })}
@@ -1098,7 +1102,7 @@ function App() {
                     <ChapterBoundary chapter="Time-series analysis">
                     <Suspense fallback={<ChapterSkeleton label="Loading time-series analysis…" />}>
                       <TimeSeriesPanel key={workflow.prepared.id} source={workflow.source} profile={workflow.profile} prepared={workflow.prepared}
-                        runs={workflow.timeSeriesRuns} counts={workflow.countSeriesModels}
+                        runs={workflow.timeSeriesRuns.filter(run => !isRegressionDesignRun(run))} counts={workflow.countSeriesModels}
                         onRun={(run) => dispatch({ type: 'time-series-run-created', run })}
                         onDeleteRun={(run) => dispatch({ type: 'time-series-run-deleted', run })}
                         onCount={(artifact) => dispatch({ type: 'count-series-model-created', artifact })}

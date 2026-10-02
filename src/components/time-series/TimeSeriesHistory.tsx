@@ -11,13 +11,14 @@ import { TimeSeriesRunResult } from './TimeSeriesRunResult'
 
 type Entry = CountSeriesModelArtifact | TimeSeriesRun
 
-export function TimeSeriesHistory<T extends Entry>({ entries, onDelete }: {
+export function TimeSeriesHistory<T extends Entry>({ entries, onDelete, label='Time-series runs' }: {
+  readonly label?: string
   readonly entries: readonly T[]
   readonly onDelete: (entry: T) => void
 }) {
   const [pending, setPending] = useState<T | null>(null)
   return <>
-    <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label="Time-series runs">
+    <ul className="m-0 list-none divide-y divide-hair p-0 text-body" aria-label={label}>
       {entries.length === 0 && <li className="px-3 py-2 text-faint">No runs yet.</li>}
       {[...entries].reverse().map((entry) => <li key={entry.id} className="flex items-start gap-2 px-3 py-2">
         <details className="min-w-0 flex-1">
@@ -27,6 +28,6 @@ export function TimeSeriesHistory<T extends Entry>({ entries, onDelete }: {
         <button type="button" className={iconControl('quiet', 'shrink-0')} aria-label={`Delete ${entry.kind === 'count-series-model' ? 'count-model run' : timeSeriesRunLabel(entry)}`} onClick={() => setPending(entry)}><Icon name="delete" size={16} /></button>
       </li>)}
     </ul>
-    <ConfirmDialog open={pending !== null} title="Delete time-series run?" message="This removes the saved result. The prepared data and other runs are unchanged." confirmLabel="Delete run" danger onClose={() => setPending(null)} onConfirm={() => { if (pending !== null) onDelete(pending); setPending(null) }} />
+    <ConfirmDialog open={pending !== null} title={label==='Time-series runs'?'Delete time-series run?':'Delete regression-design run?'} message="This removes the saved result. The prepared data and other runs are unchanged." confirmLabel="Delete run" danger onClose={() => setPending(null)} onConfirm={() => { if (pending !== null) onDelete(pending); setPending(null) }} />
   </>
 }

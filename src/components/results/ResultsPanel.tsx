@@ -2,7 +2,7 @@ import { ChapterHeading } from '@/components/ui/ChapterHeading'
 import { useMemo, useState } from 'react'
 import { TimeSeriesRunResult } from '@/components/time-series/TimeSeriesRunResult'
 import { CountSeriesRecord } from '@/components/time-series/CountSeriesCard'
-import type { TimeSeriesRun } from '@/domain/timeSeries'
+import { isRegressionDesignRun, type TimeSeriesRun } from '@/domain/timeSeries'
 import type { CountSeriesModelArtifact } from '@/domain/countSeries'
 import { WorkbenchLayout } from '@/components/shell/WorkbenchLayout'
 import { EstimateHeadline } from '@/components/results/EstimateHeadline'
@@ -191,6 +191,7 @@ function Manifest({ manifest, stepLabel }: { readonly manifest: ResultManifest; 
 type ResultView =
   | { readonly kind: 'root-cause' }
   | { readonly kind: 'time-series' }
+  | { readonly kind: 'regression-designs' }
   | { readonly kind: 'estimation'; readonly selected: EstimationRunId | null; readonly compareWith: EstimationRunId | null }
   | { readonly kind: 'survival'; readonly selected: SurvivalRunId | null }
 
@@ -199,9 +200,12 @@ const initialResultView = (
   survivalRuns: readonly SurvivalRunArtifact[],
   hasTimeSeries: boolean,
   hasRootCause: boolean,
+  hasDesigns: boolean,
 ): ResultView => estimationRuns.length > 0
   ? { kind: 'estimation', selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }
-  : survivalRuns.length > 0 ? { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null } : hasTimeSeries ? { kind: 'time-series' } : hasRootCause ? { kind: 'root-cause' } : { kind: 'survival', selected: null }
+  : survivalRuns.length > 0 ? { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null }
+  : hasDesigns ? { kind: 'regression-designs' } : hasTimeSeries ? { kind: 'time-series' }
+  : hasRootCause ? { kind: 'root-cause' } : { kind: 'survival', selected: null }
 
 const availableResultView = (
   view: ResultView,
@@ -209,34 +213,25 @@ const availableResultView = (
   survivalRuns: readonly SurvivalRunArtifact[],
   hasTimeSeries: boolean,
   hasRootCause: boolean,
+  hasDesigns: boolean,
 ): ResultView => {
-  if (view.kind === 'root-cause') return hasRootCause ? view : initialResultView(estimationRuns, survivalRuns, hasTimeSeries, false)
-  if (view.kind === 'time-series') return hasTimeSeries ? view : initialResultView(estimationRuns, survivalRuns, false, hasRootCause)
-  if (estimationRuns.length + survivalRuns.length === 0 && hasRootCause) return { kind: 'root-cause' }
-  if (estimationRuns.length + survivalRuns.length === 0 && hasTimeSeries) return { kind: 'time-series' }
+  const available = initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns)
   switch (view.kind) {
+    case 'root-cause': return hasRootCause ? view : available
+    case 'time-series': return hasTimeSeries ? view : available
+    case 'regression-designs': return hasDesigns ? view : available
     case 'estimation': {
-      if (estimationRuns.length === 0 && survivalRuns.length > 0) {
-        return { kind: 'survival', selected: survivalRuns.at(-1)?.id ?? null }
-      }
-      const selected = estimationRuns.some((run) => run.id === view.selected)
-        ? view.selected
-        : estimationRuns.at(-1)?.id ?? null
-      const compareWith = estimationRuns.some((run) => run.id === view.compareWith && run.id !== selected)
-        ? view.compareWith
-        : null
+      if (estimationRuns.length === 0) return available
+      const selected = estimationRuns.some(run => run.id === view.selected)
+        ? view.selected : estimationRuns.at(-1)?.id ?? null
+      const compareWith = estimationRuns.some(run => run.id === view.compareWith && run.id !== selected)
+        ? view.compareWith : null
       return { kind: view.kind, selected, compareWith }
     }
-    case 'survival': {
-      if (survivalRuns.length === 0 && estimationRuns.length > 0) {
-        return { kind: 'estimation', selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }
-      }
-      return {
-        kind: view.kind,
-        selected: survivalRuns.some((run) => run.id === view.selected)
-          ? view.selected
-          : survivalRuns.at(-1)?.id ?? null,
-      }
+    case 'survival': return survivalRuns.length === 0 ? available : {
+      kind: view.kind,
+      selected: survivalRuns.some(run => run.id === view.selected)
+        ? view.selected : survivalRuns.at(-1)?.id ?? null,
     }
     default: return assertNever(view)
   }
@@ -244,6 +239,7 @@ const availableResultView = (
 
 const resultIntroduction = (view: ResultView): string => {
   switch (view.kind) {
+    case 'regression-designs': return 'Review regression event-time coefficients, interaction contrasts and the comparisons underlying a two-way fixed-effects coefficient. Their causal interpretation depends on the study design and identifying assumptions.'
     case 'root-cause': return 'Review the attributed changes, uncertainty and assumed causal model. Anomaly scores describe how unusual an observation is; contributions to a mean change use the target variable’s units.'
     case 'time-series': return 'Review count-model scans and long-run relationships fitted to the prepared series. These results do not by themselves estimate the effect of an intervention.'
     case 'estimation': return 'A causal result must be interpreted with its causal question, identification strategy, estimate, uncertainty, diagnostics, and assumptions. In this section, examine those parts together, compare runs when the data or analysis choices differ, and export the analysis record.'
@@ -270,10 +266,13 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   readonly gcmEffects: readonly GcmEffectsRun[]
   readonly gcmInfluences: readonly GcmInfluenceRun[]
 }) {
-  const hasTimeSeries = timeSeriesRuns.length + countSeriesModels.length > 0
+  const designRuns = timeSeriesRuns.filter(isRegressionDesignRun)
+  const temporalRuns = timeSeriesRuns.filter(run => !isRegressionDesignRun(run))
+  const hasDesigns = designRuns.length > 0
+  const hasTimeSeries = temporalRuns.length + countSeriesModels.length > 0
   const hasRootCause = rootCauseRuns.length + gcmEffects.length + gcmInfluences.length > 0
-  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause))
-  const activeView = availableResultView(view, estimationRuns, survivalRuns, hasTimeSeries, hasRootCause)
+  const [view, setView] = useState<ResultView>(() => initialResultView(estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns))
+  const activeView = availableResultView(view, estimationRuns, survivalRuns, hasTimeSeries, hasRootCause, hasDesigns)
   const stepLabel = prepared.kind === 'prepared-time-series' ? frequencyUnit(prepared.sampling.frequency) : prepared.kind === 'prepared-panel' ? 'panel row' : 'row'
   const inputs = useMemo(() => ({ source, profile, prepared, stationarity, documents, studies, identifications, sensitivityRuns, counterfactualRuns }), [counterfactualRuns, documents, identifications, prepared, profile, sensitivityRuns, source, stationarity, studies])
   const studyOf = (candidate: EstimationRunArtifact) => studies.find((study) => study.id === candidate.study)
@@ -282,6 +281,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
     switch (kind) {
       case 'root-cause': setView({ kind }); return
       case 'time-series': setView({ kind }); return
+      case 'regression-designs': setView({ kind }); return
       case 'estimation': setView({ kind, selected: estimationRuns.at(-1)?.id ?? null, compareWith: null }); return
       case 'survival': setView({ kind, selected: survivalRuns.at(-1)?.id ?? null }); return
       default: return assertNever(kind)
@@ -295,7 +295,8 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
         {[...gcmEffects].reverse().map(run => <GcmEffectResult key={run.id} run={run} />)}
         {[...gcmInfluences].reverse().map(run => <GcmInfluenceResult key={run.id} run={run} />)}
       </div>
-      case 'time-series': return <><div className="space-y-4">{[...timeSeriesRuns].reverse().map((run) => <TimeSeriesRunResult key={run.id} run={run} />)}</div><ul className="list-none space-y-4 p-0">{[...countSeriesModels].reverse().map((artifact) => <CountSeriesRecord key={artifact.id} artifact={artifact} open />)}</ul></>
+      case 'time-series': return <><div className="space-y-4">{[...temporalRuns].reverse().map((run) => <TimeSeriesRunResult key={run.id} run={run} />)}</div><ul className="list-none space-y-4 p-0">{[...countSeriesModels].reverse().map((artifact) => <CountSeriesRecord key={artifact.id} artifact={artifact} open />)}</ul></>
+      case 'regression-designs': return <div className="space-y-4">{[...designRuns].reverse().map(run => <TimeSeriesRunResult key={run.id} run={run}/>)}</div>
       case 'estimation': {
         const run = estimationRuns.find((candidate) => candidate.id === activeView.selected) ?? null
         const other = estimationRuns.find((candidate) => candidate.id === activeView.compareWith) ?? null
@@ -329,6 +330,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
     switch (activeView.kind) {
       case 'root-cause': return undefined
       case 'time-series': return undefined
+      case 'regression-designs': return undefined
       case 'estimation': return {
         title: `Estimates (${estimationRuns.length})`,
         body: <div className="figure-strip overflow-x-auto"><table className={table} aria-label="Estimates"><thead><tr><th className={th()}>Target</th><th className={th()}>Estimator</th><th className={th('text-right')}>Estimate</th><th className={th()}>Graph</th><th className={th()}>Created</th></tr></thead><tbody>{[...estimationRuns].reverse().map((candidate) => { const study = studyOf(candidate); const effect = candidate.estimate.effect; return <tr key={candidate.id} className={tr(candidate.id === activeView.selected ? 'selected' : 'action')} onClick={() => setView({ ...activeView, selected: candidate.id })}><td className={td('text-ink')}>{study === undefined ? candidate.method : estimandSentence(study)}</td><td className={td('text-muted')}>{describeEstimator(candidate.configuration.kind)}</td><td className={td(num('whitespace-nowrap text-right text-ink'))}>{formatStatistic('raw', effect.kind === 'path' ? effect.aggregate.average : headlineValue(effect)).text}</td><td className={td('text-muted')}>{study?.dagName ?? '—'}</td><td className={td(num('whitespace-nowrap text-muted'))}>{formatTime(candidate.createdAt)}</td></tr> })}</tbody></table></div>,
@@ -346,6 +348,7 @@ export function ResultsPanel({ source, profile, prepared, stationarity, document
   const families: { value: ResultView['kind']; label: string }[] = [
     ...(hasRootCause ? [{ value: 'root-cause' as const, label: 'Causal model analysis' }] : []),
     ...(estimationRuns.length > 0 ? [{ value: 'estimation' as const, label: 'Causal estimates' }] : []),
+    ...(hasDesigns ? [{ value: 'regression-designs' as const, label: 'Regression designs' }] : []),
     ...(hasTimeSeries ? [{ value: 'time-series' as const, label: 'Time series' }] : []),
     ...(survivalRuns.length > 0 ? [{ value: 'survival' as const, label: 'Survival' }] : []),
   ]

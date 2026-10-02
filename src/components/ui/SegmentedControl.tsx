@@ -9,7 +9,7 @@ import { ScrollArrow } from './ScrollArrow'
  * by `wrap`.
  *
  * `track`, the default, is a setting among settings: a track pressed into the panel, a knob lit from above
- * sitting on it, and a hairline between neighbouring options that the knob is not beside. Labels retain
+ * sitting on it, with spacing rather than dividers between options. Labels retain
  * their weight when selection changes. It sits level with the fields around it at the `sm` and `md` sizes.
  * `line` is a view switch: the labels on a hairline, a 2px rule of ink under the chosen one, and a pale
  * surface under the option the mouse is over. Use `line` where the choice changes what the stage shows,
@@ -333,22 +333,6 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
     />
   )
 
-  const dividers = form !== 'track' || frame !== 'well' || layout === null ? null : layout.frames.slice(1).map((following, offset) => {
-    const preceding = layout.frames[offset]
-    const option = options[offset + 1]
-    if (preceding === undefined || option === undefined || Math.abs(preceding.top - following.top) > 1) return null
-    const height = Math.round(preceding.height * 0.46)
-    const beside = displayedIndex === offset || displayedIndex === offset + 1
-    return (
-      <span
-        key={option.value}
-        aria-hidden
-        className={cn('pointer-events-none absolute w-px bg-hair transition-opacity duration-(--motion-fast)', beside ? 'opacity-0' : 'opacity-100')}
-        style={{ left: (preceding.left + preceding.width + following.left) / 2 - 0.5, top: preceding.top + (preceding.height - height) / 2, height }}
-      />
-    )
-  })
-
   const hovered = form === 'line' && hover !== null ? layout?.frames[hover.index] : undefined
   const wash = hovered === undefined || hover === null ? null : (
     <span
@@ -404,7 +388,6 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
       )}
     >
       {knobElement}
-      {dividers}
       {wash}
       {options.map((option, index) => {
         const checked = index === checkedIndex
@@ -425,7 +408,8 @@ export function SegmentedControl<V extends string>({ value, onChange, options, a
               form === 'line' ? 'shrink-0 rounded-sm' : 'rounded-md',
               SIZE[form][size],
               fill && 'min-w-0 flex-1 basis-0 whitespace-normal text-center',
-              narrowFill && '@max-md/panel:min-w-0 @max-md/panel:flex-1 @max-md/panel:basis-0 @max-md/panel:whitespace-normal @max-md/panel:text-center',
+              // Equal widths while they fit; no option narrower than its own label, so a long set wraps to a second row.
+              narrowFill && '@max-md/panel:min-w-max @max-md/panel:flex-1 @max-md/panel:basis-0 @max-md/panel:text-center',
               form !== 'wrap' && 'font-medium',
               wrap && CHIP_LAYERS,
               !enabled
